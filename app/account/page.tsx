@@ -1,0 +1,213 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { getCurrentUser, signOut } from "@/lib/auth"
+import { supabase } from "@/lib/supabase"
+import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut } from "lucide-react"
+
+export default function AccountPage() {
+  const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
+  const [usage, setUsage] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        const currentUser = await getCurrentUser()
+        if (!currentUser) {
+          window.location.href = "/login"
+          return
+        }
+
+        setUser(currentUser)
+
+        // Fetch profile data
+        const { data: profileData } = await supabase.from("profiles").select("*").eq("id", currentUser.id).single()
+
+        setProfile(profileData)
+
+        // Fetch usage data
+        const { data: usageData } = await supabase
+          .from("profile_quota")
+          .select("*")
+          .eq("user_id", currentUser.id)
+          .single()
+
+        setUsage(usageData)
+      } catch (error) {
+        console.error("Error loading user data:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadUserData()
+  }, [])
+
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+      window.location.href = "/"
+    } catch (error) {
+      console.error("Sign out error:", error)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff5733]"></div>
+      </div>
+    )
+  }
+
+  const isPro = profile?.subscription_tier === "pro"
+  const usedSessions = usage?.sessions_used || 0
+  const maxSessions = isPro ? 1000 : 10
+  const usagePercentage = (usedSessions / maxSessions) * 100
+
+  return (
+    <main className="min-h-screen bg-black">
+      <Header />
+
+      <div className="pt-24 pb-16">
+        <div className="container mx-auto px-4 max-w-4xl">
+          {/* Profile Header */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-4">
+                <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center">
+                  <User className="h-8 w-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-white">{user?.user_metadata?.full_name || "Developer"}</h1>
+                  <p className="text-gray-400">{user?.email}</p>
+                </div>
+              </div>
+              <Button
+                onClick={handleSignOut}
+                variant="outline"
+                className="border-gray-600 text-white hover:bg-gray-800 bg-transparent"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign Out
+              </Button>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <Badge
+                className={
+                  isPro
+                    ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
+                    : "bg-gray-500/20 text-gray-400 border-gray-500/30"
+                }
+              >
+                {isPro ? (
+                  <>
+                    <Crown className="mr-1 h-3 w-3" />
+                    Pro Plan
+                  </>
+                ) : (
+                  "Free Plan"
+                )}
+              </Badge>
+              <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Active</Badge>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            {/* Usage Stats */}
+            <Card className="bg-gray-900/50 border-gray-700">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center">
+                  <BarChart3 className="mr-2 h-5 w-5" />
+                  Usage This Month
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-gray-400">Interview Sessions</span>
+                      <span className="text-white">
+                        {usedSessions} / {maxSessions}
+                      </span>
+                    </div>
+                    <Progress value={usagePercentage} className="h-2" />
+                  </div>
+
+                  {!isPro && usagePercentage > 80 && (
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
+                      <p className="text-yellow-400 text-sm">
+                        You're running low on sessions. Upgrade to Pro for unlimited access!
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quick Actions */}
+            <Card className="bg-gray-900/50 border-gray-700">
+              <CardHeader>
+                <CardTitle className="text-white">Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button
+                  className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80"
+                  onClick={() => (window.location.href = "vscode://nikayel.MockMate")}
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Open in VS Code
+                </Button>
+
+                {!isPro && (
+                  <Button
+                    className="w-full bg-yellow-600 hover:bg-yellow-700"
+                    onClick={() => (window.location.href = "/upgrade")}
+                  >
+                    <Crown className="mr-2 h-4 w-4" />
+                    Upgrade to Pro
+                  </Button>
+                )}
+
+                <Button
+                  variant="outline"
+                  className="w-full border-gray-600 text-white hover:bg-gray-800 bg-transparent"
+                  onClick={() => (window.location.href = "/docs")}
+                >
+                  View Documentation
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Recent Activity */}
+          <Card className="bg-gray-900/50 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center">
+                <Calendar className="mr-2 h-5 w-5" />
+                Recent Activity
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <p className="text-gray-400">No recent interview sessions</p>
+                <p className="text-gray-500 text-sm mt-2">Start practicing in VS Code to see your activity here</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <Footer />
+    </main>
+  )
+}

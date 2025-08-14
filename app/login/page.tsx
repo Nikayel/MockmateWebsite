@@ -1,11 +1,29 @@
+"use client"
+
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Github, Shield, FolderSyncIcon as Sync, BarChart3, Star, ArrowRight } from "lucide-react"
+import { signInWithGitHub } from "@/lib/auth"
+import { useState } from "react"
 
 export default function LoginPage() {
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleGitHubLogin = async () => {
+    try {
+      setIsLoading(true)
+      await signInWithGitHub()
+    } catch (error) {
+      console.error("Login failed:", error)
+      alert("Login failed. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <main className="min-h-screen bg-black">
       <Header />
@@ -40,9 +58,13 @@ export default function LoginPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* GitHub Login Button */}
-                <Button className="w-full bg-gray-800 hover:bg-gray-700 text-white py-4 text-lg flex items-center justify-center space-x-3">
+                <Button
+                  onClick={handleGitHubLogin}
+                  disabled={isLoading}
+                  className="w-full bg-gray-800 hover:bg-gray-700 text-white py-4 text-lg flex items-center justify-center space-x-3"
+                >
                   <Github className="h-6 w-6" />
-                  <span>Continue with GitHub</span>
+                  <span>{isLoading ? "Signing in..." : "Continue with GitHub"}</span>
                 </Button>
 
                 <div className="relative">
@@ -198,9 +220,14 @@ export default function LoginPage() {
           <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
             Join thousands of developers who are already using MockMate to ace their technical interviews.
           </p>
-          <Button size="lg" className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-4 text-lg">
+          <Button
+            onClick={handleGitHubLogin}
+            disabled={isLoading}
+            size="lg"
+            className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-4 text-lg"
+          >
             <Github className="mr-2 h-5 w-5" />
-            Sign In with GitHub
+            {isLoading ? "Signing in..." : "Sign In with GitHub"}
             <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
         </div>
