@@ -145,6 +145,16 @@ When users upgrade on the website, their subscription status is immediately avai
 
 MIT
 
+## Documentation
+
+Full documentation is available in the [`docs/`](./docs/) directory:
+
+- [Getting Started](./docs/GETTING_STARTED.md)
+- [Architecture](./docs/ARCHITECTURE.md)
+- [API Reference](./docs/API.md)
+- [Pricing](./docs/PRICING.md)
+- [Deployment](./docs/DEPLOYMENT.md)
+
 ## Support
 
 For issues or questions, open an issue on GitHub or email support@mockmate.dev
