@@ -6,11 +6,13 @@ import { generateVSCodeDeepLink } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle, ExternalLink, Download } from "lucide-react"
+import { User } from "@/lib/types"
 
 export default function AuthCallback() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading")
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [deepLink, setDeepLink] = useState<string>("")
+  const [redirectUrl, setRedirectUrl] = useState<string>("")
 
   useEffect(() => {
     const handleAuthCallback = async () => {
@@ -23,6 +25,14 @@ export default function AuthCallback() {
           setUser(data.session.user)
           const vscodeLink = generateVSCodeDeepLink(data.session.access_token)
           setDeepLink(vscodeLink)
+
+          // Check for redirect in localStorage
+          const savedRedirect = localStorage.getItem("auth_redirect")
+          if (savedRedirect) {
+            setRedirectUrl(`/${savedRedirect}`)
+            localStorage.removeItem("auth_redirect")
+          }
+
           setStatus("success")
         } else {
           setStatus("error")
@@ -75,10 +85,19 @@ export default function AuthCallback() {
           <p className="text-gray-300 text-center">Welcome {user?.user_metadata?.full_name || user?.email}!</p>
 
           <div className="space-y-3">
-            <Button onClick={handleOpenVSCode} className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80">
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Open MockMate in VS Code
-            </Button>
+            {redirectUrl ? (
+              <Button
+                onClick={() => (window.location.href = redirectUrl)}
+                className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80"
+              >
+                Continue to {redirectUrl.replace("/", "")}
+              </Button>
+            ) : (
+              <Button onClick={handleOpenVSCode} className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80">
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Open MockMate in VS Code
+              </Button>
+            )}
 
             <Button
               onClick={() => (window.location.href = "/account")}
