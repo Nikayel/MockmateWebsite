@@ -75,9 +75,13 @@ export default function DemoPage() {
   const [testSummary, setTestSummary] = useState({ total: 0, passed: 0, failed: 0, passRate: 0 })
   const [startTime, setStartTime] = useState<number | null>(null)
   const [elapsedTime, setElapsedTime] = useState(0)
+  const [workspaceContext, setWorkspaceContext] = useState<Array<{ path: string; content: string }>>([])
+  const [lastCodeHash, setLastCodeHash] = useState<string>("")
+  const [proactiveTimer, setProactiveTimer] = useState<NodeJS.Timeout | null>(null)
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const interviewerEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Check demo access on component mount
   useEffect(() => {
@@ -107,6 +111,102 @@ export default function DemoPage() {
   useEffect(() => {
     interviewerEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [interviewerMessages])
+
+  // Proactive interviewer: Watch for code changes and jump in
+  useEffect(() => {
+    if (!isInterviewStarted || showFeedback) return
+
+    // Simple hash of code to detect changes
+    const codeHash = code.trim().replace(/\s+/g, " ")
+    
+    // If code changed significantly and user has been typing
+    if (codeHash !== lastCodeHash && codeHash.length > 50 && lastCodeHash.length > 0) {
+      // Clear existing timer
+      if (proactiveTimer) {
+        clearTimeout(proactiveTimer)
+        setProactiveTimer(null)
+      }
+
+      // Set new timer - interviewer jumps in after 10 seconds of inactivity
+      const timer = setTimeout(() => {
+        triggerProactiveInterviewer()
+      }, 10000) // 10 seconds after last code change
+
+      setProactiveTimer(timer)
+      setLastCodeHash(codeHash)
+    }
+
+    return () => {
+      if (proactiveTimer) {
+        clearTimeout(proactiveTimer)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, isInterviewStarted, showFeedback, lastCodeHash])
+
+  const triggerProactiveInterviewer = async () => {
+    if (isLoadingInterviewer) return
+
+    setIsLoadingInterviewer(true)
+    try {
+      // Get user context for personalized AI responses
+      const userContext = getUserContext()
+
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "", // Empty for proactive mode
+          context: interviewerMessages,
+          role: "interviewer",
+          userContext: userContext,
+          workspaceContext: workspaceContext,
+          currentCode: code,
+          isProactive: true,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.reply) {
+        setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+      }
+    } catch (error) {
+      console.error("Proactive interviewer error:", error)
+    } finally {
+      setIsLoadingInterviewer(false)
+    }
+  }
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files || files.length === 0) return
+
+    const newFiles: Array<{ path: string; content: string }> = []
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      // Only process text files
+      if (file.type.startsWith("text/") || file.name.match(/\.(js|ts|jsx|tsx|py|java|cpp|c|h|json|md|txt)$/i)) {
+        try {
+          const content = await file.text()
+          // Limit file size to 50KB to avoid token limits
+          if (content.length < 50000) {
+            newFiles.push({
+              path: file.name,
+              content: content,
+            })
+          }
+        } catch (error) {
+          console.error(`Error reading file ${file.name}:`, error)
+        }
+      }
+    }
+
+    if (newFiles.length > 0) {
+      setWorkspaceContext((prev) => [...prev, ...newFiles])
+    }
+  }
 
   const startInterview = () => {
     // Check if demo has already been used
@@ -149,6 +249,11 @@ export default function DemoPage() {
     setTestSummary({ total: 0, passed: 0, failed: 0, passRate: 0 })
     setStartTime(null)
     setElapsedTime(0)
+    setLastCodeHash("")
+    if (proactiveTimer) {
+      clearTimeout(proactiveTimer)
+      setProactiveTimer(null)
+    }
   }
 
   const handleSendMessage = async (isInterviewer = false) => {
@@ -176,6 +281,9 @@ export default function DemoPage() {
             context: messages,
             role: isInterviewer ? "interviewer" : "partner",
             userContext: userContext,
+            workspaceContext: workspaceContext,
+            currentCode: code,
+            isProactive: false,
           }),
         })
 
@@ -272,39 +380,93 @@ export default function DemoPage() {
         <div className="container mx-auto px-4">
           <div className="max-w-7xl mx-auto">
             {/* Controls */}
-            <div className="flex justify-center items-center space-x-4 mb-8">
-              {!isInterviewStarted ? (
-                <Button
-                  onClick={startInterview}
-                  className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-4 text-lg"
-                >
-                  <Play className="mr-2 h-6 w-6" />
-                  Start Mock Interview
-                </Button>
-              ) : (
-                <>
-                  <div className="flex items-center space-x-2 text-white bg-gray-800 px-6 py-3 rounded-lg">
-                    <Clock className="h-5 w-5 text-[#ff5733]" />
-                    <span className="text-xl font-mono">{formatTime(elapsedTime)}</span>
-                  </div>
+            <div className="flex flex-col items-center space-y-4 mb-8">
+              <div className="flex justify-center items-center space-x-4">
+                {!isInterviewStarted ? (
                   <Button
-                    onClick={runCode}
-                    disabled={isRunningTests || showFeedback}
-                    className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 text-lg"
+                    onClick={startInterview}
+                    className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-4 text-lg"
                   >
-                    <PlayCircle className="mr-2 h-6 w-6" />
-                    {isRunningTests ? "Running..." : "Run Tests"}
+                    <Play className="mr-2 h-6 w-6" />
+                    Start Mock Interview
                   </Button>
-                </>
+                ) : (
+                  <>
+                    <div className="flex items-center space-x-2 text-white bg-gray-800 px-6 py-3 rounded-lg">
+                      <Clock className="h-5 w-5 text-[#ff5733]" />
+                      <span className="text-xl font-mono">{formatTime(elapsedTime)}</span>
+                    </div>
+                    <Button
+                      onClick={runCode}
+                      disabled={isRunningTests || showFeedback}
+                      className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 text-lg"
+                    >
+                      <PlayCircle className="mr-2 h-6 w-6" />
+                      {isRunningTests ? "Running..." : "Run Tests"}
+                    </Button>
+                  </>
+                )}
+                <Button
+                  onClick={resetInterview}
+                  variant="outline"
+                  className="border-white text-white hover:bg-white hover:text-black bg-transparent px-8 py-4 text-lg"
+                >
+                  <RotateCcw className="mr-2 h-6 w-6" />
+                  Reset
+                </Button>
+              </div>
+
+              {/* Workspace Context Upload */}
+              <div className="flex items-center space-x-4">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept=".js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.h,.json,.md,.txt,text/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  variant="outline"
+                  className="border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent"
+                  size="sm"
+                >
+                  <Code className="mr-2 h-4 w-4" />
+                  Upload Codebase Files
+                </Button>
+                {workspaceContext.length > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <Badge className="bg-green-600/20 text-green-400 border-green-600/30">
+                      {workspaceContext.length} file{workspaceContext.length !== 1 ? "s" : ""} loaded
+                    </Badge>
+                    <Button
+                      onClick={() => setWorkspaceContext([])}
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-400 hover:text-white"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                )}
+              </div>
+              {workspaceContext.length > 0 && (
+                <div className="w-full max-w-4xl">
+                  <div className="bg-gray-800/50 rounded-lg p-3 text-sm">
+                    <p className="text-gray-300 mb-2">
+                      <strong className="text-white">AI Context:</strong> Both AI personas can see your codebase files and current solution code.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {workspaceContext.map((file, idx) => (
+                        <Badge key={idx} className="bg-blue-600/20 text-blue-300 border-blue-600/30 text-xs">
+                          {file.path}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               )}
-              <Button
-                onClick={resetInterview}
-                variant="outline"
-                className="border-white text-white hover:bg-white hover:text-black bg-transparent px-8 py-4 text-lg"
-              >
-                <RotateCcw className="mr-2 h-6 w-6" />
-                Reset
-              </Button>
             </div>
 
             {/* Main Interface */}

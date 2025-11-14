@@ -13,9 +13,10 @@ interface UserContext {
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, context, role, userContext } = await request.json()
+    const { message, context, role, userContext, workspaceContext, currentCode, isProactive } = await request.json()
 
-    if (!message) {
+    // For proactive messages (interviewer jumping in), message might be empty
+    if (!message && !isProactive) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 })
     }
 
@@ -34,11 +35,28 @@ Use this information to personalize your responses and questions appropriately.
 `
       : ""
 
+    // Build workspace context string
+    let workspaceContextStr = ""
+    if (workspaceContext && Array.isArray(workspaceContext) && workspaceContext.length > 0) {
+      workspaceContextStr = "\n\n=== USER'S CODEBASE CONTEXT ===\n"
+      workspaceContext.forEach((file: { path: string; content: string }) => {
+        workspaceContextStr += `\n--- File: ${file.path} ---\n${file.content}\n`
+      })
+      workspaceContextStr += "\n=== END CODEBASE CONTEXT ===\n"
+    }
+
+    // Add current code context
+    let currentCodeContext = ""
+    if (currentCode && currentCode.trim()) {
+      currentCodeContext = `\n\n=== CURRENT SOLUTION CODE ===\n${currentCode}\n=== END CURRENT CODE ===\n`
+    }
+
     // Define system prompts based on role with enhanced context awareness
     const systemPrompts = {
       interviewer: `You are a professional technical interviewer conducting a coding interview.
 ${userContextString}
 Your responsibilities:
+- Actively observe the candidate's code and jump in with relevant questions or comments
 - Ask clarifying questions about the candidate's approach based on their skill level
 - Guide them when they're stuck (without giving away the answer)
 - Discuss time and space complexity
@@ -48,18 +66,31 @@ Your responsibilities:
 - Reference their previous topics if relevant to build continuity
 - Adjust difficulty based on their experience level
 
+IMPORTANT: You have access to the candidate's codebase and their current solution. Use this context to:
+- Comment on their coding style and patterns from their codebase
+- Ask about design decisions based on their existing code
+- Point out inconsistencies or improvements
+- Make the interview feel realistic and contextual
+
 Keep responses concise and conversational, as if in a real interview.`,
 
       partner: `You are an AI coding assistant helping during a technical interview.
 ${userContextString}
 Your responsibilities:
 - Provide hints when the user is stuck, calibrated to their skill level
-- Help debug code issues
-- Suggest optimizations appropriate for their experience
+- Help debug code issues based on their actual code
+- Suggest optimizations specific to their codebase patterns
 - Answer questions about algorithms and data structures
+- Reference their codebase when relevant to provide better help
 - Be supportive and educational
 - Focus on the Two Sum problem
 - Remember their progress and build on previous conversations
+
+IMPORTANT: You have full access to the user's codebase and current solution code. Use this to:
+- Understand their coding style and provide consistent suggestions
+- Reference patterns from their codebase
+- Help debug specific issues in their current code
+- Provide context-aware hints that match their codebase structure
 
 Keep responses brief and actionable.`,
     }
@@ -84,6 +115,24 @@ Keep responses brief and actionable.`,
       })
     }
 
+    // Build the full user message with context
+    let fullUserMessage = ""
+    
+    if (isProactive && role === "interviewer") {
+      // Proactive interviewer message - analyze code and jump in
+      fullUserMessage = `[PROACTIVE MODE] The candidate has been working on their solution. Please review their current code and codebase, then jump in with a relevant comment, question, or observation. Be natural and conversational - like a real interviewer watching their screen.
+
+${workspaceContextStr}${currentCodeContext}
+
+What would you like to say to the candidate right now?`
+    } else {
+      // Regular message
+      fullUserMessage = message
+      if (workspaceContextStr || currentCodeContext) {
+        fullUserMessage += workspaceContextStr + currentCodeContext
+      }
+    }
+
     // Start chat with history
     const chat = model.startChat({
       history: history,
@@ -94,7 +143,7 @@ Keep responses brief and actionable.`,
     })
 
     // Send message and get response
-    const result = await chat.sendMessage(message)
+    const result = await chat.sendMessage(fullUserMessage)
     const response = await result.response
     const reply = response.text()
 
