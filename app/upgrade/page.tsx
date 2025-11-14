@@ -8,9 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { getCurrentUser } from "@/lib/auth"
 import { Check, Crown, Zap, Star, ArrowRight } from "lucide-react"
+import { PRICING_CONFIG } from "@/lib/config"
+import { User } from "@/lib/types"
+import { toast } from "sonner"
 
 export default function UpgradePage() {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -30,10 +33,14 @@ export default function UpgradePage() {
     setLoading(true)
     try {
       // TODO: Implement Stripe/PayPal payment
-      alert("Payment integration coming soon! For now, contact support to upgrade.")
+      toast.info("Payment integration coming soon! For now, please contact support to upgrade.", {
+        duration: 5000,
+      })
     } catch (error) {
       console.error("Upgrade error:", error)
-      alert("Upgrade failed. Please try again.")
+      toast.error("Upgrade failed. Please try again.", {
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+      })
     } finally {
       setLoading(false)
     }
@@ -62,28 +69,19 @@ export default function UpgradePage() {
             {/* Free Plan */}
             <Card className="bg-gray-900/50 border-gray-700">
               <CardHeader>
-                <CardTitle className="text-white">Free Plan</CardTitle>
+                <CardTitle className="text-white">{PRICING_CONFIG.free.name}</CardTitle>
                 <div className="text-2xl font-bold text-white">
-                  $0<span className="text-sm font-normal text-gray-400">/month</span>
+                  {PRICING_CONFIG.free.priceDisplay}
+                  <span className="text-sm font-normal text-gray-400">{PRICING_CONFIG.free.period}</span>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <Check className="h-4 w-4 text-green-400" />
-                  <span className="text-gray-300">10 interview sessions/month</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Check className="h-4 w-4 text-green-400" />
-                  <span className="text-gray-300">Basic coding challenges</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Check className="h-4 w-4 text-green-400" />
-                  <span className="text-gray-300">Performance feedback</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Check className="h-4 w-4 text-green-400" />
-                  <span className="text-gray-300">VS Code integration</span>
-                </div>
+                {PRICING_CONFIG.free.features.slice(0, 4).map((feature, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <Check className="h-4 w-4 text-green-400" />
+                    <span className="text-gray-300">{feature}</span>
+                  </div>
+                ))}
               </CardContent>
             </Card>
 
@@ -98,37 +96,20 @@ export default function UpgradePage() {
               <CardHeader>
                 <CardTitle className="text-white flex items-center">
                   <Crown className="mr-2 h-5 w-5 text-yellow-400" />
-                  Pro Plan
+                  {PRICING_CONFIG.pro.name}
                 </CardTitle>
                 <div className="text-3xl font-bold text-white">
-                  $19<span className="text-sm font-normal text-gray-400">/month</span>
+                  {PRICING_CONFIG.pro.priceDisplay}
+                  <span className="text-sm font-normal text-gray-400">{PRICING_CONFIG.pro.period}</span>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <Check className="h-4 w-4 text-green-400" />
-                  <span className="text-white font-medium">Unlimited interview sessions</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Check className="h-4 w-4 text-green-400" />
-                  <span className="text-white">Advanced coding challenges</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Check className="h-4 w-4 text-green-400" />
-                  <span className="text-white">System design interviews</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Check className="h-4 w-4 text-green-400" />
-                  <span className="text-white">Detailed analytics & insights</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Check className="h-4 w-4 text-green-400" />
-                  <span className="text-white">Priority support</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Check className="h-4 w-4 text-green-400" />
-                  <span className="text-white">Custom interview scenarios</span>
-                </div>
+                {PRICING_CONFIG.pro.features.map((feature, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <Check className="h-4 w-4 text-green-400" />
+                    <span className={index === 0 ? "text-white font-medium" : "text-white"}>{feature}</span>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           </div>
@@ -146,7 +127,8 @@ export default function UpgradePage() {
               ) : (
                 <>
                   <Zap className="mr-2 h-5 w-5" />
-                  Upgrade to Pro - $19/month
+                  Upgrade to Pro - {PRICING_CONFIG.pro.priceDisplay}
+                  {PRICING_CONFIG.pro.period}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </>
               )}

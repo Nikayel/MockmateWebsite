@@ -1,0 +1,71 @@
+/**
+ * Shared application configuration
+ * Centralized pricing and feature configuration to ensure consistency across all pages
+ */
+
+export const PRICING_CONFIG = {
+  free: {
+    name: "Free",
+    price: 0,
+    priceDisplay: "$0",
+    period: "/month",
+    description: "Perfect for getting started",
+    sessionsPerMonth: 10,
+    sessionsDisplay: "10 interview sessions per month",
+    features: [
+      "10 interview sessions per month",
+      "Basic coding challenges",
+      "AI interviewer feedback",
+      "Performance tracking",
+      "VS Code integration",
+    ],
+    buttonText: "Start Free",
+    popular: false,
+  },
+  pro: {
+    name: "Pro",
+    price: 19,
+    priceDisplay: "$19",
+    period: "/month",
+    description: "For serious interview preparation",
+    sessionsPerMonth: 1000, // Effectively unlimited
+    sessionsDisplay: "Unlimited interview sessions",
+    features: [
+      "Unlimited interview sessions",
+      "Advanced coding challenges",
+      "System design interviews",
+      "Detailed analytics & insights",
+      "Priority support",
+      "Custom interview scenarios",
+      "Custom difficulty levels",
+    ],
+    buttonText: "Upgrade to Pro",
+    popular: true,
+  },
+  enterprise: {
+    name: "Enterprise",
+    price: null,
+    priceDisplay: "Custom",
+    period: "",
+    description: "For teams and organizations",
+    features: [
+      "Everything in Pro",
+      "Team management",
+      "Custom interview templates",
+      "Priority support",
+      "SSO integration",
+      "Custom integrations",
+    ],
+    buttonText: "Contact Sales",
+    popular: false,
+  },
+} as const
+
+export const APP_CONFIG = {
+  name: "MockMate",
+  extensionId: "nikayel.MockMate",
+  supportEmail: "support@mockmate.dev",
+  githubUrl: "https://github.com/nikayel/mockmate",
+} as const
+
+export type SubscriptionTier = "free" | "pro" | "enterprise"
