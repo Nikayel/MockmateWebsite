@@ -67,19 +67,35 @@ export function Header() {
         {isMobileMenuOpen && (
           <nav className="md:hidden mt-4 pb-4 border-t border-white/20">
             <div className="flex flex-col space-y-4 pt-4">
-              <a href="/#features" className="text-white hover:text-[#ff5733] transition-colors duration-300">
+              <a
+                href="/#features"
+                className="text-white hover:text-[#ff5733] transition-colors duration-300"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
                 Features
               </a>
-              <Link href="/pricing" className="text-white hover:text-[#ff5733] transition-colors duration-300">
+              <Link
+                href="/pricing"
+                className="text-white hover:text-[#ff5733] transition-colors duration-300"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
                 Pricing
               </Link>
-              <Link href="/demo" className="text-white hover:text-[#ff5733] transition-colors duration-300">
+              <Link
+                href="/demo"
+                className="text-white hover:text-[#ff5733] transition-colors duration-300"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
                 Demo
               </Link>
-              <Link href="/docs" className="text-white hover:text-[#ff5733] transition-colors duration-300">
+              <Link
+                href="/docs"
+                className="text-white hover:text-[#ff5733] transition-colors duration-300"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
                 Docs
               </Link>
-              <Link href="/login">
+              <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
                 <Button
                   variant="outline"
                   className="border-white text-white hover:bg-white hover:text-black transition-all duration-300 w-fit bg-transparent"

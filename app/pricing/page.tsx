@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle, Star, Zap, Crown, ArrowRight } from "lucide-react"
+import { PRICING_CONFIG } from "@/lib/config"
+import Link from "next/link"
 
 export default function PricingPage() {
   return (
@@ -37,30 +39,24 @@ export default function PricingPage() {
                   <div className="flex justify-center mb-4">
                     <Star className="h-12 w-12 text-gray-400" />
                   </div>
-                  <CardTitle className="text-2xl font-heading text-white mb-2">Free</CardTitle>
-                  <div className="text-4xl font-bold text-white mb-2">$0</div>
-                  <p className="text-gray-400">Perfect for getting started</p>
+                  <CardTitle className="text-2xl font-heading text-white mb-2">{PRICING_CONFIG.free.name}</CardTitle>
+                  <div className="text-4xl font-bold text-white mb-2">{PRICING_CONFIG.free.priceDisplay}</div>
+                  <p className="text-gray-400">{PRICING_CONFIG.free.description}</p>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-4 mb-8">
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-                      <span className="text-gray-300">5 practice sessions per week</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-                      <span className="text-gray-300">Basic coding challenges</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-                      <span className="text-gray-300">AI interviewer feedback</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-                      <span className="text-gray-300">Performance tracking</span>
-                    </li>
+                    {PRICING_CONFIG.free.features.map((feature, index) => (
+                      <li key={index} className="flex items-center space-x-3">
+                        <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
+                        <span className="text-gray-300">{feature}</span>
+                      </li>
+                    ))}
                   </ul>
-                  <Button className="w-full bg-gray-700 hover:bg-gray-600 text-white">Install Free Extension</Button>
+                  <Link href="/install">
+                    <Button className="w-full bg-gray-700 hover:bg-gray-600 text-white">
+                      {PRICING_CONFIG.free.buttonText}
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
 
@@ -73,37 +69,25 @@ export default function PricingPage() {
                   <div className="flex justify-center mb-4">
                     <Zap className="h-12 w-12 text-[#ff5733]" />
                   </div>
-                  <CardTitle className="text-2xl font-heading text-white mb-2">Pro</CardTitle>
-                  <div className="text-4xl font-bold text-white mb-2">$9</div>
-                  <p className="text-gray-400">per month</p>
+                  <CardTitle className="text-2xl font-heading text-white mb-2">{PRICING_CONFIG.pro.name}</CardTitle>
+                  <div className="text-4xl font-bold text-white mb-2">{PRICING_CONFIG.pro.priceDisplay}</div>
+                  <p className="text-gray-400">{PRICING_CONFIG.pro.period}</p>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-4 mb-8">
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-                      <span className="text-gray-300">Unlimited practice sessions</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-                      <span className="text-gray-300">Advanced coding challenges</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-                      <span className="text-gray-300">System design interviews</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-                      <span className="text-gray-300">Detailed analytics & insights</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-                      <span className="text-gray-300">Custom difficulty levels</span>
-                    </li>
+                    {PRICING_CONFIG.pro.features.map((feature, index) => (
+                      <li key={index} className="flex items-center space-x-3">
+                        <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
+                        <span className="text-gray-300">{feature}</span>
+                      </li>
+                    ))}
                   </ul>
-                  <Button className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80 text-white">
-                    Upgrade to Pro
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
+                  <Link href="/upgrade">
+                    <Button className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80 text-white">
+                      {PRICING_CONFIG.pro.buttonText}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
 
@@ -113,38 +97,26 @@ export default function PricingPage() {
                   <div className="flex justify-center mb-4">
                     <Crown className="h-12 w-12 text-yellow-400" />
                   </div>
-                  <CardTitle className="text-2xl font-heading text-white mb-2">Enterprise</CardTitle>
-                  <div className="text-4xl font-bold text-white mb-2">Custom</div>
-                  <p className="text-gray-400">For teams and organizations</p>
+                  <CardTitle className="text-2xl font-heading text-white mb-2">
+                    {PRICING_CONFIG.enterprise.name}
+                  </CardTitle>
+                  <div className="text-4xl font-bold text-white mb-2">{PRICING_CONFIG.enterprise.priceDisplay}</div>
+                  <p className="text-gray-400">{PRICING_CONFIG.enterprise.description}</p>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-4 mb-8">
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-                      <span className="text-gray-300">Everything in Pro</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-                      <span className="text-gray-300">Team management</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-                      <span className="text-gray-300">Custom interview templates</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-                      <span className="text-gray-300">Priority support</span>
-                    </li>
-                    <li className="flex items-center space-x-3">
-                      <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-                      <span className="text-gray-300">SSO integration</span>
-                    </li>
+                    {PRICING_CONFIG.enterprise.features.map((feature, index) => (
+                      <li key={index} className="flex items-center space-x-3">
+                        <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
+                        <span className="text-gray-300">{feature}</span>
+                      </li>
+                    ))}
                   </ul>
                   <Button
                     variant="outline"
                     className="w-full border-white text-white hover:bg-white hover:text-black bg-transparent"
                   >
-                    Contact Sales
+                    {PRICING_CONFIG.enterprise.buttonText}
                   </Button>
                 </CardContent>
               </Card>

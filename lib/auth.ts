@@ -1,6 +1,11 @@
 import { supabase } from "./supabase"
 
-export async function signInWithGitHub() {
+export async function signInWithGitHub(redirect?: string) {
+  // Store redirect in localStorage to retrieve after auth
+  if (redirect) {
+    localStorage.setItem("auth_redirect", redirect)
+  }
+
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "github",
     options: {
