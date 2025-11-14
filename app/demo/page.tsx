@@ -26,7 +26,10 @@ import {
   Square,
   PlayCircle,
   XCircle,
+  AlertCircle,
 } from "lucide-react"
+import { checkDemoAccess, markDemoAsUsed, getUserContext, formatDemoUsedDate } from "@/lib/demo-manager"
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from "@/components/ui/alert-dialog"
 
 // Dynamically import Monaco Editor (client-side only)
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false })
@@ -48,6 +51,9 @@ interface TestResult {
 export default function DemoPage() {
   const [isInterviewStarted, setIsInterviewStarted] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
+  const [showDemoLimitDialog, setShowDemoLimitDialog] = useState(false)
+  const [demoUsedDate, setDemoUsedDate] = useState<string>("")
+  const [canAccessDemo, setCanAccessDemo] = useState(true)
   const [code, setCode] = useState(`function twoSum(nums, target) {
   // Write your solution here
 
@@ -73,6 +79,15 @@ export default function DemoPage() {
   const chatEndRef = useRef<HTMLDivElement>(null)
   const interviewerEndRef = useRef<HTMLDivElement>(null)
 
+  // Check demo access on component mount
+  useEffect(() => {
+    const demoStatus = checkDemoAccess()
+    setCanAccessDemo(demoStatus.canAccessDemo)
+    if (!demoStatus.canAccessDemo && demoStatus.demoUsedAt) {
+      setDemoUsedDate(formatDemoUsedDate(demoStatus.demoUsedAt))
+    }
+  }, [])
+
   // Timer effect
   useEffect(() => {
     let interval: NodeJS.Timeout
@@ -94,6 +109,16 @@ export default function DemoPage() {
   }, [interviewerMessages])
 
   const startInterview = () => {
+    // Check if demo has already been used
+    if (!canAccessDemo) {
+      setShowDemoLimitDialog(true)
+      return
+    }
+
+    // Mark demo as used
+    markDemoAsUsed()
+    setCanAccessDemo(false)
+
     setIsInterviewStarted(true)
     setStartTime(Date.now())
     // AI Interviewer introduces the problem
@@ -140,6 +165,9 @@ export default function DemoPage() {
       setLoading(true)
 
       try {
+        // Get user context for personalized AI responses
+        const userContext = getUserContext()
+
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -147,6 +175,7 @@ export default function DemoPage() {
             message: input,
             context: messages,
             role: isInterviewer ? "interviewer" : "partner",
+            userContext: userContext,
           }),
         })
 
@@ -672,6 +701,64 @@ export default function DemoPage() {
           </div>
         </div>
       </section>
+
+      {/* Demo Limit Dialog */}
+      <AlertDialog open={showDemoLimitDialog} onOpenChange={setShowDemoLimitDialog}>
+        <AlertDialogContent className="bg-gray-900 border-gray-700 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center space-x-2 text-2xl">
+              <AlertCircle className="h-6 w-6 text-[#ff5733]" />
+              <span>Demo Already Used</span>
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-300 space-y-4">
+              <p className="text-lg">
+                You've already used your free demo session{demoUsedDate && ` on ${demoUsedDate}`}.
+              </p>
+              <p>
+                To continue practicing with MockMate and access unlimited interview sessions, please sign up for an account or upgrade to a paid plan.
+              </p>
+              <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 mt-4">
+                <h4 className="font-semibold text-white mb-2">What you'll get:</h4>
+                <ul className="space-y-2 text-sm text-gray-300">
+                  <li className="flex items-start space-x-2">
+                    <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>Unlimited mock interview sessions</span>
+                  </li>
+                  <li className="flex items-start space-x-2">
+                    <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>Access to 500+ coding problems</span>
+                  </li>
+                  <li className="flex items-start space-x-2">
+                    <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>Personalized AI feedback and progress tracking</span>
+                  </li>
+                  <li className="flex items-start space-x-2">
+                    <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>VS Code integration for seamless practice</span>
+                  </li>
+                </ul>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-3">
+            <AlertDialogAction
+              className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
+              onClick={() => {
+                window.location.href = "/auth/login"
+              }}
+            >
+              Sign Up / Login
+            </AlertDialogAction>
+            <Button
+              variant="outline"
+              className="border-gray-600 text-gray-300 hover:bg-gray-800"
+              onClick={() => setShowDemoLimitDialog(false)}
+            >
+              Maybe Later
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Footer />
     </main>
