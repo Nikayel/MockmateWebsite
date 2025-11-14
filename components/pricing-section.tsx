@@ -3,41 +3,10 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Check, Star } from "lucide-react"
+import { PRICING_CONFIG } from "@/lib/config"
+import Link from "next/link"
 
-const plans = [
-  {
-    name: "Free",
-    price: "$0",
-    period: "/month",
-    description: "Perfect for getting started",
-    features: [
-      "3 simulations per month",
-      "First simulation with top-tier model",
-      "Basic performance analytics",
-      "Community support",
-      "VS Code integration",
-    ],
-    buttonText: "Start Free",
-    popular: false,
-  },
-  {
-    name: "Pro",
-    price: "$19",
-    period: "/month",
-    description: "For serious interview preparation",
-    features: [
-      "30 simulations per month",
-      "All top-tier AI models",
-      "Larger context windows",
-      "Real-time streaming responses",
-      "Advanced analytics & insights",
-      "Priority support",
-      "Custom interview scenarios",
-    ],
-    buttonText: "Upgrade to Pro",
-    popular: true,
-  },
-]
+const plans = [PRICING_CONFIG.free, PRICING_CONFIG.pro]
 
 export function PricingSection() {
   return (
@@ -74,7 +43,7 @@ export function PricingSection() {
               <CardHeader className="text-center pb-8">
                 <CardTitle className="text-2xl font-heading font-bold text-white mb-2">{plan.name}</CardTitle>
                 <div className="flex items-baseline justify-center space-x-1">
-                  <span className="text-4xl font-bold text-[#ff5733]">{plan.price}</span>
+                  <span className="text-4xl font-bold text-[#ff5733]">{plan.priceDisplay}</span>
                   <span className="text-gray-400">{plan.period}</span>
                 </div>
                 <p className="text-gray-300 mt-2">{plan.description}</p>
@@ -90,15 +59,17 @@ export function PricingSection() {
                   ))}
                 </ul>
 
-                <Button
-                  className={`w-full py-3 text-lg font-semibold transition-all duration-300 ${
-                    plan.popular
-                      ? "bg-[#ff5733] hover:bg-[#ff5733]/80 text-white animate-pulse-glow"
-                      : "bg-gray-800 hover:bg-gray-700 text-white border border-gray-600"
-                  }`}
-                >
-                  {plan.buttonText}
-                </Button>
+                <Link href={plan.popular ? "/upgrade" : "/install"}>
+                  <Button
+                    className={`w-full py-3 text-lg font-semibold transition-all duration-300 ${
+                      plan.popular
+                        ? "bg-[#ff5733] hover:bg-[#ff5733]/80 text-white animate-pulse-glow"
+                        : "bg-gray-800 hover:bg-gray-700 text-white border border-gray-600"
+                    }`}
+                  >
+                    {plan.buttonText}
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           ))}

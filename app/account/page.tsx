@@ -9,13 +9,17 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { getCurrentUser, signOut } from "@/lib/auth"
 import { supabase } from "@/lib/supabase"
-import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut } from "lucide-react"
+import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle } from "lucide-react"
+import { User as UserType, Profile, ProfileQuota } from "@/lib/types"
+import { PRICING_CONFIG } from "@/lib/config"
+import { toast } from "sonner"
 
 export default function AccountPage() {
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
-  const [usage, setUsage] = useState<any>(null)
+  const [user, setUser] = useState<UserType | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [usage, setUsage] = useState<ProfileQuota | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -29,20 +33,41 @@ export default function AccountPage() {
         setUser(currentUser)
 
         // Fetch profile data
-        const { data: profileData } = await supabase.from("profiles").select("*").eq("id", currentUser.id).single()
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", currentUser.id)
+          .single()
 
-        setProfile(profileData)
+        if (profileError) {
+          console.error("Error fetching profile:", profileError)
+          setError("Failed to load profile data")
+          toast.error("Failed to load profile data", {
+            description: "Some features may not be available",
+          })
+        } else {
+          setProfile(profileData)
+        }
 
         // Fetch usage data
-        const { data: usageData } = await supabase
+        const { data: usageData, error: usageError } = await supabase
           .from("profile_quota")
           .select("*")
           .eq("user_id", currentUser.id)
           .single()
 
-        setUsage(usageData)
+        if (usageError) {
+          console.error("Error fetching usage:", usageError)
+          // Usage data might not exist for new users, so don't show error
+        } else {
+          setUsage(usageData)
+        }
       } catch (error) {
         console.error("Error loading user data:", error)
+        setError("Failed to load account data")
+        toast.error("Failed to load account data", {
+          description: error instanceof Error ? error.message : "An unknown error occurred",
+        })
       } finally {
         setLoading(false)
       }
@@ -57,6 +82,9 @@ export default function AccountPage() {
       window.location.href = "/"
     } catch (error) {
       console.error("Sign out error:", error)
+      toast.error("Failed to sign out", {
+        description: error instanceof Error ? error.message : "Please try again",
+      })
     }
   }
 
@@ -70,7 +98,7 @@ export default function AccountPage() {
 
   const isPro = profile?.subscription_tier === "pro"
   const usedSessions = usage?.sessions_used || 0
-  const maxSessions = isPro ? 1000 : 10
+  const maxSessions = isPro ? PRICING_CONFIG.pro.sessionsPerMonth : PRICING_CONFIG.free.sessionsPerMonth
   const usagePercentage = (usedSessions / maxSessions) * 100
 
   return (
@@ -79,6 +107,19 @@ export default function AccountPage() {
 
       <div className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-4xl">
+          {/* Error Banner */}
+          {error && (
+            <Card className="bg-red-900/20 border-red-500/30 mb-6">
+              <CardContent className="p-4 flex items-center space-x-3">
+                <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
+                <div>
+                  <p className="text-red-400 font-medium">{error}</p>
+                  <p className="text-red-300 text-sm">Some features may not be available</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Profile Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-6">

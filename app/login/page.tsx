@@ -7,19 +7,32 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Github, Shield, FolderSyncIcon as Sync, BarChart3, Star, ArrowRight } from "lucide-react"
 import { signInWithGitHub } from "@/lib/auth"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { toast } from "sonner"
+import { useSearchParams } from "next/navigation"
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
+  const searchParams = useSearchParams()
+  const redirect = searchParams.get("redirect")
+
+  useEffect(() => {
+    if (redirect) {
+      toast.info("Please sign in to continue", {
+        description: `You'll be redirected to ${redirect} after login`,
+      })
+    }
+  }, [redirect])
 
   const handleGitHubLogin = async () => {
     try {
       setIsLoading(true)
-      await signInWithGitHub()
+      await signInWithGitHub(redirect || undefined)
     } catch (error) {
       console.error("Login failed:", error)
-      alert("Login failed. Please try again.")
-    } finally {
+      toast.error("Login failed", {
+        description: error instanceof Error ? error.message : "Please try again",
+      })
       setIsLoading(false)
     }
   }

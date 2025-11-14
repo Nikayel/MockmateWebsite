@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Work_Sans, Open_Sans } from "next/font/google"
+import { Toaster } from "sonner"
 import "./globals.css"
 
 const workSans = Work_Sans({
@@ -36,7 +37,10 @@ html {
 }
         `}</style>
       </head>
-      <body className={`${workSans.variable} ${openSans.variable} antialiased`}>{children}</body>
+      <body className={`${workSans.variable} ${openSans.variable} antialiased`}>
+        {children}
+        <Toaster position="top-right" richColors />
+      </body>
     </html>
   )
 }
