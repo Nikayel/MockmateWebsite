@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import dynamic from "next/dynamic"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import {
   Play,
@@ -19,180 +19,202 @@ import {
   Clock,
   User,
   Bot,
-  AlertCircle,
   Lightbulb,
   Target,
   TrendingUp,
   Send,
   Square,
+  PlayCircle,
+  XCircle,
 } from "lucide-react"
 
+// Dynamically import Monaco Editor (client-side only)
+const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false })
+
+interface ChatMessage {
+  type: "user" | "ai"
+  message: string
+}
+
+interface TestResult {
+  description: string
+  passed: boolean
+  input: { nums: number[]; target: number }
+  expected: number[]
+  actual: number[] | null
+  error: string | null
+}
+
 export default function DemoPage() {
-  const [currentPhase, setCurrentPhase] = useState(0)
-  const [isRecording, setIsRecording] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [typedCode, setTypedCode] = useState("")
-  const [currentHint, setCurrentHint] = useState(0)
+  const [isInterviewStarted, setIsInterviewStarted] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
-  const [chatMessages, setChatMessages] = useState([
+  const [code, setCode] = useState(`function twoSum(nums, target) {
+  // Write your solution here
+
+}`)
+
+  const [interviewerMessages, setInterviewerMessages] = useState<ChatMessage[]>([])
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       type: "ai",
-      message: "Hi! I'm your AI coding partner. Ask me anything about the problem or need help with your approach!",
+      message: "Hi! I'm your AI coding partner. Ask me anything about the Two Sum problem or need help with your approach!",
     },
   ])
   const [chatInput, setChatInput] = useState("")
+  const [interviewerInput, setInterviewerInput] = useState("")
+  const [isLoadingChat, setIsLoadingChat] = useState(false)
+  const [isLoadingInterviewer, setIsLoadingInterviewer] = useState(false)
+  const [testResults, setTestResults] = useState<TestResult[]>([])
+  const [isRunningTests, setIsRunningTests] = useState(false)
+  const [testSummary, setTestSummary] = useState({ total: 0, passed: 0, failed: 0, passRate: 0 })
+  const [startTime, setStartTime] = useState<number | null>(null)
+  const [elapsedTime, setElapsedTime] = useState(0)
 
-  const recordingPhases = [
-    {
-      title: "Problem Introduction",
-      description: "AI interviewer presents the coding challenge",
-      duration: 3000,
-    },
-    {
-      title: "Initial Approach Discussion",
-      description: "Discussing solution strategy with AI interviewer",
-      duration: 4000,
-    },
-    {
-      title: "Coding & Bug Fixing",
-      description: "Writing code with AI coding partner assistance",
-      duration: 8000,
-    },
-    {
-      title: "Code Review & Optimization",
-      description: "AI interviewer reviews and suggests improvements",
-      duration: 4000,
-    },
-    {
-      title: "Submission & Feedback",
-      description: "Final submission and comprehensive feedback",
-      duration: 2000,
-    },
-  ]
+  const chatEndRef = useRef<HTMLDivElement>(null)
+  const interviewerEndRef = useRef<HTMLDivElement>(null)
 
-  const buggyCode = `function twoSum(nums, target) {
-    for (let i = 0; i < nums.length; i++) {
-        for (let j = i + 1; j < nums.length; j++) {
-            if (nums[i] + nums[j] == target) {
-                return [i, j];
-            }
-        }
-    }
-    return null; // Bug: should return []
-}`
-
-  const fixedCode = `function twoSum(nums, target) {
-    const map = new Map();
-    
-    for (let i = 0; i < nums.length; i++) {
-        const complement = target - nums[i];
-        
-        if (map.has(complement)) {
-            return [map.get(complement), i];
-        }
-        
-        map.set(nums[i], i);
-    }
-    
-    return []; // Fixed: proper return value
-}`
-
-  const interviewerMessages = [
-    { type: "ai", message: "Let's work on the Two Sum problem. Can you walk me through your initial approach?" },
-    { type: "user", message: "I'll use a nested loop to check all pairs of numbers." },
-    { type: "ai", message: "That's a valid brute force approach. What's the time complexity?" },
-    { type: "user", message: "O(n²) time complexity, O(1) space." },
-    {
-      type: "ai",
-      message: "Correct! Now let's see your implementation. I notice a small issue in your return statement...",
-    },
-  ]
-
-  const codingPartnerHints = [
-    "💡 Consider using a hash map for O(n) solution",
-    "🐛 Check your return value - should be [] not null",
-    "⚡ Great optimization! Much better time complexity",
-    "✅ Perfect! Clean and efficient solution",
-  ]
-
-  const handleSendMessage = () => {
-    if (chatInput.trim()) {
-      setChatMessages((prev) => [...prev, { type: "user", message: chatInput }])
-
-      // Simulate AI response
-      setTimeout(() => {
-        const responses = [
-          "Great question! For the Two Sum problem, using a hash map can reduce time complexity from O(n²) to O(n).",
-          "That's a good approach! Remember to handle edge cases like empty arrays or no valid pairs.",
-          "Nice thinking! The complement approach is key: for each number, check if (target - number) exists in your map.",
-          "Excellent! Don't forget to return the indices, not the values themselves.",
-          "Good observation! Using === instead of == is better for strict equality checking.",
-        ]
-        const randomResponse = responses[Math.floor(Math.random() * responses.length)]
-        setChatMessages((prev) => [...prev, { type: "ai", message: randomResponse }])
-      }, 1000)
-
-      setChatInput("")
-    }
-  }
-
+  // Timer effect
   useEffect(() => {
     let interval: NodeJS.Timeout
-    if (isRecording) {
-      interval = setInterval(
-        () => {
-          setProgress((prev) => {
-            if (prev >= 100) {
-              if (currentPhase < recordingPhases.length - 1) {
-                setCurrentPhase(currentPhase + 1)
-                return 0
-              } else {
-                setIsRecording(false)
-                setShowFeedback(true)
-                return 100
-              }
-            }
-            return prev + 2
-          })
-        },
-        recordingPhases[currentPhase]?.duration / 50 || 100,
-      )
+    if (isInterviewStarted && !showFeedback && startTime) {
+      interval = setInterval(() => {
+        setElapsedTime(Math.floor((Date.now() - startTime) / 1000))
+      }, 1000)
     }
     return () => clearInterval(interval)
-  }, [isRecording, currentPhase])
+  }, [isInterviewStarted, showFeedback, startTime])
+
+  // Auto-scroll chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [chatMessages])
 
   useEffect(() => {
-    if (currentPhase === 2 && isRecording) {
-      let i = 0
-      const codeToType = currentPhase === 2 && progress > 50 ? fixedCode : buggyCode
-      const timer = setInterval(() => {
-        if (i < codeToType.length) {
-          setTypedCode(codeToType.slice(0, i + 1))
-          i++
-        } else {
-          clearInterval(timer)
-          if (progress > 50 && currentHint < codingPartnerHints.length - 1) {
-            setTimeout(() => setCurrentHint((prev) => prev + 1), 1000)
-          }
-        }
-      }, 30)
-      return () => clearInterval(timer)
-    }
-  }, [currentPhase, isRecording, progress])
+    interviewerEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [interviewerMessages])
 
-  const resetRecording = () => {
-    setCurrentPhase(0)
-    setProgress(0)
-    setIsRecording(false)
-    setTypedCode("")
-    setCurrentHint(0)
+  const startInterview = () => {
+    setIsInterviewStarted(true)
+    setStartTime(Date.now())
+    // AI Interviewer introduces the problem
+    setInterviewerMessages([
+      {
+        type: "ai",
+        message:
+          "Hello! Today we'll be working on the Two Sum problem. Here's the question:\n\nGiven an array of integers 'nums' and an integer 'target', return indices of the two numbers such that they add up to target.\n\nYou may assume that each input has exactly one solution, and you may not use the same element twice.\n\nExample: nums = [2,7,11,15], target = 9\nOutput: [0,1] (because nums[0] + nums[1] = 2 + 7 = 9)\n\nTake a moment to think about your approach, then feel free to ask me any clarifying questions!",
+      },
+    ])
+  }
+
+  const resetInterview = () => {
+    setIsInterviewStarted(false)
     setShowFeedback(false)
+    setCode(`function twoSum(nums, target) {
+  // Write your solution here
+
+}`)
+    setInterviewerMessages([])
     setChatMessages([
       {
         type: "ai",
-        message: "Hi! I'm your AI coding partner. Ask me anything about the problem or need help with your approach!",
+        message: "Hi! I'm your AI coding partner. Ask me anything about the Two Sum problem or need help with your approach!",
       },
     ])
+    setTestResults([])
+    setTestSummary({ total: 0, passed: 0, failed: 0, passRate: 0 })
+    setStartTime(null)
+    setElapsedTime(0)
+  }
+
+  const handleSendMessage = async (isInterviewer = false) => {
+    const input = isInterviewer ? interviewerInput : chatInput
+    const setInput = isInterviewer ? setInterviewerInput : setChatInput
+    const messages = isInterviewer ? interviewerMessages : chatMessages
+    const setMessages = isInterviewer ? setInterviewerMessages : setChatMessages
+    const setLoading = isInterviewer ? setIsLoadingInterviewer : setIsLoadingChat
+
+    if (input.trim()) {
+      const newUserMessage: ChatMessage = { type: "user", message: input }
+      setMessages((prev) => [...prev, newUserMessage])
+      setInput("")
+      setLoading(true)
+
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: input,
+            context: messages,
+            role: isInterviewer ? "interviewer" : "partner",
+          }),
+        })
+
+        const data = await response.json()
+
+        if (data.reply) {
+          setMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            { type: "ai", message: "Sorry, I encountered an error. Please try again." },
+          ])
+        }
+      } catch (error) {
+        console.error("Chat error:", error)
+        setMessages((prev) => [...prev, { type: "ai", message: "Sorry, I couldn't process that. Please try again." }])
+      } finally {
+        setLoading(false)
+      }
+    }
+  }
+
+  const runCode = async () => {
+    setIsRunningTests(true)
+    setTestResults([])
+
+    try {
+      const response = await fetch("/api/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      })
+
+      const data = await response.json()
+
+      if (data.results) {
+        setTestResults(data.results)
+        setTestSummary(data.summary)
+
+        // If all tests passed, show feedback
+        if (data.success) {
+          setTimeout(() => {
+            setShowFeedback(true)
+          }, 2000)
+        }
+      }
+    } catch (error) {
+      console.error("Code execution error:", error)
+    } finally {
+      setIsRunningTests(false)
+    }
+  }
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
+  }
+
+  const calculateCodeQuality = () => {
+    if (testSummary.passRate === 100) {
+      // Check for optimal solution (O(n) with hash map)
+      if (code.includes("Map") || code.includes("{}") || code.includes("Object")) {
+        return { score: 95, label: "Excellent - Optimal Solution" }
+      }
+      return { score: 75, label: "Good - Brute Force" }
+    }
+    return { score: testSummary.passRate, label: "Needs Improvement" }
   }
 
   return (
@@ -203,45 +225,51 @@ export default function DemoPage() {
       <section className="pt-24 pb-12 bg-gradient-to-br from-black via-gray-900 to-black">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto text-center">
-            <Badge className="bg-[#ff5733]/20 text-[#ff5733] border-[#ff5733]/30 mb-6">Live Trial Recording</Badge>
+            <Badge className="bg-[#ff5733]/20 text-[#ff5733] border-[#ff5733]/30 mb-6">Live Mock Interview</Badge>
             <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-6">
               MockMate Trial
               <span className="text-gradient"> Recording</span>
             </h1>
             <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
-              Watch a realistic interview simulation with AI interviewer guidance, coding partner assistance, and
-              comprehensive feedback analysis.
+              Experience a realistic coding interview with an AI interviewer, real code editor, and instant feedback.
+              Practice the Two Sum problem!
             </p>
           </div>
         </div>
       </section>
 
-      {/* Trial Recording Interface */}
+      {/* Interview Interface */}
       <section className="py-16 bg-gradient-to-b from-gray-900 to-black">
         <div className="container mx-auto px-4">
           <div className="max-w-7xl mx-auto">
-            {/* Recording Controls */}
+            {/* Controls */}
             <div className="flex justify-center items-center space-x-4 mb-8">
-              <Button
-                onClick={() => setIsRecording(!isRecording)}
-                className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-4 text-lg"
-                disabled={showFeedback}
-              >
-                {isRecording ? <Pause className="mr-2 h-6 w-6" /> : <Play className="mr-2 h-6 w-6" />}
-                {isRecording ? "Pause Recording" : "Start Trial Recording"}
-              </Button>
-              {isRecording && (
+              {!isInterviewStarted ? (
                 <Button
-                  onClick={() => setIsRecording(false)}
-                  variant="outline"
-                  className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white bg-transparent px-8 py-4 text-lg"
+                  onClick={startInterview}
+                  className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-4 text-lg"
                 >
-                  <Square className="mr-2 h-6 w-6" />
-                  Stop
+                  <Play className="mr-2 h-6 w-6" />
+                  Start Mock Interview
                 </Button>
+              ) : (
+                <>
+                  <div className="flex items-center space-x-2 text-white bg-gray-800 px-6 py-3 rounded-lg">
+                    <Clock className="h-5 w-5 text-[#ff5733]" />
+                    <span className="text-xl font-mono">{formatTime(elapsedTime)}</span>
+                  </div>
+                  <Button
+                    onClick={runCode}
+                    disabled={isRunningTests || showFeedback}
+                    className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 text-lg"
+                  >
+                    <PlayCircle className="mr-2 h-6 w-6" />
+                    {isRunningTests ? "Running..." : "Run Tests"}
+                  </Button>
+                </>
               )}
               <Button
-                onClick={resetRecording}
+                onClick={resetInterview}
                 variant="outline"
                 className="border-white text-white hover:bg-white hover:text-black bg-transparent px-8 py-4 text-lg"
               >
@@ -250,121 +278,116 @@ export default function DemoPage() {
               </Button>
             </div>
 
-            {/* Progress Indicator */}
-            {!showFeedback && (
-              <div className="mb-8">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-white font-semibold text-lg">{recordingPhases[currentPhase]?.title}</span>
-                  <span className="text-gray-400">
-                    {isRecording ? `Phase ${currentPhase + 1} of ${recordingPhases.length}` : "Stopped"}
-                  </span>
-                </div>
-                <Progress value={progress} className="h-3 bg-gray-800" />
-                <p className="text-gray-300 mt-2">{recordingPhases[currentPhase]?.description}</p>
-              </div>
-            )}
-
-            {/* Main Recording Interface */}
+            {/* Main Interface */}
             {!showFeedback ? (
-              <div className="grid grid-cols-12 gap-6 h-[600px]">
-                {/* VS Code Interface - Main Area */}
-                <div className="col-span-8">
-                  <Card className="bg-gray-900/50 border-gray-700 glass-effect h-full">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-white flex items-center space-x-2">
-                        <Code className="h-5 w-5 text-[#ff5733]" />
-                        <span>VS Code - two-sum.js</span>
-                        <div className="ml-auto flex items-center space-x-2">
-                          {isRecording ? (
-                            <>
-                              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                              <span className="text-red-400 text-sm">RECORDING</span>
-                            </>
-                          ) : (
-                            <>
-                              <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-                              <span className="text-gray-400 text-sm">STOPPED</span>
-                            </>
+              <div className="space-y-6">
+                {/* Top Row: Code Editor + AI Interviewer */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Code Editor - 2/3 width */}
+                  <div className="lg:col-span-2">
+                    <Card className="bg-gray-900/50 border-gray-700 glass-effect">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-white flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Code className="h-5 w-5 text-[#ff5733]" />
+                            <span>two-sum.js</span>
+                          </div>
+                          {isInterviewStarted && (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                              <span className="text-green-400 text-sm">LIVE</span>
+                            </div>
                           )}
-                        </div>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="h-full pb-6">
-                      <div className="bg-black rounded-lg p-4 h-full">
-                        {/* VS Code Header */}
-                        <div className="flex items-center space-x-2 mb-4 pb-2 border-b border-gray-700">
-                          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                          <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                          <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                          <span className="text-gray-400 text-sm ml-4">two-sum.js</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-[400px] border border-gray-700 rounded-lg overflow-hidden">
+                          <Editor
+                            height="100%"
+                            defaultLanguage="javascript"
+                            value={code}
+                            onChange={(value) => setCode(value || "")}
+                            theme="vs-dark"
+                            options={{
+                              minimap: { enabled: false },
+                              fontSize: 14,
+                              lineNumbers: "on",
+                              scrollBeyondLastLine: false,
+                              automaticLayout: true,
+                              tabSize: 2,
+                              readOnly: !isInterviewStarted || showFeedback,
+                            }}
+                          />
                         </div>
 
-                        {/* Code Content */}
-                        {currentPhase >= 2 ? (
-                          <div className="text-left">
-                            <div className="text-gray-500 text-sm mb-2">
-                              // Two Sum Problem - Finding optimal solution
+                        {/* Test Results */}
+                        {testResults.length > 0 && (
+                          <div className="mt-4 space-y-2">
+                            <div className="flex items-center justify-between mb-2">
+                              <h3 className="text-white font-semibold">Test Results</h3>
+                              <Badge
+                                className={
+                                  testSummary.passRate === 100
+                                    ? "bg-green-600"
+                                    : testSummary.passRate >= 60
+                                      ? "bg-yellow-600"
+                                      : "bg-red-600"
+                                }
+                              >
+                                {testSummary.passed}/{testSummary.total} Passed ({testSummary.passRate}%)
+                              </Badge>
                             </div>
-                            <pre className="text-white font-mono text-sm leading-relaxed">
-                              <code>
-                                {typedCode}
-                                {isRecording && <span className="animate-pulse text-[#ff5733]">|</span>}
-                              </code>
-                            </pre>
-                            {currentPhase === 2 && progress > 30 && (
-                              <div className="mt-4 p-2 bg-yellow-900/30 border border-yellow-600 rounded">
-                                <div className="flex items-center space-x-2 text-yellow-400">
-                                  <AlertCircle className="h-4 w-4" />
-                                  <span className="text-sm">Potential optimization opportunity detected</span>
+                            <div className="space-y-1 max-h-40 overflow-y-auto">
+                              {testResults.map((result, index) => (
+                                <div
+                                  key={index}
+                                  className={`p-2 rounded text-sm ${
+                                    result.passed ? "bg-green-900/30 text-green-300" : "bg-red-900/30 text-red-300"
+                                  }`}
+                                >
+                                  <div className="flex items-center space-x-2">
+                                    {result.passed ? (
+                                      <CheckCircle className="h-4 w-4" />
+                                    ) : (
+                                      <XCircle className="h-4 w-4" />
+                                    )}
+                                    <span>{result.description}</span>
+                                  </div>
+                                  {!result.passed && result.error && (
+                                    <div className="ml-6 text-xs mt-1 opacity-80">{result.error}</div>
+                                  )}
                                 </div>
-                              </div>
-                            )}
-                          </div>
-                        ) : currentPhase === 1 ? (
-                          <div className="text-center py-20">
-                            <MessageSquare className="h-16 w-16 text-[#ff5733] mx-auto mb-4 animate-pulse" />
-                            <p className="text-white text-lg">Discussing approach with AI interviewer...</p>
-                            <p className="text-gray-400 text-sm mt-2">Analyzing problem requirements</p>
-                          </div>
-                        ) : (
-                          <div className="text-center py-20">
-                            {isRecording ? (
-                              <>
-                                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#ff5733] mx-auto mb-4"></div>
-                                <p className="text-white text-lg">MockMate AI initializing...</p>
-                                <p className="text-gray-400 text-sm mt-2">Preparing interview environment</p>
-                              </>
-                            ) : (
-                              <>
-                                <Play className="h-16 w-16 text-[#ff5733] mx-auto mb-4" />
-                                <p className="text-white text-lg">Ready to start interview</p>
-                                <p className="text-gray-400 text-sm mt-2">Click "Start Trial Recording" to begin</p>
-                              </>
-                            )}
+                              ))}
+                            </div>
                           </div>
                         )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
+                      </CardContent>
+                    </Card>
+                  </div>
 
-                {/* AI Interviewer - Right Side */}
-                <div className="col-span-4">
-                  <Card className="bg-gray-900/50 border-gray-700 glass-effect h-full">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-white flex items-center space-x-2">
-                        <Bot className="h-5 w-5 text-[#ff5733]" />
-                        <span>AI Interviewer</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="h-full pb-6">
-                      <div className="space-y-4 h-full overflow-y-auto">
-                        {currentPhase >= 1 &&
-                          interviewerMessages
-                            .slice(0, Math.min(currentPhase + 1, interviewerMessages.length))
-                            .map((msg, index) => (
-                              <div key={index} className="space-y-2">
-                                <div className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
+                  {/* AI Interviewer - 1/3 width */}
+                  <div className="lg:col-span-1">
+                    <Card className="bg-gray-900/50 border-gray-700 glass-effect h-full">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-white flex items-center space-x-2">
+                          <Bot className="h-5 w-5 text-[#ff5733]" />
+                          <span>AI Interviewer</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex flex-col h-[calc(100%-80px)]">
+                        <div className="flex-1 overflow-y-auto space-y-3 mb-4 min-h-[300px]">
+                          {interviewerMessages.length === 0 ? (
+                            <div className="text-center py-16 text-gray-400">
+                              <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                              <p>Interview will begin when you click start...</p>
+                            </div>
+                          ) : (
+                            <>
+                              {interviewerMessages.map((msg, index) => (
+                                <div
+                                  key={index}
+                                  className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
+                                >
                                   <div
                                     className={`max-w-[90%] p-3 rounded-lg ${
                                       msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-100"
@@ -380,103 +403,97 @@ export default function DemoPage() {
                                         {msg.type === "user" ? "You" : "AI Interviewer"}
                                       </span>
                                     </div>
-                                    <p className="text-sm">{msg.message}</p>
+                                    <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
                                   </div>
                                 </div>
-                              </div>
-                            ))}
-
-                        {currentPhase === 0 && (
-                          <div className="text-center py-16 text-gray-400">
-                            <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                            <p>Interview will begin when recording starts...</p>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* AI Coding Partner - Bottom */}
-                <div className="col-span-12 mt-6">
-                  <Card className="bg-gray-900/50 border-gray-700 glass-effect">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-white flex items-center space-x-2">
-                        <Lightbulb className="h-5 w-5 text-[#ff5733]" />
-                        <span>AI Coding Partner</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {isRecording && currentPhase >= 2 ? (
-                        <div className="flex items-center space-x-4 p-4 bg-gray-800/50 rounded-lg">
-                          <Bot className="h-8 w-8 text-[#ff5733] flex-shrink-0" />
-                          <div className="flex-1">
-                            <p className="text-white font-medium">Real-time Assistance</p>
-                            <p className="text-gray-300 text-sm mt-1">{codingPartnerHints[currentHint]}</p>
-                          </div>
-                          {progress > 50 && (
-                            <div className="flex items-center space-x-2 text-green-400">
-                              <CheckCircle className="h-5 w-5" />
-                              <span className="text-sm">Optimization Applied</span>
-                            </div>
+                              ))}
+                              <div ref={interviewerEndRef} />
+                            </>
                           )}
                         </div>
-                      ) : (
-                        /* Chat interface when not recording */
-                        <div className="space-y-4">
-                          <div className="h-64 overflow-y-auto space-y-3 p-4 bg-gray-800/30 rounded-lg">
-                            {chatMessages.map((msg, index) => (
-                              <div
-                                key={index}
-                                className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
-                              >
-                                <div
-                                  className={`max-w-[80%] p-3 rounded-lg ${
-                                    msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-100"
-                                  }`}
-                                >
-                                  <div className="flex items-center space-x-2 mb-1">
-                                    {msg.type === "user" ? (
-                                      <User className="h-3 w-3" />
-                                    ) : (
-                                      <Bot className="h-3 w-3 text-[#ff5733]" />
-                                    )}
-                                    <span className="text-xs opacity-75">
-                                      {msg.type === "user" ? "You" : "AI Partner"}
-                                    </span>
-                                  </div>
-                                  <p className="text-sm">{msg.message}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="flex space-x-2">
+                        {isInterviewStarted && (
+                          <div className="flex space-x-2 mt-auto">
                             <Input
-                              value={chatInput}
-                              onChange={(e) => setChatInput(e.target.value)}
-                              placeholder="Ask me about algorithms, data structures, or coding approaches..."
+                              value={interviewerInput}
+                              onChange={(e) => setInterviewerInput(e.target.value)}
+                              placeholder="Ask the interviewer..."
                               className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
-                              onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+                              onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
+                              disabled={isLoadingInterviewer}
                             />
                             <Button
-                              onClick={handleSendMessage}
+                              onClick={() => handleSendMessage(true)}
                               className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
+                              disabled={isLoadingInterviewer}
                             >
                               <Send className="h-4 w-4" />
                             </Button>
                           </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
                 </div>
+
+                {/* Bottom Row: AI Coding Partner Chat */}
+                <Card className="bg-gray-900/50 border-gray-700 glass-effect">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-white flex items-center space-x-2">
+                      <Lightbulb className="h-5 w-5 text-[#ff5733]" />
+                      <span>AI Coding Partner - Ask for Help Anytime!</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="h-64 overflow-y-auto space-y-3 p-4 bg-gray-800/30 rounded-lg">
+                        {chatMessages.map((msg, index) => (
+                          <div key={index} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
+                            <div
+                              className={`max-w-[80%] p-3 rounded-lg ${
+                                msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-100"
+                              }`}
+                            >
+                              <div className="flex items-center space-x-2 mb-1">
+                                {msg.type === "user" ? (
+                                  <User className="h-3 w-3" />
+                                ) : (
+                                  <Bot className="h-3 w-3 text-[#ff5733]" />
+                                )}
+                                <span className="text-xs opacity-75">{msg.type === "user" ? "You" : "AI Partner"}</span>
+                              </div>
+                              <p className="text-sm">{msg.message}</p>
+                            </div>
+                          </div>
+                        ))}
+                        <div ref={chatEndRef} />
+                      </div>
+                      <div className="flex space-x-2">
+                        <Input
+                          value={chatInput}
+                          onChange={(e) => setChatInput(e.target.value)}
+                          placeholder="Ask about algorithms, hints, or debugging help..."
+                          className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                          onKeyPress={(e) => e.key === "Enter" && !isLoadingChat && handleSendMessage(false)}
+                          disabled={isLoadingChat}
+                        />
+                        <Button
+                          onClick={() => handleSendMessage(false)}
+                          className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
+                          disabled={isLoadingChat}
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             ) : (
               <div className="space-y-8">
                 <div className="text-center">
                   <CheckCircle className="h-16 w-16 text-green-400 mx-auto mb-4" />
                   <h2 className="text-3xl font-heading font-bold text-white mb-2">Interview Complete!</h2>
-                  <p className="text-gray-300">Here's your comprehensive performance analysis</p>
+                  <p className="text-gray-300">Congratulations! Here's your comprehensive performance analysis</p>
                 </div>
 
                 {/* Performance Metrics */}
@@ -484,36 +501,42 @@ export default function DemoPage() {
                   <Card className="bg-gray-900/50 border-gray-700 glass-effect text-center">
                     <CardContent className="p-6">
                       <Clock className="h-8 w-8 text-[#ff5733] mx-auto mb-3" />
-                      <div className="text-2xl font-bold text-white mb-1">12:34</div>
+                      <div className="text-2xl font-bold text-white mb-1">{formatTime(elapsedTime)}</div>
                       <div className="text-gray-400 text-sm">Time Taken</div>
-                      <div className="text-green-400 text-xs mt-2">Excellent pace</div>
+                      <div className="text-green-400 text-xs mt-2">
+                        {elapsedTime < 900 ? "Excellent pace" : "Good pace"}
+                      </div>
                     </CardContent>
                   </Card>
 
                   <Card className="bg-gray-900/50 border-gray-700 glass-effect text-center">
                     <CardContent className="p-6">
                       <Target className="h-8 w-8 text-[#ff5733] mx-auto mb-3" />
-                      <div className="text-2xl font-bold text-white mb-1">92%</div>
+                      <div className="text-2xl font-bold text-white mb-1">{calculateCodeQuality().score}%</div>
                       <div className="text-gray-400 text-sm">Code Quality</div>
-                      <div className="text-green-400 text-xs mt-2">Optimal solution</div>
+                      <div className="text-green-400 text-xs mt-2">{calculateCodeQuality().label}</div>
                     </CardContent>
                   </Card>
 
                   <Card className="bg-gray-900/50 border-gray-700 glass-effect text-center">
                     <CardContent className="p-6">
                       <MessageSquare className="h-8 w-8 text-[#ff5733] mx-auto mb-3" />
-                      <div className="text-2xl font-bold text-white mb-1">A+</div>
+                      <div className="text-2xl font-bold text-white mb-1">
+                        {interviewerMessages.filter((m) => m.type === "user").length > 3 ? "A+" : "B+"}
+                      </div>
                       <div className="text-gray-400 text-sm">Communication</div>
-                      <div className="text-green-400 text-xs mt-2">Clear explanations</div>
+                      <div className="text-green-400 text-xs mt-2">Good engagement</div>
                     </CardContent>
                   </Card>
 
                   <Card className="bg-gray-900/50 border-gray-700 glass-effect text-center">
                     <CardContent className="p-6">
                       <TrendingUp className="h-8 w-8 text-[#ff5733] mx-auto mb-3" />
-                      <div className="text-2xl font-bold text-white mb-1">95%</div>
-                      <div className="text-gray-400 text-sm">Prompt Engineering</div>
-                      <div className="text-green-400 text-xs mt-2">Excellent AI usage</div>
+                      <div className="text-2xl font-bold text-white mb-1">{testSummary.passRate}%</div>
+                      <div className="text-gray-400 text-sm">Test Pass Rate</div>
+                      <div className="text-green-400 text-xs mt-2">
+                        {testSummary.passed}/{testSummary.total} tests passed
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
@@ -529,22 +552,36 @@ export default function DemoPage() {
                     </CardHeader>
                     <CardContent>
                       <ul className="space-y-3 text-gray-300">
-                        <li className="flex items-start space-x-2">
-                          <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
-                          <span>Excellent optimization from O(n²) to O(n) solution</span>
-                        </li>
-                        <li className="flex items-start space-x-2">
-                          <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
-                          <span>Clear communication of thought process</span>
-                        </li>
-                        <li className="flex items-start space-x-2">
-                          <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
-                          <span>Effective use of AI coding partner suggestions</span>
-                        </li>
-                        <li className="flex items-start space-x-2">
-                          <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
-                          <span>Quick bug identification and resolution</span>
-                        </li>
+                        {testSummary.passRate === 100 && (
+                          <li className="flex items-start space-x-2">
+                            <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
+                            <span>All test cases passed successfully</span>
+                          </li>
+                        )}
+                        {(code.includes("Map") || code.includes("{}")) && (
+                          <li className="flex items-start space-x-2">
+                            <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
+                            <span>Used optimal O(n) solution with hash map</span>
+                          </li>
+                        )}
+                        {elapsedTime < 900 && (
+                          <li className="flex items-start space-x-2">
+                            <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
+                            <span>Completed in excellent time</span>
+                          </li>
+                        )}
+                        {interviewerMessages.filter((m) => m.type === "user").length > 2 && (
+                          <li className="flex items-start space-x-2">
+                            <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
+                            <span>Good communication with interviewer</span>
+                          </li>
+                        )}
+                        {chatMessages.filter((m) => m.type === "user").length > 2 && (
+                          <li className="flex items-start space-x-2">
+                            <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
+                            <span>Effective use of AI coding partner</span>
+                          </li>
+                        )}
                       </ul>
                     </CardContent>
                   </Card>
@@ -558,18 +595,24 @@ export default function DemoPage() {
                     </CardHeader>
                     <CardContent>
                       <ul className="space-y-3 text-gray-300">
-                        <li className="flex items-start space-x-2">
-                          <div className="w-2 h-2 bg-[#ff5733] rounded-full mt-2 flex-shrink-0"></div>
-                          <span>Consider edge cases earlier in the process</span>
-                        </li>
-                        <li className="flex items-start space-x-2">
-                          <div className="w-2 h-2 bg-[#ff5733] rounded-full mt-2 flex-shrink-0"></div>
-                          <span>Add more comprehensive test cases</span>
-                        </li>
-                        <li className="flex items-start space-x-2">
-                          <div className="w-2 h-2 bg-[#ff5733] rounded-full mt-2 flex-shrink-0"></div>
-                          <span>Discuss space-time tradeoffs more explicitly</span>
-                        </li>
+                        {testSummary.passRate < 100 && (
+                          <li className="flex items-start space-x-2">
+                            <div className="w-2 h-2 bg-[#ff5733] rounded-full mt-2 flex-shrink-0"></div>
+                            <span>Some test cases failed - review edge cases</span>
+                          </li>
+                        )}
+                        {!code.includes("Map") && !code.includes("{}") && (
+                          <li className="flex items-start space-x-2">
+                            <div className="w-2 h-2 bg-[#ff5733] rounded-full mt-2 flex-shrink-0"></div>
+                            <span>Consider optimizing to O(n) time complexity using a hash map</span>
+                          </li>
+                        )}
+                        {elapsedTime > 1200 && (
+                          <li className="flex items-start space-x-2">
+                            <div className="w-2 h-2 bg-[#ff5733] rounded-full mt-2 flex-shrink-0"></div>
+                            <span>Try to complete solutions more quickly with practice</span>
+                          </li>
+                        )}
                       </ul>
                     </CardContent>
                   </Card>
@@ -577,12 +620,26 @@ export default function DemoPage() {
 
                 {/* Action Buttons */}
                 <div className="flex justify-center space-x-4">
-                  <Button onClick={resetRecording} className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-3">
-                    Try Another Problem
+                  <Button onClick={resetInterview} className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-3">
+                    Try Again
                   </Button>
                   <Button
                     variant="outline"
                     className="border-white text-white hover:bg-white hover:text-black bg-transparent px-8 py-3"
+                    onClick={() => {
+                      const report = {
+                        problem: "Two Sum",
+                        timeElapsed: elapsedTime,
+                        testResults: testSummary,
+                        code: code,
+                      }
+                      const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" })
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement("a")
+                      a.href = url
+                      a.download = "mockmate-interview-report.json"
+                      a.click()
+                    }}
                   >
                     Export Report (JSON)
                   </Button>
@@ -596,9 +653,9 @@ export default function DemoPage() {
       {/* CTA Section */}
       <section className="py-16 bg-black">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-heading font-bold text-white mb-6">Ready to Start Your Interview Practice?</h2>
+          <h2 className="text-3xl font-heading font-bold text-white mb-6">Ready to Practice More?</h2>
           <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Install MockMate in VS Code and begin practicing with AI-powered interviews today.
+            Install MockMate in VS Code and access hundreds of interview problems with AI-powered guidance.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-4 text-lg">
