@@ -99,12 +99,13 @@ export default function InterviewPage() {
   // Check authentication
   useEffect(() => {
     const checkAuth = async () => {
-      const currentUser = await getCurrentUser()
-      if (!currentUser) {
-        router.push("/login?redirect=/interview")
+      const firebaseUser = await getCurrentUser()
+      if (!firebaseUser) {
+        router.push("/login?redirect=interview")
         return
       }
-      setUser(currentUser)
+      const convertedUser = convertFirebaseUser(firebaseUser)
+      setUser(convertedUser)
       setIsLoading(false)
     }
     checkAuth()
