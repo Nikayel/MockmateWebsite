@@ -48,11 +48,11 @@ export async function POST(request: NextRequest) {
       try {
         // List promotion codes to find the one matching our code
         const promotionCodes = await stripe.promotionCodes.list({
-          code: promoCode.toUpperCase(),
+          code: promoCode.toUpperCase().trim(),
           limit: 1,
         })
 
-        console.log(`Looking for promotion code: ${promoCode.toUpperCase()}`)
+        console.log(`Looking for promotion code: ${promoCode.toUpperCase().trim()}`)
         console.log(`Found ${promotionCodes.data.length} promotion codes`)
 
         if (promotionCodes.data.length > 0) {
@@ -60,26 +60,54 @@ export async function POST(request: NextRequest) {
           console.log(`Promotion code status: active=${promotionCodeObj.active}, coupon=${promotionCodeObj.coupon.id}`)
           
           if (promotionCodeObj.active) {
-            sessionParams.discounts = [
-              {
-                coupon: promotionCodeObj.coupon.id,
-              },
-            ]
-            console.log(`Pre-applied promotion code: ${promoCode.toUpperCase()}`)
+            // Check if promotion code has restrictions that might prevent it from being applied
+            const restrictions = promotionCodeObj.restrictions
+            if (restrictions) {
+              // Check if code applies to this product/price
+              const appliesToProduct = !restrictions.first_time_transaction && 
+                                       (!restrictions.minimum_amount || restrictions.minimum_amount <= 2500) // $25.00 in cents
+              
+              if (appliesToProduct) {
+                sessionParams.discounts = [
+                  {
+                    coupon: promotionCodeObj.coupon.id,
+                  },
+                ]
+                console.log(`Pre-applied promotion code: ${promoCode.toUpperCase().trim()}`)
+              } else {
+                console.warn(`Promotion code ${promoCode} has restrictions that prevent pre-application`)
+                // Still allow checkout - user can try entering in Stripe UI
+              }
+            } else {
+              // No restrictions, safe to apply
+              sessionParams.discounts = [
+                {
+                  coupon: promotionCodeObj.coupon.id,
+                },
+              ]
+              console.log(`Pre-applied promotion code: ${promoCode.toUpperCase().trim()}`)
+            }
           } else {
             console.warn(`Promotion code ${promoCode} exists but is not active`)
+            // Return error so user knows code is invalid
+            return NextResponse.json({ 
+              error: `Promotion code "${promoCode.toUpperCase().trim()}" is not active or has expired` 
+            }, { status: 400 })
           }
         } else {
-          // If promotion code not found, still allow checkout but Stripe will handle validation
-          console.warn(`Promotion code ${promoCode} not found in Stripe. Make sure:`)
-          console.warn(`1. Code is created in ${process.env.STRIPE_SECRET_KEY?.startsWith('sk_live') ? 'LIVE' : 'TEST'} mode`)
-          console.warn(`2. Code is exactly: ${promoCode.toUpperCase()}`)
-          console.warn(`3. Code is active and not expired`)
+          // Promotion code not found - return error
+          console.warn(`Promotion code ${promoCode} not found in Stripe`)
+          return NextResponse.json({ 
+            error: `Invalid promotion code: "${promoCode.toUpperCase().trim()}". Please enter a valid code or leave empty to enter code in Stripe Checkout.` 
+          }, { status: 400 })
         }
       } catch (promoError: any) {
         console.error("Error looking up promotion code:", promoError)
         console.error("Error details:", promoError.message)
-        // Continue without pre-applying - user can enter code in Stripe UI
+        // Return error so user knows there was a problem
+        return NextResponse.json({ 
+          error: `Failed to validate promotion code: ${promoError.message || "Unknown error"}` 
+        }, { status: 500 })
       }
     }
 

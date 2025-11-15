@@ -186,6 +186,11 @@ function UpgradePageContent() {
 
       const data = await response.json()
 
+      if (!response.ok) {
+        // Handle validation errors (e.g., invalid promo code)
+        throw new Error(data.error || "Failed to create checkout session")
+      }
+
       if (data.url) {
         // Redirect to Stripe Checkout
         window.location.href = data.url
@@ -194,8 +199,10 @@ function UpgradePageContent() {
       }
     } catch (error) {
       console.error("Upgrade error:", error)
-      toast.error("Upgrade failed. Please try again.", {
-        description: error instanceof Error ? error.message : "An unknown error occurred",
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
+      toast.error("Upgrade failed", {
+        description: errorMessage,
+        duration: 5000,
       })
       setLoading(false)
     }
