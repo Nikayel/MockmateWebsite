@@ -84,6 +84,15 @@ export default function InterviewPage() {
   const [testResults, setTestResults] = useState<TestResult[]>([])
   const [isRunningTests, setIsRunningTests] = useState(false)
   const [testSummary, setTestSummary] = useState({ total: 0, passed: 0, failed: 0, passRate: 0 })
+  const [efficiencyMetrics, setEfficiencyMetrics] = useState<{
+    linesOfCode: number
+    complexity: string
+    estimatedTimeComplexity: string
+    estimatedSpaceComplexity: string
+    optimalTimeComplexity: string
+    optimalSpaceComplexity: string
+    efficiencyScore: number
+  } | null>(null)
 
   // Timer
   const [startTime, setStartTime] = useState<number | null>(null)
@@ -139,6 +148,25 @@ export default function InterviewPage() {
   useEffect(() => {
     interviewerEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [interviewerMessages])
+
+  // Update code when language changes during interview
+  useEffect(() => {
+    if (isInterviewStarted && selectedScenario && !showFeedback) {
+      const starterCode = selectedScenario.starterCode?.[selectedLanguage] || `function solution() {
+  // Write your solution here
+
+}`
+      // Only update if code is still the starter code or empty
+      const currentCodeTrimmed = code.trim()
+      const isEmptyOrStarter = currentCodeTrimmed === "" ||
+        currentCodeTrimmed.includes("Write your solution here") ||
+        currentCodeTrimmed.length < 100
+
+      if (isEmptyOrStarter) {
+        setCode(starterCode)
+      }
+    }
+  }, [selectedLanguage, isInterviewStarted, selectedScenario, showFeedback])
 
   // Proactive interviewer
   useEffect(() => {
@@ -389,11 +417,89 @@ Take a moment to think about your approach, then feel free to ask me any clarify
     }
   }
 
+  const analyzeCodeEfficiency = (code: string) => {
+    // Calculate lines of code (excluding empty lines and comments)
+    const lines = code.split('\n')
+    const linesOfCode = lines.filter(line => {
+      const trimmed = line.trim()
+      return trimmed.length > 0 && !trimmed.startsWith('//') && !trimmed.startsWith('/*') && !trimmed.startsWith('*')
+    }).length
+
+    // Basic complexity estimation based on control structures
+    const controlStructures = (code.match(/\b(if|else|for|while|switch|case|catch)\b/g) || []).length
+    const complexityLevel = controlStructures <= 3 ? "Low" : controlStructures <= 7 ? "Medium" : "High"
+
+    // Estimate time complexity based on nested loops
+    const nestedLoopCount = (code.match(/for.*{[^}]*for/gs) || []).length +
+                           (code.match(/while.*{[^}]*while/gs) || []).length
+    let estimatedTimeComplexity = "O(n)"
+    if (nestedLoopCount >= 2) {
+      estimatedTimeComplexity = "O(n³)"
+    } else if (nestedLoopCount === 1) {
+      estimatedTimeComplexity = "O(n²)"
+    } else if (code.includes("sort")) {
+      estimatedTimeComplexity = "O(n log n)"
+    }
+
+    // Estimate space complexity based on data structures
+    const hasHashMap = code.includes("Map") || code.includes("Set") || code.includes("Object") || code.includes("{}")
+    const hasArray = code.includes("[") || code.includes("Array")
+    let estimatedSpaceComplexity = "O(1)"
+    if (hasHashMap || hasArray) {
+      estimatedSpaceComplexity = "O(n)"
+    }
+
+    // Get optimal complexity from scenario
+    const optimalTimeComplexity = (selectedScenario as any)?.optimalComplexity?.time || "N/A"
+    const optimalSpaceComplexity = (selectedScenario as any)?.optimalComplexity?.space || "N/A"
+
+    // Calculate efficiency score (0-100)
+    let efficiencyScore = 100
+
+    // Deduct points for suboptimal time complexity
+    if (optimalTimeComplexity !== "N/A" && estimatedTimeComplexity !== optimalTimeComplexity) {
+      efficiencyScore -= 20
+    }
+
+    // Deduct points for suboptimal space complexity
+    if (optimalSpaceComplexity !== "N/A" && estimatedSpaceComplexity !== optimalSpaceComplexity) {
+      efficiencyScore -= 10
+    }
+
+    // Deduct points for excessive complexity
+    if (complexityLevel === "High") {
+      efficiencyScore -= 15
+    } else if (complexityLevel === "Medium") {
+      efficiencyScore -= 5
+    }
+
+    // Deduct points for excessive lines of code
+    if (linesOfCode > 30) {
+      efficiencyScore -= 10
+    } else if (linesOfCode > 20) {
+      efficiencyScore -= 5
+    }
+
+    return {
+      linesOfCode,
+      complexity: complexityLevel,
+      estimatedTimeComplexity,
+      estimatedSpaceComplexity,
+      optimalTimeComplexity,
+      optimalSpaceComplexity,
+      efficiencyScore: Math.max(0, efficiencyScore),
+    }
+  }
+
   const runCode = async () => {
     if (!selectedScenario) return
 
     setIsRunningTests(true)
     setTestResults([])
+
+    // Analyze code efficiency
+    const metrics = analyzeCodeEfficiency(code)
+    setEfficiencyMetrics(metrics)
 
     try {
       const response = await fetch("/api/execute", {
@@ -718,7 +824,7 @@ Take a moment to think about your approach, then feel free to ask me any clarify
                         <div className="flex-1 border border-gray-700 rounded-lg overflow-hidden min-h-0" style={{ minHeight: '300px' }}>
                           <Editor
                             height="100%"
-                            defaultLanguage={selectedLanguage}
+                            language={selectedLanguage}
                             value={code}
                             onChange={(value) => setCode(value || "")}
                             theme="vs-dark"
@@ -773,6 +879,55 @@ Take a moment to think about your approach, then feel free to ask me any clarify
                                 </div>
                               ))}
                             </div>
+
+                            {/* Code Efficiency Metrics */}
+                            {efficiencyMetrics && (
+                              <div className="mt-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h4 className="text-white font-semibold text-sm flex items-center">
+                                    <TrendingUp className="h-4 w-4 mr-1 text-[#ff5733]" />
+                                    Code Efficiency
+                                  </h4>
+                                  <Badge
+                                    className={
+                                      efficiencyMetrics.efficiencyScore >= 80
+                                        ? "bg-green-600"
+                                        : efficiencyMetrics.efficiencyScore >= 60
+                                          ? "bg-yellow-600"
+                                          : "bg-red-600"
+                                    }
+                                  >
+                                    {efficiencyMetrics.efficiencyScore}/100
+                                  </Badge>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                  <div className="text-gray-300">
+                                    <span className="text-gray-400">Lines:</span> {efficiencyMetrics.linesOfCode}
+                                  </div>
+                                  <div className="text-gray-300">
+                                    <span className="text-gray-400">Complexity:</span> {efficiencyMetrics.complexity}
+                                  </div>
+                                  <div className="text-gray-300">
+                                    <span className="text-gray-400">Time:</span>{" "}
+                                    <span className={efficiencyMetrics.estimatedTimeComplexity === efficiencyMetrics.optimalTimeComplexity ? "text-green-400" : "text-yellow-400"}>
+                                      {efficiencyMetrics.estimatedTimeComplexity}
+                                    </span>
+                                    {efficiencyMetrics.optimalTimeComplexity !== "N/A" && (
+                                      <span className="text-gray-500"> (optimal: {efficiencyMetrics.optimalTimeComplexity})</span>
+                                    )}
+                                  </div>
+                                  <div className="text-gray-300">
+                                    <span className="text-gray-400">Space:</span>{" "}
+                                    <span className={efficiencyMetrics.estimatedSpaceComplexity === efficiencyMetrics.optimalSpaceComplexity ? "text-green-400" : "text-yellow-400"}>
+                                      {efficiencyMetrics.estimatedSpaceComplexity}
+                                    </span>
+                                    {efficiencyMetrics.optimalSpaceComplexity !== "N/A" && (
+                                      <span className="text-gray-500"> (optimal: {efficiencyMetrics.optimalSpaceComplexity})</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
 
