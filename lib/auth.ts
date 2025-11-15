@@ -2,6 +2,7 @@ import {
   signInWithPopup, 
   signOut as firebaseSignOut, 
   GithubAuthProvider,
+  GoogleAuthProvider,
   onAuthStateChanged,
   User as FirebaseUser
 } from "firebase/auth"
@@ -15,6 +16,28 @@ export async function signInWithGitHub(redirect?: string) {
 
   const provider = new GithubAuthProvider()
   provider.addScope('read:user')
+  
+  try {
+    const result = await signInWithPopup(auth, provider)
+    return {
+      user: result.user,
+      providerId: result.providerId,
+    }
+  } catch (error) {
+    console.error("Error signing in:", error)
+    throw error
+  }
+}
+
+export async function signInWithGoogle(redirect?: string) {
+  // Store redirect in localStorage to retrieve after auth
+  if (redirect) {
+    localStorage.setItem("auth_redirect", redirect)
+  }
+
+  const provider = new GoogleAuthProvider()
+  provider.addScope('profile')
+  provider.addScope('email')
   
   try {
     const result = await signInWithPopup(auth, provider)

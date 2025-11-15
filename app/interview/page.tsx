@@ -63,7 +63,7 @@ export default function InterviewPage() {
   const [isInterviewStarted, setIsInterviewStarted] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
   const [code, setCode] = useState("")
-  const [selectedLanguage, setSelectedLanguage] = useState<"javascript" | "typescript" | "python">("javascript")
+  const [selectedLanguage, setSelectedLanguage] = useState<"javascript" | "typescript" | "python" | "java" | "cpp" | "csharp" | "go" | "rust">("javascript")
 
   // Filters
   const [filterType, setFilterType] = useState<ScenarioType[]>([])
@@ -406,14 +406,47 @@ Take a moment to think about your approach, then feel free to ask me any clarify
         setTestResults(data.results)
         setTestSummary(data.summary)
 
-        if (data.success) {
-          // Update session with completion data
+                        if (data.success) {
+          // Generate comprehensive feedback
+          let comprehensiveFeedback = `Completed ${selectedScenario?.title} with ${data.summary.passed}/${data.summary.total} tests passing`
+          let performanceScore = data.summary.passRate * 10
+
+          if (currentSessionId && user && code.trim()) {
+            try {
+              // Generate detailed feedback from AI
+              const feedbackResponse = await fetch("/api/generate-feedback", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  code,
+                  scenarioTitle: selectedScenario?.title,
+                  scenarioType: selectedScenario?.type,
+                  testResults: data.results,
+                  language: selectedLanguage,
+                  timeSpent: elapsedTime,
+                }),
+              })
+
+              if (feedbackResponse.ok) {
+                const feedbackData = await feedbackResponse.json()
+                comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
+                performanceScore = feedbackData.performanceScore || performanceScore
+                // Store feedback for display
+                setComprehensiveFeedback(comprehensiveFeedback)
+              }
+            } catch (feedbackError) {
+              console.error("Error generating feedback:", feedbackError)
+              // Continue with basic feedback if AI generation fails
+            }
+          }
+
+          // Update session with completion data and comprehensive feedback
           if (currentSessionId && user) {
             try {
               await updateInterviewSession(
                 currentSessionId,
-                data.summary.passRate,
-                `Completed ${selectedScenario?.title} with ${data.summary.passed}/${data.summary.total} tests passing`
+                performanceScore,
+                comprehensiveFeedback
               )
             } catch (error) {
               console.error("Error updating session on completion:", error)
@@ -634,6 +667,21 @@ Take a moment to think about your approach, then feel free to ask me any clarify
                       {workspaceContext.length} file{workspaceContext.length !== 1 ? "s" : ""} loaded
                     </Badge>
                   )}
+                  {/* Language Selector */}
+                  <select
+                    value={selectedLanguage}
+                    onChange={(e) => setSelectedLanguage(e.target.value as typeof selectedLanguage)}
+                    className="bg-gray-800 border border-gray-600 text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5733]"
+                  >
+                    <option value="javascript">JavaScript</option>
+                    <option value="typescript">TypeScript</option>
+                    <option value="python">Python</option>
+                    <option value="java">Java</option>
+                    <option value="cpp">C++</option>
+                    <option value="csharp">C#</option>
+                    <option value="go">Go</option>
+                    <option value="rust">Rust</option>
+                  </select>
                 </div>
                 {isInterviewStarted && (
                   <div className="flex items-center space-x-2 text-white bg-gray-800 px-4 py-2 rounded-lg">
@@ -869,13 +917,37 @@ Take a moment to think about your approach, then feel free to ask me any clarify
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-16">
-                  <CheckCircle className="h-16 w-16 text-green-400 mx-auto mb-4" />
-                  <h2 className="text-3xl font-heading font-bold text-white mb-2">Interview Complete!</h2>
-                  <p className="text-gray-300 mb-8">Congratulations! Here's your comprehensive performance analysis</p>
-                  <Button onClick={resetInterview} className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-3">
-                    Try Another Problem
-                  </Button>
+                <div className="max-w-4xl mx-auto py-8">
+                  <div className="text-center mb-8">
+                    <CheckCircle className="h-16 w-16 text-green-400 mx-auto mb-4" />
+                    <h2 className="text-3xl font-heading font-bold text-white mb-2">Interview Complete!</h2>
+                    <p className="text-gray-300 mb-8">Congratulations! Here's your comprehensive performance analysis</p>
+                  </div>
+                  
+                  {/* Comprehensive Feedback */}
+                  {comprehensiveFeedback && (
+                    <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-6">
+                      <CardHeader>
+                        <CardTitle className="text-white flex items-center space-x-2">
+                          <TrendingUp className="h-5 w-5 text-[#ff5733]" />
+                          <span>Performance Feedback</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="prose prose-invert max-w-none">
+                          <div className="text-gray-200 whitespace-pre-wrap text-sm leading-relaxed">
+                            {comprehensiveFeedback}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <div className="text-center">
+                    <Button onClick={resetInterview} className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-3">
+                      Try Another Problem
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
