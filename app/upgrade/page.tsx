@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useSearchParams } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
@@ -15,37 +15,61 @@ import { Check, Crown, Zap, Star, ArrowRight, Ticket, CheckCircle } from "lucide
 import { PRICING_CONFIG, getProPricing } from "@/lib/config"
 import { User } from "@/lib/types"
 import { toast } from "sonner"
+import { ErrorBoundary } from "@/components/error-boundary"
 
-export default function UpgradePage() {
+function UpgradePageContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(false)
   const [promoCode, setPromoCode] = useState("")
   const [applyingPromo, setApplyingPromo] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const proPricing = getProPricing('website') // Website pricing
 
   useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
     const loadUser = async () => {
-      const firebaseUser = await getCurrentUser()
-      if (firebaseUser) {
-        const convertedUser = convertFirebaseUser(firebaseUser)
-        setUser(convertedUser)
+      try {
+        const firebaseUser = await getCurrentUser()
+        if (firebaseUser) {
+          const convertedUser = convertFirebaseUser(firebaseUser)
+          setUser(convertedUser)
+        }
+      } catch (error) {
+        console.error("Error loading user:", error)
       }
     }
     loadUser()
+  }, [])
 
-    // Check for Stripe redirect success
-    if (searchParams.get("success") === "true") {
-      toast.success("Payment successful! Your account has been upgraded to Pro.")
-      // Reload to show updated subscription
-      setTimeout(() => {
-        window.location.href = "/profile"
-      }, 2000)
+  useEffect(() => {
+    if (!mounted) return
+
+    try {
+      // Check for Stripe redirect success
+      const success = searchParams?.get("success")
+      const canceled = searchParams?.get("canceled")
+
+      if (success === "true") {
+        toast.success("Payment successful! Your account has been upgraded to Pro.")
+        // Clean URL and redirect
+        router.replace("/upgrade")
+        setTimeout(() => {
+          router.push("/profile")
+        }, 2000)
+      } else if (canceled === "true") {
+        toast.info("Payment canceled. You can try again anytime.")
+        // Clean URL params after showing toast
+        router.replace("/upgrade")
+      }
+    } catch (error) {
+      console.error("Error handling search params:", error)
     }
-    if (searchParams.get("canceled") === "true") {
-      toast.info("Payment canceled. You can try again anytime.")
-    }
-  }, [searchParams])
+  }, [mounted, searchParams, router])
 
   const handlePromoCode = async () => {
     if (!user || !promoCode.trim()) {
@@ -311,5 +335,19 @@ export default function UpgradePage() {
 
       <Footer />
     </main>
+  )
+}
+
+export default function UpgradePage() {
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={
+        <main className="min-h-screen bg-black flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff5733]"></div>
+        </main>
+      }>
+        <UpgradePageContent />
+      </Suspense>
+    </ErrorBoundary>
   )
 }
