@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { CodeViewerDialog } from "@/components/CodeViewerDialog"
+import { CodeViewerSidePanel } from "@/components/CodeViewerSidePanel"
 import {
   Play,
   RotateCcw,
@@ -1116,7 +1116,7 @@ Let's have a great interview! How would you like to approach this problem?`
 
               {/* Main Interface - Three Column Layout */}
               {!showFeedback && !showPostInterviewDiscussion ? (
-                <div className="grid grid-cols-12 gap-2 flex-1 min-h-0 overflow-hidden">
+                <div className={`grid grid-cols-12 gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${isCodeViewerOpen ? 'ml-[600px]' : ''}`}>
                   {/* Left: Problem Description / File Upload */}
                   <div className="col-span-12 lg:col-span-3 flex flex-col min-h-0">
                     <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden">
@@ -1628,9 +1628,9 @@ Let's have a great interview! How would you like to approach this problem?`
         </section>
       )}
 
-      {/* Code Viewer Dialog */}
+      {/* Code Viewer Side Panel */}
       {selectedFile && (
-        <CodeViewerDialog
+        <CodeViewerSidePanel
           isOpen={isCodeViewerOpen}
           onClose={() => {
             setIsCodeViewerOpen(false)

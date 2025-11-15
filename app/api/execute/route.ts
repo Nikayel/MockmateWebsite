@@ -29,8 +29,16 @@ async function executePython(code: string, testCase: any, scenarioType: string) 
   }
 }
 
-// Validate test results
+// Validate test results with improved edge case handling
 function validateResult(actual: any, expected: any, testCase: any, scenarioType: string): boolean {
+  // Handle null/undefined cases first
+  if (expected === null || expected === undefined) {
+    return actual === null || actual === undefined
+  }
+  if (actual === null || actual === undefined) {
+    return false
+  }
+
   // For DSA array problems (like two-sum), check if arrays are equal
   if (Array.isArray(expected) && Array.isArray(actual)) {
     if (expected.length !== actual.length) return false
@@ -47,8 +55,32 @@ function validateResult(actual: any, expected: any, testCase: any, scenarioType:
       }
     }
 
-    // Default array comparison
-    return expected.every((val: any, idx: number) => val === actual[idx])
+    // For array of arrays (like 2D arrays), deep compare
+    if (expected.length > 0 && Array.isArray(expected[0])) {
+      return expected.every((expectedRow: any, rowIdx: number) => {
+        if (!Array.isArray(actual[rowIdx])) return false
+        return expectedRow.every((val: any, colIdx: number) => val === actual[rowIdx][colIdx])
+      })
+    }
+
+    // For arrays where order doesn't matter (set-like), check as sets
+    if (testCase.orderMatters === false) {
+      const expectedSet = new Set(expected.map((x: any) => JSON.stringify(x)))
+      const actualSet = new Set(actual.map((x: any) => JSON.stringify(x)))
+      if (expectedSet.size !== actualSet.size) return false
+      for (const item of expectedSet) {
+        if (!actualSet.has(item)) return false
+      }
+      return true
+    }
+
+    // Default array comparison (order matters)
+    return expected.every((val: any, idx: number) => {
+      if (typeof val === 'number' && typeof actual[idx] === 'number') {
+        return Math.abs(val - actual[idx]) < 0.0001
+      }
+      return val === actual[idx]
+    })
   }
 
   // For boolean results
@@ -56,18 +88,40 @@ function validateResult(actual: any, expected: any, testCase: any, scenarioType:
     return expected === actual
   }
 
-  // For numeric results (with small tolerance for floating point)
+  // For numeric results (with tolerance for floating point)
   if (typeof expected === 'number' && typeof actual === 'number') {
-    return Math.abs(expected - actual) < 0.01
+    // Use relative tolerance for large numbers, absolute for small
+    const tolerance = Math.max(0.0001, Math.abs(expected) * 0.0001)
+    return Math.abs(expected - actual) < tolerance
   }
 
-  // For object/null comparisons
-  if (expected === null) return actual === null
-  if (typeof expected === 'object' && typeof actual === 'object') {
-    return JSON.stringify(expected) === JSON.stringify(actual)
+  // For string results (case-sensitive by default, but allow case-insensitive if specified)
+  if (typeof expected === 'string' && typeof actual === 'string') {
+    if (testCase.caseSensitive === false) {
+      return expected.toLowerCase() === actual.toLowerCase()
+    }
+    return expected === actual
   }
 
-  // Default comparison
+  // For object comparisons (deep equality)
+  if (typeof expected === 'object' && typeof actual === 'object' && !Array.isArray(expected)) {
+    try {
+      // Handle nested objects
+      const expectedKeys = Object.keys(expected).sort()
+      const actualKeys = Object.keys(actual).sort()
+      
+      if (expectedKeys.length !== actualKeys.length) return false
+      
+      return expectedKeys.every(key => {
+        return validateResult(actual[key], expected[key], { ...testCase, orderMatters: true }, scenarioType)
+      })
+    } catch {
+      // Fallback to JSON comparison
+      return JSON.stringify(expected) === JSON.stringify(actual)
+    }
+  }
+
+  // Default strict comparison
   return expected === actual
 }
 
@@ -101,23 +155,68 @@ export async function POST(request: NextRequest) {
     let allPassed = true
     let executionError = null
 
-    // Execute each test case
+    // Execute each test case with timeout protection
     for (const testCase of testCases) {
       let executionResult: any
+      const startTime = Date.now()
+      const TIMEOUT_MS = 10000 // 10 second timeout per test case
 
-      // Execute based on language
-      switch (language) {
-        case 'python':
-          executionResult = await executePython(code, testCase, scenario.type)
-          break
-        case 'javascript':
-        case 'typescript':
-        default:
-          executionResult = await executeJavaScript(code, testCase, scenario.type)
-          break
-      }
+      try {
+        // Execute based on language
+        switch (language) {
+          case 'python':
+            executionResult = await executePython(code, testCase, scenario.type)
+            break
+          case 'javascript':
+          case 'typescript':
+          default:
+            executionResult = await executeJavaScript(code, testCase, scenario.type)
+            break
+        }
 
-      if (executionResult.error) {
+        // Check for timeout
+        if (Date.now() - startTime > TIMEOUT_MS) {
+          allPassed = false
+          results.push({
+            description: testCase.description,
+            input: testCase.input,
+            expected: testCase.expected,
+            actual: null,
+            passed: false,
+            error: 'Execution timeout: code took too long to execute',
+          })
+          continue
+        }
+
+        if (executionResult.error) {
+          allPassed = false
+          results.push({
+            description: testCase.description,
+            input: testCase.input,
+            expected: testCase.expected,
+            actual: null,
+            passed: false,
+            error: executionResult.error,
+          })
+          continue
+        }
+
+        // Validate result
+        const passed = validateResult(executionResult.result, testCase.expected, testCase, scenario.type)
+
+        if (!passed) {
+          allPassed = false
+        }
+
+        results.push({
+          description: testCase.description,
+          input: testCase.input,
+          expected: testCase.expected,
+          actual: executionResult.result,
+          passed,
+          error: null,
+        })
+      } catch (error) {
         allPassed = false
         results.push({
           description: testCase.description,
@@ -125,26 +224,9 @@ export async function POST(request: NextRequest) {
           expected: testCase.expected,
           actual: null,
           passed: false,
-          error: executionResult.error,
+          error: error instanceof Error ? error.message : 'Unknown execution error',
         })
-        continue
       }
-
-      // Validate result
-      const passed = validateResult(executionResult.result, testCase.expected, testCase, scenario.type)
-
-      if (!passed) {
-        allPassed = false
-      }
-
-      results.push({
-        description: testCase.description,
-        input: testCase.input,
-        expected: testCase.expected,
-        actual: executionResult.result,
-        passed,
-        error: null,
-      })
     }
 
     // Calculate summary

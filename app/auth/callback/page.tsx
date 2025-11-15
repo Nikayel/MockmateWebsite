@@ -24,6 +24,7 @@ export default function AuthCallback() {
         if (firebaseUser) {
           const convertedUser = convertFirebaseUser(firebaseUser)
           setUser(convertedUser)
+          setStatus("success")
           
           // Create/update profile in Firestore immediately
           await createOrUpdateProfile(
@@ -47,8 +48,8 @@ export default function AuthCallback() {
             return
           }
 
-          // Default redirect to account dashboard for new users
-          router.push("/account")
+          // Default redirect to dashboard for new users
+          router.push("/dashboard")
         } else {
           setStatus("error")
         }
@@ -115,7 +116,7 @@ export default function AuthCallback() {
             )}
 
             <Button
-              onClick={() => (window.location.href = "/account")}
+              onClick={() => (window.location.href = "/dashboard")}
               variant="outline"
               className="w-full border-gray-600 text-white hover:bg-gray-800"
             >

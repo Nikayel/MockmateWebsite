@@ -11,6 +11,8 @@ import { createOrUpdateProfile } from "@/lib/firestore-helpers"
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import { useSearchParams, useRouter } from "next/navigation"
+import { auth } from "@/lib/firebase"
+import { onAuthStateChanged } from "firebase/auth"
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -26,17 +28,38 @@ export default function LoginPage() {
     }
   }, [redirect])
 
+  // Listen for auth state changes to redirect after successful login
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // User is authenticated, redirect them
+        const savedRedirect = localStorage.getItem("auth_redirect")
+        if (savedRedirect) {
+          localStorage.removeItem("auth_redirect")
+          router.push(`/${savedRedirect}`)
+        } else if (redirect) {
+          router.push(`/${redirect}`)
+        } else {
+          router.push("/dashboard")
+        }
+      }
+    })
+
+    return () => unsubscribe()
+  }, [router, redirect])
+
   const handleGitHubLogin = async () => {
     try {
       setIsLoading(true)
-      // signInWithGitHub redirects to GitHub, then to /auth/callback
       // Store redirect in localStorage for callback to use
       if (redirect) {
         localStorage.setItem("auth_redirect", redirect)
+      } else {
+        // Default to dashboard if no redirect specified
+        localStorage.setItem("auth_redirect", "dashboard")
       }
       await signInWithGitHub()
-      // User will be redirected to GitHub, then back to /auth/callback
-      // The callback page will handle the redirect
+      // After popup closes, onAuthStateChanged will handle the redirect
     } catch (error) {
       console.error("Login failed:", error)
       toast.error("Login failed", {
@@ -52,10 +75,12 @@ export default function LoginPage() {
       // Store redirect in localStorage for callback to use
       if (redirect) {
         localStorage.setItem("auth_redirect", redirect)
+      } else {
+        // Default to dashboard if no redirect specified
+        localStorage.setItem("auth_redirect", "dashboard")
       }
       await signInWithGoogle()
-      // User will be redirected to Google, then back to /auth/callback
-      // The callback page will handle the redirect
+      // After popup closes, onAuthStateChanged will handle the redirect
     } catch (error) {
       console.error("Login failed:", error)
       toast.error("Login failed", {
