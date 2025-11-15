@@ -47,8 +47,8 @@ export default function AuthCallback() {
             return
           }
 
-          // Default redirect to dashboard for new users
-          router.push("/dashboard")
+          // Default redirect to account dashboard for new users
+          router.push("/account")
         } else {
           setStatus("error")
         }
