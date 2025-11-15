@@ -68,6 +68,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [initialized])
 
+  // Token refresh - refresh ID token every 50 minutes (tokens expire after 1 hour)
+  useEffect(() => {
+    if (!firebaseUser) return
+
+    const refreshToken = async () => {
+      try {
+        // Force token refresh
+        await firebaseUser.getIdToken(true)
+        console.log("ID token refreshed successfully")
+      } catch (error) {
+        console.error("Failed to refresh token:", error)
+      }
+    }
+
+    // Refresh immediately if token is close to expiration
+    const checkAndRefresh = async () => {
+      try {
+        const tokenResult = await firebaseUser.getIdTokenResult()
+        const expirationTime = new Date(tokenResult.expirationTime).getTime()
+        const currentTime = Date.now()
+        const timeUntilExpiration = expirationTime - currentTime
+
+        // If token expires in less than 10 minutes, refresh now
+        if (timeUntilExpiration < 10 * 60 * 1000) {
+          await refreshToken()
+        }
+      } catch (error) {
+        console.error("Failed to check token expiration:", error)
+      }
+    }
+
+    // Check immediately on mount
+    checkAndRefresh()
+
+    // Set up periodic refresh every 50 minutes
+    const refreshInterval = setInterval(refreshToken, 50 * 60 * 1000)
+
+    return () => {
+      clearInterval(refreshInterval)
+    }
+  }, [firebaseUser])
+
   return (
     <AuthContext.Provider value={{ user, firebaseUser, loading, initialized }}>
       {children}

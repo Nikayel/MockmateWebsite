@@ -3,7 +3,7 @@
  */
 
 import { db } from "./firebase"
-import { doc, setDoc, getDoc, collection, query, where, getDocs } from "firebase/firestore"
+import { doc, setDoc, getDoc, collection, query, where, getDocs, runTransaction, increment } from "firebase/firestore"
 import { Profile, ProfileQuota } from "./types"
 import { PRICING_CONFIG } from "./config"
 
@@ -294,7 +294,7 @@ export async function updateInterviewSession(
 }
 
 /**
- * Increment session usage
+ * Increment session usage (with atomic transaction to prevent race conditions)
  */
 export async function incrementSessionUsage(userId: string): Promise<void> {
   const profile = await getUserProfile(userId)
@@ -307,13 +307,32 @@ export async function incrementSessionUsage(userId: string): Promise<void> {
   )
 
   const quotaSnap = await getDocs(quotaQuery)
-  
+
   if (!quotaSnap.empty) {
     const quotaRef = quotaSnap.docs[0].ref
-    await setDoc(quotaRef, {
-      sessions_used: quota.sessions_used + 1,
-      updated_at: new Date().toISOString(),
-    }, { merge: true })
+
+    // Use Firestore transaction to prevent race conditions
+    await runTransaction(db, async (transaction) => {
+      const quotaDoc = await transaction.get(quotaRef)
+
+      if (!quotaDoc.exists()) {
+        throw new Error("Quota document does not exist")
+      }
+
+      const currentUsage = quotaDoc.data().sessions_used || 0
+      const sessionLimit = quotaDoc.data().sessions_limit || 0
+
+      // Check if user has exceeded limit
+      if (currentUsage >= sessionLimit) {
+        throw new Error("Session limit exceeded")
+      }
+
+      // Atomically increment sessions_used
+      transaction.update(quotaRef, {
+        sessions_used: increment(1),
+        updated_at: new Date().toISOString(),
+      })
+    })
   }
 }
 
