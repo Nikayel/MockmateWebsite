@@ -20,9 +20,10 @@ MockMate helps developers prepare for technical interviews by simulating realist
 - **Next.js 15** - React framework with App Router
 - **TypeScript** - Type-safe development
 - **Tailwind CSS** - Styling
-- **Supabase** - Authentication and database
+- **Firebase** - Authentication and Firestore database
 - **Google Gemini** - AI chat functionality
 - **Monaco Editor** - Code editor for demo
+- **Stripe** - Payment processing (proprietary)
 
 ## Getting Started
 
@@ -30,7 +31,7 @@ MockMate helps developers prepare for technical interviews by simulating realist
 
 - Node.js 18+ 
 - pnpm (or npm/yarn)
-- Supabase account
+- Firebase account (for authentication and Firestore)
 - Google Gemini API key
 
 ### Installation
@@ -53,9 +54,23 @@ cp .env.example .env.local
 
 Fill in your `.env.local`:
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+# Firebase Configuration
+NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+
+# AI Configuration
 GEMINI_API_KEY=your_gemini_api_key
+
+# Stripe Configuration (for payment features - proprietary)
+STRIPE_SECRET_KEY=sk_test_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_PRICE_ID_WEBSITE=price_...
+STRIPE_PRICE_ID_VSCODE=price_...
+STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
 4. Run the dev server:
@@ -100,9 +115,17 @@ Visit `http://localhost:3000`
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL | Yes |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key | Yes |
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase API key | Yes |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Firebase auth domain | Yes |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Firebase project ID | Yes |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Firebase storage bucket | Yes |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase messaging sender ID | Yes |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase app ID | Yes |
 | `GEMINI_API_KEY` | Google Gemini API key | Yes |
+| `STRIPE_SECRET_KEY` | Stripe secret key (proprietary) | No* |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (proprietary) | No* |
+
+\* Required only for payment features (proprietary)
 
 ## Development
 
@@ -127,12 +150,21 @@ The site is deployed on Vercel. Push to `main` branch to deploy automatically.
 ## Connection to Extension
 
 The website and VS Code extension share:
-- Same Supabase project (authentication & database)
-- Same user profiles table
+- Same Firebase project (authentication & Firestore database)
+- Same user profiles collection
 - Same subscription tiers
 - OAuth flow: Website → Extension via deep links
 
 When users upgrade on the website, their subscription status is immediately available in the extension.
+
+## Security & Firebase Rules
+
+This project uses Firebase Firestore with Row-Level Security (RLS) rules. See [FIRESTORE_RULES.md](./FIRESTORE_RULES.md) for the complete security rules configuration.
+
+**Important**: Always configure Firestore security rules in your Firebase Console to restrict access to user data. The rules ensure:
+- Users can only read/write their own profile
+- Users can only access their own interview sessions
+- All operations require authentication
 
 ## Contributing
 
@@ -143,7 +175,27 @@ When users upgrade on the website, their subscription status is immediately avai
 
 ## License
 
-MIT
+This project uses a **hybrid open-source approach**:
+
+- **Core functionality, UI components, and interview features**: MIT License (fully open source)
+- **Payment processing, proprietary algorithms, and advanced features**: All Rights Reserved (proprietary)
+
+See [PRIVATE.md](./PRIVATE.md) for details on what's open source vs proprietary.
+
+### Open Source Components
+- Core UI components and design system
+- Authentication and user management
+- Interview functionality and AI chat
+- Basic dashboard and session management
+- Documentation and setup guides
+
+### Proprietary Components
+- Stripe payment integration
+- Subscription management logic
+- Advanced analytics and algorithms
+- Business-specific features
+
+This hybrid model allows the community to benefit from the core platform while protecting business-critical components.
 
 ## Documentation
 
