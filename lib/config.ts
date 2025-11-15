@@ -10,10 +10,10 @@ export const PRICING_CONFIG = {
     priceDisplay: "$0",
     period: "/month",
     description: "Perfect for getting started",
-    sessionsPerMonth: 10,
-    sessionsDisplay: "10 interview sessions per month",
+    sessionsPerMonth: 2,
+    sessionsDisplay: "2 interview sessions per month",
     features: [
-      "10 interview sessions per month",
+      "2 interview sessions per month",
       "Basic coding challenges",
       "AI interviewer feedback",
       "Performance tracking",

@@ -31,6 +31,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
+import { checkUsageLimit, incrementSessionUsage } from "@/lib/firestore-helpers"
 import { scenarios, filterScenarios, getScenarioById, type Scenario, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
 import { User as UserType } from "@/lib/types"
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from "@/components/ui/alert-dialog"
@@ -91,12 +92,14 @@ export default function InterviewPage() {
   const [workspaceContext, setWorkspaceContext] = useState<Array<{ path: string; content: string }>>([])
   const [lastCodeHash, setLastCodeHash] = useState<string>("")
   const [proactiveTimer, setProactiveTimer] = useState<NodeJS.Timeout | null>(null)
+  const [usageLimit, setUsageLimit] = useState<{ used: number; limit: number; allowed: boolean } | null>(null)
+  const [showLimitDialog, setShowLimitDialog] = useState(false)
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const interviewerEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Check authentication
+  // Check authentication and usage limit
   useEffect(() => {
     const checkAuth = async () => {
       const firebaseUser = await getCurrentUser()
@@ -106,6 +109,11 @@ export default function InterviewPage() {
       }
       const convertedUser = convertFirebaseUser(firebaseUser)
       setUser(convertedUser)
+      
+      // Check usage limit
+      const usage = await checkUsageLimit(firebaseUser.uid)
+      setUsageLimit(usage)
+      
       setIsLoading(false)
     }
     checkAuth()
@@ -217,10 +225,29 @@ export default function InterviewPage() {
     }
   }
 
-  const startInterview = () => {
+  const startInterview = async () => {
     if (!selectedScenario) {
       toast.error("Please select a scenario first")
       return
+    }
+
+    // Check usage limit before starting
+    if (user && usageLimit && !usageLimit.allowed) {
+      setShowLimitDialog(true)
+      return
+    }
+
+    // Increment usage when starting interview
+    if (user) {
+      try {
+        await incrementSessionUsage(user.id)
+        // Refresh usage limit
+        const updatedUsage = await checkUsageLimit(user.id)
+        setUsageLimit(updatedUsage)
+      } catch (error) {
+        console.error("Error incrementing usage:", error)
+        toast.error("Failed to track session usage")
+      }
     }
 
     setIsInterviewStarted(true)
@@ -482,15 +509,34 @@ Take a moment to think about your approach, then feel free to ask me any clarify
 
               {/* Start Button */}
               {selectedScenario && (
-                <div className="mt-8 text-center">
+                <div className="mt-8 text-center space-y-4">
+                  {usageLimit && !usageLimit.allowed && (
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-4">
+                      <p className="text-yellow-400 font-medium mb-2">Monthly Limit Reached</p>
+                      <p className="text-gray-300 text-sm mb-4">
+                        You've used all {usageLimit.limit} free sessions this month. Upgrade to Pro for unlimited practice!
+                      </p>
+                      <Link href="/upgrade">
+                        <Button className="bg-yellow-500 hover:bg-yellow-600 text-black">
+                          Upgrade to Pro
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
                   <Button
                     onClick={startInterview}
+                    disabled={usageLimit && !usageLimit.allowed}
                     size="lg"
-                    className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-4 text-lg"
+                    className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-4 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Play className="mr-2 h-5 w-5" />
                     Start Interview
                   </Button>
+                  {usageLimit && usageLimit.allowed && (
+                    <p className="text-sm text-gray-400">
+                      {usageLimit.limit - usageLimit.used} session{usageLimit.limit - usageLimit.used !== 1 ? 's' : ''} remaining this month
+                    </p>
+                  )}
                 </div>
               )}
             </div>
