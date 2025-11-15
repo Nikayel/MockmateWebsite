@@ -14,7 +14,7 @@ import { db } from "@/lib/firebase"
 import { doc, setDoc, getDoc } from "firebase/firestore"
 import { Check, Crown, Zap, Star, ArrowRight, Ticket, CheckCircle } from "lucide-react"
 import { PRICING_CONFIG, getProPricing } from "@/lib/config"
-import { User } from "@/lib/types"
+import { User, Profile } from "@/lib/types"
 import { toast } from "sonner"
 import { ErrorBoundary } from "@/components/error-boundary"
 
@@ -57,10 +57,18 @@ function UpgradePageContent() {
 
       if (success === "true") {
         toast.success("Payment successful! Your account has been upgraded to Pro.")
-        // Clean URL and redirect
+        // Clean URL and reload profile data
         router.replace("/upgrade")
-        setTimeout(() => {
-          router.push("/profile")
+        // Reload user profile to reflect Pro status
+        setTimeout(async () => {
+          const firebaseUser = await getCurrentUser()
+          if (firebaseUser) {
+            const userProfile = await getUserProfile(firebaseUser.uid)
+            if (userProfile) {
+              setProfile(userProfile)
+            }
+          }
+          router.push("/dashboard")
         }, 2000)
       } else if (canceled === "true") {
         toast.info("Payment canceled. You can try again anytime.")
