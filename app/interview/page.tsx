@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { CodeViewerDialog } from "@/components/CodeViewerDialog"
 import {
   Play,
   RotateCcw,
@@ -112,6 +113,10 @@ export default function InterviewPage() {
   const [proactiveTimer, setProactiveTimer] = useState<NodeJS.Timeout | null>(null)
   const [usageLimit, setUsageLimit] = useState<{ used: number; limit: number; allowed: boolean } | null>(null)
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+
+  // Code viewer dialog state
+  const [selectedFile, setSelectedFile] = useState<{ path: string; content: string } | null>(null)
+  const [isCodeViewerOpen, setIsCodeViewerOpen] = useState(false)
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const interviewerEndRef = useRef<HTMLDivElement>(null)
@@ -275,6 +280,20 @@ Let's continue!`
       // For bug fix scenarios, use buggyCode
       if (selectedScenario.type === 'bugfix') {
         newCode = (selectedScenario as any).buggyCode?.[selectedLanguage] || `// Bug fix code not available for ${selectedLanguage}`
+
+        // Also update workspace files when language changes
+        const codebaseFiles = (selectedScenario as any).codebaseFiles?.[selectedLanguage] || []
+        if (codebaseFiles.length > 0) {
+          const contextFiles = codebaseFiles.map((file: any) => ({
+            path: file.fileName,
+            content: file.content,
+          }))
+          setWorkspaceContext(contextFiles)
+          toast.success(`Loaded ${contextFiles.length} codebase file(s) for ${selectedLanguage}`)
+        } else {
+          // Clear workspace if no files available for this language
+          setWorkspaceContext([])
+        }
       } else {
         // For DSA scenarios, use starterCode
         newCode = (selectedScenario as any).starterCode?.[selectedLanguage] || `function solution() {
@@ -1185,9 +1204,19 @@ Let's have a great interview! How would you like to approach this problem?`
                               </p>
                               <div className="space-y-1 max-h-32 overflow-y-auto">
                                 {workspaceContext.map((file, idx) => (
-                                  <div key={idx} className="text-xs text-gray-300 bg-gray-800/50 px-2 py-1 rounded border border-gray-700">
-                                    <div className="font-semibold text-blue-400">{file.path}</div>
-                                  </div>
+                                  <button
+                                    key={idx}
+                                    onClick={() => {
+                                      setSelectedFile(file)
+                                      setIsCodeViewerOpen(true)
+                                    }}
+                                    className="w-full text-left text-xs text-gray-300 bg-gray-800/50 px-2 py-1 rounded border border-gray-700 hover:bg-gray-700/50 hover:border-blue-500 transition-colors cursor-pointer"
+                                  >
+                                    <div className="font-semibold text-blue-400 flex items-center gap-1">
+                                      <Code className="h-3 w-3" />
+                                      {file.path}
+                                    </div>
+                                  </button>
                                 ))}
                               </div>
                             </div>
@@ -1212,9 +1241,19 @@ Let's have a great interview! How would you like to approach this problem?`
                               {workspaceContext.length > 0 && (
                                 <div className="mt-2 space-y-1">
                                   {workspaceContext.map((file, idx) => (
-                                    <div key={idx} className="text-xs text-gray-400 truncate bg-gray-800/30 px-2 py-1 rounded">
-                                      {file.path}
-                                    </div>
+                                    <button
+                                      key={idx}
+                                      onClick={() => {
+                                        setSelectedFile(file)
+                                        setIsCodeViewerOpen(true)
+                                      }}
+                                      className="w-full text-left text-xs text-gray-400 bg-gray-800/30 px-2 py-1 rounded hover:bg-gray-700/30 hover:text-blue-400 transition-colors cursor-pointer"
+                                    >
+                                      <div className="truncate flex items-center gap-1">
+                                        <Code className="h-3 w-3 flex-shrink-0" />
+                                        {file.path}
+                                      </div>
+                                    </button>
                                   ))}
                                 </div>
                               )}
@@ -1587,6 +1626,19 @@ Let's have a great interview! How would you like to approach this problem?`
             </div>
           </div>
         </section>
+      )}
+
+      {/* Code Viewer Dialog */}
+      {selectedFile && (
+        <CodeViewerDialog
+          isOpen={isCodeViewerOpen}
+          onClose={() => {
+            setIsCodeViewerOpen(false)
+            setSelectedFile(null)
+          }}
+          fileName={selectedFile.path}
+          content={selectedFile.content}
+        />
       )}
 
       <Footer />

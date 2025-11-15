@@ -1236,6 +1236,23 @@ def process_adjacent_pairs(readings):
         change = calculate_change(current, next_reading)
         changes.append(change)
     return changes`,
+      java: `// DataProcessor.java - Main file with the bug
+import java.util.ArrayList;
+import java.util.List;
+
+public class DataProcessor {
+    // BUG: Off-by-one error in loop condition
+    public static List<Double> processAdjacentPairs(double[] readings) {
+        List<Double> changes = new ArrayList<>();
+        for (int i = 0; i <= readings.length; i++) {
+            double current = readings[i];
+            double next = readings[i + 1];
+            double change = Calculator.calculateChange(current, next);
+            changes.add(change);
+        }
+        return changes;
+    }
+}`,
     },
     codebaseFiles: {
       javascript: [
@@ -1342,6 +1359,90 @@ def analyze_trends(sensor_data):
           description: 'Main module that coordinates the processing',
         },
       ],
+      java: [
+        {
+          fileName: 'utils/Calculator.java',
+          content: `// Utility functions for change calculation
+package utils;
+
+public class Calculator {
+    public static double calculateChange(double current, double next) {
+        if (Double.isNaN(current) || Double.isNaN(next)) {
+            throw new IllegalArgumentException("Invalid readings: NaN values");
+        }
+        if (current == 0) {
+            return next == 0 ? 0 : Double.POSITIVE_INFINITY;
+        }
+        return ((next - current) / current) * 100;
+    }
+
+    public static boolean isSignificantChange(double change, double threshold) {
+        return Math.abs(change) > threshold;
+    }
+
+    public static boolean isSignificantChange(double change) {
+        return isSignificantChange(change, 10.0);
+    }
+}`,
+          description: 'Utility functions that expect valid data',
+        },
+        {
+          fileName: 'validators/DataValidator.java',
+          content: `// Data validation module
+package validators;
+
+public class DataValidator {
+    public static boolean validateReadings(double[] readings) {
+        if (readings == null) {
+            throw new IllegalArgumentException("Readings must not be null");
+        }
+        if (readings.length < 2) {
+            throw new IllegalArgumentException("Need at least 2 readings for comparison");
+        }
+        for (double reading : readings) {
+            if (Double.isNaN(reading)) {
+                throw new IllegalArgumentException("All readings must be valid numbers");
+            }
+        }
+        return true;
+    }
+}`,
+          description: 'Validates input data before processing',
+        },
+        {
+          fileName: 'TrendAnalyzer.java',
+          content: `// Main entry point
+import validators.DataValidator;
+import utils.Calculator;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class TrendAnalyzer {
+    public static class TrendResult {
+        public List<Double> allChanges;
+        public List<Double> significantChanges;
+        public double trendStrength;
+
+        public TrendResult(List<Double> allChanges, List<Double> significantChanges, double trendStrength) {
+            this.allChanges = allChanges;
+            this.significantChanges = significantChanges;
+            this.trendStrength = trendStrength;
+        }
+    }
+
+    public static TrendResult analyzeTrends(double[] sensorData) {
+        DataValidator.validateReadings(sensorData);
+        List<Double> changes = DataProcessor.processAdjacentPairs(sensorData);
+        List<Double> significantChanges = changes.stream()
+            .filter(Calculator::isSignificantChange)
+            .collect(Collectors.toList());
+        double trendStrength = changes.isEmpty() ? 0.0 : (double) significantChanges.size() / changes.size();
+        return new TrendResult(changes, significantChanges, trendStrength);
+    }
+}`,
+          description: 'Main module that coordinates the processing',
+        },
+      ],
     },
     expectedBehavior: 'Should process all adjacent pairs without index errors and return correct change calculations',
     bugDescription: 'Off-by-one error in loop condition causes array index out of bounds when accessing readings[i] and readings[i+1]',
@@ -1411,6 +1512,19 @@ def get_user_email_formatted(user):
 def get_user_display_name(user):
     # BUG: Assumes user and name always exist
     return f"{user['firstName']} {user['lastName']}"`,
+      java: `// UserService.java - Main file with null reference bugs
+public class UserService {
+    // BUG: No null check on user
+    // BUG: No check if email exists
+    public static String getUserEmailFormatted(User user) {
+        return user.getEmail().toLowerCase().trim();
+    }
+
+    // BUG: Assumes user and name always exist
+    public static String getUserDisplayName(User user) {
+        return user.getFirstName() + " " + user.getLastName();
+    }
+}`,
     },
     codebaseFiles: {
       javascript: [
@@ -1546,6 +1660,132 @@ def register_user(request_data):
           description: 'API controller that registers users and sends emails',
         },
       ],
+      java: [
+        {
+          fileName: 'models/User.java',
+          content: `// User model definition
+package models;
+
+public class User {
+    private String id;
+    private String email;
+    private String firstName;
+    private String lastName;
+    private boolean isActive;
+
+    public User() {
+        this.isActive = true;
+    }
+
+    public User(String id, String email, String firstName, String lastName) {
+        this.id = id;
+        this.email = email;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.isActive = true;
+    }
+
+    // Getters
+    public String getId() { return id; }
+    public String getEmail() { return email; }
+    public String getFirstName() { return firstName; }
+    public String getLastName() { return lastName; }
+    public boolean isActive() { return isActive; }
+
+    // Setters
+    public void setId(String id) { this.id = id; }
+    public void setEmail(String email) { this.email = email; }
+    public void setFirstName(String firstName) { this.firstName = firstName; }
+    public void setLastName(String lastName) { this.lastName = lastName; }
+    public void setActive(boolean active) { this.isActive = active; }
+}
+
+// NOTE: Users from external APIs might have missing fields
+// or might be null entirely`,
+          description: 'User model that can have null fields',
+        },
+        {
+          fileName: 'services/EmailService.java',
+          content: `// Email service that uses user data
+package services;
+
+import models.User;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
+
+public class EmailService {
+    // This will crash if user data is incomplete
+    public static Map<String, Object> sendWelcomeEmail(User user) {
+        String email = UserService.getUserEmailFormatted(user);
+        String name = UserService.getUserDisplayName(user);
+
+        System.out.println("Sending welcome email to " + email + " for " + name);
+        // Email sending logic...
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("recipient", email);
+        return result;
+    }
+
+    // Bulk processing - should handle invalid users gracefully
+    public static List<Map<String, Object>> sendBulkEmails(List<User> users) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        for (User user : users) {
+            try {
+                results.add(sendWelcomeEmail(user));
+            } catch (Exception e) {
+                Map<String, Object> errorResult = new HashMap<>();
+                errorResult.put("success", false);
+                errorResult.put("error", e.getMessage());
+                results.add(errorResult);
+            }
+        }
+        return results;
+    }
+}`,
+          description: 'Email service that depends on user service functions',
+        },
+        {
+          fileName: 'api/UserController.java',
+          content: `// API controller
+package api;
+
+import models.User;
+import services.EmailService;
+import java.util.Map;
+import java.util.HashMap;
+
+public class UserController {
+    public static Map<String, Object> registerUser(Map<String, Object> requestData) {
+        Map<String, Object> userData = (Map<String, Object>) requestData.get("body");
+        User user = new User();
+        if (userData != null) {
+            user.setId((String) userData.get("id"));
+            user.setEmail((String) userData.get("email"));
+            user.setFirstName((String) userData.get("firstName"));
+            user.setLastName((String) userData.get("lastName"));
+        }
+
+        try {
+            // User data from API might be incomplete
+            Map<String, Object> emailResult = EmailService.sendWelcomeEmail(user);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.putAll(emailResult);
+            return response;
+        } catch (Exception error) {
+            // Currently crashes with NullPointerException
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to process user registration");
+            return errorResponse;
+        }
+    }
+}`,
+          description: 'API controller that registers users and sends emails',
+        },
+      ],
     },
     expectedBehavior: 'Should safely handle null/undefined user objects and missing fields without crashing, returning appropriate defaults or error messages',
     bugDescription: 'Missing null/undefined checks cause crashes when user object is null or when required fields are missing',
@@ -1607,6 +1847,20 @@ async def get_user_with_posts(user_id):
     user = fetch_user(user_id)  # BUG: Missing await
     posts = await fetch_user_posts(user['id'])
     return {"user": user, "posts": posts}`,
+      java: `// UserService.java - Main file with async/await bug
+import java.util.concurrent.CompletableFuture;
+import java.util.Map;
+import java.util.List;
+
+public class UserService {
+    public static CompletableFuture<Map<String, Object>> getUserWithPosts(String userId) {
+        CompletableFuture<User> user = fetchUser(userId);  // BUG: Not waiting for completion
+        CompletableFuture<List<Post>> posts = user.get().getId()  // Will throw exception
+            .thenCompose(id -> fetchUserPosts(id));
+
+        return posts.thenApply(p -> Map.of("user", user, "posts", p));
+    }
+}`,
     },
     codebaseFiles: {
       javascript: [
@@ -1840,6 +2094,167 @@ async def render_user_dashboard(user_id: str):
           description: 'Dashboard that uses the buggy service',
         },
       ],
+      java: [
+        {
+          fileName: 'api/UserAPI.java',
+          content: `// User API functions
+package api;
+
+import java.util.concurrent.CompletableFuture;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.URI;
+import com.google.gson.Gson;
+import java.util.List;
+
+public class UserAPI {
+    private static final HttpClient client = HttpClient.newHttpClient();
+    private static final Gson gson = new Gson();
+
+    public static CompletableFuture<User> fetchUser(String userId) {
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create("https://api.example.com/users/" + userId))
+            .build();
+
+        return client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+            .thenApply(response -> {
+                if (response.statusCode() != 200) {
+                    throw new RuntimeException("Failed to fetch user: " + response.statusCode());
+                }
+                return gson.fromJson(response.body(), User.class);
+            });
+    }
+
+    public static CompletableFuture<List<Post>> fetchUserPosts(String userId) {
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create("https://api.example.com/users/" + userId + "/posts"))
+            .build();
+
+        return client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+            .thenApply(response -> {
+                if (response.statusCode() != 200) {
+                    throw new RuntimeException("Failed to fetch posts: " + response.statusCode());
+                }
+                return gson.fromJson(response.body(), new TypeToken<List<Post>>(){}.getType());
+            });
+    }
+}
+
+class User {
+    String id;
+    String name;
+    String email;
+    String avatar;
+
+    public String getId() { return id; }
+    public String getName() { return name; }
+    public String getEmail() { return email; }
+}
+
+class Post {
+    String id;
+    String userId;
+    String title;
+    String body;
+    String createdAt;
+}`,
+          description: 'API functions returning CompletableFuture - all async',
+        },
+        {
+          fileName: 'components/UserDashboard.java',
+          content: `// User Dashboard component that uses getUserWithPosts
+package components;
+
+import api.UserAPI;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+
+public class UserDashboard {
+    public static void renderUserDashboard(String userId) {
+        System.out.println("Loading...");
+
+        try {
+            CompletableFuture<Map<String, Object>> dataFuture = UserService.getUserWithPosts(userId);
+
+            dataFuture.thenAccept(data -> {
+                // This will fail if user is still a CompletableFuture
+                User user = (User) data.get("user");
+                List<Post> posts = (List<Post>) data.get("posts");
+
+                System.out.println("User: " + user.getName());
+                System.out.println("Email: " + user.getEmail());
+                System.out.println("Posts: " + posts.size());
+
+                for (Post post : posts) {
+                    System.out.println("  - " + post.title);
+                }
+            }).exceptionally(error -> {
+                System.err.println("Dashboard error: " + error.getMessage());
+                error.printStackTrace();
+                return null;
+            }).join();
+        } catch (Exception e) {
+            System.err.println("Error: " + e.getMessage());
+        }
+    }
+}`,
+          description: 'Dashboard component that depends on getUserWithPosts',
+        },
+        {
+          fileName: 'tests/UserServiceTest.java',
+          content: `// Test file for UserService
+package tests;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.Map;
+
+public class UserServiceTest {
+    public static void testGetUserWithPosts() {
+        System.out.println("Testing getUserWithPosts...");
+
+        try {
+            CompletableFuture<Map<String, Object>> resultFuture =
+                UserService.getUserWithPosts("user123");
+
+            Map<String, Object> result = resultFuture.join();
+
+            // Check if user is actually a User object, not a CompletableFuture
+            Object userObj = result.get("user");
+            if (userObj instanceof CompletableFuture) {
+                System.err.println("❌ FAIL: user is a CompletableFuture, not a User object!");
+                System.err.println("   This means the fetchUser call was not properly awaited");
+                return;
+            }
+
+            User user = (User) userObj;
+            // Check if user has expected properties
+            if (user.getId() == null || user.getName() == null) {
+                System.err.println("❌ FAIL: user object missing expected properties");
+                return;
+            }
+
+            // Check posts
+            Object postsObj = result.get("posts");
+            if (!(postsObj instanceof List)) {
+                System.err.println("❌ FAIL: posts is not a List");
+                return;
+            }
+
+            System.out.println("✅ PASS: getUserWithPosts works correctly");
+        } catch (Exception error) {
+            System.err.println("❌ FAIL: Error occurred: " + error.getMessage());
+            error.printStackTrace();
+        }
+    }
+
+    public static void main(String[] args) {
+        testGetUserWithPosts();
+    }
+}`,
+          description: 'Test file showing how the bug manifests',
+        },
+      ],
     },
     expectedBehavior: 'Should properly await both API calls and return complete data',
     bugDescription: 'Missing await on first async call causes user to be a Promise',
@@ -1896,6 +2311,24 @@ def create_buttons():
     for i in range(3):
         buttons.append(lambda: print(i))
     return buttons`,
+      java: `// ButtonFactory.java - Creates event handlers with closure bug
+import java.util.ArrayList;
+import java.util.List;
+
+public class ButtonFactory {
+    public static List<Runnable> createButtons() {
+        List<Runnable> buttons = new ArrayList<>();
+        // BUG: Using shared mutable container instead of effectively final variable
+        int[] sharedCounter = new int[1];  // Mutable array shared by all lambdas
+        for (int i = 0; i < 3; i++) {
+            sharedCounter[0] = i;  // Update shared counter
+            // BUG: All lambdas capture reference to same array
+            buttons.add(() -> System.out.println(sharedCounter[0]));
+        }
+        // After loop, sharedCounter[0] is 2, so all lambdas print 2
+        return buttons;
+    }
+}`,
     },
     codebaseFiles: {
       javascript: [
@@ -2143,6 +2576,120 @@ if __name__ == '__main__':
           description: 'Test showing the bug and expected behavior',
         },
       ],
+      java: [
+        {
+          fileName: 'ui/ButtonManager.java',
+          content: `// ButtonManager - Manages dynamic button creation
+package ui;
+
+import java.util.List;
+
+public class ButtonManager {
+    private List<Runnable> handlers;
+
+    public void createButtons() {
+        this.handlers = ButtonFactory.createButtons();
+        System.out.println("Expected: Buttons should print 0, 1, 2 when called");
+        System.out.println("Actual: All buttons print 2 due to closure bug");
+    }
+
+    public void testHandlers() {
+        System.out.println("Testing button handlers:");
+        for (int index = 0; index < handlers.size(); index++) {
+            System.out.print("Handler " + index + " prints: ");
+            handlers.get(index).run();
+        }
+    }
+
+    public List<Runnable> getHandlers() {
+        return handlers;
+    }
+}`,
+          description: 'UI manager that uses createButtons function',
+        },
+        {
+          fileName: 'utils/EventHandlerFactory.java',
+          content: `// Utility functions showing correct patterns
+package utils;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class EventHandlerFactory {
+    // Pattern 1: Using effectively final variable (CORRECT)
+    public static List<Runnable> createHandlersWithFinal() {
+        List<Runnable> handlers = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            final int index = i;  // Effectively final - each iteration gets its own copy
+            handlers.add(() -> System.out.println(index));
+        }
+        return handlers;
+    }
+
+    // Pattern 2: Using method to capture value (CORRECT)
+    public static List<Runnable> createHandlersWithMethod() {
+        List<Runnable> handlers = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            handlers.add(createHandler(i));
+        }
+        return handlers;
+    }
+
+    private static Runnable createHandler(int value) {
+        return () -> System.out.println(value);
+    }
+
+    // Pattern 3: Using separate array for each lambda (CORRECT)
+    public static List<Runnable> createHandlersWithSeparateArrays() {
+        List<Runnable> handlers = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            int[] counter = new int[]{i};  // Each lambda gets its own array
+            handlers.add(() -> System.out.println(counter[0]));
+        }
+        return handlers;
+    }
+}`,
+          description: 'Reference implementations showing correct patterns',
+        },
+        {
+          fileName: 'tests/ClosureTest.java',
+          content: `// Test file to demonstrate closure bug
+package tests;
+
+import java.util.List;
+import utils.EventHandlerFactory;
+
+public class ClosureTest {
+    public static void testClosureBug() {
+        System.out.println("=== Testing Closure Bug ===\\n");
+
+        System.out.println("Buggy version (shared mutable array):");
+        List<Runnable> buggyHandlers = ButtonFactory.createButtons();
+        for (int index = 0; index < buggyHandlers.size(); index++) {
+            System.out.print("  Handler " + index + " prints: ");
+            buggyHandlers.get(index).run();  // All will print 2
+        }
+
+        System.out.println("\\nExpected behavior:");
+        System.out.println("  Handler 0 should print: 0");
+        System.out.println("  Handler 1 should print: 1");
+        System.out.println("  Handler 2 should print: 2");
+
+        System.out.println("\\nFixed version (using effectively final):");
+        List<Runnable> fixedHandlers = EventHandlerFactory.createHandlersWithFinal();
+        for (int index = 0; index < fixedHandlers.size(); index++) {
+            System.out.print("  Handler " + index + " prints: ");
+            fixedHandlers.get(index).run();  // Will correctly print 0, 1, 2
+        }
+    }
+
+    public static void main(String[] args) {
+        testClosureBug();
+    }
+}`,
+          description: 'Test showing the bug and expected behavior',
+        },
+      ],
     },
     expectedBehavior: 'Each button should log its correct index (0, 1, 2)',
     bugDescription: 'Closure captures the variable i, not its value at each iteration',
@@ -2200,6 +2747,38 @@ function useWindowSize() {
   }, []);
 
   return size;
+}`,
+      java: `// WindowSizeTracker.java - Class with memory leak
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import javax.swing.JFrame;
+
+public class WindowSizeTracker {
+    private int width;
+    private JFrame frame;
+
+    public WindowSizeTracker(JFrame frame) {
+        this.frame = frame;
+        this.width = frame.getWidth();
+        attachListener();
+    }
+
+    private void attachListener() {
+        ComponentAdapter resizeListener = new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                width = frame.getWidth();
+                System.out.println("Window resized: " + width);
+            }
+        };
+        // BUG: Listener added but no cleanup/removal method provided
+        frame.addComponentListener(resizeListener);
+        // Missing cleanup/dispose method
+    }
+
+    public int getWidth() {
+        return width;
+    }
 }`,
     },
     codebaseFiles: {
@@ -2440,6 +3019,196 @@ export function useWindowSize(): WindowSize {
           description: 'Fixed TypeScript version with proper types',
         },
       ],
+      java: [
+        {
+          fileName: 'components/ResponsivePanel.java',
+          content: `// ResponsivePanel - Component that uses the buggy tracker
+package components;
+
+import javax.swing.*;
+import java.awt.*;
+
+public class ResponsivePanel extends JPanel {
+    private WindowSizeTracker sizeTracker;
+    private JLabel sizeLabel;
+    private JFrame parentFrame;
+
+    public ResponsivePanel(JFrame frame) {
+        this.parentFrame = frame;
+        this.sizeTracker = new WindowSizeTracker(frame);
+
+        setLayout(new BorderLayout());
+        sizeLabel = new JLabel("Window: " + sizeTracker.getWidth() + "px");
+        add(sizeLabel, BorderLayout.NORTH);
+
+        // Component that might be added/removed frequently
+        // Each time it's recreated, a new listener is added without removing the old one
+    }
+
+    public void updateDisplay() {
+        sizeLabel.setText("Window: " + sizeTracker.getWidth() + "px");
+    }
+
+    // BUG: No cleanup method to remove listeners when panel is disposed
+    // This causes memory leak when panel is removed and recreated
+}`,
+          description: 'Component using the buggy WindowSizeTracker',
+        },
+        {
+          fileName: 'components/ToggleableWidget.java',
+          content: `// ToggleableWidget - Component that gets added/removed frequently
+package components;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+public class ToggleableWidget extends JFrame {
+    private JButton toggleButton;
+    private ResponsivePanel panel;
+    private boolean showingPanel = false;
+
+    public ToggleableWidget() {
+        setTitle("Memory Leak Demo");
+        setSize(600, 400);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        toggleButton = new JButton("Toggle Widget");
+        toggleButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                togglePanel();
+            }
+        });
+
+        add(toggleButton, BorderLayout.SOUTH);
+    }
+
+    private void togglePanel() {
+        if (showingPanel && panel != null) {
+            // BUG: Removing panel but its listeners remain attached
+            remove(panel);
+            panel = null;
+            showingPanel = false;
+        } else {
+            // Each time we create a new panel, it adds a new listener
+            // Previous listeners are never removed, causing memory leak
+            panel = new ResponsivePanel(this);
+            add(panel, BorderLayout.CENTER);
+            showingPanel = true;
+        }
+        revalidate();
+        repaint();
+        System.out.println("Panel toggled. Memory leak growing if listeners not cleaned up.");
+    }
+}`,
+          description: 'Widget that toggles panel, demonstrating the leak',
+        },
+        {
+          fileName: 'utils/MemoryLeakDetector.java',
+          content: `// Memory leak detection utility
+package utils;
+
+import javax.swing.*;
+import java.awt.event.ComponentListener;
+import java.lang.reflect.Field;
+
+public class MemoryLeakDetector {
+    public static int countComponentListeners(JFrame frame) {
+        ComponentListener[] listeners = frame.getComponentListeners();
+        return listeners.length;
+    }
+
+    public static void testForMemoryLeak(JFrame frame, int iterations) {
+        System.out.println("Testing for memory leaks...");
+        System.out.println("Creating and destroying components " + iterations + " times");
+
+        int initialListeners = countComponentListeners(frame);
+        System.out.println("Initial listener count: " + initialListeners);
+
+        // Simulate creating and destroying components multiple times
+        for (int i = 0; i < iterations; i++) {
+            ResponsivePanel panel = new ResponsivePanel(frame);
+            // Simulate component being removed
+            panel = null;
+        }
+
+        // Force garbage collection
+        System.gc();
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        int finalListeners = countComponentListeners(frame);
+        System.out.println("Final listener count: " + finalListeners);
+
+        int leakedListeners = finalListeners - initialListeners;
+        if (leakedListeners > 0) {
+            System.err.println("❌ MEMORY LEAK DETECTED: " + leakedListeners + " listeners not removed");
+        } else {
+            System.out.println("✅ No memory leak detected");
+        }
+    }
+}`,
+          description: 'Utility to detect memory leaks',
+        },
+        {
+          fileName: 'WindowSizeTracker.fixed.java',
+          content: `// Fixed version with proper cleanup
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import javax.swing.JFrame;
+
+public class WindowSizeTrackerFixed {
+    private int width;
+    private JFrame frame;
+    private ComponentAdapter resizeListener;
+
+    public WindowSizeTrackerFixed(JFrame frame) {
+        this.frame = frame;
+        this.width = frame.getWidth();
+        attachListener();
+    }
+
+    private void attachListener() {
+        resizeListener = new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                width = frame.getWidth();
+                System.out.println("Window resized: " + width);
+            }
+        };
+        frame.addComponentListener(resizeListener);
+    }
+
+    public int getWidth() {
+        return width;
+    }
+
+    // FIXED: Added cleanup method to remove listener
+    public void dispose() {
+        if (frame != null && resizeListener != null) {
+            frame.removeComponentListener(resizeListener);
+            resizeListener = null;
+        }
+    }
+
+    // FIXED: Cleanup in finalize as backup (though dispose() should be called explicitly)
+    @Override
+    protected void finalize() throws Throwable {
+        try {
+            dispose();
+        } finally {
+            super.finalize();
+        }
+    }
+}`,
+          description: 'Fixed version with proper cleanup',
+        },
+      ],
     },
     expectedBehavior: 'Should add AND remove event listener to prevent memory leaks',
     bugDescription: 'Event listener is added but never removed on component unmount',
@@ -2485,6 +3254,16 @@ def add_numbers(a, b):
     # BUG: No type checking or conversion
     return a + b
 # add_numbers("5", 3) would raise TypeError in Python`,
+      java: `// Calculator.java - Math utilities with type coercion bug
+public class Calculator {
+    // BUG: Concatenates instead of adding when inputs are strings
+    public static String addNumbers(String a, String b) {
+        // BUG: No conversion to numbers - string concatenation occurs
+        return a + b;
+    }
+    // addNumbers("5", "3") returns "53" instead of 8
+    // Should parse strings to numbers before adding
+}`,
     },
     codebaseFiles: {
       javascript: [
@@ -2647,6 +3426,132 @@ class PriceCalculator:
           description: 'Price calculator affected by type issues',
         },
       ],
+      java: [
+        {
+          fileName: 'services/PriceCalculator.java',
+          content: `// PriceCalculator - Uses addNumbers for calculations
+package services;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class PriceCalculator {
+    private List<Item> items;
+
+    public PriceCalculator() {
+        this.items = new ArrayList<>();
+    }
+
+    public void addItem(String name, String price) {
+        // Prices might come from web forms/JSON as strings
+        items.add(new Item(name, price));
+    }
+
+    public String calculateTotal() {
+        String total = "0";
+        for (Item item : items) {
+            // BUG: If item.price is a string, concatenation occurs
+            total = Calculator.addNumbers(total, item.price);
+        }
+        return total;
+    }
+
+    public String calculateWithTax(String subtotal, String taxRate) {
+        // taxRate might be "0.08" from user input
+        return Calculator.addNumbers(subtotal, taxRate);
+    }
+
+    static class Item {
+        String name;
+        String price;
+
+        Item(String name, String price) {
+            this.name = name;
+            this.price = price;
+        }
+    }
+}`,
+          description: 'Price calculator affected by type coercion bug',
+        },
+        {
+          fileName: 'utils/FormHelpers.java',
+          content: `// Form helper utilities
+package utils;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class FormHelpers {
+    public static Map<String, String> getFormValues(Map<String, String> formData) {
+        // WARNING: All form values are strings!
+        // Even numeric inputs come as strings
+        return new HashMap<>(formData);
+    }
+
+    // Example usage that causes the bug:
+    public static Map<String, Object> handleCheckoutForm(Map<String, String> formData) {
+        Map<String, String> values = getFormValues(formData);
+
+        // values.get("quantity") is "2" (string)
+        // values.get("price") is "10.50" (string)
+        // When passed to addNumbers, results in "210.50" instead of 12.50
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("quantity", values.get("quantity"));
+        result.put("price", values.get("price"));
+        result.put("itemTotal", Calculator.addNumbers(
+            values.get("quantity"),
+            values.get("price")
+        ));
+
+        return result;
+    }
+}`,
+          description: 'Form helpers that return string values',
+        },
+        {
+          fileName: 'tests/CalculatorTest.java',
+          content: `// Test file showing type coercion issues
+package tests;
+
+public class CalculatorTest {
+    public static void testAddNumbers() {
+        System.out.println("=== Testing addNumbers ===\\n");
+
+        // Test 1: Two number strings (BUG)
+        System.out.println("Test 1: addNumbers(\\"5\\", \\"3\\")");
+        System.out.println("Expected: 8");
+        String result1 = Calculator.addNumbers("5", "3");
+        System.out.println("Actual: " + result1);
+        System.out.println("❌ Fail - Got \\"53\\" (concatenation)\\n");
+
+        // Test 2: Decimal strings (BUG)
+        System.out.println("Test 2: addNumbers(\\"10.5\\", \\"2.3\\")");
+        System.out.println("Expected: 12.8");
+        String result2 = Calculator.addNumbers("10.5", "2.3");
+        System.out.println("Actual: " + result2);
+        System.out.println("❌ Fail - Got \\"10.52.3\\"\\n");
+
+        // Test 3: Zero and number (BUG)
+        System.out.println("Test 3: addNumbers(\\"0\\", \\"100\\")");
+        System.out.println("Expected: 100");
+        String result3 = Calculator.addNumbers("0", "100");
+        System.out.println("Actual: " + result3);
+        System.out.println("❌ Fail - Got \\"0100\\"\\n");
+
+        System.out.println("SOLUTION: Convert strings to numbers before adding:");
+        System.out.println("double num1 = Double.parseDouble(a);");
+        System.out.println("double num2 = Double.parseDouble(b);");
+        System.out.println("return String.valueOf(num1 + num2);");
+    }
+
+    public static void main(String[] args) {
+        testAddNumbers();
+    }
+}`,
+          description: 'Test demonstrating the type coercion bug',
+        },
+      ],
     },
     expectedBehavior: 'Should always return numeric sum, converting strings to numbers',
     bugDescription: 'String concatenation happens instead of numeric addition',
@@ -2700,6 +3605,19 @@ class PriceCalculator:
 async function handleSearch(query: string) {
   const results = await searchAPI(query);
   displayResults(results);
+}`,
+      java: `// SearchHandler.java - Search handler with race condition
+import java.util.concurrent.CompletableFuture;
+
+public class SearchHandler {
+    public static void handleSearch(String query) {
+        CompletableFuture<SearchResult> resultsFuture = searchAPI(query);
+        // BUG: No tracking of which request is latest
+        resultsFuture.thenAccept(results -> {
+            displayResults(results);
+        });
+    }
+    // When user types quickly, older searches can overwrite newer ones
 }`,
     },
     expectedBehavior: 'Should only display results for the most recent query',
@@ -2937,6 +3855,182 @@ export function SearchResults({ results }: SearchResultsProps) {
           description: 'Component that displays search results - shows wrong results when race condition occurs',
         },
       ],
+      java: [
+        {
+          fileName: 'components/SearchBar.java',
+          content: `// SearchBar component with race condition
+package components;
+
+import java.util.concurrent.CompletableFuture;
+import api.SearchAPI;
+import api.SearchResult;
+
+public class SearchBar {
+    private String query = "";
+    private SearchResultListener listener;
+
+    public SearchBar(SearchResultListener listener) {
+        this.listener = listener;
+    }
+
+    public void handleSearch(String query) {
+        // BUG: No tracking of which request is latest
+        CompletableFuture<SearchResult> resultsFuture = SearchAPI.search(query);
+        resultsFuture.thenAccept(results -> {
+            listener.onResults(results);
+        });
+    }
+
+    public void handleChange(String newQuery) {
+        this.query = newQuery;
+        handleSearch(newQuery); // Fires on every keystroke
+    }
+
+    public interface SearchResultListener {
+        void onResults(SearchResult results);
+    }
+}`,
+          description: 'SearchBar component that triggers searches on every keystroke',
+        },
+        {
+          fileName: 'api/SearchAPI.java',
+          content: `// Simulates API call with random delays
+package api;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.List;
+import java.util.Arrays;
+import java.util.Random;
+
+public class SearchAPI {
+    private static final Random random = new Random();
+
+    public static CompletableFuture<SearchResult> search(String query) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // Simulate network delay (100-500ms)
+                int delay = random.nextInt(400) + 100;
+                Thread.sleep(delay);
+
+                // Simulate search results
+                return new SearchResult(
+                    query,
+                    Arrays.asList(
+                        new SearchItem(1, "Result for \\"" + query + "\\" - 1"),
+                        new SearchItem(2, "Result for \\"" + query + "\\" - 2"),
+                        new SearchItem(3, "Result for \\"" + query + "\\" - 3")
+                    ),
+                    System.currentTimeMillis()
+                );
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
+            }
+        });
+    }
+}
+
+class SearchResult {
+    String query;
+    List<SearchItem> results;
+    long timestamp;
+
+    SearchResult(String query, List<SearchItem> results, long timestamp) {
+        this.query = query;
+        this.results = results;
+        this.timestamp = timestamp;
+    }
+}
+
+class SearchItem {
+    int id;
+    String title;
+
+    SearchItem(int id, String title) {
+        this.id = id;
+        this.title = title;
+    }
+}`,
+          description: 'API function with simulated variable delay causing race conditions',
+        },
+        {
+          fileName: 'tests/SearchRaceConditionTest.java',
+          content: `// Test demonstrating the race condition bug
+package tests;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
+public class SearchRaceConditionTest {
+    public static void testRaceCondition() throws Exception {
+        System.out.println("=== Testing Search Race Condition ===\\n");
+
+        SearchResultTracker tracker = new SearchResultTracker();
+
+        // Mock searchAPI to control timing
+        // "a" takes 300ms, "ab" takes 200ms, "abc" takes 100ms
+        // So "abc" completes first, but "a" completes last and overwrites
+
+        System.out.println("Simulating quick typing: 'a', 'ab', 'abc'");
+        System.out.println("Delays: 'a'=300ms, 'ab'=200ms, 'abc'=100ms");
+        System.out.println();
+
+        // Type quickly
+        CompletableFuture<SearchResult> future1 = simulateSearch("a", 300);
+        CompletableFuture<SearchResult> future2 = simulateSearch("ab", 200);
+        CompletableFuture<SearchResult> future3 = simulateSearch("abc", 100);
+
+        future1.thenAccept(r -> {
+            System.out.println("Response for 'a' arrived at " + r.timestamp);
+            tracker.setResults(r);
+        });
+        future2.thenAccept(r -> {
+            System.out.println("Response for 'ab' arrived at " + r.timestamp);
+            tracker.setResults(r);
+        });
+        future3.thenAccept(r -> {
+            System.out.println("Response for 'abc' arrived at " + r.timestamp);
+            tracker.setResults(r);
+        });
+
+        // Wait for all to complete
+        Thread.sleep(500);
+
+        System.out.println("\\nFinal displayed results: " + tracker.getCurrentQuery());
+        System.out.println("❌ BUG: Shows results for 'a' instead of 'abc'!");
+        System.out.println("Because 'a' took longest and completed last\\n");
+    }
+
+    private static CompletableFuture<SearchResult> simulateSearch(String query, int delay) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                Thread.sleep(delay);
+                return new SearchResult(query, null, System.currentTimeMillis());
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    static class SearchResultTracker {
+        private SearchResult currentResults;
+
+        void setResults(SearchResult results) {
+            this.currentResults = results;
+        }
+
+        String getCurrentQuery() {
+            return currentResults != null ? currentResults.query : "none";
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        testRaceCondition();
+    }
+}`,
+          description: 'Test demonstrating the race condition bug when typing quickly',
+        },
+      ],
     },
   },
   {
@@ -2965,6 +4059,15 @@ export function SearchResults({ results }: SearchResultsProps) {
     updatedUser = user.copy()
     updatedUser['preferences']['theme'] = newTheme
     return updatedUser`,
+      java: `// UserSettingsManager.java - Shallow copy bug
+public class UserSettingsManager {
+    public static User updateUserSettings(User user, String newTheme) {
+        User updatedUser = user.clone(); // BUG: shallow clone
+        updatedUser.getPreferences().setTheme(newTheme);
+        return updatedUser;
+    }
+    // Original user.preferences.theme also changes!
+}`,
     },
     expectedBehavior: 'Should deep copy nested objects to prevent mutations',
     bugDescription: 'Spread operator only creates shallow copy, nested objects are still referenced',
@@ -3382,6 +4485,154 @@ class TestSettingsMutation(unittest.TestCase):
           description: 'Test demonstrating shallow vs deep copy in Python',
         },
       ],
+      java: [
+        {
+          fileName: 'models/User.java',
+          content: `// User model with shallow clone implementation
+package models;
+
+public class User implements Cloneable {
+    private String name;
+    private String email;
+    private Preferences preferences;
+
+    public User(String name, String email, Preferences preferences) {
+        this.name = name;
+        this.email = email;
+        this.preferences = preferences;
+    }
+
+    // BUG: Default clone() only does shallow copy
+    @Override
+    public User clone() {
+        try {
+            return (User) super.clone(); // Shallow copy!
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public String getName() { return name; }
+    public String getEmail() { return email; }
+    public Preferences getPreferences() { return preferences; }
+    public void setPreferences(Preferences preferences) { this.preferences = preferences; }
+}
+
+class Preferences {
+    private String theme;
+    private Notifications notifications;
+    private String language;
+
+    public Preferences(String theme, Notifications notifications, String language) {
+        this.theme = theme;
+        this.notifications = notifications;
+        this.language = language;
+    }
+
+    public String getTheme() { return theme; }
+    public void setTheme(String theme) { this.theme = theme; }
+    public Notifications getNotifications() { return notifications; }
+    public String getLanguage() { return language; }
+}
+
+class Notifications {
+    private boolean email;
+    private boolean push;
+    private boolean sms;
+
+    public Notifications(boolean email, boolean push, boolean sms) {
+        this.email = email;
+        this.push = push;
+        this.sms = sms;
+    }
+
+    public boolean isEmail() { return email; }
+    public void setEmail(boolean email) { this.email = email; }
+    public boolean isPush() { return push; }
+    public boolean isSms() { return sms; }
+}`,
+          description: 'User model with shallow clone causing mutation bugs',
+        },
+        {
+          fileName: 'services/SettingsManager.java',
+          content: `// Settings manager with shallow copy bug
+package services;
+
+import models.User;
+
+public class SettingsManager {
+    // BUG: Shallow clone doesn't prevent nested object mutation
+    public User updateUserSettings(User user, String newTheme) {
+        User updatedUser = user.clone(); // Shallow copy
+        updatedUser.getPreferences().setTheme(newTheme); // Mutates original!
+        return updatedUser;
+    }
+
+    // This has the same bug
+    public User toggleNotification(User user, String notificationType) {
+        User updatedUser = user.clone();
+        switch (notificationType) {
+            case "email":
+                updatedUser.getPreferences().getNotifications()
+                    .setEmail(!updatedUser.getPreferences().getNotifications().isEmail());
+                break;
+            // ... other cases
+        }
+        return updatedUser; // Original user is also modified
+    }
+}`,
+          description: 'Settings manager class with shallow copy bug affecting nested objects',
+        },
+        {
+          fileName: 'tests/SettingsMutationTest.java',
+          content: `// Test demonstrating shallow vs deep copy in Java
+package tests;
+
+import models.User;
+import models.Preferences;
+import models.Notifications;
+import services.SettingsManager;
+
+public class SettingsMutationTest {
+    public static void testShallowCopyMutation() {
+        System.out.println("=== Testing Shallow Copy Mutation Bug ===\\n");
+
+        SettingsManager manager = new SettingsManager();
+
+        // Create original user
+        Notifications notifications = new Notifications(true, false, true);
+        Preferences preferences = new Preferences("light", notifications, "en");
+        User originalUser = new User("John", "john@test.com", preferences);
+
+        System.out.println("Original theme: " + originalUser.getPreferences().getTheme());
+
+        // Update theme to dark
+        User updatedUser = manager.updateUserSettings(originalUser, "dark");
+
+        System.out.println("\\nAfter update:");
+        System.out.println("Original theme: " + originalUser.getPreferences().getTheme());
+        System.out.println("Updated theme: " + updatedUser.getPreferences().getTheme());
+
+        // BUG: Original object is mutated!
+        if (originalUser.getPreferences().getTheme().equals("dark")) {
+            System.out.println("\\n❌ BUG: Original was mutated! Expected 'light', got 'dark'");
+        }
+
+        // They share the same preferences object
+        if (originalUser.getPreferences() == updatedUser.getPreferences()) {
+            System.out.println("❌ Same preferences reference - shallow copy!");
+        }
+
+        System.out.println("\\nFIX: Override clone() to create deep copy of nested objects");
+    }
+
+    public static void main(String[] args) {
+        testShallowCopyMutation();
+    }
+}`,
+          description: 'Test demonstrating the shallow copy mutation bug',
+        },
+      ],
     },
   },
   {
@@ -3405,6 +4656,17 @@ class TestSettingsMutation(unittest.TestCase):
       python: `def calculateTotal(prices):
     return sum(prices)
 # calculateTotal([0.1, 0.2]) returns 0.30000000000000004`,
+      java: `// InvoiceCalculator.java - Floating point precision bug
+public class InvoiceCalculator {
+    public static double calculateTotal(double[] prices) {
+        double sum = 0.0;
+        for (double price : prices) {
+            sum += price; // BUG: Direct floating point addition
+        }
+        return sum;
+    }
+    // calculateTotal(new double[]{0.1, 0.2}) returns 0.30000000000000004
+}`,
     },
     expectedBehavior: 'Should return precise decimal values suitable for financial calculations',
     bugDescription: 'Floating point arithmetic causes precision errors',
@@ -3842,6 +5104,257 @@ class TestFloatingPointBugs(unittest.TestCase):
           description: 'Tests demonstrating floating point bugs in Python',
         },
       ],
+      java: [
+        {
+          fileName: 'services/InvoiceCalculator.java',
+          content: `// Invoice calculator with floating point precision bugs
+package services;
+
+import java.util.List;
+
+public class InvoiceCalculator {
+    public static class LineItem {
+        public String name;
+        public double price;
+
+        public LineItem(String name, double price) {
+            this.name = name;
+            this.price = price;
+        }
+    }
+
+    public static class Invoice {
+        public double subtotal;
+        public double tax;
+        public double total;
+        public List<LineItem> items;
+
+        public Invoice(double subtotal, double tax, double total, List<LineItem> items) {
+            this.subtotal = subtotal;
+            this.tax = tax;
+            this.total = total;
+            this.items = items;
+        }
+    }
+
+    // BUG: Direct floating point arithmetic causes precision errors
+    public double calculateTotal(List<LineItem> lineItems) {
+        double sum = 0.0;
+        for (LineItem item : lineItems) {
+            sum += item.price; // BUG: Direct addition
+        }
+        return sum;
+        // 0.1 + 0.2 = 0.30000000000000004
+    }
+
+    public double calculateTax(double subtotal, double taxRate) {
+        return subtotal * taxRate; // BUG: Precision errors
+    }
+
+    public double calculateDiscount(double price, double discountPercent) {
+        double discount = price * (discountPercent / 100);
+        return price - discount; // BUG: Precision errors compound
+    }
+
+    public Invoice generateInvoice(List<LineItem> items, double taxRate) {
+        double subtotal = calculateTotal(items);
+        double tax = calculateTax(subtotal, taxRate);
+        double total = subtotal + tax;
+
+        return new Invoice(
+            subtotal, // BUG: May have precision errors
+            tax,      // BUG: May have precision errors
+            total,    // BUG: Compounded errors
+            items
+        );
+    }
+
+    public Invoice generateInvoice(List<LineItem> items) {
+        return generateInvoice(items, 0.08);
+    }
+
+    // Example usage showing the bug
+    public static void main(String[] args) {
+        InvoiceCalculator calculator = new InvoiceCalculator();
+        List<LineItem> items = List.of(
+            new LineItem("Item 1", 0.1),
+            new LineItem("Item 2", 0.2)
+        );
+
+        double result = calculator.calculateTotal(items);
+        System.out.println(result); // 0.30000000000000004 instead of 0.3
+    }
+}`,
+          description: 'Invoice calculator with floating point precision bugs',
+        },
+        {
+          fileName: 'services/PaymentProcessor.java',
+          content: `// Payment processor that compounds floating point errors
+package services;
+
+import services.InvoiceCalculator;
+import services.InvoiceCalculator.LineItem;
+import services.InvoiceCalculator.Invoice;
+import java.util.List;
+
+public class PaymentProcessor {
+    private InvoiceCalculator calculator;
+
+    public static class PaymentResult {
+        public String status;
+        public String message;
+        public Double change;
+
+        public PaymentResult(String status, String message) {
+            this.status = status;
+            this.message = message;
+            this.change = null;
+        }
+
+        public PaymentResult(String status, String message, Double change) {
+            this.status = status;
+            this.message = message;
+            this.change = change;
+        }
+    }
+
+    public PaymentProcessor() {
+        this.calculator = new InvoiceCalculator();
+    }
+
+    public PaymentResult processPayment(List<LineItem> items, double paymentAmount) {
+        Invoice invoice = calculator.generateInvoice(items);
+
+        // BUG: Comparing floating point numbers directly
+        if (paymentAmount == invoice.total) {
+            return new PaymentResult("success", "Payment exact");
+        } else if (paymentAmount < invoice.total) {
+            double shortage = invoice.total - paymentAmount;
+            return new PaymentResult(
+                "insufficient",
+                String.format("Short by $%.2f", shortage) // BUG: May show weird decimals
+            );
+        } else {
+            double change = paymentAmount - invoice.total;
+            return new PaymentResult(
+                "success",
+                "Payment received",
+                change // BUG: Precision errors in change calculation
+            );
+        }
+    }
+
+    public double splitBill(double totalAmount, int numPeople) {
+        // BUG: Division can create repeating decimals
+        double perPerson = totalAmount / numPeople;
+        double total = perPerson * numPeople;
+
+        // This might not equal the original totalAmount!
+        if (total != totalAmount) {
+            System.out.println("WARNING: Rounding error detected!");
+        }
+
+        return perPerson;
+    }
+
+    // Example that fails spectacularly
+    public void demonstrateBug() {
+        List<LineItem> items = List.of(
+            new LineItem("Coffee", 2.50),
+            new LineItem("Muffin", 3.15),
+            new LineItem("Juice", 1.99)
+        );
+
+        Invoice invoice = calculator.generateInvoice(items);
+        System.out.println("Total: " + invoice.total); // Might be 8.211200000000001
+
+        // Customer pays exact amount shown on screen: 8.21
+        PaymentResult payment = processPayment(items, 8.21);
+        System.out.println(payment.status); // Might say "insufficient" due to precision!
+    }
+}`,
+          description: 'Payment processor that compounds floating point errors',
+        },
+        {
+          fileName: 'utils/MoneyUtils.java',
+          content: `// Utility functions showing proper ways to handle money
+package utils;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import services.InvoiceCalculator.LineItem;
+import java.util.List;
+
+public class MoneyUtils {
+
+    /**
+     * Convert dollars to cents to work with integers
+     * This avoids floating point errors entirely
+     */
+    public static long dollarsToCents(double dollars) {
+        return Math.round(dollars * 100);
+    }
+
+    public static double centsToDollars(long cents) {
+        return cents / 100.0;
+    }
+
+    /**
+     * Add money amounts safely using BigDecimal
+     */
+    public static double addMoney(double... amounts) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (double amount : amounts) {
+            total = total.add(BigDecimal.valueOf(amount));
+        }
+        return total.setScale(2, RoundingMode.HALF_UP).doubleValue();
+    }
+
+    /**
+     * Round to 2 decimal places properly
+     */
+    public static double roundToMoney(double amount) {
+        return Math.round(amount * 100.0) / 100.0;
+    }
+
+    /**
+     * Compare money amounts safely
+     */
+    public static boolean moneyEquals(double a, double b) {
+        return Math.abs(a - b) < 0.001; // Epsilon comparison
+    }
+
+    // Example: Fixed invoice calculator
+    public static class FixedInvoiceCalculator {
+        public double calculateTotal(List<LineItem> lineItems) {
+            long totalCents = 0;
+            for (LineItem item : lineItems) {
+                totalCents += dollarsToCents(item.price);
+            }
+            return centsToDollars(totalCents);
+        }
+
+        public double calculateTax(double subtotal, double taxRate) {
+            long subtotalCents = dollarsToCents(subtotal);
+            long taxCents = Math.round(subtotalCents * taxRate);
+            return centsToDollars(taxCents);
+        }
+    }
+
+    // Demonstration
+    public static void main(String[] args) {
+        double buggy = 0.1 + 0.2; // 0.30000000000000004
+        double fixed = addMoney(0.1, 0.2); // 0.3
+
+        System.out.println("Buggy: " + buggy);
+        System.out.println("Fixed: " + fixed);
+        System.out.println("Are they equal? " + (buggy == 0.3)); // false
+        System.out.println("Fixed equals 0.3? " + (fixed == 0.3)); // true
+    }
+}`,
+          description: 'Utility functions showing proper techniques for handling money calculations',
+        },
+      ],
     },
   },
   {
@@ -3874,6 +5387,17 @@ class TestFloatingPointBugs(unittest.TestCase):
     while count >= 0:
         print(count)
         count += 1`,
+      java: `// CountdownTimer.java - Infinite loop bug
+public class CountdownTimer {
+    public static void countdown(int n) {
+        int count = n;
+        while (count >= 0) {
+            System.out.println(count);
+            count++; // BUG: Should be count-- to decrement!
+        }
+        // This function never returns - program hangs!
+    }
+}`,
     },
     expectedBehavior: 'Should count down from n to 0 and then stop',
     bugDescription: 'Loop increments instead of decrements, causing infinite loop',
@@ -4396,6 +5920,272 @@ class TestInfiniteLoops(unittest.TestCase):
           description: 'Tests demonstrating infinite loop bugs in Python',
         },
       ],
+      java: [
+        {
+          fileName: 'ui/CountdownTimer.java',
+          content: `// Countdown timer with infinite loop bug
+package ui;
+
+public class CountdownTimer {
+    private int timeLeft;
+    private boolean isRunning;
+
+    public CountdownTimer(int startTime) {
+        this.timeLeft = startTime;
+        this.isRunning = false;
+    }
+
+    // BUG: Infinite loop in countdown logic
+    public void countdown(int n) {
+        int count = n;
+        while (count >= 0) {
+            System.out.println(count);
+            count++; // BUG: Should be count-- to decrement!
+        }
+        // This function never returns - program hangs!
+    }
+
+    public void startTimer() {
+        isRunning = true;
+        // WARNING: This will hang the program!
+        countdown(timeLeft);
+        timeLeft = 0;
+        isRunning = false;
+    }
+
+    public int getTimeLeft() {
+        return timeLeft;
+    }
+
+    public boolean isRunning() {
+        return isRunning;
+    }
+
+    public static void main(String[] args) {
+        CountdownTimer timer = new CountdownTimer(5);
+        System.out.println("Starting countdown from " + timer.getTimeLeft());
+        // This will hang forever
+        timer.startTimer();
+        System.out.println("Done!"); // Never reached
+    }
+}`,
+          description: 'Timer component with infinite loop bug that hangs the program',
+        },
+        {
+          fileName: 'animation/ParticleSystem.java',
+          content: `// Particle animation system with infinite loop bugs
+package animation;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class ParticleSystem {
+    private List<Particle> particles;
+
+    public static class Particle {
+        public double x, y;
+        public double vx, vy;
+
+        public Particle(double x, double y, double vx, double vy) {
+            this.x = x;
+            this.y = y;
+            this.vx = vx;
+            this.vy = vy;
+        }
+    }
+
+    public ParticleSystem() {
+        this.particles = new ArrayList<>();
+    }
+
+    // BUG: Infinite loop in particle update
+    public void updateParticles(double canvasHeight) {
+        int i = 0;
+        while (i < particles.size()) {
+            Particle particle = particles.get(i);
+
+            // Update particle position
+            particle.x += particle.vx;
+            particle.y += particle.vy;
+
+            // BUG: Forgot to increment i!
+            // i++; // This line is missing
+
+            // Remove particles that are off screen
+            if (particle.y > canvasHeight) {
+                particles.remove(i);
+                // BUG: After remove, we should NOT increment i
+                // but we forgot to increment i at all!
+            }
+        }
+        // This method hangs because i never changes
+    }
+
+    // Another infinite loop bug
+    public void fadeOutAnimation(double duration) {
+        double opacity = 1.0;
+        double step = 0.05;
+
+        // BUG: Condition will never be false
+        while (opacity > 0) {
+            System.out.println("Opacity: " + opacity);
+            opacity += step; // BUG: Should be -= not +=
+            // opacity keeps increasing, never reaches 0
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    // Correct version for comparison
+    public void updateParticlesFixed(double canvasHeight) {
+        int i = 0;
+        while (i < particles.size()) {
+            Particle particle = particles.get(i);
+
+            particle.x += particle.vx;
+            particle.y += particle.vy;
+
+            if (particle.y > canvasHeight) {
+                particles.remove(i);
+                // Don't increment i when we remove an element
+            } else {
+                i++; // Increment when we keep the element
+            }
+        }
+    }
+
+    public void addParticle(Particle particle) {
+        particles.add(particle);
+    }
+
+    public List<Particle> getParticles() {
+        return particles;
+    }
+}`,
+          description: 'Animation controller with multiple infinite loop bugs',
+        },
+        {
+          fileName: 'utils/LoopDebugger.java',
+          content: `// Utilities to detect and debug infinite loops
+package utils;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.BooleanSupplier;
+import java.util.concurrent.*;
+
+public class LoopDebugger {
+
+    /**
+     * Wraps a while loop with iteration limit to prevent infinite loops
+     */
+    public static int safeWhile(BooleanSupplier condition, Runnable body, int maxIterations) {
+        int iterations = 0;
+
+        while (condition.getAsBoolean() && iterations < maxIterations) {
+            body.run();
+            iterations++;
+
+            if (iterations >= maxIterations) {
+                throw new RuntimeException(
+                    "Possible infinite loop detected: exceeded " + maxIterations + " iterations"
+                );
+            }
+        }
+
+        return iterations;
+    }
+
+    public static int safeWhile(BooleanSupplier condition, Runnable body) {
+        return safeWhile(condition, body, 10000);
+    }
+
+    /**
+     * Wraps a function with a timeout to prevent hanging
+     */
+    public static <T> T withTimeout(Callable<T> fn, long timeoutMs) throws TimeoutException {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Future<T> future = executor.submit(fn);
+
+        try {
+            return future.get(timeoutMs, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            throw new TimeoutException(
+                "Function timed out after " + timeoutMs + "ms - possible infinite loop"
+            );
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    /**
+     * Example: Safe countdown implementation
+     */
+    public static List<Integer> safeCountdown(int n) {
+        List<Integer> results = new ArrayList<>();
+        int count = n;
+        int iterations = 0;
+        final int MAX_ITERATIONS = 1000;
+
+        while (count >= 0) {
+            if (iterations++ > MAX_ITERATIONS) {
+                throw new RuntimeException("Infinite loop detected in countdown");
+            }
+
+            results.add(count);
+            count--; // Correct decrement
+        }
+
+        return results;
+    }
+
+    /**
+     * Detects common infinite loop patterns in code
+     */
+    public static List<String> detectInfiniteLoopPattern(String code) {
+        List<String> warnings = new ArrayList<>();
+
+        // Pattern 1: while loop with wrong increment direction
+        if (code.matches(".*while.*>=.*\\{[^}]*\\+\\+.*")) {
+            warnings.add("Potential infinite loop: incrementing when condition checks >=");
+        }
+
+        // Pattern 2: while loop with wrong decrement direction
+        if (code.matches(".*while.*<=.*\\{[^}]*--.*")) {
+            warnings.add("Potential infinite loop: decrementing when condition checks <=");
+        }
+
+        return warnings;
+    }
+
+    // Example usage
+    public static void main(String[] args) {
+        String buggyCode = """
+            public void countdown(int n) {
+                int count = n;
+                while (count >= 0) {
+                    System.out.println(count);
+                    count++; // BUG!
+                }
+            }
+            """;
+
+        System.out.println("Loop warnings: " + detectInfiniteLoopPattern(buggyCode));
+
+        // Test safe countdown
+        List<Integer> result = safeCountdown(5);
+        System.out.println("Safe countdown result: " + result);
+    }
+}`,
+          description: 'Debugging utilities to detect and prevent infinite loops',
+        },
+      ],
     },
   },
   {
@@ -4428,6 +6218,41 @@ class TestInfiniteLoops(unittest.TestCase):
   };
 
   return (/*...*/);
+}`,
+      python: `# Python example with observable pattern
+class TodoList:
+    def __init__(self):
+        self.todos = []
+        self.observers = []
+
+    def add_todo(self, text):
+        # BUG: Direct mutation doesn't notify observers
+        self.todos.append({'text': text, 'completed': False})
+        self.notify_observers(self.todos)  # Same reference!
+
+    def notify_observers(self, todos):
+        # Observers check reference equality, won't update
+        for observer in self.observers:
+            observer.update(todos)`,
+      java: `// TodoListManager.java - State mutation bug with observers
+import java.util.*;
+
+public class TodoListManager {
+    private List<Todo> todos = new ArrayList<>();
+    private List<TodoObserver> observers = new ArrayList<>();
+
+    public void addTodo(String text) {
+        // BUG: Direct mutation doesn't trigger observer updates
+        todos.add(new Todo(text, false));
+        notifyObservers(todos); // Same reference!
+    }
+
+    private void notifyObservers(List<Todo> todos) {
+        // Observers check reference equality, won't detect change
+        for (TodoObserver observer : observers) {
+            observer.onTodosChanged(todos);
+        }
+    }
 }`,
     },
     expectedBehavior: 'Should create new array instead of mutating, triggering re-render',
@@ -4876,6 +6701,407 @@ describe('TodoList State Mutation Bug', () => {
           description: 'Tests using React Testing Library showing mutation bugs',
         },
       ],
+      python: [
+        {
+          fileName: 'models/todo_list.py',
+          content: `from typing import List, Dict, Callable
+
+class TodoList:
+    """TodoList with observer pattern showing state mutation bug"""
+
+    def __init__(self):
+        self.todos: List[Dict] = [
+            {'id': 1, 'text': 'Learn Python', 'completed': False},
+            {'id': 2, 'text': 'Build a project', 'completed': False}
+        ]
+        self.observers: List[Callable] = []
+        self._last_notified_reference = None
+
+    def add_observer(self, observer: Callable):
+        self.observers.append(observer)
+
+    def add_todo(self, text: str) -> None:
+        """BUG: Direct mutation doesn't trigger observer updates"""
+        import time
+        new_todo = {
+            'id': int(time.time() * 1000),
+            'text': text,
+            'completed': False
+        }
+
+        # BUG: This mutates the list in place
+        self.todos.append(new_todo)
+        self.notify_observers(self.todos)  # Same reference!
+
+    def toggle_todo(self, todo_id: int) -> None:
+        """BUG: Direct mutation of todo object"""
+        todo = next((t for t in self.todos if t['id'] == todo_id), None)
+        if todo:
+            todo['completed'] = not todo['completed']  # BUG: Direct mutation
+            self.notify_observers(self.todos)  # Same reference!
+
+    def delete_todo(self, todo_id: int) -> None:
+        """BUG: Direct mutation using remove"""
+        todo = next((t for t in self.todos if t['id'] == todo_id), None)
+        if todo:
+            self.todos.remove(todo)  # BUG: Mutates list
+            self.notify_observers(self.todos)  # Same reference!
+
+    def notify_observers(self, todos: List[Dict]) -> None:
+        """Observers check reference equality, won't detect change"""
+        # Check if reference changed
+        if self._last_notified_reference is todos:
+            # Same reference - observers might not update
+            print("WARNING: Same reference - observers may not update!")
+
+        self._last_notified_reference = todos
+
+        for observer in self.observers:
+            observer(todos)`,
+          description: 'TodoList with observer pattern showing state mutation bugs',
+        },
+        {
+          fileName: 'ui/todo_display.py',
+          content: `from models.todo_list import TodoList
+
+class TodoDisplay:
+    """UI component that observes TodoList"""
+
+    def __init__(self, todo_list: TodoList):
+        self.todo_list = todo_list
+        self.last_todos_reference = None
+        self.render_count = 0
+
+        # Subscribe to changes
+        todo_list.add_observer(self.on_todos_changed)
+
+    def on_todos_changed(self, todos):
+        """BUG: Won't detect changes if reference is the same"""
+        # Check if reference changed
+        if self.last_todos_reference is todos:
+            print(f"Display NOT updated - same reference (todos: {len(todos)})")
+            return  # No re-render because reference didn't change!
+
+        print(f"Display updated - new reference (todos: {len(todos)})")
+        self.last_todos_reference = todos
+        self.render_count += 1
+
+    def demonstrate_bug(self):
+        """Shows the state mutation bug in action"""
+        print(f"\\nInitial render count: {self.render_count}")
+        print(f"Initial todos: {len(self.todo_list.todos)}")
+
+        # Try to add a todo
+        self.todo_list.add_todo("Buy milk")
+        print(f"After adding todo - render count: {self.render_count}")
+        print(f"Actual todos in list: {len(self.todo_list.todos)}")
+
+        # The list was updated, but display wasn't re-rendered!
+        # This demonstrates the React state mutation bug in Python
+
+    def demonstrate_fix(self):
+        """Shows the correct way to notify changes"""
+        print("\\n--- Using Fixed Version ---")
+
+        # Create a new list reference
+        self.todo_list.todos = [*self.todo_list.todos]
+        self.todo_list.notify_observers(self.todo_list.todos)
+
+        print(f"After fix - render count: {self.render_count}")`,
+          description: 'UI component that observes todo list and demonstrates update bug',
+        },
+        {
+          fileName: 'tests/test_state_mutation.py',
+          content: `import unittest
+from models.todo_list import TodoList
+from ui.todo_display import TodoDisplay
+
+class TestStateMutationBug(unittest.TestCase):
+    def setUp(self):
+        self.todo_list = TodoList()
+
+    def test_mutation_same_reference(self):
+        """Demonstrates that mutation keeps the same reference"""
+        original_ref = self.todo_list.todos
+
+        # Mutate the list
+        self.todo_list.todos.append({'id': 3, 'text': 'Test', 'completed': False})
+
+        # Reference is the same!
+        self.assertIs(self.todo_list.todos, original_ref)
+        self.assertEqual(len(self.todo_list.todos), 3)
+
+    def test_new_list_different_reference(self):
+        """Shows that creating new list changes reference"""
+        original_ref = self.todo_list.todos
+
+        # Create new list
+        self.todo_list.todos = [*self.todo_list.todos, {'id': 3, 'text': 'Test', 'completed': False}]
+
+        # Reference is different!
+        self.assertIsNot(self.todo_list.todos, original_ref)
+        self.assertEqual(len(self.todo_list.todos), 3)
+
+    def test_display_not_updated_on_mutation(self):
+        """Demonstrates the bug - display doesn't update"""
+        display = TodoDisplay(self.todo_list)
+
+        initial_renders = display.render_count
+
+        # Add todo (which mutates in place)
+        self.todo_list.add_todo("Buy milk")
+
+        # Display was NOT updated because reference didn't change
+        self.assertEqual(display.render_count, initial_renders)
+
+        # But the todo was actually added to the list!
+        self.assertEqual(len(self.todo_list.todos), 3)
+
+if __name__ == '__main__':
+    unittest.main()`,
+          description: 'Tests demonstrating state mutation bugs in Python',
+        },
+      ],
+      java: [
+        {
+          fileName: 'models/TodoListManager.java',
+          content: `// TodoList manager with observer pattern showing state mutation bug
+package models;
+
+import java.util.*;
+
+public class TodoListManager {
+    public static class Todo {
+        public long id;
+        public String text;
+        public boolean completed;
+
+        public Todo(long id, String text, boolean completed) {
+            this.id = id;
+            this.text = text;
+            this.completed = completed;
+        }
+    }
+
+    public interface TodoObserver {
+        void onTodosChanged(List<Todo> todos);
+    }
+
+    private List<Todo> todos;
+    private List<TodoObserver> observers;
+    private List<Todo> lastNotifiedReference;
+
+    public TodoListManager() {
+        this.todos = new ArrayList<>();
+        this.observers = new ArrayList<>();
+
+        // Initial todos
+        todos.add(new Todo(1, "Learn Java", false));
+        todos.add(new Todo(2, "Build a project", false));
+    }
+
+    public void addObserver(TodoObserver observer) {
+        observers.add(observer);
+    }
+
+    // BUG: Direct mutation doesn't trigger observer updates
+    public void addTodo(String text) {
+        Todo newTodo = new Todo(System.currentTimeMillis(), text, false);
+
+        // BUG: This mutates the list in place
+        todos.add(newTodo);
+        notifyObservers(todos);  // Same reference!
+    }
+
+    // BUG: Direct mutation of todo object
+    public void toggleTodo(long todoId) {
+        Todo todo = todos.stream()
+            .filter(t -> t.id == todoId)
+            .findFirst()
+            .orElse(null);
+
+        if (todo != null) {
+            todo.completed = !todo.completed;  // BUG: Direct mutation
+            notifyObservers(todos);  // Same reference, no update!
+        }
+    }
+
+    // BUG: Direct mutation using remove
+    public void deleteTodo(long todoId) {
+        todos.removeIf(t -> t.id == todoId);  // BUG: Mutates list
+        notifyObservers(todos);  // Same reference!
+    }
+
+    private void notifyObservers(List<Todo> todos) {
+        // Check if reference changed
+        if (lastNotifiedReference == todos) {
+            System.out.println("WARNING: Same reference - observers may not update!");
+        }
+
+        lastNotifiedReference = todos;
+
+        for (TodoObserver observer : observers) {
+            observer.onTodosChanged(todos);
+        }
+    }
+
+    public List<Todo> getTodos() {
+        return todos;
+    }
+}`,
+          description: 'TodoList manager with observer pattern showing state mutation bugs',
+        },
+        {
+          fileName: 'ui/TodoDisplay.java',
+          content: `// UI component that observes TodoList
+package ui;
+
+import models.TodoListManager;
+import models.TodoListManager.Todo;
+import models.TodoListManager.TodoObserver;
+import java.util.List;
+
+public class TodoDisplay implements TodoObserver {
+    private TodoListManager todoList;
+    private List<Todo> lastTodosReference;
+    private int renderCount;
+
+    public TodoDisplay(TodoListManager todoList) {
+        this.todoList = todoList;
+        this.lastTodosReference = null;
+        this.renderCount = 0;
+
+        // Subscribe to changes
+        todoList.addObserver(this);
+    }
+
+    @Override
+    public void onTodosChanged(List<Todo> todos) {
+        // BUG: Won't detect changes if reference is the same
+        // Check if reference changed using identity comparison
+        if (lastTodosReference == todos) {
+            System.out.println("Display NOT updated - same reference (todos: " + todos.size() + ")");
+            return;  // No re-render because reference didn't change!
+        }
+
+        System.out.println("Display updated - new reference (todos: " + todos.size() + ")");
+        lastTodosReference = todos;
+        renderCount++;
+    }
+
+    public void demonstrateBug() {
+        System.out.println("\\nInitial render count: " + renderCount);
+        System.out.println("Initial todos: " + todoList.getTodos().size());
+
+        // Try to add a todo
+        todoList.addTodo("Buy milk");
+        System.out.println("After adding todo - render count: " + renderCount);
+        System.out.println("Actual todos in list: " + todoList.getTodos().size());
+
+        // The list was updated, but display wasn't re-rendered!
+        // This demonstrates the React state mutation bug in Java
+    }
+
+    public void demonstrateFix() {
+        System.out.println("\\n--- Using Fixed Version ---");
+
+        // Create a new list reference
+        List<Todo> newList = new ArrayList<>(todoList.getTodos());
+        // This would trigger update because it's a new reference
+        onTodosChanged(newList);
+
+        System.out.println("After fix - render count: " + renderCount);
+    }
+
+    public int getRenderCount() {
+        return renderCount;
+    }
+}`,
+          description: 'UI component that observes todo list and demonstrates update bug',
+        },
+        {
+          fileName: 'tests/StateMutationTest.java',
+          content: `// Tests demonstrating state mutation bugs
+package tests;
+
+import models.TodoListManager;
+import models.TodoListManager.Todo;
+import ui.TodoDisplay;
+import java.util.*;
+
+public class StateMutationTest {
+
+    public static void testMutationSameReference() {
+        System.out.println("\\n=== Test: Mutation Same Reference ===");
+
+        TodoListManager todoList = new TodoListManager();
+        List<Todo> originalRef = todoList.getTodos();
+
+        // Mutate the list
+        todoList.getTodos().add(new Todo(3, "Test", false));
+
+        // Reference is the same!
+        boolean sameReference = (todoList.getTodos() == originalRef);
+        System.out.println("Same reference after mutation: " + sameReference);
+        System.out.println("Todo count: " + todoList.getTodos().size());
+
+        assert sameReference : "Reference should be the same after mutation";
+        assert todoList.getTodos().size() == 3 : "Should have 3 todos";
+    }
+
+    public static void testNewListDifferentReference() {
+        System.out.println("\\n=== Test: New List Different Reference ===");
+
+        TodoListManager todoList = new TodoListManager();
+        List<Todo> originalRef = todoList.getTodos();
+
+        // Create new list (this would be the fix)
+        List<Todo> newList = new ArrayList<>(todoList.getTodos());
+        newList.add(new Todo(3, "Test", false));
+
+        // Reference is different!
+        boolean differentReference = (newList != originalRef);
+        System.out.println("Different reference with new list: " + differentReference);
+        System.out.println("New list todo count: " + newList.size());
+
+        assert differentReference : "Reference should be different";
+        assert newList.size() == 3 : "Should have 3 todos";
+    }
+
+    public static void testDisplayNotUpdatedOnMutation() {
+        System.out.println("\\n=== Test: Display Not Updated on Mutation ===");
+
+        TodoListManager todoList = new TodoListManager();
+        TodoDisplay display = new TodoDisplay(todoList);
+
+        int initialRenders = display.getRenderCount();
+
+        // Add todo (which mutates in place)
+        todoList.addTodo("Buy milk");
+
+        // Display was NOT updated because reference didn't change
+        System.out.println("Initial renders: " + initialRenders);
+        System.out.println("Current renders: " + display.getRenderCount());
+        System.out.println("Actual todo count: " + todoList.getTodos().size());
+
+        assert display.getRenderCount() == initialRenders :
+            "Render count should not increase due to mutation";
+
+        // But the todo was actually added to the list!
+        assert todoList.getTodos().size() == 3 : "Should have 3 todos";
+    }
+
+    public static void main(String[] args) {
+        testMutationSameReference();
+        testNewListDifferentReference();
+        testDisplayNotUpdatedOnMutation();
+
+        System.out.println("\\n=== All tests completed ===");
+    }
+}`,
+          description: 'Tests demonstrating state mutation bugs in Java',
+        },
+      ],
     },
   },
   {
@@ -4903,6 +7129,27 @@ describe('TodoList State Mutation Bug', () => {
     response = await fetch(f'/api/users/{userId}')
     data = await response.json()
     return data`,
+      java: `// UserDataLoader.java - Missing error handling
+import java.net.http.*;
+import com.google.gson.*;
+
+public class UserDataLoader {
+    private static final HttpClient client = HttpClient.newHttpClient();
+    private static final Gson gson = new Gson();
+
+    public static User loadUserData(String userId) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create("/api/users/" + userId))
+            .build();
+
+        // BUG: No error handling for failed requests
+        HttpResponse<String> response = client.send(request,
+            HttpResponse.BodyHandlers.ofString());
+
+        // BUG: Doesn't check status code before parsing
+        return gson.fromJson(response.body(), User.class);
+    }
+}`,
     },
     expectedBehavior: 'Should handle network errors and invalid responses gracefully',
     bugDescription: 'Missing try-catch and response validation',
@@ -5368,6 +7615,292 @@ class TestPromiseErrorHandling:
           description: 'Python tests showing async error handling',
         },
       ],
+      java: [
+        {
+          fileName: 'api/ApiClient.java',
+          content: `// API client with missing error handling
+package api;
+
+import java.net.http.*;
+import java.net.URI;
+import java.io.IOException;
+import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
+import models.User;
+
+public class ApiClient {
+    private static final HttpClient client = HttpClient.newHttpClient();
+    private static final Gson gson = new Gson();
+
+    // BUG: No error handling in API calls
+    public User loadUserData(String userId) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create("https://api.example.com/users/" + userId))
+            .build();
+
+        HttpResponse<String> response = client.send(request,
+            HttpResponse.BodyHandlers.ofString());
+
+        // BUG: Doesn't check if response is ok (200-299)
+        // Will fail on 404, 500, etc. when trying to parse JSON
+        User data = gson.fromJson(response.body(), User.class);
+
+        return data;
+    }
+
+    public User updateUserProfile(String userId, User updates)
+            throws IOException, InterruptedException {
+        String jsonBody = gson.toJson(updates);
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create("https://api.example.com/users/" + userId))
+            .PUT(HttpRequest.BodyPublishers.ofString(jsonBody))
+            .header("Content-Type", "application/json")
+            .build();
+
+        HttpResponse<String> response = client.send(request,
+            HttpResponse.BodyHandlers.ofString());
+
+        // BUG: No validation of response status
+        return gson.fromJson(response.body(), User.class);
+    }
+
+    public void deleteUser(String userId) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create("https://api.example.com/users/" + userId))
+            .DELETE()
+            .build();
+
+        HttpResponse<String> response = client.send(request,
+            HttpResponse.BodyHandlers.ofString());
+
+        // BUG: Doesn't throw error on failure
+        // Caller has no way to know if delete succeeded
+    }
+
+    // Example of what happens with the buggy code
+    public static void demonstrateBug() {
+        ApiClient client = new ApiClient();
+
+        try {
+            // This will throw JsonSyntaxException when server returns 404 HTML page
+            User user = client.loadUserData("invalid-id");
+            System.out.println("Got user: " + user.name);
+        } catch (IOException | InterruptedException e) {
+            System.out.println("Network error: " + e.getMessage());
+        } catch (JsonSyntaxException e) {
+            // BUG: Gets here when trying to parse HTML error page as JSON
+            System.out.println("JSON parsing failed - probably got error HTML: " + e.getMessage());
+        }
+    }
+}`,
+          description: 'API client with no error handling for HTTP status codes',
+        },
+        {
+          fileName: 'ui/UserProfileView.java',
+          content: `// User profile view with poor error handling
+package ui;
+
+import api.ApiClient;
+import models.User;
+import java.util.concurrent.CompletableFuture;
+
+public class UserProfileView {
+    private ApiClient apiClient;
+    private User currentUser;
+    private boolean loading;
+    private String errorMessage;
+
+    public UserProfileView() {
+        this.apiClient = new ApiClient();
+        this.loading = false;
+    }
+
+    // BUG: No error handling for promise rejection
+    public void loadUser(String userId) {
+        loading = true;
+
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                return apiClient.loadUserData(userId); // Can throw!
+            } catch (Exception e) {
+                // BUG: Exception is swallowed, not propagated
+                System.err.println("Error loading user: " + e.getMessage());
+                return null;
+            }
+        }).thenAccept(user -> {
+            currentUser = user;
+            loading = false;
+            // BUG: If user is null, we don't set an error state
+            // UI will try to render null user and crash
+        });
+        // BUG: Exception in async chain is not handled!
+    }
+
+    public void updateProfile(String userId, User updates) {
+        CompletableFuture.runAsync(() -> {
+            try {
+                apiClient.updateUserProfile(userId, updates);
+                // BUG: Doesn't check if update succeeded
+                // BUG: Doesn't refresh user data after update
+            } catch (Exception e) {
+                // BUG: Error is logged but not shown to user
+                System.err.println("Update failed: " + e.getMessage());
+            }
+        });
+        // No error handling for the CompletableFuture itself!
+    }
+
+    // Attempting to render when currentUser might be null
+    public String render() {
+        if (loading) {
+            return "<div>Loading...</div>";
+        }
+
+        // BUG: If loadUserData fails, currentUser stays null and this crashes
+        return String.format("""
+            <div class="user-profile">
+                <h1>%s</h1>
+                <p>Email: %s</p>
+                <p>Bio: %s</p>
+            </div>
+            """, currentUser.name, currentUser.email, currentUser.bio);
+        // NullPointerException when currentUser is null!
+    }
+
+    // Fixed version shows proper error handling
+    public void loadUserFixed(String userId) {
+        loading = true;
+        errorMessage = null;
+
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                return apiClient.loadUserData(userId);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to load user: " + e.getMessage(), e);
+            }
+        }).thenAccept(user -> {
+            currentUser = user;
+            loading = false;
+        }).exceptionally(ex -> {
+            // Properly handle errors
+            errorMessage = ex.getMessage();
+            loading = false;
+            currentUser = null;
+            return null;
+        });
+    }
+
+    public String renderFixed() {
+        if (loading) {
+            return "<div>Loading...</div>";
+        }
+
+        if (errorMessage != null) {
+            return "<div class='error'>" + errorMessage + "</div>";
+        }
+
+        if (currentUser == null) {
+            return "<div>No user data</div>";
+        }
+
+        return String.format("""
+            <div class="user-profile">
+                <h1>%s</h1>
+                <p>Email: %s</p>
+                <p>Bio: %s</p>
+            </div>
+            """, currentUser.name, currentUser.email, currentUser.bio);
+    }
+}`,
+          description: 'User profile view with poor async error handling',
+        },
+        {
+          fileName: 'tests/ApiClientTest.java',
+          content: `// Tests demonstrating error handling issues
+package tests;
+
+import api.ApiClient;
+import models.User;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.io.IOException;
+import com.google.gson.JsonSyntaxException;
+
+public class ApiClientTest {
+
+    @Test
+    public void testBuggyLoadUserDataWithInvalidId() {
+        ApiClient client = new ApiClient();
+
+        // BUG: This throws JsonSyntaxException instead of a meaningful error
+        // because the API returns HTML error page, not JSON
+        assertThrows(JsonSyntaxException.class, () -> {
+            client.loadUserData("invalid-id");
+        });
+
+        // The exception message is unhelpful:
+        // "Expected BEGIN_OBJECT but was STRING at line 1 column 1"
+        // Should instead say "User not found" or similar
+    }
+
+    @Test
+    public void testBuggyUpdateWithServerError() {
+        ApiClient client = new ApiClient();
+        User updates = new User("1", "Updated Name", "updated@email.com", "New bio");
+
+        // BUG: When server returns 500, this throws JsonSyntaxException
+        // instead of properly indicating server error
+        assertThrows(Exception.class, () -> {
+            client.updateUserProfile("1", updates);
+        });
+    }
+
+    @Test
+    public void demonstrateProperErrorHandling() {
+        // This shows what proper error handling should look like:
+
+        class FixedApiClient {
+            private final HttpClient client = HttpClient.newHttpClient();
+            private final Gson gson = new Gson();
+
+            public User loadUserData(String userId) throws IOException, InterruptedException {
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.example.com/users/" + userId))
+                    .build();
+
+                HttpResponse<String> response = client.send(request,
+                    HttpResponse.BodyHandlers.ofString());
+
+                // FIXED: Check status code first
+                if (response.statusCode() == 404) {
+                    throw new IllegalArgumentException("User not found: " + userId);
+                } else if (response.statusCode() >= 400) {
+                    throw new IOException("HTTP error " + response.statusCode() +
+                        ": " + response.body());
+                }
+
+                // FIXED: Only parse JSON if we got a success status
+                try {
+                    return gson.fromJson(response.body(), User.class);
+                } catch (JsonSyntaxException e) {
+                    throw new IOException("Invalid JSON response", e);
+                }
+            }
+        }
+
+        // Now errors are clear and meaningful
+        FixedApiClient fixedClient = new FixedApiClient();
+        Exception ex = assertThrows(IllegalArgumentException.class, () -> {
+            fixedClient.loadUserData("invalid-id");
+        });
+        assertTrue(ex.getMessage().contains("User not found"));
+    }
+}`,
+          description: 'Tests showing error handling problems and solutions',
+        },
+      ],
     },
   },
   // ==================== COMPREHENSIVE MULTI-FILE BUG FIX SCENARIOS ====================
@@ -5415,6 +7948,78 @@ export function UserDashboard({ userId }) {
       <UserPreferences preferences={preferences} />
     </div>
   );
+}`,
+      python: `# user_dashboard.py - Race condition in async data fetching
+import asyncio
+from api.user_api import fetch_user_data, fetch_user_preferences
+
+class UserDashboard:
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.user_data = None
+        self.preferences = None
+        self.loading = True
+
+    async def load_data(self):
+        """BUG: Race condition - tasks can complete in any order"""
+        self.loading = True
+
+        # BUG: These run concurrently but update state independently
+        # If user_id changes during loading, we might show old data
+        asyncio.create_task(self._load_user_data(self.user_id))
+        asyncio.create_task(self._load_preferences(self.user_id))
+
+    async def _load_user_data(self, user_id):
+        data = await fetch_user_data(user_id)
+        self.user_data = data  # BUG: Might be for old user_id
+
+    async def _load_preferences(self, user_id):
+        prefs = await fetch_user_preferences(user_id)
+        self.preferences = prefs  # BUG: Might be for old user_id
+        self.loading = False`,
+      java: `// UserDashboard.java - Race condition in async data loading
+import java.util.concurrent.CompletableFuture;
+import api.UserApi;
+import models.User;
+import models.UserPreferences;
+
+public class UserDashboard {
+    private String userId;
+    private User userData;
+    private UserPreferences preferences;
+    private boolean loading;
+
+    public UserDashboard(String userId) {
+        this.userId = userId;
+        this.loading = true;
+    }
+
+    // BUG: Race condition - async calls can complete in any order
+    public void loadData() {
+        loading = true;
+
+        // BUG: These run independently, can complete in wrong order
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                return UserApi.fetchUserData(userId);
+            } catch (Exception e) {
+                return null;
+            }
+        }).thenAccept(data -> {
+            this.userData = data; // BUG: Might be for old userId
+        });
+
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                return UserApi.fetchUserPreferences(userId);
+            } catch (Exception e) {
+                return null;
+            }
+        }).thenAccept(prefs -> {
+            this.preferences = prefs; // BUG: Might be for old userId
+            this.loading = false;
+        });
+    }
 }`,
     },
     codebaseFiles: {
@@ -5474,6 +8079,299 @@ export function UserPreferences({ preferences }) {
   );
 }`,
           description: 'Component that displays user preferences',
+        },
+      ],
+      python: [
+        {
+          fileName: 'api/user_api.py',
+          content: `# API functions for user data
+import asyncio
+import random
+
+async def fetch_user_data(user_id):
+    """Fetch user data with variable latency"""
+    # Simulated delay
+    await asyncio.sleep(random.random())
+    return {
+        'id': user_id,
+        'name': f'User {user_id}',
+        'email': f'user{user_id}@example.com',
+        'joinedDate': '2024-01-01'
+    }
+
+async def fetch_user_preferences(user_id):
+    """Fetch user preferences with variable latency"""
+    await asyncio.sleep(random.random() * 0.5)
+    return {
+        'theme': 'dark',
+        'notifications': True,
+        'language': 'en'
+    }`,
+          description: 'API functions with variable latency causing race conditions',
+        },
+        {
+          fileName: 'ui/user_dashboard_view.py',
+          content: `# User dashboard view component
+class UserDashboardView:
+    def __init__(self, user_data, preferences):
+        self.user_data = user_data
+        self.preferences = preferences
+
+    def render(self):
+        """Render the dashboard"""
+        if not self.user_data:
+            return "No user data"
+
+        html = f"""
+        <div class="user-profile">
+            <h2>{self.user_data.get('name', 'N/A')}</h2>
+            <p>Email: {self.user_data.get('email', 'N/A')}</p>
+            <p>Joined: {self.user_data.get('joinedDate', 'N/A')}</p>
+        </div>
+        """
+
+        if self.preferences:
+            html += f"""
+            <div class="user-preferences">
+                <h3>Preferences</h3>
+                <ul>
+                    <li>Theme: {self.preferences.get('theme', 'N/A')}</li>
+                    <li>Notifications: {'On' if self.preferences.get('notifications') else 'Off'}</li>
+                    <li>Language: {self.preferences.get('language', 'N/A')}</li>
+                </ul>
+            </div>
+            """
+
+        return html`,
+          description: 'View component for rendering user dashboard',
+        },
+        {
+          fileName: 'tests/test_race_condition.py',
+          content: `# Tests demonstrating race condition
+import asyncio
+import pytest
+from api.user_api import fetch_user_data, fetch_user_preferences
+
+@pytest.mark.asyncio
+async def test_race_condition_scenario():
+    """Demonstrates the race condition bug"""
+    user_id = "user1"
+
+    # BUG: These can complete in any order
+    task1 = asyncio.create_task(fetch_user_data(user_id))
+    task2 = asyncio.create_task(fetch_user_preferences(user_id))
+
+    # If we change user_id here, previous tasks might still update state
+    user_id = "user2"
+
+    # The tasks from user1 might complete after we've moved to user2
+    result1 = await task1  # Returns data for user1
+    result2 = await task2  # Returns data for user1
+
+    # But we're now expecting data for user2!
+    # This is the race condition
+
+@pytest.mark.asyncio
+async def test_fixed_version():
+    """Shows proper handling with cancellation"""
+    user_id = "user1"
+
+    # Create tasks
+    task1 = asyncio.create_task(fetch_user_data(user_id))
+    task2 = asyncio.create_task(fetch_user_preferences(user_id))
+
+    # Simulate user changing
+    user_id = "user2"
+
+    # FIXED: Cancel old tasks
+    task1.cancel()
+    task2.cancel()
+
+    # Start new tasks
+    new_task1 = asyncio.create_task(fetch_user_data(user_id))
+    new_task2 = asyncio.create_task(fetch_user_preferences(user_id))
+
+    # Now we only get data for user2
+    result1 = await new_task1
+    result2 = await new_task2
+
+    assert result1['id'] == user_id
+    assert result2 is not None`,
+          description: 'Tests showing race condition and fix',
+        },
+      ],
+      java: [
+        {
+          fileName: 'api/UserApi.java',
+          content: `// API functions for user data
+package api;
+
+import models.User;
+import models.UserPreferences;
+import java.util.concurrent.CompletableFuture;
+import java.util.Random;
+
+public class UserApi {
+    private static final Random random = new Random();
+
+    public static CompletableFuture<User> fetchUserData(String userId) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // Simulated variable delay
+                Thread.sleep((long)(random.nextDouble() * 1000));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+
+            return new User(
+                userId,
+                "User " + userId,
+                "user" + userId + "@example.com",
+                "2024-01-01"
+            );
+        });
+    }
+
+    public static CompletableFuture<UserPreferences> fetchUserPreferences(String userId) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // Simulated variable delay
+                Thread.sleep((long)(random.nextDouble() * 500));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+
+            return new UserPreferences("dark", true, "en");
+        });
+    }
+}`,
+          description: 'API functions with variable latency causing race conditions',
+        },
+        {
+          fileName: 'ui/UserDashboardView.java',
+          content: `// User dashboard view component
+package ui;
+
+import models.User;
+import models.UserPreferences;
+
+public class UserDashboardView {
+    private User userData;
+    private UserPreferences preferences;
+
+    public UserDashboardView(User userData, UserPreferences preferences) {
+        this.userData = userData;
+        this.preferences = preferences;
+    }
+
+    public String render() {
+        if (userData == null) {
+            return "No user data";
+        }
+
+        StringBuilder html = new StringBuilder();
+        html.append(String.format("""
+            <div class="user-profile">
+                <h2>%s</h2>
+                <p>Email: %s</p>
+                <p>Joined: %s</p>
+            </div>
+            """, userData.name, userData.email, userData.joinedDate));
+
+        if (preferences != null) {
+            html.append(String.format("""
+                <div class="user-preferences">
+                    <h3>Preferences</h3>
+                    <ul>
+                        <li>Theme: %s</li>
+                        <li>Notifications: %s</li>
+                        <li>Language: %s</li>
+                    </ul>
+                </div>
+                """, preferences.theme,
+                preferences.notifications ? "On" : "Off",
+                preferences.language));
+        }
+
+        return html.toString();
+    }
+}`,
+          description: 'View component for rendering user dashboard',
+        },
+        {
+          fileName: 'tests/RaceConditionTest.java',
+          content: `// Tests demonstrating race condition
+package tests;
+
+import api.UserApi;
+import models.User;
+import models.UserPreferences;
+import org.junit.jupiter.api.Test;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+public class RaceConditionTest {
+
+    @Test
+    public void testRaceConditionScenario() throws Exception {
+        // Demonstrates the race condition bug
+        AtomicReference<String> currentUserId = new AtomicReference<>("user1");
+
+        // BUG: These can complete in any order
+        CompletableFuture<User> userFuture =
+            UserApi.fetchUserData(currentUserId.get());
+        CompletableFuture<UserPreferences> prefFuture =
+            UserApi.fetchUserPreferences(currentUserId.get());
+
+        // Simulate user changing while requests are in flight
+        Thread.sleep(100);
+        currentUserId.set("user2");
+
+        // The futures from user1 might complete after we've moved to user2
+        User user = userFuture.get(); // Returns data for user1
+        UserPreferences prefs = prefFuture.get(); // Returns data for user1
+
+        // But we're now expecting data for user2!
+        // This is the race condition
+        assertNotEquals(currentUserId.get(), user.id);
+    }
+
+    @Test
+    public void testFixedVersion() throws Exception {
+        // Shows proper handling with cancellation
+        AtomicReference<String> currentUserId = new AtomicReference<>("user1");
+
+        // Create futures
+        CompletableFuture<User> userFuture =
+            UserApi.fetchUserData(currentUserId.get());
+        CompletableFuture<UserPreferences> prefFuture =
+            UserApi.fetchUserPreferences(currentUserId.get());
+
+        // Simulate user changing
+        Thread.sleep(100);
+        currentUserId.set("user2");
+
+        // FIXED: Cancel old futures
+        userFuture.cancel(true);
+        prefFuture.cancel(true);
+
+        // Start new futures
+        CompletableFuture<User> newUserFuture =
+            UserApi.fetchUserData(currentUserId.get());
+        CompletableFuture<UserPreferences> newPrefFuture =
+            UserApi.fetchUserPreferences(currentUserId.get());
+
+        // Now we only get data for user2
+        User user = newUserFuture.get();
+        UserPreferences prefs = newPrefFuture.get();
+
+        assertEquals(currentUserId.get(), user.id);
+        assertNotNull(prefs);
+    }
+}`,
+          description: 'Tests showing race condition and fix',
         },
       ],
     },
@@ -5600,6 +8498,99 @@ class ShoppingCart {
     this.items.forEach(item => this.renderItem(item));
   }
 }`,
+      python: `# shopping_cart.py - Cart manager with memory leaks
+import threading
+import json
+
+class ShoppingCart:
+    def __init__(self):
+        self.items = []
+        self.listeners = []
+        self.item_elements = {}
+
+        # BUG: Timer never stopped
+        self.price_update_timer = threading.Timer(5.0, self._update_prices_loop)
+        self.price_update_timer.start()
+
+    def add_item(self, item):
+        self.items.append(item)
+        self._notify_listeners()
+
+    def remove_item(self, item_id):
+        self.items = [item for item in self.items if item['id'] != item_id]
+        # BUG: Element not removed from dict, causing memory leak
+        self._notify_listeners()
+
+    def subscribe(self, callback):
+        self.listeners.append(callback)
+        # BUG: No unsubscribe mechanism
+
+    def _notify_listeners(self):
+        for listener in self.listeners:
+            listener(self.items)
+
+    def _update_prices_loop(self):
+        """BUG: Runs forever, never cleaned up"""
+        self._update_prices()
+        self.price_update_timer = threading.Timer(5.0, self._update_prices_loop)
+        self.price_update_timer.start()
+
+    def _update_prices(self):
+        # Update prices (simplified)
+        pass`,
+      java: `// ShoppingCart.java - Cart manager with memory leaks
+import java.util.*;
+import java.util.concurrent.*;
+
+public class ShoppingCart {
+    private List<CartItem> items;
+    private List<CartListener> listeners;
+    private Map<String, Object> itemElements;
+    private ScheduledExecutorService scheduler;
+    private ScheduledFuture<?> priceUpdateTask;
+
+    public ShoppingCart() {
+        this.items = new ArrayList<>();
+        this.listeners = new ArrayList<>();
+        this.itemElements = new HashMap<>();
+
+        // BUG: Scheduler never shut down
+        this.scheduler = Executors.newScheduledThreadPool(1);
+        this.priceUpdateTask = scheduler.scheduleAtFixedRate(
+            () -> updatePrices(),
+            5, 5, TimeUnit.SECONDS
+        );
+    }
+
+    public void addItem(CartItem item) {
+        items.add(item);
+        notifyListeners();
+    }
+
+    public void removeItem(String itemId) {
+        items.removeIf(item -> item.getId().equals(itemId));
+        // BUG: Element not removed from Map, causing memory leak
+        notifyListeners();
+    }
+
+    public void subscribe(CartListener callback) {
+        listeners.add(callback);
+        // BUG: No unsubscribe mechanism
+    }
+
+    private void notifyListeners() {
+        for (CartListener listener : listeners) {
+            listener.onCartChanged(new ArrayList<>(items));
+        }
+    }
+
+    private void updatePrices() {
+        // BUG: This runs forever, scheduler never shut down
+        // Fetch latest prices (simplified)
+    }
+
+    // Missing: cleanup method to stop scheduler and clear listeners
+}`,
     },
     codebaseFiles: {
       javascript: [
@@ -5674,6 +8665,242 @@ export class ProductPage {
   }
 }`,
           description: 'Product page that instantiates shopping cart',
+        },
+      ],
+      python: [
+        {
+          fileName: 'cart_ui.py',
+          content: `# Cart UI component
+class CartUI:
+    def __init__(self, cart):
+        self.cart = cart
+        self.update_cart_count()
+
+        # BUG: Subscribe to cart changes but never unsubscribe
+        cart.subscribe(lambda items: self.on_cart_changed(items))
+
+    def update_cart_count(self):
+        count = len(self.cart.items)
+        print(f"Cart count: {count}")
+
+    def on_cart_changed(self, items):
+        """Called when cart changes"""
+        self.update_cart_count()
+        self.update_total_price(items)
+
+    def update_total_price(self, items):
+        total = sum(item.get('price', 0) for item in items)
+        print(f"Total: \${total:.2f}")`,
+          description: 'UI component that subscribes to cart changes without cleanup',
+        },
+        {
+          fileName: 'product_page.py',
+          content: `# Product page that creates cart instances
+from shopping_cart import ShoppingCart
+from cart_ui import CartUI
+
+class ProductPage:
+    def __init__(self):
+        self.current_cart = None
+
+    def init(self):
+        # BUG: Creates new cart instance without cleaning up old one
+        self.current_cart = ShoppingCart()
+        self.cart_ui = CartUI(self.current_cart)
+
+        # Old cart and timer still running in background!
+
+    def navigate_away(self):
+        # BUG: No cleanup - timer keeps running
+        # listeners keep accumulating
+        pass`,
+          description: 'Page that creates cart instances without proper cleanup',
+        },
+        {
+          fileName: 'tests/test_memory_leak.py',
+          content: `# Tests to detect memory leaks
+import unittest
+import gc
+import sys
+from shopping_cart import ShoppingCart
+from cart_ui import CartUI
+
+class TestMemoryLeaks(unittest.TestCase):
+    def test_cart_listener_leak(self):
+        """Demonstrates listener accumulation"""
+        cart = ShoppingCart()
+        initial_listeners = len(cart.listeners)
+
+        # Create multiple UIs
+        for i in range(10):
+            ui = CartUI(cart)
+            # BUG: UI is garbage collected but listener remains
+
+        gc.collect()
+
+        # Listeners keep growing!
+        self.assertEqual(len(cart.listeners), initial_listeners + 10)
+        # This demonstrates the leak - listeners never cleaned up
+
+    def test_timer_leak(self):
+        """Shows timer continues running"""
+        cart = ShoppingCart()
+        # Timer starts in constructor
+
+        # Simulate cart going out of scope
+        cart = None
+        gc.collect()
+
+        # BUG: Timer still running in background!
+        # No way to stop it
+
+if __name__ == '__main__':
+    unittest.main()`,
+          description: 'Tests that demonstrate memory leaks',
+        },
+      ],
+      java: [
+        {
+          fileName: 'ui/CartUI.java',
+          content: `// Cart UI component
+package ui;
+
+import models.ShoppingCart;
+import models.CartItem;
+import models.CartListener;
+import java.util.List;
+
+public class CartUI {
+    private ShoppingCart cart;
+
+    public CartUI(ShoppingCart cart) {
+        this.cart = cart;
+        updateCartCount();
+
+        // BUG: Subscribe to cart changes but never unsubscribe
+        cart.subscribe(new CartListener() {
+            @Override
+            public void onCartChanged(List<CartItem> items) {
+                CartUI.this.onCartChanged(items);
+            }
+        });
+    }
+
+    private void updateCartCount() {
+        System.out.println("Cart count: " + cart.getItems().size());
+    }
+
+    private void onCartChanged(List<CartItem> items) {
+        updateCartCount();
+        updateTotalPrice(items);
+    }
+
+    private void updateTotalPrice(List<CartItem> items) {
+        double total = items.stream()
+            .mapToDouble(item -> item.getPrice())
+            .sum();
+        System.out.printf("Total: $%.2f%n", total);
+    }
+
+    // Missing: cleanup/dispose method to unsubscribe
+}`,
+          description: 'UI component that subscribes to cart changes without cleanup',
+        },
+        {
+          fileName: 'pages/ProductPage.java',
+          content: `// Product page that creates cart instances
+package pages;
+
+import models.ShoppingCart;
+import ui.CartUI;
+
+public class ProductPage {
+    private ShoppingCart currentCart;
+    private CartUI cartUI;
+
+    public void init() {
+        // BUG: Creates new cart instance without cleaning up old one
+        if (currentCart != null) {
+            // Old cart's scheduler keeps running!
+            // Old listeners accumulate!
+        }
+
+        currentCart = new ShoppingCart();
+        cartUI = new CartUI(currentCart);
+
+        // Old cart and scheduler still running in background!
+    }
+
+    public void navigateAway() {
+        // BUG: No cleanup
+        // Scheduler keeps running
+        // Listeners keep accumulating
+        // Memory leak!
+    }
+
+    // Missing: cleanup method to stop scheduler and clear listeners
+}`,
+          description: 'Page that creates cart instances without proper cleanup',
+        },
+        {
+          fileName: 'tests/MemoryLeakTest.java',
+          content: `// Tests to detect memory leaks
+package tests;
+
+import models.ShoppingCart;
+import models.CartItem;
+import ui.CartUI;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+public class MemoryLeakTest {
+
+    @Test
+    public void testCartListenerLeak() {
+        // Demonstrates listener accumulation
+        ShoppingCart cart = new ShoppingCart();
+        int initialListeners = cart.getListenerCount();
+
+        // Create multiple UIs
+        for (int i = 0; i < 10; i++) {
+            CartUI ui = new CartUI(cart);
+            // BUG: UI can be garbage collected but listener remains
+        }
+
+        System.gc(); // Suggest garbage collection
+
+        // Listeners keep growing!
+        assertEquals(initialListeners + 10, cart.getListenerCount());
+        // This demonstrates the leak - listeners never cleaned up
+    }
+
+    @Test
+    public void testSchedulerLeak() {
+        // Shows scheduler continues running
+        ShoppingCart cart = new ShoppingCart();
+        // Scheduler starts in constructor
+
+        // Get thread count before
+        int threadsBefore = Thread.activeCount();
+
+        // Simulate cart going out of scope
+        cart = null;
+        System.gc();
+
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // BUG: Scheduler thread still running!
+        // Thread count hasn't decreased
+        int threadsAfter = Thread.activeCount();
+        assertTrue(threadsAfter >= threadsBefore,
+            "Scheduler thread still running after cart disposed");
+    }
+}`,
+          description: 'Tests that demonstrate memory leaks',
         },
       ],
     },
@@ -5761,6 +8988,99 @@ class UserController {
 }
 
 module.exports = new UserController();`,
+      python: `# user_controller.py - Controller with poor error handling
+from services.user_service import UserService
+
+class UserController:
+    def __init__(self):
+        self.service = UserService()
+
+    async def get_user(self, request):
+        user_id = request.params.get('userId')
+
+        # BUG: No try-except, unhandled exception
+        user = await self.service.get_user_by_id(user_id)
+
+        if not user:
+            # BUG: Inconsistent error response format
+            return {'error': 'User not found'}, 404
+
+        return user, 200
+
+    async def create_user(self, request):
+        user_data = request.json
+
+        # BUG: Validation errors not caught
+        new_user = await self.service.create_user(user_data)
+
+        # BUG: Success but no status code set
+        return new_user
+
+    async def delete_user(self, request):
+        user_id = request.params.get('userId')
+
+        await self.service.delete_user(user_id)
+
+        # BUG: No status code, no error handling
+        return {}`,
+      java: `// UserController.java - Controller with poor error handling
+package controllers;
+
+import services.UserService;
+import models.User;
+import javax.ws.rs.*;
+import javax.ws.rs.core.Response;
+
+@Path("/users")
+public class UserController {
+    private UserService userService = new UserService();
+
+    @GET
+    @Path("/{userId}")
+    public Response getUser(@PathParam("userId") String userId) throws Exception {
+        // BUG: No try-catch, throws exception to caller
+        User user = userService.getUserById(userId);
+
+        if (user == null) {
+            // BUG: Inconsistent error response format
+            return Response.status(404).entity("User not found").build();
+        }
+
+        return Response.ok(user).build();
+    }
+
+    @POST
+    public Response createUser(User userData) throws Exception {
+        // BUG: Validation errors not caught
+        User newUser = userService.createUser(userData);
+
+        // BUG: Success but should return 201 Created
+        return Response.ok(newUser).build();
+    }
+
+    @PUT
+    @Path("/{userId}")
+    public Response updateUser(@PathParam("userId") String userId, User updates) {
+        try {
+            User updatedUser = userService.updateUser(userId, updates);
+            return Response.ok(updatedUser).build();
+        } catch (Exception error) {
+            // BUG: Generic error handling, loses error details
+            return Response.status(500)
+                .entity("{\"error\": \"Something went wrong\"}")
+                .build();
+        }
+    }
+
+    @DELETE
+    @Path("/{userId}")
+    public Response deleteUser(@PathParam("userId") String userId) throws Exception {
+        userService.deleteUser(userId);
+
+        // BUG: No status code (should be 204 No Content)
+        return Response.ok().build();
+    }
+}`,
     },
     codebaseFiles: {
       javascript: [
@@ -5854,6 +9174,240 @@ router.delete('/users/:userId', UserController.deleteUser);
 
 module.exports = router;`,
           description: 'Express route definitions',
+        },
+      ],
+      python: [
+        {
+          fileName: 'services/user_service.py',
+          content: `# user_service.py - Service layer with various error conditions
+from database import db
+
+class UserService:
+    async def get_user_by_id(self, user_id):
+        if not user_id:
+            raise ValueError('User ID is required')
+
+        # BUG: Database errors not wrapped properly
+        user = await db.query('SELECT * FROM users WHERE id = $1', [user_id])
+        return user[0] if user else None
+
+    async def create_user(self, user_data):
+        # BUG: No validation
+        if not user_data.get('email'):
+            raise ValueError('Email required')
+
+        # BUG: Duplicate email error not handled specially
+        result = await db.query(
+            'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *',
+            [user_data.get('name'), user_data.get('email')]
+        )
+        return result[0]
+
+    async def update_user(self, user_id, updates):
+        # BUG: No check if user exists
+        result = await db.query(
+            'UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING *',
+            [updates.get('name'), updates.get('email'), user_id]
+        )
+        return result[0] if result else None
+
+    async def delete_user(self, user_id):
+        # BUG: No check if user exists, no return value
+        await db.query('DELETE FROM users WHERE id = $1', [user_id])`,
+          description: 'Service layer with poor error handling',
+        },
+        {
+          fileName: 'middleware/error_handler.py',
+          content: `# error_handler.py - Error handling middleware
+def error_handler(app):
+    @app.errorhandler(Exception)
+    def handle_error(error):
+        # BUG: All errors return 500
+        # BUG: Exposes full error message (security risk)
+        return {
+            'error': str(error),
+            'type': type(error).__name__
+        }, 500
+
+    # BUG: No differentiation between error types
+    # BUG: No logging
+    # BUG: Stack traces exposed in production`,
+          description: 'Error handling middleware with security issues',
+        },
+        {
+          fileName: 'tests/test_error_handling.py',
+          content: `# test_error_handling.py - Tests for error handling
+import pytest
+from user_controller import UserController
+
+class TestErrorHandling:
+    def test_missing_user_returns_404(self):
+        """BUG: This test fails - no proper error handling"""
+        controller = UserController()
+
+        # Should return 404, but might crash instead
+        # response = await controller.get_user({'params': {'userId': 'invalid'}})
+        # assert response[1] == 404
+
+    def test_duplicate_email_handling(self):
+        """BUG: Doesn't differentiate duplicate key errors"""
+        # Should return 409 Conflict
+        # Actually returns generic 500
+
+    def test_validation_errors(self):
+        """BUG: No consistent validation error format"""
+        # Should return 400 Bad Request with details
+        # Actually might crash or return inconsistent format`,
+          description: 'Tests showing error handling issues',
+        },
+      ],
+      java: [
+        {
+          fileName: 'services/UserService.java',
+          content: `// UserService.java - Service layer with various error conditions
+package services;
+
+import models.User;
+import database.Database;
+import java.sql.*;
+import java.util.List;
+
+public class UserService {
+    private Database db = new Database();
+
+    public User getUserById(String userId) throws Exception {
+        if (userId == null || userId.isEmpty()) {
+            throw new IllegalArgumentException("User ID is required");
+        }
+
+        // BUG: Database errors not wrapped properly
+        List<User> users = db.query("SELECT * FROM users WHERE id = ?", userId);
+        return users.isEmpty() ? null : users.get(0);
+    }
+
+    public User createUser(User userData) throws Exception {
+        // BUG: No validation
+        if (userData.getEmail() == null) {
+            throw new IllegalArgumentException("Email required");
+        }
+
+        // BUG: Duplicate email error not handled specially
+        // SQLException with specific error code should be caught
+        List<User> result = db.query(
+            "INSERT INTO users (name, email) VALUES (?, ?) RETURNING *",
+            userData.getName(), userData.getEmail()
+        );
+        return result.get(0);
+    }
+
+    public User updateUser(String userId, User updates) throws Exception {
+        // BUG: No check if user exists
+        List<User> result = db.query(
+            "UPDATE users SET name = ?, email = ? WHERE id = ? RETURNING *",
+            updates.getName(), updates.getEmail(), userId
+        );
+        return result.isEmpty() ? null : result.get(0);
+    }
+
+    public void deleteUser(String userId) throws Exception {
+        // BUG: No check if user exists, no indication if anything was deleted
+        db.execute("DELETE FROM users WHERE id = ?", userId);
+    }
+}`,
+          description: 'Service layer with poor error handling',
+        },
+        {
+          fileName: 'middleware/ErrorHandler.java',
+          content: `// ErrorHandler.java - Error handling middleware
+package middleware;
+
+import javax.ws.rs.core.Response;
+import javax.ws.rs.ext.ExceptionMapper;
+import javax.ws.rs.ext.Provider;
+import java.sql.SQLException;
+
+@Provider
+public class ErrorHandler implements ExceptionMapper<Exception> {
+
+    @Override
+    public Response toResponse(Exception exception) {
+        // BUG: All errors return 500
+        // BUG: Exposes full error message (security risk)
+        String errorMessage = exception.getMessage();
+        String stackTrace = getStackTrace(exception);
+
+        // BUG: Stack traces exposed in production
+        return Response.status(500)
+            .entity(String.format(
+                "{\"error\": \"%s\", \"type\": \"%s\", \"stack\": \"%s\"}",
+                errorMessage,
+                exception.getClass().getName(),
+                stackTrace
+            ))
+            .build();
+
+        // BUG: No differentiation between error types
+        // BUG: No logging
+        // SQLException, IllegalArgumentException, etc. all return same status
+    }
+
+    private String getStackTrace(Exception e) {
+        StringBuilder sb = new StringBuilder();
+        for (StackTraceElement element : e.getStackTrace()) {
+            sb.append(element.toString()).append("\\n");
+        }
+        return sb.toString();
+    }
+}`,
+          description: 'Error handling middleware with security issues',
+        },
+        {
+          fileName: 'tests/ErrorHandlingTest.java',
+          content: `// ErrorHandlingTest.java - Tests for error handling
+package tests;
+
+import controllers.UserController;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+import javax.ws.rs.core.Response;
+
+public class ErrorHandlingTest {
+
+    @Test
+    public void testMissingUserReturns404() {
+        // BUG: This test fails - no proper error handling
+        UserController controller = new UserController();
+
+        try {
+            Response response = controller.getUser("invalid-id");
+            // Should return 404, but might throw exception instead
+            assertEquals(404, response.getStatus());
+        } catch (Exception e) {
+            fail("Should not throw exception, should return 404");
+        }
+    }
+
+    @Test
+    public void testDuplicateEmailHandling() {
+        // BUG: Doesn't differentiate duplicate key errors
+        // Should return 409 Conflict
+        // Actually returns generic 500
+    }
+
+    @Test
+    public void testValidationErrors() {
+        // BUG: No consistent validation error format
+        // Should return 400 Bad Request with details
+        // Actually might throw exception or return inconsistent format
+    }
+
+    @Test
+    public void testErrorResponseFormat() {
+        // BUG: Errors expose stack traces
+        // Security risk - internal details leaked
+    }
+}`,
+          description: 'Tests showing error handling issues',
         },
       ],
     },
