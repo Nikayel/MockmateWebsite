@@ -566,35 +566,11 @@ Take a moment to think about your approach, then feel free to ask me any clarify
 
       {/* Interview Interface */}
       {!showScenarioBrowser && (
-        <section className="pt-24 pb-16 bg-gradient-to-b from-gray-900 to-black min-h-screen">
-          <div className="container mx-auto px-4">
-            <div className="max-w-7xl mx-auto">
-              {/* Controls */}
-              <div className="flex flex-col items-center space-y-4 mb-6 interview-controls">
-                <div className="flex justify-center items-center space-x-4 flex-wrap gap-4">
-                  <div className="flex items-center space-x-2 text-white bg-gray-800 px-6 py-3 rounded-lg">
-                    <Clock className="h-5 w-5 text-[#ff5733]" />
-                    <span className="text-xl font-mono">{formatTime(elapsedTime)}</span>
-                  </div>
-                  <Button
-                    onClick={runCode}
-                    disabled={isRunningTests || showFeedback}
-                    className="bg-green-600 hover:bg-green-700 text-white px-8 py-3"
-                  >
-                    <PlayCircle className="mr-2 h-5 w-5" />
-                    {isRunningTests ? "Running..." : "Run Tests"}
-                  </Button>
-                  <Button
-                    onClick={resetInterview}
-                    variant="outline"
-                    className="border-white text-white hover:bg-white hover:text-black bg-transparent px-8 py-3"
-                  >
-                    <RotateCcw className="mr-2 h-5 w-5" />
-                    Reset
-                  </Button>
-                </div>
-
-                {/* Workspace Context Upload */}
+        <section className="pt-20 pb-4 bg-gradient-to-b from-gray-900 to-black h-screen flex flex-col">
+          <div className="container mx-auto px-4 flex-1 flex flex-col overflow-hidden">
+            <div className="max-w-[1920px] mx-auto flex-1 flex flex-col gap-4">
+              {/* Workspace Context Upload - Top Bar */}
+              <div className="flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center space-x-4">
                   <input
                     ref={fileInputRef}
@@ -619,217 +595,244 @@ Take a moment to think about your approach, then feel free to ask me any clarify
                     </Badge>
                   )}
                 </div>
+                {isInterviewStarted && (
+                  <div className="flex items-center space-x-2 text-white bg-gray-800 px-4 py-2 rounded-lg">
+                    <Clock className="h-4 w-4 text-[#ff5733]" />
+                    <span className="text-lg font-mono">{formatTime(elapsedTime)}</span>
+                  </div>
+                )}
               </div>
 
-              {/* Main Interface */}
+              {/* Main Interface - All 3 Panels Side by Side */}
               {!showFeedback ? (
-                <div className="space-y-6">
-                  {/* Top Row: Code Editor + AI Interviewer */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Code Editor - 2/3 width */}
-                    <div className="lg:col-span-2">
-                    <Card className="bg-gray-900/50 border-gray-700 glass-effect interview-card">
-                      <CardHeader className="pb-3">
+                <div className="grid grid-cols-12 gap-4 flex-1 min-h-0">
+                  {/* Code Editor - Left Panel (5 columns) */}
+                  <div className="col-span-12 lg:col-span-5 flex flex-col min-h-0">
+                    <Card className="bg-gray-900/50 border-gray-700 glass-effect interview-card flex flex-col h-full">
+                      <CardHeader className="pb-3 flex-shrink-0">
                         <CardTitle className="text-white flex items-center justify-between">
                           <div className="flex items-center space-x-2">
                             <Code className="h-5 w-5 text-[#ff5733]" />
-                            <span>{selectedScenario?.title.toLowerCase().replace(/\s+/g, "-")}.{selectedLanguage === "javascript" ? "js" : selectedLanguage === "typescript" ? "ts" : "py"}</span>
-                          </div>
-                            {isInterviewStarted && (
-                              <div className="flex items-center space-x-2">
-                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                <span className="text-green-400 text-sm">LIVE</span>
-                              </div>
-                            )}
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="h-[500px] border border-gray-700 rounded-lg overflow-hidden">
-                            <Editor
-                              height="100%"
-                              defaultLanguage={selectedLanguage}
-                              value={code}
-                              onChange={(value) => setCode(value || "")}
-                              theme="vs-dark"
-                              options={{
-                                minimap: { enabled: false },
-                                fontSize: 14,
-                                lineNumbers: "on",
-                                scrollBeyondLastLine: false,
-                                automaticLayout: true,
-                                tabSize: 2,
-                                readOnly: !isInterviewStarted || showFeedback,
-                              }}
-                            />
-                          </div>
-
-                          {/* Test Results */}
-                          {testResults.length > 0 && (
-                            <div className="mt-4 space-y-2">
-                              <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-white font-semibold">Test Results</h3>
-                                <Badge
-                                  className={
-                                    testSummary.passRate === 100
-                                      ? "bg-green-600"
-                                      : testSummary.passRate >= 60
-                                        ? "bg-yellow-600"
-                                        : "bg-red-600"
-                                  }
-                                >
-                                  {testSummary.passed}/{testSummary.total} Passed ({testSummary.passRate}%)
-                                </Badge>
-                              </div>
-                              <div className="space-y-1 max-h-40 overflow-y-auto">
-                                {testResults.map((result, index) => (
-                                  <div
-                                    key={index}
-                                    className={`p-2 rounded text-sm ${
-                                      result.passed ? "bg-green-900/30 text-green-300" : "bg-red-900/30 text-red-300"
-                                    }`}
-                                  >
-                                    <div className="flex items-center space-x-2">
-                                      {result.passed ? (
-                                        <CheckCircle className="h-4 w-4" />
-                                      ) : (
-                                        <XCircle className="h-4 w-4" />
-                                      )}
-                                      <span>{result.description}</span>
-                                    </div>
-                                    {!result.passed && result.error && (
-                                      <div className="ml-6 text-xs mt-1 opacity-80">{result.error}</div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* AI Interviewer - 1/3 width RIGHT PANEL */}
-                    <div className="lg:col-span-1">
-                      <Card className="bg-gray-900/50 border-gray-700 glass-effect h-full interview-card">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-white flex items-center space-x-2">
-                            <Bot className="h-5 w-5 text-[#ff5733]" />
-                            <span>AI Interviewer</span>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex flex-col h-[calc(100%-80px)]">
-                          <div className="flex-1 overflow-y-auto space-y-3 mb-4 min-h-[400px]">
-                            {interviewerMessages.length === 0 ? (
-                              <div className="text-center py-16 text-gray-400">
-                                <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                                <p>Interview will begin when you click start...</p>
-                              </div>
-                            ) : (
-                              <>
-                                {interviewerMessages.map((msg, index) => (
-                                  <div
-                                    key={index}
-                                    className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"} chat-message`}
-                                  >
-                                    <div
-                                      className={`max-w-[90%] p-3 rounded-lg ${
-                                        msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-100"
-                                      }`}
-                                    >
-                                      <div className="flex items-center space-x-2 mb-1">
-                                        {msg.type === "user" ? (
-                                          <User className="h-3 w-3" />
-                                        ) : (
-                                          <Bot className="h-3 w-3 text-[#ff5733]" />
-                                        )}
-                                        <span className="text-xs opacity-75">
-                                          {msg.type === "user" ? "You" : "AI Interviewer"}
-                                        </span>
-                                      </div>
-                                      <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
-                                    </div>
-                                  </div>
-                                ))}
-                                <div ref={interviewerEndRef} />
-                              </>
-                            )}
+                            <span className="text-sm">{selectedScenario?.title.toLowerCase().replace(/\s+/g, "-")}.{selectedLanguage === "javascript" ? "js" : selectedLanguage === "typescript" ? "ts" : "py"}</span>
                           </div>
                           {isInterviewStarted && (
-                            <div className="flex space-x-2 mt-auto">
-                              <Input
-                                value={interviewerInput}
-                                onChange={(e) => setInterviewerInput(e.target.value)}
-                                placeholder="Ask the interviewer..."
-                                className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
-                                onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
-                                disabled={isLoadingInterviewer}
-                              />
-                              <Button
-                                onClick={() => handleSendMessage(true)}
-                                className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
-                                disabled={isLoadingInterviewer}
-                              >
-                                <Send className="h-4 w-4" />
-                              </Button>
+                            <div className="flex items-center space-x-2">
+                              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                              <span className="text-green-400 text-xs">LIVE</span>
                             </div>
                           )}
-                        </CardContent>
-                      </Card>
-                    </div>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex flex-col flex-1 min-h-0">
+                        <div className="flex-1 border border-gray-700 rounded-lg overflow-hidden min-h-0">
+                          <Editor
+                            height="100%"
+                            defaultLanguage={selectedLanguage}
+                            value={code}
+                            onChange={(value) => setCode(value || "")}
+                            theme="vs-dark"
+                            options={{
+                              minimap: { enabled: false },
+                              fontSize: 14,
+                              lineNumbers: "on",
+                              scrollBeyondLastLine: false,
+                              automaticLayout: true,
+                              tabSize: 2,
+                              readOnly: !isInterviewStarted || showFeedback,
+                            }}
+                          />
+                        </div>
+
+                        {/* Test Results */}
+                        {testResults.length > 0 && (
+                          <div className="mt-3 space-y-2 flex-shrink-0">
+                            <div className="flex items-center justify-between">
+                              <h3 className="text-white font-semibold text-sm">Test Results</h3>
+                              <Badge
+                                className={
+                                  testSummary.passRate === 100
+                                    ? "bg-green-600"
+                                    : testSummary.passRate >= 60
+                                      ? "bg-yellow-600"
+                                      : "bg-red-600"
+                                }
+                              >
+                                {testSummary.passed}/{testSummary.total} ({testSummary.passRate}%)
+                              </Badge>
+                            </div>
+                            <div className="space-y-1 max-h-24 overflow-y-auto">
+                              {testResults.map((result, index) => (
+                                <div
+                                  key={index}
+                                  className={`p-2 rounded text-xs ${
+                                    result.passed ? "bg-green-900/30 text-green-300" : "bg-red-900/30 text-red-300"
+                                  }`}
+                                >
+                                  <div className="flex items-center space-x-2">
+                                    {result.passed ? (
+                                      <CheckCircle className="h-3 w-3" />
+                                    ) : (
+                                      <XCircle className="h-3 w-3" />
+                                    )}
+                                    <span className="truncate">{result.description}</span>
+                                  </div>
+                                  {!result.passed && result.error && (
+                                    <div className="ml-5 text-xs mt-1 opacity-80 truncate">{result.error}</div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Controls at Bottom of Code Editor */}
+                        <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-700 flex-shrink-0">
+                          <Button
+                            onClick={resetInterview}
+                            variant="outline"
+                            size="sm"
+                            className="border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent"
+                          >
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                            Reset
+                          </Button>
+                          <Button
+                            onClick={runCode}
+                            disabled={isRunningTests || showFeedback}
+                            className="bg-green-600 hover:bg-green-700 text-white flex-1"
+                            size="sm"
+                          >
+                            <PlayCircle className="mr-2 h-4 w-4" />
+                            {isRunningTests ? "Running..." : "Run Tests"}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
 
-                  {/* Bottom Row: AI Coding Partner Chat */}
-                  <Card className="bg-gray-900/50 border-gray-700 glass-effect interview-card">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-white flex items-center space-x-2">
-                        <Lightbulb className="h-5 w-5 text-[#ff5733]" />
-                        <span>AI Coding Partner - Ask for Help Anytime!</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="h-64 overflow-y-auto space-y-3 p-4 bg-gray-800/30 rounded-lg">
+                  {/* AI Interviewer - Middle Panel (3.5 columns) */}
+                  <div className="col-span-12 lg:col-span-4 flex flex-col min-h-0">
+                    <Card className="bg-gray-900/50 border-gray-700 glass-effect h-full flex flex-col">
+                      <CardHeader className="pb-3 flex-shrink-0">
+                        <CardTitle className="text-white flex items-center space-x-2">
+                          <Bot className="h-5 w-5 text-[#ff5733]" />
+                          <span className="text-sm">AI Interviewer</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex flex-col flex-1 min-h-0">
+                        <div className="flex-1 overflow-y-auto space-y-3 mb-3 min-h-0">
+                          {interviewerMessages.length === 0 ? (
+                            <div className="text-center py-8 text-gray-400">
+                              <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                              <p className="text-sm">Interview will begin when you click start...</p>
+                            </div>
+                          ) : (
+                            <>
+                              {interviewerMessages.map((msg, index) => (
+                                <div
+                                  key={index}
+                                  className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"} chat-message`}
+                                >
+                                  <div
+                                    className={`max-w-[90%] p-2 rounded-lg ${
+                                      msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-100"
+                                    }`}
+                                  >
+                                    <div className="flex items-center space-x-1 mb-1">
+                                      {msg.type === "user" ? (
+                                        <User className="h-3 w-3" />
+                                      ) : (
+                                        <Bot className="h-3 w-3 text-[#ff5733]" />
+                                      )}
+                                      <span className="text-xs opacity-75">
+                                        {msg.type === "user" ? "You" : "Interviewer"}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs whitespace-pre-wrap">{msg.message}</p>
+                                  </div>
+                                </div>
+                              ))}
+                              <div ref={interviewerEndRef} />
+                            </>
+                          )}
+                        </div>
+                        {isInterviewStarted && (
+                          <div className="flex space-x-2 flex-shrink-0">
+                            <Input
+                              value={interviewerInput}
+                              onChange={(e) => setInterviewerInput(e.target.value)}
+                              placeholder="Ask the interviewer..."
+                              className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-sm"
+                              onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
+                              disabled={isLoadingInterviewer}
+                            />
+                            <Button
+                              onClick={() => handleSendMessage(true)}
+                              className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
+                              size="sm"
+                              disabled={isLoadingInterviewer}
+                            >
+                              <Send className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* AI Coding Partner - Right Panel (3.5 columns) */}
+                  <div className="col-span-12 lg:col-span-3 flex flex-col min-h-0">
+                    <Card className="bg-gray-900/50 border-gray-700 glass-effect h-full flex flex-col">
+                      <CardHeader className="pb-3 flex-shrink-0">
+                        <CardTitle className="text-white flex items-center space-x-2">
+                          <Lightbulb className="h-5 w-5 text-[#ff5733]" />
+                          <span className="text-sm">AI Coding Partner</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex flex-col flex-1 min-h-0">
+                        <div className="flex-1 overflow-y-auto space-y-2 mb-3 min-h-0 p-2 bg-gray-800/30 rounded-lg">
                           {chatMessages.map((msg, index) => (
                             <div key={index} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"} chat-message`}>
                               <div
-                                className={`max-w-[80%] p-3 rounded-lg ${
+                                className={`max-w-[85%] p-2 rounded-lg ${
                                   msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-100"
                                 }`}
                               >
-                                <div className="flex items-center space-x-2 mb-1">
+                                <div className="flex items-center space-x-1 mb-1">
                                   {msg.type === "user" ? (
                                     <User className="h-3 w-3" />
                                   ) : (
                                     <Bot className="h-3 w-3 text-[#ff5733]" />
                                   )}
-                                  <span className="text-xs opacity-75">{msg.type === "user" ? "You" : "AI Partner"}</span>
+                                  <span className="text-xs opacity-75">{msg.type === "user" ? "You" : "Partner"}</span>
                                 </div>
-                                <p className="text-sm">{msg.message}</p>
+                                <p className="text-xs">{msg.message}</p>
                               </div>
                             </div>
                           ))}
                           <div ref={chatEndRef} />
                         </div>
-                        <div className="flex space-x-2">
+                        <div className="flex space-x-2 flex-shrink-0">
                           <Input
                             value={chatInput}
                             onChange={(e) => setChatInput(e.target.value)}
-                            placeholder="Ask about algorithms, hints, or debugging help..."
-                            className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                            placeholder="Ask for help..."
+                            className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-sm"
                             onKeyPress={(e) => e.key === "Enter" && !isLoadingChat && handleSendMessage(false)}
                             disabled={isLoadingChat}
                           />
                           <Button
                             onClick={() => handleSendMessage(false)}
                             className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
+                            size="sm"
                             disabled={isLoadingChat}
                           >
                             <Send className="h-4 w-4" />
                           </Button>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-16">
