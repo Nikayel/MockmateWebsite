@@ -48,27 +48,65 @@ export async function createOrUpdateProfile(
     ? "free" 
     : (existingProfile.subscription_tier || "free")
 
-  const profileData: Profile = {
+  // Build profile data, filtering out undefined values for Firestore
+  // Firestore doesn't allow undefined values, so we only include defined fields
+  const profileDataForFirestore: Record<string, any> = {
     id: userId,
     email: email || "", // Ensure email is at least empty string, not undefined
+    subscription_tier: subscriptionTier,
+    created_at: existingProfile?.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+
+  // Only add optional fields if they have values (not undefined)
+  if (displayName) {
+    profileDataForFirestore.full_name = displayName
+  }
+  if (photoURL) {
+    profileDataForFirestore.avatar_url = photoURL
+  }
+
+  // Preserve existing subscription data if profile exists and fields are defined
+  if (existingProfile) {
+    if (existingProfile.subscription_status !== undefined) {
+      profileDataForFirestore.subscription_status = existingProfile.subscription_status
+    }
+    if (existingProfile.stripe_customer_id !== undefined) {
+      profileDataForFirestore.stripe_customer_id = existingProfile.stripe_customer_id
+    }
+    if (existingProfile.stripe_subscription_id !== undefined) {
+      profileDataForFirestore.stripe_subscription_id = existingProfile.stripe_subscription_id
+    }
+    if (existingProfile.subscription_start_date !== undefined) {
+      profileDataForFirestore.subscription_start_date = existingProfile.subscription_start_date
+    }
+    if (existingProfile.subscription_current_period_end !== undefined) {
+      profileDataForFirestore.subscription_current_period_end = existingProfile.subscription_current_period_end
+    }
+    if (existingProfile.subscription_platform !== undefined) {
+      profileDataForFirestore.subscription_platform = existingProfile.subscription_platform
+    }
+  }
+
+  // Build the Profile object for return (can have undefined optional fields)
+  const profileData: Profile = {
+    id: userId,
+    email: email || "",
     full_name: displayName || undefined,
     avatar_url: photoURL || undefined,
     subscription_tier: subscriptionTier,
-    // Preserve existing subscription data if profile exists
-    ...(existingProfile && {
-      subscription_status: existingProfile.subscription_status,
-      stripe_customer_id: existingProfile.stripe_customer_id,
-      stripe_subscription_id: existingProfile.stripe_subscription_id,
-      subscription_start_date: existingProfile.subscription_start_date,
-      subscription_current_period_end: existingProfile.subscription_current_period_end,
-      subscription_platform: existingProfile.subscription_platform,
-    }),
+    subscription_status: existingProfile?.subscription_status,
+    stripe_customer_id: existingProfile?.stripe_customer_id,
+    stripe_subscription_id: existingProfile?.stripe_subscription_id,
+    subscription_start_date: existingProfile?.subscription_start_date,
+    subscription_current_period_end: existingProfile?.subscription_current_period_end,
+    subscription_platform: existingProfile?.subscription_platform,
     created_at: existingProfile?.created_at || new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
 
   try {
-    await setDoc(profileRef, profileData, { merge: true })
+    await setDoc(profileRef, profileDataForFirestore, { merge: true })
     console.log("✅ Profile saved successfully to Firestore:", userId)
     console.log(`   Subscription tier: ${subscriptionTier} (${isNewProfile ? 'new profile' : 'existing profile preserved'})`)
     return profileData

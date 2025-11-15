@@ -89,12 +89,19 @@ export default function LoginPage() {
           console.error("Error code:", profileError.code)
           console.error("Error message:", profileError.message)
 
-          // Show error to user but allow them to continue
-          toast.error("Profile setup failed", {
-            description: "You may need to complete setup later"
-          })
+          // Only show error toast for critical errors, not for permission issues
+          // Permission issues might be temporary and the user can still use the app
+          if (profileError.code === "permission-denied") {
+            console.warn("Profile creation failed due to permissions - user can still use the app")
+            // Don't show error toast for permission issues - they might resolve on retry
+          } else {
+            // Show error for other issues, but don't block the user
+            toast.error("Profile setup encountered an issue", {
+              description: "You can still use the app, but some features may be limited"
+            })
+          }
 
-          // Mark as complete and redirect anyway
+          // Mark as complete and redirect anyway - don't block user from using the app
           setAuthStatus("complete")
 
           const savedRedirect = localStorage.getItem("auth_redirect")
