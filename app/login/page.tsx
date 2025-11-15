@@ -7,13 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Github, Shield, FolderSyncIcon as Sync, BarChart3, Star, ArrowRight } from "lucide-react"
 import { signInWithGitHub } from "@/lib/auth"
+import { createOrUpdateProfile } from "@/lib/firestore-helpers"
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const searchParams = useSearchParams()
+  const router = useRouter()
   const redirect = searchParams.get("redirect")
 
   useEffect(() => {
@@ -27,7 +29,24 @@ export default function LoginPage() {
   const handleGitHubLogin = async () => {
     try {
       setIsLoading(true)
-      await signInWithGitHub(redirect || undefined)
+      const result = await signInWithGitHub(redirect || undefined)
+      
+      // Create/update profile in Firestore
+      if (result.user) {
+        await createOrUpdateProfile(
+          result.user.uid,
+          result.user.email || "",
+          result.user.displayName,
+          result.user.photoURL
+        )
+      }
+
+      // Redirect after successful login
+      if (redirect) {
+        router.push(`/${redirect}`)
+      } else {
+        router.push("/account")
+      }
     } catch (error) {
       console.error("Login failed:", error)
       toast.error("Login failed", {
