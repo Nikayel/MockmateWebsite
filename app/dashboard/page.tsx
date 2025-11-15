@@ -183,134 +183,35 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column - 2/3 */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Practice Section */}
-              <Card className="bg-gray-900/50 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center justify-between">
-                    <span className="flex items-center">
-                      <Terminal className="h-5 w-5 mr-2 text-[#ff5733]" />
-                      Coding Practice
-                    </span>
-                    {!usage?.allowed && (
-                      <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
-                        Limit Reached
-                      </Badge>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {usage?.allowed ? (
-                    <div className="space-y-4">
-                      <p className="text-gray-300">
-                        Ready to practice? Start a new interview session and work on real coding problems with AI guidance.
-                      </p>
-                      <Link href="/interview">
-                        <Button className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80 text-white py-6 text-lg">
-                          <Terminal className="mr-2 h-5 w-5" />
-                          Start New Practice Session
-                          <ArrowRight className="ml-2 h-5 w-5" />
-                        </Button>
-                      </Link>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
-                        <p className="text-yellow-400 font-medium mb-2">Monthly Limit Reached</p>
-                        <p className="text-gray-300 text-sm mb-4">
-                          You've used all {usage?.limit || 2} free sessions this month. Upgrade to Pro for unlimited practice!
-                        </p>
-                        <Link href="/upgrade">
-                          <Button className="bg-yellow-500 hover:bg-yellow-600 text-black">
-                            <Crown className="mr-2 h-4 w-4" />
-                            Upgrade to Pro
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Recent Activity */}
-              <Card className="bg-gray-900/50 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center">
-                    <Clock className="h-5 w-5 mr-2 text-[#ff5733]" />
-                    Recent Activity
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8">
-                    <Calendar className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-                    <p className="text-gray-400">No recent sessions</p>
-                    <p className="text-gray-500 text-sm mt-2">Start practicing to see your activity here</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Right Column - 1/3 */}
-            <div className="space-y-6">
-              {/* Profile Summary */}
-              <Card className="bg-gray-900/50 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center">
-                    <User className="h-5 w-5 mr-2 text-[#ff5733]" />
-                    Profile
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center">
-                      <User className="h-8 w-8 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-white font-medium">{user.user_metadata?.full_name || "Developer"}</p>
-                      <p className="text-gray-400 text-sm">{user.email}</p>
-                    </div>
-                  </div>
-                  <Link href="/profile">
-                    <Button variant="outline" className="w-full border-gray-600 text-white hover:bg-gray-800">
-                      View Full Profile
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-
-              {/* Quick Links */}
-              <Card className="bg-gray-900/50 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-white">Quick Links</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <Link href="/sessions">
-                    <Button variant="ghost" className="w-full justify-start text-white hover:bg-gray-800">
-                      <Clock className="mr-2 h-4 w-4" />
-                      View All Sessions
-                    </Button>
-                  </Link>
-                  <Link href="/profile">
-                    <Button variant="ghost" className="w-full justify-start text-white hover:bg-gray-800">
-                      <User className="mr-2 h-4 w-4" />
-                      Account Settings
-                    </Button>
-                  </Link>
-                  {!isPro && (
-                    <Link href="/upgrade">
-                      <Button variant="ghost" className="w-full justify-start text-white hover:bg-gray-800">
-                        <Crown className="mr-2 h-4 w-4" />
-                        Upgrade to Pro
-                      </Button>
-                    </Link>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+          {/* Recent Activity */}
+          <Card className="bg-gray-900/50 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center justify-between">
+                <span className="flex items-center">
+                  <Clock className="h-5 w-5 mr-2 text-[#ff5733]" />
+                  Recent Activity
+                </span>
+                <Link href="/sessions">
+                  <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                    View All
+                  </Button>
+                </Link>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Calendar className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+                <p className="text-gray-400">No recent sessions</p>
+                <p className="text-gray-500 text-sm mt-2">Start practicing to see your activity here</p>
+                <Link href="/interview" className="block mt-4">
+                  <Button className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white">
+                    <Terminal className="mr-2 h-4 w-4" />
+                    Start Practice Session
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
