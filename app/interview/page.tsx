@@ -62,6 +62,7 @@ export default function InterviewPage() {
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null)
   const [isInterviewStarted, setIsInterviewStarted] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
+  const [comprehensiveFeedback, setComprehensiveFeedback] = useState<string>("")
   const [code, setCode] = useState("")
   const [selectedLanguage, setSelectedLanguage] = useState<"javascript" | "typescript" | "python" | "java" | "cpp" | "csharp" | "go" | "rust">("javascript")
 
