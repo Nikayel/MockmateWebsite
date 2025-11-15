@@ -17,6 +17,10 @@ export interface Profile {
   full_name?: string
   avatar_url?: string
   subscription_tier: "free" | "pro" | "enterprise"
+  subscription_platform?: "website" | "vscode"
+  subscription_status?: string
+  stripe_customer_id?: string
+  stripe_subscription_id?: string
   created_at: string
   updated_at: string
 }

@@ -37,15 +37,27 @@ export async function createOrUpdateProfile(
 
 /**
  * Get user profile from Firestore
+ * If user has Stripe subscription info but tier is free, sync from Stripe
  */
-export async function getUserProfile(userId: string): Promise<Profile | null> {
+export async function getUserProfile(userId: string, syncStripe: boolean = true): Promise<Profile | null> {
   const profileRef = doc(db, "profiles", userId)
   const profileSnap = await getDoc(profileRef)
 
-  if (profileSnap.exists()) {
-    return profileSnap.data() as Profile
+  if (!profileSnap.exists()) {
+    return null
   }
-  return null
+
+  const profile = profileSnap.data() as Profile
+
+  // If user has Stripe IDs but subscription_tier is free, sync from Stripe
+  if (syncStripe && profile.subscription_tier === "free" && 
+      (profile.stripe_subscription_id || profile.stripe_customer_id)) {
+    const { syncSubscriptionFromStripe } = await import("./stripe-helpers")
+    const syncedProfile = await syncSubscriptionFromStripe(userId)
+    return syncedProfile || profile
+  }
+
+  return profile
 }
 
 /**
