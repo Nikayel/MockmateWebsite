@@ -39,16 +39,34 @@ export async function POST(request: NextRequest) {
         userId,
         platform: platform || "website",
       },
+      // Enable promotion code input in Stripe Checkout UI
+      allow_promotion_codes: true,
     }
 
-    // Apply promo code if provided
+    // Pre-apply promo code if provided (look up promotion code to get coupon ID)
     if (promoCode) {
-      // Stripe will validate the coupon code
-      sessionParams.discounts = [
-        {
-          coupon: promoCode.toUpperCase(),
-        },
-      ]
+      try {
+        // List promotion codes to find the one matching our code
+        const promotionCodes = await stripe.promotionCodes.list({
+          code: promoCode.toUpperCase(),
+          limit: 1,
+        })
+
+        if (promotionCodes.data.length > 0 && promotionCodes.data[0].active) {
+          const promotionCodeObj = promotionCodes.data[0]
+          sessionParams.discounts = [
+            {
+              coupon: promotionCodeObj.coupon.id,
+            },
+          ]
+        } else {
+          // If promotion code not found, still allow checkout but Stripe will handle validation
+          console.warn(`Promotion code ${promoCode} not found, allowing user to enter in Stripe UI`)
+        }
+      } catch (promoError) {
+        console.error("Error looking up promotion code:", promoError)
+        // Continue without pre-applying - user can enter code in Stripe UI
+      }
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams)
