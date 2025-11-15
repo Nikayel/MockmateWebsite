@@ -39,10 +39,10 @@ export const PRICING_CONFIG = {
       description: "For serious interview preparation",
     },
     // Shared features
-    sessionsPerMonth: 1000, // Effectively unlimited
-    sessionsDisplay: "Unlimited interview sessions",
+    sessionsPerMonth: 35,
+    sessionsDisplay: "35 interview sessions per month",
     features: [
-      "Unlimited interview sessions",
+      "35 interview sessions per month",
       "Advanced coding challenges",
       "System design interviews",
       "Detailed analytics & insights",

@@ -1,15 +1,18 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { auth } from "@/lib/firebase"
 import { onAuthStateChanged } from "firebase/auth"
 import { generateVSCodeDeepLink, convertFirebaseUser } from "@/lib/auth"
+import { createOrUpdateProfile } from "@/lib/firestore-helpers"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle, ExternalLink, Download } from "lucide-react"
 import { User } from "@/lib/types"
 
 export default function AuthCallback() {
+  const router = useRouter()
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading")
   const [user, setUser] = useState<User | null>(null)
   const [deepLink, setDeepLink] = useState<string>("")
@@ -22,6 +25,14 @@ export default function AuthCallback() {
           const convertedUser = convertFirebaseUser(firebaseUser)
           setUser(convertedUser)
           
+          // Create/update profile in Firestore immediately
+          await createOrUpdateProfile(
+            firebaseUser.uid,
+            firebaseUser.email || "",
+            firebaseUser.displayName,
+            firebaseUser.photoURL
+          )
+          
           // Get ID token for VS Code deep link
           const token = await firebaseUser.getIdToken()
           const vscodeLink = generateVSCodeDeepLink(token)
@@ -30,11 +41,18 @@ export default function AuthCallback() {
           // Check for redirect in localStorage
           const savedRedirect = localStorage.getItem("auth_redirect")
           if (savedRedirect) {
-            setRedirectUrl(`/${savedRedirect}`)
             localStorage.removeItem("auth_redirect")
+            // Auto-redirect immediately for frictionless flow
+            setTimeout(() => {
+              router.push(`/${savedRedirect}`)
+            }, 500)
+            return
           }
 
-          setStatus("success")
+          // Default redirect to dashboard for new users
+          setTimeout(() => {
+            router.push("/dashboard")
+          }, 500)
         } else {
           setStatus("error")
         }
@@ -45,7 +63,7 @@ export default function AuthCallback() {
     })
 
     return () => unsubscribe()
-  }, [])
+  }, [router])
 
   const handleOpenVSCode = () => {
     window.location.href = deepLink

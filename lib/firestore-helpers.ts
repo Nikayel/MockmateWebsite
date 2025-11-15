@@ -74,6 +74,28 @@ export async function initializeUserQuota(userId: string, subscriptionTier: "fre
       })
     
     if (currentPeriodQuota) {
+      // Update quota limit if subscription tier changed
+      const sessionsLimit = subscriptionTier === "pro" 
+        ? PRICING_CONFIG.pro.sessionsPerMonth 
+        : PRICING_CONFIG.free.sessionsPerMonth
+      
+      // If limit changed, update it
+      if (currentPeriodQuota.sessions_limit !== sessionsLimit) {
+        const quotaRef = quotaSnap.docs.find(doc => {
+          const quota = doc.data() as ProfileQuota
+          const quotaStart = new Date(quota.period_start)
+          return quotaStart >= periodStart && quotaStart <= periodEnd
+        })?.ref
+        
+        if (quotaRef) {
+          await setDoc(quotaRef, {
+            sessions_limit: sessionsLimit,
+            updated_at: new Date().toISOString(),
+          }, { merge: true })
+          currentPeriodQuota.sessions_limit = sessionsLimit
+        }
+      }
+      
       return currentPeriodQuota
     }
   }

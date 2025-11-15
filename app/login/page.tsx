@@ -29,24 +29,14 @@ export default function LoginPage() {
   const handleGitHubLogin = async () => {
     try {
       setIsLoading(true)
-      const result = await signInWithGitHub(redirect || undefined)
-      
-      // Create/update profile in Firestore
-      if (result.user) {
-        await createOrUpdateProfile(
-          result.user.uid,
-          result.user.email || "",
-          result.user.displayName,
-          result.user.photoURL
-        )
-      }
-
-      // Redirect after successful login
+      // signInWithGitHub redirects to GitHub, then to /auth/callback
+      // Store redirect in localStorage for callback to use
       if (redirect) {
-        router.push(`/${redirect}`)
-      } else {
-        router.push("/account")
+        localStorage.setItem("auth_redirect", redirect)
       }
+      await signInWithGitHub()
+      // User will be redirected to GitHub, then back to /auth/callback
+      // The callback page will handle the redirect
     } catch (error) {
       console.error("Login failed:", error)
       toast.error("Login failed", {
