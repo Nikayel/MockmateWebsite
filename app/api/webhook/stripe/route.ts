@@ -44,6 +44,27 @@ export async function POST(request: NextRequest) {
       
       if (userId) {
         try {
+          // Fetch subscription details to get dates
+          let subscriptionStartDate: string | undefined
+          let currentPeriodEnd: string | undefined
+          
+          if (session.subscription) {
+            try {
+              const subscription = await stripe.subscriptions.retrieve(
+                session.subscription as string
+              )
+              subscriptionStartDate = subscription.created
+                ? new Date(subscription.created * 1000).toISOString()
+                : undefined
+              currentPeriodEnd = subscription.current_period_end
+                ? new Date(subscription.current_period_end * 1000).toISOString()
+                : undefined
+            } catch (subError) {
+              console.error("Error fetching subscription details:", subError)
+              // Continue without dates if fetch fails
+            }
+          }
+
           const profileRef = doc(db, "profiles", userId)
           await setDoc(profileRef, {
             subscription_tier: "pro",
@@ -51,6 +72,8 @@ export async function POST(request: NextRequest) {
             stripe_customer_id: session.customer as string,
             stripe_subscription_id: session.subscription as string,
             subscription_status: "active",
+            subscription_start_date: subscriptionStartDate,
+            subscription_current_period_end: currentPeriodEnd,
             updated_at: new Date().toISOString(),
           }, { merge: true })
 
