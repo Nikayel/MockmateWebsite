@@ -190,6 +190,36 @@ export default function AccountPage() {
             </div>
           </div>
 
+          {/* Account Details - Show for all users */}
+          <Card className="bg-gray-900/50 border-gray-700 mb-6">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center">
+                <User className="mr-2 h-5 w-5" />
+                Account Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Email</span>
+                  <span className="text-white">{user?.email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Member Since</span>
+                  <span className="text-white">
+                    {profile?.created_at
+                      ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })
+                      : 'N/A'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Subscription</span>
+                  <span className="text-white capitalize">{profile?.subscription_tier || 'free'}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             {/* Usage Stats */}
             <Card className="bg-gray-900/50 border-gray-700">
@@ -263,24 +293,31 @@ export default function AccountPage() {
               <CardHeader>
                 <CardTitle className="text-white flex items-center">
                   <Crown className="mr-2 h-5 w-5" />
-                  Subscription Details
+                  Pro Subscription Details
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Subscription Type</span>
+                    <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+                      <Crown className="mr-1 h-3 w-3" />
+                      Pro
+                    </Badge>
+                  </div>
                   {profile.subscription_start_date && (
                     <div className="flex justify-between">
-                      <span className="text-gray-400">Pro Plan Since</span>
+                      <span className="text-gray-400">Pro Member Since</span>
                       <span className="text-white">
-                        {new Date(profile.subscription_start_date).toLocaleDateString()}
+                        {new Date(profile.subscription_start_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })}
                       </span>
                     </div>
                   )}
                   {profile.subscription_current_period_end && (
                     <div className="flex justify-between">
-                      <span className="text-gray-400">Valid Until</span>
+                      <span className="text-gray-400">Current Period Ends</span>
                       <span className="text-white">
-                        {new Date(profile.subscription_current_period_end).toLocaleDateString()}
+                        {new Date(profile.subscription_current_period_end).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })}
                       </span>
                     </div>
                   )}
