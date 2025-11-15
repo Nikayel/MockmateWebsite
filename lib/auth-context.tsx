@@ -27,8 +27,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [initialized, setInitialized] = useState(false)
 
   useEffect(() => {
+    let mounted = true
+
     // Single auth state listener for the entire app
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (!mounted) return
+
       setFirebaseUser(firebaseUser)
 
       if (firebaseUser) {
@@ -41,13 +45,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
       setInitialized(true)
     }, (error) => {
+      if (!mounted) return
       console.error("Auth state change error:", error)
       setLoading(false)
       setInitialized(true)
     })
 
-    return () => unsubscribe()
-  }, [])
+    // Safety timeout to prevent infinite loading
+    // Firebase should respond quickly, but if it doesn't, we mark as initialized anyway
+    const timeout = setTimeout(() => {
+      if (mounted && !initialized) {
+        console.warn("Auth initialization timeout - marking as initialized")
+        setLoading(false)
+        setInitialized(true)
+      }
+    }, 3000) // 3 second timeout
+
+    return () => {
+      mounted = false
+      clearTimeout(timeout)
+      unsubscribe()
+    }
+  }, [initialized])
 
   return (
     <AuthContext.Provider value={{ user, firebaseUser, loading, initialized }}>
