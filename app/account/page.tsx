@@ -35,27 +35,11 @@ export default function AccountPage() {
         const convertedUser = convertFirebaseUser(firebaseUser)
         setUser(convertedUser)
 
-        // Fetch profile data from Firestore
+        // Fetch profile data from Firestore (use helper to ensure consistency)
         try {
-          const profileRef = doc(db, "profiles", firebaseUser.uid)
-          const profileSnap = await getDoc(profileRef)
-          
-          if (profileSnap.exists()) {
-            setProfile(profileSnap.data() as Profile)
-          } else {
-            // Create default profile if doesn't exist
-            const defaultProfile: Profile = {
-              id: firebaseUser.uid,
-              email: firebaseUser.email || "",
-              full_name: firebaseUser.displayName || undefined,
-              avatar_url: firebaseUser.photoURL || undefined,
-              subscription_tier: "free",
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            }
-            // Save to Firestore
-            await setDoc(profileRef, defaultProfile)
-            setProfile(defaultProfile)
+          const userProfile = await getUserProfile(firebaseUser.uid)
+          if (userProfile) {
+            setProfile(userProfile)
           }
         } catch (profileError) {
           console.error("Error fetching profile:", profileError)
