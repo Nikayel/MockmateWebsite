@@ -7,9 +7,8 @@ import { HeroSection } from "@/components/hero-section"
 import { FeaturesSection } from "@/components/features-section"
 import { PricingSection } from "@/components/pricing-section"
 import { Footer } from "@/components/footer"
-import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
+import { useAuth } from "@/lib/auth-context"
 import { getUserProfile, checkUsageLimit } from "@/lib/firestore-helpers"
-import { User as UserType } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -19,37 +18,50 @@ import Link from "next/link"
 
 export default function HomePage() {
   const router = useRouter()
-  const [user, setUser] = useState<UserType | null>(null)
+  const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
   const [usage, setUsage] = useState<{ used: number; limit: number; allowed: boolean } | null>(null)
   const [isPro, setIsPro] = useState(false)
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const loadUserData = async () => {
+      // Wait for auth to initialize
+      if (authLoading || !initialized) return
+
+      // If not authenticated, show marketing page
+      if (!firebaseUser) {
+        setIsLoading(false)
+        return
+      }
+
       try {
-        const firebaseUser = await getCurrentUser()
-        if (firebaseUser) {
-          const convertedUser = convertFirebaseUser(firebaseUser)
-          setUser(convertedUser)
-          
-          // Get profile and usage
-          const profile = await getUserProfile(firebaseUser.uid)
-          setIsPro(profile?.subscription_tier === "pro")
-          
-          const usageData = await checkUsageLimit(firebaseUser.uid)
-          setUsage(usageData)
-        }
+        // Get profile and usage
+        const profile = await getUserProfile(firebaseUser.uid)
+        setIsPro(profile?.subscription_tier === "pro")
+        
+        const usageData = await checkUsageLimit(firebaseUser.uid)
+        setUsage(usageData)
       } catch (error) {
-        console.error("Error checking auth:", error)
+        console.error("Error loading user data:", error)
       } finally {
         setIsLoading(false)
       }
     }
-    checkAuth()
-  }, [])
 
-  // If signed in, redirect to practice section
-  if (!isLoading && user) {
+    loadUserData()
+  }, [firebaseUser, authLoading, initialized])
+
+  // Show loading while auth is initializing
+  if (authLoading || !initialized) {
+    return (
+      <main className="min-h-screen bg-black flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff5733]"></div>
+      </main>
+    )
+  }
+
+  // If signed in, show dashboard view
+  if (!isLoading && user && firebaseUser) {
     return (
       <main className="min-h-screen bg-black">
         <Header />
