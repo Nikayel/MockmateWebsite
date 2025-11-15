@@ -30,7 +30,7 @@ import {
   X,
   ChevronRight,
 } from "lucide-react"
-import { getCurrentUser } from "@/lib/auth"
+import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
 import { scenarios, filterScenarios, getScenarioById, type Scenario, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
 import { User as UserType } from "@/lib/types"
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from "@/components/ui/alert-dialog"

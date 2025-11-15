@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { getCurrentUser, signOut } from "@/lib/auth"
-import { supabase } from "@/lib/supabase"
+import { getCurrentUser, signOut, convertFirebaseUser } from "@/lib/auth"
+import { db } from "@/lib/firebase"
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore"
 import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle } from "lucide-react"
 import { User as UserType, Profile, ProfileQuota } from "@/lib/types"
 import { PRICING_CONFIG } from "@/lib/config"
@@ -24,43 +25,57 @@ export default function AccountPage() {
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        const currentUser = await getCurrentUser()
-        if (!currentUser) {
+        const firebaseUser = await getCurrentUser()
+        if (!firebaseUser) {
           window.location.href = "/login"
           return
         }
 
-        setUser(currentUser)
+        const convertedUser = convertFirebaseUser(firebaseUser)
+        setUser(convertedUser)
 
-        // Fetch profile data
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", currentUser.id)
-          .single()
-
-        if (profileError) {
+        // Fetch profile data from Firestore
+        try {
+          const profileRef = doc(db, "profiles", firebaseUser.uid)
+          const profileSnap = await getDoc(profileRef)
+          
+          if (profileSnap.exists()) {
+            setProfile(profileSnap.data() as Profile)
+          } else {
+            // Create default profile if doesn't exist
+            const defaultProfile: Profile = {
+              id: firebaseUser.uid,
+              email: firebaseUser.email || "",
+              full_name: firebaseUser.displayName || undefined,
+              avatar_url: firebaseUser.photoURL || undefined,
+              subscription_tier: "free",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }
+            setProfile(defaultProfile)
+          }
+        } catch (profileError) {
           console.error("Error fetching profile:", profileError)
           setError("Failed to load profile data")
           toast.error("Failed to load profile data", {
             description: "Some features may not be available",
           })
-        } else {
-          setProfile(profileData)
         }
 
-        // Fetch usage data
-        const { data: usageData, error: usageError } = await supabase
-          .from("profile_quota")
-          .select("*")
-          .eq("user_id", currentUser.id)
-          .single()
-
-        if (usageError) {
+        // Fetch usage data from Firestore
+        try {
+          const usageQuery = query(
+            collection(db, "profile_quota"),
+            where("user_id", "==", firebaseUser.uid)
+          )
+          const usageSnap = await getDocs(usageQuery)
+          
+          if (!usageSnap.empty) {
+            setUsage(usageSnap.docs[0].data() as ProfileQuota)
+          }
+        } catch (usageError) {
           console.error("Error fetching usage:", usageError)
           // Usage data might not exist for new users, so don't show error
-        } else {
-          setUsage(usageData)
         }
       } catch (error) {
         console.error("Error loading user data:", error)

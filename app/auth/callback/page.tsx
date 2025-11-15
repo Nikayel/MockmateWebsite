@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { supabase } from "@/lib/supabase"
-import { generateVSCodeDeepLink } from "@/lib/auth"
+import { auth } from "@/lib/firebase"
+import { onAuthStateChanged } from "firebase/auth"
+import { generateVSCodeDeepLink, convertFirebaseUser } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle, ExternalLink, Download } from "lucide-react"
@@ -15,15 +16,15 @@ export default function AuthCallback() {
   const [redirectUrl, setRedirectUrl] = useState<string>("")
 
   useEffect(() => {
-    const handleAuthCallback = async () => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
-        const { data, error } = await supabase.auth.getSession()
-
-        if (error) throw error
-
-        if (data.session) {
-          setUser(data.session.user)
-          const vscodeLink = generateVSCodeDeepLink(data.session.access_token)
+        if (firebaseUser) {
+          const convertedUser = convertFirebaseUser(firebaseUser)
+          setUser(convertedUser)
+          
+          // Get ID token for VS Code deep link
+          const token = await firebaseUser.getIdToken()
+          const vscodeLink = generateVSCodeDeepLink(token)
           setDeepLink(vscodeLink)
 
           // Check for redirect in localStorage
@@ -41,9 +42,9 @@ export default function AuthCallback() {
         console.error("Auth callback error:", error)
         setStatus("error")
       }
-    }
+    })
 
-    handleAuthCallback()
+    return () => unsubscribe()
   }, [])
 
   const handleOpenVSCode = () => {

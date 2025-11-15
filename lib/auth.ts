@@ -1,4 +1,11 @@
-import { supabase } from "./supabase"
+import { 
+  signInWithPopup, 
+  signOut as firebaseSignOut, 
+  GithubAuthProvider,
+  onAuthStateChanged,
+  User as FirebaseUser
+} from "firebase/auth"
+import { auth } from "./firebase"
 
 export async function signInWithGitHub(redirect?: string) {
   // Store redirect in localStorage to retrieve after auth
@@ -6,42 +13,54 @@ export async function signInWithGitHub(redirect?: string) {
     localStorage.setItem("auth_redirect", redirect)
   }
 
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "github",
-    options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
-    },
-  })
-
-  if (error) {
+  const provider = new GithubAuthProvider()
+  provider.addScope('read:user')
+  
+  try {
+    const result = await signInWithPopup(auth, provider)
+    return {
+      user: result.user,
+      providerId: result.providerId,
+    }
+  } catch (error) {
     console.error("Error signing in:", error)
     throw error
   }
-
-  return data
 }
 
 export async function signOut() {
-  const { error } = await supabase.auth.signOut()
-  if (error) {
+  try {
+    await firebaseSignOut(auth)
+  } catch (error) {
     console.error("Error signing out:", error)
     throw error
   }
 }
 
-export async function getCurrentUser() {
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-  if (error) {
-    console.error("Error getting user:", error)
-    return null
-  }
-  return user
+export async function getCurrentUser(): Promise<FirebaseUser | null> {
+  return new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe()
+      resolve(user)
+    })
+  })
 }
 
 export function generateVSCodeDeepLink(token: string) {
   const encodedToken = encodeURIComponent(token)
   return `vscode://nikayel.MockMate/auth-callback?token=${encodedToken}`
+}
+
+// Helper to convert Firebase user to our User type
+export function convertFirebaseUser(firebaseUser: FirebaseUser | null) {
+  if (!firebaseUser) return null
+  
+  return {
+    id: firebaseUser.uid,
+    email: firebaseUser.email || "",
+    user_metadata: {
+      full_name: firebaseUser.displayName || undefined,
+      avatar_url: firebaseUser.photoURL || undefined,
+    },
+  }
 }
