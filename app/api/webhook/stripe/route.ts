@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { db } from "@/lib/firebase"
 import { doc, setDoc } from "firebase/firestore"
+import { updateQuotaForSubscriptionTier } from "@/lib/firestore-helpers"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-11-20.acacia", // Use latest Stripe API version
@@ -47,9 +48,13 @@ export async function POST(request: NextRequest) {
             updated_at: new Date().toISOString(),
           }, { merge: true })
 
+          // Update quota to reflect Pro subscription (35 sessions)
+          await updateQuotaForSubscriptionTier(userId, "pro")
+
           console.log(`User ${userId} upgraded to Pro via Stripe`)
           console.log(`Subscription ID: ${session.subscription}`)
           console.log(`Customer ID: ${session.customer}`)
+          console.log(`Quota updated to Pro limit (35 sessions)`)
         } catch (error) {
           console.error("Error updating user profile:", error)
           return NextResponse.json({ error: "Failed to update profile" }, { status: 500 })

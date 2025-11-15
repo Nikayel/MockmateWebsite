@@ -203,3 +203,12 @@ export async function incrementSessionUsage(userId: string): Promise<void> {
   }
 }
 
+/**
+ * Update user quota when subscription tier changes
+ * This ensures existing quotas get updated limits
+ */
+export async function updateQuotaForSubscriptionTier(userId: string, subscriptionTier: "free" | "pro" | "enterprise"): Promise<void> {
+  // This will update the quota limit if it exists, or create a new one
+  await initializeUserQuota(userId, subscriptionTier)
+}
+
