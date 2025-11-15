@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getCurrentUser } from "@/lib/auth"
+import { getUserIdFromRequest } from "@/lib/auth-server"
 import { syncSubscriptionFromStripe } from "@/lib/stripe-helpers"
 
 /**
@@ -8,17 +8,18 @@ import { syncSubscriptionFromStripe } from "@/lib/stripe-helpers"
  */
 export async function POST(request: NextRequest) {
   try {
-    const firebaseUser = await getCurrentUser()
+    // Get user ID from Firebase ID token in Authorization header
+    const userId = await getUserIdFromRequest(request)
     
-    if (!firebaseUser) {
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { userId } = await request.json()
-    const targetUserId = userId || firebaseUser.uid
+    const body = await request.json()
+    const targetUserId = body.userId || userId
 
     // Only allow users to sync their own subscription
-    if (targetUserId !== firebaseUser.uid) {
+    if (targetUserId !== userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 
@@ -34,6 +35,9 @@ export async function POST(request: NextRequest) {
         subscription_tier: updatedProfile.subscription_tier,
         subscription_status: updatedProfile.subscription_status,
         stripe_subscription_id: updatedProfile.stripe_subscription_id,
+        stripe_customer_id: updatedProfile.stripe_customer_id,
+        subscription_start_date: updatedProfile.subscription_start_date,
+        subscription_current_period_end: updatedProfile.subscription_current_period_end,
       },
     })
   } catch (error) {

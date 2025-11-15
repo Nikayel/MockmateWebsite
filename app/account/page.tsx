@@ -40,6 +40,36 @@ export default function AccountPage() {
           const userProfile = await getUserProfile(firebaseUser.uid)
           if (userProfile) {
             setProfile(userProfile)
+            
+            // If user has Stripe IDs, sync subscription to get latest details
+            // This ensures subscription dates, status, etc. are up to date
+            if (userProfile.stripe_customer_id || userProfile.stripe_subscription_id) {
+              try {
+                const idToken = await firebaseUser.getIdToken()
+                const syncResponse = await fetch("/api/sync-subscription", {
+                  method: "POST",
+                  headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${idToken}`
+                  },
+                  body: JSON.stringify({ userId: firebaseUser.uid }),
+                })
+                
+                if (syncResponse.ok) {
+                  const syncData = await syncResponse.json()
+                  if (syncData.success && syncData.profile) {
+                    // Reload profile after sync
+                    const updatedProfile = await getUserProfile(firebaseUser.uid)
+                    if (updatedProfile) {
+                      setProfile(updatedProfile)
+                    }
+                  }
+                }
+              } catch (syncError) {
+                // Don't show error for sync failures - profile data is still valid
+                console.log("Subscription sync failed (non-critical):", syncError)
+              }
+            }
           }
         } catch (profileError) {
           console.error("Error fetching profile:", profileError)
@@ -94,10 +124,22 @@ export default function AccountPage() {
     if (!user) return
     
     try {
+      // Get Firebase ID token for authentication
+      const firebaseUser = await getCurrentUser()
+      if (!firebaseUser) {
+        toast.error("Please sign in again")
+        return
+      }
+
+      const idToken = await firebaseUser.getIdToken()
+      
       toast.info("Opening subscription management portal...")
       const response = await fetch("/api/customer-portal", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
       })
 
       const data = await response.json()

@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { getCurrentUser } from "@/lib/auth"
+import { getUserIdFromRequest } from "@/lib/auth-server"
 import { db } from "@/lib/firebase"
 import { doc, getDoc } from "firebase/firestore"
 import { Profile } from "@/lib/types"
@@ -21,14 +21,15 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
  */
 export async function POST(request: NextRequest) {
   try {
-    const firebaseUser = await getCurrentUser()
+    // Get user ID from Firebase ID token in Authorization header
+    const userId = await getUserIdFromRequest(request)
     
-    if (!firebaseUser) {
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     // Get user profile to find Stripe customer ID
-    const profileRef = doc(db, "profiles", firebaseUser.uid)
+    const profileRef = doc(db, "profiles", userId)
     const profileSnap = await getDoc(profileRef)
     
     if (!profileSnap.exists()) {

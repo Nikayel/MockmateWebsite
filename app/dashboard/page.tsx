@@ -50,6 +50,40 @@ export default function DashboardPage() {
         const userProfile = await getUserProfile(firebaseUser.uid)
         if (userProfile) {
           setProfile(userProfile)
+          
+          // Auto-sync subscription if user has Stripe IDs but tier is "free"
+          // This fixes Pro users who were incorrectly reset
+          if ((userProfile.stripe_subscription_id || userProfile.stripe_customer_id) && 
+              userProfile.subscription_tier === "free") {
+            console.log("Auto-syncing subscription for user with Stripe IDs but free tier")
+            try {
+              const token = await firebaseUser.getIdToken()
+              const syncResponse = await fetch("/api/sync-subscription", {
+                method: "POST",
+                headers: { 
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ userId: firebaseUser.uid }),
+              })
+              
+              if (syncResponse.ok) {
+                const syncData = await syncResponse.json()
+                if (syncData.success && syncData.profile.subscription_tier === "pro") {
+                  // Reload profile and usage after sync
+                  const updatedProfile = await getUserProfile(firebaseUser.uid)
+                  if (updatedProfile) {
+                    setProfile(updatedProfile)
+                  }
+                  const updatedUsage = await checkUsageLimit(firebaseUser.uid)
+                  setUsage(updatedUsage)
+                }
+              }
+            } catch (syncError) {
+              console.error("Auto-sync failed (non-critical):", syncError)
+              // Don't show error to user, just log it
+            }
+          }
         }
 
         // Load usage (this will use the correct subscription tier)

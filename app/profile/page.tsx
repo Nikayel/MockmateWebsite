@@ -43,6 +43,47 @@ export default function ProfilePage() {
           const userProfile = await getUserProfile(firebaseUser.uid)
           if (userProfile) {
             setProfile(userProfile)
+            
+            // Auto-sync subscription if user has Stripe IDs but tier is "free"
+            // This fixes Pro users who were incorrectly reset
+            if ((userProfile.stripe_subscription_id || userProfile.stripe_customer_id) && 
+                userProfile.subscription_tier === "free") {
+              console.log("Auto-syncing subscription for user with Stripe IDs but free tier")
+              try {
+                const token = await firebaseUser.getIdToken()
+                const syncResponse = await fetch("/api/sync-subscription", {
+                  method: "POST",
+                  headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                  },
+                  body: JSON.stringify({ userId: firebaseUser.uid }),
+                })
+                
+                if (syncResponse.ok) {
+                  const syncData = await syncResponse.json()
+                  if (syncData.success && syncData.profile.subscription_tier === "pro") {
+                    // Reload profile after sync
+                    const updatedProfile = await getUserProfile(firebaseUser.uid)
+                    if (updatedProfile) {
+                      setProfile(updatedProfile)
+                      // Reload usage to get correct limits
+                      const usageQuery = query(
+                        collection(db, "profile_quota"),
+                        where("user_id", "==", firebaseUser.uid)
+                      )
+                      const usageSnap = await getDocs(usageQuery)
+                      if (!usageSnap.empty) {
+                        setUsage(usageSnap.docs[0].data() as ProfileQuota)
+                      }
+                    }
+                  }
+                }
+              } catch (syncError) {
+                console.error("Auto-sync failed (non-critical):", syncError)
+                // Don't show error to user, just log it
+              }
+            }
           }
         } catch (profileError) {
           console.error("Error fetching profile:", profileError)
@@ -97,10 +138,21 @@ export default function ProfilePage() {
     if (!user) return
     
     try {
+      // Get Firebase ID token to send with request
+      const firebaseUser = await getCurrentUser()
+      if (!firebaseUser) {
+        throw new Error("Not authenticated")
+      }
+      
+      const token = await firebaseUser.getIdToken()
+      
       toast.info("Syncing subscription from Stripe...")
       const response = await fetch("/api/sync-subscription", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ userId: user.id }),
       })
 
@@ -109,7 +161,6 @@ export default function ProfilePage() {
       if (data.success) {
         toast.success(`Subscription synced! Status: ${data.profile.subscription_tier}`)
         // Reload profile
-        const firebaseUser = await getCurrentUser()
         if (firebaseUser) {
           const userProfile = await getUserProfile(firebaseUser.uid)
           if (userProfile) {
@@ -135,10 +186,21 @@ export default function ProfilePage() {
     if (!user) return
     
     try {
+      // Get Firebase ID token to send with request
+      const firebaseUser = await getCurrentUser()
+      if (!firebaseUser) {
+        throw new Error("Not authenticated")
+      }
+      
+      const token = await firebaseUser.getIdToken()
+      
       toast.info("Opening subscription management portal...")
       const response = await fetch("/api/customer-portal", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
       })
 
       const data = await response.json()
@@ -324,7 +386,13 @@ export default function ProfilePage() {
                 <div className="flex justify-between">
                   <span className="text-gray-400">Member Since</span>
                   <span className="text-white">
-                    {profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : "N/A"}
+                    {profile?.created_at 
+                      ? new Date(profile.created_at).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: '2-digit', 
+                          day: '2-digit' 
+                        })
+                      : "N/A"}
                   </span>
                 </div>
                 <div className="flex justify-between">

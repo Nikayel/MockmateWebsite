@@ -16,23 +16,74 @@ export async function createOrUpdateProfile(
   displayName?: string | null,
   photoURL?: string | null
 ): Promise<Profile> {
+  if (!userId) {
+    throw new Error("User ID is required to create/update profile")
+  }
+
+  if (!email || email.trim() === "") {
+    console.warn("Warning: Creating profile with empty email for user:", userId)
+    // Don't throw error, but log warning - some providers might not provide email immediately
+  }
+
   const profileRef = doc(db, "profiles", userId)
-  const profileSnap = await getDoc(profileRef)
+  
+  // Check if profile exists first
+  let profileSnap
+  let existingProfile: Profile | null = null
+  try {
+    profileSnap = await getDoc(profileRef)
+    if (profileSnap.exists()) {
+      existingProfile = profileSnap.data() as Profile
+    }
+  } catch (readError: any) {
+    console.error("Error reading existing profile:", readError)
+    // Continue anyway - we'll try to create it
+    profileSnap = { exists: () => false, data: () => null } as any
+  }
+
+  // Only set subscription_tier to "free" for NEW profiles
+  // For existing profiles, preserve their current subscription tier
+  const isNewProfile = !existingProfile
+  const subscriptionTier = isNewProfile 
+    ? "free" 
+    : (existingProfile.subscription_tier || "free")
 
   const profileData: Profile = {
     id: userId,
-    email: email,
+    email: email || "", // Ensure email is at least empty string, not undefined
     full_name: displayName || undefined,
     avatar_url: photoURL || undefined,
-    subscription_tier: "free",
-    created_at: profileSnap.exists() 
-      ? profileSnap.data().created_at 
-      : new Date().toISOString(),
+    subscription_tier: subscriptionTier,
+    // Preserve existing subscription data if profile exists
+    ...(existingProfile && {
+      subscription_status: existingProfile.subscription_status,
+      stripe_customer_id: existingProfile.stripe_customer_id,
+      stripe_subscription_id: existingProfile.stripe_subscription_id,
+      subscription_start_date: existingProfile.subscription_start_date,
+      subscription_current_period_end: existingProfile.subscription_current_period_end,
+      subscription_platform: existingProfile.subscription_platform,
+    }),
+    created_at: existingProfile?.created_at || new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
 
-  await setDoc(profileRef, profileData, { merge: true })
-  return profileData
+  try {
+    await setDoc(profileRef, profileData, { merge: true })
+    console.log("✅ Profile saved successfully to Firestore:", userId)
+    console.log(`   Subscription tier: ${subscriptionTier} (${isNewProfile ? 'new profile' : 'existing profile preserved'})`)
+    return profileData
+  } catch (writeError: any) {
+    console.error("❌ Error writing profile to Firestore:", writeError)
+    console.error("User ID:", userId)
+    console.error("Email:", email)
+    console.error("Error code:", writeError.code)
+    console.error("Error message:", writeError.message)
+    
+    // Re-throw with more context
+    throw new Error(
+      `Failed to save profile: ${writeError.message || "Unknown error"} (Code: ${writeError.code || "unknown"})`
+    )
+  }
 }
 
 /**
@@ -49,10 +100,10 @@ export async function getUserProfile(userId: string, syncStripe: boolean = true)
 
   const profile = profileSnap.data() as Profile
 
-  // If user has Stripe IDs but subscription_tier is free, sync from Stripe
+  // If user has Stripe IDs, verify subscription status matches
+  // This catches cases where tier was incorrectly reset to "free"
   // Only sync on server-side (check if we're in a server environment)
-  if (syncStripe && profile.subscription_tier === "free" && 
-      (profile.stripe_subscription_id || profile.stripe_customer_id)) {
+  if (syncStripe && (profile.stripe_subscription_id || profile.stripe_customer_id)) {
     try {
       // Only sync if we're on the server (have access to STRIPE_SECRET_KEY)
       // Client-side will use the API endpoint instead

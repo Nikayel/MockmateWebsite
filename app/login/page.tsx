@@ -5,7 +5,7 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Github, Shield, FolderSyncIcon as Sync, BarChart3, Star, ArrowRight } from "lucide-react"
+import { Github, Shield, FolderSyncIcon as Sync, BarChart3, Star, ArrowRight, Terminal, CheckCircle } from "lucide-react"
 import { signInWithGitHub, signInWithGoogle } from "@/lib/auth"
 import { createOrUpdateProfile } from "@/lib/firestore-helpers"
 import { useState, useEffect } from "react"
@@ -16,6 +16,8 @@ import { onAuthStateChanged } from "firebase/auth"
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
+  const [authStatus, setAuthStatus] = useState<"idle" | "authenticating" | "creating-profile" | "complete">("idle")
+  const [authProvider, setAuthProvider] = useState<"github" | "google" | null>(null)
   const searchParams = useSearchParams()
   const router = useRouter()
   const redirect = searchParams.get("redirect")
@@ -31,26 +33,78 @@ export default function LoginPage() {
   // Listen for auth state changes to redirect after successful login
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // User is authenticated, redirect them
-        const savedRedirect = localStorage.getItem("auth_redirect")
-        if (savedRedirect) {
-          localStorage.removeItem("auth_redirect")
-          router.push(`/${savedRedirect}`)
-        } else if (redirect) {
-          router.push(`/${redirect}`)
-        } else {
-          router.push("/dashboard")
+      if (user && authStatus === "authenticating") {
+        // Update status to creating profile
+        setAuthStatus("creating-profile")
+        
+        // Create/update profile in Firestore immediately
+        // This ensures profile exists for both GitHub and Google logins
+        try {
+          console.log("Creating/updating profile for user:", user.uid)
+          console.log("User email:", user.email)
+          console.log("User displayName:", user.displayName)
+          console.log("User photoURL:", user.photoURL)
+          
+          await createOrUpdateProfile(
+            user.uid,
+            user.email || "",
+            user.displayName,
+            user.photoURL
+          )
+          
+          console.log("Profile created/updated successfully for:", user.uid)
+          
+          // Mark as complete
+          setAuthStatus("complete")
+          
+          // Small delay to show completion state
+          await new Promise(resolve => setTimeout(resolve, 500))
+          
+          // User is authenticated, redirect them
+          const savedRedirect = localStorage.getItem("auth_redirect")
+          if (savedRedirect) {
+            localStorage.removeItem("auth_redirect")
+            router.push(`/${savedRedirect}`)
+          } else if (redirect) {
+            router.push(`/${redirect}`)
+          } else {
+            router.push("/dashboard")
+          }
+        } catch (profileError: any) {
+          console.error("Failed to create/update profile:", profileError)
+          console.error("Error code:", profileError.code)
+          console.error("Error message:", profileError.message)
+          // Don't block the flow, but log the error
+          if (profileError.code === "permission-denied") {
+            console.error("❌ Firestore permission denied! Check security rules.")
+          }
+          
+          // Still redirect even if profile creation fails
+          setAuthStatus("complete")
+          await new Promise(resolve => setTimeout(resolve, 500))
+          
+          const savedRedirect = localStorage.getItem("auth_redirect")
+          if (savedRedirect) {
+            localStorage.removeItem("auth_redirect")
+            router.push(`/${savedRedirect}`)
+          } else if (redirect) {
+            router.push(`/${redirect}`)
+          } else {
+            router.push("/dashboard")
+          }
         }
       }
     })
 
     return () => unsubscribe()
-  }, [router, redirect])
+  }, [router, redirect, authStatus])
 
   const handleGitHubLogin = async () => {
     try {
       setIsLoading(true)
+      setAuthStatus("authenticating")
+      setAuthProvider("github")
+      
       // Store redirect in localStorage for callback to use
       if (redirect) {
         localStorage.setItem("auth_redirect", redirect)
@@ -66,12 +120,17 @@ export default function LoginPage() {
         description: error instanceof Error ? error.message : "Please try again",
       })
       setIsLoading(false)
+      setAuthStatus("idle")
+      setAuthProvider(null)
     }
   }
 
   const handleGoogleLogin = async () => {
     try {
       setIsLoading(true)
+      setAuthStatus("authenticating")
+      setAuthProvider("google")
+      
       // Store redirect in localStorage for callback to use
       if (redirect) {
         localStorage.setItem("auth_redirect", redirect)
@@ -87,12 +146,111 @@ export default function LoginPage() {
         description: error instanceof Error ? error.message : "Please try again",
       })
       setIsLoading(false)
+      setAuthStatus("idle")
+      setAuthProvider(null)
     }
   }
 
   return (
     <main className="min-h-screen bg-black">
       <Header />
+      
+      {/* Professional Loading Overlay */}
+      {(authStatus === "authenticating" || authStatus === "creating-profile" || authStatus === "complete") && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="max-w-md w-full mx-4">
+            <Card className="bg-gray-900/90 border-gray-700 shadow-2xl">
+              <CardContent className="p-8 text-center">
+                {/* Animated Logo/Icon */}
+                <div className="mb-6 flex justify-center">
+                  <div className="relative">
+                    <div className="w-20 h-20 border-4 border-[#ff5733]/30 border-t-[#ff5733] rounded-full animate-spin"></div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Terminal className="h-8 w-8 text-[#ff5733]" />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Status Message */}
+                <h2 className="text-2xl font-bold text-white mb-2">
+                  {authStatus === "authenticating" && "Authenticating..."}
+                  {authStatus === "creating-profile" && "Setting up your account..."}
+                  {authStatus === "complete" && "Welcome to MockMate!"}
+                </h2>
+                
+                <p className="text-gray-400 mb-6">
+                  {authStatus === "authenticating" && `Signing you in with ${authProvider === "github" ? "GitHub" : "Google"}...`}
+                  {authStatus === "creating-profile" && "Creating your profile and preparing your dashboard..."}
+                  {authStatus === "complete" && "Redirecting you to your dashboard..."}
+                </p>
+                
+                {/* Progress Steps */}
+                <div className="space-y-3 mb-6">
+                  <div className={`flex items-center space-x-3 ${authStatus !== "idle" ? "opacity-100" : "opacity-50"}`}>
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                      authStatus === "authenticating" || authStatus === "creating-profile" || authStatus === "complete"
+                        ? "bg-[#ff5733] text-white"
+                        : "bg-gray-700 text-gray-400"
+                    }`}>
+                      {authStatus !== "idle" && <CheckCircle className="h-4 w-4" />}
+                    </div>
+                    <span className="text-sm text-gray-300">Authentication</span>
+                  </div>
+                  
+                  <div className={`flex items-center space-x-3 ${
+                    authStatus === "creating-profile" || authStatus === "complete" ? "opacity-100" : "opacity-50"
+                  }`}>
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                      authStatus === "creating-profile" || authStatus === "complete"
+                        ? "bg-[#ff5733] text-white"
+                        : authStatus === "authenticating"
+                        ? "bg-[#ff5733]/20 border-2 border-[#ff5733] animate-pulse"
+                        : "bg-gray-700 text-gray-400"
+                    }`}>
+                      {authStatus === "creating-profile" || authStatus === "complete" ? (
+                        <CheckCircle className="h-4 w-4" />
+                      ) : authStatus === "authenticating" ? (
+                        <div className="w-2 h-2 bg-[#ff5733] rounded-full animate-pulse"></div>
+                      ) : null}
+                    </div>
+                    <span className="text-sm text-gray-300">Profile Setup</span>
+                  </div>
+                  
+                  <div className={`flex items-center space-x-3 ${
+                    authStatus === "complete" ? "opacity-100" : "opacity-50"
+                  }`}>
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                      authStatus === "complete"
+                        ? "bg-[#ff5733] text-white"
+                        : authStatus === "creating-profile"
+                        ? "bg-[#ff5733]/20 border-2 border-[#ff5733] animate-pulse"
+                        : "bg-gray-700 text-gray-400"
+                    }`}>
+                      {authStatus === "complete" ? (
+                        <CheckCircle className="h-4 w-4" />
+                      ) : authStatus === "creating-profile" ? (
+                        <div className="w-2 h-2 bg-[#ff5733] rounded-full animate-pulse"></div>
+                      ) : null}
+                    </div>
+                    <span className="text-sm text-gray-300">Ready to go!</span>
+                  </div>
+                </div>
+                
+                {/* Loading Bar */}
+                <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
+                  <div 
+                    className={`h-full bg-gradient-to-r from-[#ff5733] to-[#ff8c69] transition-all duration-500 ${
+                      authStatus === "authenticating" ? "w-1/3" :
+                      authStatus === "creating-profile" ? "w-2/3" :
+                      authStatus === "complete" ? "w-full" : "w-0"
+                    }`}
+                  ></div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
       <section className="pt-24 pb-12 bg-gradient-to-br from-black via-gray-900 to-black">
