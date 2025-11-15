@@ -167,7 +167,8 @@ export async function createInterviewSession(
   userId: string,
   scenarioTitle: string,
   scenarioType: string,
-  difficulty: "easy" | "medium" | "hard"
+  difficulty: "easy" | "medium" | "hard",
+  scenarioId?: string
 ): Promise<string> {
   const sessionRef = doc(collection(db, "interview_sessions"))
   const sessionData = {
@@ -175,6 +176,7 @@ export async function createInterviewSession(
     user_id: userId,
     topic: scenarioTitle,
     type: scenarioType,
+    scenario_id: scenarioId, // Store scenario ID for reopening
     difficulty: difficulty,
     started_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
