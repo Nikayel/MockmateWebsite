@@ -57,9 +57,32 @@ function UpgradePageContent() {
       const canceled = searchParams?.get("canceled")
 
       if (success === "true") {
+        const sessionId = searchParams?.get("session_id")
         toast.success("Payment successful! Your account has been upgraded to Pro.")
-        // Clean URL and reload profile data
+        
+        // Clean URL
         router.replace("/upgrade")
+        
+        // If we have session ID, verify and sync subscription immediately
+        if (sessionId && user) {
+          try {
+            // Call sync API to check Stripe and update profile
+            const syncResponse = await fetch("/api/sync-subscription", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ userId: user.id }),
+            })
+            
+            if (syncResponse.ok) {
+              const syncData = await syncResponse.json()
+              console.log("Subscription synced:", syncData)
+            }
+          } catch (syncError) {
+            console.error("Error syncing subscription:", syncError)
+            // Continue anyway - webhook will handle it
+          }
+        }
+        
         // Reload user profile to reflect Pro status
         setTimeout(async () => {
           const firebaseUser = await getCurrentUser()
@@ -70,7 +93,7 @@ function UpgradePageContent() {
             }
           }
           router.push("/dashboard")
-        }, 2000)
+        }, 1500)
       } else if (canceled === "true") {
         toast.info("Payment canceled. You can try again anytime.")
         // Clean URL params after showing toast
