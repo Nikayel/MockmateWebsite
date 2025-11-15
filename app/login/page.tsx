@@ -36,30 +36,24 @@ export default function LoginPage() {
       if (user && authStatus === "authenticating") {
         // Update status to creating profile
         setAuthStatus("creating-profile")
-        
+
         // Create/update profile in Firestore immediately
         // This ensures profile exists for both GitHub and Google logins
         try {
           console.log("Creating/updating profile for user:", user.uid)
-          console.log("User email:", user.email)
-          console.log("User displayName:", user.displayName)
-          console.log("User photoURL:", user.photoURL)
-          
+
           await createOrUpdateProfile(
             user.uid,
             user.email || "",
             user.displayName,
             user.photoURL
           )
-          
+
           console.log("Profile created/updated successfully for:", user.uid)
-          
+
           // Mark as complete
           setAuthStatus("complete")
-          
-          // Small delay to show completion state
-          await new Promise(resolve => setTimeout(resolve, 500))
-          
+
           // User is authenticated, redirect them
           const savedRedirect = localStorage.getItem("auth_redirect")
           if (savedRedirect) {
@@ -74,15 +68,15 @@ export default function LoginPage() {
           console.error("Failed to create/update profile:", profileError)
           console.error("Error code:", profileError.code)
           console.error("Error message:", profileError.message)
-          // Don't block the flow, but log the error
-          if (profileError.code === "permission-denied") {
-            console.error("❌ Firestore permission denied! Check security rules.")
-          }
-          
-          // Still redirect even if profile creation fails
+
+          // Show error to user but allow them to continue
+          toast.error("Profile setup failed", {
+            description: "You may need to complete setup later"
+          })
+
+          // Mark as complete and redirect anyway
           setAuthStatus("complete")
-          await new Promise(resolve => setTimeout(resolve, 500))
-          
+
           const savedRedirect = localStorage.getItem("auth_redirect")
           if (savedRedirect) {
             localStorage.removeItem("auth_redirect")
@@ -285,37 +279,55 @@ export default function LoginPage() {
                 <Button
                   onClick={handleGitHubLogin}
                   disabled={isLoading}
-                  className="w-full bg-gray-800 hover:bg-gray-700 text-white py-4 text-lg flex items-center justify-center space-x-3"
+                  className="w-full bg-gray-800 hover:bg-gray-700 disabled:bg-gray-800/50 disabled:cursor-not-allowed text-white py-4 text-lg flex items-center justify-center space-x-3 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  <Github className="h-6 w-6" />
-                  <span>{isLoading ? "Signing in..." : "Continue with GitHub"}</span>
+                  {isLoading && authProvider === "github" ? (
+                    <>
+                      <div className="h-6 w-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Signing in...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Github className="h-6 w-6" />
+                      <span>Continue with GitHub</span>
+                    </>
+                  )}
                 </Button>
 
                 {/* Google Login Button */}
                 <Button
                   onClick={handleGoogleLogin}
                   disabled={isLoading}
-                  className="w-full bg-white hover:bg-gray-100 text-gray-900 py-4 text-lg flex items-center justify-center space-x-3 border border-gray-300"
+                  className="w-full bg-white hover:bg-gray-100 disabled:bg-gray-100/50 disabled:cursor-not-allowed text-gray-900 py-4 text-lg flex items-center justify-center space-x-3 border border-gray-300 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  <svg className="h-6 w-6" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.69-2.23 1.1-3.71 1.1-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                    />
-                  </svg>
-                  <span>{isLoading ? "Signing in..." : "Continue with Google"}</span>
+                  {isLoading && authProvider === "google" ? (
+                    <>
+                      <div className="h-6 w-6 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin" />
+                      <span>Signing in...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-6 w-6" viewBox="0 0 24 24">
+                        <path
+                          fill="#4285F4"
+                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.69-2.23 1.1-3.71 1.10-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                        />
+                      </svg>
+                      <span>Continue with Google</span>
+                    </>
+                  )}
                 </Button>
 
                 {/* Security Notice */}

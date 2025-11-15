@@ -7,33 +7,33 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { getCurrentUser, signOut, convertFirebaseUser } from "@/lib/auth"
+import { useAuth } from "@/lib/auth-context"
+import { signOut } from "@/lib/auth"
 import { getUserProfile } from "@/lib/firestore-helpers"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore"
 import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle, XCircle } from "lucide-react"
-import { User as UserType, Profile, ProfileQuota } from "@/lib/types"
+import { Profile, ProfileQuota } from "@/lib/types"
 import { PRICING_CONFIG } from "@/lib/config"
 import { toast } from "sonner"
 
 export default function AccountPage() {
-  const [user, setUser] = useState<UserType | null>(null)
+  const { user, firebaseUser, loading: authLoading } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [usage, setUsage] = useState<ProfileQuota | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const loadUserData = async () => {
-      try {
-        const firebaseUser = await getCurrentUser()
-        if (!firebaseUser) {
-          window.location.href = "/login"
-          return
-        }
+      if (authLoading) return
 
-        const convertedUser = convertFirebaseUser(firebaseUser)
-        setUser(convertedUser)
+      if (!firebaseUser) {
+        window.location.href = "/login"
+        return
+      }
+
+      try {
 
         // Fetch profile data from Firestore (use helper to ensure consistency)
         try {
@@ -101,12 +101,12 @@ export default function AccountPage() {
           description: error instanceof Error ? error.message : "An unknown error occurred",
         })
       } finally {
-        setLoading(false)
+        setDataLoading(false)
       }
     }
 
     loadUserData()
-  }, [])
+  }, [firebaseUser, authLoading])
 
   const handleSignOut = async () => {
     try {
@@ -121,11 +121,10 @@ export default function AccountPage() {
   }
 
   const handleManageSubscription = async () => {
-    if (!user) return
-    
+    if (!user || !firebaseUser) return
+
     try {
       // Get Firebase ID token for authentication
-      const firebaseUser = await getCurrentUser()
       if (!firebaseUser) {
         toast.error("Please sign in again")
         return
@@ -157,7 +156,7 @@ export default function AccountPage() {
     }
   }
 
-  if (loading) {
+  if (authLoading || dataLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff5733]"></div>

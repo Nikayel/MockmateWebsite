@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { getCurrentUser, signOut, convertFirebaseUser } from "@/lib/auth"
+import { signOut } from "@/lib/auth"
+import { useAuth } from "@/lib/auth-context"
 import { getUserProfile } from "@/lib/firestore-helpers"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore"
@@ -20,23 +21,21 @@ import Link from "next/link"
 
 export default function ProfilePage() {
   const router = useRouter()
-  const [user, setUser] = useState<UserType | null>(null)
+  const { user, firebaseUser, loading: authLoading } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [usage, setUsage] = useState<ProfileQuota | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (authLoading) return
+
     const loadUserData = async () => {
       try {
-        const firebaseUser = await getCurrentUser()
         if (!firebaseUser) {
           router.push("/login?redirect=profile")
           return
         }
-
-        const convertedUser = convertFirebaseUser(firebaseUser)
-        setUser(convertedUser)
 
         // Fetch profile data from Firestore (use helper to ensure consistency)
         try {
@@ -120,7 +119,7 @@ export default function ProfilePage() {
     }
 
     loadUserData()
-  }, [router])
+  }, [authLoading, firebaseUser, router])
 
   const handleSignOut = async () => {
     try {
@@ -135,15 +134,10 @@ export default function ProfilePage() {
   }
 
   const handleSyncSubscription = async () => {
-    if (!user) return
-    
+    if (!user || !firebaseUser) return
+
     try {
       // Get Firebase ID token to send with request
-      const firebaseUser = await getCurrentUser()
-      if (!firebaseUser) {
-        throw new Error("Not authenticated")
-      }
-      
       const token = await firebaseUser.getIdToken()
       
       toast.info("Syncing subscription from Stripe...")
@@ -183,15 +177,10 @@ export default function ProfilePage() {
   }
 
   const handleManageSubscription = async () => {
-    if (!user) return
-    
+    if (!user || !firebaseUser) return
+
     try {
       // Get Firebase ID token to send with request
-      const firebaseUser = await getCurrentUser()
-      if (!firebaseUser) {
-        throw new Error("Not authenticated")
-      }
-      
       const token = await firebaseUser.getIdToken()
       
       toast.info("Opening subscription management portal...")
@@ -218,7 +207,7 @@ export default function ProfilePage() {
     }
   }
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <main className="min-h-screen bg-black flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff5733]"></div>
