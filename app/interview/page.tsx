@@ -928,9 +928,9 @@ Let's have a great interview! How would you like to approach this problem?`
               {/* Filters */}
               <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-6">
                 <CardContent className="p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                     {/* Search */}
-                    <div className="md:col-span-2">
+                    <div className="md:col-span-2 lg:col-span-2">
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <Input
@@ -971,6 +971,26 @@ Let's have a great interview! How would you like to approach this problem?`
                         <option value="hard">Hard</option>
                       </select>
                     </div>
+
+                    {/* Company Filter */}
+                    <div>
+                      <select
+                        value={filterCompanies.join(",")}
+                        onChange={(e) => setFilterCompanies(e.target.value ? e.target.value.split(",") as Company[] : [])}
+                        className="w-full bg-gray-800 border border-gray-600 text-white rounded-md px-3 py-2"
+                      >
+                        <option value="">All Companies</option>
+                        <option value="Google">Google</option>
+                        <option value="Meta">Meta</option>
+                        <option value="Amazon">Amazon</option>
+                        <option value="Microsoft">Microsoft</option>
+                        <option value="Apple">Apple</option>
+                        <option value="Netflix">Netflix</option>
+                        <option value="Airbnb">Airbnb</option>
+                        <option value="Shopify">Shopify</option>
+                        <option value="Walmart">Walmart</option>
+                      </select>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -980,7 +1000,8 @@ Let's have a great interview! How would you like to approach this problem?`
                 {filteredScenarios.map((scenario) => (
                   <Card
                     key={scenario.id}
-                    className={`bg-gray-900/50 border-gray-700 glass-effect scenario-card ${
+                    onClick={() => setSelectedScenario(scenario)}
+                    className={`bg-gray-900/50 border-gray-700 glass-effect scenario-card cursor-pointer transition-all duration-200 hover:border-gray-600 ${
                       selectedScenario?.id === scenario.id ? "border-[#ff5733] ring-2 ring-[#ff5733]/50 selected" : ""
                     }`}
                   >
@@ -1009,7 +1030,7 @@ Let's have a great interview! How would you like to approach this problem?`
                         <span>{scenario.companies.slice(0, 2).join(", ")}</span>
                         <span>{scenario.estimatedTime} min</span>
                       </div>
-                      {/* Start Button on Card */}
+                      {/* Conditional Button Display */}
                       <div className="space-y-2">
                         {usageLimit && !usageLimit.allowed && scenario.type !== 'dsa' && (
                           <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2 mb-2">
@@ -1024,21 +1045,30 @@ Let's have a great interview! How would you like to approach this problem?`
                             </Link>
                           </div>
                         )}
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedScenario(scenario)
-                            // Use setTimeout to ensure state is updated before calling startInterview
-                            setTimeout(() => {
+                        {selectedScenario?.id === scenario.id ? (
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation()
                               startInterview()
-                            }, 0)
-                          }}
-                          disabled={usageLimit && !usageLimit.allowed && scenario.type !== 'dsa'}
-                          className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Play className="mr-2 h-4 w-4" />
-                          Start Interview
-                        </Button>
+                            }}
+                            disabled={usageLimit && !usageLimit.allowed && scenario.type !== 'dsa'}
+                            className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80 text-white disabled:opacity-50 disabled:cursor-not-allowed h-12 text-lg font-semibold shadow-lg"
+                          >
+                            <Play className="mr-2 h-5 w-5" />
+                            Start Interview
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedScenario(scenario)
+                            }}
+                            variant="outline"
+                            className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white"
+                          >
+                            Select Practice
+                          </Button>
+                        )}
                         {usageLimit && usageLimit.allowed && scenario.type !== 'dsa' && (
                           <p className="text-xs text-gray-400 text-center">
                             {usageLimit.limit - usageLimit.used} session{usageLimit.limit - usageLimit.used !== 1 ? 's' : ''} remaining
