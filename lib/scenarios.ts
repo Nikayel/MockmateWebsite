@@ -449,6 +449,33 @@ public:
       time: 'O(n)',
       space: 'O(n)',
     },
+    testCases: [
+      {
+        input: { nums: [1, 2, 3, 1] },
+        expected: true,
+        description: 'Basic case with duplicate: [1,2,3,1]',
+      },
+      {
+        input: { nums: [1, 2, 3, 4] },
+        expected: false,
+        description: 'No duplicates: [1,2,3,4]',
+      },
+      {
+        input: { nums: [1, 1, 1, 3, 3, 4, 3, 2, 4, 2] },
+        expected: true,
+        description: 'Multiple duplicates',
+      },
+      {
+        input: { nums: [1] },
+        expected: false,
+        description: 'Single element',
+      },
+      {
+        input: { nums: [1, 1] },
+        expected: true,
+        description: 'Two identical elements',
+      },
+    ],
   },
   {
     id: 'dsa-product-array-except-self',
@@ -501,6 +528,33 @@ You must write an algorithm that runs in O(n) time and without using the divisio
       time: 'O(n)',
       space: 'O(1)',
     },
+    testCases: [
+      {
+        input: { nums: [1, 2, 3, 4] },
+        expected: [24, 12, 8, 6],
+        description: 'Basic case: [1,2,3,4]',
+      },
+      {
+        input: { nums: [-1, 1, 0, -3, 3] },
+        expected: [0, 0, 9, 0, 0],
+        description: 'With zeros and negatives',
+      },
+      {
+        input: { nums: [2, 3] },
+        expected: [3, 2],
+        description: 'Two elements: [2,3]',
+      },
+      {
+        input: { nums: [1, 2, 3] },
+        expected: [6, 3, 2],
+        description: 'Three elements: [1,2,3]',
+      },
+      {
+        input: { nums: [-1, -2, -3, -4] },
+        expected: [-24, -12, -8, -6],
+        description: 'All negative numbers',
+      },
+    ],
   },
   {
     id: 'dsa-maximum-subarray',
@@ -555,6 +609,33 @@ A subarray is a contiguous part of an array.`,
       time: 'O(n)',
       space: 'O(1)',
     },
+    testCases: [
+      {
+        input: { nums: [-2, 1, -3, 4, -1, 2, 1, -5, 4] },
+        expected: 6,
+        description: 'Classic case: [4,-1,2,1] subarray sum = 6',
+      },
+      {
+        input: { nums: [1] },
+        expected: 1,
+        description: 'Single element',
+      },
+      {
+        input: { nums: [5, 4, -1, 7, 8] },
+        expected: 23,
+        description: 'All positive sum',
+      },
+      {
+        input: { nums: [-1, -2, -3, -4] },
+        expected: -1,
+        description: 'All negative: return largest negative',
+      },
+      {
+        input: { nums: [1, 2, -1, -2, 2, 1, -2, 1] },
+        expected: 3,
+        description: 'Mixed positive and negative',
+      },
+    ],
   },
   {
     id: 'dsa-merge-intervals',
@@ -605,6 +686,33 @@ A subarray is a contiguous part of an array.`,
       time: 'O(n log n)',
       space: 'O(n)',
     },
+    testCases: [
+      {
+        input: { intervals: [[1, 3], [2, 6], [8, 10], [15, 18]] },
+        expected: [[1, 6], [8, 10], [15, 18]],
+        description: 'Basic merge: [[1,3],[2,6]] -> [[1,6]]',
+      },
+      {
+        input: { intervals: [[1, 4], [4, 5]] },
+        expected: [[1, 5]],
+        description: 'Adjacent intervals: [[1,4],[4,5]]',
+      },
+      {
+        input: { intervals: [[1, 4], [0, 4]] },
+        expected: [[0, 4]],
+        description: 'Overlapping intervals',
+      },
+      {
+        input: { intervals: [[1, 4], [2, 3]] },
+        expected: [[1, 4]],
+        description: 'Fully contained interval',
+      },
+      {
+        input: { intervals: [[1, 4]] },
+        expected: [[1, 4]],
+        description: 'Single interval',
+      },
+    ],
   },
   {
     id: 'dsa-group-anagrams',
@@ -659,6 +767,36 @@ An Anagram is a word or phrase formed by rearranging the letters of a different 
       time: 'O(n * k log k)',
       space: 'O(n * k)',
     },
+    testCases: [
+      {
+        input: { strs: ["eat", "tea", "tan", "ate", "nat", "bat"] },
+        expected: [["bat"], ["nat", "tan"], ["ate", "eat", "tea"]],
+        description: 'Multiple anagram groups',
+        orderMatters: false,
+      },
+      {
+        input: { strs: [""] },
+        expected: [[""]],
+        description: 'Empty string',
+      },
+      {
+        input: { strs: ["a"] },
+        expected: [["a"]],
+        description: 'Single character',
+      },
+      {
+        input: { strs: ["ab", "ba", "abc", "bca", "cab"] },
+        expected: [["ab", "ba"], ["abc", "bca", "cab"]],
+        description: 'Multiple groups of different sizes',
+        orderMatters: false,
+      },
+      {
+        input: { strs: ["a", "b", "c"] },
+        expected: [["a"], ["b"], ["c"]],
+        description: 'No anagrams',
+        orderMatters: false,
+      },
+    ],
   },
   {
     id: 'dsa-longest-consecutive-sequence',
@@ -709,6 +847,33 @@ You must write an algorithm that runs in O(n) time.`,
       time: 'O(n)',
       space: 'O(n)',
     },
+    testCases: [
+      {
+        input: { nums: [100, 4, 200, 1, 3, 2] },
+        expected: 4,
+        description: 'Unsorted with sequence [1,2,3,4]',
+      },
+      {
+        input: { nums: [0, 3, 7, 2, 5, 8, 4, 6, 0, 1] },
+        expected: 9,
+        description: 'Long sequence with duplicates',
+      },
+      {
+        input: { nums: [1, 2, 0, 1] },
+        expected: 3,
+        description: 'Sequence [0,1,2] with duplicate',
+      },
+      {
+        input: { nums: [] },
+        expected: 0,
+        description: 'Empty array',
+      },
+      {
+        input: { nums: [9, 1, 4, 7, 3, 2, 8, 5, 6] },
+        expected: 9,
+        description: 'Full consecutive sequence [1-9]',
+      },
+    ],
   },
   {
     id: 'dsa-reverse-linked-list',
@@ -760,6 +925,33 @@ You must write an algorithm that runs in O(n) time.`,
       time: 'O(n)',
       space: 'O(1)',
     },
+    testCases: [
+      {
+        input: { values: [1, 2, 3, 4, 5] },
+        expected: [5, 4, 3, 2, 1],
+        description: 'Reverse list: [1,2,3,4,5] -> [5,4,3,2,1]',
+      },
+      {
+        input: { values: [1, 2] },
+        expected: [2, 1],
+        description: 'Two nodes: [1,2] -> [2,1]',
+      },
+      {
+        input: { values: [] },
+        expected: [],
+        description: 'Empty list',
+      },
+      {
+        input: { values: [1] },
+        expected: [1],
+        description: 'Single node',
+      },
+      {
+        input: { values: [1, 2, 3] },
+        expected: [3, 2, 1],
+        description: 'Three nodes: [1,2,3] -> [3,2,1]',
+      },
+    ],
   },
   {
     id: 'dsa-linked-list-cycle',
@@ -817,6 +1009,33 @@ Return true if there is a cycle in the linked list. Otherwise, return false.`,
       time: 'O(n)',
       space: 'O(1)',
     },
+    testCases: [
+      {
+        input: { values: [3, 2, 0, -4], pos: 1 },
+        expected: true,
+        description: 'Cycle at position 1',
+      },
+      {
+        input: { values: [1, 2], pos: 0 },
+        expected: true,
+        description: 'Cycle at position 0',
+      },
+      {
+        input: { values: [1], pos: -1 },
+        expected: false,
+        description: 'No cycle, single node',
+      },
+      {
+        input: { values: [1, 2, 3, 4], pos: -1 },
+        expected: false,
+        description: 'No cycle, multiple nodes',
+      },
+      {
+        input: { values: [], pos: -1 },
+        expected: false,
+        description: 'Empty list',
+      },
+    ],
   },
   {
     id: 'dsa-binary-search',
@@ -870,6 +1089,38 @@ You must write an algorithm with O(log n) runtime complexity.`,
       time: 'O(log n)',
       space: 'O(1)',
     },
+    testCases: [
+      {
+        input: { nums: [-1, 0, 3, 5, 9, 12], target: 9 },
+        expected: 4,
+        description: 'Target found at index 4',
+      },
+      {
+        input: { nums: [-1, 0, 3, 5, 9, 12], target: 2 },
+        expected: -1,
+        description: 'Target not found',
+      },
+      {
+        input: { nums: [5], target: 5 },
+        expected: 0,
+        description: 'Single element, found',
+      },
+      {
+        input: { nums: [5], target: -5 },
+        expected: -1,
+        description: 'Single element, not found',
+      },
+      {
+        input: { nums: [1, 3, 5, 7, 9, 11, 13, 15], target: 1 },
+        expected: 0,
+        description: 'Target at beginning',
+      },
+      {
+        input: { nums: [1, 3, 5, 7, 9, 11, 13, 15], target: 15 },
+        expected: 7,
+        description: 'Target at end',
+      },
+    ],
   },
   {
     id: 'dsa-valid-binary-search-tree',
@@ -923,6 +1174,33 @@ A valid BST is defined as follows:
       time: 'O(n)',
       space: 'O(h)',
     },
+    testCases: [
+      {
+        input: { tree: [2, 1, 3] },
+        expected: true,
+        description: 'Valid BST: [2,1,3]',
+      },
+      {
+        input: { tree: [5, 1, 4, null, null, 3, 6] },
+        expected: false,
+        description: 'Invalid: right child 4 < root 5',
+      },
+      {
+        input: { tree: [1] },
+        expected: true,
+        description: 'Single node',
+      },
+      {
+        input: { tree: [2, 2, 2] },
+        expected: false,
+        description: 'Duplicate values',
+      },
+      {
+        input: { tree: [5, 1, 6, null, null, 4, 7] },
+        expected: false,
+        description: 'Invalid: left child of 6 is 4 (< 5)',
+      },
+    ],
   },
   {
     id: 'dsa-lowest-common-ancestor',
@@ -978,6 +1256,33 @@ According to the definition of LCA: "The lowest common ancestor is defined betwe
       time: 'O(h)',
       space: 'O(1)',
     },
+    testCases: [
+      {
+        input: { tree: [6, 2, 8, 0, 4, 7, 9, null, null, 3, 5], p: 2, q: 8 },
+        expected: 6,
+        description: 'LCA of 2 and 8 is 6',
+      },
+      {
+        input: { tree: [6, 2, 8, 0, 4, 7, 9, null, null, 3, 5], p: 2, q: 4 },
+        expected: 2,
+        description: 'LCA of 2 and 4 is 2 (ancestor of itself)',
+      },
+      {
+        input: { tree: [2, 1, 3], p: 1, q: 3 },
+        expected: 2,
+        description: 'Simple tree: LCA is root',
+      },
+      {
+        input: { tree: [6, 2, 8, 0, 4, 7, 9], p: 0, q: 4 },
+        expected: 2,
+        description: 'Both nodes in left subtree',
+      },
+      {
+        input: { tree: [6, 2, 8, 0, 4, 7, 9], p: 7, q: 9 },
+        expected: 8,
+        description: 'Both nodes in right subtree',
+      },
+    ],
   },
   {
     id: 'dsa-3sum',
@@ -1031,6 +1336,35 @@ Notice that the solution set must not contain duplicate triplets.`,
       time: 'O(n²)',
       space: 'O(1)',
     },
+    testCases: [
+      {
+        input: { nums: [-1, 0, 1, 2, -1, -4] },
+        expected: [[-1, -1, 2], [-1, 0, 1]],
+        description: 'Multiple triplets',
+        orderMatters: false,
+      },
+      {
+        input: { nums: [0, 1, 1] },
+        expected: [],
+        description: 'No valid triplets',
+      },
+      {
+        input: { nums: [0, 0, 0] },
+        expected: [[0, 0, 0]],
+        description: 'All zeros',
+      },
+      {
+        input: { nums: [-2, 0, 1, 1, 2] },
+        expected: [[-2, 0, 2], [-2, 1, 1]],
+        description: 'Multiple solutions with duplicates',
+        orderMatters: false,
+      },
+      {
+        input: { nums: [1, 2, -2, -1] },
+        expected: [],
+        description: 'No triplets sum to zero',
+      },
+    ],
   },
   {
     id: 'dsa-climbing-stairs',
@@ -1081,6 +1415,33 @@ Each time you can either climb 1 or 2 steps. In how many distinct ways can you c
       time: 'O(n)',
       space: 'O(1)',
     },
+    testCases: [
+      {
+        input: { n: 2 },
+        expected: 2,
+        description: '2 steps: [1+1, 2]',
+      },
+      {
+        input: { n: 3 },
+        expected: 3,
+        description: '3 steps: [1+1+1, 1+2, 2+1]',
+      },
+      {
+        input: { n: 1 },
+        expected: 1,
+        description: 'Single step',
+      },
+      {
+        input: { n: 5 },
+        expected: 8,
+        description: '5 steps: Fibonacci(5) = 8',
+      },
+      {
+        input: { n: 10 },
+        expected: 89,
+        description: '10 steps: Fibonacci(10) = 89',
+      },
+    ],
   },
   {
     id: 'dsa-coin-change',
@@ -1138,6 +1499,33 @@ You may assume that you have an infinite number of each kind of coin.`,
       time: 'O(amount * coins.length)',
       space: 'O(amount)',
     },
+    testCases: [
+      {
+        input: { coins: [1, 2, 5], amount: 11 },
+        expected: 3,
+        description: '11 = 5 + 5 + 1',
+      },
+      {
+        input: { coins: [2], amount: 3 },
+        expected: -1,
+        description: 'Cannot make amount 3 with only coin 2',
+      },
+      {
+        input: { coins: [1], amount: 0 },
+        expected: 0,
+        description: 'Amount 0 requires 0 coins',
+      },
+      {
+        input: { coins: [1, 2, 5], amount: 100 },
+        expected: 20,
+        description: '100 = 20 coins of 5',
+      },
+      {
+        input: { coins: [1, 3, 4, 5], amount: 7 },
+        expected: 2,
+        description: '7 = 3 + 4',
+      },
+    ],
   },
   {
     id: 'dsa-number-of-islands',
@@ -1189,6 +1577,63 @@ An island is surrounded by water and is formed by connecting adjacent lands hori
       time: 'O(m * n)',
       space: 'O(m * n)',
     },
+    testCases: [
+      {
+        input: {
+          grid: [
+            ["1", "1", "1", "1", "0"],
+            ["1", "1", "0", "1", "0"],
+            ["1", "1", "0", "0", "0"],
+            ["0", "0", "0", "0", "0"]
+          ]
+        },
+        expected: 1,
+        description: 'Single large island',
+      },
+      {
+        input: {
+          grid: [
+            ["1", "1", "0", "0", "0"],
+            ["1", "1", "0", "0", "0"],
+            ["0", "0", "1", "0", "0"],
+            ["0", "0", "0", "1", "1"]
+          ]
+        },
+        expected: 3,
+        description: 'Three separate islands',
+      },
+      {
+        input: {
+          grid: [
+            ["1", "0", "1"],
+            ["0", "1", "0"],
+            ["1", "0", "1"]
+          ]
+        },
+        expected: 5,
+        description: 'Five single-cell islands',
+      },
+      {
+        input: {
+          grid: [
+            ["0", "0", "0"],
+            ["0", "0", "0"],
+            ["0", "0", "0"]
+          ]
+        },
+        expected: 0,
+        description: 'No islands (all water)',
+      },
+      {
+        input: {
+          grid: [
+            ["1"]
+          ]
+        },
+        expected: 1,
+        description: 'Single cell island',
+      },
+    ],
   },
   // ==================== Bug Fix Scenarios ====================
   {
