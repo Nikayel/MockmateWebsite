@@ -6,8 +6,9 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
-import { Check, Crown, Zap, Star, ArrowRight } from "lucide-react"
+import { Check, Crown, Zap, Star, ArrowRight, Ticket } from "lucide-react"
 import { PRICING_CONFIG, getProPricing } from "@/lib/config"
 import { User } from "@/lib/types"
 import { toast } from "sonner"
@@ -15,6 +16,8 @@ import { toast } from "sonner"
 export default function UpgradePage() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(false)
+  const [promoCode, setPromoCode] = useState("")
+  const [applyingPromo, setApplyingPromo] = useState(false)
   const proPricing = getProPricing('website') // Website pricing
 
   useEffect(() => {
@@ -27,6 +30,43 @@ export default function UpgradePage() {
     }
     loadUser()
   }, [])
+
+  const handlePromoCode = async () => {
+    if (!user || !promoCode.trim()) {
+      toast.error("Please enter a promo code")
+      return
+    }
+
+    setApplyingPromo(true)
+    try {
+      const response = await fetch("/api/promo-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: promoCode.trim(),
+          userId: user.id,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.valid) {
+        toast.success(data.message || "Promo code applied successfully!")
+        setPromoCode("")
+        // Reload page to show updated subscription
+        setTimeout(() => {
+          window.location.reload()
+        }, 1500)
+      } else {
+        toast.error(data.error || "Invalid promo code")
+      }
+    } catch (error) {
+      console.error("Promo code error:", error)
+      toast.error("Failed to apply promo code. Please try again.")
+    } finally {
+      setApplyingPromo(false)
+    }
+  }
 
   const handleUpgrade = async () => {
     if (!user) {
@@ -120,6 +160,37 @@ export default function UpgradePage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Promo Code Section */}
+          {user && (
+            <Card className="bg-gray-900/50 border-gray-700 mb-8">
+              <CardContent className="pt-6">
+                <div className="flex flex-col sm:flex-row gap-3 items-center">
+                  <div className="flex-1 w-full">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Ticket className="h-4 w-4 text-yellow-400" />
+                      <label className="text-sm text-gray-300">Have a promo code?</label>
+                    </div>
+                    <Input
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                      placeholder="Enter promo code"
+                      className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                      onKeyPress={(e) => e.key === "Enter" && !applyingPromo && handlePromoCode()}
+                      disabled={applyingPromo}
+                    />
+                  </div>
+                  <Button
+                    onClick={handlePromoCode}
+                    disabled={applyingPromo || !promoCode.trim()}
+                    className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
+                  >
+                    {applyingPromo ? "Applying..." : "Apply"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* CTA */}
           <div className="text-center">
