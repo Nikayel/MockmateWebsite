@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle, Star, Zap, Crown, ArrowRight } from "lucide-react"
-import { PRICING_CONFIG } from "@/lib/config"
+import { PRICING_CONFIG, getProPricing } from "@/lib/config"
 import Link from "next/link"
 
 export default function PricingPage() {
+  const proPricing = getProPricing('website') // Website pricing
   return (
     <main className="min-h-screen bg-black">
       <Header />
@@ -69,9 +70,12 @@ export default function PricingPage() {
                   <div className="flex justify-center mb-4">
                     <Zap className="h-12 w-12 text-[#ff5733]" />
                   </div>
-                  <CardTitle className="text-2xl font-heading text-white mb-2">{PRICING_CONFIG.pro.name}</CardTitle>
-                  <div className="text-4xl font-bold text-white mb-2">{PRICING_CONFIG.pro.priceDisplay}</div>
-                  <p className="text-gray-400">{PRICING_CONFIG.pro.period}</p>
+                  <CardTitle className="text-2xl font-heading text-white mb-2">{proPricing.name}</CardTitle>
+                  <div className="text-4xl font-bold text-white mb-2">{proPricing.priceDisplay}</div>
+                  <p className="text-gray-400">{proPricing.period}</p>
+                  <Badge className="mt-2 bg-blue-600/20 text-blue-300 border-blue-600/30">
+                    💡 VS Code users: $19/month (install extension)
+                  </Badge>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-4 mb-8">

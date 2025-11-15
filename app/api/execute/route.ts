@@ -8,14 +8,41 @@ interface TestCase {
 
 export async function POST(request: NextRequest) {
   try {
-    const { code } = await request.json()
+    const { code, scenarioId } = await request.json()
 
     if (!code) {
       return NextResponse.json({ error: "Code is required" }, { status: 400 })
     }
 
-    // Test cases for Two Sum problem
-    const testCases: TestCase[] = [
+    // Test cases based on scenario
+    // For now, default to Two Sum if no scenarioId provided
+    const testCases: TestCase[] = scenarioId === "dsa-valid-parentheses" ? [
+      {
+        input: { s: "()" },
+        expected: true,
+        description: "Basic case: ()",
+      },
+      {
+        input: { s: "()[]{}" },
+        expected: true,
+        description: "Multiple types: ()[]{}",
+      },
+      {
+        input: { s: "(]" },
+        expected: false,
+        description: "Mismatched: (]",
+      },
+      {
+        input: { s: "([)]" },
+        expected: false,
+        description: "Wrong order: ([)]",
+      },
+      {
+        input: { s: "{[]}" },
+        expected: true,
+        description: "Nested: {[]}",
+      },
+    ] : [
       {
         input: { nums: [2, 7, 11, 15], target: 9 },
         expected: [0, 1],
@@ -50,19 +77,26 @@ export async function POST(request: NextRequest) {
     try {
       // Execute the code safely
       // eslint-disable-next-line no-new-func
-      const twoSum = new Function("return " + code)()
+      const func = new Function("return " + code)()
 
       for (const testCase of testCases) {
         try {
-          const result = twoSum(testCase.input.nums, testCase.input.target)
+          let result: any
+          let passed = false
 
-          // Check if result is valid
-          const isValid =
-            Array.isArray(result) &&
-            result.length === 2 &&
-            testCase.input.nums[result[0]] + testCase.input.nums[result[1]] === testCase.input.target
-
-          const passed = isValid
+          if (scenarioId === "dsa-valid-parentheses") {
+            result = func(testCase.input.s)
+            passed = result === testCase.expected
+          } else {
+            // Default: Two Sum
+            result = func(testCase.input.nums, testCase.input.target)
+            // Check if result is valid
+            const isValid =
+              Array.isArray(result) &&
+              result.length === 2 &&
+              testCase.input.nums[result[0]] + testCase.input.nums[result[1]] === testCase.input.target
+            passed = isValid
+          }
 
           if (!passed) {
             allPassed = false

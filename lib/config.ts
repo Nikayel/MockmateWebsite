@@ -1,6 +1,6 @@
 /**
  * Shared application configuration
- * Centralized pricing and feature configuration to ensure consistency across all pages
+ * Platform-specific pricing: Website ($25) vs VS Code Extension ($19)
  */
 
 export const PRICING_CONFIG = {
@@ -23,11 +23,22 @@ export const PRICING_CONFIG = {
     popular: false,
   },
   pro: {
-    name: "Pro",
-    price: 19,
-    priceDisplay: "$19",
-    period: "/month",
-    description: "For serious interview preparation",
+    // Platform-specific pricing
+    website: {
+      name: "Pro",
+      price: 25,
+      priceDisplay: "$25",
+      period: "/month",
+      description: "For serious interview preparation",
+    },
+    vscode: {
+      name: "Pro",
+      price: 19,
+      priceDisplay: "$19",
+      period: "/month",
+      description: "For serious interview preparation",
+    },
+    // Shared features
     sessionsPerMonth: 1000, // Effectively unlimited
     sessionsDisplay: "Unlimited interview sessions",
     features: [
@@ -68,4 +79,10 @@ export const APP_CONFIG = {
   githubUrl: "https://github.com/nikayel/mockmate",
 } as const
 
+// Helper function to get pricing based on platform
+export function getProPricing(platform: 'website' | 'vscode' = 'website') {
+  return PRICING_CONFIG.pro[platform]
+}
+
 export type SubscriptionTier = "free" | "pro" | "enterprise"
+export type SubscriptionPlatform = "website" | "vscode"

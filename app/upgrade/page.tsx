@@ -8,13 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { getCurrentUser } from "@/lib/auth"
 import { Check, Crown, Zap, Star, ArrowRight } from "lucide-react"
-import { PRICING_CONFIG } from "@/lib/config"
+import { PRICING_CONFIG, getProPricing } from "@/lib/config"
 import { User } from "@/lib/types"
 import { toast } from "sonner"
 
 export default function UpgradePage() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(false)
+  const proPricing = getProPricing('website') // Website pricing
 
   useEffect(() => {
     const loadUser = async () => {
@@ -96,12 +97,15 @@ export default function UpgradePage() {
               <CardHeader>
                 <CardTitle className="text-white flex items-center">
                   <Crown className="mr-2 h-5 w-5 text-yellow-400" />
-                  {PRICING_CONFIG.pro.name}
+                  {proPricing.name}
                 </CardTitle>
                 <div className="text-3xl font-bold text-white">
-                  {PRICING_CONFIG.pro.priceDisplay}
-                  <span className="text-sm font-normal text-gray-400">{PRICING_CONFIG.pro.period}</span>
+                  {proPricing.priceDisplay}
+                  <span className="text-sm font-normal text-gray-400">{proPricing.period}</span>
                 </div>
+                <Badge className="mt-2 bg-blue-600/20 text-blue-300 border-blue-600/30 text-xs">
+                  💡 VS Code users: $19/month
+                </Badge>
               </CardHeader>
               <CardContent className="space-y-3">
                 {PRICING_CONFIG.pro.features.map((feature, index) => (
@@ -127,8 +131,8 @@ export default function UpgradePage() {
               ) : (
                 <>
                   <Zap className="mr-2 h-5 w-5" />
-                  Upgrade to Pro - {PRICING_CONFIG.pro.priceDisplay}
-                  {PRICING_CONFIG.pro.period}
+                  Upgrade to Pro - {proPricing.priceDisplay}
+                  {proPricing.period}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </>
               )}
