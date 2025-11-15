@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
+import { useAuth } from "@/lib/auth-context"
 import { getUserProfile } from "@/lib/firestore-helpers"
 import { db } from "@/lib/firebase"
 import { doc, setDoc, getDoc } from "firebase/firestore"
@@ -27,7 +27,7 @@ import { ErrorBoundary } from "@/components/error-boundary"
 function UpgradePageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const [user, setUser] = useState<User | null>(null)
+  const { user, firebaseUser, loading: authLoading } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(false)
   const [promoCode, setPromoCode] = useState("")
@@ -40,21 +40,7 @@ function UpgradePageContent() {
   }, [])
 
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const firebaseUser = await getCurrentUser()
-        if (firebaseUser) {
-          const convertedUser = convertFirebaseUser(firebaseUser)
-          setUser(convertedUser)
-        }
-      } catch (error) {
-        console.error("Error loading user:", error)
-      }
-    }
-    loadUser()
-  }, [])
-
-  useEffect(() => {
+    if (authLoading) return
     if (!mounted) return
 
     const handleStripeRedirect = async () => {
@@ -92,7 +78,6 @@ function UpgradePageContent() {
           
           // Reload user profile to reflect Pro status
           setTimeout(async () => {
-            const firebaseUser = await getCurrentUser()
             if (firebaseUser) {
               const userProfile = await getUserProfile(firebaseUser.uid)
               if (userProfile) {
@@ -112,7 +97,7 @@ function UpgradePageContent() {
     }
 
     handleStripeRedirect()
-  }, [mounted, searchParams, router, user])
+  }, [authLoading, mounted, searchParams, router, user, firebaseUser])
 
   const handlePromoCode = async () => {
     if (!user || !promoCode.trim()) {
@@ -137,7 +122,6 @@ function UpgradePageContent() {
         // Promo code is valid, now update profile client-side (with proper auth)
         try {
           // Verify Firebase auth before Firestore writes
-          const firebaseUser = await getCurrentUser()
           if (!firebaseUser || firebaseUser.uid !== user.id) {
             toast.error("Authentication error. Please log in again.")
             window.location.href = "/login?redirect=upgrade"

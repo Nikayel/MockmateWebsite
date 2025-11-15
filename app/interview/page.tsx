@@ -33,10 +33,9 @@ import {
   ChevronRight,
   ArrowRight,
 } from "lucide-react"
-import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
+import { useAuth } from "@/lib/auth-context"
 import { checkUsageLimit, incrementSessionUsage, getUserProfile, createInterviewSession, updateInterviewSession } from "@/lib/firestore-helpers"
 import { scenarios, filterScenarios, getScenarioById, type Scenario, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
-import { User as UserType } from "@/lib/types"
 import { toast } from "sonner"
 
 // Dynamically import Monaco Editor (client-side only)
@@ -59,7 +58,7 @@ interface TestResult {
 export default function InterviewPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [user, setUser] = useState<UserType | null>(null)
+  const { user, firebaseUser, loading: authLoading } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
   const [showScenarioBrowser, setShowScenarioBrowser] = useState(true)
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null)
@@ -125,13 +124,12 @@ export default function InterviewPage() {
   // Check authentication and usage limit, handle session reopening
   useEffect(() => {
     const checkAuth = async () => {
-      const firebaseUser = await getCurrentUser()
+      if (authLoading) return
+
       if (!firebaseUser) {
         router.push("/login?redirect=interview")
         return
       }
-      const convertedUser = convertFirebaseUser(firebaseUser)
-      setUser(convertedUser)
       
       // Check usage limit
       const usage = await checkUsageLimit(firebaseUser.uid)
@@ -198,7 +196,7 @@ Let's continue!`
       setIsLoading(false)
     }
     checkAuth()
-  }, [router, searchParams])
+  }, [router, searchParams, firebaseUser, authLoading])
 
   // Timer effect
   useEffect(() => {

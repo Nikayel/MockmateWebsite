@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Work_Sans, Open_Sans } from "next/font/google"
 import { Toaster } from "sonner"
+import { AuthProvider } from "@/lib/auth-context"
 import "./globals.css"
 
 const workSans = Work_Sans({
@@ -38,8 +39,10 @@ html {
         `}</style>
       </head>
       <body className={`${workSans.variable} ${openSans.variable} antialiased`}>
-        {children}
-        <Toaster position="top-right" richColors />
+        <AuthProvider>
+          {children}
+          <Toaster position="top-right" richColors />
+        </AuthProvider>
       </body>
     </html>
   )

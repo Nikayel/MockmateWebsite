@@ -4,14 +4,13 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Code, Menu, X, User, LayoutDashboard, Clock, Terminal, LogOut } from "lucide-react"
 import Link from "next/link"
-import { getCurrentUser, signOut, convertFirebaseUser } from "@/lib/auth"
-import { User as UserType } from "@/lib/types"
+import { signOut } from "@/lib/auth"
+import { useAuth } from "@/lib/auth-context"
 
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [user, setUser] = useState<UserType | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const { user, loading: isLoading } = useAuth()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -21,27 +20,9 @@ export function Header() {
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const firebaseUser = await getCurrentUser()
-        if (firebaseUser) {
-          const convertedUser = convertFirebaseUser(firebaseUser)
-          setUser(convertedUser)
-        }
-      } catch (error) {
-        console.error("Auth check error:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    checkAuth()
-  }, [])
-
   const handleSignOut = async () => {
     try {
       await signOut()
-      setUser(null)
       window.location.href = "/"
     } catch (error) {
       console.error("Sign out error:", error)

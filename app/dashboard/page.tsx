@@ -8,17 +8,17 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
+import { useAuth } from "@/lib/auth-context"
 import { getUserProfile, initializeUserQuota, checkUsageLimit } from "@/lib/firestore-helpers"
-import { User as UserType, Profile, ProfileQuota } from "@/lib/types"
+import { Profile, ProfileQuota } from "@/lib/types"
 import { PRICING_CONFIG } from "@/lib/config"
-import { 
-  User, 
-  Crown, 
-  BarChart3, 
-  Calendar, 
-  Terminal, 
-  TrendingUp, 
+import {
+  User,
+  Crown,
+  BarChart3,
+  Calendar,
+  Terminal,
+  TrendingUp,
   Target,
   Clock,
   Zap,
@@ -29,22 +29,23 @@ import { toast } from "sonner"
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [user, setUser] = useState<UserType | null>(null)
+  const { user, firebaseUser, loading: authLoading } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [usage, setUsage] = useState<{ used: number; limit: number; allowed: boolean } | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(true)
 
   useEffect(() => {
     const loadDashboard = async () => {
-      try {
-        const firebaseUser = await getCurrentUser()
-        if (!firebaseUser) {
-          router.push("/login?redirect=dashboard")
-          return
-        }
+      // Wait for auth to initialize
+      if (authLoading) return
 
-        const convertedUser = convertFirebaseUser(firebaseUser)
-        setUser(convertedUser)
+      // Redirect if not authenticated
+      if (!firebaseUser) {
+        router.push("/login?redirect=dashboard")
+        return
+      }
+
+      try {
 
         // Load profile (refresh to get latest subscription status)
         const userProfile = await getUserProfile(firebaseUser.uid)
@@ -93,26 +94,26 @@ export default function DashboardPage() {
         console.error("Error loading dashboard:", error)
         toast.error("Failed to load dashboard")
       } finally {
-        setLoading(false)
+        setDataLoading(false)
       }
     }
 
     loadDashboard()
-    
+
     // Refresh data when page becomes visible (e.g., after returning from Stripe)
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
+      if (document.visibilityState === "visible" && !authLoading) {
         loadDashboard()
       }
     }
     document.addEventListener("visibilitychange", handleVisibilityChange)
-    
+
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
-  }, [router])
+  }, [router, firebaseUser, authLoading])
 
-  if (loading) {
+  if (authLoading || dataLoading) {
     return (
       <main className="min-h-screen bg-black flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff5733]"></div>

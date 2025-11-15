@@ -7,7 +7,7 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
+import { useAuth } from "@/lib/auth-context"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
 import { Clock, Calendar, Target, TrendingUp, Terminal, ArrowRight, Play } from "lucide-react"
@@ -17,21 +17,19 @@ import { getScenarioById } from "@/lib/scenarios"
 
 export default function SessionsPage() {
   const router = useRouter()
-  const [user, setUser] = useState<UserType | null>(null)
+  const { user, firebaseUser, loading: authLoading } = useAuth()
   const [sessions, setSessions] = useState<InterviewSession[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (authLoading) return
+
     const loadSessions = async () => {
       try {
-        const firebaseUser = await getCurrentUser()
         if (!firebaseUser) {
           router.push("/login?redirect=sessions")
           return
         }
-
-        const convertedUser = convertFirebaseUser(firebaseUser)
-        setUser(convertedUser)
 
         // Fetch sessions from Firestore
         try {
@@ -70,9 +68,9 @@ export default function SessionsPage() {
     }
 
     loadSessions()
-  }, [router])
+  }, [authLoading, firebaseUser, router])
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <main className="min-h-screen bg-black flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff5733]"></div>
