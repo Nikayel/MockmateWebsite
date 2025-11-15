@@ -11,10 +11,11 @@ import { Progress } from "@/components/ui/progress"
 import { getCurrentUser, signOut, convertFirebaseUser } from "@/lib/auth"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore"
-import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle } from "lucide-react"
+import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle, Terminal } from "lucide-react"
 import { User as UserType, Profile, ProfileQuota } from "@/lib/types"
 import { PRICING_CONFIG } from "@/lib/config"
 import { toast } from "sonner"
+import Link from "next/link"
 
 export default function ProfilePage() {
   const router = useRouter()
