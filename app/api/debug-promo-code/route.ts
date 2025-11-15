@@ -6,22 +6,38 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
 })
 
 // Debug endpoint to check promotion codes
-// Access at: /api/debug-promo-code?code=FREE25
+// Access at: /api/debug-promo-code?code=FREE25 or ?id=promo_xxxxx
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const code = searchParams.get("code") || "FREE25"
+    const code = searchParams.get("code")
+    const promoId = searchParams.get("id")
 
     const mode = process.env.STRIPE_SECRET_KEY?.startsWith("sk_live") ? "LIVE" : "TEST"
     
     // List all promotion codes
     const allPromoCodes = await stripe.promotionCodes.list({ limit: 100 })
     
-    // Find specific code
-    const specificCode = await stripe.promotionCodes.list({
-      code: code.toUpperCase(),
-      limit: 1,
-    })
+    let specificCode: Stripe.PromotionCode[] = []
+    
+    // Look up by ID if provided
+    if (promoId) {
+      try {
+        const promo = await stripe.promotionCodes.retrieve(promoId)
+        specificCode = [promo]
+      } catch (err) {
+        console.error("Error retrieving promotion code by ID:", err)
+      }
+    }
+    
+    // Or look up by code string
+    if (code) {
+      const found = await stripe.promotionCodes.list({
+        code: code.toUpperCase(),
+        limit: 1,
+      })
+      specificCode = found.data
+    }
 
     return NextResponse.json({
       mode,
@@ -36,23 +52,26 @@ export async function GET(request: NextRequest) {
         maxRedemptions: pc.max_redemptions,
         timesRedeemed: pc.times_redeemed,
       })),
-      foundCode: specificCode.data.length > 0 ? {
-        code: specificCode.data[0].code,
-        active: specificCode.data[0].active,
-        couponId: specificCode.data[0].coupon.id,
-        couponName: specificCode.data[0].coupon.name,
-        couponPercentOff: specificCode.data[0].coupon.percent_off,
-        couponAmountOff: specificCode.data[0].coupon.amount_off,
-        expiresAt: specificCode.data[0].expires_at,
-        maxRedemptions: specificCode.data[0].max_redemptions,
-        timesRedeemed: specificCode.data[0].times_redeemed,
+      foundCode: specificCode.length > 0 ? {
+        id: specificCode[0].id,
+        code: specificCode[0].code,
+        active: specificCode[0].active,
+        couponId: specificCode[0].coupon.id,
+        couponName: specificCode[0].coupon.name,
+        couponPercentOff: specificCode[0].coupon.percent_off,
+        couponAmountOff: specificCode[0].coupon.amount_off,
+        expiresAt: specificCode[0].expires_at,
+        maxRedemptions: specificCode[0].max_redemptions,
+        timesRedeemed: specificCode[0].times_redeemed,
+        restrictions: specificCode[0].restrictions,
       } : null,
       instructions: [
         `You are using ${mode} mode keys`,
         `Make sure your promotion code is created in ${mode} mode in Stripe Dashboard`,
         `Go to: Products → Coupons → Find your coupon → Promotion codes tab → Create promotion code`,
-        `Set code to exactly: ${code.toUpperCase()}`,
+        code ? `Set code to exactly: ${code.toUpperCase()}` : `Use the code STRING (not ID) when entering in Stripe Checkout`,
         `Make sure it's Active and not expired`,
+        `The code STRING is what users enter (e.g., "FREE25"), not the ID (promo_xxxxx)`,
       ],
     })
   } catch (error) {
