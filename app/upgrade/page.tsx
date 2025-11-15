@@ -1,3 +1,9 @@
+/**
+ * PROPRIETARY CODE - NOT OPEN SOURCE
+ * This file contains payment UI and upgrade flow logic and is not part of the MIT license.
+ * All rights reserved.
+ */
+
 "use client"
 
 import { useState, useEffect, Suspense } from "react"
@@ -93,7 +99,7 @@ function UpgradePageContent() {
                 setProfile(userProfile)
               }
             }
-            router.push("/dashboard")
+            router.push("/account")
           }, 1500)
         } else if (canceled === "true") {
           toast.info("Payment canceled. You can try again anytime.")

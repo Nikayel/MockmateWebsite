@@ -1,4 +1,8 @@
 /**
+ * PROPRIETARY CODE - NOT OPEN SOURCE
+ * This file contains subscription management logic and is not part of the MIT license.
+ * All rights reserved.
+ * 
  * Stripe helper functions for subscription management
  */
 

@@ -1,3 +1,9 @@
+/**
+ * PROPRIETARY CODE - NOT OPEN SOURCE
+ * This file contains promotion code debugging utilities and is not part of the MIT license.
+ * All rights reserved.
+ */
+
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 
