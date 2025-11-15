@@ -108,10 +108,18 @@ Keep responses brief and actionable.`,
     })
 
     // Build conversation history for Gemini
+    // IMPORTANT: Gemini requires history to start with a "user" message, not "model"
     const history: Array<{ role: "user" | "model"; parts: [{ text: string }] }> = []
 
     if (context && Array.isArray(context)) {
+      let foundFirstUser = false
       context.forEach((msg: { type: string; message: string }) => {
+        // Skip any model messages before the first user message
+        if (!foundFirstUser && msg.type !== "user") {
+          return
+        }
+        foundFirstUser = true
+        
         history.push({
           role: msg.type === "user" ? "user" : "model",
           parts: [{ text: msg.message }],
