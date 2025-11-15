@@ -316,6 +316,7 @@ Take a moment to think about your approach, then feel free to ask me any clarify
     
     setIsInterviewStarted(false)
     setShowFeedback(false)
+    setComprehensiveFeedback("")
     setShowScenarioBrowser(true)
     setCode("")
     setInterviewerMessages([])
