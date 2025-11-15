@@ -334,6 +334,62 @@ export default function ProfilePage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Subscription Details - Show for Pro users */}
+          {isPro && profile && (
+            <Card className="bg-gray-900/50 border-gray-700">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center">
+                  <Crown className="mr-2 h-5 w-5" />
+                  Subscription Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {profile.subscription_start_date && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Pro Plan Since</span>
+                      <span className="text-white">
+                        {new Date(profile.subscription_start_date).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                  {profile.subscription_current_period_end && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Valid Until</span>
+                      <span className="text-white">
+                        {new Date(profile.subscription_current_period_end).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                  {profile.subscription_status && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Status</span>
+                      <Badge
+                        className={
+                          profile.subscription_status === "active"
+                            ? "bg-green-500/20 text-green-400 border-green-500/30"
+                            : "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
+                        }
+                      >
+                        {profile.subscription_status}
+                      </Badge>
+                    </div>
+                  )}
+                  <div className="pt-2 border-t border-gray-700">
+                    <Button
+                      onClick={handleManageSubscription}
+                      variant="outline"
+                      className="w-full border-gray-600 text-white hover:bg-gray-800 bg-transparent"
+                    >
+                      <XCircle className="mr-2 h-4 w-4" />
+                      Manage Subscription / Cancel
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
