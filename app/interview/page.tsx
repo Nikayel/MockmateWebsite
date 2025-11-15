@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   Play,
   RotateCcw,
@@ -30,6 +31,8 @@ import {
   Filter,
   X,
   ChevronRight,
+  FileText,
+  Eye,
 } from "lucide-react"
 import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
 import { checkUsageLimit, incrementSessionUsage, getUserProfile, createInterviewSession, updateInterviewSession } from "@/lib/firestore-helpers"
@@ -104,6 +107,7 @@ export default function InterviewPage() {
 
   // Workspace context
   const [workspaceContext, setWorkspaceContext] = useState<Array<{ path: string; content: string }>>([])
+  const [selectedWorkspaceFile, setSelectedWorkspaceFile] = useState<{ path: string; content: string } | null>(null)
   const [lastCodeHash, setLastCodeHash] = useState<string>("")
   const [proactiveTimer, setProactiveTimer] = useState<NodeJS.Timeout | null>(null)
   const [usageLimit, setUsageLimit] = useState<{ used: number; limit: number; allowed: boolean } | null>(null)
@@ -205,7 +209,7 @@ export default function InterviewPage() {
     }
   }, [interviewerMessages])
 
-  // Update code when language changes during interview
+  // Update code and workspace files when language changes during interview
   useEffect(() => {
     if (isInterviewStarted && selectedScenario && !showFeedback) {
       let newCode: string
@@ -213,6 +217,23 @@ export default function InterviewPage() {
       // For bug fix scenarios, use buggyCode
       if (selectedScenario.type === 'bugfix') {
         newCode = (selectedScenario as any).buggyCode?.[selectedLanguage] || `// Bug fix code not available for ${selectedLanguage}`
+
+        // Update workspace files for bug fix scenarios
+        const codebaseFiles = (selectedScenario as any).codebaseFiles?.[selectedLanguage] || []
+        if (codebaseFiles.length > 0) {
+          const contextFiles = codebaseFiles.map((file: any) => ({
+            path: file.fileName,
+            content: file.content,
+          }))
+          setWorkspaceContext(contextFiles)
+          toast.success(`Loaded ${contextFiles.length} ${selectedLanguage} workspace file(s)`)
+        } else {
+          // Clear workspace files if none available for this language
+          if (workspaceContext.length > 0) {
+            setWorkspaceContext([])
+            toast.info(`No workspace files available for ${selectedLanguage}`)
+          }
+        }
       } else {
         // For DSA scenarios, use starterCode
         newCode = (selectedScenario as any).starterCode?.[selectedLanguage] || `function solution() {
@@ -987,9 +1008,15 @@ Let's have a great interview! How would you like to approach this problem?`
                               </p>
                               <div className="space-y-1 max-h-32 overflow-y-auto">
                                 {workspaceContext.map((file, idx) => (
-                                  <div key={idx} className="text-xs text-gray-300 bg-gray-800/50 px-2 py-1 rounded border border-gray-700">
-                                    <div className="font-semibold text-blue-400">{file.path}</div>
-                                  </div>
+                                  <button
+                                    key={idx}
+                                    onClick={() => setSelectedWorkspaceFile(file)}
+                                    className="w-full text-left text-xs text-gray-300 bg-gray-800/50 px-2 py-1 rounded border border-gray-700 hover:bg-gray-700/50 hover:border-blue-500 transition-colors cursor-pointer flex items-center gap-2"
+                                  >
+                                    <FileText className="h-3 w-3 text-blue-400 flex-shrink-0" />
+                                    <div className="font-semibold text-blue-400 truncate flex-1">{file.path}</div>
+                                    <Eye className="h-3 w-3 text-gray-500 flex-shrink-0" />
+                                  </button>
                                 ))}
                               </div>
                             </div>
@@ -1014,9 +1041,15 @@ Let's have a great interview! How would you like to approach this problem?`
                               {workspaceContext.length > 0 && (
                                 <div className="mt-2 space-y-1">
                                   {workspaceContext.map((file, idx) => (
-                                    <div key={idx} className="text-xs text-gray-400 truncate bg-gray-800/30 px-2 py-1 rounded">
-                                      {file.path}
-                                    </div>
+                                    <button
+                                      key={idx}
+                                      onClick={() => setSelectedWorkspaceFile(file)}
+                                      className="w-full text-left text-xs text-gray-400 truncate bg-gray-800/30 px-2 py-1 rounded hover:bg-gray-700/50 hover:text-blue-400 transition-colors cursor-pointer flex items-center gap-2"
+                                    >
+                                      <FileText className="h-3 w-3 flex-shrink-0" />
+                                      <span className="truncate flex-1">{file.path}</span>
+                                      <Eye className="h-3 w-3 flex-shrink-0 opacity-50" />
+                                    </button>
                                   ))}
                                 </div>
                               )}
@@ -1272,6 +1305,49 @@ Let's have a great interview! How would you like to approach this problem?`
       )}
 
       <Footer />
+
+      {/* Workspace File Viewer Dialog */}
+      <Dialog open={selectedWorkspaceFile !== null} onOpenChange={(open) => !open && setSelectedWorkspaceFile(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] bg-gray-900 border-gray-700">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <FileText className="h-5 w-5 text-blue-400" />
+              {selectedWorkspaceFile?.path || "File Viewer"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 overflow-auto max-h-[60vh]">
+            {selectedWorkspaceFile && (
+              <Editor
+                height="500px"
+                language={
+                  selectedWorkspaceFile.path.endsWith('.tsx') || selectedWorkspaceFile.path.endsWith('.ts') ? 'typescript' :
+                  selectedWorkspaceFile.path.endsWith('.jsx') || selectedWorkspaceFile.path.endsWith('.js') ? 'javascript' :
+                  selectedWorkspaceFile.path.endsWith('.py') ? 'python' :
+                  selectedWorkspaceFile.path.endsWith('.java') ? 'java' :
+                  selectedWorkspaceFile.path.endsWith('.cpp') || selectedWorkspaceFile.path.endsWith('.c') || selectedWorkspaceFile.path.endsWith('.h') ? 'cpp' :
+                  selectedWorkspaceFile.path.endsWith('.go') ? 'go' :
+                  selectedWorkspaceFile.path.endsWith('.rs') ? 'rust' :
+                  selectedWorkspaceFile.path.endsWith('.cs') ? 'csharp' :
+                  selectedWorkspaceFile.path.endsWith('.json') ? 'json' :
+                  selectedWorkspaceFile.path.endsWith('.md') ? 'markdown' :
+                  'plaintext'
+                }
+                value={selectedWorkspaceFile.content}
+                theme="vs-dark"
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: false },
+                  fontSize: 13,
+                  lineNumbers: "on",
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                  tabSize: 2,
+                }}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }
