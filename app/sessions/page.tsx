@@ -17,12 +17,12 @@ import { getScenarioById } from "@/lib/scenarios"
 
 export default function SessionsPage() {
   const router = useRouter()
-  const { user, firebaseUser, loading: authLoading } = useAuth()
+  const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [sessions, setSessions] = useState<InterviewSession[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (authLoading) return
+    if (authLoading || !initialized) return
 
     const loadSessions = async () => {
       try {
@@ -68,9 +68,9 @@ export default function SessionsPage() {
     }
 
     loadSessions()
-  }, [authLoading, firebaseUser, router])
+  }, [authLoading, firebaseUser, router, initialized])
 
-  if (loading || authLoading) {
+  if (loading || authLoading || !initialized) {
     return (
       <main className="min-h-screen bg-black flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff5733]"></div>

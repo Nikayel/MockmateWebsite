@@ -58,7 +58,7 @@ interface TestResult {
 export default function InterviewPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, firebaseUser, loading: authLoading } = useAuth()
+  const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
   const [showScenarioBrowser, setShowScenarioBrowser] = useState(true)
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null)
@@ -124,7 +124,7 @@ export default function InterviewPage() {
   // Check authentication and usage limit, handle session reopening
   useEffect(() => {
     const checkAuth = async () => {
-      if (authLoading) return
+      if (authLoading || !initialized) return
 
       if (!firebaseUser) {
         router.push("/login?redirect=interview")
@@ -196,7 +196,7 @@ Let's continue!`
       setIsLoading(false)
     }
     checkAuth()
-  }, [router, searchParams, firebaseUser, authLoading])
+  }, [router, searchParams, firebaseUser, authLoading, initialized])
 
   // Timer effect
   useEffect(() => {

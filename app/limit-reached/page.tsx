@@ -15,12 +15,12 @@ import { AlertCircle, Crown, CheckCircle, ArrowRight, Clock } from "lucide-react
 
 export default function LimitReachedPage() {
   const router = useRouter()
-  const { user, firebaseUser, loading: authLoading } = useAuth()
+  const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [usageLimit, setUsageLimit] = useState<{ used: number; limit: number; allowed: boolean } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (authLoading) return
+    if (authLoading || !initialized) return
 
     const checkAuth = async () => {
       try {
@@ -45,9 +45,9 @@ export default function LimitReachedPage() {
     }
 
     checkAuth()
-  }, [authLoading, firebaseUser, router])
+  }, [authLoading, firebaseUser, router, initialized])
 
-  if (loading || authLoading) {
+  if (loading || authLoading || !initialized) {
     return (
       <main className="min-h-screen bg-black flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff5733]"></div>

@@ -21,14 +21,14 @@ import Link from "next/link"
 
 export default function ProfilePage() {
   const router = useRouter()
-  const { user, firebaseUser, loading: authLoading } = useAuth()
+  const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [usage, setUsage] = useState<ProfileQuota | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (authLoading) return
+    if (authLoading || !initialized) return
 
     const loadUserData = async () => {
       try {
@@ -119,7 +119,7 @@ export default function ProfilePage() {
     }
 
     loadUserData()
-  }, [authLoading, firebaseUser, router])
+  }, [authLoading, firebaseUser, router, initialized])
 
   const handleSignOut = async () => {
     try {
@@ -207,7 +207,7 @@ export default function ProfilePage() {
     }
   }
 
-  if (loading || authLoading) {
+  if (loading || authLoading || !initialized) {
     return (
       <main className="min-h-screen bg-black flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff5733]"></div>

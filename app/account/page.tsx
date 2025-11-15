@@ -18,7 +18,7 @@ import { PRICING_CONFIG } from "@/lib/config"
 import { toast } from "sonner"
 
 export default function AccountPage() {
-  const { user, firebaseUser, loading: authLoading } = useAuth()
+  const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [usage, setUsage] = useState<ProfileQuota | null>(null)
   const [dataLoading, setDataLoading] = useState(true)
@@ -26,7 +26,7 @@ export default function AccountPage() {
 
   useEffect(() => {
     const loadUserData = async () => {
-      if (authLoading) return
+      if (authLoading || !initialized) return
 
       if (!firebaseUser) {
         window.location.href = "/login"
