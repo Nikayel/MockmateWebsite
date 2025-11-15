@@ -46,13 +46,13 @@ export default function DashboardPage() {
         const convertedUser = convertFirebaseUser(firebaseUser)
         setUser(convertedUser)
 
-        // Load profile
+        // Load profile (refresh to get latest subscription status)
         const userProfile = await getUserProfile(firebaseUser.uid)
         if (userProfile) {
           setProfile(userProfile)
         }
 
-        // Load usage
+        // Load usage (this will use the correct subscription tier)
         const usageData = await checkUsageLimit(firebaseUser.uid)
         setUsage(usageData)
       } catch (error) {
@@ -64,6 +64,18 @@ export default function DashboardPage() {
     }
 
     loadDashboard()
+    
+    // Refresh data when page becomes visible (e.g., after returning from Stripe)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadDashboard()
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+    }
   }, [router])
 
   if (loading) {
