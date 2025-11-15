@@ -4,28 +4,83 @@ import { getScenarioById } from "@/lib/scenarios"
 // Language-specific code execution
 async function executeJavaScript(code: string, testCase: any, scenarioType: string) {
   try {
-    // eslint-disable-next-line no-new-func
-    const func = new Function("return " + code)()
-    const result = func(...Object.values(testCase.input))
-    return { result, error: null }
+    // Trim and validate code
+    const trimmedCode = code.trim()
+    if (!trimmedCode || trimmedCode.length === 0) {
+      return { result: null, error: "Code is empty" }
+    }
+
+    // Check for obviously invalid code patterns
+    if (trimmedCode.length < 10) {
+      return { result: null, error: "Code is too short to be a valid solution" }
+    }
+
+    let func: any
+
+    // Try multiple strategies to extract and execute the function
+    try {
+      // Strategy 1: Code is a function expression/declaration that can be returned
+      // eslint-disable-next-line no-new-func
+      func = new Function("return " + trimmedCode)()
+      
+      // Validate it's a function
+      if (typeof func !== 'function') {
+        // Strategy 2: Code might be a function declaration, try wrapping differently
+        try {
+          // Try as an IIFE that returns a function
+          // eslint-disable-next-line no-new-func
+          const wrapped = new Function(`
+            ${trimmedCode}
+            // Try to find and return the function
+            if (typeof solution === 'function') return solution;
+            if (typeof twoSum === 'function') return twoSum;
+            if (typeof main === 'function') return main;
+            throw new Error('No function found in code');
+          `)()
+          func = wrapped
+        } catch (wrapError) {
+          // Strategy 3: Code is the function body itself, wrap it
+          try {
+            // eslint-disable-next-line no-new-func
+            func = new Function(...Object.keys(testCase.input), trimmedCode)
+          } catch (paramError) {
+            return { result: null, error: `Code must define a callable function. Found: ${typeof func}` }
+          }
+        }
+      }
+    } catch (parseError) {
+      return { result: null, error: `Invalid JavaScript syntax: ${parseError instanceof Error ? parseError.message : "Parse error"}` }
+    }
+
+    // Final validation
+    if (typeof func !== 'function') {
+      return { result: null, error: "Code must define a function that can be called" }
+    }
+
+    // Execute the function with test case inputs
+    try {
+      const inputValues = Object.values(testCase.input)
+      const result = func(...inputValues)
+      return { result, error: null }
+    } catch (execError) {
+      return { 
+        result: null, 
+        error: `Runtime error: ${execError instanceof Error ? execError.message : "Unknown execution error"}` 
+      }
+    }
   } catch (error) {
     return { result: null, error: error instanceof Error ? error.message : "Execution error" }
   }
 }
 
 async function executePython(code: string, testCase: any, scenarioType: string) {
-  // For Python, we'll use a mock execution since we can't run Python in the browser
+  // For Python, we can't execute it in the browser/Node.js without a sandbox
+  // Return an error indicating Python execution is not supported yet
   // In production, this would call a sandboxed Python execution service
-  try {
-    // Mock Python execution - return expected for now
-    // In a real implementation, this would send to a Python execution service
-    return {
-      result: testCase.expected,
-      error: null,
-      note: "Python execution simulated - integrate with code execution service for production"
-    }
-  } catch (error) {
-    return { result: null, error: error instanceof Error ? error.message : "Python execution error" }
+  return {
+    result: null,
+    error: "Python execution is not yet supported. Please use JavaScript/TypeScript for now.",
+    note: "Python execution requires a sandboxed execution service - coming soon"
   }
 }
 
