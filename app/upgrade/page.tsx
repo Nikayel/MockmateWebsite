@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
@@ -10,12 +11,13 @@ import { Input } from "@/components/ui/input"
 import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
 import { db } from "@/lib/firebase"
 import { doc, setDoc, getDoc } from "firebase/firestore"
-import { Check, Crown, Zap, Star, ArrowRight, Ticket } from "lucide-react"
+import { Check, Crown, Zap, Star, ArrowRight, Ticket, CheckCircle } from "lucide-react"
 import { PRICING_CONFIG, getProPricing } from "@/lib/config"
 import { User } from "@/lib/types"
 import { toast } from "sonner"
 
 export default function UpgradePage() {
+  const searchParams = useSearchParams()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(false)
   const [promoCode, setPromoCode] = useState("")
@@ -31,7 +33,19 @@ export default function UpgradePage() {
       }
     }
     loadUser()
-  }, [])
+
+    // Check for Stripe redirect success
+    if (searchParams.get("success") === "true") {
+      toast.success("Payment successful! Your account has been upgraded to Pro.")
+      // Reload to show updated subscription
+      setTimeout(() => {
+        window.location.href = "/profile"
+      }, 2000)
+    }
+    if (searchParams.get("canceled") === "true") {
+      toast.info("Payment canceled. You can try again anytime.")
+    }
+  }, [searchParams])
 
   const handlePromoCode = async () => {
     if (!user || !promoCode.trim()) {
@@ -112,16 +126,30 @@ export default function UpgradePage() {
 
     setLoading(true)
     try {
-      // TODO: Implement Stripe/PayPal payment
-      toast.info("Payment integration coming soon! For now, please contact support to upgrade.", {
-        duration: 5000,
+      // Create Stripe checkout session
+      const response = await fetch("/api/create-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          platform: "website", // or detect from context
+          promoCode: promoCode.trim() || undefined,
+        }),
       })
+
+      const data = await response.json()
+
+      if (data.url) {
+        // Redirect to Stripe Checkout
+        window.location.href = data.url
+      } else {
+        throw new Error(data.error || "Failed to create checkout session")
+      }
     } catch (error) {
       console.error("Upgrade error:", error)
       toast.error("Upgrade failed. Please try again.", {
         description: error instanceof Error ? error.message : "An unknown error occurred",
       })
-    } finally {
       setLoading(false)
     }
   }
@@ -210,19 +238,24 @@ export default function UpgradePage() {
                     <Input
                       value={promoCode}
                       onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                      placeholder="Enter promo code"
+                      placeholder="Enter promo code (applied at checkout)"
                       className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
                       onKeyPress={(e) => e.key === "Enter" && !applyingPromo && handlePromoCode()}
                       disabled={applyingPromo}
                     />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Promo codes can also be applied during Stripe checkout
+                    </p>
                   </div>
-                  <Button
-                    onClick={handlePromoCode}
-                    disabled={applyingPromo || !promoCode.trim()}
-                    className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
-                  >
-                    {applyingPromo ? "Applying..." : "Apply"}
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      onClick={handlePromoCode}
+                      disabled={applyingPromo || !promoCode.trim()}
+                      className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
+                    >
+                      {applyingPromo ? "Applying..." : "Apply Free Code"}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
