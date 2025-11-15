@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
-import { getUserProfile } from "@/lib/firestore-helpers"
 import { db } from "@/lib/firebase"
 import { doc, setDoc, getDoc } from "firebase/firestore"
 import { Check, Crown, Zap, Star, ArrowRight, Ticket } from "lucide-react"
@@ -56,8 +55,16 @@ export default function UpgradePage() {
       if (data.valid) {
         // Promo code is valid, now update profile client-side (with proper auth)
         try {
-          // Mark promo code as used
+          // Check if code was already used (double-check client-side)
           const promoUsageRef = doc(db, "promo_code_usage", `${user.id}_${promoCode.trim().toUpperCase()}`)
+          const promoUsageSnap = await getDoc(promoUsageRef)
+          
+          if (promoUsageSnap.exists()) {
+            toast.error("This promo code has already been used")
+            return
+          }
+
+          // Mark promo code as used
           await setDoc(promoUsageRef, {
             user_id: user.id,
             code: promoCode.trim().toUpperCase(),
@@ -81,7 +88,7 @@ export default function UpgradePage() {
         } catch (updateError: any) {
           console.error("Error updating profile:", updateError)
           if (updateError.code === "permission-denied") {
-            toast.error("Permission denied. Please check Firestore security rules.")
+            toast.error("Permission denied. Please update Firestore security rules. See FIRESTORE_RULES.md")
           } else {
             toast.error("Failed to apply promo code. Please try again.")
           }

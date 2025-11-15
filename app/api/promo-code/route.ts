@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/firebase"
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
+import { doc, getDoc } from "firebase/firestore"
 
 // Promo codes stored server-side (not in git)
 // These are only visible in the server-side API route, not in client code
