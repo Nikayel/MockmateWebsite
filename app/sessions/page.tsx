@@ -10,9 +10,10 @@ import { Badge } from "@/components/ui/badge"
 import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
-import { Clock, Calendar, Target, TrendingUp, Terminal, ArrowRight } from "lucide-react"
+import { Clock, Calendar, Target, TrendingUp, Terminal, ArrowRight, Play } from "lucide-react"
 import { User as UserType, InterviewSession } from "@/lib/types"
 import Link from "next/link"
+import { getScenarioById } from "@/lib/scenarios"
 
 export default function SessionsPage() {
   const router = useRouter()
@@ -117,55 +118,79 @@ export default function SessionsPage() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {sessions.map((session) => (
-                <Card key={session.id} className="bg-gray-900/50 border-gray-700 hover:border-[#ff5733]/50 transition-colors">
-                  <CardHeader>
-                    <div className="flex items-start justify-between mb-2">
-                      <CardTitle className="text-white">{session.topic}</CardTitle>
-                      <Badge className={
-                        session.difficulty === "easy" ? "bg-green-600" :
-                        session.difficulty === "medium" ? "bg-yellow-600" :
-                        "bg-red-600"
-                      }>
-                        {session.difficulty.toUpperCase()}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center text-sm text-gray-400">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      {new Date(session.started_at).toLocaleDateString()}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {session.performance_score && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-gray-400 text-sm">Performance</span>
-                          <div className="flex items-center space-x-2">
-                            <TrendingUp className="h-4 w-4 text-[#ff5733]" />
-                            <span className="text-white font-semibold">{session.performance_score}%</span>
+              {sessions.map((session) => {
+                const isInProgress = !session.completed_at
+                const canReopen = isInProgress && session.scenario_id
+                
+                return (
+                  <Card key={session.id} className={`bg-gray-900/50 border-gray-700 transition-colors ${
+                    canReopen ? "hover:border-[#ff5733]/50 cursor-pointer" : ""
+                  }`}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between mb-2">
+                        <CardTitle className="text-white">{session.topic}</CardTitle>
+                        <Badge className={
+                          session.difficulty === "easy" ? "bg-green-600" :
+                          session.difficulty === "medium" ? "bg-yellow-600" :
+                          "bg-red-600"
+                        }>
+                          {session.difficulty.toUpperCase()}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-400">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        {new Date(session.started_at).toLocaleDateString()}
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {session.performance_score && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-400 text-sm">Performance</span>
+                            <div className="flex items-center space-x-2">
+                              <TrendingUp className="h-4 w-4 text-[#ff5733]" />
+                              <span className="text-white font-semibold">{session.performance_score}%</span>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                      {session.completed_at && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-gray-400 text-sm">Status</span>
-                          <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                            Completed
-                          </Badge>
-                        </div>
-                      )}
-                      {!session.completed_at && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-gray-400 text-sm">Status</span>
-                          <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
-                            In Progress
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                        )}
+                        {session.completed_at && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-400 text-sm">Status</span>
+                            <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                              Completed
+                            </Badge>
+                          </div>
+                        )}
+                        {!session.completed_at && (
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-gray-400 text-sm">Status</span>
+                            <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+                              In Progress
+                            </Badge>
+                          </div>
+                        )}
+                        {canReopen && (
+                          <Button
+                            onClick={() => {
+                              // Navigate to interview page with scenario ID
+                              router.push(`/interview?session=${session.id}&scenario=${session.scenario_id}`)
+                            }}
+                            className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
+                          >
+                            <Play className="mr-2 h-4 w-4" />
+                            Continue Practice
+                          </Button>
+                        )}
+                        {session.type === 'dsa' && (
+                          <p className="text-xs text-green-400 text-center mt-2">
+                            Free to practice
+                          </p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           )}
         </div>
