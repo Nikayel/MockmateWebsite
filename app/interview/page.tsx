@@ -32,7 +32,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
-import { checkUsageLimit, incrementSessionUsage, getUserProfile } from "@/lib/firestore-helpers"
+import { checkUsageLimit, incrementSessionUsage, getUserProfile, createInterviewSession, updateInterviewSession } from "@/lib/firestore-helpers"
 import { scenarios, filterScenarios, getScenarioById, type Scenario, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
 import { User as UserType } from "@/lib/types"
 import { toast } from "sonner"
@@ -93,6 +93,7 @@ export default function InterviewPage() {
   const [lastCodeHash, setLastCodeHash] = useState<string>("")
   const [proactiveTimer, setProactiveTimer] = useState<NodeJS.Timeout | null>(null)
   const [usageLimit, setUsageLimit] = useState<{ used: number; limit: number; allowed: boolean } | null>(null)
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const interviewerEndRef = useRef<HTMLDivElement>(null)
@@ -246,16 +247,26 @@ export default function InterviewPage() {
       return
     }
 
-    // Increment usage when starting interview
+    // Increment usage and create session when starting interview
     if (user) {
       try {
+        // Create session document first
+        const sessionId = await createInterviewSession(
+          user.id,
+          selectedScenario.title,
+          selectedScenario.type,
+          selectedScenario.difficulty
+        )
+        setCurrentSessionId(sessionId)
+        
+        // Then increment usage
         await incrementSessionUsage(user.id)
         // Refresh usage limit
         const updatedUsage = await checkUsageLimit(user.id)
         setUsageLimit(updatedUsage)
       } catch (error) {
-        console.error("Error incrementing usage:", error)
-        toast.error("Failed to track session usage")
+        console.error("Error creating session:", error)
+        toast.error("Failed to track session")
       }
     }
 
@@ -288,7 +299,20 @@ Take a moment to think about your approach, then feel free to ask me any clarify
     }])
   }
 
-  const resetInterview = () => {
+  const resetInterview = async () => {
+    // Update session if it exists and was completed
+    if (currentSessionId && showFeedback && testSummary.total > 0) {
+      try {
+        await updateInterviewSession(
+          currentSessionId,
+          testSummary.passRate,
+          `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
+        )
+      } catch (error) {
+        console.error("Error updating session:", error)
+      }
+    }
+    
     setIsInterviewStarted(false)
     setShowFeedback(false)
     setShowScenarioBrowser(true)
@@ -300,6 +324,7 @@ Take a moment to think about your approach, then feel free to ask me any clarify
     setStartTime(null)
     setElapsedTime(0)
     setLastCodeHash("")
+    setCurrentSessionId(null)
     if (proactiveTimer) {
       clearTimeout(proactiveTimer)
       setProactiveTimer(null)

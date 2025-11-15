@@ -116,6 +116,48 @@ export async function checkUsageLimit(userId: string): Promise<{ allowed: boolea
 }
 
 /**
+ * Create a new interview session
+ */
+export async function createInterviewSession(
+  userId: string,
+  scenarioTitle: string,
+  scenarioType: string,
+  difficulty: "easy" | "medium" | "hard"
+): Promise<string> {
+  const sessionRef = doc(collection(db, "interview_sessions"))
+  const sessionData = {
+    id: sessionRef.id,
+    user_id: userId,
+    topic: scenarioTitle,
+    type: scenarioType,
+    difficulty: difficulty,
+    started_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+  
+  await setDoc(sessionRef, sessionData)
+  return sessionRef.id
+}
+
+/**
+ * Update interview session on completion
+ */
+export async function updateInterviewSession(
+  sessionId: string,
+  performanceScore?: number,
+  feedback?: string
+): Promise<void> {
+  const sessionRef = doc(db, "interview_sessions", sessionId)
+  await setDoc(sessionRef, {
+    completed_at: new Date().toISOString(),
+    performance_score: performanceScore,
+    feedback: feedback,
+    updated_at: new Date().toISOString(),
+  }, { merge: true })
+}
+
+/**
  * Increment session usage
  */
 export async function incrementSessionUsage(userId: string): Promise<void> {

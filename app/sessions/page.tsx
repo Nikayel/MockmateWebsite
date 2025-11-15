@@ -34,18 +34,28 @@ export default function SessionsPage() {
 
         // Fetch sessions from Firestore
         try {
+          // Query without orderBy first to avoid index requirement
           const sessionsQuery = query(
             collection(db, "interview_sessions"),
-            where("user_id", "==", firebaseUser.uid),
-            orderBy("started_at", "desc")
+            where("user_id", "==", firebaseUser.uid)
           )
           const sessionsSnap = await getDocs(sessionsQuery)
           
           if (!sessionsSnap.empty) {
-            setSessions(sessionsSnap.docs.map(doc => ({
+            // Sort in memory to avoid composite index requirement
+            const sessionsData = sessionsSnap.docs.map(doc => ({
               id: doc.id,
               ...doc.data()
-            } as InterviewSession)))
+            } as InterviewSession))
+            
+            // Sort by started_at descending
+            sessionsData.sort((a, b) => {
+              const dateA = new Date(a.started_at).getTime()
+              const dateB = new Date(b.started_at).getTime()
+              return dateB - dateA
+            })
+            
+            setSessions(sessionsData)
           }
         } catch (error) {
           console.error("Error fetching sessions:", error)
