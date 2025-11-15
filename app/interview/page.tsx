@@ -401,12 +401,15 @@ Take a moment to think about your approach, then feel free to ask me any clarify
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
   }
 
-  const filteredScenarios = filterScenarios({
-    type: filterType.length > 0 ? filterType : undefined,
-    difficulty: filterDifficulty.length > 0 ? filterDifficulty : undefined,
-    companies: filterCompanies.length > 0 ? filterCompanies : undefined,
-    searchQuery: searchQuery || undefined,
-  })
+  // Memoize filtered scenarios to avoid recalculating on every render
+  const filteredScenarios = useMemo(() => {
+    return filterScenarios({
+      type: filterType.length > 0 ? filterType : undefined,
+      difficulty: filterDifficulty.length > 0 ? filterDifficulty : undefined,
+      companies: filterCompanies.length > 0 ? filterCompanies : undefined,
+      searchQuery: searchQuery || undefined,
+    })
+  }, [filterType, filterDifficulty, filterCompanies, searchQuery])
 
   if (isLoading) {
     return (
