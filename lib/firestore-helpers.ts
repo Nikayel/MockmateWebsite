@@ -56,18 +56,26 @@ export async function initializeUserQuota(userId: string, subscriptionTier: "fre
   const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
 
-  // Check if quota already exists for this period
+  // Query by user_id only (no composite index needed)
   const quotaQuery = query(
     collection(db, "profile_quota"),
-    where("user_id", "==", userId),
-    where("period_start", ">=", periodStart.toISOString()),
-    where("period_start", "<=", periodEnd.toISOString())
+    where("user_id", "==", userId)
   )
 
   const quotaSnap = await getDocs(quotaQuery)
 
+  // Filter by date range in memory to avoid composite index requirement
   if (!quotaSnap.empty) {
-    return quotaSnap.docs[0].data() as ProfileQuota
+    const currentPeriodQuota = quotaSnap.docs
+      .map(doc => doc.data() as ProfileQuota)
+      .find(quota => {
+        const quotaStart = new Date(quota.period_start)
+        return quotaStart >= periodStart && quotaStart <= periodEnd
+      })
+    
+    if (currentPeriodQuota) {
+      return currentPeriodQuota
+    }
   }
 
   // Create new quota
