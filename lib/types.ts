@@ -43,6 +43,8 @@ export interface InterviewSession {
   completed_at?: string
   difficulty: "easy" | "medium" | "hard"
   topic: string
+  type?: string // scenario type: 'dsa', 'bugfix', etc.
+  scenario_id?: string // scenario ID for reopening sessions
   performance_score?: number
   feedback?: string
 }
