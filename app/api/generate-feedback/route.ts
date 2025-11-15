@@ -13,20 +13,66 @@ export async function POST(request: NextRequest) {
 
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      systemInstruction: `You are an experienced technical interviewer providing comprehensive feedback on a coding interview solution.
+      systemInstruction: `You are an experienced technical interviewer providing comprehensive, detailed feedback on a coding interview solution.
       
-Your feedback should be detailed, constructive, and similar to what a real interviewer at a top tech company would provide.
-Focus on:
-1. Code correctness and edge cases
-2. Time complexity (Big O notation) - analyze and explain
-3. Space complexity (Big O notation) - analyze and explain
-4. Code quality (readability, maintainability, style)
-5. Algorithm efficiency and optimization opportunities
-6. Best practices and design patterns
-7. Specific improvements and suggestions
-8. Overall assessment and strengths/weaknesses
+Your feedback should be extremely thorough, constructive, and similar to what a senior engineer at a top tech company (Google, Meta, Amazon) would provide in a real interview debrief.
 
-Be professional, encouraging, but honest. Provide actionable feedback that helps the candidate improve.`,
+Provide a STRUCTURED, DETAILED analysis covering:
+
+1. **CORRECTNESS ANALYSIS** (Detailed)
+   - Does the solution work correctly for all test cases?
+   - Are edge cases properly handled? List specific edge cases checked/missed
+   - Are there any logical errors or bugs?
+   - Boundary condition handling
+
+2. **COMPLEXITY ANALYSIS** (Detailed with explanations)
+   - Time Complexity: Exact Big O notation with detailed explanation of why
+   - Space Complexity: Exact Big O notation with detailed explanation
+   - Compare against optimal solution complexity
+   - Explain the analysis step-by-step
+
+3. **CODE QUALITY ASSESSMENT** (Detailed)
+   - Readability: Is the code easy to understand?
+   - Maintainability: Can it be easily modified/extended?
+   - Style: Does it follow language best practices?
+   - Structure: Is the code well-organized?
+   - Naming: Are variables/functions well-named?
+
+4. **OPTIMIZATION OPPORTUNITIES** (Critical Section)
+   - Specific optimizations that could be made
+   - Algorithm improvements
+   - Data structure choices
+   - Performance bottlenecks identified
+   - Before/after complexity comparisons
+
+5. **BEST PRACTICES & DESIGN PATTERNS**
+   - Language-specific best practices followed/missed
+   - Design patterns that could be applied
+   - Code organization improvements
+
+6. **STRENGTHS** (What they did well)
+   - Specific positive aspects
+   - Good decisions made
+   - Areas of strong performance
+
+7. **AREAS FOR IMPROVEMENT** (Actionable)
+   - Specific, actionable suggestions
+   - Concrete examples of how to improve
+   - Learning resources or topics to study
+
+8. **SCORE BREAKDOWN** (Detailed)
+   - Correctness: X/10 (with explanation)
+   - Efficiency: X/10 (with explanation)
+   - Code Quality: X/10 (with explanation)
+   - Problem Solving: X/10 (with explanation)
+   - Overall: X/10 (weighted average)
+
+9. **RECOMMENDATIONS**
+   - What to study next
+   - Specific topics to focus on
+   - Practice problems to try
+
+Be professional, encouraging, but honest and thorough. Provide actionable feedback that helps the candidate improve significantly.`,
     })
 
     const testResultsSummary = testResults && Array.isArray(testResults) 
@@ -54,18 +100,18 @@ ${testResults.filter((t: any) => !t.passed).map((t: any) =>
 ).join('\n\n')}
 ` : ''}
 
-Please provide detailed feedback covering:
-1. **Correctness**: Does the solution work correctly? Are edge cases handled?
-2. **Time Complexity**: What is the Big O time complexity? Explain your analysis.
-3. **Space Complexity**: What is the Big O space complexity? Explain your analysis.
-4. **Code Quality**: Is the code readable, maintainable, and well-structured?
-5. **Efficiency**: Are there optimization opportunities? Could the algorithm be improved?
-6. **Best Practices**: Does the code follow language-specific best practices?
-7. **Strengths**: What did the candidate do well?
-8. **Areas for Improvement**: Specific, actionable suggestions
-9. **Overall Assessment**: Summary and rating (1-10 scale)
+Provide an EXTREMELY COMPREHENSIVE and DETAILED analysis. Structure your response with clear sections and subsections.
 
-Format your response in a clear, structured way that would be helpful for interview preparation.`
+Include:
+- Detailed correctness analysis with specific edge cases
+- Step-by-step complexity analysis with explanations
+- In-depth code quality assessment
+- Specific optimization opportunities with before/after comparisons
+- Detailed score breakdown (Correctness, Efficiency, Code Quality, Problem Solving, Overall)
+- Actionable improvement recommendations
+- Learning resources and next steps
+
+Format your response with clear markdown headers and structure. Be thorough - this feedback should be comprehensive enough to help the candidate significantly improve.`
 
     const result = await model.generateContent(prompt)
     const response = await result.response
