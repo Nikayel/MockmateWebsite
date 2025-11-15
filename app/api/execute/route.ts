@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getScenarioById } from "@/lib/scenarios"
+import { VM } from "vm2"
+import { executeRateLimit } from "@/lib/rate-limit"
 
 // Language-specific code execution
 async function executeJavaScript(code: string, testCase: any, scenarioType: string) {
@@ -15,34 +17,48 @@ async function executeJavaScript(code: string, testCase: any, scenarioType: stri
       return { result: null, error: "Code is too short to be a valid solution" }
     }
 
+    // Create a sandboxed VM with strict timeout and memory limits
+    const vm = new VM({
+      timeout: 5000, // 5 second timeout
+      sandbox: {
+        // Only provide safe built-ins
+        console: {
+          log: () => {}, // Disable console output
+          error: () => {},
+          warn: () => {}
+        }
+      },
+      eval: false, // Disable eval
+      wasm: false, // Disable WebAssembly
+    })
+
     let func: any
 
     // Try multiple strategies to extract and execute the function
     try {
       // Strategy 1: Code is a function expression/declaration that can be returned
-      // eslint-disable-next-line no-new-func
-      func = new Function("return " + trimmedCode)()
-      
-      // Validate it's a function
-      if (typeof func !== 'function') {
+      try {
+        func = vm.run("(" + trimmedCode + ")")
+      } catch {
         // Strategy 2: Code might be a function declaration, try wrapping differently
         try {
           // Try as an IIFE that returns a function
-          // eslint-disable-next-line no-new-func
-          const wrapped = new Function(`
-            ${trimmedCode}
-            // Try to find and return the function
-            if (typeof solution === 'function') return solution;
-            if (typeof twoSum === 'function') return twoSum;
-            if (typeof main === 'function') return main;
-            throw new Error('No function found in code');
-          `)()
+          const wrapped = vm.run(`
+            (function() {
+              ${trimmedCode}
+              // Try to find and return the function
+              if (typeof solution === 'function') return solution;
+              if (typeof twoSum === 'function') return twoSum;
+              if (typeof main === 'function') return main;
+              throw new Error('No function found in code');
+            })()
+          `)
           func = wrapped
         } catch (wrapError) {
           // Strategy 3: Code is the function body itself, wrap it
           try {
-            // eslint-disable-next-line no-new-func
-            func = new Function(...Object.keys(testCase.input), trimmedCode)
+            const paramNames = Object.keys(testCase.input).join(', ')
+            func = vm.run(`(function(${paramNames}) { ${trimmedCode} })`)
           } catch (paramError) {
             return { result: null, error: `Code must define a callable function. Found: ${typeof func}` }
           }
@@ -57,15 +73,15 @@ async function executeJavaScript(code: string, testCase: any, scenarioType: stri
       return { result: null, error: "Code must define a function that can be called" }
     }
 
-    // Execute the function with test case inputs
+    // Execute the function with test case inputs in the sandbox
     try {
       const inputValues = Object.values(testCase.input)
       const result = func(...inputValues)
       return { result, error: null }
     } catch (execError) {
-      return { 
-        result: null, 
-        error: `Runtime error: ${execError instanceof Error ? execError.message : "Unknown execution error"}` 
+      return {
+        result: null,
+        error: `Runtime error: ${execError instanceof Error ? execError.message : "Unknown execution error"}`
       }
     }
   } catch (error) {
@@ -181,6 +197,12 @@ function validateResult(actual: any, expected: any, testCase: any, scenarioType:
 }
 
 export async function POST(request: NextRequest) {
+  // Apply rate limiting
+  const rateLimitResponse = await executeRateLimit(request)
+  if (rateLimitResponse) {
+    return rateLimitResponse
+  }
+
   try {
     const { code, scenarioId, language = 'javascript' } = await request.json()
 

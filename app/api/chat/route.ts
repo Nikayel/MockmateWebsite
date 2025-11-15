@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { chatRateLimit } from "@/lib/rate-limit"
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
@@ -12,6 +13,12 @@ interface UserContext {
 }
 
 export async function POST(request: NextRequest) {
+  // Apply rate limiting
+  const rateLimitResponse = await chatRateLimit(request)
+  if (rateLimitResponse) {
+    return rateLimitResponse
+  }
+
   try {
     const { message, context, role, userContext, workspaceContext, currentCode, isProactive, scenarioTitle, scenarioType, elapsedTime } = await request.json()
 

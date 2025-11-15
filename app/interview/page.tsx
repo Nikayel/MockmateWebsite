@@ -348,6 +348,73 @@ Let's continue!`
     }
   }, [code, isInterviewStarted, showFeedback, showPostInterviewDiscussion, lastCodeHash])
 
+  // Auto-save session data every 30 seconds
+  useEffect(() => {
+    if (!isInterviewStarted || !selectedScenario || !firebaseUser) return
+
+    const autoSaveInterval = setInterval(() => {
+      try {
+        const sessionData = {
+          scenarioId: selectedScenario.id,
+          code,
+          chatMessages,
+          interviewerMessages,
+          selectedLanguage,
+          elapsedTime,
+          testResults,
+          workspaceContext,
+          timestamp: Date.now(),
+        }
+
+        // Save to localStorage with user-specific key
+        const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
+        localStorage.setItem(storageKey, JSON.stringify(sessionData))
+
+        // Show subtle indication that auto-save happened (optional)
+        console.log("Session auto-saved at", new Date().toLocaleTimeString())
+      } catch (error) {
+        console.error("Auto-save failed:", error)
+      }
+    }, 30000) // 30 seconds
+
+    // Cleanup on unmount
+    return () => {
+      clearInterval(autoSaveInterval)
+    }
+  }, [isInterviewStarted, selectedScenario, firebaseUser, code, chatMessages, interviewerMessages, selectedLanguage, elapsedTime, testResults, workspaceContext])
+
+  // Restore auto-saved session on mount
+  useEffect(() => {
+    if (!firebaseUser || !selectedScenario || isInterviewStarted) return
+
+    try {
+      const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
+      const savedData = localStorage.getItem(storageKey)
+
+      if (savedData) {
+        const sessionData = JSON.parse(savedData)
+        const timeSinceLastSave = Date.now() - sessionData.timestamp
+
+        // Only restore if saved within last 24 hours
+        if (timeSinceLastSave < 24 * 60 * 60 * 1000) {
+          setCode(sessionData.code || "")
+          setChatMessages(sessionData.chatMessages || [])
+          setInterviewerMessages(sessionData.interviewerMessages || [])
+          setSelectedLanguage(sessionData.selectedLanguage || "javascript")
+          setTestResults(sessionData.testResults || [])
+          setWorkspaceContext(sessionData.workspaceContext || [])
+
+          toast.info("Session restored from auto-save")
+        } else {
+          // Clean up old saves
+          localStorage.removeItem(storageKey)
+        }
+      }
+    } catch (error) {
+      console.error("Failed to restore auto-saved session:", error)
+    }
+  }, [firebaseUser, selectedScenario])
+
   const triggerProactiveInterviewer = async () => {
     if (isLoadingInterviewer || showFeedback || showPostInterviewDiscussion) return
 
