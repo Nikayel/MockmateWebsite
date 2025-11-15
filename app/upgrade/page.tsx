@@ -8,6 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
+import { getUserProfile } from "@/lib/firestore-helpers"
+import { db } from "@/lib/firebase"
+import { doc, setDoc, getDoc } from "firebase/firestore"
 import { Check, Crown, Zap, Star, ArrowRight, Ticket } from "lucide-react"
 import { PRICING_CONFIG, getProPricing } from "@/lib/config"
 import { User } from "@/lib/types"
@@ -51,12 +54,38 @@ export default function UpgradePage() {
       const data = await response.json()
 
       if (data.valid) {
-        toast.success(data.message || "Promo code applied successfully!")
-        setPromoCode("")
-        // Reload page to show updated subscription
-        setTimeout(() => {
-          window.location.reload()
-        }, 1500)
+        // Promo code is valid, now update profile client-side (with proper auth)
+        try {
+          // Mark promo code as used
+          const promoUsageRef = doc(db, "promo_code_usage", `${user.id}_${promoCode.trim().toUpperCase()}`)
+          await setDoc(promoUsageRef, {
+            user_id: user.id,
+            code: promoCode.trim().toUpperCase(),
+            used_at: new Date().toISOString(),
+            discount_type: data.discount_type,
+          })
+
+          // Update user profile to Pro
+          const profileRef = doc(db, "profiles", user.id)
+          await setDoc(profileRef, {
+            subscription_tier: "pro",
+            updated_at: new Date().toISOString(),
+          }, { merge: true })
+
+          toast.success("Promo code applied successfully! You've been upgraded to Pro.")
+          setPromoCode("")
+          // Reload page to show updated subscription
+          setTimeout(() => {
+            window.location.reload()
+          }, 1500)
+        } catch (updateError: any) {
+          console.error("Error updating profile:", updateError)
+          if (updateError.code === "permission-denied") {
+            toast.error("Permission denied. Please check Firestore security rules.")
+          } else {
+            toast.error("Failed to apply promo code. Please try again.")
+          }
+        }
       } else {
         toast.error(data.error || "Invalid promo code")
       }

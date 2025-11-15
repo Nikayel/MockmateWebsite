@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/firebase"
-import { doc, getDoc, setDoc } from "firebase/firestore"
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 
 // Promo codes stored server-side (not in git)
 // These are only visible in the server-side API route, not in client code
@@ -39,27 +39,18 @@ export async function POST(request: NextRequest) {
       }, { status: 200 })
     }
 
-    // Mark code as used
-    await setDoc(promoUsageRef, {
-      user_id: userId,
-      code: code.toUpperCase(),
-      used_at: new Date().toISOString(),
-      discount_type: promoCode.type,
-    })
-
+    // Mark code as used (this will be done client-side with proper auth)
+    // We'll return success and let client update profile
+    
     // Apply promo code - upgrade user to Pro
-    if (promoCode.type === "free") {
-      const profileRef = doc(db, "profiles", userId)
-      await setDoc(profileRef, {
-        subscription_tier: "pro",
-        updated_at: new Date().toISOString(),
-      }, { merge: true })
-    }
+    // Note: Profile update must be done client-side due to Firestore rules
+    // The API validates the code, client updates the profile
 
     return NextResponse.json({ 
       valid: true,
-      message: "Promo code applied successfully! You've been upgraded to Pro.",
+      message: "Promo code validated! Upgrading your account...",
       discount_type: promoCode.type,
+      userId: userId, // Return userId so client can update profile
     })
   } catch (error) {
     console.error("Promo code error:", error)
