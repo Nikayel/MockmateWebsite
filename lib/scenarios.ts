@@ -43,6 +43,14 @@ export interface BugFixScenario extends BaseScenario {
   buggyCode: {
     [language: string]: string;
   };
+  // Optional multi-file codebase for more realistic scenarios
+  codebaseFiles?: {
+    [language: string]: {
+      fileName: string;
+      content: string;
+      description?: string;
+    }[];
+  };
   expectedBehavior: string;
   bugDescription: string;
   hints: string[];
@@ -1518,6 +1526,518 @@ async function handleSearch(query: string) {
       {
         input: 'Invalid userId (404 response)',
         expectedOutput: 'Throws/returns error without crashing',
+      },
+    ],
+  },
+  // ==================== COMPREHENSIVE MULTI-FILE BUG FIX SCENARIOS ====================
+  {
+    id: 'bugfix-react-state-race-condition',
+    title: 'Fix Race Condition in React Component',
+    type: 'bugfix',
+    difficulty: 'medium',
+    companies: ['Meta', 'Netflix', 'Airbnb'],
+    description: 'Debug a race condition in a React component with multiple async calls',
+    tags: ['react', 'async', 'race-condition', 'hooks'],
+    estimatedTime: 25,
+    problemStatement: `A user dashboard component is experiencing race conditions when fetching user data and preferences. Sometimes old data overwrites newer data. Debug and fix the issue across multiple files.`,
+    buggyCode: {
+      javascript: `// UserDashboard.jsx - Main component with race condition
+import React, { useState, useEffect } from 'react';
+import { fetchUserData } from './api/userApi';
+import { UserProfile } from './components/UserProfile';
+import { UserPreferences } from './components/UserPreferences';
+
+export function UserDashboard({ userId }) {
+  const [userData, setUserData] = useState(null);
+  const [preferences, setPreferences] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+
+    // BUG: Race condition - these async calls can complete in any order
+    fetchUserData(userId).then(data => {
+      setUserData(data);
+    });
+
+    fetchUserPreferences(userId).then(prefs => {
+      setPreferences(prefs);
+      setLoading(false);
+    });
+  }, [userId]);
+
+  if (loading) return <div>Loading...</div>;
+
+  return (
+    <div>
+      <UserProfile user={userData} />
+      <UserPreferences preferences={preferences} />
+    </div>
+  );
+}`,
+    },
+    codebaseFiles: {
+      javascript: [
+        {
+          fileName: 'api/userApi.js',
+          content: `// API functions for user data
+export async function fetchUserData(userId) {
+  const response = await fetch(\`/api/users/\${userId}\`);
+  // Simulated delay
+  await new Promise(resolve => setTimeout(resolve, Math.random() * 1000));
+  return response.json();
+}
+
+export async function fetchUserPreferences(userId) {
+  const response = await fetch(\`/api/users/\${userId}/preferences\`);
+  await new Promise(resolve => setTimeout(resolve, Math.random() * 500));
+  return response.json();
+}`,
+          description: 'API functions with variable latency causing race conditions',
+        },
+        {
+          fileName: 'components/UserProfile.jsx',
+          content: `// User profile display component
+import React from 'react';
+
+export function UserProfile({ user }) {
+  if (!user) return null;
+
+  return (
+    <div className="user-profile">
+      <h2>{user.name}</h2>
+      <p>Email: {user.email}</p>
+      <p>Joined: {user.joinedDate}</p>
+    </div>
+  );
+}`,
+          description: 'Component that displays user profile data',
+        },
+        {
+          fileName: 'components/UserPreferences.jsx',
+          content: `// User preferences display component
+import React from 'react';
+
+export function UserPreferences({ preferences }) {
+  if (!preferences) return null;
+
+  return (
+    <div className="user-preferences">
+      <h3>Preferences</h3>
+      <ul>
+        <li>Theme: {preferences.theme}</li>
+        <li>Notifications: {preferences.notifications ? 'On' : 'Off'}</li>
+        <li>Language: {preferences.language}</li>
+      </ul>
+    </div>
+  );
+}`,
+          description: 'Component that displays user preferences',
+        },
+      ],
+    },
+    expectedBehavior: 'Data should load correctly regardless of API response timing, and switching users should cancel previous requests',
+    bugDescription: 'Race condition in async data fetching - old data can overwrite new data when userId changes quickly',
+    hints: [
+      'Use Promise.all() to wait for all async operations',
+      'Implement cleanup in useEffect to handle component unmounting or userId changes',
+      'Consider using AbortController to cancel in-flight requests',
+      'Store userId in a ref to compare against when data arrives',
+    ],
+    testCases: [
+      {
+        input: 'Rapidly switch between different userIds',
+        expectedOutput: 'Only data for the current userId is displayed',
+      },
+      {
+        input: 'Load user with slow API response',
+        expectedOutput: 'Loading state until both API calls complete',
+      },
+    ],
+  },
+  {
+    id: 'bugfix-ecommerce-cart-memory-leak',
+    title: 'Fix Memory Leak in Shopping Cart',
+    type: 'bugfix',
+    difficulty: 'hard',
+    companies: ['Amazon', 'Shopify', 'Walmart'],
+    description: 'Find and fix memory leaks in an e-commerce shopping cart system',
+    tags: ['memory-leak', 'event-listeners', 'javascript', 'performance'],
+    estimatedTime: 30,
+    problemStatement: `An e-commerce shopping cart system has memory leaks causing the browser to slow down over time. Users report that after adding/removing items multiple times, the page becomes sluggish. Debug the cart system across multiple files.`,
+    buggyCode: {
+      javascript: `// ShoppingCart.js - Main cart manager with memory leaks
+class ShoppingCart {
+  constructor() {
+    this.items = [];
+    this.listeners = [];
+    this.itemElements = new Map();
+
+    // BUG: Event listener never removed
+    window.addEventListener('storage', this.syncWithLocalStorage.bind(this));
+
+    // BUG: Interval never cleared
+    this.priceUpdateInterval = setInterval(() => {
+      this.updatePrices();
+    }, 5000);
+  }
+
+  addItem(item) {
+    this.items.push(item);
+    this.renderItem(item);
+    this.saveToLocalStorage();
+    this.notifyListeners();
+  }
+
+  removeItem(itemId) {
+    this.items = this.items.filter(item => item.id !== itemId);
+    // BUG: Element not removed from Map, causing memory leak
+    const element = this.itemElements.get(itemId);
+    if (element) {
+      element.remove();
+    }
+    this.saveToLocalStorage();
+    this.notifyListeners();
+  }
+
+  renderItem(item) {
+    const element = document.createElement('div');
+    element.className = 'cart-item';
+    element.innerHTML = \`
+      <span>\${item.name}</span>
+      <span>$\${item.price}</span>
+      <button data-id="\${item.id}">Remove</button>
+    \`;
+
+    // BUG: Event listener added but never cleaned up
+    const removeBtn = element.querySelector('button');
+    removeBtn.addEventListener('click', () => {
+      this.removeItem(item.id);
+    });
+
+    this.itemElements.set(item.id, element);
+    document.getElementById('cart-items').appendChild(element);
+  }
+
+  subscribe(callback) {
+    this.listeners.push(callback);
+    // BUG: No unsubscribe function returned
+  }
+
+  notifyListeners() {
+    this.listeners.forEach(listener => listener(this.items));
+  }
+
+  syncWithLocalStorage(event) {
+    if (event.key === 'cart') {
+      this.items = JSON.parse(event.newValue || '[]');
+      this.renderAllItems();
+    }
+  }
+
+  saveToLocalStorage() {
+    localStorage.setItem('cart', JSON.stringify(this.items));
+  }
+
+  updatePrices() {
+    // Fetch latest prices from API
+    fetch('/api/prices')
+      .then(res => res.json())
+      .then(prices => {
+        this.items.forEach(item => {
+          if (prices[item.id]) {
+            item.price = prices[item.id];
+          }
+        });
+        this.renderAllItems();
+      });
+  }
+
+  renderAllItems() {
+    document.getElementById('cart-items').innerHTML = '';
+    // BUG: Old elements not properly cleaned from Map
+    this.items.forEach(item => this.renderItem(item));
+  }
+}`,
+    },
+    codebaseFiles: {
+      javascript: [
+        {
+          fileName: 'CartUI.js',
+          content: `// Cart UI component
+export class CartUI {
+  constructor(cart) {
+    this.cart = cart;
+    this.updateCartCount();
+
+    // Subscribe to cart changes
+    cart.subscribe((items) => {
+      this.updateCartCount();
+      this.updateTotalPrice(items);
+    });
+  }
+
+  updateCartCount() {
+    const badge = document.getElementById('cart-count');
+    if (badge) {
+      badge.textContent = this.cart.items.length;
+    }
+  }
+
+  updateTotalPrice(items) {
+    const total = items.reduce((sum, item) => sum + item.price, 0);
+    const totalElement = document.getElementById('cart-total');
+    if (totalElement) {
+      totalElement.textContent = \`$\${total.toFixed(2)}\`;
+    }
+  }
+}`,
+          description: 'UI component that subscribes to cart changes',
+        },
+        {
+          fileName: 'ProductPage.js',
+          content: `// Product page that creates cart instances
+export class ProductPage {
+  constructor() {
+    this.currentCart = null;
+  }
+
+  init() {
+    // BUG: Creates new cart instance without cleaning up old one
+    this.currentCart = new ShoppingCart();
+    new CartUI(this.currentCart);
+
+    this.attachEventListeners();
+  }
+
+  attachEventListeners() {
+    document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const product = this.getProductFromElement(e.target);
+        this.currentCart.addItem(product);
+      });
+    });
+  }
+
+  getProductFromElement(element) {
+    const card = element.closest('.product-card');
+    return {
+      id: card.dataset.productId,
+      name: card.querySelector('.product-name').textContent,
+      price: parseFloat(card.querySelector('.product-price').textContent),
+    };
+  }
+
+  destroy() {
+    // BUG: No cleanup of cart or event listeners
+  }
+}`,
+          description: 'Product page that instantiates shopping cart',
+        },
+      ],
+    },
+    expectedBehavior: 'Cart should properly clean up event listeners, intervals, and DOM references when items are removed or cart is destroyed',
+    bugDescription: 'Multiple memory leaks: unreleased event listeners, uncanceled intervals, orphaned DOM references in Map, and missing unsubscribe functionality',
+    hints: [
+      'Add a destroy() method to ShoppingCart that cleans up intervals and event listeners',
+      'Return an unsubscribe function from the subscribe() method',
+      'Clear itemElements Map entries when removing items',
+      'Use AbortController or event listener removal in ProductPage',
+      'Consider using WeakMap for element references',
+    ],
+    testCases: [
+      {
+        input: 'Add and remove 100 items repeatedly',
+        expectedOutput: 'Memory usage stays relatively constant',
+      },
+      {
+        input: 'Navigate away from page',
+        expectedOutput: 'All intervals and event listeners are cleaned up',
+      },
+    ],
+  },
+  {
+    id: 'bugfix-api-service-error-handling',
+    title: 'Fix Error Handling in Microservice API',
+    type: 'bugfix',
+    difficulty: 'medium',
+    companies: ['Google', 'Amazon', 'Microsoft'],
+    description: 'Debug error handling issues in a Node.js microservice API',
+    tags: ['node.js', 'api', 'error-handling', 'async'],
+    estimatedTime: 25,
+    problemStatement: `A microservice API has poor error handling causing crashes and inconsistent error responses. Fix the error handling across the service layer, controller, and middleware.`,
+    buggyCode: {
+      javascript: `// userController.js - Controller with poor error handling
+const UserService = require('./services/UserService');
+
+class UserController {
+  async getUser(req, res) {
+    const { userId } = req.params;
+
+    // BUG: No try-catch, unhandled promise rejection
+    const user = await UserService.getUserById(userId);
+
+    if (!user) {
+      // BUG: Inconsistent error response format
+      res.status(404).send('User not found');
+      return;
+    }
+
+    res.json(user);
+  }
+
+  async createUser(req, res) {
+    const userData = req.body;
+
+    // BUG: Validation errors not caught
+    const newUser = await UserService.createUser(userData);
+
+    // BUG: Success but no status code set
+    res.json(newUser);
+  }
+
+  async updateUser(req, res) {
+    const { userId } = req.params;
+    const updates = req.body;
+
+    try {
+      const updatedUser = await UserService.updateUser(userId, updates);
+      res.json(updatedUser);
+    } catch (error) {
+      // BUG: Generic error handling, loses error details
+      res.status(500).json({ error: 'Something went wrong' });
+    }
+  }
+
+  async deleteUser(req, res) {
+    const { userId } = req.params;
+
+    await UserService.deleteUser(userId);
+
+    // BUG: No status code, no error handling
+    res.send();
+  }
+}
+
+module.exports = new UserController();`,
+    },
+    codebaseFiles: {
+      javascript: [
+        {
+          fileName: 'services/UserService.js',
+          content: `// UserService.js - Service layer with various error conditions
+const db = require('../database');
+
+class UserService {
+  async getUserById(userId) {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+
+    // BUG: Database errors not wrapped properly
+    const user = await db.query('SELECT * FROM users WHERE id = $1', [userId]);
+    return user.rows[0];
+  }
+
+  async createUser(userData) {
+    // BUG: No validation
+    if (!userData.email) {
+      throw new Error('Email required');
+    }
+
+    // BUG: Duplicate email error not handled specially
+    const result = await db.query(
+      'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *',
+      [userData.name, userData.email]
+    );
+
+    return result.rows[0];
+  }
+
+  async updateUser(userId, updates) {
+    const user = await this.getUserById(userId);
+
+    if (!user) {
+      // BUG: Throws generic Error instead of specific NotFoundError
+      throw new Error('User not found');
+    }
+
+    const result = await db.query(
+      'UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING *',
+      [updates.name, updates.email, userId]
+    );
+
+    return result.rows[0];
+  }
+
+  async deleteUser(userId) {
+    // BUG: No check if user exists
+    await db.query('DELETE FROM users WHERE id = $1', [userId]);
+    return true;
+  }
+}
+
+module.exports = new UserService();`,
+          description: 'Service layer with database operations and validation',
+        },
+        {
+          fileName: 'middleware/errorHandler.js',
+          content: `// errorHandler.js - Incomplete error handling middleware
+function errorHandler(err, req, res, next) {
+  console.error(err);
+
+  // BUG: All errors get 500 status
+  res.status(500).json({
+    error: err.message
+  });
+
+  // BUG: Sensitive error details exposed in production
+  // BUG: No error type differentiation
+  // BUG: No logging to error tracking service
+}
+
+module.exports = errorHandler;`,
+          description: 'Express error handling middleware',
+        },
+        {
+          fileName: 'routes/userRoutes.js',
+          content: `// userRoutes.js - Route definitions
+const express = require('express');
+const router = express.Router();
+const UserController = require('../controllers/userController');
+
+router.get('/users/:userId', UserController.getUser);
+router.post('/users', UserController.createUser);
+router.put('/users/:userId', UserController.updateUser);
+router.delete('/users/:userId', UserController.deleteUser);
+
+module.exports = router;`,
+          description: 'Express route definitions',
+        },
+      ],
+    },
+    expectedBehavior: 'All errors should be properly caught, logged, and returned with appropriate status codes and consistent error response format',
+    bugDescription: 'Multiple error handling issues: unhandled promise rejections, inconsistent error responses, missing status codes, poor error differentiation, and security issues',
+    hints: [
+      'Wrap all async controller methods in try-catch or use async error handling middleware',
+      'Create custom error classes (NotFoundError, ValidationError, etc.)',
+      'Implement consistent error response format across all endpoints',
+      'Add proper HTTP status codes for different error types',
+      'Improve errorHandler middleware to differentiate error types',
+      'Don\'t expose sensitive error details in production',
+    ],
+    testCases: [
+      {
+        input: 'Request non-existent user',
+        expectedOutput: '404 status with consistent error format',
+      },
+      {
+        input: 'Create user with duplicate email',
+        expectedOutput: '409 Conflict with appropriate error message',
+      },
+      {
+        input: 'Database connection failure',
+        expectedOutput: '500 error without exposing internal details',
       },
     ],
   },
