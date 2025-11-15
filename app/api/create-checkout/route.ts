@@ -52,19 +52,33 @@ export async function POST(request: NextRequest) {
           limit: 1,
         })
 
-        if (promotionCodes.data.length > 0 && promotionCodes.data[0].active) {
+        console.log(`Looking for promotion code: ${promoCode.toUpperCase()}`)
+        console.log(`Found ${promotionCodes.data.length} promotion codes`)
+
+        if (promotionCodes.data.length > 0) {
           const promotionCodeObj = promotionCodes.data[0]
-          sessionParams.discounts = [
-            {
-              coupon: promotionCodeObj.coupon.id,
-            },
-          ]
+          console.log(`Promotion code status: active=${promotionCodeObj.active}, coupon=${promotionCodeObj.coupon.id}`)
+          
+          if (promotionCodeObj.active) {
+            sessionParams.discounts = [
+              {
+                coupon: promotionCodeObj.coupon.id,
+              },
+            ]
+            console.log(`Pre-applied promotion code: ${promoCode.toUpperCase()}`)
+          } else {
+            console.warn(`Promotion code ${promoCode} exists but is not active`)
+          }
         } else {
           // If promotion code not found, still allow checkout but Stripe will handle validation
-          console.warn(`Promotion code ${promoCode} not found, allowing user to enter in Stripe UI`)
+          console.warn(`Promotion code ${promoCode} not found in Stripe. Make sure:`)
+          console.warn(`1. Code is created in ${process.env.STRIPE_SECRET_KEY?.startsWith('sk_live') ? 'LIVE' : 'TEST'} mode`)
+          console.warn(`2. Code is exactly: ${promoCode.toUpperCase()}`)
+          console.warn(`3. Code is active and not expired`)
         }
-      } catch (promoError) {
+      } catch (promoError: any) {
         console.error("Error looking up promotion code:", promoError)
+        console.error("Error details:", promoError.message)
         // Continue without pre-applying - user can enter code in Stripe UI
       }
     }
