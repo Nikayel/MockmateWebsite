@@ -1,4 +1,8 @@
-# Firestore Security Rules
+# Firestore Security Rules (RLS)
+
+**Yes, you need Row-Level Security (RLS) in Firebase!** Firestore security rules are essential for protecting user data.
+
+Firebase uses security rules (not RLS like PostgreSQL, but similar concept) to enforce access control at the database level. These rules are **required** and must be configured in the Firebase Console.
 
 Copy and paste these rules into Firebase Console → Firestore Database → Rules
 
