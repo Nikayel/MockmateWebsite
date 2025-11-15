@@ -140,13 +140,17 @@ export default function InterviewPage() {
     return () => clearInterval(interval)
   }, [isInterviewStarted, showFeedback, startTime])
 
-  // Auto-scroll chat
+  // Auto-scroll chat - scroll only within container, not the whole page
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" })
+    }
   }, [chatMessages])
 
   useEffect(() => {
-    interviewerEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (interviewerEndRef.current) {
+      interviewerEndRef.current.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" })
+    }
   }, [interviewerMessages])
 
   // Update code when language changes during interview
@@ -310,21 +314,20 @@ export default function InterviewPage() {
 }`
     setCode(starterCode)
 
-    // Initialize interviewer with problem statement
-    const initialMessage = `Hello! Today we'll be working on **${selectedScenario.title}**.
+    // Initialize interviewer with welcome message (problem details are now in left panel)
+    const initialMessage = `Hello! I'm your interviewer today. We'll be working on **${selectedScenario.title}** - a ${selectedScenario.difficulty} ${selectedScenario.type.toUpperCase()} problem.
 
-${selectedScenario.problemStatement}
+I can see you're reviewing the problem description on the left. Take a moment to understand it, then feel free to:
+- Ask me clarifying questions about the requirements
+- Discuss your approach before coding
+- Ask for hints if you get stuck
 
-${selectedScenario.examples.length > 0 ? `\n**Examples:**\n${selectedScenario.examples.map((ex, i) => `\nExample ${i + 1}:\nInput: ${ex.input}\nOutput: ${ex.output}${ex.explanation ? `\nExplanation: ${ex.explanation}` : ""}`).join("\n")}` : ""}
-
-${selectedScenario.constraints.length > 0 ? `\n**Constraints:**\n${selectedScenario.constraints.map(c => `- ${c}`).join("\n")}` : ""}
-
-Take a moment to think about your approach, then feel free to ask me any clarifying questions!`
+Let's have a great interview! How would you like to approach this problem?`
 
     setInterviewerMessages([{ type: "ai", message: initialMessage }])
     setChatMessages([{
       type: "ai",
-      message: `Hi! I'm your AI coding partner. I can help you with ${selectedScenario.title}. Ask me anything about algorithms, hints, or debugging!`,
+      message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${selectedScenario.title}. Just ask!`,
     }])
   }
 
@@ -747,39 +750,27 @@ Take a moment to think about your approach, then feel free to ask me any clarify
 
       {/* Interview Interface */}
       {!showScenarioBrowser && (
-        <section className="pt-24 pb-4 bg-gradient-to-b from-gray-900 to-black min-h-screen flex flex-col">
+        <section className="pt-20 pb-2 bg-gradient-to-b from-gray-900 to-black h-screen flex flex-col overflow-hidden">
           <div className="container mx-auto px-4 flex-1 flex flex-col overflow-hidden">
-            <div className="max-w-[1920px] mx-auto flex-1 flex flex-col gap-4">
-              {/* Workspace Context Upload - Top Bar */}
-              <div className="flex items-center justify-between flex-shrink-0 mb-2">
-                <div className="flex items-center space-x-4">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    accept=".js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.h,.json,.md,.txt,text/*"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                  <Button
-                    onClick={() => fileInputRef.current?.click()}
-                    variant="outline"
-                    className="border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent"
-                    size="sm"
-                  >
-                    <Code className="mr-2 h-4 w-4" />
-                    Upload Codebase Files
-                  </Button>
-                  {workspaceContext.length > 0 && (
-                    <Badge className="bg-green-600/20 text-green-400 border-green-600/30">
-                      {workspaceContext.length} file{workspaceContext.length !== 1 ? "s" : ""} loaded
-                    </Badge>
-                  )}
+            <div className="max-w-[1920px] mx-auto flex-1 flex flex-col gap-2 overflow-hidden">
+              {/* Compact Top Bar */}
+              <div className="flex items-center justify-between flex-shrink-0">
+                <div className="flex items-center space-x-3">
+                  <h2 className="text-white text-sm font-semibold truncate max-w-md">
+                    {selectedScenario?.title}
+                  </h2>
+                  <Badge className={`${
+                    selectedScenario?.difficulty === "easy" ? "bg-green-600/20 text-green-400" :
+                    selectedScenario?.difficulty === "medium" ? "bg-yellow-600/20 text-yellow-400" :
+                    "bg-red-600/20 text-red-400"
+                  } text-xs`}>
+                    {selectedScenario?.difficulty?.toUpperCase()}
+                  </Badge>
                   {/* Language Selector */}
                   <select
                     value={selectedLanguage}
                     onChange={(e) => setSelectedLanguage(e.target.value as typeof selectedLanguage)}
-                    className="bg-gray-800 border border-gray-600 text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5733]"
+                    className="bg-gray-800 border border-gray-600 text-white rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#ff5733]"
                   >
                     <option value="javascript">JavaScript</option>
                     <option value="typescript">TypeScript</option>
@@ -791,37 +782,126 @@ Take a moment to think about your approach, then feel free to ask me any clarify
                     <option value="rust">Rust</option>
                   </select>
                 </div>
-                {isInterviewStarted && (
-                  <div className="flex items-center space-x-2 text-white bg-gray-800 px-4 py-2 rounded-lg">
-                    <Clock className="h-4 w-4 text-[#ff5733]" />
-                    <span className="text-lg font-mono">{formatTime(elapsedTime)}</span>
-                  </div>
-                )}
+                <div className="flex items-center space-x-3">
+                  {isInterviewStarted && (
+                    <div className="flex items-center space-x-2 text-white bg-gray-800 px-3 py-1 rounded-lg">
+                      <Clock className="h-3 w-3 text-[#ff5733]" />
+                      <span className="text-sm font-mono">{formatTime(elapsedTime)}</span>
+                    </div>
+                  )}
+                  <Button
+                    onClick={resetInterview}
+                    variant="outline"
+                    size="sm"
+                    className="border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent h-7 text-xs"
+                  >
+                    <RotateCcw className="mr-1 h-3 w-3" />
+                    Reset
+                  </Button>
+                </div>
               </div>
 
-              {/* Main Interface - Code Editor with Partner + Interviewer */}
+              {/* Main Interface - Three Column Layout */}
               {!showFeedback ? (
-                <div className="grid grid-cols-12 gap-4 flex-1 min-h-0">
-                  {/* Left: Code Editor with Coding Partner at Bottom */}
-                  <div className="col-span-12 lg:col-span-7 flex flex-col min-h-0">
-                    <Card className="bg-gray-900/50 border-gray-700 glass-effect interview-card flex flex-col h-full">
-                      <CardHeader className="pb-3 flex-shrink-0">
-                        <CardTitle className="text-white flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <Code className="h-5 w-5 text-[#ff5733]" />
-                            <span>{selectedScenario?.title.toLowerCase().replace(/\s+/g, "-")}.{selectedLanguage === "javascript" ? "js" : selectedLanguage === "typescript" ? "ts" : "py"}</span>
+                <div className="grid grid-cols-12 gap-2 flex-1 min-h-0 overflow-hidden">
+                  {/* Left: Problem Description / File Upload */}
+                  <div className="col-span-12 lg:col-span-3 flex flex-col min-h-0">
+                    <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden">
+                      <CardHeader className="pb-2 flex-shrink-0">
+                        <CardTitle className="text-white flex items-center space-x-2 text-sm">
+                          <Target className="h-4 w-4 text-[#ff5733]" />
+                          <span>Problem</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex-1 min-h-0 overflow-y-auto text-xs space-y-3">
+                        {selectedScenario && (
+                          <>
+                            <div>
+                              <h3 className="text-white font-semibold mb-1">Description</h3>
+                              <p className="text-gray-300 leading-relaxed">{selectedScenario.problemStatement}</p>
+                            </div>
+
+                            {selectedScenario.type === 'dsa' && selectedScenario.examples && selectedScenario.examples.length > 0 && (
+                              <div>
+                                <h3 className="text-white font-semibold mb-1">Examples</h3>
+                                <div className="space-y-2">
+                                  {selectedScenario.examples.slice(0, 2).map((ex, i) => (
+                                    <div key={i} className="bg-gray-800/50 p-2 rounded text-xs">
+                                      <div className="text-gray-400">Input: <span className="text-green-400">{ex.input}</span></div>
+                                      <div className="text-gray-400">Output: <span className="text-blue-400">{ex.output}</span></div>
+                                      {ex.explanation && <div className="text-gray-500 mt-1 text-xs">{ex.explanation}</div>}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {selectedScenario.type === 'dsa' && selectedScenario.constraints && selectedScenario.constraints.length > 0 && (
+                              <div>
+                                <h3 className="text-white font-semibold mb-1">Constraints</h3>
+                                <ul className="text-gray-300 space-y-1 list-disc list-inside">
+                                  {selectedScenario.constraints.slice(0, 3).map((c, i) => (
+                                    <li key={i} className="text-xs">{c}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* Upload Codebase Section */}
+                        <div className="border-t border-gray-700 pt-3 mt-3">
+                          <h3 className="text-white font-semibold mb-2">Workspace Files</h3>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            multiple
+                            accept=".js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.h,.json,.md,.txt,text/*"
+                            onChange={handleFileUpload}
+                            className="hidden"
+                          />
+                          <Button
+                            onClick={() => fileInputRef.current?.click()}
+                            variant="outline"
+                            className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent text-xs h-7"
+                          >
+                            <Code className="mr-1 h-3 w-3" />
+                            Upload Files
+                          </Button>
+                          {workspaceContext.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {workspaceContext.map((file, idx) => (
+                                <div key={idx} className="text-xs text-gray-400 truncate bg-gray-800/30 px-2 py-1 rounded">
+                                  {file.path}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Center: Code Editor with Partner at Bottom */}
+                  <div className="col-span-12 lg:col-span-5 flex flex-col min-h-0 overflow-hidden">
+                    <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden">
+                      <CardHeader className="pb-2 flex-shrink-0">
+                        <CardTitle className="text-white flex items-center justify-between text-xs">
+                          <div className="flex items-center space-x-1">
+                            <Code className="h-3 w-3 text-[#ff5733]" />
+                            <span>{selectedScenario?.title.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}.{selectedLanguage === "javascript" ? "js" : selectedLanguage === "typescript" ? "ts" : "py"}</span>
                           </div>
                           {isInterviewStarted && (
-                            <div className="flex items-center space-x-2">
-                              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                              <span className="text-green-400 text-sm">LIVE</span>
+                            <div className="flex items-center space-x-1">
+                              <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                              <span className="text-green-400 text-xs">LIVE</span>
                             </div>
                           )}
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="flex flex-col flex-1 min-h-0 gap-3">
+                      <CardContent className="flex flex-col flex-1 min-h-0 gap-2 p-3">
                         {/* Code Editor */}
-                        <div className="flex-1 border border-gray-700 rounded-lg overflow-hidden min-h-0" style={{ minHeight: '300px' }}>
+                        <div className="flex-1 border border-gray-700 rounded-lg overflow-hidden min-h-0" style={{ height: '45%' }}>
                           <Editor
                             height="100%"
                             language={selectedLanguage}
@@ -830,7 +910,7 @@ Take a moment to think about your approach, then feel free to ask me any clarify
                             theme="vs-dark"
                             options={{
                               minimap: { enabled: false },
-                              fontSize: 14,
+                              fontSize: 13,
                               lineNumbers: "on",
                               scrollBeyondLastLine: false,
                               automaticLayout: true,
@@ -840,163 +920,97 @@ Take a moment to think about your approach, then feel free to ask me any clarify
                           />
                         </div>
 
-                        {/* Test Results */}
+                        {/* Test Results & Efficiency - Compact */}
                         {testResults.length > 0 && (
-                          <div className="space-y-2 flex-shrink-0">
-                            <div className="flex items-center justify-between">
-                              <h3 className="text-white font-semibold text-sm">Test Results</h3>
-                              <Badge
-                                className={
-                                  testSummary.passRate === 100
-                                    ? "bg-green-600"
-                                    : testSummary.passRate >= 60
-                                      ? "bg-yellow-600"
-                                      : "bg-red-600"
-                                }
-                              >
-                                {testSummary.passed}/{testSummary.total} ({testSummary.passRate}%)
-                              </Badge>
-                            </div>
-                            <div className="space-y-1 max-h-20 overflow-y-auto">
-                              {testResults.map((result, index) => (
-                                <div
-                                  key={index}
-                                  className={`p-2 rounded text-xs ${
-                                    result.passed ? "bg-green-900/30 text-green-300" : "bg-red-900/30 text-red-300"
-                                  }`}
+                          <div className="flex-shrink-0 bg-gray-800/30 p-2 rounded border border-gray-700" style={{ maxHeight: '15%' }}>
+                            <div className="flex items-center justify-between mb-1">
+                              <h3 className="text-white font-semibold text-xs">Results</h3>
+                              <div className="flex items-center space-x-2">
+                                <Badge
+                                  className={`${
+                                    testSummary.passRate === 100 ? "bg-green-600" :
+                                    testSummary.passRate >= 60 ? "bg-yellow-600" : "bg-red-600"
+                                  } text-xs h-4`}
                                 >
-                                  <div className="flex items-center space-x-2">
-                                    {result.passed ? (
-                                      <CheckCircle className="h-3 w-3" />
-                                    ) : (
-                                      <XCircle className="h-3 w-3" />
-                                    )}
-                                    <span className="truncate">{result.description}</span>
-                                  </div>
-                                  {!result.passed && result.error && (
-                                    <div className="ml-5 text-xs mt-1 opacity-80 truncate">{result.error}</div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-
-                            {/* Code Efficiency Metrics */}
-                            {efficiencyMetrics && (
-                              <div className="mt-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                                <div className="flex items-center justify-between mb-2">
-                                  <h4 className="text-white font-semibold text-sm flex items-center">
-                                    <TrendingUp className="h-4 w-4 mr-1 text-[#ff5733]" />
-                                    Code Efficiency
-                                  </h4>
-                                  <Badge
-                                    className={
-                                      efficiencyMetrics.efficiencyScore >= 80
-                                        ? "bg-green-600"
-                                        : efficiencyMetrics.efficiencyScore >= 60
-                                          ? "bg-yellow-600"
-                                          : "bg-red-600"
-                                    }
-                                  >
-                                    {efficiencyMetrics.efficiencyScore}/100
+                                  {testSummary.passed}/{testSummary.total}
+                                </Badge>
+                                {efficiencyMetrics && (
+                                  <Badge className={`${
+                                    efficiencyMetrics.efficiencyScore >= 80 ? "bg-green-600" :
+                                    efficiencyMetrics.efficiencyScore >= 60 ? "bg-yellow-600" : "bg-red-600"
+                                  } text-xs h-4`}>
+                                    Eff: {efficiencyMetrics.efficiencyScore}
                                   </Badge>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2 text-xs">
-                                  <div className="text-gray-300">
-                                    <span className="text-gray-400">Lines:</span> {efficiencyMetrics.linesOfCode}
-                                  </div>
-                                  <div className="text-gray-300">
-                                    <span className="text-gray-400">Complexity:</span> {efficiencyMetrics.complexity}
-                                  </div>
-                                  <div className="text-gray-300">
-                                    <span className="text-gray-400">Time:</span>{" "}
-                                    <span className={efficiencyMetrics.estimatedTimeComplexity === efficiencyMetrics.optimalTimeComplexity ? "text-green-400" : "text-yellow-400"}>
-                                      {efficiencyMetrics.estimatedTimeComplexity}
-                                    </span>
-                                    {efficiencyMetrics.optimalTimeComplexity !== "N/A" && (
-                                      <span className="text-gray-500"> (optimal: {efficiencyMetrics.optimalTimeComplexity})</span>
-                                    )}
-                                  </div>
-                                  <div className="text-gray-300">
-                                    <span className="text-gray-400">Space:</span>{" "}
-                                    <span className={efficiencyMetrics.estimatedSpaceComplexity === efficiencyMetrics.optimalSpaceComplexity ? "text-green-400" : "text-yellow-400"}>
-                                      {efficiencyMetrics.estimatedSpaceComplexity}
-                                    </span>
-                                    {efficiencyMetrics.optimalSpaceComplexity !== "N/A" && (
-                                      <span className="text-gray-500"> (optimal: {efficiencyMetrics.optimalSpaceComplexity})</span>
-                                    )}
-                                  </div>
-                                </div>
+                                )}
                               </div>
-                            )}
+                            </div>
+                            <div className="flex gap-1 text-xs text-gray-400">
+                              {efficiencyMetrics && (
+                                <>
+                                  <span>Time: <span className="text-white">{efficiencyMetrics.estimatedTimeComplexity}</span></span>
+                                  <span className="mx-1">•</span>
+                                  <span>Space: <span className="text-white">{efficiencyMetrics.estimatedSpaceComplexity}</span></span>
+                                </>
+                              )}
+                            </div>
                           </div>
                         )}
 
                         {/* Controls */}
-                        <div className="flex items-center justify-between gap-2 flex-shrink-0 pt-2 border-t border-gray-700">
-                          <Button
-                            onClick={resetInterview}
-                            variant="outline"
-                            size="sm"
-                            className="border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent"
-                          >
-                            <RotateCcw className="mr-2 h-4 w-4" />
-                            Reset
-                          </Button>
+                        <div className="flex items-center justify-end gap-2 flex-shrink-0">
                           <Button
                             onClick={runCode}
                             disabled={isRunningTests || showFeedback}
-                            className="bg-green-600 hover:bg-green-700 text-white"
-                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white text-xs h-7"
                           >
-                            <PlayCircle className="mr-2 h-4 w-4" />
+                            <PlayCircle className="mr-1 h-3 w-3" />
                             {isRunningTests ? "Running..." : "Run Tests"}
                           </Button>
                         </div>
 
-                        {/* AI Coding Partner - Integrated at Bottom */}
-                        <div className="flex-shrink-0 border-t border-gray-700 pt-3">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <Lightbulb className="h-4 w-4 text-[#ff5733]" />
-                            <span className="text-white text-sm font-medium">AI Coding Partner</span>
+                        {/* AI Coding Partner - Fixed Height */}
+                        <div className="flex flex-col border-t border-gray-700 pt-2" style={{ height: '35%' }}>
+                          <div className="flex items-center space-x-1 mb-1 flex-shrink-0">
+                            <Lightbulb className="h-3 w-3 text-[#ff5733]" />
+                            <span className="text-white text-xs font-medium">AI Partner</span>
                           </div>
-                          <div className="h-32 overflow-y-auto space-y-2 mb-2 p-2 bg-gray-800/30 rounded-lg">
+                          <div className="flex-1 overflow-y-auto space-y-1 mb-2 p-2 bg-gray-800/30 rounded min-h-0">
                             {chatMessages.map((msg, index) => (
-                              <div key={index} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"} chat-message`}>
+                              <div key={index} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
                                 <div
-                                  className={`max-w-[80%] p-2 rounded-lg ${
+                                  className={`max-w-[85%] p-1.5 rounded text-xs ${
                                     msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-100"
                                   }`}
                                 >
-                                  <div className="flex items-center space-x-1 mb-1">
+                                  <div className="flex items-center space-x-1 mb-0.5">
                                     {msg.type === "user" ? (
-                                      <User className="h-3 w-3" />
+                                      <User className="h-2.5 w-2.5" />
                                     ) : (
-                                      <Bot className="h-3 w-3 text-[#ff5733]" />
+                                      <Bot className="h-2.5 w-2.5 text-[#ff5733]" />
                                     )}
                                     <span className="text-xs opacity-75">{msg.type === "user" ? "You" : "Partner"}</span>
                                   </div>
-                                  <p className="text-xs">{msg.message}</p>
+                                  <p className="text-xs leading-tight">{msg.message}</p>
                                 </div>
                               </div>
                             ))}
                             <div ref={chatEndRef} />
                           </div>
-                          <div className="flex space-x-2">
+                          <div className="flex space-x-1 flex-shrink-0">
                             <Input
                               value={chatInput}
                               onChange={(e) => setChatInput(e.target.value)}
-                              placeholder="Ask for help with algorithms, debugging, or hints..."
-                              className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-sm"
+                              placeholder="Ask for help..."
+                              className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-xs h-7"
                               onKeyPress={(e) => e.key === "Enter" && !isLoadingChat && handleSendMessage(false)}
                               disabled={isLoadingChat}
                             />
                             <Button
                               onClick={() => handleSendMessage(false)}
-                              className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
-                              size="sm"
+                              className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white h-7 px-2"
                               disabled={isLoadingChat}
                             >
-                              <Send className="h-4 w-4" />
+                              <Send className="h-3 w-3" />
                             </Button>
                           </div>
                         </div>
@@ -1004,45 +1018,45 @@ Take a moment to think about your approach, then feel free to ask me any clarify
                     </Card>
                   </div>
 
-                  {/* Right: AI Interviewer Panel */}
-                  <div className="col-span-12 lg:col-span-5 flex flex-col min-h-0">
-                    <Card className="bg-gray-900/50 border-gray-700 glass-effect h-full flex flex-col">
-                      <CardHeader className="pb-3 flex-shrink-0">
-                        <CardTitle className="text-white flex items-center space-x-2">
-                          <Bot className="h-5 w-5 text-[#ff5733]" />
+                  {/* Right: AI Interviewer Panel - Fixed Height */}
+                  <div className="col-span-12 lg:col-span-4 flex flex-col min-h-0 overflow-hidden">
+                    <Card className="bg-gray-900/50 border-gray-700 glass-effect h-full flex flex-col overflow-hidden">
+                      <CardHeader className="pb-2 flex-shrink-0">
+                        <CardTitle className="text-white flex items-center space-x-2 text-sm">
+                          <Bot className="h-4 w-4 text-[#ff5733]" />
                           <span>AI Interviewer</span>
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="flex flex-col flex-1 min-h-0">
-                        <div className="flex-1 overflow-y-auto space-y-3 mb-3 min-h-0">
+                      <CardContent className="flex flex-col flex-1 min-h-0 overflow-hidden p-3">
+                        <div className="flex-1 overflow-y-auto space-y-2 mb-2 min-h-0 pr-2">
                           {interviewerMessages.length === 0 ? (
-                            <div className="text-center py-16 text-gray-400">
-                              <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                              <p className="text-sm">Interview will begin when you click start...</p>
+                            <div className="text-center py-8 text-gray-400">
+                              <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                              <p className="text-xs">Interview will begin when you start...</p>
                             </div>
                           ) : (
                             <>
                               {interviewerMessages.map((msg, index) => (
                                 <div
                                   key={index}
-                                  className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"} chat-message`}
+                                  className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
                                 >
                                   <div
-                                    className={`max-w-[85%] p-3 rounded-lg ${
+                                    className={`max-w-[90%] p-2 rounded-lg ${
                                       msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-100"
                                     }`}
                                   >
-                                    <div className="flex items-center space-x-2 mb-1">
+                                    <div className="flex items-center space-x-1 mb-1">
                                       {msg.type === "user" ? (
-                                        <User className="h-4 w-4" />
+                                        <User className="h-3 w-3" />
                                       ) : (
-                                        <Bot className="h-4 w-4 text-[#ff5733]" />
+                                        <Bot className="h-3 w-3 text-[#ff5733]" />
                                       )}
-                                      <span className="text-sm opacity-75">
-                                        {msg.type === "user" ? "You" : "AI Interviewer"}
+                                      <span className="text-xs opacity-75">
+                                        {msg.type === "user" ? "You" : "Interviewer"}
                                       </span>
                                     </div>
-                                    <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                                    <p className="text-xs whitespace-pre-wrap leading-relaxed">{msg.message}</p>
                                   </div>
                                 </div>
                               ))}
@@ -1051,21 +1065,21 @@ Take a moment to think about your approach, then feel free to ask me any clarify
                           )}
                         </div>
                         {isInterviewStarted && (
-                          <div className="flex space-x-2 flex-shrink-0">
+                          <div className="flex space-x-1 flex-shrink-0 border-t border-gray-700 pt-2">
                             <Input
                               value={interviewerInput}
                               onChange={(e) => setInterviewerInput(e.target.value)}
-                              placeholder="Ask the interviewer a question..."
-                              className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                              placeholder="Ask a question..."
+                              className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-xs h-7"
                               onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
                               disabled={isLoadingInterviewer}
                             />
                             <Button
                               onClick={() => handleSendMessage(true)}
-                              className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
+                              className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white h-7 px-2"
                               disabled={isLoadingInterviewer}
                             >
-                              <Send className="h-4 w-4" />
+                              <Send className="h-3 w-3" />
                             </Button>
                           </div>
                         )}
