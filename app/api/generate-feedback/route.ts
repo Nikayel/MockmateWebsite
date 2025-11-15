@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
+const genAI = process.env.GEMINI_API_KEY 
+  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) 
+  : null
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,6 +11,17 @@ export async function POST(request: NextRequest) {
 
     if (!code || !scenarioTitle) {
       return NextResponse.json({ error: "Code and scenario title are required" }, { status: 400 })
+    }
+
+    if (!genAI || !process.env.GEMINI_API_KEY) {
+      console.error("GEMINI_API_KEY is not configured")
+      return NextResponse.json(
+        { 
+          error: "Feedback generation is temporarily unavailable. Please check API configuration.",
+          feedback: `## Feedback for ${scenarioTitle}\n\nFeedback generation service is currently unavailable. Your solution has been submitted successfully.`
+        },
+        { status: 503 }
+      )
     }
 
     const model = genAI.getGenerativeModel({
