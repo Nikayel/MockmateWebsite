@@ -43,16 +43,12 @@ export default function AuthCallback() {
           if (savedRedirect) {
             localStorage.removeItem("auth_redirect")
             // Auto-redirect immediately for frictionless flow
-            setTimeout(() => {
-              router.push(`/${savedRedirect}`)
-            }, 500)
+            router.push(`/${savedRedirect}`)
             return
           }
 
           // Default redirect to dashboard for new users
-          setTimeout(() => {
-            router.push("/dashboard")
-          }, 500)
+          router.push("/dashboard")
         } else {
           setStatus("error")
         }
