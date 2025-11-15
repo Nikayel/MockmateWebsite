@@ -641,11 +641,11 @@ Take a moment to think about your approach, then feel free to ask me any clarify
 
       {/* Interview Interface */}
       {!showScenarioBrowser && (
-        <section className="pt-20 pb-4 bg-gradient-to-b from-gray-900 to-black h-screen flex flex-col">
+        <section className="pt-24 pb-4 bg-gradient-to-b from-gray-900 to-black min-h-screen flex flex-col">
           <div className="container mx-auto px-4 flex-1 flex flex-col overflow-hidden">
             <div className="max-w-[1920px] mx-auto flex-1 flex flex-col gap-4">
               {/* Workspace Context Upload - Top Bar */}
-              <div className="flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center justify-between flex-shrink-0 mb-2">
                 <div className="flex items-center space-x-4">
                   <input
                     ref={fileInputRef}

@@ -244,10 +244,17 @@ export default function ProfilePage() {
                 <CardTitle className="text-white">Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Link href="/dashboard">
+                <Link href="/interview">
                   <Button className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80">
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    Go to Dashboard
+                    <Terminal className="mr-2 h-4 w-4" />
+                    Start Practice
+                  </Button>
+                </Link>
+
+                <Link href="/sessions">
+                  <Button variant="outline" className="w-full border-gray-600 text-white hover:bg-gray-800 bg-transparent">
+                    <Clock className="mr-2 h-4 w-4" />
+                    View Sessions
                   </Button>
                 </Link>
 
@@ -271,13 +278,6 @@ export default function ProfilePage() {
                     Sync Subscription Status
                   </Button>
                 )}
-
-                <Link href="/interview">
-                  <Button variant="outline" className="w-full border-gray-600 text-white hover:bg-gray-800 bg-transparent">
-                    <Terminal className="mr-2 h-4 w-4" />
-                    Start Practice
-                  </Button>
-                </Link>
               </CardContent>
             </Card>
           </div>
