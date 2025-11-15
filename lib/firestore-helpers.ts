@@ -50,12 +50,17 @@ export async function getUserProfile(userId: string, syncStripe: boolean = true)
   const profile = profileSnap.data() as Profile
 
   // If user has Stripe IDs but subscription_tier is free, sync from Stripe
+  // Only sync on server-side (check if we're in a server environment)
   if (syncStripe && profile.subscription_tier === "free" && 
       (profile.stripe_subscription_id || profile.stripe_customer_id)) {
     try {
-      const { syncSubscriptionFromStripe } = await import("./stripe-helpers")
-      const syncedProfile = await syncSubscriptionFromStripe(userId)
-      return syncedProfile || profile
+      // Only sync if we're on the server (have access to STRIPE_SECRET_KEY)
+      // Client-side will use the API endpoint instead
+      if (typeof window === "undefined" && process.env.STRIPE_SECRET_KEY) {
+        const { syncSubscriptionFromStripe } = await import("./stripe-helpers")
+        const syncedProfile = await syncSubscriptionFromStripe(userId)
+        return syncedProfile || profile
+      }
     } catch (syncError) {
       console.error("Error syncing subscription from Stripe:", syncError)
       // Return existing profile if sync fails
