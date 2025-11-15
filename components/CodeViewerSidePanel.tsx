@@ -83,16 +83,7 @@ export function CodeViewerSidePanel({
   if (!isOpen) return null
 
   return (
-    <>
-      {/* Backdrop overlay */}
-      <div
-        className="fixed inset-0 bg-black/50 z-30"
-        onClick={onClose}
-        aria-label="Close file viewer"
-      />
-      
-      {/* Side panel */}
-      <div className="fixed left-0 top-0 h-full w-[600px] z-40 bg-gray-900 border-r border-gray-700 shadow-2xl flex flex-col transition-transform duration-300 ease-in-out">
+    <div className="fixed left-0 top-0 h-full w-[600px] z-40 bg-gray-900 border-r border-gray-700 shadow-2xl flex flex-col transition-transform duration-300 ease-in-out">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800/50 flex-shrink-0">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -140,7 +131,6 @@ export function CodeViewerSidePanel({
         <span>{content.split('\n').length} lines</span>
       </div>
     </div>
-    </>
   )
 }
 
