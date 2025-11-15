@@ -6,7 +6,7 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { getCurrentUser } from "@/lib/auth"
+import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
 import { Check, Crown, Zap, Star, ArrowRight } from "lucide-react"
 import { PRICING_CONFIG, getProPricing } from "@/lib/config"
 import { User } from "@/lib/types"
@@ -19,8 +19,11 @@ export default function UpgradePage() {
 
   useEffect(() => {
     const loadUser = async () => {
-      const currentUser = await getCurrentUser()
-      setUser(currentUser)
+      const firebaseUser = await getCurrentUser()
+      if (firebaseUser) {
+        const convertedUser = convertFirebaseUser(firebaseUser)
+        setUser(convertedUser)
+      }
     }
     loadUser()
   }, [])
