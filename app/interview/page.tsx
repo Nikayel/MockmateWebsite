@@ -407,6 +407,19 @@ Take a moment to think about your approach, then feel free to ask me any clarify
         setTestSummary(data.summary)
 
         if (data.success) {
+          // Update session with completion data
+          if (currentSessionId && user) {
+            try {
+              await updateInterviewSession(
+                currentSessionId,
+                data.summary.passRate,
+                `Completed ${selectedScenario?.title} with ${data.summary.passed}/${data.summary.total} tests passing`
+              )
+            } catch (error) {
+              console.error("Error updating session on completion:", error)
+            }
+          }
+          
           setTimeout(() => {
             setShowFeedback(true)
           }, 2000)
