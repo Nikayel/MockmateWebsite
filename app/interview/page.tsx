@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import dynamic from "next/dynamic"
 import { Header } from "@/components/header"
@@ -30,6 +30,7 @@ import {
   Filter,
   X,
   ChevronRight,
+  ArrowRight,
 } from "lucide-react"
 import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
 import { checkUsageLimit, incrementSessionUsage, getUserProfile, createInterviewSession, updateInterviewSession } from "@/lib/firestore-helpers"
@@ -56,13 +57,16 @@ interface TestResult {
 
 export default function InterviewPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [user, setUser] = useState<UserType | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showScenarioBrowser, setShowScenarioBrowser] = useState(true)
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null)
   const [isInterviewStarted, setIsInterviewStarted] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
+  const [showPostInterviewDiscussion, setShowPostInterviewDiscussion] = useState(false)
   const [comprehensiveFeedback, setComprehensiveFeedback] = useState<string>("")
+  const [isGeneratingDiscussion, setIsGeneratingDiscussion] = useState(false)
   const [code, setCode] = useState("")
   const [selectedLanguage, setSelectedLanguage] = useState<"javascript" | "typescript" | "python" | "java" | "cpp" | "csharp" | "go" | "rust">("javascript")
 
@@ -113,7 +117,7 @@ export default function InterviewPage() {
   const interviewerEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Check authentication and usage limit
+  // Check authentication and usage limit, handle session reopening
   useEffect(() => {
     const checkAuth = async () => {
       const firebaseUser = await getCurrentUser()
@@ -128,10 +132,68 @@ export default function InterviewPage() {
       const usage = await checkUsageLimit(firebaseUser.uid)
       setUsageLimit(usage)
       
+      // Check if we're reopening a session
+      const sessionId = searchParams?.get("session")
+      const scenarioId = searchParams?.get("scenario")
+      
+      if (sessionId && scenarioId) {
+        // Load the scenario and reopen the session
+        const scenario = getScenarioById(scenarioId)
+        if (scenario) {
+          setSelectedScenario(scenario)
+          setCurrentSessionId(sessionId)
+          // Start the interview immediately
+          setIsInterviewStarted(true)
+          setShowScenarioBrowser(false)
+          setStartTime(Date.now())
+          
+          // Initialize code based on scenario type
+          let initialCode: string
+          if (scenario.type === 'bugfix') {
+            initialCode = (scenario as any).buggyCode?.[selectedLanguage] || `// Bug fix code not available for ${selectedLanguage}`
+            const codebaseFiles = (scenario as any).codebaseFiles?.[selectedLanguage] || []
+            if (codebaseFiles.length > 0) {
+              const contextFiles = codebaseFiles.map((file: any) => ({
+                path: file.fileName,
+                content: file.content,
+              }))
+              setWorkspaceContext(contextFiles)
+            }
+          } else {
+            initialCode = (scenario as any).starterCode?.[selectedLanguage] || `function solution() {
+  // Write your solution here
+
+}`
+          }
+          setCode(initialCode)
+          
+          // Initialize interviewer with welcome message
+          const problemType = scenario.type === 'bugfix' ? 'BUG FIX' : scenario.type.toUpperCase()
+          const initialMessage = `Welcome back! You're continuing your practice on **${scenario.title}** - a ${scenario.difficulty} ${problemType} problem.
+
+You can continue where you left off. Feel free to:
+- Ask me clarifying questions about the requirements
+- Discuss your approach before coding
+- Ask for hints if you get stuck
+
+Let's continue!`
+          
+          setInterviewerMessages([{ type: "ai", message: initialMessage }])
+          setChatMessages([{
+            type: "ai",
+            message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
+          }])
+          
+          toast.success("Session resumed")
+        } else {
+          toast.error("Scenario not found")
+        }
+      }
+      
       setIsLoading(false)
     }
     checkAuth()
-  }, [router])
+  }, [router, searchParams])
 
   // Timer effect
   useEffect(() => {
@@ -234,21 +296,29 @@ export default function InterviewPage() {
     }
   }, [selectedLanguage, isInterviewStarted, selectedScenario, showFeedback])
 
-  // Proactive interviewer
+  // Proactive interviewer - improved with context-aware timing
   useEffect(() => {
-    if (!isInterviewStarted || showFeedback) return
+    if (!isInterviewStarted || showFeedback || showPostInterviewDiscussion) return
 
     const codeHash = code.trim().replace(/\s+/g, " ")
+    const codeLength = code.trim().length
     
-    if (codeHash !== lastCodeHash && codeHash.length > 50 && lastCodeHash.length > 0) {
+    // More intelligent timing based on code activity
+    // Jump in after 15-30 seconds of inactivity, but only if meaningful code exists
+    if (codeHash !== lastCodeHash && codeLength > 50 && lastCodeHash.length > 0) {
       if (proactiveTimer) {
         clearTimeout(proactiveTimer)
         setProactiveTimer(null)
       }
 
+      // Variable timing: shorter for more complex code, longer for simpler
+      const baseDelay = 15000 // 15 seconds base
+      const complexityMultiplier = codeLength > 200 ? 0.8 : codeLength > 100 ? 1.0 : 1.2
+      const delay = Math.floor(baseDelay * complexityMultiplier)
+
       const timer = setTimeout(() => {
         triggerProactiveInterviewer()
-      }, 10000)
+      }, delay)
 
       setProactiveTimer(timer)
       setLastCodeHash(codeHash)
@@ -259,21 +329,24 @@ export default function InterviewPage() {
         clearTimeout(proactiveTimer)
       }
     }
-  }, [code, isInterviewStarted, showFeedback, lastCodeHash])
+  }, [code, isInterviewStarted, showFeedback, showPostInterviewDiscussion, lastCodeHash])
 
   const triggerProactiveInterviewer = async () => {
-    if (isLoadingInterviewer) return
+    if (isLoadingInterviewer || showFeedback || showPostInterviewDiscussion) return
 
     setIsLoadingInterviewer(true)
     try {
       // Get user profile for context
       const userProfile = user ? await getUserProfile(user.id) : null
       
+      // Analyze code patterns for context-aware feedback
+      const codeAnalysis = analyzeCodeForProactiveFeedback(code)
+      
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: "",
+          message: codeAnalysis ? `[CONTEXT ANALYSIS]\n${codeAnalysis}` : "",
           context: interviewerMessages,
           role: "interviewer",
           userContext: userProfile ? {
@@ -286,6 +359,7 @@ export default function InterviewPage() {
           scenarioTitle: selectedScenario?.title,
           scenarioType: selectedScenario?.type,
           isProactive: true,
+          elapsedTime: elapsedTime,
         }),
       })
 
@@ -298,6 +372,154 @@ export default function InterviewPage() {
       console.error("Proactive interviewer error:", error)
     } finally {
       setIsLoadingInterviewer(false)
+    }
+  }
+
+  // Analyze code for context-aware proactive feedback
+  const analyzeCodeForProactiveFeedback = (code: string): string => {
+    const analysis: string[] = []
+    const codeLower = code.toLowerCase()
+    
+    // Detect patterns
+    if (code.includes("for") && code.includes("for")) {
+      analysis.push("Candidate is using nested loops - potential O(n²) complexity")
+    }
+    
+    if (code.match(/sort|\.sort\(/)) {
+      analysis.push("Candidate is using sorting - good algorithmic thinking")
+    }
+    
+    if (code.match(/Map|Set|HashMap|HashSet/)) {
+      analysis.push("Candidate is using hash-based data structures - efficient approach")
+    }
+    
+    if (code.match(/recursion|function.*\(.*\)\s*{[\s\S]*\1\(/)) {
+      analysis.push("Candidate is using recursion - should consider base cases and stack overflow")
+    }
+    
+    if (code.length > 300 && !code.includes("//")) {
+      analysis.push("Code is getting lengthy - candidate might benefit from breaking into helper functions")
+    }
+    
+    if (code.match(/if.*if.*if/)) {
+      analysis.push("Multiple nested conditionals detected - could indicate complexity")
+    }
+    
+    if (code.match(/\/\/ TODO|\/\/ FIXME|\/\/ HACK/)) {
+      analysis.push("Candidate has TODO/FIXME comments - they're aware of incomplete parts")
+    }
+    
+    // Time-based context
+    const minutesSpent = Math.floor(elapsedTime / 60)
+    if (minutesSpent > 10 && code.length < 100) {
+      analysis.push(`Candidate has been working for ${minutesSpent} minutes but code is still minimal - might need guidance`)
+    }
+    
+    return analysis.length > 0 ? analysis.join("\n") : ""
+  }
+
+  const triggerPostInterviewDiscussion = async (testResults: TestResult[], summary: any) => {
+    setIsGeneratingDiscussion(true)
+    
+    try {
+      // Generate comprehensive feedback first
+      let comprehensiveFeedback = `Completed ${selectedScenario?.title} with ${summary.passed}/${summary.total} tests passing`
+      let performanceScore = summary.passRate * 10
+
+      if (currentSessionId && user && code.trim()) {
+        try {
+          const feedbackResponse = await fetch("/api/generate-feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              code,
+              scenarioTitle: selectedScenario?.title,
+              scenarioType: selectedScenario?.type,
+              testResults: testResults,
+              language: selectedLanguage,
+              timeSpent: elapsedTime,
+            }),
+          })
+
+          if (feedbackResponse.ok) {
+            const feedbackData = await feedbackResponse.json()
+            comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
+            performanceScore = feedbackData.performanceScore || performanceScore
+            setComprehensiveFeedback(comprehensiveFeedback)
+          }
+        } catch (feedbackError) {
+          console.error("Error generating feedback:", feedbackError)
+        }
+      }
+
+      // Now trigger interviewer to discuss the solution
+      const userProfile = user ? await getUserProfile(user.id) : null
+      const metrics = analyzeCodeEfficiency(code)
+      
+      const discussionPrompt = `[POST-INTERVIEW DISCUSSION] The candidate has completed the coding solution. All tests are passing.
+
+TEST RESULTS: ${summary.passed}/${summary.total} tests passed (${summary.passRate}% pass rate)
+TIME SPENT: ${Math.floor(elapsedTime / 60)} minutes ${elapsedTime % 60} seconds
+EFFICIENCY METRICS:
+- Time Complexity: ${metrics.estimatedTimeComplexity} (Optimal: ${metrics.optimalTimeComplexity})
+- Space Complexity: ${metrics.estimatedSpaceComplexity} (Optimal: ${metrics.optimalSpaceComplexity})
+- Efficiency Score: ${metrics.efficiencyScore}/100
+- Code Complexity: ${metrics.complexity}
+- Lines of Code: ${metrics.linesOfCode}
+
+Please:
+1. Congratulate them on completing the solution
+2. Analyze their solution's time and space complexity
+3. Discuss optimization opportunities if the solution isn't optimal
+4. Point out what they did well
+5. Suggest specific improvements
+6. Ask if they want to optimize further or discuss the solution
+
+Be conversational and thorough - like a real interviewer debriefing after a coding interview.`
+
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: discussionPrompt,
+          context: interviewerMessages,
+          role: "interviewer",
+          userContext: userProfile ? {
+            email: user.email,
+            subscription_tier: userProfile.subscription_tier,
+            sessions_used: usageLimit?.used || 0,
+          } : undefined,
+          workspaceContext: workspaceContext,
+          currentCode: code,
+          scenarioTitle: selectedScenario?.title,
+          scenarioType: selectedScenario?.type,
+          isProactive: false,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.reply) {
+        setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+      }
+
+      // Update session with completion data
+      if (currentSessionId && user) {
+        try {
+          await updateInterviewSession(
+            currentSessionId,
+            performanceScore,
+            comprehensiveFeedback
+          )
+        } catch (error) {
+          console.error("Error updating session on completion:", error)
+        }
+      }
+    } catch (error) {
+      console.error("Error in post-interview discussion:", error)
+      toast.error("Failed to start discussion")
+    } finally {
+      setIsGeneratingDiscussion(false)
     }
   }
 
@@ -336,13 +558,14 @@ export default function InterviewPage() {
       return
     }
 
-    // Check usage limit before starting - redirect to limit page
-    if (user && usageLimit && !usageLimit.allowed) {
+    // Check usage limit before starting - redirect to limit page (skip for DSA questions)
+    if (user && usageLimit && !usageLimit.allowed && selectedScenario.type !== 'dsa') {
       router.push("/limit-reached")
       return
     }
 
-    // Increment usage and create session when starting interview
+    // Create session and increment usage when starting interview
+    // DSA questions don't count against session limit
     if (user) {
       try {
         // Create session document first
@@ -350,15 +573,18 @@ export default function InterviewPage() {
           user.id,
           selectedScenario.title,
           selectedScenario.type,
-          selectedScenario.difficulty
+          selectedScenario.difficulty,
+          selectedScenario.id
         )
         setCurrentSessionId(sessionId)
         
-        // Then increment usage
-        await incrementSessionUsage(user.id)
-        // Refresh usage limit
-        const updatedUsage = await checkUsageLimit(user.id)
-        setUsageLimit(updatedUsage)
+        // Only increment usage for non-DSA questions
+        if (selectedScenario.type !== 'dsa') {
+          await incrementSessionUsage(user.id)
+          // Refresh usage limit
+          const updatedUsage = await checkUsageLimit(user.id)
+          setUsageLimit(updatedUsage)
+        }
       } catch (error) {
         console.error("Error creating session:", error)
         toast.error("Failed to track session")
@@ -414,12 +640,12 @@ Let's have a great interview! How would you like to approach this problem?`
 
   const resetInterview = async () => {
     // Update session if it exists and was completed
-    if (currentSessionId && showFeedback && testSummary.total > 0) {
+    if (currentSessionId && (showFeedback || showPostInterviewDiscussion) && testSummary.total > 0) {
       try {
         await updateInterviewSession(
           currentSessionId,
           testSummary.passRate,
-          `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
+          comprehensiveFeedback || `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
         )
       } catch (error) {
         console.error("Error updating session:", error)
@@ -428,7 +654,9 @@ Let's have a great interview! How would you like to approach this problem?`
     
     setIsInterviewStarted(false)
     setShowFeedback(false)
+    setShowPostInterviewDiscussion(false)
     setComprehensiveFeedback("")
+    setIsGeneratingDiscussion(false)
     setShowScenarioBrowser(true)
     setCode("")
     setInterviewerMessages([])
@@ -441,10 +669,16 @@ Let's have a great interview! How would you like to approach this problem?`
     setCurrentSessionId(null)
     setRevealedHints(0)
     setWorkspaceContext([])
+    setEfficiencyMetrics(null)
     if (proactiveTimer) {
       clearTimeout(proactiveTimer)
       setProactiveTimer(null)
     }
+  }
+
+  const proceedToFinalFeedback = async () => {
+    setShowPostInterviewDiscussion(false)
+    setShowFeedback(true)
   }
 
   const handleSendMessage = async (isInterviewer = false) => {
@@ -614,55 +848,12 @@ Let's have a great interview! How would you like to approach this problem?`
         }
 
         if (data.success) {
-          // Generate comprehensive feedback
-          let comprehensiveFeedback = `Completed ${selectedScenario?.title} with ${data.summary.passed}/${data.summary.total} tests passing`
-          let performanceScore = data.summary.passRate * 10
-
-          if (currentSessionId && user && code.trim()) {
-            try {
-              // Generate detailed feedback from AI
-              const feedbackResponse = await fetch("/api/generate-feedback", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  code,
-                  scenarioTitle: selectedScenario?.title,
-                  scenarioType: selectedScenario?.type,
-                  testResults: data.results,
-                  language: selectedLanguage,
-                  timeSpent: elapsedTime,
-                }),
-              })
-
-              if (feedbackResponse.ok) {
-                const feedbackData = await feedbackResponse.json()
-                comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
-                performanceScore = feedbackData.performanceScore || performanceScore
-                // Store feedback for display
-                setComprehensiveFeedback(comprehensiveFeedback)
-              }
-            } catch (feedbackError) {
-              console.error("Error generating feedback:", feedbackError)
-              // Continue with basic feedback if AI generation fails
-            }
-          }
-
-          // Update session with completion data and comprehensive feedback
-          if (currentSessionId && user) {
-            try {
-              await updateInterviewSession(
-                currentSessionId,
-                performanceScore,
-                comprehensiveFeedback
-              )
-            } catch (error) {
-              console.error("Error updating session on completion:", error)
-            }
-          }
+          // Start post-interview discussion phase instead of immediately showing feedback
+          setIsRunningTests(false)
+          setShowPostInterviewDiscussion(true)
           
-          setTimeout(() => {
-            setShowFeedback(true)
-          }, 2000)
+          // Trigger interviewer to analyze the solution
+          triggerPostInterviewDiscussion(data.results, data.summary)
         }
       }
     } catch (error) {
@@ -772,10 +963,9 @@ Let's have a great interview! How would you like to approach this problem?`
                 {filteredScenarios.map((scenario) => (
                   <Card
                     key={scenario.id}
-                    className={`bg-gray-900/50 border-gray-700 glass-effect cursor-pointer scenario-card ${
+                    className={`bg-gray-900/50 border-gray-700 glass-effect scenario-card ${
                       selectedScenario?.id === scenario.id ? "border-[#ff5733] ring-2 ring-[#ff5733]/50 selected" : ""
                     }`}
-                    onClick={() => setSelectedScenario(scenario)}
                   >
                     <CardHeader>
                       <div className="flex items-start justify-between mb-2">
@@ -798,47 +988,55 @@ Let's have a great interview! How would you like to approach this problem?`
                           </Badge>
                         ))}
                       </div>
-                      <div className="flex items-center justify-between text-sm text-gray-400">
+                      <div className="flex items-center justify-between text-sm text-gray-400 mb-4">
                         <span>{scenario.companies.slice(0, 2).join(", ")}</span>
                         <span>{scenario.estimatedTime} min</span>
+                      </div>
+                      {/* Start Button on Card */}
+                      <div className="space-y-2">
+                        {usageLimit && !usageLimit.allowed && scenario.type !== 'dsa' && (
+                          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2 mb-2">
+                            <p className="text-yellow-400 text-xs font-medium mb-1">Limit Reached</p>
+                            <p className="text-gray-300 text-xs mb-2">
+                              Upgrade to Pro for unlimited practice!
+                            </p>
+                            <Link href="/limit-reached">
+                              <Button size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-black w-full text-xs h-6">
+                                Upgrade
+                              </Button>
+                            </Link>
+                          </div>
+                        )}
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedScenario(scenario)
+                            // Use setTimeout to ensure state is updated before calling startInterview
+                            setTimeout(() => {
+                              startInterview()
+                            }, 0)
+                          }}
+                          disabled={usageLimit && !usageLimit.allowed && scenario.type !== 'dsa'}
+                          className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Play className="mr-2 h-4 w-4" />
+                          Start Interview
+                        </Button>
+                        {usageLimit && usageLimit.allowed && scenario.type !== 'dsa' && (
+                          <p className="text-xs text-gray-400 text-center">
+                            {usageLimit.limit - usageLimit.used} session{usageLimit.limit - usageLimit.used !== 1 ? 's' : ''} remaining
+                          </p>
+                        )}
+                        {scenario.type === 'dsa' && (
+                          <p className="text-xs text-green-400 text-center">
+                            Free to practice
+                          </p>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
                 ))}
               </div>
-
-              {/* Start Button */}
-              {selectedScenario && (
-                <div className="mt-8 text-center space-y-4">
-                  {usageLimit && !usageLimit.allowed && (
-                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-4">
-                      <p className="text-yellow-400 font-medium mb-2">Monthly Limit Reached</p>
-                      <p className="text-gray-300 text-sm mb-4">
-                        You've used all {usageLimit.limit} free sessions this month. Upgrade to Pro for unlimited practice!
-                      </p>
-                      <Link href="/limit-reached">
-                        <Button className="bg-yellow-500 hover:bg-yellow-600 text-black">
-                          View Details & Upgrade
-                        </Button>
-                      </Link>
-                    </div>
-                  )}
-                  <Button
-                    onClick={startInterview}
-                    disabled={usageLimit && !usageLimit.allowed}
-                    size="lg"
-                    className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-4 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Play className="mr-2 h-5 w-5" />
-                    Start Interview
-                  </Button>
-                  {usageLimit && usageLimit.allowed && (
-                    <p className="text-sm text-gray-400">
-                      {usageLimit.limit - usageLimit.used} session{usageLimit.limit - usageLimit.used !== 1 ? 's' : ''} remaining this month
-                    </p>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         </section>
@@ -898,7 +1096,7 @@ Let's have a great interview! How would you like to approach this problem?`
               </div>
 
               {/* Main Interface - Three Column Layout */}
-              {!showFeedback ? (
+              {!showFeedback && !showPostInterviewDiscussion ? (
                 <div className="grid grid-cols-12 gap-2 flex-1 min-h-0 overflow-hidden">
                   {/* Left: Problem Description / File Upload */}
                   <div className="col-span-12 lg:col-span-3 flex flex-col min-h-0">
@@ -1209,20 +1407,20 @@ Let's have a great interview! How would you like to approach this problem?`
                             </>
                           )}
                         </div>
-                        {isInterviewStarted && (
+                        {(isInterviewStarted || showPostInterviewDiscussion) && (
                           <div className="flex space-x-1 flex-shrink-0 border-t border-gray-700 pt-2">
                             <Input
                               value={interviewerInput}
                               onChange={(e) => setInterviewerInput(e.target.value)}
-                              placeholder="Ask a question..."
+                              placeholder={showPostInterviewDiscussion ? "Ask about optimization or improvements..." : "Ask a question..."}
                               className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-xs h-7"
                               onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
-                              disabled={isLoadingInterviewer}
+                              disabled={isLoadingInterviewer || isGeneratingDiscussion}
                             />
                             <Button
                               onClick={() => handleSendMessage(true)}
                               className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white h-7 px-2"
-                              disabled={isLoadingInterviewer}
+                              disabled={isLoadingInterviewer || isGeneratingDiscussion}
                             >
                               <Send className="h-3 w-3" />
                             </Button>
@@ -1230,6 +1428,126 @@ Let's have a great interview! How would you like to approach this problem?`
                         )}
                       </CardContent>
                     </Card>
+                  </div>
+                </div>
+              ) : showPostInterviewDiscussion ? (
+                /* Post-Interview Discussion Phase */
+                <div className="max-w-6xl mx-auto py-8">
+                  <div className="text-center mb-6">
+                    <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-3" />
+                    <h2 className="text-2xl font-heading font-bold text-white mb-2">Solution Complete!</h2>
+                    <p className="text-gray-300 mb-4">All tests passed! Let's discuss your solution with the interviewer.</p>
+                    {testSummary.total > 0 && (
+                      <div className="flex items-center justify-center gap-4 mb-4">
+                        <Badge className="bg-green-600 text-white">
+                          {testSummary.passed}/{testSummary.total} Tests Passed
+                        </Badge>
+                        {efficiencyMetrics && (
+                          <>
+                            <Badge className={`${
+                              efficiencyMetrics.efficiencyScore >= 80 ? "bg-green-600" :
+                              efficiencyMetrics.efficiencyScore >= 60 ? "bg-yellow-600" : "bg-red-600"
+                            } text-white`}>
+                              Efficiency: {efficiencyMetrics.efficiencyScore}/100
+                            </Badge>
+                            <Badge variant="outline" className="border-gray-600 text-gray-300">
+                              Time: {efficiencyMetrics.estimatedTimeComplexity}
+                            </Badge>
+                            <Badge variant="outline" className="border-gray-600 text-gray-300">
+                              Space: {efficiencyMetrics.estimatedSpaceComplexity}
+                            </Badge>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Interviewer Discussion Panel */}
+                  <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-6">
+                    <CardHeader>
+                      <CardTitle className="text-white flex items-center space-x-2">
+                        <Bot className="h-5 w-5 text-[#ff5733]" />
+                        <span>Post-Interview Discussion</span>
+                        {isGeneratingDiscussion && (
+                          <span className="text-xs text-gray-400 ml-2">(Analyzing your solution...)</span>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4 max-h-96 overflow-y-auto mb-4 pr-2">
+                        {interviewerMessages.slice(-5).map((msg, index) => (
+                          <div
+                            key={index}
+                            className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
+                          >
+                            <div
+                              className={`max-w-[85%] p-3 rounded-lg ${
+                                msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-100"
+                              }`}
+                            >
+                              <div className="flex items-center space-x-2 mb-1">
+                                {msg.type === "user" ? (
+                                  <User className="h-4 w-4" />
+                                ) : (
+                                  <Bot className="h-4 w-4 text-[#ff5733]" />
+                                )}
+                                <span className="text-sm font-medium">
+                                  {msg.type === "user" ? "You" : "Interviewer"}
+                                </span>
+                              </div>
+                              <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.message}</p>
+                            </div>
+                          </div>
+                        ))}
+                        {isGeneratingDiscussion && (
+                          <div className="flex justify-start">
+                            <div className="bg-gray-800 p-3 rounded-lg">
+                              <div className="flex items-center space-x-2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#ff5733]"></div>
+                                <span className="text-sm text-gray-300">Interviewer is analyzing your solution...</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Chat Input */}
+                      <div className="flex space-x-2 border-t border-gray-700 pt-4">
+                        <Input
+                          value={interviewerInput}
+                          onChange={(e) => setInterviewerInput(e.target.value)}
+                          placeholder="Ask about optimization, complexity, or improvements..."
+                          className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                          onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
+                          disabled={isLoadingInterviewer || isGeneratingDiscussion}
+                        />
+                        <Button
+                          onClick={() => handleSendMessage(true)}
+                          className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
+                          disabled={isLoadingInterviewer || isGeneratingDiscussion}
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Action Buttons */}
+                  <div className="flex justify-center gap-4">
+                    <Button
+                      onClick={proceedToFinalFeedback}
+                      className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-6"
+                    >
+                      View Detailed Feedback
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                    <Button
+                      onClick={resetInterview}
+                      variant="outline"
+                      className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                    >
+                      Try Another Problem
+                    </Button>
                   </div>
                 </div>
               ) : (
