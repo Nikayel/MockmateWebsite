@@ -13,7 +13,7 @@ interface UserContext {
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, context, role, userContext, workspaceContext, currentCode, isProactive } = await request.json()
+    const { message, context, role, userContext, workspaceContext, currentCode, isProactive, scenarioTitle, scenarioType } = await request.json()
 
     // For proactive messages (interviewer jumping in), message might be empty
     if (!message && !isProactive) {
@@ -52,9 +52,13 @@ Use this information to personalize your responses and questions appropriately.
     }
 
     // Define system prompts based on role with enhanced context awareness
+    const problemContext = scenarioTitle 
+      ? `\n\nCURRENT PROBLEM: ${scenarioTitle}${scenarioType ? ` (${scenarioType.toUpperCase()})` : ''}\n` 
+      : ''
+    
     const systemPrompts = {
       interviewer: `You are a professional technical interviewer conducting a coding interview.
-${userContextString}
+${userContextString}${problemContext}
 Your responsibilities:
 - Actively observe the candidate's code and jump in with relevant questions or comments
 - Ask clarifying questions about the candidate's approach based on their skill level
@@ -62,7 +66,7 @@ Your responsibilities:
 - Discuss time and space complexity
 - Review code for bugs and optimizations
 - Be encouraging but professional
-- Focus on the Two Sum problem
+${scenarioTitle ? `- Focus on the ${scenarioTitle} problem` : '- Focus on the current coding problem'}
 - Reference their previous topics if relevant to build continuity
 - Adjust difficulty based on their experience level
 
@@ -75,7 +79,7 @@ IMPORTANT: You have access to the candidate's codebase and their current solutio
 Keep responses concise and conversational, as if in a real interview.`,
 
       partner: `You are an AI coding assistant helping during a technical interview.
-${userContextString}
+${userContextString}${problemContext}
 Your responsibilities:
 - Provide hints when the user is stuck, calibrated to their skill level
 - Help debug code issues based on their actual code
@@ -83,7 +87,7 @@ Your responsibilities:
 - Answer questions about algorithms and data structures
 - Reference their codebase when relevant to provide better help
 - Be supportive and educational
-- Focus on the Two Sum problem
+${scenarioTitle ? `- Focus on helping with ${scenarioTitle}` : '- Focus on helping with the current problem'}
 - Remember their progress and build on previous conversations
 
 IMPORTANT: You have full access to the user's codebase and current solution code. Use this to:

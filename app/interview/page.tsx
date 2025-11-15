@@ -31,7 +31,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
-import { checkUsageLimit, incrementSessionUsage } from "@/lib/firestore-helpers"
+import { checkUsageLimit, incrementSessionUsage, getUserProfile } from "@/lib/firestore-helpers"
 import { scenarios, filterScenarios, getScenarioById, type Scenario, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
 import { User as UserType } from "@/lib/types"
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from "@/components/ui/alert-dialog"
@@ -171,6 +171,9 @@ export default function InterviewPage() {
 
     setIsLoadingInterviewer(true)
     try {
+      // Get user profile for context
+      const userProfile = user ? await getUserProfile(user.id) : null
+      
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -178,8 +181,15 @@ export default function InterviewPage() {
           message: "",
           context: interviewerMessages,
           role: "interviewer",
+          userContext: userProfile ? {
+            email: user.email,
+            subscription_tier: userProfile.subscription_tier,
+            sessions_used: usageLimit?.used || 0,
+          } : undefined,
           workspaceContext: workspaceContext,
           currentCode: code,
+          scenarioTitle: selectedScenario?.title,
+          scenarioType: selectedScenario?.type,
           isProactive: true,
         }),
       })
@@ -311,6 +321,9 @@ Take a moment to think about your approach, then feel free to ask me any clarify
       setLoading(true)
 
       try {
+        // Get user profile for context
+        const userProfile = user ? await getUserProfile(user.id) : null
+        
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -318,8 +331,15 @@ Take a moment to think about your approach, then feel free to ask me any clarify
             message: input,
             context: messages,
             role: isInterviewer ? "interviewer" : "partner",
+            userContext: userProfile ? {
+              email: user.email,
+              subscription_tier: userProfile.subscription_tier,
+              sessions_used: usageLimit?.used || 0,
+            } : undefined,
             workspaceContext: workspaceContext,
             currentCode: code,
+            scenarioTitle: selectedScenario?.title,
+            scenarioType: selectedScenario?.type,
             isProactive: false,
           }),
         })
