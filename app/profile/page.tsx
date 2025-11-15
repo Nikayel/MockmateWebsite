@@ -260,6 +260,18 @@ export default function ProfilePage() {
                   </Link>
                 )}
 
+                {/* Sync subscription button - show if user has Stripe IDs */}
+                {(profile?.stripe_subscription_id || profile?.stripe_customer_id) && (
+                  <Button
+                    onClick={handleSyncSubscription}
+                    variant="outline"
+                    className="w-full border-gray-600 text-white hover:bg-gray-800 bg-transparent"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Sync Subscription Status
+                  </Button>
+                )}
+
                 <Link href="/interview">
                   <Button variant="outline" className="w-full border-gray-600 text-white hover:bg-gray-800 bg-transparent">
                     <Terminal className="mr-2 h-4 w-4" />
