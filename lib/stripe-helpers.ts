@@ -8,9 +8,18 @@ import { doc, getDoc, setDoc } from "firebase/firestore"
 import { Profile } from "./types"
 import { updateQuotaForSubscriptionTier } from "./firestore-helpers"
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2024-11-20.acacia",
-})
+// Initialize Stripe only if secret key is available
+let stripe: Stripe | null = null
+try {
+  const secretKey = process.env.STRIPE_SECRET_KEY
+  if (secretKey) {
+    stripe = new Stripe(secretKey, {
+      apiVersion: "2024-11-20.acacia",
+    })
+  }
+} catch (error) {
+  console.error("Failed to initialize Stripe:", error)
+}
 
 /**
  * Sync user subscription status from Stripe
@@ -18,6 +27,15 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
  */
 export async function syncSubscriptionFromStripe(userId: string): Promise<Profile | null> {
   try {
+    // Check if Stripe is initialized
+    if (!stripe) {
+      console.warn("Stripe not initialized - cannot sync subscription")
+      // Return existing profile if Stripe is not configured
+      const profileRef = doc(db, "profiles", userId)
+      const profileSnap = await getDoc(profileRef)
+      return profileSnap.exists() ? (profileSnap.data() as Profile) : null
+    }
+
     // Get user profile
     const profileRef = doc(db, "profiles", userId)
     const profileSnap = await getDoc(profileRef)

@@ -52,9 +52,15 @@ export async function getUserProfile(userId: string, syncStripe: boolean = true)
   // If user has Stripe IDs but subscription_tier is free, sync from Stripe
   if (syncStripe && profile.subscription_tier === "free" && 
       (profile.stripe_subscription_id || profile.stripe_customer_id)) {
-    const { syncSubscriptionFromStripe } = await import("./stripe-helpers")
-    const syncedProfile = await syncSubscriptionFromStripe(userId)
-    return syncedProfile || profile
+    try {
+      const { syncSubscriptionFromStripe } = await import("./stripe-helpers")
+      const syncedProfile = await syncSubscriptionFromStripe(userId)
+      return syncedProfile || profile
+    } catch (syncError) {
+      console.error("Error syncing subscription from Stripe:", syncError)
+      // Return existing profile if sync fails
+      return profile
+    }
   }
 
   return profile
