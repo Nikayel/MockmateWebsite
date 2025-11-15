@@ -22,6 +22,26 @@ export default function LoginPage() {
   const router = useRouter()
   const redirect = searchParams.get("redirect")
 
+  // Check if user is already logged in and redirect them
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // User is already logged in, redirect them
+        const savedRedirect = localStorage.getItem("auth_redirect")
+        if (savedRedirect) {
+          localStorage.removeItem("auth_redirect")
+          router.push(`/${savedRedirect}`)
+        } else if (redirect) {
+          router.push(`/${redirect}`)
+        } else {
+          router.push("/dashboard")
+        }
+      }
+    })
+
+    return () => unsubscribe()
+  }, [router, redirect])
+
   useEffect(() => {
     if (redirect) {
       toast.info("Please sign in to continue", {
