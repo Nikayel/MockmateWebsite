@@ -12,7 +12,7 @@ import { getCurrentUser, signOut, convertFirebaseUser } from "@/lib/auth"
 import { getUserProfile } from "@/lib/firestore-helpers"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore"
-import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle, Terminal } from "lucide-react"
+import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle, Terminal, RefreshCw } from "lucide-react"
 import { User as UserType, Profile, ProfileQuota } from "@/lib/types"
 import { PRICING_CONFIG } from "@/lib/config"
 import { toast } from "sonner"
@@ -88,6 +88,44 @@ export default function ProfilePage() {
     } catch (error) {
       console.error("Sign out error:", error)
       toast.error("Failed to sign out", {
+        description: error instanceof Error ? error.message : "Please try again",
+      })
+    }
+  }
+
+  const handleSyncSubscription = async () => {
+    if (!user) return
+    
+    try {
+      toast.info("Syncing subscription from Stripe...")
+      const response = await fetch("/api/sync-subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success(`Subscription synced! Status: ${data.profile.subscription_tier}`)
+        // Reload profile
+        const firebaseUser = await getCurrentUser()
+        if (firebaseUser) {
+          const userProfile = await getUserProfile(firebaseUser.uid)
+          if (userProfile) {
+            setProfile(userProfile)
+          }
+        }
+        // Reload page to show updated status
+        setTimeout(() => {
+          window.location.reload()
+        }, 1000)
+      } else {
+        throw new Error(data.error || "Sync failed")
+      }
+    } catch (error) {
+      console.error("Sync subscription error:", error)
+      toast.error("Failed to sync subscription", {
         description: error instanceof Error ? error.message : "Please try again",
       })
     }
