@@ -90,6 +90,31 @@ export default function AccountPage() {
     }
   }
 
+  const handleManageSubscription = async () => {
+    if (!user) return
+    
+    try {
+      toast.info("Opening subscription management portal...")
+      const response = await fetch("/api/customer-portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+
+      const data = await response.json()
+
+      if (data.success && data.url) {
+        window.location.href = data.url
+      } else {
+        throw new Error(data.error || "Failed to open portal")
+      }
+    } catch (error) {
+      console.error("Customer portal error:", error)
+      toast.error("Failed to open subscription portal", {
+        description: error instanceof Error ? error.message : "Please try again",
+      })
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
