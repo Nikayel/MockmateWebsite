@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getAuth } from "firebase/auth"
 import { db } from "@/lib/firebase"
 import { doc, getDoc, setDoc } from "firebase/firestore"
 
 // Promo codes stored server-side (not in git)
+// These are only visible in the server-side API route, not in client code
 const PROMO_CODES: Record<string, { discount: number; type: "percentage" | "free" }> = {
-  "free25": { discount: 100, type: "free" }, // Free Pro plan
+  "FREE25": { discount: 100, type: "free" }, // Free Pro plan
   // Add more promo codes here as needed
+  // Format: "CODE": { discount: number, type: "free" | "percentage" }
 }
 
 export async function POST(request: NextRequest) {
