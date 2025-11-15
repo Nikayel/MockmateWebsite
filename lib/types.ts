@@ -21,6 +21,8 @@ export interface Profile {
   subscription_status?: string
   stripe_customer_id?: string
   stripe_subscription_id?: string
+  subscription_start_date?: string // ISO date string when subscription started
+  subscription_current_period_end?: string // ISO date string when current period ends
   created_at: string
   updated_at: string
 }
