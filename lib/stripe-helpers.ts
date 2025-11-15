@@ -96,12 +96,22 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
         subscriptionTier = "pro"
         subscriptionStatus = subscription.status
         
-        // Update profile with latest subscription info
+        // Extract subscription dates
+        const subscriptionStartDate = subscription.created
+          ? new Date(subscription.created * 1000).toISOString()
+          : undefined
+        const currentPeriodEnd = subscription.current_period_end
+          ? new Date(subscription.current_period_end * 1000).toISOString()
+          : undefined
+        
+        // Update profile with latest subscription info including dates
         await setDoc(profileRef, {
           subscription_tier: "pro",
           subscription_status: subscription.status,
           stripe_subscription_id: subscription.id,
           stripe_customer_id: subscription.customer as string,
+          subscription_start_date: subscriptionStartDate,
+          subscription_current_period_end: currentPeriodEnd,
           updated_at: new Date().toISOString(),
         }, { merge: true })
 
