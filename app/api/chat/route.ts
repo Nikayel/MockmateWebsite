@@ -13,7 +13,7 @@ interface UserContext {
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, context, role, userContext, workspaceContext, currentCode, isProactive, scenarioTitle, scenarioType } = await request.json()
+    const { message, context, role, userContext, workspaceContext, currentCode, isProactive, scenarioTitle, scenarioType, elapsedTime } = await request.json()
 
     // For proactive messages (interviewer jumping in), message might be empty
     if (!message && !isProactive) {
@@ -123,12 +123,23 @@ Keep responses brief and actionable.`,
     let fullUserMessage = ""
     
     if (isProactive && role === "interviewer") {
-      // Proactive interviewer message - analyze code and jump in
-      fullUserMessage = `[PROACTIVE MODE] The candidate has been working on their solution. Please review their current code and codebase, then jump in with a relevant comment, question, or observation. Be natural and conversational - like a real interviewer watching their screen.
+      // Proactive interviewer message - analyze code and jump in with context-aware feedback
+      const timeSpent = elapsedTime || 0
+      const minutesSpent = Math.floor(timeSpent / 60)
+      
+      fullUserMessage = `[PROACTIVE MODE - CONTEXT-AWARE] The candidate has been working on their solution${minutesSpent > 0 ? ` for ${minutesSpent} minute${minutesSpent !== 1 ? 's' : ''}` : ''}. 
+
+Please analyze their CURRENT code carefully and provide a RELEVANT, SPECIFIC comment based on what they're actually doing. Look for:
+- Specific patterns they're using (loops, recursion, data structures)
+- Potential issues or optimizations in their current approach
+- Questions about their design decisions
+- Encouragement if they're on the right track
+
+Be CONVERSATIONAL and NATURAL - like a real interviewer watching their screen in real-time. Don't be generic - reference specific parts of their code.
 
 ${workspaceContextStr}${currentCodeContext}
 
-What would you like to say to the candidate right now?`
+Based on their current code, what specific, relevant comment or question would you like to make right now?`
     } else {
       // Regular message
       fullUserMessage = message
