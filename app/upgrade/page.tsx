@@ -22,6 +22,7 @@ function UpgradePageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(false)
   const [promoCode, setPromoCode] = useState("")
   const [applyingPromo, setApplyingPromo] = useState(false)
