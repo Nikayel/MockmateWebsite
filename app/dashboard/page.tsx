@@ -29,7 +29,7 @@ import { toast } from "sonner"
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { user, firebaseUser, loading: authLoading } = useAuth()
+  const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [usage, setUsage] = useState<{ used: number; limit: number; allowed: boolean } | null>(null)
   const [dataLoading, setDataLoading] = useState(true)
@@ -37,7 +37,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const loadDashboard = async () => {
       // Wait for auth to initialize
-      if (authLoading) return
+      if (authLoading || !initialized) return
 
       // Redirect if not authenticated
       if (!firebaseUser) {
@@ -111,9 +111,9 @@ export default function DashboardPage() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
-  }, [router, firebaseUser, authLoading])
+  }, [router, firebaseUser, authLoading, initialized])
 
-  if (authLoading || dataLoading) {
+  if (authLoading || !initialized || dataLoading) {
     return (
       <main className="min-h-screen bg-black flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff5733]"></div>
