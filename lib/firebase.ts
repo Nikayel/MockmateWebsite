@@ -31,7 +31,7 @@ export const auth = getAuth(app)
 export const db = getFirestore(app)
 
 // Initialize Analytics only on client side
-export const analytics: Analytics | null = 
+export const analytics: Analytics | null =
   typeof window !== "undefined" ? getAnalytics(app) : null
 
 export default app
