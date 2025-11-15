@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import dynamic from "next/dynamic"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -34,7 +35,6 @@ import { getCurrentUser, convertFirebaseUser } from "@/lib/auth"
 import { checkUsageLimit, incrementSessionUsage, getUserProfile } from "@/lib/firestore-helpers"
 import { scenarios, filterScenarios, getScenarioById, type Scenario, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
 import { User as UserType } from "@/lib/types"
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 
 // Dynamically import Monaco Editor (client-side only)
@@ -93,7 +93,6 @@ export default function InterviewPage() {
   const [lastCodeHash, setLastCodeHash] = useState<string>("")
   const [proactiveTimer, setProactiveTimer] = useState<NodeJS.Timeout | null>(null)
   const [usageLimit, setUsageLimit] = useState<{ used: number; limit: number; allowed: boolean } | null>(null)
-  const [showLimitDialog, setShowLimitDialog] = useState(false)
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const interviewerEndRef = useRef<HTMLDivElement>(null)
@@ -241,9 +240,9 @@ export default function InterviewPage() {
       return
     }
 
-    // Check usage limit before starting
+    // Check usage limit before starting - redirect to limit page
     if (user && usageLimit && !usageLimit.allowed) {
-      setShowLimitDialog(true)
+      router.push("/limit-reached")
       return
     }
 
@@ -536,9 +535,9 @@ Take a moment to think about your approach, then feel free to ask me any clarify
                       <p className="text-gray-300 text-sm mb-4">
                         You've used all {usageLimit.limit} free sessions this month. Upgrade to Pro for unlimited practice!
                       </p>
-                      <Link href="/upgrade">
+                      <Link href="/limit-reached">
                         <Button className="bg-yellow-500 hover:bg-yellow-600 text-black">
-                          Upgrade to Pro
+                          View Details & Upgrade
                         </Button>
                       </Link>
                     </div>
@@ -842,64 +841,6 @@ Take a moment to think about your approach, then feel free to ask me any clarify
           </div>
         </section>
       )}
-
-      {/* Usage Limit Dialog */}
-      <AlertDialog open={showLimitDialog} onOpenChange={setShowLimitDialog}>
-        <AlertDialogContent className="bg-gray-900 border-gray-700 text-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center space-x-2 text-2xl">
-              <AlertCircle className="h-6 w-6 text-[#ff5733]" />
-              <span>Monthly Limit Reached</span>
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-gray-300 space-y-4">
-              <p className="text-lg">
-                You've used all {usageLimit?.limit || 2} free sessions this month.
-              </p>
-              <p>
-                Upgrade to Pro for unlimited interview sessions and advanced features!
-              </p>
-              <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 mt-4">
-                <h4 className="font-semibold text-white mb-2">Pro Plan Benefits:</h4>
-                <ul className="space-y-2 text-sm text-gray-300">
-                  <li className="flex items-start space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
-                    <span>Unlimited interview sessions</span>
-                  </li>
-                  <li className="flex items-start space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
-                    <span>Access to 500+ coding problems</span>
-                  </li>
-                  <li className="flex items-start space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
-                    <span>Advanced coding challenges</span>
-                  </li>
-                  <li className="flex items-start space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
-                    <span>Detailed analytics & insights</span>
-                  </li>
-                </ul>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-3">
-            <AlertDialogAction
-              className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
-              onClick={() => {
-                window.location.href = "/upgrade"
-              }}
-            >
-              Upgrade to Pro
-            </AlertDialogAction>
-            <Button
-              variant="outline"
-              className="border-gray-600 text-gray-300 hover:bg-gray-800"
-              onClick={() => setShowLimitDialog(false)}
-            >
-              Maybe Later
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <Footer />
     </main>
