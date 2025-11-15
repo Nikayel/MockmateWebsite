@@ -69,12 +69,29 @@ export default function UpgradePage() {
       if (data.valid) {
         // Promo code is valid, now update profile client-side (with proper auth)
         try {
+          // Verify Firebase auth before Firestore writes
+          const firebaseUser = await getCurrentUser()
+          if (!firebaseUser || firebaseUser.uid !== user.id) {
+            toast.error("Authentication error. Please log in again.")
+            window.location.href = "/login?redirect=upgrade"
+            setApplyingPromo(false)
+            return
+          }
+
           // Check if code was already used (double-check client-side)
           const promoUsageRef = doc(db, "promo_code_usage", `${user.id}_${promoCode.trim().toUpperCase()}`)
-          const promoUsageSnap = await getDoc(promoUsageRef)
+          let promoUsageSnap
+          try {
+            promoUsageSnap = await getDoc(promoUsageRef)
+          } catch (readError: any) {
+            // If read fails due to permissions, it might be because document doesn't exist
+            // Continue to try creating it
+            console.log("Read check failed (document may not exist):", readError)
+          }
           
-          if (promoUsageSnap.exists()) {
+          if (promoUsageSnap?.exists()) {
             toast.error("This promo code has already been used")
+            setApplyingPromo(false)
             return
           }
 
@@ -101,11 +118,17 @@ export default function UpgradePage() {
           }, 1500)
         } catch (updateError: any) {
           console.error("Error updating profile:", updateError)
+          console.error("Error code:", updateError.code)
+          console.error("Error message:", updateError.message)
+          
           if (updateError.code === "permission-denied") {
-            toast.error("Permission denied. Please update Firestore security rules. See FIRESTORE_RULES.md")
+            toast.error("Permission denied. Please:\n1. Update Firestore security rules in Firebase Console\n2. See FIRESTORE_RULES.md for instructions", {
+              duration: 10000,
+            })
           } else {
-            toast.error("Failed to apply promo code. Please try again.")
+            toast.error(`Failed to apply promo code: ${updateError.message || "Unknown error"}`)
           }
+          setApplyingPromo(false)
         }
       } else {
         toast.error(data.error || "Invalid promo code")
