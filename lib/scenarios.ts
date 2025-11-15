@@ -5,7 +5,7 @@
 
 export type ScenarioType = 'dsa' | 'bugfix' | 'optimization' | 'security' | 'system-design';
 export type DifficultyLevel = 'easy' | 'medium' | 'hard';
-export type Company = 'Google' | 'Meta' | 'Amazon' | 'Netflix' | 'Apple' | 'Microsoft' | 'Startup' | 'Generic';
+export type Company = 'Google' | 'Meta' | 'Amazon' | 'Netflix' | 'Apple' | 'Microsoft' | 'Startup' | 'Generic' | 'Airbnb' | 'Shopify' | 'Walmart';
 
 export interface BaseScenario {
   id: string;
@@ -1590,20 +1590,256 @@ def register_user(request_data):
     estimatedTime: 15,
     problemStatement: `This function should fetch user data and then fetch their posts, but the posts are undefined. Fix the async issue.`,
     buggyCode: {
-      javascript: `async function getUserWithPosts(userId) {
-  const user = fetchUser(userId);
+      javascript: `// userService.js - Main file with async/await bug
+async function getUserWithPosts(userId) {
+  const user = fetchUser(userId);  // BUG: Missing await
   const posts = await fetchUserPosts(user.id);
   return { user, posts };
 }`,
-      typescript: `async function getUserWithPosts(userId: string) {
-  const user = fetchUser(userId);
+      typescript: `// userService.ts - Main file with async/await bug
+async function getUserWithPosts(userId: string) {
+  const user = fetchUser(userId);  // BUG: Missing await
   const posts = await fetchUserPosts(user.id);
   return { user, posts };
 }`,
-      python: `async def getUserWithPosts(userId):
-    user = fetchUser(userId)  # This should be awaited
-    posts = await fetchUserPosts(user.id)
+      python: `# user_service.py - Main file with async/await bug
+async def get_user_with_posts(user_id):
+    user = fetch_user(user_id)  # BUG: Missing await
+    posts = await fetch_user_posts(user['id'])
     return {"user": user, "posts": posts}`,
+    },
+    codebaseFiles: {
+      javascript: [
+        {
+          fileName: 'api/userAPI.js',
+          content: `// User API functions
+export async function fetchUser(userId) {
+  const response = await fetch(\`https://api.example.com/users/\${userId}\`);
+  if (!response.ok) {
+    throw new Error(\`Failed to fetch user: \${response.statusText}\`);
+  }
+  return response.json();
+}
+
+export async function fetchUserPosts(userId) {
+  const response = await fetch(\`https://api.example.com/users/\${userId}/posts\`);
+  if (!response.ok) {
+    throw new Error(\`Failed to fetch posts: \${response.statusText}\`);
+  }
+  return response.json();
+}
+
+export async function fetchUserComments(userId) {
+  const response = await fetch(\`https://api.example.com/users/\${userId}/comments\`);
+  return response.json();
+}`,
+          description: 'API functions for fetching user data - all async',
+        },
+        {
+          fileName: 'components/UserDashboard.js',
+          content: `// User Dashboard component that uses getUserWithPosts
+import { getUserWithPosts } from './userService.js';
+
+export async function renderUserDashboard(userId) {
+  const container = document.getElementById('dashboard');
+
+  try {
+    container.innerHTML = '<div class="loading">Loading...</div>';
+
+    const data = await getUserWithPosts(userId);
+
+    // This will fail if user is a Promise object
+    const userHTML = \`
+      <div class="user-info">
+        <h2>\${data.user.name}</h2>
+        <p>\${data.user.email}</p>
+      </div>
+    \`;
+
+    const postsHTML = \`
+      <div class="posts">
+        <h3>Posts (\${data.posts.length})</h3>
+        \${data.posts.map(post => \`
+          <div class="post">
+            <h4>\${post.title}</h4>
+            <p>\${post.body}</p>
+          </div>
+        \`).join('')}
+      </div>
+    \`;
+
+    container.innerHTML = userHTML + postsHTML;
+  } catch (error) {
+    container.innerHTML = \`<div class="error">Error: \${error.message}</div>\`;
+    console.error('Dashboard error:', error);
+  }
+}`,
+          description: 'Dashboard component that depends on getUserWithPosts',
+        },
+        {
+          fileName: 'tests/userService.test.js',
+          content: `// Test file for userService
+import { getUserWithPosts } from './userService.js';
+
+async function testGetUserWithPosts() {
+  console.log('Testing getUserWithPosts...');
+
+  try {
+    const result = await getUserWithPosts('user123');
+
+    // Check if user is actually a user object, not a Promise
+    if (result.user instanceof Promise) {
+      console.error('❌ FAIL: user is a Promise, not an object!');
+      console.error('   This means the fetchUser call was not awaited');
+      return false;
+    }
+
+    // Check if user has expected properties
+    if (!result.user.id || !result.user.name) {
+      console.error('❌ FAIL: user object missing expected properties');
+      return false;
+    }
+
+    // Check posts
+    if (!Array.isArray(result.posts)) {
+      console.error('❌ FAIL: posts is not an array');
+      return false;
+    }
+
+    console.log('✅ PASS: getUserWithPosts works correctly');
+    return true;
+  } catch (error) {
+    console.error('❌ FAIL: Error occurred:', error.message);
+    return false;
+  }
+}
+
+// Run test
+testGetUserWithPosts();`,
+          description: 'Test file showing how the bug manifests',
+        },
+      ],
+      typescript: [
+        {
+          fileName: 'api/userAPI.ts',
+          content: `// User API functions
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+}
+
+export interface Post {
+  id: string;
+  userId: string;
+  title: string;
+  body: string;
+  createdAt: string;
+}
+
+export async function fetchUser(userId: string): Promise<User> {
+  const response = await fetch(\`https://api.example.com/users/\${userId}\`);
+  if (!response.ok) {
+    throw new Error(\`Failed to fetch user: \${response.statusText}\`);
+  }
+  return response.json();
+}
+
+export async function fetchUserPosts(userId: string): Promise<Post[]> {
+  const response = await fetch(\`https://api.example.com/users/\${userId}/posts\`);
+  if (!response.ok) {
+    throw new Error(\`Failed to fetch posts: \${response.statusText}\`);
+  }
+  return response.json();
+}`,
+          description: 'API functions with TypeScript interfaces',
+        },
+        {
+          fileName: 'components/UserDashboard.tsx',
+          content: `// User Dashboard component
+import { getUserWithPosts } from './userService';
+
+interface DashboardProps {
+  userId: string;
+}
+
+export async function renderUserDashboard({ userId }: DashboardProps) {
+  const container = document.getElementById('dashboard');
+  if (!container) return;
+
+  try {
+    container.innerHTML = '<div class="loading">Loading...</div>';
+
+    const data = await getUserWithPosts(userId);
+
+    // TypeScript won't catch the Promise bug at compile time
+    // because user is typed as User, but at runtime it's Promise<User>
+    const userHTML = \`
+      <div class="user-info">
+        <h2>\${data.user.name}</h2>
+        <p>\${data.user.email}</p>
+      </div>
+    \`;
+
+    container.innerHTML = userHTML;
+  } catch (error) {
+    console.error('Dashboard error:', error);
+  }
+}`,
+          description: 'TypeScript component using the buggy service',
+        },
+      ],
+      python: [
+        {
+          fileName: 'api/user_api.py',
+          content: `# User API functions
+import aiohttp
+import asyncio
+
+async def fetch_user(user_id: str) -> dict:
+    """Fetch user data from API"""
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f'https://api.example.com/users/{user_id}') as response:
+            if response.status != 200:
+                raise Exception(f'Failed to fetch user: {response.status}')
+            return await response.json()
+
+async def fetch_user_posts(user_id: str) -> list:
+    """Fetch user's posts from API"""
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f'https://api.example.com/users/{user_id}/posts') as response:
+            if response.status != 200:
+                raise Exception(f'Failed to fetch posts: {response.status}')
+            return await response.json()`,
+          description: 'Async API functions for fetching user data',
+        },
+        {
+          fileName: 'components/user_dashboard.py',
+          content: `# User Dashboard component
+from user_service import get_user_with_posts
+
+async def render_user_dashboard(user_id: str):
+    """Render user dashboard with posts"""
+    try:
+        data = await get_user_with_posts(user_id)
+
+        # This will fail if user is a coroutine object instead of dict
+        print(f"User: {data['user']['name']}")
+        print(f"Email: {data['user']['email']}")
+        print(f"Posts: {len(data['posts'])}")
+
+        for post in data['posts']:
+            print(f"  - {post['title']}")
+
+    except TypeError as e:
+        print(f"TypeError: {e}")
+        print("This likely means user is a coroutine, not a dict")
+    except Exception as e:
+        print(f"Error: {e}")`,
+          description: 'Dashboard that uses the buggy service',
+        },
+      ],
     },
     expectedBehavior: 'Should properly await both API calls and return complete data',
     bugDescription: 'Missing await on first async call causes user to be a Promise',
@@ -1614,8 +1850,9 @@ def register_user(request_data):
     ],
     testCases: [
       {
-        input: '"user123"',
-        expectedOutput: 'Returns object with user data and posts array',
+        input: { userId: 'user123' },
+        expected: { user: { id: 'user123', name: 'John Doe' }, posts: [] },
+        description: 'Should return user object and posts array',
       },
     ],
   },
@@ -1630,29 +1867,282 @@ def register_user(request_data):
     estimatedTime: 15,
     problemStatement: `This code should create buttons that log 0, 1, 2 when clicked, but they all log 3. Fix the closure issue.`,
     buggyCode: {
-      javascript: `function createButtons() {
+      javascript: `// buttonFactory.js - Creates event handlers with closure bug
+function createButtons() {
   const buttons = [];
+  // BUG: Using 'var' creates function-scoped variable
   for (var i = 0; i < 3; i++) {
     buttons.push(function() {
-      console.log(i);
+      console.log(i);  // Captures reference to i, not value
     });
   }
   return buttons;
 }`,
-      typescript: `function createButtons(): Function[] {
+      typescript: `// buttonFactory.ts - Creates event handlers with closure bug
+function createButtons(): Function[] {
   const buttons: Function[] = [];
+  // BUG: Using 'var' creates function-scoped variable
   for (var i = 0; i < 3; i++) {
     buttons.push(function() {
-      console.log(i);
+      console.log(i);  // Captures reference to i, not value
     });
   }
   return buttons;
 }`,
-      python: `def createButtons():
+      python: `# button_factory.py - Creates event handlers with closure bug
+def create_buttons():
     buttons = []
+    # BUG: Lambda captures variable i by reference
     for i in range(3):
         buttons.append(lambda: print(i))
     return buttons`,
+    },
+    codebaseFiles: {
+      javascript: [
+        {
+          fileName: 'ui/ButtonManager.js',
+          content: `// ButtonManager - Manages dynamic button creation
+import { createButtons } from './buttonFactory.js';
+
+export class ButtonManager {
+  constructor(containerId) {
+    this.container = document.getElementById(containerId);
+    this.handlers = [];
+  }
+
+  renderButtons() {
+    this.handlers = createButtons();
+
+    this.container.innerHTML = '';
+
+    this.handlers.forEach((handler, index) => {
+      const button = document.createElement('button');
+      button.textContent = \`Button \${index}\`;
+      button.className = 'btn';
+      button.addEventListener('click', handler);
+      this.container.appendChild(button);
+    });
+
+    console.log('Expected: Buttons should log 0, 1, 2 when clicked');
+    console.log('Actual: All buttons log 3 due to closure bug');
+  }
+
+  testHandlers() {
+    console.log('Testing button handlers:');
+    this.handlers.forEach((handler, index) => {
+      console.log(\`Handler \${index} logs:\`);
+      handler();
+    });
+  }
+}`,
+          description: 'UI manager that uses createButtons function',
+        },
+        {
+          fileName: 'utils/eventHandlerFactory.js',
+          content: `// Utility functions for creating event handlers
+// These show the CORRECT patterns to avoid closure bugs
+
+// Pattern 1: Using let (block scope)
+export function createHandlersWithLet() {
+  const handlers = [];
+  for (let i = 0; i < 3; i++) {  // 'let' creates block-scoped variable
+    handlers.push(function() {
+      console.log(i);
+    });
+  }
+  return handlers;
+}
+
+// Pattern 2: Using IIFE (Immediately Invoked Function Expression)
+export function createHandlersWithIIFE() {
+  const handlers = [];
+  for (var i = 0; i < 3; i++) {
+    handlers.push((function(index) {
+      return function() {
+        console.log(index);
+      };
+    })(i));
+  }
+  return handlers;
+}
+
+// Pattern 3: Using forEach
+export function createHandlersWithForEach() {
+  return [0, 1, 2].map(i => {
+    return function() {
+      console.log(i);
+    };
+  });
+}
+
+// Pattern 4: Using bind
+export function createHandlersWithBind() {
+  const handlers = [];
+  for (var i = 0; i < 3; i++) {
+    handlers.push(console.log.bind(console, i));
+  }
+  return handlers;
+}`,
+          description: 'Reference implementations showing correct patterns',
+        },
+        {
+          fileName: 'tests/closureTest.js',
+          content: `// Test file to demonstrate closure bug
+import { createButtons } from './buttonFactory.js';
+import { createHandlersWithLet } from './utils/eventHandlerFactory.js';
+
+function testClosureBug() {
+  console.log('=== Testing Closure Bug ===\\n');
+
+  console.log('Buggy version (using var):');
+  const buggyHandlers = createButtons();
+  buggyHandlers.forEach((handler, index) => {
+    console.log(\`  Handler \${index} logs:\`, end='');
+    handler();  // All will log 3
+  });
+
+  console.log('\\nExpected behavior:');
+  console.log('  Handler 0 should log: 0');
+  console.log('  Handler 1 should log: 1');
+  console.log('  Handler 2 should log: 2');
+
+  console.log('\\nFixed version (using let):');
+  const fixedHandlers = createHandlersWithLet();
+  fixedHandlers.forEach((handler, index) => {
+    console.log(\`  Handler \${index} logs:\`, end='');
+    handler();  // Will correctly log 0, 1, 2
+  });
+}
+
+testClosureBug();`,
+          description: 'Test showing the bug and expected behavior',
+        },
+      ],
+      typescript: [
+        {
+          fileName: 'ui/ButtonManager.ts',
+          content: `// ButtonManager - Manages dynamic button creation
+import { createButtons } from './buttonFactory';
+
+type EventHandler = () => void;
+
+export class ButtonManager {
+  private container: HTMLElement | null;
+  private handlers: EventHandler[] = [];
+
+  constructor(containerId: string) {
+    this.container = document.getElementById(containerId);
+  }
+
+  renderButtons(): void {
+    if (!this.container) return;
+
+    this.handlers = createButtons();
+    this.container.innerHTML = '';
+
+    this.handlers.forEach((handler, index) => {
+      const button = document.createElement('button');
+      button.textContent = \`Button \${index}\`;
+      button.className = 'btn';
+      button.addEventListener('click', handler);
+      this.container!.appendChild(button);
+    });
+  }
+
+  testHandlers(): void {
+    console.log('Testing button handlers:');
+    this.handlers.forEach((handler, index) => {
+      console.log(\`Handler \${index}:\`);
+      handler();
+    });
+  }
+}`,
+          description: 'TypeScript button manager using the buggy factory',
+        },
+      ],
+      python: [
+        {
+          fileName: 'ui/button_manager.py',
+          content: `# ButtonManager - Manages dynamic button creation
+from button_factory import create_buttons
+
+class ButtonManager:
+    def __init__(self):
+        self.handlers = []
+
+    def create_buttons(self):
+        """Create button handlers"""
+        self.handlers = create_buttons()
+        print('Expected: Buttons should print 0, 1, 2 when called')
+        print('Actual: All buttons print 2 due to closure bug')
+
+    def test_handlers(self):
+        """Test all handlers"""
+        print('Testing button handlers:')
+        for index, handler in enumerate(self.handlers):
+            print(f'Handler {index} prints:', end=' ')
+            handler()`,
+          description: 'UI manager that uses create_buttons function',
+        },
+        {
+          fileName: 'utils/event_handler_factory.py',
+          content: `# Utility functions showing correct patterns
+
+# Pattern 1: Using default arguments (CORRECT)
+def create_handlers_with_default():
+    """Create handlers using default argument to capture value"""
+    handlers = []
+    for i in range(3):
+        handlers.append(lambda index=i: print(index))
+    return handlers
+
+# Pattern 2: Using functools.partial (CORRECT)
+from functools import partial
+
+def create_handlers_with_partial():
+    """Create handlers using partial application"""
+    handlers = []
+    for i in range(3):
+        handlers.append(partial(print, i))
+    return handlers
+
+# Pattern 3: Using list comprehension (CORRECT)
+def create_handlers_with_comprehension():
+    """Create handlers using list comprehension"""
+    return [lambda index=i: print(index) for i in range(3)]`,
+          description: 'Reference implementations showing correct patterns',
+        },
+        {
+          fileName: 'tests/closure_test.py',
+          content: `# Test file to demonstrate closure bug
+from button_factory import create_buttons
+from utils.event_handler_factory import create_handlers_with_default
+
+def test_closure_bug():
+    print('=== Testing Closure Bug ===\\n')
+
+    print('Buggy version (lambda capturing variable):')
+    buggy_handlers = create_buttons()
+    for index, handler in enumerate(buggy_handlers):
+        print(f'  Handler {index} prints:', end=' ')
+        handler()  # All will print 2
+
+    print('\\nExpected behavior:')
+    print('  Handler 0 should print: 0')
+    print('  Handler 1 should print: 1')
+    print('  Handler 2 should print: 2')
+
+    print('\\nFixed version (using default arguments):')
+    fixed_handlers = create_handlers_with_default()
+    for index, handler in enumerate(fixed_handlers):
+        print(f'  Handler {index} prints:', end=' ')
+        handler()  # Will correctly print 0, 1, 2
+
+if __name__ == '__main__':
+    test_closure_bug()`,
+          description: 'Test showing the bug and expected behavior',
+        },
+      ],
     },
     expectedBehavior: 'Each button should log its correct index (0, 1, 2)',
     bugDescription: 'Closure captures the variable i, not its value at each iteration',
@@ -1660,11 +2150,13 @@ def register_user(request_data):
       'The issue is with variable scope in the loop',
       'Consider using let instead of var in JavaScript',
       'You could also use an IIFE or pass i as a parameter',
+      'In Python, use default arguments in lambda: lambda i=i: print(i)',
     ],
     testCases: [
       {
-        input: 'Call each returned function',
-        expectedOutput: 'Logs 0, 1, 2 respectively',
+        input: { action: 'Call each returned function' },
+        expected: [0, 1, 2],
+        description: 'Should log 0, 1, 2 respectively',
       },
     ],
   },
@@ -1679,30 +2171,275 @@ def register_user(request_data):
     estimatedTime: 15,
     problemStatement: `This React component adds event listeners but never removes them, causing a memory leak. Fix it.`,
     buggyCode: {
-      javascript: `function useWindowSize() {
+      javascript: `// useWindowSize.js - Hook with memory leak
+function useWindowSize() {
   const [size, setSize] = useState({ width: window.innerWidth });
 
   useEffect(() => {
     function handleResize() {
       setSize({ width: window.innerWidth });
     }
+    // BUG: Event listener added but never removed
     window.addEventListener('resize', handleResize);
+    // Missing cleanup function
   }, []);
 
   return size;
 }`,
-      typescript: `function useWindowSize() {
+      typescript: `// useWindowSize.ts - Hook with memory leak
+function useWindowSize() {
   const [size, setSize] = useState({ width: window.innerWidth });
 
   useEffect(() => {
     function handleResize() {
       setSize({ width: window.innerWidth });
     }
+    // BUG: Event listener added but never removed
     window.addEventListener('resize', handleResize);
+    // Missing cleanup function
   }, []);
 
   return size;
 }`,
+    },
+    codebaseFiles: {
+      javascript: [
+        {
+          fileName: 'components/ResponsiveLayout.jsx',
+          content: `// ResponsiveLayout - Component that uses the buggy hook
+import React from 'react';
+import { useWindowSize } from '../hooks/useWindowSize';
+
+export function ResponsiveLayout() {
+  const { width } = useWindowSize();
+
+  return (
+    <div className="layout">
+      <div className="header">
+        <h1>Responsive App</h1>
+        <span className="window-size">Window: {width}px</span>
+      </div>
+
+      <div className="content">
+        {width < 768 ? (
+          <MobileView />
+        ) : width < 1024 ? (
+          <TabletView />
+        ) : (
+          <DesktopView />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MobileView() {
+  return <div>Mobile View</div>;
+}
+
+function TabletView() {
+  return <div>Tablet View</div>;
+}
+
+function DesktopView() {
+  return <div>Desktop View</div>;
+}`,
+          description: 'Component using the buggy useWindowSize hook',
+        },
+        {
+          fileName: 'components/ConditionalWidget.jsx',
+          content: `// ConditionalWidget - Mounts/unmounts frequently
+import React, { useState } from 'react';
+import { useWindowSize } from '../hooks/useWindowSize';
+
+export function ConditionalWidget() {
+  const [showWidget, setShowWidget] = useState(true);
+
+  return (
+    <div>
+      <button onClick={() => setShowWidget(!showWidget)}>
+        Toggle Widget
+      </button>
+
+      {/* This component mounts and unmounts frequently */}
+      {/* Each mount adds a new listener without removing the old one */}
+      {showWidget && <WindowSizeDisplay />}
+    </div>
+  );
+}
+
+function WindowSizeDisplay() {
+  const { width } = useWindowSize();
+
+  return (
+    <div className="widget">
+      Current width: {width}px
+    </div>
+  );
+}`,
+          description: 'Component that mounts/unmounts, demonstrating the leak',
+        },
+        {
+          fileName: 'utils/memoryTest.js',
+          content: `// Memory leak testing utility
+export function testForMemoryLeak() {
+  let listenerCount = 0;
+
+  // Override addEventListener to count listeners
+  const originalAddEventListener = window.addEventListener;
+  const originalRemoveEventListener = window.removeEventListener;
+
+  window.addEventListener = function(...args) {
+    listenerCount++;
+    console.log(\`Listener added. Total: \${listenerCount}\`);
+    return originalAddEventListener.apply(this, args);
+  };
+
+  window.removeEventListener = function(...args) {
+    listenerCount--;
+    console.log(\`Listener removed. Total: \${listenerCount}\`);
+    return originalRemoveEventListener.apply(this, args);
+  };
+
+  return {
+    getListenerCount: () => listenerCount,
+    reset: () => {
+      window.addEventListener = originalAddEventListener;
+      window.removeEventListener = originalRemoveEventListener;
+    }
+  };
+}
+
+// Test scenario
+export function runMemoryLeakTest(ComponentToTest, iterations = 10) {
+  const test = testForMemoryLeak();
+
+  console.log('Testing for memory leaks...');
+  console.log(\`Mounting and unmounting component \${iterations} times\`);
+
+  for (let i = 0; i < iterations; i++) {
+    // Simulate mount
+    const component = ComponentToTest();
+    // Simulate unmount
+    component?.cleanup?.();
+  }
+
+  const finalCount = test.getListenerCount();
+  test.reset();
+
+  if (finalCount > 0) {
+    console.error(\`❌ MEMORY LEAK DETECTED: \${finalCount} listeners not removed\`);
+  } else {
+    console.log('✅ No memory leak detected');
+  }
+
+  return finalCount === 0;
+}`,
+          description: 'Utility to detect memory leaks in components',
+        },
+        {
+          fileName: 'hooks/useWindowSize.fixed.js',
+          content: `// Fixed version with proper cleanup
+import { useState, useEffect } from 'react';
+
+export function useWindowSize() {
+  const [size, setSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight
+  });
+
+  useEffect(() => {
+    function handleResize() {
+      setSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    }
+
+    window.addEventListener('resize', handleResize);
+
+    // FIXED: Return cleanup function
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []); // Empty dependency array - only run once
+
+  return size;
+}`,
+          description: 'Fixed version showing proper cleanup',
+        },
+      ],
+      typescript: [
+        {
+          fileName: 'components/ResponsiveLayout.tsx',
+          content: `// ResponsiveLayout - Component using the buggy hook
+import React from 'react';
+import { useWindowSize } from '../hooks/useWindowSize';
+
+interface Size {
+  width: number;
+  height?: number;
+}
+
+export function ResponsiveLayout(): JSX.Element {
+  const { width }: Size = useWindowSize();
+
+  const getViewType = (): string => {
+    if (width < 768) return 'Mobile';
+    if (width < 1024) return 'Tablet';
+    return 'Desktop';
+  };
+
+  return (
+    <div className="layout">
+      <div className="header">
+        <h1>Responsive App</h1>
+        <span className="window-size">
+          {width}px - {getViewType()} View
+        </span>
+      </div>
+    </div>
+  );
+}`,
+          description: 'TypeScript component using the hook',
+        },
+        {
+          fileName: 'hooks/useWindowSize.fixed.ts',
+          content: `// Fixed version with proper cleanup and TypeScript
+import { useState, useEffect } from 'react';
+
+interface WindowSize {
+  width: number;
+  height: number;
+}
+
+export function useWindowSize(): WindowSize {
+  const [size, setSize] = useState<WindowSize>({
+    width: window.innerWidth,
+    height: window.innerHeight
+  });
+
+  useEffect(() => {
+    function handleResize(): void {
+      setSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    }
+
+    window.addEventListener('resize', handleResize);
+
+    // Cleanup function
+    return (): void => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  return size;
+}`,
+          description: 'Fixed TypeScript version with proper types',
+        },
+      ],
     },
     expectedBehavior: 'Should add AND remove event listener to prevent memory leaks',
     bugDescription: 'Event listener is added but never removed on component unmount',
@@ -1710,11 +2447,13 @@ def register_user(request_data):
       'useEffect can return a cleanup function',
       'Cleanup function runs when component unmounts',
       'Use removeEventListener in the cleanup',
+      'The cleanup function should mirror the setup',
     ],
     testCases: [
       {
-        input: 'Mount and unmount component multiple times',
-        expectedOutput: 'No duplicate event listeners, no memory leak',
+        input: { action: 'Mount and unmount component 10 times' },
+        expected: { listenerCount: 0 },
+        description: 'No duplicate event listeners, no memory leak',
       },
     ],
   },
@@ -1729,37 +2468,214 @@ def register_user(request_data):
     estimatedTime: 10,
     problemStatement: `This function should sum two numbers, but sometimes returns unexpected results. Fix the type issue.`,
     buggyCode: {
-      javascript: `function addNumbers(a, b) {
+      javascript: `// calculator.js - Math utilities with type coercion bug
+function addNumbers(a, b) {
+  // BUG: No type conversion - string concatenation occurs
   return a + b;
 }
 // addNumbers("5", 3) returns "53" instead of 8`,
-      typescript: `function addNumbers(a: any, b: any) {
+      typescript: `// calculator.ts - Math utilities with type coercion bug
+function addNumbers(a: any, b: any) {
+  // BUG: Using 'any' allows strings, no conversion
   return a + b;
 }
 // addNumbers("5", 3) returns "53" instead of 8`,
-      python: `def addNumbers(a, b):
+      python: `# calculator.py - Math utilities with type issue
+def add_numbers(a, b):
+    # BUG: No type checking or conversion
     return a + b
-# addNumbers("5", 3) raises TypeError`,
+# add_numbers("5", 3) would raise TypeError in Python`,
+    },
+    codebaseFiles: {
+      javascript: [
+        {
+          fileName: 'services/PriceCalculator.js',
+          content: `// PriceCalculator - Uses addNumbers for calculations
+import { addNumbers } from './calculator.js';
+
+export class PriceCalculator {
+  constructor() {
+    this.items = [];
+  }
+
+  addItem(name, price) {
+    // Prices might come from form inputs as strings
+    this.items.push({ name, price });
+  }
+
+  calculateTotal() {
+    let total = 0;
+    for (const item of this.items) {
+      // BUG: If item.price is a string, concatenation occurs
+      total = addNumbers(total, item.price);
+    }
+    return total;
+  }
+
+  calculateWithTax(subtotal, taxRate) {
+    // taxRate might be "0.08" from an input field
+    const tax = addNumbers(subtotal, taxRate);
+    return tax;
+  }
+}`,
+          description: 'Price calculator affected by type coercion bug',
+        },
+        {
+          fileName: 'utils/formHelpers.js',
+          content: `// Form helper utilities
+export function getFormValues(formId) {
+  const form = document.getElementById(formId);
+  const formData = new FormData(form);
+  const values = {};
+
+  for (const [key, value] of formData.entries()) {
+    // WARNING: All form values are strings!
+    values[key] = value;
+  }
+
+  return values;
+}
+
+// Example usage that causes the bug:
+export function handleCheckoutForm() {
+  const values = getFormValues('checkout-form');
+
+  // values.quantity is "2" (string)
+  // values.price is "10.50" (string)
+  // When passed to addNumbers, results in "210.50" instead of 12.50
+
+  return {
+    quantity: values.quantity,
+    price: values.price,
+    itemTotal: addNumbers(values.quantity, values.price)
+  };
+}`,
+          description: 'Form helpers that return string values',
+        },
+        {
+          fileName: 'tests/calculatorTest.js',
+          content: `// Test file showing type coercion issues
+import { addNumbers } from './calculator.js';
+
+function testAddNumbers() {
+  console.log('=== Testing addNumbers ===\\n');
+
+  // Test 1: Numbers (works correctly)
+  console.log('Test 1: addNumbers(5, 3)');
+  console.log('Expected: 8');
+  console.log('Actual:', addNumbers(5, 3));
+  console.log('✅ Pass\\n');
+
+  // Test 2: String + Number (BUG)
+  console.log('Test 2: addNumbers("5", 3)');
+  console.log('Expected: 8');
+  console.log('Actual:', addNumbers("5", 3));
+  console.log('❌ Fail - Got "53" (concatenation)\\n');
+
+  // Test 3: Two strings (BUG)
+  console.log('Test 3: addNumbers("5", "3")');
+  console.log('Expected: 8');
+  console.log('Actual:', addNumbers("5", "3"));
+  console.log('❌ Fail - Got "53" (concatenation)\\n');
+
+  // Test 4: Decimal strings (BUG)
+  console.log('Test 4: addNumbers("10.5", "2.3")');
+  console.log('Expected: 12.8');
+  console.log('Actual:', addNumbers("10.5", "2.3"));
+  console.log('❌ Fail - Got "10.52.3"\\n');
+}
+
+testAddNumbers();`,
+          description: 'Test demonstrating the type coercion bug',
+        },
+      ],
+      typescript: [
+        {
+          fileName: 'services/PriceCalculator.ts',
+          content: `// PriceCalculator with proper types (but still buggy)
+import { addNumbers } from './calculator';
+
+interface Item {
+  name: string;
+  price: number | string;  // Problem: allows strings
+}
+
+export class PriceCalculator {
+  private items: Item[] = [];
+
+  addItem(name: string, price: number | string): void {
+    this.items.push({ name, price });
+  }
+
+  calculateTotal(): number | string {
+    let total: any = 0;
+    for (const item of this.items) {
+      total = addNumbers(total, item.price);
+    }
+    return total;
+  }
+}`,
+          description: 'TypeScript calculator with loose typing',
+        },
+      ],
+      python: [
+        {
+          fileName: 'services/price_calculator.py',
+          content: `# PriceCalculator - Uses add_numbers for calculations
+from calculator import add_numbers
+
+class PriceCalculator:
+    def __init__(self):
+        self.items = []
+
+    def add_item(self, name, price):
+        """Add item to cart"""
+        # Prices might come from web forms as strings
+        self.items.append({"name": name, "price": price})
+
+    def calculate_total(self):
+        """Calculate total price"""
+        total = 0
+        for item in self.items:
+            # If item['price'] is a string, this will fail
+            try:
+                total = add_numbers(total, item['price'])
+            except TypeError as e:
+                print(f"Error: Cannot add {type(total)} and {type(item['price'])}")
+                raise
+        return total`,
+          description: 'Price calculator affected by type issues',
+        },
+      ],
     },
     expectedBehavior: 'Should always return numeric sum, converting strings to numbers',
     bugDescription: 'String concatenation happens instead of numeric addition',
     hints: [
       'JavaScript + operator behaves differently with strings vs numbers',
       'Convert inputs to numbers explicitly',
-      'Use Number(), parseInt(), or the + unary operator',
+      'Use Number(), parseInt(), parseFloat(), or the + unary operator',
+      'Consider using TypeScript with strict types',
     ],
     testCases: [
       {
-        input: '(5, 3)',
-        expectedOutput: '8',
+        input: { a: 5, b: 3 },
+        expected: 8,
+        description: 'Numbers: 5 + 3 = 8',
       },
       {
-        input: '("5", 3)',
-        expectedOutput: '8',
+        input: { a: '5', b: 3 },
+        expected: 8,
+        description: 'String + Number: "5" + 3 = 8',
       },
       {
-        input: '("5", "3")',
-        expectedOutput: '8',
+        input: { a: '5', b: '3' },
+        expected: 8,
+        description: 'Two strings: "5" + "3" = 8',
+      },
+      {
+        input: { a: '10.5', b: '2.3' },
+        expected: 12.8,
+        description: 'Decimal strings: "10.5" + "2.3" = 12.8',
       },
     ],
   },
@@ -1796,9 +2712,232 @@ async function handleSearch(query: string) {
     testCases: [
       {
         input: 'Quick succession: "a", "ab", "abc"',
-        expectedOutput: 'Only shows results for "abc", ignores earlier results',
+        expected: 'Only shows results for "abc", ignores earlier results',
       },
     ],
+    codebaseFiles: {
+      javascript: [
+        {
+          fileName: 'components/SearchBar.jsx',
+          content: `import React, { useState } from 'react';
+import { searchAPI } from '../api/searchAPI';
+
+export function SearchBar({ onResults }) {
+  const [query, setQuery] = useState('');
+
+  async function handleSearch(query) {
+    // BUG: No tracking of which request is latest
+    const results = await searchAPI(query);
+    onResults(results);
+  }
+
+  const handleChange = (e) => {
+    const newQuery = e.target.value;
+    setQuery(newQuery);
+    handleSearch(newQuery); // Fires on every keystroke
+  };
+
+  return (
+    <input
+      type="text"
+      value={query}
+      onChange={handleChange}
+      placeholder="Search..."
+    />
+  );
+}`,
+          description: 'SearchBar component that triggers searches on every keystroke',
+        },
+        {
+          fileName: 'api/searchAPI.js',
+          content: `// Simulates API call with random delays
+export async function searchAPI(query) {
+  // Simulate network delay (100-500ms)
+  const delay = Math.random() * 400 + 100;
+
+  await new Promise(resolve => setTimeout(resolve, delay));
+
+  // Simulate search results
+  return {
+    query,
+    results: [
+      { id: 1, title: \`Result for "\${query}" - 1\` },
+      { id: 2, title: \`Result for "\${query}" - 2\` },
+      { id: 3, title: \`Result for "\${query}" - 3\` },
+    ],
+    timestamp: Date.now()
+  };
+}`,
+          description: 'API function with simulated variable delay causing race conditions',
+        },
+        {
+          fileName: 'components/SearchResults.jsx',
+          content: `import React from 'react';
+
+export function SearchResults({ results }) {
+  if (!results) {
+    return <div>No results yet</div>;
+  }
+
+  return (
+    <div className="search-results">
+      <h3>Results for: {results.query}</h3>
+      <ul>
+        {results.results.map(result => (
+          <li key={result.id}>{result.title}</li>
+        ))}
+      </ul>
+      <small>Timestamp: {results.timestamp}</small>
+    </div>
+  );
+}`,
+          description: 'Component that displays search results - shows wrong results when race condition occurs',
+        },
+        {
+          fileName: 'tests/searchRaceCondition.test.js',
+          content: `import { render, fireEvent, waitFor } from '@testing-library/react';
+import { SearchBar } from '../components/SearchBar';
+import { SearchResults } from '../components/SearchResults';
+import { searchAPI } from '../api/searchAPI';
+
+jest.mock('../api/searchAPI');
+
+describe('Search Race Condition Bug', () => {
+  test('demonstrates race condition - older results overwrite newer', async () => {
+    let onResults;
+    const { getByPlaceholderText, getByText } = render(
+      <div>
+        <SearchBar onResults={(r) => { onResults = r; }} />
+        <SearchResults results={onResults} />
+      </div>
+    );
+
+    // Mock searchAPI to control timing
+    searchAPI.mockImplementation((query) => {
+      const delays = { 'a': 300, 'ab': 200, 'abc': 100 }; // Reverse order!
+      return new Promise(resolve =>
+        setTimeout(() => resolve({
+          query,
+          results: [{ id: 1, title: \`Result for "\${query}"\` }],
+          timestamp: Date.now()
+        }), delays[query])
+      );
+    });
+
+    const input = getByPlaceholderText('Search...');
+
+    // Type quickly: a, ab, abc
+    fireEvent.change(input, { target: { value: 'a' } });
+    fireEvent.change(input, { target: { value: 'ab' } });
+    fireEvent.change(input, { target: { value: 'abc' } });
+
+    // Wait for all requests to complete
+    await waitFor(() => {}, { timeout: 500 });
+
+    // BUG: Shows results for "a" instead of "abc"!
+    // Because "a" took longest (300ms) and completed last
+    expect(getByText(/Result for "a"/)).toBeInTheDocument();
+    // This assertion FAILS - we don't see "abc" results
+    // expect(getByText(/Result for "abc"/)).toBeInTheDocument();
+  });
+});`,
+          description: 'Test demonstrating the race condition bug when typing quickly',
+        },
+      ],
+      typescript: [
+        {
+          fileName: 'components/SearchBar.tsx',
+          content: `import React, { useState } from 'react';
+import { searchAPI, SearchResult } from '../api/searchAPI';
+
+interface SearchBarProps {
+  onResults: (results: SearchResult) => void;
+}
+
+export function SearchBar({ onResults }: SearchBarProps) {
+  const [query, setQuery] = useState('');
+
+  async function handleSearch(query: string): Promise<void> {
+    // BUG: No tracking of which request is latest
+    const results = await searchAPI(query);
+    onResults(results);
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newQuery = e.target.value;
+    setQuery(newQuery);
+    handleSearch(newQuery); // Fires on every keystroke
+  };
+
+  return (
+    <input
+      type="text"
+      value={query}
+      onChange={handleChange}
+      placeholder="Search..."
+    />
+  );
+}`,
+          description: 'SearchBar component that triggers searches on every keystroke',
+        },
+        {
+          fileName: 'api/searchAPI.ts',
+          content: `export interface SearchResult {
+  query: string;
+  results: Array<{ id: number; title: string }>;
+  timestamp: number;
+}
+
+// Simulates API call with random delays
+export async function searchAPI(query: string): Promise<SearchResult> {
+  // Simulate network delay (100-500ms)
+  const delay = Math.random() * 400 + 100;
+
+  await new Promise(resolve => setTimeout(resolve, delay));
+
+  // Simulate search results
+  return {
+    query,
+    results: [
+      { id: 1, title: \`Result for "\${query}" - 1\` },
+      { id: 2, title: \`Result for "\${query}" - 2\` },
+      { id: 3, title: \`Result for "\${query}" - 3\` },
+    ],
+    timestamp: Date.now()
+  };
+}`,
+          description: 'API function with simulated variable delay causing race conditions',
+        },
+        {
+          fileName: 'components/SearchResults.tsx',
+          content: `import React from 'react';
+import { SearchResult } from '../api/searchAPI';
+
+interface SearchResultsProps {
+  results: SearchResult | null;
+}
+
+export function SearchResults({ results }: SearchResultsProps) {
+  if (!results) {
+    return <div>No results yet</div>;
+  }
+
+  return (
+    <div className="search-results">
+      <h3>Results for: {results.query}</h3>
+      <ul>
+        {results.results.map(result => (
+          <li key={result.id}>{result.title}</li>
+        ))}
+      </ul>
+      <small>Timestamp: {results.timestamp}</small>
+    </div>
+  );
+}`,
+          description: 'Component that displays search results - shows wrong results when race condition occurs',
+        },
+      ],
+    },
   },
   {
     id: 'bugfix-deepcopy',
@@ -1837,9 +2976,413 @@ async function handleSearch(query: string) {
     testCases: [
       {
         input: '{name: "John", preferences: {theme: "light"}}, "dark"',
-        expectedOutput: 'Original user.preferences.theme stays "light"',
+        expected: 'Original user.preferences.theme stays "light"',
       },
     ],
+    codebaseFiles: {
+      javascript: [
+        {
+          fileName: 'components/UserSettings.jsx',
+          content: `import React, { useState } from 'react';
+import { SettingsManager } from '../services/SettingsManager';
+
+const settingsManager = new SettingsManager();
+
+export function UserSettings() {
+  const [user, setUser] = useState({
+    name: 'John Doe',
+    email: 'john@example.com',
+    preferences: {
+      theme: 'light',
+      notifications: {
+        email: true,
+        push: false,
+        sms: true
+      },
+      language: 'en'
+    }
+  });
+
+  const updateTheme = (newTheme) => {
+    // BUG: This mutates the original user object!
+    const updated = settingsManager.updateUserSettings(user, newTheme);
+    setUser(updated);
+
+    // Original user object is also modified
+    console.log('Original user theme:', user.preferences.theme);
+    // Expected: 'light', Actual: 'dark' (mutation bug!)
+  };
+
+  return (
+    <div>
+      <h2>User Settings</h2>
+      <p>Name: {user.name}</p>
+      <p>Current Theme: {user.preferences.theme}</p>
+      <button onClick={() => updateTheme('dark')}>
+        Switch to Dark Theme
+      </button>
+      <button onClick={() => updateTheme('light')}>
+        Switch to Light Theme
+      </button>
+    </div>
+  );
+}`,
+          description: 'Component that updates user settings and experiences mutation bug',
+        },
+        {
+          fileName: 'services/SettingsManager.js',
+          content: `export class SettingsManager {
+  // BUG: Shallow copy doesn't prevent nested object mutation
+  updateUserSettings(user, newTheme) {
+    const updatedUser = { ...user }; // Shallow copy
+    updatedUser.preferences.theme = newTheme; // Mutates original!
+    return updatedUser;
+  }
+
+  // This has the same bug
+  toggleNotification(user, notificationType) {
+    const updatedUser = { ...user };
+    updatedUser.preferences.notifications[notificationType] =
+      !updatedUser.preferences.notifications[notificationType];
+    return updatedUser; // Original user is also modified
+  }
+
+  // Even this seemingly safe operation has the bug
+  updateLanguage(user, newLanguage) {
+    const updatedUser = { ...user };
+    updatedUser.preferences.language = newLanguage;
+    // This works because 'preferences' is replaced, but it's inconsistent
+    return updatedUser;
+  }
+}`,
+          description: 'Settings manager class with shallow copy bug affecting nested objects',
+        },
+        {
+          fileName: 'tests/settingsMutation.test.js',
+          content: `import { SettingsManager } from '../services/SettingsManager';
+
+describe('SettingsManager Mutation Bug', () => {
+  const settingsManager = new SettingsManager();
+
+  test('demonstrates shallow copy mutation bug', () => {
+    const originalUser = {
+      name: 'John',
+      preferences: {
+        theme: 'light',
+        notifications: {
+          email: true,
+          push: false
+        }
+      }
+    };
+
+    // Update theme to dark
+    const updatedUser = settingsManager.updateUserSettings(originalUser, 'dark');
+
+    // BUG: Original object is mutated!
+    expect(originalUser.preferences.theme).toBe('light'); // FAILS!
+    expect(originalUser.preferences.theme).toBe('dark'); // Actually true :(
+
+    expect(updatedUser.preferences.theme).toBe('dark'); // Passes
+
+    // They share the same preferences object
+    expect(originalUser.preferences).toBe(updatedUser.preferences); // Same reference!
+  });
+
+  test('demonstrates nested mutation bug', () => {
+    const originalUser = {
+      name: 'Jane',
+      preferences: {
+        theme: 'light',
+        notifications: {
+          email: true,
+          push: false,
+          sms: true
+        }
+      }
+    };
+
+    // Toggle email notifications
+    const updatedUser = settingsManager.toggleNotification(originalUser, 'email');
+
+    // BUG: Original notifications object is mutated!
+    expect(originalUser.preferences.notifications.email).toBe(true); // FAILS!
+    expect(originalUser.preferences.notifications.email).toBe(false); // Actual value
+
+    // Both objects share the same notifications reference
+    expect(originalUser.preferences.notifications)
+      .toBe(updatedUser.preferences.notifications);
+  });
+});`,
+          description: 'Test file demonstrating the shallow copy mutation bug',
+        },
+        {
+          fileName: 'examples/deepCopyExamples.js',
+          content: `// Examples showing the difference between shallow and deep copy
+
+// Example 1: Shallow copy problem
+function shallowCopyProblem() {
+  const original = {
+    name: 'User',
+    settings: { theme: 'light' }
+  };
+
+  const copy = { ...original };
+  copy.settings.theme = 'dark';
+
+  console.log('Original theme:', original.settings.theme); // 'dark' - MUTATED!
+  console.log('Copy theme:', copy.settings.theme); // 'dark'
+  console.log('Same reference?', original.settings === copy.settings); // true
+}
+
+// Example 2: Solutions for deep copy
+
+// Solution 1: structuredClone (modern browsers/Node 17+)
+function deepCopyWithStructuredClone(obj) {
+  return structuredClone(obj);
+}
+
+// Solution 2: JSON parse/stringify (simple but has limitations)
+function deepCopyWithJSON(obj) {
+  return JSON.parse(JSON.stringify(obj));
+  // Limitations: loses functions, undefined, Dates become strings, etc.
+}
+
+// Solution 3: Recursive deep copy
+function deepCopyRecursive(obj) {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (obj instanceof Date) return new Date(obj);
+  if (obj instanceof Array) return obj.map(item => deepCopyRecursive(item));
+
+  const copy = {};
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      copy[key] = deepCopyRecursive(obj[key]);
+    }
+  }
+  return copy;
+}
+
+// Solution 4: Using spread operator correctly for nested objects
+function properNestedCopy(user, newTheme) {
+  return {
+    ...user,
+    preferences: {
+      ...user.preferences,
+      theme: newTheme
+    }
+  };
+}`,
+          description: 'Examples showing shallow vs deep copy and various solutions',
+        },
+      ],
+      typescript: [
+        {
+          fileName: 'components/UserSettings.tsx',
+          content: `import React, { useState } from 'react';
+import { SettingsManager, User } from '../services/SettingsManager';
+
+const settingsManager = new SettingsManager();
+
+export function UserSettings() {
+  const [user, setUser] = useState<User>({
+    name: 'John Doe',
+    email: 'john@example.com',
+    preferences: {
+      theme: 'light',
+      notifications: {
+        email: true,
+        push: false,
+        sms: true
+      },
+      language: 'en'
+    }
+  });
+
+  const updateTheme = (newTheme: 'light' | 'dark') => {
+    // BUG: This mutates the original user object!
+    const updated = settingsManager.updateUserSettings(user, newTheme);
+    setUser(updated);
+
+    // Original user object is also modified
+    console.log('Original user theme:', user.preferences.theme);
+    // Expected: 'light', Actual: 'dark' (mutation bug!)
+  };
+
+  return (
+    <div>
+      <h2>User Settings</h2>
+      <p>Name: {user.name}</p>
+      <p>Current Theme: {user.preferences.theme}</p>
+      <button onClick={() => updateTheme('dark')}>
+        Switch to Dark Theme
+      </button>
+      <button onClick={() => updateTheme('light')}>
+        Switch to Light Theme
+      </button>
+    </div>
+  );
+}`,
+          description: 'Component that updates user settings and experiences mutation bug',
+        },
+        {
+          fileName: 'services/SettingsManager.ts',
+          content: `export interface User {
+  name: string;
+  email: string;
+  preferences: {
+    theme: 'light' | 'dark';
+    notifications: {
+      email: boolean;
+      push: boolean;
+      sms: boolean;
+    };
+    language: string;
+  };
+}
+
+export class SettingsManager {
+  // BUG: Shallow copy doesn't prevent nested object mutation
+  updateUserSettings(user: User, newTheme: 'light' | 'dark'): User {
+    const updatedUser = { ...user }; // Shallow copy
+    updatedUser.preferences.theme = newTheme; // Mutates original!
+    return updatedUser;
+  }
+
+  toggleNotification(user: User, notificationType: keyof User['preferences']['notifications']): User {
+    const updatedUser = { ...user };
+    updatedUser.preferences.notifications[notificationType] =
+      !updatedUser.preferences.notifications[notificationType];
+    return updatedUser; // Original user is also modified
+  }
+}`,
+          description: 'Settings manager class with shallow copy bug affecting nested objects',
+        },
+        {
+          fileName: 'tests/settingsMutation.test.ts',
+          content: `import { SettingsManager, User } from '../services/SettingsManager';
+
+describe('SettingsManager Mutation Bug', () => {
+  const settingsManager = new SettingsManager();
+
+  test('demonstrates shallow copy mutation bug', () => {
+    const originalUser: User = {
+      name: 'John',
+      email: 'john@test.com',
+      preferences: {
+        theme: 'light',
+        notifications: {
+          email: true,
+          push: false,
+          sms: true
+        },
+        language: 'en'
+      }
+    };
+
+    // Update theme to dark
+    const updatedUser = settingsManager.updateUserSettings(originalUser, 'dark');
+
+    // BUG: Original object is mutated!
+    expect(originalUser.preferences.theme).toBe('light'); // FAILS!
+    expect(originalUser.preferences.theme).toBe('dark'); // Actually true :(
+
+    // They share the same preferences object
+    expect(originalUser.preferences).toBe(updatedUser.preferences); // Same reference!
+  });
+});`,
+          description: 'Test file demonstrating the shallow copy mutation bug',
+        },
+      ],
+      python: [
+        {
+          fileName: 'services/settings_manager.py',
+          content: `from copy import copy, deepcopy
+
+class SettingsManager:
+    """Manages user settings with shallow copy bug"""
+
+    def update_user_settings(self, user, new_theme):
+        """BUG: dict.copy() only creates shallow copy"""
+        updated_user = user.copy()  # Shallow copy
+        updated_user['preferences']['theme'] = new_theme  # Mutates original!
+        return updated_user
+
+    def toggle_notification(self, user, notification_type):
+        """Same shallow copy bug"""
+        updated_user = user.copy()
+        updated_user['preferences']['notifications'][notification_type] = \\
+            not updated_user['preferences']['notifications'][notification_type]
+        return updated_user  # Original user is also modified
+
+    def update_user_settings_fixed(self, user, new_theme):
+        """Fixed version using deepcopy"""
+        updated_user = deepcopy(user)
+        updated_user['preferences']['theme'] = new_theme
+        return updated_user`,
+          description: 'Python settings manager showing shallow copy bug with dict.copy()',
+        },
+        {
+          fileName: 'tests/test_settings_mutation.py',
+          content: `import unittest
+from services.settings_manager import SettingsManager
+
+class TestSettingsMutation(unittest.TestCase):
+    def setUp(self):
+        self.manager = SettingsManager()
+        self.original_user = {
+            'name': 'John',
+            'email': 'john@test.com',
+            'preferences': {
+                'theme': 'light',
+                'notifications': {
+                    'email': True,
+                    'push': False,
+                    'sms': True
+                },
+                'language': 'en'
+            }
+        }
+
+    def test_shallow_copy_mutation_bug(self):
+        """Demonstrates that dict.copy() causes mutation"""
+        # Update theme to dark
+        updated_user = self.manager.update_user_settings(
+            self.original_user, 'dark'
+        )
+
+        # BUG: Original object is mutated!
+        # This assertion FAILS
+        # self.assertEqual(self.original_user['preferences']['theme'], 'light')
+
+        # This is what actually happens
+        self.assertEqual(self.original_user['preferences']['theme'], 'dark')
+
+        # They share the same preferences dictionary
+        self.assertIs(
+            self.original_user['preferences'],
+            updated_user['preferences']
+        )
+
+    def test_deepcopy_fix(self):
+        """Shows that deepcopy prevents mutation"""
+        updated_user = self.manager.update_user_settings_fixed(
+            self.original_user, 'dark'
+        )
+
+        # Original is NOT mutated with deepcopy
+        self.assertEqual(self.original_user['preferences']['theme'], 'light')
+        self.assertEqual(updated_user['preferences']['theme'], 'dark')
+
+        # They have different preference objects
+        self.assertIsNot(
+            self.original_user['preferences'],
+            updated_user['preferences']
+        )`,
+          description: 'Test demonstrating shallow vs deep copy in Python',
+        },
+      ],
+    },
   },
   {
     id: 'bugfix-floating-point',
@@ -1873,13 +3416,433 @@ async function handleSearch(query: string) {
     testCases: [
       {
         input: '[0.1, 0.2]',
-        expectedOutput: '0.3 (or 0.30)',
+        expected: '0.3 (or 0.30)',
       },
       {
         input: '[10.15, 5.99, 2.50]',
-        expectedOutput: '18.64',
+        expected: '18.64',
       },
     ],
+    codebaseFiles: {
+      javascript: [
+        {
+          fileName: 'services/InvoiceCalculator.js',
+          content: `export class InvoiceCalculator {
+  // BUG: Direct floating point arithmetic causes precision errors
+  calculateTotal(lineItems) {
+    return lineItems.reduce((sum, item) => sum + item.price, 0);
+    // 0.1 + 0.2 = 0.30000000000000004
+  }
+
+  calculateTax(subtotal, taxRate) {
+    return subtotal * taxRate;
+    // Can produce results like 10.004999999999999 instead of 10.01
+  }
+
+  calculateDiscount(price, discountPercent) {
+    const discount = price * (discountPercent / 100);
+    return price - discount;
+    // Precision errors compound
+  }
+
+  generateInvoice(items, taxRate = 0.08) {
+    const subtotal = this.calculateTotal(items);
+    const tax = this.calculateTax(subtotal, taxRate);
+    const total = subtotal + tax;
+
+    return {
+      subtotal, // BUG: May have precision errors
+      tax,      // BUG: May have precision errors
+      total,    // BUG: Compounded errors
+      items
+    };
+  }
+}
+
+// Example usage showing the bug
+const calculator = new InvoiceCalculator();
+const items = [
+  { name: 'Item 1', price: 0.1 },
+  { name: 'Item 2', price: 0.2 }
+];
+
+const result = calculator.calculateTotal(items);
+console.log(result); // 0.30000000000000004 instead of 0.3`,
+          description: 'Invoice calculator with floating point precision bugs',
+        },
+        {
+          fileName: 'services/PaymentProcessor.js',
+          content: `import { InvoiceCalculator } from './InvoiceCalculator';
+
+export class PaymentProcessor {
+  constructor() {
+    this.calculator = new InvoiceCalculator();
+  }
+
+  processPayment(items, paymentAmount) {
+    const invoice = this.calculator.generateInvoice(items);
+
+    // BUG: Comparing floating point numbers directly
+    if (paymentAmount === invoice.total) {
+      return { status: 'success', message: 'Payment exact' };
+    } else if (paymentAmount < invoice.total) {
+      const shortage = invoice.total - paymentAmount;
+      return {
+        status: 'insufficient',
+        message: \`Short by $\${shortage}\` // BUG: May show weird decimals
+      };
+    } else {
+      const change = paymentAmount - invoice.total;
+      return {
+        status: 'success',
+        change: change // BUG: Precision errors in change calculation
+      };
+    }
+  }
+
+  splitBill(totalAmount, numPeople) {
+    // BUG: Division can create repeating decimals
+    const perPerson = totalAmount / numPeople;
+    const total = perPerson * numPeople;
+
+    // This might not equal the original totalAmount!
+    if (total !== totalAmount) {
+      console.warn('Rounding error detected!');
+    }
+
+    return perPerson;
+  }
+
+  // Example that fails spectacularly
+  demonstrateBug() {
+    const items = [
+      { name: 'Coffee', price: 2.50 },
+      { name: 'Muffin', price: 3.15 },
+      { name: 'Juice', price: 1.99 }
+    ];
+
+    const invoice = this.calculator.generateInvoice(items);
+    console.log('Total:', invoice.total); // Might be 8.211200000000001
+
+    // Customer pays exact amount shown on screen: 8.21
+    const payment = this.processPayment(items, 8.21);
+    console.log(payment); // Might say "insufficient" due to precision!
+  }
+}`,
+          description: 'Payment processor that compounds floating point errors',
+        },
+        {
+          fileName: 'tests/floatingPointBug.test.js',
+          content: `import { InvoiceCalculator } from '../services/InvoiceCalculator';
+import { PaymentProcessor } from '../services/PaymentProcessor';
+
+describe('Floating Point Precision Bugs', () => {
+  describe('InvoiceCalculator', () => {
+    const calculator = new InvoiceCalculator();
+
+    test('demonstrates basic floating point error', () => {
+      const items = [
+        { name: 'Item 1', price: 0.1 },
+        { name: 'Item 2', price: 0.2 }
+      ];
+
+      const total = calculator.calculateTotal(items);
+
+      // This test FAILS due to floating point precision
+      expect(total).toBe(0.3); // FAILS!
+
+      // Actual value
+      expect(total).toBe(0.30000000000000004); // Passes but wrong!
+    });
+
+    test('demonstrates compounding errors', () => {
+      const items = [
+        { name: 'A', price: 10.15 },
+        { name: 'B', price: 5.99 },
+        { name: 'C', price: 2.50 }
+      ];
+
+      const invoice = calculator.generateInvoice(items, 0.08);
+
+      // Expected: 18.64 + tax (1.49) = 20.13
+      // Actual: Precision errors make this unpredictable
+      console.log('Subtotal:', invoice.subtotal); // Might be wrong
+      console.log('Tax:', invoice.tax); // Definitely wrong
+      console.log('Total:', invoice.total); // Compounded errors
+
+      // This assertion is flaky
+      expect(invoice.total).toBe(20.13); // FAILS sometimes!
+    });
+  });
+
+  describe('PaymentProcessor', () => {
+    const processor = new PaymentProcessor();
+
+    test('demonstrates payment comparison bug', () => {
+      const items = [{ name: 'Item', price: 0.1 }];
+
+      // Customer tries to pay exact amount
+      const result = processor.processPayment(items, 0.108);
+
+      // Expected: 'success' (0.1 * 1.08 = 0.108)
+      // Actual: 'insufficient' due to precision errors
+      expect(result.status).toBe('success'); // FAILS!
+      expect(result.status).toBe('insufficient'); // Actually true
+    });
+
+    test('demonstrates bill splitting bug', () => {
+      const total = 10.00;
+      const perPerson = processor.splitBill(total, 3);
+
+      // 10 / 3 = 3.3333...
+      expect(perPerson).toBe(3.33); // FAILS!
+      expect(perPerson).toBe(3.3333333333333335); // Actual
+
+      // When you multiply back
+      const reconstructedTotal = perPerson * 3;
+      expect(reconstructedTotal).toBe(total); // FAILS! Off by tiny amount
+    });
+  });
+});`,
+          description: 'Tests demonstrating various floating point precision errors',
+        },
+        {
+          fileName: 'utils/moneyUtils.js',
+          content: `// Utility functions showing proper ways to handle money
+
+/**
+ * Convert dollars to cents to work with integers
+ * This avoids floating point errors entirely
+ */
+export function dollarsToCents(dollars) {
+  return Math.round(dollars * 100);
+}
+
+export function centsToDollars(cents) {
+  return cents / 100;
+}
+
+/**
+ * Add money amounts safely
+ */
+export function addMoney(...amounts) {
+  const cents = amounts.map(dollarsToCents);
+  const totalCents = cents.reduce((sum, c) => sum + c, 0);
+  return centsToDollars(totalCents);
+}
+
+/**
+ * Round to 2 decimal places properly
+ */
+export function roundToMoney(amount) {
+  return Math.round(amount * 100) / 100;
+}
+
+/**
+ * Compare money amounts safely
+ */
+export function moneyEquals(a, b) {
+  return Math.abs(a - b) < 0.001; // Epsilon comparison
+}
+
+// Example: Fixed invoice calculator
+export class FixedInvoiceCalculator {
+  calculateTotal(lineItems) {
+    const centsArray = lineItems.map(item => dollarsToCents(item.price));
+    const totalCents = centsArray.reduce((sum, cents) => sum + cents, 0);
+    return centsToDollars(totalCents);
+  }
+
+  calculateTax(subtotal, taxRate) {
+    const subtotalCents = dollarsToCents(subtotal);
+    const taxCents = Math.round(subtotalCents * taxRate);
+    return centsToDollars(taxCents);
+  }
+}
+
+// Demonstration
+const buggy = 0.1 + 0.2; // 0.30000000000000004
+const fixed = addMoney(0.1, 0.2); // 0.3
+
+console.log('Buggy:', buggy);
+console.log('Fixed:', fixed);
+console.log('Are they equal?', buggy === 0.3); // false
+console.log('Fixed equals 0.3?', fixed === 0.3); // true`,
+          description: 'Utility functions showing proper techniques for handling money calculations',
+        },
+      ],
+      typescript: [
+        {
+          fileName: 'services/InvoiceCalculator.ts',
+          content: `export interface LineItem {
+  name: string;
+  price: number;
+}
+
+export interface Invoice {
+  subtotal: number;
+  tax: number;
+  total: number;
+  items: LineItem[];
+}
+
+export class InvoiceCalculator {
+  // BUG: Direct floating point arithmetic causes precision errors
+  calculateTotal(lineItems: LineItem[]): number {
+    return lineItems.reduce((sum, item) => sum + item.price, 0);
+    // 0.1 + 0.2 = 0.30000000000000004
+  }
+
+  calculateTax(subtotal: number, taxRate: number): number {
+    return subtotal * taxRate;
+  }
+
+  generateInvoice(items: LineItem[], taxRate: number = 0.08): Invoice {
+    const subtotal = this.calculateTotal(items);
+    const tax = this.calculateTax(subtotal, taxRate);
+    const total = subtotal + tax;
+
+    return {
+      subtotal, // BUG: May have precision errors
+      tax,      // BUG: May have precision errors
+      total,    // BUG: Compounded errors
+      items
+    };
+  }
+}`,
+          description: 'Invoice calculator with floating point precision bugs',
+        },
+        {
+          fileName: 'utils/moneyUtils.ts',
+          content: `// Utility functions showing proper ways to handle money
+
+export function dollarsToCents(dollars: number): number {
+  return Math.round(dollars * 100);
+}
+
+export function centsToDollars(cents: number): number {
+  return cents / 100;
+}
+
+export function addMoney(...amounts: number[]): number {
+  const cents = amounts.map(dollarsToCents);
+  const totalCents = cents.reduce((sum, c) => sum + c, 0);
+  return centsToDollars(totalCents);
+}
+
+export function roundToMoney(amount: number): number {
+  return Math.round(amount * 100) / 100;
+}
+
+export function moneyEquals(a: number, b: number): boolean {
+  return Math.abs(a - b) < 0.001; // Epsilon comparison
+}`,
+          description: 'Utility functions showing proper techniques for handling money calculations',
+        },
+      ],
+      python: [
+        {
+          fileName: 'services/invoice_calculator.py',
+          content: `from decimal import Decimal, ROUND_HALF_UP
+
+class InvoiceCalculator:
+    """Invoice calculator showing floating point bugs"""
+
+    def calculate_total_buggy(self, line_items):
+        """BUG: Float arithmetic has precision errors"""
+        total = sum(item['price'] for item in line_items)
+        return total
+        # 0.1 + 0.2 = 0.30000000000000004
+
+    def calculate_total_fixed(self, line_items):
+        """Fixed: Using Decimal for precise calculations"""
+        total = sum(Decimal(str(item['price'])) for item in line_items)
+        return float(total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+
+    def calculate_tax_buggy(self, subtotal, tax_rate):
+        """BUG: Float multiplication causes precision errors"""
+        return subtotal * tax_rate
+
+    def calculate_tax_fixed(self, subtotal, tax_rate):
+        """Fixed: Using Decimal"""
+        subtotal_dec = Decimal(str(subtotal))
+        tax_rate_dec = Decimal(str(tax_rate))
+        tax = subtotal_dec * tax_rate_dec
+        return float(tax.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+
+    def generate_invoice_buggy(self, items, tax_rate=0.08):
+        """BUG: Compounding precision errors"""
+        subtotal = self.calculate_total_buggy(items)
+        tax = self.calculate_tax_buggy(subtotal, tax_rate)
+        total = subtotal + tax
+
+        return {
+            'subtotal': subtotal,  # May have errors
+            'tax': tax,           # May have errors
+            'total': total,       # Compounded errors
+            'items': items
+        }`,
+          description: 'Python invoice calculator showing float vs Decimal',
+        },
+        {
+          fileName: 'tests/test_floating_point.py',
+          content: `import unittest
+from decimal import Decimal
+from services.invoice_calculator import InvoiceCalculator
+
+class TestFloatingPointBugs(unittest.TestCase):
+    def setUp(self):
+        self.calculator = InvoiceCalculator()
+
+    def test_basic_float_bug(self):
+        """Demonstrates basic floating point error"""
+        items = [
+            {'name': 'Item 1', 'price': 0.1},
+            {'name': 'Item 2', 'price': 0.2}
+        ]
+
+        total = self.calculator.calculate_total_buggy(items)
+
+        # This assertion FAILS
+        # self.assertEqual(total, 0.3)
+
+        # This is what actually happens
+        self.assertEqual(total, 0.30000000000000004)
+
+    def test_decimal_fix(self):
+        """Shows Decimal provides correct results"""
+        items = [
+            {'name': 'Item 1', 'price': 0.1},
+            {'name': 'Item 2', 'price': 0.2}
+        ]
+
+        total = self.calculator.calculate_total_fixed(items)
+
+        # With Decimal, this works correctly
+        self.assertEqual(total, 0.3)
+
+    def test_invoice_precision(self):
+        """Demonstrates compounding errors in invoice"""
+        items = [
+            {'name': 'A', 'price': 10.15},
+            {'name': 'B', 'price': 5.99},
+            {'name': 'C', 'price': 2.50}
+        ]
+
+        invoice = self.calculator.generate_invoice_buggy(items, 0.08)
+
+        # Expected: 18.64 + 1.49 = 20.13
+        # Actual: Precision errors
+        print(f"Subtotal: {invoice['subtotal']}")
+        print(f"Tax: {invoice['tax']}")
+        print(f"Total: {invoice['total']}")
+
+        # This might fail due to precision
+        # self.assertAlmostEqual(invoice['total'], 20.13, places=2)`,
+          description: 'Tests demonstrating floating point bugs in Python',
+        },
+      ],
+    },
   },
   {
     id: 'bugfix-infinite-loop',
@@ -1922,9 +3885,518 @@ async function handleSearch(query: string) {
     testCases: [
       {
         input: '5',
-        expectedOutput: 'Prints 5, 4, 3, 2, 1, 0 and stops',
+        expected: 'Prints 5, 4, 3, 2, 1, 0 and stops',
       },
     ],
+    codebaseFiles: {
+      javascript: [
+        {
+          fileName: 'components/TimerComponent.jsx',
+          content: `import React, { useState, useEffect } from 'react';
+
+export function TimerComponent({ startTime }) {
+  const [timeLeft, setTimeLeft] = useState(startTime);
+  const [isRunning, setIsRunning] = useState(false);
+
+  // BUG: Infinite loop in countdown logic
+  function countdown(n) {
+    let count = n;
+    while (count >= 0) {
+      console.log(count);
+      count++; // BUG: Should be count-- to decrement!
+    }
+    // This function never returns - browser hangs!
+  }
+
+  const startTimer = () => {
+    setIsRunning(true);
+    // WARNING: This will freeze the browser!
+    countdown(timeLeft);
+    setTimeLeft(0);
+  };
+
+  return (
+    <div className="timer">
+      <h2>Countdown Timer</h2>
+      <div className="time-display">{timeLeft} seconds</div>
+      <button onClick={startTimer} disabled={isRunning}>
+        Start Countdown
+      </button>
+      {isRunning && <p>Counting down...</p>}
+    </div>
+  );
+}`,
+          description: 'Timer component with infinite loop bug that freezes the browser',
+        },
+        {
+          fileName: 'animations/AnimationController.js',
+          content: `export class AnimationController {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.particles = [];
+  }
+
+  // BUG: Infinite loop in particle update
+  updateParticles() {
+    let i = 0;
+    while (i < this.particles.length) {
+      const particle = this.particles[i];
+
+      // Update particle position
+      particle.x += particle.vx;
+      particle.y += particle.vy;
+
+      // BUG: Forgot to increment i!
+      // i++; // This line is missing
+
+      // Remove particles that are off screen
+      if (particle.y > this.canvas.height) {
+        this.particles.splice(i, 1);
+        // BUG: After splice, we should NOT increment i
+        // but we forgot to increment i at all!
+      }
+    }
+    // This function hangs because i never changes
+  }
+
+  // Another infinite loop bug
+  fadeOutAnimation(element, duration) {
+    let opacity = 1.0;
+    const step = 0.05;
+
+    // BUG: Condition will never be false
+    while (opacity > 0) {
+      element.style.opacity = opacity;
+      opacity += step; // BUG: Should be -= not +=
+      // opacity keeps increasing, never reaches 0
+    }
+  }
+
+  // Correct version for comparison
+  updateParticlesFixed() {
+    let i = 0;
+    while (i < this.particles.length) {
+      const particle = this.particles[i];
+
+      particle.x += particle.vx;
+      particle.y += particle.vy;
+
+      if (particle.y > this.canvas.height) {
+        this.particles.splice(i, 1);
+        // Don't increment i when we remove an element
+      } else {
+        i++; // Increment when we keep the element
+      }
+    }
+  }
+}`,
+          description: 'Animation controller with multiple infinite loop bugs',
+        },
+        {
+          fileName: 'tests/infiniteLoop.test.js',
+          content: `import { TimerComponent } from '../components/TimerComponent';
+import { AnimationController } from '../animations/AnimationController';
+
+describe('Infinite Loop Bugs', () => {
+  describe('TimerComponent countdown bug', () => {
+    test('countdown never terminates', () => {
+      // WARNING: This test will hang if you run it!
+      // Normally we'd use a timeout to detect infinite loops
+
+      const countdown = (n) => {
+        let count = n;
+        while (count >= 0) {
+          console.log(count);
+          count++; // BUG: increments instead of decrements
+        }
+      };
+
+      // This will hang:
+      // countdown(5);
+
+      // To test this safely, we need a timeout:
+      jest.setTimeout(1000); // 1 second timeout
+
+      expect(() => {
+        const timeout = setTimeout(() => {
+          throw new Error('Function timed out - likely infinite loop');
+        }, 500);
+
+        countdown(5);
+        clearTimeout(timeout);
+      }).toThrow('Function timed out');
+    });
+
+    test('demonstrates correct countdown', () => {
+      const countdownFixed = (n) => {
+        let count = n;
+        const results = [];
+        while (count >= 0) {
+          results.push(count);
+          count--; // FIXED: Now it decrements
+        }
+        return results;
+      };
+
+      const result = countdownFixed(5);
+      expect(result).toEqual([5, 4, 3, 2, 1, 0]);
+    });
+  });
+
+  describe('AnimationController bugs', () => {
+    test('updateParticles hangs due to missing increment', () => {
+      const canvas = document.createElement('canvas');
+      const controller = new AnimationController(canvas);
+
+      controller.particles = [
+        { x: 10, y: 10, vx: 1, vy: 1 },
+        { x: 20, y: 20, vx: 1, vy: 1 }
+      ];
+
+      // This would hang:
+      // controller.updateParticles();
+
+      // Fixed version works:
+      controller.updateParticlesFixed();
+      expect(controller.particles.length).toBeLessThanOrEqual(2);
+    });
+
+    test('fadeOut increments instead of decrements', () => {
+      const element = document.createElement('div');
+      element.style.opacity = '1.0';
+      const controller = new AnimationController(document.createElement('canvas'));
+
+      // This would hang forever:
+      // controller.fadeOutAnimation(element, 1000);
+
+      // The bug: opacity starts at 1.0, adds 0.05 each iteration
+      // So it becomes 1.05, 1.10, 1.15... never reaches 0
+      expect(1.0 + 0.05).toBeGreaterThan(0); // Always true!
+    });
+  });
+});`,
+          description: 'Tests that would hang due to infinite loops (with safety timeouts)',
+        },
+        {
+          fileName: 'utils/loopDebugger.js',
+          content: `// Utilities to detect and debug infinite loops
+
+/**
+ * Wraps a while loop with iteration limit to prevent infinite loops
+ */
+export function safeWhile(condition, body, maxIterations = 10000) {
+  let iterations = 0;
+
+  while (condition() && iterations < maxIterations) {
+    body();
+    iterations++;
+
+    if (iterations >= maxIterations) {
+      throw new Error(
+        \`Possible infinite loop detected: exceeded \${maxIterations} iterations\`
+      );
+    }
+  }
+
+  return iterations;
+}
+
+/**
+ * Wraps a function with a timeout to prevent hanging
+ */
+export function withTimeout(fn, timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(\`Function timed out after \${timeoutMs}ms - possible infinite loop\`));
+    }, timeoutMs);
+
+    try {
+      const result = fn();
+      clearTimeout(timer);
+      resolve(result);
+    } catch (error) {
+      clearTimeout(timer);
+      reject(error);
+    }
+  });
+}
+
+/**
+ * Example: Safe countdown implementation
+ */
+export function safeCountdown(n) {
+  const results = [];
+  let count = n;
+  let iterations = 0;
+  const MAX_ITERATIONS = 1000;
+
+  while (count >= 0) {
+    if (iterations++ > MAX_ITERATIONS) {
+      throw new Error('Infinite loop detected in countdown');
+    }
+
+    results.push(count);
+    count--; // Correct decrement
+  }
+
+  return results;
+}
+
+/**
+ * Detects common infinite loop patterns
+ */
+export function detectInfiniteLoopPattern(code) {
+  const warnings = [];
+
+  // Pattern 1: while loop with wrong increment direction
+  if (/while.*>=.*\\{[^}]*\\+\\+/.test(code)) {
+    warnings.push('Potential infinite loop: incrementing when condition checks >=');
+  }
+
+  // Pattern 2: while loop with wrong decrement direction
+  if (/while.*<=.*\\{[^}]*--/.test(code)) {
+    warnings.push('Potential infinite loop: decrementing when condition checks <=');
+  }
+
+  // Pattern 3: while loop with no increment/decrement
+  if (/while.*\\{(?!.*(?:\\+\\+|--|\\+=|-=))[^}]*\\}/.test(code)) {
+    warnings.push('Potential infinite loop: loop variable not modified');
+  }
+
+  return warnings;
+}
+
+// Example usage
+const buggyCode = \`
+function countdown(n) {
+  let count = n;
+  while (count >= 0) {
+    console.log(count);
+    count++; // BUG!
+  }
+}
+\`;
+
+console.log('Loop warnings:', detectInfiniteLoopPattern(buggyCode));`,
+          description: 'Debugging utilities to detect and prevent infinite loops',
+        },
+      ],
+      typescript: [
+        {
+          fileName: 'components/TimerComponent.tsx',
+          content: `import React, { useState } from 'react';
+
+interface TimerProps {
+  startTime: number;
+}
+
+export function TimerComponent({ startTime }: TimerProps) {
+  const [timeLeft, setTimeLeft] = useState(startTime);
+  const [isRunning, setIsRunning] = useState(false);
+
+  // BUG: Infinite loop in countdown logic
+  function countdown(n: number): void {
+    let count = n;
+    while (count >= 0) {
+      console.log(count);
+      count++; // BUG: Should be count-- to decrement!
+    }
+    // This function never returns - browser hangs!
+  }
+
+  const startTimer = () => {
+    setIsRunning(true);
+    // WARNING: This will freeze the browser!
+    countdown(timeLeft);
+    setTimeLeft(0);
+  };
+
+  return (
+    <div className="timer">
+      <h2>Countdown Timer</h2>
+      <div className="time-display">{timeLeft} seconds</div>
+      <button onClick={startTimer} disabled={isRunning}>
+        Start Countdown
+      </button>
+      {isRunning && <p>Counting down...</p>}
+    </div>
+  );
+}`,
+          description: 'Timer component with infinite loop bug that freezes the browser',
+        },
+        {
+          fileName: 'utils/loopDebugger.ts',
+          content: `// Utilities to detect and debug infinite loops
+
+export function safeWhile(
+  condition: () => boolean,
+  body: () => void,
+  maxIterations: number = 10000
+): number {
+  let iterations = 0;
+
+  while (condition() && iterations < maxIterations) {
+    body();
+    iterations++;
+
+    if (iterations >= maxIterations) {
+      throw new Error(
+        \`Possible infinite loop detected: exceeded \${maxIterations} iterations\`
+      );
+    }
+  }
+
+  return iterations;
+}
+
+export function withTimeout<T>(
+  fn: () => T,
+  timeoutMs: number = 5000
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(\`Function timed out after \${timeoutMs}ms - possible infinite loop\`));
+    }, timeoutMs);
+
+    try {
+      const result = fn();
+      clearTimeout(timer);
+      resolve(result);
+    } catch (error) {
+      clearTimeout(timer);
+      reject(error);
+    }
+  });
+}
+
+export function safeCountdown(n: number): number[] {
+  const results: number[] = [];
+  let count = n;
+  let iterations = 0;
+  const MAX_ITERATIONS = 1000;
+
+  while (count >= 0) {
+    if (iterations++ > MAX_ITERATIONS) {
+      throw new Error('Infinite loop detected in countdown');
+    }
+
+    results.push(count);
+    count--;
+  }
+
+  return results;
+}`,
+          description: 'Debugging utilities to detect and prevent infinite loops',
+        },
+      ],
+      python: [
+        {
+          fileName: 'utils/timer.py',
+          content: `import time
+from typing import List
+
+class TimerController:
+    """Timer with infinite loop bug"""
+
+    def countdown_buggy(self, n: int) -> None:
+        """BUG: Infinite loop - increments instead of decrements"""
+        count = n
+        while count >= 0:
+            print(count)
+            count += 1  # BUG: Should be count -= 1
+            # This will run forever!
+
+    def countdown_fixed(self, n: int) -> List[int]:
+        """Fixed version that correctly counts down"""
+        count = n
+        results = []
+        while count >= 0:
+            results.append(count)
+            count -= 1  # FIXED: Now it decrements
+        return results
+
+    def fade_animation_buggy(self, duration: float) -> None:
+        """BUG: Opacity increases instead of decreases"""
+        opacity = 1.0
+        step = 0.05
+
+        while opacity > 0:
+            print(f"Opacity: {opacity}")
+            opacity += step  # BUG: Should be -= not +=
+            time.sleep(0.01)
+            # opacity keeps growing, never reaches 0!
+
+    def fade_animation_fixed(self, duration: float) -> None:
+        """Fixed version"""
+        opacity = 1.0
+        step = 0.05
+
+        while opacity > 0:
+            print(f"Opacity: {opacity}")
+            opacity -= step  # FIXED: Now it decreases
+            time.sleep(0.01)`,
+          description: 'Python timer showing infinite loop bug',
+        },
+        {
+          fileName: 'tests/test_infinite_loop.py',
+          content: `import unittest
+import signal
+from utils.timer import TimerController
+
+class TimeoutError(Exception):
+    pass
+
+def timeout_handler(signum, frame):
+    raise TimeoutError("Function timed out - likely infinite loop")
+
+class TestInfiniteLoops(unittest.TestCase):
+    def setUp(self):
+        self.timer = TimerController()
+
+    def test_countdown_buggy_would_hang(self):
+        """This test demonstrates the bug (safely with timeout)"""
+        # Set a 2-second timeout
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(2)
+
+        try:
+            # This would hang forever
+            self.timer.countdown_buggy(5)
+            self.fail("Should have timed out")
+        except TimeoutError:
+            # Expected - the function hung
+            pass
+        finally:
+            signal.alarm(0)  # Cancel the alarm
+
+    def test_countdown_fixed_works(self):
+        """Fixed version works correctly"""
+        result = self.timer.countdown_fixed(5)
+        self.assertEqual(result, [5, 4, 3, 2, 1, 0])
+
+    def test_demonstrates_bug_logic(self):
+        """Shows why the bug creates an infinite loop"""
+        count = 5
+
+        # Buggy logic: count++ when condition is count >= 0
+        # 5 >= 0? Yes -> increment to 6
+        # 6 >= 0? Yes -> increment to 7
+        # 7 >= 0? Yes -> increment to 8
+        # ... this never stops!
+
+        iterations = 0
+        while count >= 0 and iterations < 10:
+            count += 1  # Bug: incrementing
+            iterations += 1
+
+        # After 10 iterations, count is much larger, not 0
+        self.assertEqual(count, 15)  # Started at 5, added 10
+        self.assertGreater(count, 0)  # Still above 0, would continue forever`,
+          description: 'Tests demonstrating infinite loop bugs in Python',
+        },
+      ],
+    },
   },
   {
     id: 'bugfix-state-mutation',
@@ -1968,9 +4440,443 @@ async function handleSearch(query: string) {
     testCases: [
       {
         input: 'Add todo "Buy milk"',
-        expectedOutput: 'UI updates to show new todo',
+        expected: 'UI updates to show new todo',
       },
     ],
+    codebaseFiles: {
+      javascript: [
+        {
+          fileName: 'components/TodoList.jsx',
+          content: `import React, { useState } from 'react';
+import { TodoItem } from './TodoItem';
+
+export function TodoList() {
+  const [todos, setTodos] = useState([
+    { id: 1, text: 'Learn React', completed: false },
+    { id: 2, text: 'Build a project', completed: false }
+  ]);
+  const [inputText, setInputText] = useState('');
+
+  // BUG: Direct array mutation doesn't trigger re-render
+  const addTodo = (text) => {
+    const newTodo = {
+      id: Date.now(),
+      text,
+      completed: false
+    };
+
+    // BUG: This mutates the array in place
+    todos.push(newTodo);
+    setTodos(todos); // Same reference, React doesn't detect change!
+
+    setInputText('');
+  };
+
+  // This has the same bug
+  const toggleTodo = (id) => {
+    const todo = todos.find(t => t.id === id);
+    if (todo) {
+      todo.completed = !todo.completed; // BUG: Direct mutation
+      setTodos(todos); // Same reference, no re-render!
+    }
+  };
+
+  // This also has the bug
+  const deleteTodo = (id) => {
+    const index = todos.findIndex(t => t.id === id);
+    if (index !== -1) {
+      todos.splice(index, 1); // BUG: Mutates array
+      setTodos(todos); // Same reference, no re-render!
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (inputText.trim()) {
+      addTodo(inputText.trim());
+    }
+  };
+
+  return (
+    <div className="todo-list">
+      <h1>My Todo List</h1>
+
+      <form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          placeholder="Add a new todo..."
+        />
+        <button type="submit">Add</button>
+      </form>
+
+      <ul>
+        {todos.map(todo => (
+          <TodoItem
+            key={todo.id}
+            todo={todo}
+            onToggle={toggleTodo}
+            onDelete={deleteTodo}
+          />
+        ))}
+      </ul>
+
+      <div className="stats">
+        <p>Total: {todos.length}</p>
+        <p>Completed: {todos.filter(t => t.completed).length}</p>
+      </div>
+    </div>
+  );
+}`,
+          description: 'TodoList component with state mutation bugs - UI does not update',
+        },
+        {
+          fileName: 'components/TodoItem.jsx',
+          content: `import React from 'react';
+
+export function TodoItem({ todo, onToggle, onDelete }) {
+  return (
+    <li className={todo.completed ? 'completed' : ''}>
+      <input
+        type="checkbox"
+        checked={todo.completed}
+        onChange={() => onToggle(todo.id)}
+      />
+      <span>{todo.text}</span>
+      <button onClick={() => onDelete(todo.id)}>Delete</button>
+    </li>
+  );
+}`,
+          description: 'TodoItem child component that displays individual todos',
+        },
+        {
+          fileName: 'tests/TodoList.test.jsx',
+          content: `import { render, screen, fireEvent } from '@testing-library/react';
+import { TodoList } from '../components/TodoList';
+
+describe('TodoList State Mutation Bug', () => {
+  test('demonstrates bug - new todos do not appear in UI', () => {
+    render(<TodoList />);
+
+    // Initial state: 2 todos
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+
+    // Add a new todo
+    const input = screen.getByPlaceholderText('Add a new todo...');
+    const addButton = screen.getByText('Add');
+
+    fireEvent.change(input, { target: { value: 'Buy milk' } });
+    fireEvent.click(addButton);
+
+    // BUG: UI does not update!
+    // This assertion FAILS because the component doesn't re-render
+    expect(screen.getAllByRole('listitem')).toHaveLength(3); // FAILS!
+
+    // We still see only 2 items because React didn't detect the change
+    expect(screen.getAllByRole('listitem')).toHaveLength(2); // Actual behavior
+
+    // The todo was added to the array (in memory) but UI doesn't show it
+    expect(screen.queryByText('Buy milk')).not.toBeInTheDocument();
+  });
+
+  test('demonstrates toggle bug - checkboxes do not update', () => {
+    render(<TodoList />);
+
+    const checkboxes = screen.getAllByRole('checkbox');
+    const firstCheckbox = checkboxes[0];
+
+    // Initially unchecked
+    expect(firstCheckbox).not.toBeChecked();
+
+    // Click to toggle
+    fireEvent.click(firstCheckbox);
+
+    // BUG: Checkbox does not update in UI
+    expect(firstCheckbox).toBeChecked(); // FAILS!
+    expect(firstCheckbox).not.toBeChecked(); // Still unchecked in UI
+  });
+
+  test('demonstrates delete bug - items do not disappear', () => {
+    render(<TodoList />);
+
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+
+    // Click delete on first item
+    const deleteButtons = screen.getAllByText('Delete');
+    fireEvent.click(deleteButtons[0]);
+
+    // BUG: Item does not disappear from UI
+    expect(screen.getAllByRole('listitem')).toHaveLength(1); // FAILS!
+    expect(screen.getAllByRole('listitem')).toHaveLength(2); // Still 2 items
+  });
+
+  test('explains why the bug happens', () => {
+    // The bug occurs because:
+    const originalArray = [{ id: 1, text: 'Item 1' }];
+
+    // Mutating the array
+    originalArray.push({ id: 2, text: 'Item 2' });
+
+    // The reference is still the same
+    const sameArray = originalArray;
+    expect(originalArray === sameArray).toBe(true);
+
+    // React uses Object.is() for comparison (similar to ===)
+    // Since the reference didn't change, React thinks nothing changed
+    // So it doesn't re-render
+
+    // Correct approach: create new array
+    const newArray = [...originalArray, { id: 3, text: 'Item 3' }];
+    expect(originalArray === newArray).toBe(false); // Different reference!
+  });
+});`,
+          description: 'Tests using React Testing Library showing mutation bugs',
+        },
+        {
+          fileName: 'examples/stateMutationExamples.jsx',
+          content: `import React, { useState } from 'react';
+
+// Example 1: WRONG - Direct mutation
+export function TodoListBuggy() {
+  const [todos, setTodos] = useState([]);
+
+  const addTodo = (text) => {
+    todos.push({ text, completed: false }); // WRONG: Mutates array
+    setTodos(todos); // Same reference, no re-render
+  };
+
+  // UI won't update!
+  return (/*...*/);
+}
+
+// Example 2: CORRECT - Create new array
+export function TodoListFixed() {
+  const [todos, setTodos] = useState([]);
+
+  const addTodo = (text) => {
+    // Method 1: Spread operator
+    setTodos([...todos, { text, completed: false }]); // ✓ New array
+
+    // Method 2: concat
+    // setTodos(todos.concat({ text, completed: false })); // ✓ New array
+
+    // Method 3: Array.from with modification
+    // setTodos(Array.from(todos).concat({ text, completed: false })); // ✓
+  };
+
+  // UI updates correctly!
+  return (/*...*/);
+}
+
+// Example 3: Toggle with mutation (WRONG)
+export function toggleTodoBuggy(todos, setTodos, id) {
+  const todo = todos.find(t => t.id === id);
+  todo.completed = !todo.completed; // WRONG: Mutates object
+  setTodos(todos); // No re-render
+}
+
+// Example 4: Toggle immutably (CORRECT)
+export function toggleTodoFixed(todos, setTodos, id) {
+  setTodos(todos.map(todo =>
+    todo.id === id
+      ? { ...todo, completed: !todo.completed } // New object
+      : todo
+  ));
+}
+
+// Example 5: Delete with mutation (WRONG)
+export function deleteTodoBuggy(todos, setTodos, id) {
+  const index = todos.findIndex(t => t.id === id);
+  todos.splice(index, 1); // WRONG: Mutates array
+  setTodos(todos); // No re-render
+}
+
+// Example 6: Delete immutably (CORRECT)
+export function deleteTodoFixed(todos, setTodos, id) {
+  setTodos(todos.filter(todo => todo.id !== id)); // New array
+}
+
+// Example 7: Why this matters - React's comparison
+function ReactComparison() {
+  // React uses Object.is() which is similar to ===
+
+  const arr1 = [1, 2, 3];
+  const arr2 = arr1;
+  arr2.push(4);
+
+  console.log(arr1 === arr2); // true - same reference!
+  // React sees this as "no change" and doesn't re-render
+
+  const arr3 = [1, 2, 3];
+  const arr4 = [...arr3, 4];
+
+  console.log(arr3 === arr4); // false - different references!
+  // React sees this as "changed" and re-renders
+}`,
+          description: 'Examples showing wrong vs correct state updates in React',
+        },
+      ],
+      typescript: [
+        {
+          fileName: 'components/TodoList.tsx',
+          content: `import React, { useState } from 'react';
+import { TodoItem } from './TodoItem';
+
+interface Todo {
+  id: number;
+  text: string;
+  completed: boolean;
+}
+
+export function TodoList() {
+  const [todos, setTodos] = useState<Todo[]>([
+    { id: 1, text: 'Learn React', completed: false },
+    { id: 2, text: 'Build a project', completed: false }
+  ]);
+  const [inputText, setInputText] = useState('');
+
+  // BUG: Direct array mutation doesn't trigger re-render
+  const addTodo = (text: string) => {
+    const newTodo: Todo = {
+      id: Date.now(),
+      text,
+      completed: false
+    };
+
+    // BUG: This mutates the array in place
+    todos.push(newTodo);
+    setTodos(todos); // Same reference, React doesn't detect change!
+
+    setInputText('');
+  };
+
+  const toggleTodo = (id: number) => {
+    const todo = todos.find(t => t.id === id);
+    if (todo) {
+      todo.completed = !todo.completed; // BUG: Direct mutation
+      setTodos(todos); // Same reference, no re-render!
+    }
+  };
+
+  const deleteTodo = (id: number) => {
+    const index = todos.findIndex(t => t.id === id);
+    if (index !== -1) {
+      todos.splice(index, 1); // BUG: Mutates array
+      setTodos(todos); // Same reference, no re-render!
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (inputText.trim()) {
+      addTodo(inputText.trim());
+    }
+  };
+
+  return (
+    <div className="todo-list">
+      <h1>My Todo List</h1>
+
+      <form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          placeholder="Add a new todo..."
+        />
+        <button type="submit">Add</button>
+      </form>
+
+      <ul>
+        {todos.map(todo => (
+          <TodoItem
+            key={todo.id}
+            todo={todo}
+            onToggle={toggleTodo}
+            onDelete={deleteTodo}
+          />
+        ))}
+      </ul>
+
+      <div className="stats">
+        <p>Total: {todos.length}</p>
+        <p>Completed: {todos.filter(t => t.completed).length}</p>
+      </div>
+    </div>
+  );
+}`,
+          description: 'TodoList component with state mutation bugs - UI does not update',
+        },
+        {
+          fileName: 'components/TodoItem.tsx',
+          content: `import React from 'react';
+
+interface Todo {
+  id: number;
+  text: string;
+  completed: boolean;
+}
+
+interface TodoItemProps {
+  todo: Todo;
+  onToggle: (id: number) => void;
+  onDelete: (id: number) => void;
+}
+
+export function TodoItem({ todo, onToggle, onDelete }: TodoItemProps) {
+  return (
+    <li className={todo.completed ? 'completed' : ''}>
+      <input
+        type="checkbox"
+        checked={todo.completed}
+        onChange={() => onToggle(todo.id)}
+      />
+      <span>{todo.text}</span>
+      <button onClick={() => onDelete(todo.id)}>Delete</button>
+    </li>
+  );
+}`,
+          description: 'TodoItem child component that displays individual todos',
+        },
+        {
+          fileName: 'tests/TodoList.test.tsx',
+          content: `import { render, screen, fireEvent } from '@testing-library/react';
+import { TodoList } from '../components/TodoList';
+
+describe('TodoList State Mutation Bug', () => {
+  test('demonstrates bug - new todos do not appear in UI', () => {
+    render(<TodoList />);
+
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+
+    const input = screen.getByPlaceholderText('Add a new todo...');
+    const addButton = screen.getByText('Add');
+
+    fireEvent.change(input, { target: { value: 'Buy milk' } });
+    fireEvent.click(addButton);
+
+    // BUG: UI does not update!
+    expect(screen.getAllByRole('listitem')).toHaveLength(3); // FAILS!
+    expect(screen.queryByText('Buy milk')).not.toBeInTheDocument();
+  });
+
+  test('explains why the bug happens', () => {
+    const originalArray = [{ id: 1, text: 'Item 1' }];
+    originalArray.push({ id: 2, text: 'Item 2' });
+
+    const sameArray = originalArray;
+    expect(originalArray === sameArray).toBe(true);
+
+    // React doesn't detect the change because reference is the same
+    const newArray = [...originalArray, { id: 3, text: 'Item 3' }];
+    expect(originalArray === newArray).toBe(false); // Different reference!
+  });
+});`,
+          description: 'Tests using React Testing Library showing mutation bugs',
+        },
+      ],
+    },
   },
   {
     id: 'bugfix-promise-error-handling',
@@ -2008,13 +4914,461 @@ async function handleSearch(query: string) {
     testCases: [
       {
         input: 'Valid userId',
-        expectedOutput: 'Returns user data',
+        expected: 'Returns user data',
       },
       {
         input: 'Invalid userId (404 response)',
-        expectedOutput: 'Throws/returns error without crashing',
+        expected: 'Throws/returns error without crashing',
       },
     ],
+    codebaseFiles: {
+      javascript: [
+        {
+          fileName: 'components/UserProfile.jsx',
+          content: `import React, { useState, useEffect } from 'react';
+import { loadUserData } from '../api/apiClient';
+
+export function UserProfile({ userId }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // BUG: No error handling for promise rejection
+    const fetchUser = async () => {
+      setLoading(true);
+      const data = await loadUserData(userId); // Can throw!
+      setUser(data);
+      setLoading(false);
+    };
+
+    fetchUser(); // Unhandled promise rejection if this fails!
+  }, [userId]);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  // BUG: If loadUserData fails, user stays null and app crashes here
+  return (
+    <div className="user-profile">
+      <h1>{user.name}</h1>
+      <p>Email: {user.email}</p>
+      <p>Bio: {user.bio}</p>
+    </div>
+  );
+}`,
+          description: 'UserProfile component with no error handling for async data loading',
+        },
+        {
+          fileName: 'api/apiClient.js',
+          content: `// BUG: No error handling in API calls
+export async function loadUserData(userId) {
+  const response = await fetch(\`/api/users/\${userId}\`);
+
+  // BUG: Doesn't check if response is ok (200-299)
+  // Will fail on 404, 500, etc. when trying to parse JSON
+  const data = await response.json();
+
+  return data;
+}
+
+export async function updateUserProfile(userId, updates) {
+  const response = await fetch(\`/api/users/\${userId}\`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates)
+  });
+
+  // BUG: Same issue - no response validation
+  return await response.json();
+}
+
+export async function deleteUser(userId) {
+  const response = await fetch(\`/api/users/\${userId}\`, {
+    method: 'DELETE'
+  });
+
+  // BUG: No error handling
+  return await response.json();
+}
+
+// Example of what happens when these fail:
+// loadUserData('invalid-id')
+//   -> fetch returns 404
+//   -> response.json() tries to parse error HTML as JSON
+//   -> Throws "Unexpected token < in JSON"
+//   -> Unhandled promise rejection!`,
+          description: 'API client with no error handling or response validation',
+        },
+        {
+          fileName: 'components/ErrorBoundary.jsx',
+          content: `import React from 'react';
+
+export class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Error caught by boundary:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="error-container">
+          <h1>Something went wrong</h1>
+          <p>{this.state.error?.message}</p>
+          <button onClick={() => this.setState({ hasError: false })}>
+            Try again
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// NOTE: ErrorBoundary only catches errors in render/lifecycle methods
+// It does NOT catch:
+// - Errors in event handlers
+// - Async errors (setTimeout, promises)
+// - Errors in the error boundary itself
+//
+// So our unhandled promise rejections will NOT be caught!`,
+          description: 'ErrorBoundary component - but it cannot catch async errors',
+        },
+        {
+          fileName: 'tests/promiseErrorHandling.test.jsx',
+          content: `import { render, screen, waitFor } from '@testing-library/react';
+import { UserProfile } from '../components/UserProfile';
+import { loadUserData } from '../api/apiClient';
+
+// Mock the API
+jest.mock('../api/apiClient');
+
+describe('Promise Error Handling Bugs', () => {
+  test('demonstrates unhandled rejection on 404', async () => {
+    // Mock API to simulate 404 error
+    loadUserData.mockRejectedValue(new Error('User not found'));
+
+    // Set up listener for unhandled rejections
+    const unhandledRejections = [];
+    const handler = (event) => {
+      unhandledRejections.push(event.reason);
+    };
+    window.addEventListener('unhandledrejection', handler);
+
+    // Render component
+    render(<UserProfile userId="invalid-id" />);
+
+    // Wait a bit for the promise to reject
+    await waitFor(() => {}, { timeout: 100 });
+
+    // BUG: Unhandled promise rejection occurred!
+    expect(unhandledRejections.length).toBeGreaterThan(0);
+    expect(unhandledRejections[0].message).toBe('User not found');
+
+    window.removeEventListener('unhandledrejection', handler);
+  });
+
+  test('demonstrates component crash on null data', async () => {
+    // Mock successful API call
+    loadUserData.mockResolvedValue({
+      name: 'John Doe',
+      email: 'john@example.com',
+      bio: 'Developer'
+    });
+
+    render(<UserProfile userId="123" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    // Now simulate a failed API call
+    loadUserData.mockRejectedValue(new Error('Network error'));
+
+    // Re-render with different userId
+    const { rerender } = render(<UserProfile userId="456" />);
+
+    // BUG: Component crashes because user is null
+    // This test would throw an error without proper error handling
+  });
+
+  test('shows proper error handling approach', async () => {
+    // Example of correct error handling:
+    const fetchWithErrorHandling = async (userId) => {
+      try {
+        const data = await loadUserData(userId);
+        return { success: true, data };
+      } catch (error) {
+        console.error('Failed to load user:', error);
+        return { success: false, error: error.message };
+      }
+    };
+
+    loadUserData.mockRejectedValue(new Error('User not found'));
+
+    const result = await fetchWithErrorHandling('invalid');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('User not found');
+    // No unhandled rejection!
+  });
+
+  test('demonstrates response validation bug', async () => {
+    // Simulate what the buggy code does with a 404 response
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        json: () => Promise.reject(new Error('Unexpected token < in JSON'))
+      })
+    );
+
+    try {
+      // This is what happens inside loadUserData
+      const response = await fetch('/api/users/123');
+      const data = await response.json(); // Throws!
+      // Never gets here
+    } catch (error) {
+      expect(error.message).toBe('Unexpected token < in JSON');
+    }
+  });
+});`,
+          description: 'Tests demonstrating unhandled promise rejections and their consequences',
+        },
+      ],
+      typescript: [
+        {
+          fileName: 'components/UserProfile.tsx',
+          content: `import React, { useState, useEffect } from 'react';
+import { loadUserData, User } from '../api/apiClient';
+
+interface UserProfileProps {
+  userId: string;
+}
+
+export function UserProfile({ userId }: UserProfileProps) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // BUG: No error handling for promise rejection
+    const fetchUser = async () => {
+      setLoading(true);
+      const data = await loadUserData(userId); // Can throw!
+      setUser(data);
+      setLoading(false);
+    };
+
+    fetchUser(); // Unhandled promise rejection if this fails!
+  }, [userId]);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  // BUG: If loadUserData fails, user stays null and app crashes here
+  return (
+    <div className="user-profile">
+      <h1>{user!.name}</h1>
+      <p>Email: {user!.email}</p>
+      <p>Bio: {user!.bio}</p>
+    </div>
+  );
+}`,
+          description: 'UserProfile component with no error handling for async data loading',
+        },
+        {
+          fileName: 'api/apiClient.ts',
+          content: `export interface User {
+  id: string;
+  name: string;
+  email: string;
+  bio: string;
+}
+
+// BUG: No error handling in API calls
+export async function loadUserData(userId: string): Promise<User> {
+  const response = await fetch(\`/api/users/\${userId}\`);
+
+  // BUG: Doesn't check if response is ok (200-299)
+  // Will fail on 404, 500, etc. when trying to parse JSON
+  const data = await response.json();
+
+  return data;
+}
+
+export async function updateUserProfile(
+  userId: string,
+  updates: Partial<User>
+): Promise<User> {
+  const response = await fetch(\`/api/users/\${userId}\`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates)
+  });
+
+  // BUG: Same issue - no response validation
+  return await response.json();
+}
+
+// Fixed version with proper error handling:
+export async function loadUserDataFixed(userId: string): Promise<User> {
+  try {
+    const response = await fetch(\`/api/users/\${userId}\`);
+
+    if (!response.ok) {
+      throw new Error(\`HTTP error! status: \${response.status}\`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Failed to load user data:', error);
+    throw new Error(\`Failed to load user: \${error instanceof Error ? error.message : 'Unknown error'}\`);
+  }
+}`,
+          description: 'API client with no error handling or response validation',
+        },
+        {
+          fileName: 'tests/promiseErrorHandling.test.ts',
+          content: `import { loadUserData, User } from '../api/apiClient';
+
+describe('Promise Error Handling Bugs', () => {
+  test('demonstrates unhandled rejection', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 404,
+        json: () => Promise.reject(new Error('Invalid JSON'))
+      } as Response)
+    );
+
+    // This will cause an unhandled promise rejection
+    try {
+      await loadUserData('123');
+    } catch (error) {
+      expect(error).toBeDefined();
+    }
+  });
+
+  test('shows proper error handling', async () => {
+    const fetchWithErrorHandling = async (userId: string): Promise<{ success: boolean; data?: User; error?: string }> => {
+      try {
+        const data = await loadUserData(userId);
+        return { success: true, data };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    };
+
+    global.fetch = jest.fn(() =>
+      Promise.reject(new Error('Network error'))
+    );
+
+    const result = await fetchWithErrorHandling('123');
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+  });
+});`,
+          description: 'Tests demonstrating unhandled promise rejections',
+        },
+      ],
+      python: [
+        {
+          fileName: 'api/api_client.py',
+          content: `import aiohttp
+import asyncio
+from typing import Dict, Any
+
+class APIClient:
+    """API client with missing error handling"""
+
+    def __init__(self, base_url: str):
+        self.base_url = base_url
+
+    async def load_user_data(self, user_id: str) -> Dict[str, Any]:
+        """BUG: No error handling for failed requests"""
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{self.base_url}/users/{user_id}") as response:
+                # BUG: Doesn't check response status
+                # Will fail on 404, 500, etc.
+                data = await response.json()
+                return data
+
+    async def load_user_data_fixed(self, user_id: str) -> Dict[str, Any]:
+        """Fixed version with proper error handling"""
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{self.base_url}/users/{user_id}") as response:
+                    # Check status code
+                    if response.status != 200:
+                        raise ValueError(f"HTTP error! status: {response.status}")
+
+                    data = await response.json()
+                    return data
+        except aiohttp.ClientError as e:
+            raise Exception(f"Failed to load user: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Unexpected error: {str(e)}")`,
+          description: 'Python async API client showing missing error handling',
+        },
+        {
+          fileName: 'tests/test_promise_errors.py',
+          content: `import pytest
+import asyncio
+from unittest.mock import Mock, patch
+from api.api_client import APIClient
+
+class TestPromiseErrorHandling:
+    @pytest.mark.asyncio
+    async def test_unhandled_error(self):
+        """Demonstrates unhandled error in async function"""
+        client = APIClient("http://api.example.com")
+
+        # Mock a failed response
+        with patch('aiohttp.ClientSession.get') as mock_get:
+            mock_response = Mock()
+            mock_response.status = 404
+            mock_response.json = Mock(side_effect=ValueError("Invalid JSON"))
+            mock_get.return_value.__aenter__.return_value = mock_response
+
+            # BUG: This raises an unhandled exception
+            with pytest.raises(ValueError):
+                await client.load_user_data("invalid-id")
+
+    @pytest.mark.asyncio
+    async def test_proper_error_handling(self):
+        """Shows proper error handling approach"""
+        client = APIClient("http://api.example.com")
+
+        with patch('aiohttp.ClientSession.get') as mock_get:
+            mock_response = Mock()
+            mock_response.status = 404
+            mock_get.return_value.__aenter__.return_value = mock_response
+
+            # Fixed version handles errors properly
+            with pytest.raises(Exception) as exc_info:
+                await client.load_user_data_fixed("invalid-id")
+
+            assert "HTTP error" in str(exc_info.value)`,
+          description: 'Python tests showing async error handling',
+        },
+      ],
+    },
   },
   // ==================== COMPREHENSIVE MULTI-FILE BUG FIX SCENARIOS ====================
   {
@@ -2134,11 +5488,11 @@ export function UserPreferences({ preferences }) {
     testCases: [
       {
         input: 'Rapidly switch between different userIds',
-        expectedOutput: 'Only data for the current userId is displayed',
+        expected: 'Only data for the current userId is displayed',
       },
       {
         input: 'Load user with slow API response',
-        expectedOutput: 'Loading state until both API calls complete',
+        expected: 'Loading state until both API calls complete',
       },
     ],
   },
@@ -2335,11 +5689,11 @@ export class ProductPage {
     testCases: [
       {
         input: 'Add and remove 100 items repeatedly',
-        expectedOutput: 'Memory usage stays relatively constant',
+        expected: 'Memory usage stays relatively constant',
       },
       {
         input: 'Navigate away from page',
-        expectedOutput: 'All intervals and event listeners are cleaned up',
+        expected: 'All intervals and event listeners are cleaned up',
       },
     ],
   },
@@ -2516,15 +5870,15 @@ module.exports = router;`,
     testCases: [
       {
         input: 'Request non-existent user',
-        expectedOutput: '404 status with consistent error format',
+        expected: '404 status with consistent error format',
       },
       {
         input: 'Create user with duplicate email',
-        expectedOutput: '409 Conflict with appropriate error message',
+        expected: '409 Conflict with appropriate error message',
       },
       {
         input: 'Database connection failure',
-        expectedOutput: '500 error without exposing internal details',
+        expected: '500 error without exposing internal details',
       },
     ],
   },
