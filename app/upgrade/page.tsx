@@ -27,7 +27,7 @@ import { ErrorBoundary } from "@/components/error-boundary"
 function UpgradePageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { user, firebaseUser, loading: authLoading } = useAuth()
+  const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(false)
   const [promoCode, setPromoCode] = useState("")
@@ -40,7 +40,7 @@ function UpgradePageContent() {
   }, [])
 
   useEffect(() => {
-    if (authLoading) return
+    if (authLoading || !initialized) return
     if (!mounted) return
 
     const handleStripeRedirect = async () => {
@@ -97,7 +97,7 @@ function UpgradePageContent() {
     }
 
     handleStripeRedirect()
-  }, [authLoading, mounted, searchParams, router, user, firebaseUser])
+  }, [authLoading, mounted, searchParams, router, user, firebaseUser, initialized])
 
   const handlePromoCode = async () => {
     if (!user || !promoCode.trim()) {

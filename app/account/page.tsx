@@ -106,7 +106,7 @@ export default function AccountPage() {
     }
 
     loadUserData()
-  }, [firebaseUser, authLoading])
+  }, [firebaseUser, authLoading, initialized])
 
   const handleSignOut = async () => {
     try {
