@@ -98,6 +98,10 @@ export default function InterviewPage() {
   const [startTime, setStartTime] = useState<number | null>(null)
   const [elapsedTime, setElapsedTime] = useState(0)
 
+  // Hints
+  const [revealedHints, setRevealedHints] = useState<number>(0)
+  const [hintTimers, setHintTimers] = useState<number[]>([])
+
   // Workspace context
   const [workspaceContext, setWorkspaceContext] = useState<Array<{ path: string; content: string }>>([])
   const [lastCodeHash, setLastCodeHash] = useState<string>("")
@@ -140,6 +144,54 @@ export default function InterviewPage() {
     return () => clearInterval(interval)
   }, [isInterviewStarted, showFeedback, startTime])
 
+  // Progressive hints reveal effect
+  useEffect(() => {
+    if (!isInterviewStarted || !selectedScenario || showFeedback) return
+
+    const hints = (selectedScenario as any).hints || []
+    if (hints.length === 0) return
+
+    // Reveal hints at intervals: 3min, 6min, 9min, etc.
+    const hintInterval = 180 // 3 minutes in seconds
+
+    // Check if it's time to reveal a new hint
+    const hintsToReveal = Math.floor(elapsedTime / hintInterval)
+    const maxHints = Math.min(hintsToReveal, hints.length)
+
+    if (maxHints > revealedHints) {
+      setRevealedHints(maxHints)
+      // Play sound and show notification
+      playSound('hint')
+      toast.info(`💡 New hint available! (${maxHints}/${hints.length})`)
+    }
+  }, [elapsedTime, isInterviewStarted, selectedScenario, showFeedback, revealedHints])
+
+  // Sound effects
+  const playSound = (type: 'hint' | 'success' | 'fail' | 'milestone') => {
+    // Use Web Audio API for subtle sound effects
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const oscillator = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+
+    oscillator.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+
+    // Different frequencies for different events
+    const soundConfig = {
+      hint: { freq: 800, duration: 0.1, volume: 0.1 },
+      success: { freq: 1000, duration: 0.15, volume: 0.15 },
+      fail: { freq: 400, duration: 0.2, volume: 0.1 },
+      milestone: { freq: 1200, duration: 0.2, volume: 0.15 },
+    }
+
+    const config = soundConfig[type]
+    oscillator.frequency.value = config.freq
+    gainNode.gain.value = config.volume
+
+    oscillator.start(audioContext.currentTime)
+    oscillator.stop(audioContext.currentTime + config.duration)
+  }
+
   // Auto-scroll chat - scroll only within container, not the whole page
   useEffect(() => {
     if (chatEndRef.current) {
@@ -156,18 +208,28 @@ export default function InterviewPage() {
   // Update code when language changes during interview
   useEffect(() => {
     if (isInterviewStarted && selectedScenario && !showFeedback) {
-      const starterCode = selectedScenario.starterCode?.[selectedLanguage] || `function solution() {
+      let newCode: string
+
+      // For bug fix scenarios, use buggyCode
+      if (selectedScenario.type === 'bugfix') {
+        newCode = (selectedScenario as any).buggyCode?.[selectedLanguage] || `// Bug fix code not available for ${selectedLanguage}`
+      } else {
+        // For DSA scenarios, use starterCode
+        newCode = (selectedScenario as any).starterCode?.[selectedLanguage] || `function solution() {
   // Write your solution here
 
 }`
+      }
+
       // Only update if code is still the starter code or empty
       const currentCodeTrimmed = code.trim()
       const isEmptyOrStarter = currentCodeTrimmed === "" ||
         currentCodeTrimmed.includes("Write your solution here") ||
+        currentCodeTrimmed.includes("BUG:") ||
         currentCodeTrimmed.length < 100
 
       if (isEmptyOrStarter) {
-        setCode(starterCode)
+        setCode(newCode)
       }
     }
   }, [selectedLanguage, isInterviewStarted, selectedScenario, showFeedback])
@@ -306,16 +368,35 @@ export default function InterviewPage() {
     setIsInterviewStarted(true)
     setShowScenarioBrowser(false)
     setStartTime(Date.now())
-    
-    // Initialize code with starter code
-    const starterCode = selectedScenario.starterCode?.[selectedLanguage] || `function solution() {
+
+    // Initialize code based on scenario type
+    let initialCode: string
+    if (selectedScenario.type === 'bugfix') {
+      // For bug fixes, load buggy code
+      initialCode = (selectedScenario as any).buggyCode?.[selectedLanguage] || `// Bug fix code not available for ${selectedLanguage}`
+
+      // Auto-load codebase files into workspace context for bug fixes
+      const codebaseFiles = (selectedScenario as any).codebaseFiles?.[selectedLanguage] || []
+      if (codebaseFiles.length > 0) {
+        const contextFiles = codebaseFiles.map((file: any) => ({
+          path: file.fileName,
+          content: file.content,
+        }))
+        setWorkspaceContext(contextFiles)
+        toast.success(`Loaded ${contextFiles.length} codebase file(s) for context`)
+      }
+    } else {
+      // For DSA problems, load starter code
+      initialCode = (selectedScenario as any).starterCode?.[selectedLanguage] || `function solution() {
   // Write your solution here
-  
+
 }`
-    setCode(starterCode)
+    }
+    setCode(initialCode)
 
     // Initialize interviewer with welcome message (problem details are now in left panel)
-    const initialMessage = `Hello! I'm your interviewer today. We'll be working on **${selectedScenario.title}** - a ${selectedScenario.difficulty} ${selectedScenario.type.toUpperCase()} problem.
+    const problemType = selectedScenario.type === 'bugfix' ? 'BUG FIX' : selectedScenario.type.toUpperCase()
+    const initialMessage = `Hello! I'm your interviewer today. We'll be working on **${selectedScenario.title}** - a ${selectedScenario.difficulty} ${problemType} problem.
 
 I can see you're reviewing the problem description on the left. Take a moment to understand it, then feel free to:
 - Ask me clarifying questions about the requirements
@@ -358,6 +439,8 @@ Let's have a great interview! How would you like to approach this problem?`
     setElapsedTime(0)
     setLastCodeHash("")
     setCurrentSessionId(null)
+    setRevealedHints(0)
+    setWorkspaceContext([])
     if (proactiveTimer) {
       clearTimeout(proactiveTimer)
       setProactiveTimer(null)
@@ -508,7 +591,11 @@ Let's have a great interview! How would you like to approach this problem?`
       const response = await fetch("/api/execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, scenarioId: selectedScenario.id }),
+        body: JSON.stringify({
+          code,
+          scenarioId: selectedScenario.id,
+          language: selectedLanguage,
+        }),
       })
 
       const data = await response.json()
@@ -517,7 +604,16 @@ Let's have a great interview! How would you like to approach this problem?`
         setTestResults(data.results)
         setTestSummary(data.summary)
 
-                        if (data.success) {
+        // Play sound based on results
+        if (data.summary.passRate === 100) {
+          playSound('success')
+        } else if (data.summary.passRate >= 50) {
+          playSound('milestone')
+        } else {
+          playSound('fail')
+        }
+
+        if (data.success) {
           // Generate comprehensive feedback
           let comprehensiveFeedback = `Completed ${selectedScenario?.title} with ${data.summary.passed}/${data.summary.total} tests passing`
           let performanceScore = data.summary.passRate * 10
@@ -846,36 +942,85 @@ Let's have a great interview! How would you like to approach this problem?`
                                 </ul>
                               </div>
                             )}
+
+                            {/* Hints Section */}
+                            {isInterviewStarted && (selectedScenario as any).hints && (selectedScenario as any).hints.length > 0 && (
+                              <div className="border-t border-gray-700 pt-3 mt-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h3 className="text-white font-semibold flex items-center space-x-1 text-xs">
+                                    <Lightbulb className="h-3 w-3 text-yellow-400" />
+                                    <span>Hints ({revealedHints}/{(selectedScenario as any).hints.length})</span>
+                                  </h3>
+                                  {revealedHints < (selectedScenario as any).hints.length && (
+                                    <span className="text-xs text-gray-400">
+                                      Next in {Math.ceil((180 - (elapsedTime % 180)) / 60)}m
+                                    </span>
+                                  )}
+                                </div>
+                                {revealedHints > 0 ? (
+                                  <div className="space-y-2">
+                                    {(selectedScenario as any).hints.slice(0, revealedHints).map((hint: string, i: number) => (
+                                      <div key={i} className="bg-yellow-500/10 border border-yellow-500/20 rounded p-2">
+                                        <p className="text-yellow-200 text-xs leading-relaxed">
+                                          <span className="font-semibold">Hint {i + 1}:</span> {hint}
+                                        </p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-gray-400 text-xs italic">
+                                    Hints will unlock every 3 minutes as you work on the problem
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </>
                         )}
 
                         {/* Upload Codebase Section */}
                         <div className="border-t border-gray-700 pt-3 mt-3">
                           <h3 className="text-white font-semibold mb-2">Workspace Files</h3>
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            multiple
-                            accept=".js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.h,.json,.md,.txt,text/*"
-                            onChange={handleFileUpload}
-                            className="hidden"
-                          />
-                          <Button
-                            onClick={() => fileInputRef.current?.click()}
-                            variant="outline"
-                            className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent text-xs h-7"
-                          >
-                            <Code className="mr-1 h-3 w-3" />
-                            Upload Files
-                          </Button>
-                          {workspaceContext.length > 0 && (
-                            <div className="mt-2 space-y-1">
-                              {workspaceContext.map((file, idx) => (
-                                <div key={idx} className="text-xs text-gray-400 truncate bg-gray-800/30 px-2 py-1 rounded">
-                                  {file.path}
-                                </div>
-                              ))}
+                          {selectedScenario.type === 'bugfix' && workspaceContext.length > 0 ? (
+                            <div className="mb-2">
+                              <p className="text-xs text-green-400 mb-2">
+                                ✓ {workspaceContext.length} codebase file(s) loaded automatically
+                              </p>
+                              <div className="space-y-1 max-h-32 overflow-y-auto">
+                                {workspaceContext.map((file, idx) => (
+                                  <div key={idx} className="text-xs text-gray-300 bg-gray-800/50 px-2 py-1 rounded border border-gray-700">
+                                    <div className="font-semibold text-blue-400">{file.path}</div>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
+                          ) : (
+                            <>
+                              <input
+                                ref={fileInputRef}
+                                type="file"
+                                multiple
+                                accept=".js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.h,.json,.md,.txt,text/*"
+                                onChange={handleFileUpload}
+                                className="hidden"
+                              />
+                              <Button
+                                onClick={() => fileInputRef.current?.click()}
+                                variant="outline"
+                                className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent text-xs h-7"
+                              >
+                                <Code className="mr-1 h-3 w-3" />
+                                Upload Files
+                              </Button>
+                              {workspaceContext.length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  {workspaceContext.map((file, idx) => (
+                                    <div key={idx} className="text-xs text-gray-400 truncate bg-gray-800/30 px-2 py-1 rounded">
+                                      {file.path}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                       </CardContent>
