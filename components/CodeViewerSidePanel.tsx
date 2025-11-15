@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import React, { useEffect } from "react"
 import dynamic from "next/dynamic"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
