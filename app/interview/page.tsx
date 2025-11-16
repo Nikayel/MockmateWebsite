@@ -33,6 +33,8 @@ import {
   ChevronRight,
   ArrowRight,
   ArrowLeft,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
 import {
   AlertDialog,
@@ -80,6 +82,7 @@ export default function InterviewPage() {
   const [comprehensiveFeedback, setComprehensiveFeedback] = useState<string>("")
   const [performanceScore, setPerformanceScore] = useState<number | null>(null)
   const [isGeneratingDiscussion, setIsGeneratingDiscussion] = useState(false)
+  const [showCodeInDiscussion, setShowCodeInDiscussion] = useState(false)
   const [code, setCode] = useState("")
   const [selectedLanguage, setSelectedLanguage] = useState<"javascript" | "typescript" | "python" | "java" | "cpp" | "csharp" | "go" | "rust">("javascript")
 
@@ -1624,7 +1627,7 @@ Let's have a great interview! How would you like to approach this problem?`
                 </div>
               ) : showPostInterviewDiscussion ? (
                 /* Post-Interview Discussion Phase */
-                <div className="max-w-6xl mx-auto py-8">
+                <div className="max-w-7xl mx-auto py-8 px-4">
                   <div className="text-center mb-6">
                     <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-3" />
                     <h2 className="text-2xl font-heading font-bold text-white mb-2">Solution Complete!</h2>
@@ -1654,6 +1657,68 @@ Let's have a great interview! How would you like to approach this problem?`
                     )}
                   </div>
 
+                  {/* Collapsible Code Viewer */}
+                  <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-6">
+                    <CardHeader
+                      className="cursor-pointer hover:bg-gray-800/50 transition-colors"
+                      onClick={() => setShowCodeInDiscussion(!showCodeInDiscussion)}
+                    >
+                      <CardTitle className="text-white flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Code className="h-5 w-5 text-[#ff5733]" />
+                          <span>Your Solution</span>
+                          <Badge variant="outline" className="border-gray-600 text-gray-400">
+                            {selectedLanguage}
+                          </Badge>
+                        </div>
+                        {showCodeInDiscussion ? (
+                          <ChevronUp className="h-5 w-5 text-gray-400" />
+                        ) : (
+                          <ChevronDown className="h-5 w-5 text-gray-400" />
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    {showCodeInDiscussion && (
+                      <CardContent>
+                        <div className="border border-gray-700 rounded-lg overflow-hidden">
+                          <Editor
+                            height="400px"
+                            language={selectedLanguage}
+                            value={code}
+                            theme="vs-dark"
+                            options={{
+                              readOnly: true,
+                              minimap: { enabled: false },
+                              fontSize: 14,
+                              scrollBeyondLastLine: false,
+                            }}
+                          />
+                        </div>
+                        {testResults.length > 0 && (
+                          <div className="mt-4 space-y-2">
+                            <h4 className="text-sm font-semibold text-white">Test Results:</h4>
+                            {testResults.map((result, index) => (
+                              <div
+                                key={index}
+                                className={`p-2 rounded border ${
+                                  result.passed
+                                    ? "bg-green-900/20 border-green-700"
+                                    : "bg-red-900/20 border-red-700"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className={result.passed ? "text-green-400" : "text-red-400"}>
+                                    {result.passed ? "✓" : "✗"} {result.description}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    )}
+                  </Card>
+
                   {/* Interviewer Discussion Panel */}
                   <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-6">
                     <CardHeader>
@@ -1666,8 +1731,8 @@ Let's have a great interview! How would you like to approach this problem?`
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-4 max-h-96 overflow-y-auto mb-4 pr-2">
-                        {interviewerMessages.slice(-5).map((msg, index) => (
+                      <div className="space-y-4 max-h-[500px] overflow-y-auto mb-4 pr-2">
+                        {interviewerMessages.map((msg, index) => (
                           <div
                             key={index}
                             className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
@@ -1701,8 +1766,9 @@ Let's have a great interview! How would you like to approach this problem?`
                             </div>
                           </div>
                         )}
+                        <div ref={interviewerEndRef} />
                       </div>
-                      
+
                       {/* Chat Input */}
                       <div className="flex space-x-2 border-t border-gray-700 pt-4">
                         <Input
