@@ -27,9 +27,10 @@ import {
   PlayCircle,
   XCircle,
   AlertCircle,
+  ArrowLeft,
 } from "lucide-react"
 import { checkDemoAccess, markDemoAsUsed, getUserContext, formatDemoUsedDate } from "@/lib/demo-manager"
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from "@/components/ui/alert-dialog"
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog"
 
 // Dynamically import Monaco Editor (client-side only)
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false })
@@ -82,6 +83,9 @@ export default function DemoPage() {
   const chatEndRef = useRef<HTMLDivElement>(null)
   const interviewerEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Close confirmation dialog state
+  const [showCloseDialog, setShowCloseDialog] = useState(false)
 
   // Check demo access on component mount
   useEffect(() => {
@@ -226,7 +230,7 @@ export default function DemoPage() {
       {
         type: "ai",
         message:
-          "Hello! Today we'll be working on the Two Sum problem. Here's the question:\n\nGiven an array of integers 'nums' and an integer 'target', return indices of the two numbers such that they add up to target.\n\nYou may assume that each input has exactly one solution, and you may not use the same element twice.\n\nExample: nums = [2,7,11,15], target = 9\nOutput: [0,1] (because nums[0] + nums[1] = 2 + 7 = 9)\n\nTake a moment to think about your approach, then feel free to ask me any clarifying questions!",
+          "Hello! I'm Sable, your interviewer today. We'll be working on the Two Sum problem. Here's the question:\n\nGiven an array of integers 'nums' and an integer 'target', return indices of the two numbers such that they add up to target.\n\nYou may assume that each input has exactly one solution, and you may not use the same element twice.\n\nExample: nums = [2,7,11,15], target = 9\nOutput: [0,1] (because nums[0] + nums[1] = 2 + 7 = 9)\n\nTake a moment to think about your approach, then feel free to ask me any clarifying questions!",
       },
     ])
   }
@@ -354,9 +358,12 @@ export default function DemoPage() {
     return { score: testSummary.passRate, label: "Needs Improvement" }
   }
 
+  // Determine if we should hide the header (during interview mode)
+  const isInterviewMode = isInterviewStarted
+  
   return (
     <main className="min-h-screen bg-black">
-      <Header />
+      {!isInterviewMode && <Header />}
 
       {/* Hero Section */}
       <section className="pt-24 pb-12 bg-gradient-to-br from-black via-gray-900 to-black">
@@ -396,6 +403,14 @@ export default function DemoPage() {
                       <Clock className="h-5 w-5 text-[#ff5733]" />
                       <span className="text-xl font-mono">{formatTime(elapsedTime)}</span>
                     </div>
+                    <Button
+                      onClick={() => setShowCloseDialog(true)}
+                      variant="outline"
+                      className="border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent px-6 py-4 text-lg"
+                    >
+                      <ArrowLeft className="mr-2 h-5 w-5" />
+                      Close
+                    </Button>
                     <Button
                       onClick={runCode}
                       disabled={isRunningTests || showFeedback}
@@ -864,6 +879,32 @@ export default function DemoPage() {
         </div>
       </section>
 
+      {/* Close Confirmation Dialog */}
+      <AlertDialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
+        <AlertDialogContent className="bg-gray-900 border-gray-700">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">You want to close this interview?</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-300">
+              If you close now, your progress will be saved but you'll exit the interview session. You can always come back to continue later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-gray-800 text-white border-gray-600 hover:bg-gray-700">
+              Stay
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowCloseDialog(false)
+                resetInterview()
+              }}
+              className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
+            >
+              Close Interview
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Demo Limit Dialog */}
       <AlertDialog open={showDemoLimitDialog} onOpenChange={setShowDemoLimitDialog}>
         <AlertDialogContent className="bg-gray-900 border-gray-700 text-white">
@@ -922,7 +963,7 @@ export default function DemoPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Footer />
+      {!isInterviewMode && <Footer />}
     </main>
   )
 }
