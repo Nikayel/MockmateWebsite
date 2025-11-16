@@ -33,11 +33,24 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [usage, setUsage] = useState<{ used: number; limit: number; allowed: boolean } | null>(null)
   const [dataLoading, setDataLoading] = useState(true)
+  const [authCheckComplete, setAuthCheckComplete] = useState(false)
+
+  // Separate effect to handle auth check with delay to prevent race condition on refresh
+  useEffect(() => {
+    if (!initialized || authLoading) return
+
+    // Give Firebase a moment to restore session on page refresh before checking auth
+    const timer = setTimeout(() => {
+      setAuthCheckComplete(true)
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [initialized, authLoading])
 
   useEffect(() => {
     const loadDashboard = async () => {
-      // Wait for auth to initialize
-      if (authLoading || !initialized) return
+      // Wait for auth to fully initialize and complete our auth check
+      if (authLoading || !initialized || !authCheckComplete) return
 
       // Redirect if not authenticated
       if (!firebaseUser) {
@@ -113,7 +126,7 @@ export default function DashboardPage() {
     }
   }, [router, firebaseUser, authLoading, initialized])
 
-  if (authLoading || !initialized || dataLoading) {
+  if (authLoading || !initialized || !authCheckComplete || dataLoading) {
     return (
       <main className="min-h-screen bg-black flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff5733]"></div>

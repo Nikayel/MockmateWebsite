@@ -53,13 +53,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Safety timeout to prevent infinite loading
     // Firebase should respond quickly, but if it doesn't, we mark as initialized anyway
+    // Increased to 3 seconds to give Firebase more time to restore sessions on page refresh
     const timeout = setTimeout(() => {
       if (mounted && !initialized) {
         console.warn("Auth initialization timeout - marking as initialized")
         setLoading(false)
         setInitialized(true)
       }
-    }, 1500) // 1.5 second timeout (reduced from 3s for better UX)
+    }, 3000) // 3 second timeout to prevent race condition on refresh
 
     return () => {
       mounted = false

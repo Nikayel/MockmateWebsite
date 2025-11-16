@@ -23,10 +23,23 @@ export default function AccountPage() {
   const [usage, setUsage] = useState<ProfileQuota | null>(null)
   const [dataLoading, setDataLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [authCheckComplete, setAuthCheckComplete] = useState(false)
+
+  // Separate effect to handle auth check with delay to prevent race condition on refresh
+  useEffect(() => {
+    if (!initialized || authLoading) return
+
+    // Give Firebase a moment to restore session on page refresh before checking auth
+    const timer = setTimeout(() => {
+      setAuthCheckComplete(true)
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [initialized, authLoading])
 
   useEffect(() => {
     const loadUserData = async () => {
-      if (authLoading || !initialized) return
+      if (authLoading || !initialized || !authCheckComplete) return
 
       if (!firebaseUser) {
         window.location.href = "/login"
