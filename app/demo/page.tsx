@@ -577,7 +577,7 @@ export default function DemoPage() {
                       <CardHeader className="pb-3">
                         <CardTitle className="text-white flex items-center space-x-2">
                           <Bot className="h-5 w-5 text-[#ff5733]" />
-                          <span>AI Interviewer</span>
+                          <span>Sable</span>
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="flex flex-col h-[calc(100%-80px)]">
@@ -606,7 +606,7 @@ export default function DemoPage() {
                                         <Bot className="h-3 w-3 text-[#ff5733]" />
                                       )}
                                       <span className="text-xs opacity-75">
-                                        {msg.type === "user" ? "You" : "AI Interviewer"}
+                                        {msg.type === "user" ? "You" : "Sable"}
                                       </span>
                                     </div>
                                     <p className="text-sm whitespace-pre-wrap">{msg.message}</p>

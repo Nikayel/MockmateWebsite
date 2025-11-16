@@ -1642,7 +1642,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       <CardHeader className="pb-2 flex-shrink-0">
                         <CardTitle className="text-white flex items-center space-x-2 text-sm">
                           <Bot className="h-4 w-4 text-[#ff5733]" />
-                          <span>AI Interviewer</span>
+                          <span>Sable</span>
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="flex flex-col flex-1 min-h-0 overflow-hidden p-3">

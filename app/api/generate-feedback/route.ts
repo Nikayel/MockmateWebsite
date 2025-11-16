@@ -111,11 +111,42 @@ ${testResults.filter((t: any) => !t.passed).map((t: any) =>
 
 Remember:
 - Be explicit when tests pass but collaboration/explanation was missing; enforce the score caps as stated.
-- Only include insights that materially change the candidate’s next interview.
-- Keep every section lean—if there’s nothing meaningful to say, write “No major findings.”
-- If tests failed, highlight the most critical fix inside “Fix Next”.`
+- Only include insights that materially change the candidate's next interview.
+- Keep every section lean—if there's nothing meaningful to say, write "No major findings."
+- If tests failed, highlight the most critical fix inside "Fix Next".`
 
-    const result = await model.generateContent(prompt)
+    // Generate content with retry logic
+    let result: any = null
+    const maxRetries = 3
+    const baseDelay = 1000 // 1 second
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        result = await model.generateContent(prompt)
+        break // Success, exit retry loop
+      } catch (error: any) {
+        // Check if it's a retryable error (503, 429, or 500 with overload message)
+        const isRetryable =
+          error?.status === 503 ||
+          error?.status === 429 ||
+          (error?.status === 500 && error?.message?.includes('overloaded')) ||
+          error?.message?.includes('503') ||
+          error?.message?.includes('Service Unavailable')
+
+        if (!isRetryable || attempt === maxRetries - 1) {
+          throw error // Don't retry non-retryable errors or if last attempt
+        }
+
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = baseDelay * Math.pow(2, attempt)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+    }
+
+    if (!result) {
+      throw new Error("Failed to generate content after retries")
+    }
+
     const response = await result.response
     const feedback = response.text()
 

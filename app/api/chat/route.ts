@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
         userName = nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1)
       }
     }
-    
+
     const userContextString = userInfo
       ? `
 CANDIDATE INFORMATION:
@@ -75,10 +75,10 @@ IMPORTANT: When referencing the candidate, use their first name or last name onl
     }
 
     // Define system prompts based on role with enhanced context awareness
-    const problemContext = scenarioTitle 
-      ? `\n\nCURRENT PROBLEM: ${scenarioTitle}${scenarioType ? ` (${scenarioType.toUpperCase()})` : ''}\n` 
+    const problemContext = scenarioTitle
+      ? `\n\nCURRENT PROBLEM: ${scenarioTitle}${scenarioType ? ` (${scenarioType.toUpperCase()})` : ''}\n`
       : ''
-    
+
     const systemPrompts = {
       interviewer: `You are Sable, a professional and experienced technical interviewer conducting a coding interview. You work at a top tech company and have high standards, but you're also kind, direct, and genuinely interested in helping candidates succeed.
 
@@ -202,7 +202,7 @@ Keep responses brief, actionable, and helpful. You're a tool they can use, but t
           return
         }
         foundFirstUser = true
-        
+
         history.push({
           role: msg.type === "user" ? "user" : "model",
           parts: [{ text: msg.message }],
@@ -212,12 +212,12 @@ Keep responses brief, actionable, and helpful. You're a tool they can use, but t
 
     // Build the full user message with context
     let fullUserMessage = ""
-    
+
     if (isProactive && role === "interviewer") {
       // Proactive interviewer message - analyze code and jump in with context-aware feedback
       const timeSpent = elapsedTime || 0
       const minutesSpent = Math.floor(timeSpent / 60)
-      
+
       fullUserMessage = `[PROACTIVE MODE - CONTEXT-AWARE] The candidate has been working on their solution${minutesSpent > 0 ? ` for ${minutesSpent} minute${minutesSpent !== 1 ? 's' : ''}` : ''}. 
 
 Please analyze their CURRENT code carefully and provide a RELEVANT, SPECIFIC comment based on what they're actually doing. Look for:
@@ -248,8 +248,37 @@ Based on their current code, what specific, relevant comment or question would y
       },
     })
 
-    // Send message and get response
-    const result = await chat.sendMessage(fullUserMessage)
+    // Send message and get response with retry logic
+    let result
+    let lastError
+    const maxRetries = 3
+    const baseDelay = 1000 // 1 second
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        result = await chat.sendMessage(fullUserMessage)
+        break // Success, exit retry loop
+      } catch (error: any) {
+        lastError = error
+
+        // Check if it's a retryable error (503, 429, or 500 with overload message)
+        const isRetryable =
+          error?.status === 503 ||
+          error?.status === 429 ||
+          (error?.status === 500 && error?.message?.includes('overloaded')) ||
+          error?.message?.includes('503') ||
+          error?.message?.includes('Service Unavailable')
+
+        if (!isRetryable || attempt === maxRetries - 1) {
+          throw error // Don't retry non-retryable errors or if last attempt
+        }
+
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = baseDelay * Math.pow(2, attempt)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+    }
+
     const response = await result.response
     const reply = response.text()
 
