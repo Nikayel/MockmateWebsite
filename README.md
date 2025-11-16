@@ -197,15 +197,20 @@ See [PRIVATE.md](./PRIVATE.md) for details on what's open source vs proprietary.
 
 This hybrid model allows the community to benefit from the core platform while protecting business-critical components.
 
-## Documentation
+## API Endpoints
 
-Full documentation is available in the [`docs/`](./docs/) directory:
+The website provides several API endpoints for core functionality:
 
-- [Getting Started](./docs/GETTING_STARTED.md)
-- [Architecture](./docs/ARCHITECTURE.md)
-- [API Reference](./docs/API.md)
-- [Pricing](./docs/PRICING.md)
-- [Deployment](./docs/DEPLOYMENT.md)
+- **`/api/chat`** - AI interviewer chat responses using Google Gemini
+- **`/api/execute`** - Code execution for testing interview solutions
+- **`/api/generate-feedback`** - Performance feedback generation after interviews
+- **`/api/create-checkout`** - Stripe payment checkout session creation
+- **`/api/customer-portal`** - Stripe customer portal for subscription management
+- **`/api/sync-subscription`** - Subscription synchronization with Firestore
+- **`/api/promo-code`** - Promotional code validation
+- **`/api/webhook/stripe`** - Stripe webhook handler for payment events
+
+All API endpoints implement rate limiting for security and stability.
 
 ## Support
 
