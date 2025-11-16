@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false)
         setInitialized(true)
       }
-    }, 3000) // 3 second timeout
+    }, 1500) // 1.5 second timeout (reduced from 3s for better UX)
 
     return () => {
       mounted = false

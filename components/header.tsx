@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/auth-context"
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const { user, loading: isLoading } = useAuth()
+  const { user, loading: isLoading, initialized } = useAuth()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -47,7 +47,11 @@ export function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-6">
-            {user ? (
+            {!initialized ? (
+              <div className="h-10 flex items-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white opacity-50"></div>
+              </div>
+            ) : user ? (
               <>
                 <Link href="/dashboard" className="text-white hover:text-[#ff5733] transition-colors duration-300 flex items-center space-x-1">
                   <LayoutDashboard className="h-4 w-4" />
@@ -114,7 +118,11 @@ export function Header() {
         {isMobileMenuOpen && (
           <nav className="md:hidden mt-4 pb-4 border-t border-white/20">
             <div className="flex flex-col space-y-4 pt-4">
-              {user ? (
+              {!initialized ? (
+                <div className="flex justify-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white opacity-50"></div>
+                </div>
+              ) : user ? (
                 <>
                   <Link
                     href="/dashboard"

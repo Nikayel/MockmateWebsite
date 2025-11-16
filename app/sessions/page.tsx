@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/auth-context"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
-import { Clock, Calendar, Target, TrendingUp, Terminal, ArrowRight, Play } from "lucide-react"
+import { Clock, Calendar, Target, TrendingUp, Terminal, ArrowRight, Play, ChevronDown, ChevronUp, FileText } from "lucide-react"
 import { User as UserType, InterviewSession } from "@/lib/types"
 import Link from "next/link"
 import { getScenarioById } from "@/lib/scenarios"
@@ -20,6 +20,7 @@ export default function SessionsPage() {
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [sessions, setSessions] = useState<InterviewSession[]>([])
   const [loading, setLoading] = useState(true)
+  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null)
 
   useEffect(() => {
     if (authLoading || !initialized) return
@@ -119,11 +120,11 @@ export default function SessionsPage() {
               {sessions.map((session) => {
                 const isInProgress = !session.completed_at
                 const canReopen = isInProgress && session.scenario_id
-                
+                const isExpanded = expandedSessionId === session.id
+                const hasFeedback = session.feedback && session.completed_at
+
                 return (
-                  <Card key={session.id} className={`bg-gray-900/50 border-gray-700 transition-colors ${
-                    canReopen ? "hover:border-[#ff5733]/50 cursor-pointer" : ""
-                  }`}>
+                  <Card key={session.id} className="bg-gray-900/50 border-gray-700 transition-colors">
                     <CardHeader>
                       <div className="flex items-start justify-between mb-2">
                         <CardTitle className="text-white">{session.topic}</CardTitle>
@@ -147,7 +148,7 @@ export default function SessionsPage() {
                             <span className="text-gray-400 text-sm">Performance</span>
                             <div className="flex items-center space-x-2">
                               <TrendingUp className="h-4 w-4 text-[#ff5733]" />
-                              <span className="text-white font-semibold">{session.performance_score}%</span>
+                              <span className="text-white font-semibold">{Math.round(session.performance_score)}%</span>
                             </div>
                           </div>
                         )}
@@ -167,6 +168,35 @@ export default function SessionsPage() {
                             </Badge>
                           </div>
                         )}
+
+                        {/* Feedback Section */}
+                        {hasFeedback && (
+                          <>
+                            <Button
+                              onClick={() => setExpandedSessionId(isExpanded ? null : session.id)}
+                              variant="outline"
+                              className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white"
+                            >
+                              <FileText className="mr-2 h-4 w-4" />
+                              {isExpanded ? "Hide Feedback" : "View Feedback"}
+                              {isExpanded ? (
+                                <ChevronUp className="ml-auto h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="ml-auto h-4 w-4" />
+                              )}
+                            </Button>
+
+                            {isExpanded && (
+                              <div className="mt-3 p-3 bg-gray-800/50 border border-gray-700 rounded-lg max-h-96 overflow-y-auto">
+                                <h4 className="text-sm font-semibold text-white mb-2">Interview Feedback</h4>
+                                <div className="text-xs text-gray-300 whitespace-pre-wrap leading-relaxed">
+                                  {session.feedback}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+
                         {canReopen && (
                           <Button
                             onClick={() => {
