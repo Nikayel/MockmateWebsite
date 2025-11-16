@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getScenarioById } from "@/lib/scenarios"
-import { VM } from "vm2"
+import { runInNewContext } from "vm"
 import { executeRateLimit } from "@/lib/rate-limit"
+
+// Mark route as dynamic to avoid build-time issues
+export const dynamic = 'force-dynamic'
 
 // Language-specific code execution
 async function executeJavaScript(code: string, testCase: any, scenarioType: string) {
@@ -17,20 +20,26 @@ async function executeJavaScript(code: string, testCase: any, scenarioType: stri
       return { result: null, error: "Code is too short to be a valid solution" }
     }
 
-    // Create a sandboxed VM with strict timeout and memory limits
-    const vm = new VM({
-      timeout: 5000, // 5 second timeout
-      sandbox: {
-        // Only provide safe built-ins
-        console: {
-          log: () => {}, // Disable console output
-          error: () => {},
-          warn: () => {}
-        }
+    // Create a sandboxed context with limited access
+    const sandbox = {
+      console: {
+        log: () => {}, // Disable console output
+        error: () => {},
+        warn: () => {},
+        info: () => {},
       },
-      eval: false, // Disable eval
-      wasm: false, // Disable WebAssembly
-    })
+      setTimeout: undefined,
+      setInterval: undefined,
+      setImmediate: undefined,
+      Buffer: undefined,
+      process: undefined,
+      require: undefined,
+      global: undefined,
+      module: undefined,
+      exports: undefined,
+      __dirname: undefined,
+      __filename: undefined,
+    }
 
     let func: any
 
@@ -38,12 +47,12 @@ async function executeJavaScript(code: string, testCase: any, scenarioType: stri
     try {
       // Strategy 1: Code is a function expression/declaration that can be returned
       try {
-        func = vm.run("(" + trimmedCode + ")")
+        func = runInNewContext("(" + trimmedCode + ")", sandbox, { timeout: 5000 })
       } catch {
         // Strategy 2: Code might be a function declaration, try wrapping differently
         try {
           // Try as an IIFE that returns a function
-          const wrapped = vm.run(`
+          const wrapped = runInNewContext(`
             (function() {
               ${trimmedCode}
               // Try to find and return the function
@@ -52,13 +61,13 @@ async function executeJavaScript(code: string, testCase: any, scenarioType: stri
               if (typeof main === 'function') return main;
               throw new Error('No function found in code');
             })()
-          `)
+          `, sandbox, { timeout: 5000 })
           func = wrapped
         } catch (wrapError) {
           // Strategy 3: Code is the function body itself, wrap it
           try {
             const paramNames = Object.keys(testCase.input).join(', ')
-            func = vm.run(`(function(${paramNames}) { ${trimmedCode} })`)
+            func = runInNewContext(`(function(${paramNames}) { ${trimmedCode} })`, sandbox, { timeout: 5000 })
           } catch (paramError) {
             return { result: null, error: `Code must define a callable function. Found: ${typeof func}` }
           }
