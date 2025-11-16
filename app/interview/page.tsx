@@ -47,6 +47,7 @@ import {
 import { useAuth } from "@/lib/auth-context"
 import { checkUsageLimit, incrementSessionUsage, getUserProfile, createInterviewSession, updateInterviewSession } from "@/lib/firestore-helpers"
 import { scenarios, filterScenarios, getScenarioById, type Scenario, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
+import { extractProtectedElements, validateCodeProtection, enforceCodeProtection } from "@/lib/code-protection"
 import { toast } from "sonner"
 
 // Dynamically import Monaco Editor (client-side only)
@@ -130,6 +131,10 @@ export default function InterviewPage() {
   
   // Close confirmation dialog state
   const [showCloseDialog, setShowCloseDialog] = useState(false)
+
+  // Code protection state
+  const [protectedElements, setProtectedElements] = useState<ReturnType<typeof extractProtectedElements> | null>(null)
+  const [starterCode, setStarterCode] = useState<string>("")
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const interviewerEndRef = useRef<HTMLDivElement>(null)
@@ -323,6 +328,11 @@ Let's continue!`
 
       if (isEmptyOrStarter) {
         setCode(newCode)
+        setStarterCode(newCode)
+        
+        // Extract protected elements for code protection
+        const protectedElementsData = extractProtectedElements(newCode, selectedLanguage)
+        setProtectedElements(protectedElementsData)
       }
     }
   }, [selectedLanguage, isInterviewStarted, selectedScenario, showFeedback])
@@ -717,6 +727,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 }`
     }
     setCode(initialCode)
+    setStarterCode(initialCode)
+    
+    // Extract protected elements for code protection
+    const protectedElementsData = extractProtectedElements(initialCode, selectedLanguage)
+    setProtectedElements(protectedElementsData)
 
     // Initialize interviewer with welcome message (problem details are now in left panel)
     const problemType = selectedScenario.type === 'bugfix' ? 'BUG FIX' : selectedScenario.type.toUpperCase()
@@ -1404,7 +1419,22 @@ Let's have a great interview! How would you like to approach this problem?`
                             height="100%"
                             language={selectedLanguage}
                             value={code}
-                            onChange={(value) => setCode(value || "")}
+                            onChange={(value) => {
+                              const newCode = value || ""
+                              
+                              // Enforce code protection if enabled
+                              if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
+                                const validation = validateCodeProtection(newCode, protectedElements, selectedLanguage)
+                                
+                                if (!validation.valid) {
+                                  // Show error and prevent the change
+                                  toast.error(`Cannot remove required code: ${validation.errors[0]}`)
+                                  return // Don't update code
+                                }
+                              }
+                              
+                              setCode(newCode)
+                            }}
                             theme="vs-dark"
                             options={{
                               minimap: { enabled: false },

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getScenarioById } from "@/lib/scenarios"
 import { runInNewContext } from "vm"
 import { executeRateLimit } from "@/lib/rate-limit"
+import { spawn } from "child_process"
 
 // Mark route as dynamic to avoid build-time issues
 export const dynamic = 'force-dynamic'
@@ -99,13 +100,132 @@ async function executeJavaScript(code: string, testCase: any, scenarioType: stri
 }
 
 async function executePython(code: string, testCase: any, scenarioType: string) {
-  // For Python, we can't execute it in the browser/Node.js without a sandbox
-  // Return an error indicating Python execution is not supported yet
-  // In production, this would call a sandboxed Python execution service
-  return {
-    result: null,
-    error: "Python execution is not yet supported. Please use JavaScript/TypeScript for now.",
-    note: "Python execution requires a sandboxed execution service - coming soon"
+  try {
+    // Trim and validate code
+    const trimmedCode = code.trim()
+    if (!trimmedCode || trimmedCode.length === 0) {
+      return { result: null, error: "Code is empty" }
+    }
+
+    // Check for obviously invalid code patterns
+    if (trimmedCode.length < 10) {
+      return { result: null, error: "Code is too short to be a valid solution" }
+    }
+
+    // Extract function name from code (handle both twoSum and two_sum)
+    let functionName = null
+    const functionMatch = trimmedCode.match(/def\s+(\w+)\s*\(/i)
+    if (functionMatch) {
+      functionName = functionMatch[1]
+    } else {
+      return { result: null, error: "Code must define a function using 'def function_name(...)'" }
+    }
+
+    // Prepare test case inputs
+    const inputValues = Object.values(testCase.input)
+
+    // Create Python script that executes the function
+    // Use stdin to pass input data to avoid shell escaping issues
+    const pythonScript = `
+import json
+import sys
+
+${trimmedCode}
+
+# Get input from stdin
+try:
+    input_str = sys.stdin.read()
+    input_data = json.loads(input_str)
+    result = ${functionName}(*input_data)
+    print(json.dumps(result))
+except Exception as e:
+    print(json.dumps({"error": str(e)}), file=sys.stderr)
+    sys.exit(1)
+`
+
+    // Execute Python code with timeout
+    const TIMEOUT_MS = 5000
+    return new Promise((resolve) => {
+      const pythonProcess = spawn('python3', ['-c', pythonScript], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+      })
+
+      let stdout = ''
+      let stderr = ''
+      let timeoutId: NodeJS.Timeout
+
+      // Set timeout
+      timeoutId = setTimeout(() => {
+        pythonProcess.kill()
+        resolve({ result: null, error: "Execution timeout: code took too long to execute" })
+      }, TIMEOUT_MS)
+
+      // Collect stdout
+      pythonProcess.stdout.on('data', (data) => {
+        stdout += data.toString()
+      })
+
+      // Collect stderr
+      pythonProcess.stderr.on('data', (data) => {
+        stderr += data.toString()
+      })
+
+      // Handle process completion
+      pythonProcess.on('close', (code) => {
+        clearTimeout(timeoutId)
+
+        if (stderr) {
+          try {
+            const errorData = JSON.parse(stderr)
+            if (errorData.error) {
+              resolve({ result: null, error: `Runtime error: ${errorData.error}` })
+              return
+            }
+          } catch {
+            // If stderr is not JSON, it might be a Python error
+            if (stderr.trim()) {
+              resolve({ result: null, error: `Python error: ${stderr.trim()}` })
+              return
+            }
+          }
+        }
+
+        if (stdout) {
+          try {
+            const result = JSON.parse(stdout.trim())
+            resolve({ result, error: null })
+            return
+          } catch (parseError) {
+            resolve({ result: null, error: `Failed to parse result: ${stdout.trim()}` })
+            return
+          }
+        }
+
+        if (code !== 0) {
+          resolve({ result: null, error: `Process exited with code ${code}` })
+          return
+        }
+
+        resolve({ result: null, error: "No output from Python execution" })
+      })
+
+      // Handle spawn errors
+      pythonProcess.on('error', (error: any) => {
+        clearTimeout(timeoutId)
+        if (error.code === 'ENOENT' || error.message.includes('python3')) {
+          resolve({ result: null, error: "Python 3 is not installed or not available in PATH. Please ensure Python 3 is installed." })
+        } else {
+          resolve({ result: null, error: `Execution error: ${error.message || "Unknown error"}` })
+        }
+      })
+
+      // Send input data to stdin
+      const inputJson = JSON.stringify(inputValues)
+      pythonProcess.stdin.write(inputJson)
+      pythonProcess.stdin.end()
+    })
+  } catch (error) {
+    return { result: null, error: error instanceof Error ? error.message : "Execution error" }
   }
 }
 
