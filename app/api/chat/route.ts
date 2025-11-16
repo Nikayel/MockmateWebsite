@@ -47,13 +47,14 @@ export async function POST(request: NextRequest) {
     const userContextString = userInfo
       ? `
 CANDIDATE INFORMATION:
+- Name: ${userName} (use first name or last name only, never full name)
 - Email: ${userInfo.email || "Guest User"}
 - Subscription: ${userInfo.subscription_tier || "free"} tier
 - Sessions completed: ${userInfo.sessions_used || 0}
 - Previous topics: ${userInfo.previous_topics?.join(", ") || "None"}
 - Skill level: ${userInfo.skill_level || "Intermediate"}
 
-Use this information to personalize your responses and questions appropriately.
+IMPORTANT: When referencing the candidate, use their first name or last name only (e.g., "John" or "Smith"), never their full name. Keep it casual and professional.
 `
       : ""
 
