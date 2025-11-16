@@ -74,6 +74,7 @@ export default function InterviewPage() {
   const searchParams = useSearchParams()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
+  const [authCheckComplete, setAuthCheckComplete] = useState(false)
   const [showScenarioBrowser, setShowScenarioBrowser] = useState(true)
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null)
   const [isInterviewStarted, setIsInterviewStarted] = useState(false)
@@ -144,10 +145,22 @@ export default function InterviewPage() {
   const interviewerEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Separate effect to handle auth check with delay to prevent race condition on refresh
+  useEffect(() => {
+    if (!initialized || authLoading) return
+
+    // Give Firebase a moment to restore session on page refresh before checking auth
+    const timer = setTimeout(() => {
+      setAuthCheckComplete(true)
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [initialized, authLoading])
+
   // Check authentication and usage limit, handle session reopening
   useEffect(() => {
     const checkAuth = async () => {
-      if (authLoading || !initialized) return
+      if (authLoading || !initialized || !authCheckComplete) return
 
       if (!firebaseUser) {
         router.push("/login?redirect=interview")

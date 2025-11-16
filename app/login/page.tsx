@@ -178,50 +178,50 @@ export default function LoginPage() {
       
       {/* Professional Loading Overlay */}
       {(authStatus === "authenticating" || authStatus === "creating-profile" || authStatus === "complete") && (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="max-w-md w-full mx-auto my-auto">
             <Card className="bg-gray-900/90 border-gray-700 shadow-2xl">
-              <CardContent className="p-8 text-center">
+              <CardContent className="p-4 sm:p-6 md:p-8 text-center">
                 {/* Animated Logo/Icon */}
-                <div className="mb-6 flex justify-center">
+                <div className="mb-4 sm:mb-6 flex justify-center">
                   <div className="relative">
-                    <div className="w-20 h-20 border-4 border-[#ff5733]/30 border-t-[#ff5733] rounded-full animate-spin"></div>
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 border-4 border-[#ff5733]/30 border-t-[#ff5733] rounded-full animate-spin"></div>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <Terminal className="h-8 w-8 text-[#ff5733]" />
+                      <Terminal className="h-6 w-6 sm:h-8 sm:w-8 text-[#ff5733]" />
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Status Message */}
-                <h2 className="text-2xl font-bold text-white mb-2">
+                <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
                   {authStatus === "authenticating" && "Authenticating..."}
                   {authStatus === "creating-profile" && "Setting up your account..."}
                   {authStatus === "complete" && "Welcome to MockMate!"}
                 </h2>
-                
-                <p className="text-gray-400 mb-6">
+
+                <p className="text-sm sm:text-base text-gray-400 mb-4 sm:mb-6">
                   {authStatus === "authenticating" && `Signing you in with ${authProvider === "github" ? "GitHub" : "Google"}...`}
                   {authStatus === "creating-profile" && "Creating your profile and preparing your dashboard..."}
                   {authStatus === "complete" && "Redirecting you to your dashboard..."}
                 </p>
-                
+
                 {/* Progress Steps */}
-                <div className="space-y-3 mb-6">
-                  <div className={`flex items-center space-x-3 ${authStatus !== "idle" ? "opacity-100" : "opacity-50"}`}>
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
+                  <div className={`flex items-center space-x-2 sm:space-x-3 ${authStatus !== "idle" ? "opacity-100" : "opacity-50"}`}>
+                    <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center ${
                       authStatus === "authenticating" || authStatus === "creating-profile" || authStatus === "complete"
                         ? "bg-[#ff5733] text-white"
                         : "bg-gray-700 text-gray-400"
                     }`}>
-                      {authStatus !== "idle" && <CheckCircle className="h-4 w-4" />}
+                      {authStatus !== "idle" && <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />}
                     </div>
-                    <span className="text-sm text-gray-300">Authentication</span>
+                    <span className="text-xs sm:text-sm text-gray-300">Authentication</span>
                   </div>
-                  
-                  <div className={`flex items-center space-x-3 ${
+
+                  <div className={`flex items-center space-x-2 sm:space-x-3 ${
                     authStatus === "creating-profile" || authStatus === "complete" ? "opacity-100" : "opacity-50"
                   }`}>
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                    <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center ${
                       authStatus === "creating-profile" || authStatus === "complete"
                         ? "bg-[#ff5733] text-white"
                         : authStatus === "authenticating"
@@ -229,18 +229,18 @@ export default function LoginPage() {
                         : "bg-gray-700 text-gray-400"
                     }`}>
                       {authStatus === "creating-profile" || authStatus === "complete" ? (
-                        <CheckCircle className="h-4 w-4" />
+                        <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                       ) : authStatus === "authenticating" ? (
                         <div className="w-2 h-2 bg-[#ff5733] rounded-full animate-pulse"></div>
                       ) : null}
                     </div>
-                    <span className="text-sm text-gray-300">Profile Setup</span>
+                    <span className="text-xs sm:text-sm text-gray-300">Profile Setup</span>
                   </div>
-                  
-                  <div className={`flex items-center space-x-3 ${
+
+                  <div className={`flex items-center space-x-2 sm:space-x-3 ${
                     authStatus === "complete" ? "opacity-100" : "opacity-50"
                   }`}>
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                    <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center ${
                       authStatus === "complete"
                         ? "bg-[#ff5733] text-white"
                         : authStatus === "creating-profile"
@@ -248,12 +248,12 @@ export default function LoginPage() {
                         : "bg-gray-700 text-gray-400"
                     }`}>
                       {authStatus === "complete" ? (
-                        <CheckCircle className="h-4 w-4" />
+                        <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                       ) : authStatus === "creating-profile" ? (
                         <div className="w-2 h-2 bg-[#ff5733] rounded-full animate-pulse"></div>
                       ) : null}
                     </div>
-                    <span className="text-sm text-gray-300">Ready to go!</span>
+                    <span className="text-xs sm:text-sm text-gray-300">Ready to go!</span>
                   </div>
                 </div>
                 
