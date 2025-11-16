@@ -101,19 +101,19 @@ export function HeroSection() {
             </Link>
           </div>
 
-          {/* Stats */}
+          {/* Features Highlight */}
           <div className="grid grid-cols-3 gap-8 mt-16 max-w-2xl mx-auto">
             <div className="text-center">
-              <div className="text-3xl font-bold text-[#ff5733] mb-2">10K+</div>
-              <div className="text-gray-400">Developers</div>
+              <div className="text-3xl font-bold text-[#ff5733] mb-2">AI-Powered</div>
+              <div className="text-gray-400">Smart Interviewer</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-[#ff5733] mb-2">50K+</div>
-              <div className="text-gray-400">Interviews</div>
+              <div className="text-3xl font-bold text-[#ff5733] mb-2">Real-Time</div>
+              <div className="text-gray-400">Code Feedback</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-[#ff5733] mb-2">95%</div>
-              <div className="text-gray-400">Success Rate</div>
+              <div className="text-3xl font-bold text-[#ff5733] mb-2">In VS Code</div>
+              <div className="text-gray-400">Native Integration</div>
             </div>
           </div>
         </div>
