@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(timeout)
       unsubscribe()
     }
-  }, [initialized])
+  }, []) // Empty dependency array - only run once on mount
 
   // Token refresh - refresh ID token every 50 minutes (tokens expire after 1 hour)
   useEffect(() => {
