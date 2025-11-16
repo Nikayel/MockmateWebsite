@@ -6,6 +6,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
 interface UserContext {
   email?: string
+  full_name?: string
   subscription_tier?: string
   sessions_used?: number
   previous_topics?: string[]
