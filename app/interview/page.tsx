@@ -32,7 +32,18 @@ import {
   X,
   ChevronRight,
   ArrowRight,
+  ArrowLeft,
 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { useAuth } from "@/lib/auth-context"
 import { checkUsageLimit, incrementSessionUsage, getUserProfile, createInterviewSession, updateInterviewSession } from "@/lib/firestore-helpers"
 import { scenarios, filterScenarios, getScenarioById, type Scenario, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
@@ -116,6 +127,9 @@ export default function InterviewPage() {
   // Code viewer dialog state
   const [selectedFile, setSelectedFile] = useState<{ path: string; content: string } | null>(null)
   const [isCodeViewerOpen, setIsCodeViewerOpen] = useState(false)
+  
+  // Close confirmation dialog state
+  const [showCloseDialog, setShowCloseDialog] = useState(false)
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const interviewerEndRef = useRef<HTMLDivElement>(null)
@@ -706,7 +720,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
     // Initialize interviewer with welcome message (problem details are now in left panel)
     const problemType = selectedScenario.type === 'bugfix' ? 'BUG FIX' : selectedScenario.type.toUpperCase()
-    const initialMessage = `Hello! I'm your interviewer today. We'll be working on **${selectedScenario.title}** - a ${selectedScenario.difficulty} ${problemType} problem.
+    const initialMessage = `Hello! I'm Sable, your interviewer today. We'll be working on **${selectedScenario.title}** - a ${selectedScenario.difficulty} ${problemType} problem.
 
 I can see you're reviewing the problem description on the left. Take a moment to understand it, then feel free to:
 - Ask me clarifying questions about the requirements
@@ -782,6 +796,9 @@ Let's have a great interview! How would you like to approach this problem?`
         // Get user profile for context
         const userProfile = user ? await getUserProfile(user.id) : null
         
+        // Extract name for personalization
+        let userName = user?.user_metadata?.full_name || userProfile?.full_name || user?.email?.split("@")[0] || ""
+        
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -791,6 +808,7 @@ Let's have a great interview! How would you like to approach this problem?`
             role: isInterviewer ? "interviewer" : "partner",
             userContext: userProfile ? {
               email: user.email,
+              full_name: userName,
               subscription_tier: userProfile.subscription_tier,
               sessions_used: usageLimit?.used || 0,
             } : undefined,
@@ -976,9 +994,12 @@ Let's have a great interview! How would you like to approach this problem?`
     return null
   }
 
+  // Determine if we should hide the header (during interview mode)
+  const isInterviewMode = !showScenarioBrowser && (isInterviewStarted || selectedScenario !== null)
+  
   return (
     <main className="min-h-screen bg-black">
-      <Header />
+      {!isInterviewMode && <Header />}
 
       {/* Scenario Browser */}
       {showScenarioBrowser && (
@@ -1158,11 +1179,11 @@ Let's have a great interview! How would you like to approach this problem?`
 
       {/* Interview Interface */}
       {!showScenarioBrowser && (
-        <section className="pt-20 pb-2 bg-gradient-to-b from-gray-900 to-black h-screen flex flex-col overflow-hidden">
+        <section className="pt-2 pb-2 bg-gradient-to-b from-gray-900 to-black h-screen flex flex-col overflow-hidden">
           <div className="container mx-auto px-4 flex-1 flex flex-col overflow-hidden">
             <div className="max-w-[1920px] mx-auto flex-1 flex flex-col gap-2 overflow-hidden">
               {/* Compact Top Bar */}
-              <div className="flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center justify-between flex-shrink-0 pt-2">
                 <div className="flex items-center space-x-3">
                   <h2 className="text-white text-sm font-semibold truncate max-w-md">
                     {selectedScenario?.title}
@@ -1198,13 +1219,13 @@ Let's have a great interview! How would you like to approach this problem?`
                     </div>
                   )}
                   <Button
-                    onClick={resetInterview}
+                    onClick={() => setShowCloseDialog(true)}
                     variant="outline"
                     size="sm"
                     className="border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent h-7 text-xs"
                   >
-                    <RotateCcw className="mr-1 h-3 w-3" />
-                    Reset
+                    <ArrowLeft className="mr-1 h-3 w-3" />
+                    Close
                   </Button>
                 </div>
               </div>
@@ -1736,7 +1757,33 @@ Let's have a great interview! How would you like to approach this problem?`
         />
       )}
 
-      <Footer />
+      {/* Close Confirmation Dialog */}
+      <AlertDialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
+        <AlertDialogContent className="bg-gray-900 border-gray-700">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">You want to close this interview?</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-300">
+              If you close now, your progress will be saved but you'll exit the interview session. You can always come back to continue later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-gray-800 text-white border-gray-600 hover:bg-gray-700">
+              Stay
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowCloseDialog(false)
+                resetInterview()
+              }}
+              className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
+            >
+              Close Interview
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {!isInterviewMode && <Footer />}
     </main>
   )
 }
