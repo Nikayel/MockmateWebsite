@@ -53,21 +53,21 @@ export default function SessionsPage() {
             where("user_id", "==", firebaseUser.uid)
           )
           const sessionsSnap = await getDocs(sessionsQuery)
-          
+
           if (!sessionsSnap.empty) {
             // Sort in memory to avoid composite index requirement
             const sessionsData = sessionsSnap.docs.map(doc => ({
               id: doc.id,
               ...doc.data()
             } as InterviewSession))
-            
+
             // Sort by started_at descending
             sessionsData.sort((a, b) => {
               const dateA = new Date(a.started_at).getTime()
               const dateB = new Date(b.started_at).getTime()
               return dateB - dateA
             })
-            
+
             setSessions(sessionsData)
           }
         } catch (error) {
@@ -82,7 +82,7 @@ export default function SessionsPage() {
     }
 
     loadSessions()
-  }, [authLoading, firebaseUser, router, initialized])
+  }, [authLoading, firebaseUser, router, initialized, authCheckComplete])
 
   if (loading || authLoading || !initialized) {
     return (
@@ -143,8 +143,8 @@ export default function SessionsPage() {
                         <CardTitle className="text-white">{session.topic}</CardTitle>
                         <Badge className={
                           session.difficulty === "easy" ? "bg-green-600" :
-                          session.difficulty === "medium" ? "bg-yellow-600" :
-                          "bg-red-600"
+                            session.difficulty === "medium" ? "bg-yellow-600" :
+                              "bg-red-600"
                         }>
                           {session.difficulty.toUpperCase()}
                         </Badge>

@@ -53,7 +53,7 @@ export default function AccountPage() {
           const userProfile = await getUserProfile(firebaseUser.uid)
           if (userProfile) {
             setProfile(userProfile)
-            
+
             // If user has Stripe IDs, sync subscription to get latest details
             // This ensures subscription dates, status, etc. are up to date
             if (userProfile.stripe_customer_id || userProfile.stripe_subscription_id) {
@@ -61,13 +61,13 @@ export default function AccountPage() {
                 const idToken = await firebaseUser.getIdToken()
                 const syncResponse = await fetch("/api/sync-subscription", {
                   method: "POST",
-                  headers: { 
+                  headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${idToken}`
                   },
                   body: JSON.stringify({ userId: firebaseUser.uid }),
                 })
-                
+
                 if (syncResponse.ok) {
                   const syncData = await syncResponse.json()
                   if (syncData.success && syncData.profile) {
@@ -99,7 +99,7 @@ export default function AccountPage() {
             where("user_id", "==", firebaseUser.uid)
           )
           const usageSnap = await getDocs(usageQuery)
-          
+
           if (!usageSnap.empty) {
             setUsage(usageSnap.docs[0].data() as ProfileQuota)
           }
@@ -119,7 +119,7 @@ export default function AccountPage() {
     }
 
     loadUserData()
-  }, [firebaseUser, authLoading, initialized])
+  }, [firebaseUser, authLoading, initialized, authCheckComplete])
 
   const handleSignOut = async () => {
     try {
@@ -144,11 +144,11 @@ export default function AccountPage() {
       }
 
       const idToken = await firebaseUser.getIdToken()
-      
+
       toast.info("Opening subscription management portal...")
       const response = await fetch("/api/customer-portal", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`
         },

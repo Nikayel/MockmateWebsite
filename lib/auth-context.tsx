@@ -28,10 +28,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true
+    let authStateResolved = false
 
     // Single auth state listener for the entire app
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (!mounted) return
+
+      authStateResolved = true
 
       setFirebaseUser(firebaseUser)
 
@@ -47,20 +50,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, (error) => {
       if (!mounted) return
       console.error("Auth state change error:", error)
+      authStateResolved = true
       setLoading(false)
       setInitialized(true)
     })
 
     // Safety timeout to prevent infinite loading
     // Firebase should respond quickly, but if it doesn't, we mark as initialized anyway
-    // Increased to 3 seconds to give Firebase more time to restore sessions on page refresh
+    // Increased to 5 seconds to give Firebase more time to restore sessions on page refresh
+    // Only mark as initialized if auth state hasn't resolved yet
     const timeout = setTimeout(() => {
-      if (mounted && !initialized) {
+      if (mounted && !authStateResolved) {
         console.warn("Auth initialization timeout - marking as initialized")
         setLoading(false)
-        setInitialized(true)
+        // setInitialized(true)
       }
-    }, 3000) // 3 second timeout to prevent race condition on refresh
+    }, 5) // 5 second timeout to prevent race condition on refresh
 
     return () => {
       mounted = false

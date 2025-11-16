@@ -55,23 +55,23 @@ export default function ProfilePage() {
           const userProfile = await getUserProfile(firebaseUser.uid)
           if (userProfile) {
             setProfile(userProfile)
-            
+
             // Auto-sync subscription if user has Stripe IDs but tier is "free"
             // This fixes Pro users who were incorrectly reset
-            if ((userProfile.stripe_subscription_id || userProfile.stripe_customer_id) && 
-                userProfile.subscription_tier === "free") {
+            if ((userProfile.stripe_subscription_id || userProfile.stripe_customer_id) &&
+              userProfile.subscription_tier === "free") {
               console.log("Auto-syncing subscription for user with Stripe IDs but free tier")
               try {
                 const token = await firebaseUser.getIdToken()
                 const syncResponse = await fetch("/api/sync-subscription", {
                   method: "POST",
-                  headers: { 
+                  headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`
                   },
                   body: JSON.stringify({ userId: firebaseUser.uid }),
                 })
-                
+
                 if (syncResponse.ok) {
                   const syncData = await syncResponse.json()
                   if (syncData.success && syncData.profile.subscription_tier === "pro") {
@@ -112,7 +112,7 @@ export default function ProfilePage() {
             where("user_id", "==", firebaseUser.uid)
           )
           const usageSnap = await getDocs(usageQuery)
-          
+
           if (!usageSnap.empty) {
             setUsage(usageSnap.docs[0].data() as ProfileQuota)
           }
@@ -132,7 +132,7 @@ export default function ProfilePage() {
     }
 
     loadUserData()
-  }, [authLoading, firebaseUser, router, initialized])
+  }, [authLoading, firebaseUser, router, initialized, authCheckComplete])
 
   const handleSignOut = async () => {
     try {
@@ -152,11 +152,11 @@ export default function ProfilePage() {
     try {
       // Get Firebase ID token to send with request
       const token = await firebaseUser.getIdToken()
-      
+
       toast.info("Syncing subscription from Stripe...")
       const response = await fetch("/api/sync-subscription", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
@@ -195,11 +195,11 @@ export default function ProfilePage() {
     try {
       // Get Firebase ID token to send with request
       const token = await firebaseUser.getIdToken()
-      
+
       toast.info("Opening subscription management portal...")
       const response = await fetch("/api/customer-portal", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
@@ -388,12 +388,12 @@ export default function ProfilePage() {
                 <div className="flex justify-between">
                   <span className="text-gray-400">Member Since</span>
                   <span className="text-white">
-                    {profile?.created_at 
-                      ? new Date(profile.created_at).toLocaleDateString('en-US', { 
-                          year: 'numeric', 
-                          month: '2-digit', 
-                          day: '2-digit' 
-                        })
+                    {profile?.created_at
+                      ? new Date(profile.created_at).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
+                      })
                       : "N/A"}
                   </span>
                 </div>

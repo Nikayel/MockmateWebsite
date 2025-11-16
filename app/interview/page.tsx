@@ -232,7 +232,7 @@ Let's continue!`
       setIsLoading(false)
     }
     checkAuth()
-  }, [router, searchParams, firebaseUser, authLoading, initialized])
+  }, [router, searchParams, firebaseUser, authLoading, initialized, authCheckComplete])
 
   // Timer effect
   useEffect(() => {
@@ -547,9 +547,57 @@ Let's continue!`
     setIsGeneratingDiscussion(true)
     
     try {
+      if (!selectedScenario) {
+        return
+      }
+
+      const partnerMessagesSent = chatMessages.filter((msg) => msg.type === "user").length
+      const partnerMessagesReceived = chatMessages.filter((msg) => msg.type === "ai").length
+      const interviewerUserMessages = interviewerMessages.filter((msg) => msg.type === "user")
+      const interviewerQuestionsAnswered = interviewerUserMessages.length
+      const interviewerClarificationsRequested = interviewerUserMessages.filter((msg) =>
+        msg.message.includes("?")
+      ).length
+      const interviewerFeedbackAcknowledged = interviewerUserMessages.filter((msg) =>
+        /thanks|got it|understand|cool|okay|ok/i.test(msg.message)
+      ).length
+      const proactiveInteractions =
+        interviewerQuestionsAnswered > 0 || partnerMessagesSent > 0 ? 1 : 0
+
+      const aiCollaborationMetrics = {
+        partnerMessagesSent,
+        partnerMessagesReceived,
+        partnerHintsRequested: revealedHints,
+      }
+
+      const interactionMetrics = {
+        interviewerQuestionsAnswered,
+        interviewerClarificationsRequested,
+        interviewerFeedbackAcknowledged,
+        proactiveInteractions,
+        problemDifficulty: selectedScenario?.difficulty,
+        problemType: selectedScenario?.type,
+        skillsDemonstrated: selectedScenario?.tags || [],
+      }
+
+      const noInterviewerWalkthrough = interactionMetrics.interviewerQuestionsAnswered === 0
+      const noAiPartnerCollab = aiCollaborationMetrics.partnerMessagesSent === 0
+      const rushedSession = elapsedTime < 90
+
+      const applyCollaborationPenalty = (score: number) => {
+        let adjustedScore = score
+        if (noInterviewerWalkthrough || noAiPartnerCollab || rushedSession) {
+          adjustedScore = Math.min(adjustedScore, 9)
+        }
+        if ((noInterviewerWalkthrough && noAiPartnerCollab) || rushedSession) {
+          adjustedScore = Math.min(adjustedScore, 8)
+        }
+        return Math.max(0, adjustedScore)
+      }
+
       // Generate comprehensive feedback first
       let comprehensiveFeedback = `Completed ${selectedScenario?.title} with ${summary.passed}/${summary.total} tests passing`
-      let calculatedPerformanceScore = summary.passRate * 10
+      let calculatedPerformanceScore = summary.passRate / 10
 
       if (currentSessionId && user && code.trim()) {
         try {
@@ -563,6 +611,8 @@ Let's continue!`
               testResults: testResults,
               language: selectedLanguage,
               timeSpent: elapsedTime,
+              aiCollaborationMetrics,
+              interactionMetrics,
             }),
           })
 
@@ -570,13 +620,15 @@ Let's continue!`
             const feedbackData = await feedbackResponse.json()
             comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
             calculatedPerformanceScore = feedbackData.performanceScore || calculatedPerformanceScore
-            setComprehensiveFeedback(comprehensiveFeedback)
-            setPerformanceScore(calculatedPerformanceScore)
           }
         } catch (feedbackError) {
           console.error("Error generating feedback:", feedbackError)
         }
       }
+
+      calculatedPerformanceScore = applyCollaborationPenalty(calculatedPerformanceScore)
+      setComprehensiveFeedback(comprehensiveFeedback)
+      setPerformanceScore(calculatedPerformanceScore)
 
       // Now trigger interviewer to discuss the solution
       const userProfile = user ? await getUserProfile(user.id) : null
@@ -600,6 +652,11 @@ Please:
 4. Point out what they did well
 5. Suggest specific improvements
 6. Ask if they want to optimize further or discuss the solution
+
+Tone requirements:
+- Be brutally honest yet professional; call out gaps directly.
+- Explicitly mention whether they walked through their work and collaborated with the AI partner (or if they failed to do so).
+- If you lack evidence for either point, state that and remind them to narrate and collaborate next time.
 
 Be conversational and thorough - like a real interviewer debriefing after a coding interview.`
 
@@ -755,14 +812,14 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
     // Initialize interviewer with welcome message (problem details are now in left panel)
     const problemType = selectedScenario.type === 'bugfix' ? 'BUG FIX' : selectedScenario.type.toUpperCase()
-    const initialMessage = `Hello! I'm Sable, your interviewer today. We'll be working on **${selectedScenario.title}** - a ${selectedScenario.difficulty} ${problemType} problem.
+    const initialMessage = `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${selectedScenario.title}**, a ${selectedScenario.difficulty} ${problemType} problem.
 
-I can see you're reviewing the problem description on the left. Take a moment to understand it, then feel free to:
-- Ask me clarifying questions about the requirements
-- Discuss your approach before coding
-- Ask for hints if you get stuck
+Here's what I expect:
+- Walk me through your plan before you code; if you skip that, I'll call it out.
+- Narrate while you build so I can understand your reasoning.
+- Use the AI partner intentionally. If you're just copying suggestions, I'll flag it.
 
-Let's have a great interview! How would you like to approach this problem?`
+Take a breath, study the prompt on the left, and tell me how you plan to attack this.`
 
     setInterviewerMessages([{ type: "ai", message: initialMessage }])
     setChatMessages([{
@@ -1034,6 +1091,7 @@ Let's have a great interview! How would you like to approach this problem?`
 
   // Determine if we should hide the header (during interview mode)
   const isInterviewMode = !showScenarioBrowser && (isInterviewStarted || selectedScenario !== null)
+  const isResultView = showFeedback || showPostInterviewDiscussion
   
   return (
     <main className="min-h-screen bg-black">
@@ -1217,9 +1275,13 @@ Let's have a great interview! How would you like to approach this problem?`
 
       {/* Interview Interface */}
       {!showScenarioBrowser && (
-        <section className="pt-2 pb-2 bg-gradient-to-b from-gray-900 to-black h-screen flex flex-col overflow-hidden">
-          <div className="container mx-auto px-2 flex-1 flex flex-col overflow-hidden">
-            <div className="w-full mx-auto flex-1 flex flex-col gap-1 overflow-hidden">
+        <section
+          className={`pt-2 pb-2 bg-gradient-to-b from-gray-900 to-black flex flex-col ${
+            isResultView ? "min-h-screen overflow-x-hidden overflow-y-auto" : "h-screen overflow-hidden"
+          }`}
+        >
+          <div className={`container mx-auto px-2 flex-1 flex flex-col ${isResultView ? "overflow-visible" : "overflow-hidden"}`}>
+            <div className={`w-full mx-auto flex-1 flex flex-col gap-1 ${isResultView ? "overflow-visible" : "overflow-hidden"}`}>
               {/* Compact Top Bar */}
               <div className="flex items-center justify-between flex-shrink-0 pt-2">
                 <div className="flex items-center space-x-3">
@@ -1270,9 +1332,13 @@ Let's have a great interview! How would you like to approach this problem?`
 
               {/* Main Interface - Three Column Layout */}
               {!showFeedback && !showPostInterviewDiscussion ? (
-                <div className={`grid grid-cols-12 gap-1 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${isCodeViewerOpen ? 'ml-[600px]' : ''}`}>
+                <div
+                  className={`grid grid-cols-1 gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${
+                    isCodeViewerOpen ? "xl:ml-[600px]" : ""
+                  } lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)_320px]`}
+                >
                   {/* Left: Problem Description / File Upload */}
-                  <div className="col-span-12 lg:col-span-2 flex flex-col min-h-0">
+                  <div className="flex flex-col min-h-0 order-1">
                     <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden">
                       <CardHeader className="pb-2 flex-shrink-0">
                         <CardTitle className="text-white flex items-center space-x-2 text-sm">
@@ -1280,7 +1346,7 @@ Let's have a great interview! How would you like to approach this problem?`
                           <span>Problem</span>
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="flex-1 min-h-0 overflow-y-auto text-xs space-y-3">
+                      <CardContent className="flex-1 min-h-0 overflow-y-auto text-xs sm:text-sm leading-relaxed space-y-4 pr-1">
                         {selectedScenario && (
                           <>
                             <div>
@@ -1419,7 +1485,7 @@ Let's have a great interview! How would you like to approach this problem?`
                   </div>
 
                   {/* Center: Code Editor with Partner at Bottom */}
-                  <div className="col-span-12 lg:col-span-7 flex flex-col min-h-0 overflow-hidden">
+                  <div className="flex flex-col min-h-0 overflow-hidden order-2">
                     <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden">
                       <CardHeader className="pb-2 flex-shrink-0">
                         <CardTitle className="text-white flex items-center justify-between text-xs">
@@ -1570,7 +1636,7 @@ Let's have a great interview! How would you like to approach this problem?`
                   </div>
 
                   {/* Right: AI Interviewer Panel - Fixed Height */}
-                  <div className="col-span-12 lg:col-span-3 flex flex-col min-h-0 overflow-hidden">
+                  <div className="flex flex-col min-h-0 overflow-hidden order-3 lg:col-span-2 xl:col-span-1">
                     <Card className="bg-gray-900/50 border-gray-700 glass-effect h-full flex flex-col overflow-hidden">
                       <CardHeader className="pb-2 flex-shrink-0">
                         <CardTitle className="text-white flex items-center space-x-2 text-sm">
@@ -1822,24 +1888,74 @@ Let's have a great interview! How would you like to approach this problem?`
                   </div>
                 </div>
               ) : (
-                <div className="max-w-4xl mx-auto py-8">
-                  <div className="text-center mb-8">
-                    <CheckCircle className="h-16 w-16 text-green-400 mx-auto mb-4" />
-                    <h2 className="text-3xl font-heading font-bold text-white mb-2">Interview Complete!</h2>
-                    <p className="text-gray-300 mb-8">Congratulations! Here's your comprehensive performance analysis</p>
+                <div className="max-w-5xl mx-auto py-10 px-4 space-y-8">
+                  <div className="text-center space-y-4">
+                    <CheckCircle className="h-16 w-16 text-green-400 mx-auto" />
+                    <div>
+                      <h2 className="text-3xl font-heading font-bold text-white mb-2">Interview Complete!</h2>
+                      <p className="text-gray-300">
+                        Brutally honest review incoming. Scroll through the full breakdown, then jump back into practice
+                        or head to your dashboard.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
+                      <Card className="bg-gray-900/60 border-gray-700 glass-effect">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-white text-sm flex items-center justify-between">
+                            Overall Score
+                            <TrendingUp className="h-4 w-4 text-[#ff5733]" />
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-4xl font-bold text-white">
+                            {performanceScore !== null ? `${Math.round(performanceScore)}/10` : "—"}
+                          </p>
+                          <p className="text-gray-400 text-sm mt-1">
+                            {performanceScore !== null ? "Based on interviewer rubric" : "Score pending analysis"}
+                          </p>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-gray-900/60 border-gray-700 glass-effect">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-white text-sm">Test Coverage</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-4xl font-bold text-white">
+                            {testSummary.total > 0 ? `${testSummary.passed}/${testSummary.total}` : "—"}
+                          </p>
+                          <p className="text-gray-400 text-sm mt-1">Passing unit tests</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-gray-900/60 border-gray-700 glass-effect sm:col-span-2 lg:col-span-1">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-white text-sm">Complexity Callout</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {efficiencyMetrics ? (
+                            <div className="space-y-1 text-sm text-gray-300">
+                              <p>Time: <span className="text-white">{efficiencyMetrics.estimatedTimeComplexity}</span></p>
+                              <p>Space: <span className="text-white">{efficiencyMetrics.estimatedSpaceComplexity}</span></p>
+                              <p>Efficiency: <span className="text-white">{efficiencyMetrics.efficiencyScore}/100</span></p>
+                            </div>
+                          ) : (
+                            <p className="text-gray-400 text-sm">Run tests to capture efficiency metrics.</p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
                   </div>
                   
                   {/* Comprehensive Feedback */}
                   {comprehensiveFeedback && (
-                    <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-6">
+                    <Card className="bg-gray-900/70 border-gray-700 glass-effect">
                       <CardHeader>
                         <CardTitle className="text-white flex items-center space-x-2">
                           <TrendingUp className="h-5 w-5 text-[#ff5733]" />
-                          <span>Performance Evaluation</span>
+                          <span>Brutal Debrief & Action Plan</span>
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="prose prose-invert max-w-none max-h-[600px] overflow-y-auto pr-2">
+                        <div className="prose prose-invert max-w-none max-h-[70vh] overflow-y-auto pr-2">
                           <div className="text-gray-200 whitespace-pre-wrap text-sm leading-relaxed">
                             {comprehensiveFeedback}
                           </div>
@@ -1848,8 +1964,15 @@ Let's have a great interview! How would you like to approach this problem?`
                     </Card>
                   )}
 
-                  <div className="text-center">
-                    <Button onClick={resetInterview} className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-3">
+                  <div className="flex flex-wrap justify-center gap-4 pt-4">
+                    <Button
+                      onClick={() => router.push("/dashboard")}
+                      variant="outline"
+                      className="border-[#ff5733] text-white hover:bg-[#ff5733]/10"
+                    >
+                      Back to Dashboard
+                    </Button>
+                    <Button onClick={resetInterview} className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8">
                       Try Another Problem
                     </Button>
                   </div>

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { feedbackRateLimit } from "@/lib/rate-limit"
 
-const genAI = process.env.GEMINI_API_KEY 
-  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) 
+const genAI = process.env.GEMINI_API_KEY
+  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
   : null
 
 export async function POST(request: NextRequest) {
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     if (!genAI || !process.env.GEMINI_API_KEY) {
       console.error("GEMINI_API_KEY is not configured")
       return NextResponse.json(
-        { 
+        {
           error: "Feedback generation is temporarily unavailable. Please check API configuration.",
           feedback: `## Feedback for ${scenarioTitle}\n\nFeedback generation service is currently unavailable. Your solution has been submitted successfully.`
         },
@@ -33,101 +33,31 @@ export async function POST(request: NextRequest) {
 
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      systemInstruction: `You are an experienced technical interviewer providing comprehensive, critical feedback on a coding interview solution, similar to Meta's and Google's interview evaluations.
-      
-Your feedback should be extremely thorough, honest, and critical - similar to what a senior engineer at a top tech company (Google, Meta, Amazon) would provide in a real interview debrief. Be direct, specific, and constructive.
+      systemInstruction: `You are a senior interviewer delivering a "Brutal Debrief & Action Plan." Reports were previously bloated—now you must be surgical, time-efficient, and direct.
 
-EVALUATION PRINCIPLES:
-- Call out weak reasoning: "You didn't walk through your approach." "Your explanation was unclear." "You jumped to code without thinking."
-- Assess AI usage critically: "You over-relied on AI." "Your questions to AI were poor." "You didn't understand the AI suggestions."
-- Demand better explanations: "Your reasoning was weak here." "You didn't explain your thought process." "This shows poor problem-solving skills."
-- Point out what they should have done: "You should have considered X first." "You should have walked through an example." "You should have analyzed complexity before coding."
+Tone: candid, data-backed, encouraging. Never rant, never waffle.
 
-Provide a STRUCTURED, DETAILED, and CRITICAL analysis covering:
+HARD RULES
+- Limit yourself to ~350 words. Omit fluff and generic advice.
+- Tie every comment to observed signals (tests, time spent, interaction counts, hints, efficiency metrics, etc.).
+- If time spent < 120 seconds OR the user never messaged the interviewer/AI partner, assume they did NOT walk through their thinking. Explicitly call this out and cap BOTH "Reasoning & Explanation" and "AI Collaboration" at 4/10. Also cap the overall score at 9/10 in this situation, even if all tests pass.
+- If time spent ≥ 120 seconds but interviewer message count from the user is 0, still mention the missing walkthrough.
+- Use markdown with the exact sections below, in order, no extras:
+  1. **TL;DR** – 1-2 sentences summarizing outcome + top risk.
+  2. **Score Snapshot** – bullet list of the six ratings (Correctness, Efficiency, Code Quality, Reasoning & Explanation, AI Collaboration, Overall) formatted as “Label: X/10 – justification”.
+  3. **What Worked** – up to 3 bullets, each ≤1 sentence describing concrete wins.
+  4. **Fix Next** – up to 3 prioritized bullets focused on the highest-impact gaps.
+  5. **Action Plan** – numbered list of exactly 3 steps, each with an owner suggestion (e.g., “You”) and a timeframe (“today”, “this week”).
+  6. **AI & Communication Watchlist** – one concise paragraph calling out collaboration quality. If interaction counts are near zero, state “No evidence you walked the interviewer through your work—narrate next time.”
 
-1. **CORRECTNESS ANALYSIS** (Detailed)
-   - Does the solution work correctly for all test cases?
-   - Are edge cases properly handled? List specific edge cases checked/missed
-   - Are there any logical errors or bugs?
-   - Boundary condition handling
-
-2. **COMPLEXITY ANALYSIS** (Detailed with explanations)
-   - Time Complexity: Exact Big O notation with detailed explanation of why
-   - Space Complexity: Exact Big O notation with detailed explanation
-   - Compare against optimal solution complexity
-   - Explain the analysis step-by-step
-
-3. **CODE QUALITY ASSESSMENT** (Detailed)
-   - Readability: Is the code easy to understand?
-   - Maintainability: Can it be easily modified/extended?
-   - Style: Does it follow language best practices?
-   - Structure: Is the code well-organized?
-   - Naming: Are variables/functions well-named?
-
-4. **OPTIMIZATION OPPORTUNITIES** (Critical Section)
-   - Specific optimizations that could be made
-   - Algorithm improvements
-   - Data structure choices
-   - Performance bottlenecks identified
-   - Before/after complexity comparisons
-
-5. **REASONING & EXPLANATION ASSESSMENT**
-   - Did they walk through their approach BEFORE coding? If not, call this out.
-   - Quality of their reasoning: Was it clear? Systematic? Well-thought-out?
-   - Did they explain their thought process? If not, this is a weakness.
-   - Did they consider edge cases in their reasoning? If not, point this out.
-   - Did they analyze complexity before/during coding? If not, this shows poor practice.
-   - Did they test their logic mentally? If not, call this out.
-   - Rate their reasoning: X/10 (be honest - most candidates score 3-6/10)
-   - Specific examples of weak reasoning with quotes/explanations
-
-6. **AI COLLABORATION ASSESSMENT** (Meta pilot program style)
-   - How effectively did they use AI assistance? Be critical - most candidates misuse it.
-   - Quality of questions asked to AI: Were they specific? Did they show understanding? Call out vague/poor questions.
-   - Did they understand and properly implement AI suggestions? Or did they just copy-paste?
-   - Were they overly dependent on AI? If yes, this is a concern - call it out.
-   - Could they distinguish good AI suggestions from bad ones? Most can't - be honest.
-   - How well did they integrate AI help with their own problem-solving? Most fail here.
-   - Did they use AI to think FOR them, or to help them think? This is critical.
-   - Rate their AI collaboration skills: X/10 (be honest - most score 2-5/10)
-   - Specific examples of poor AI usage with quotes
-
-7. **BEST PRACTICES & DESIGN PATTERNS**
-   - Language-specific best practices followed/missed
-   - Design patterns that could be applied
-   - Code organization improvements
-
-8. **STRENGTHS** (What they did well)
-   - Specific positive aspects
-   - Good decisions made
-   - Areas of strong performance
-   - Strong AI collaboration (if applicable)
-
-9. **AREAS FOR IMPROVEMENT** (Actionable and specific)
-   - Specific, actionable suggestions
-   - Concrete examples of how to improve
-   - Learning resources or topics to study
-   - AI collaboration improvements (if applicable)
-
-10. **SCORE BREAKDOWN** (Detailed and honest)
-   - Correctness: X/10 (with explanation)
-   - Efficiency: X/10 (with explanation)
-   - Code Quality: X/10 (with explanation)
-   - Reasoning & Explanation: X/10 (with explanation - be honest, most score 3-6/10)
-   - Problem Solving Process: X/10 (with explanation - did they think before coding?)
-   - AI Collaboration: X/10 (with explanation - be critical, most misuse AI)
-   - Overall: X/10 (weighted average - be realistic)
-
-11. **RECOMMENDATIONS**
-   - What to study next
-   - Specific topics to focus on
-   - Practice problems to try
-   - AI collaboration best practices (if applicable)
-
-Be professional but honest. Be direct, specific, and constructive. This is a real interview evaluation - they need to know exactly where they can improve and why. Provide actionable feedback that helps the candidate improve significantly.`,
+- Never invent data. If something wasn’t captured, say “No signal captured.”
+- Prefer examples from the candidate’s code/tests over hypothetical ones.
+- Mention edge cases/complexities only if relevant to the observed solution.
+- Keep formatting tight—no tables, no nested sub-bullets, no code fences unless quoting the candidate’s own code.
+`,
     })
 
-    const testResultsSummary = testResults && Array.isArray(testResults) 
+    const testResultsSummary = testResults && Array.isArray(testResults)
       ? `\n\nTEST RESULTS:\n- Total tests: ${testResults.length}\n- Passed: ${testResults.filter((t: any) => t.passed).length}\n- Failed: ${testResults.filter((t: any) => t.passed === false).length}\n`
       : ""
 
@@ -158,7 +88,7 @@ INTERACTION METRICS:
 - Skills demonstrated: ${interactionMetrics.skillsDemonstrated?.join(', ') || 'Not tracked'}
 ` : ""
 
-    const prompt = `Please provide comprehensive interview feedback for the following coding solution:
+    const prompt = `Provide a concise, brutally honest interview debrief using the exact structure from the system instruction.
 
 PROBLEM: ${scenarioTitle}${scenarioType ? ` (${scenarioType})` : ''}
 LANGUAGE: ${language || 'JavaScript'}
@@ -167,32 +97,23 @@ ${testResultsSummary}
 ${aiCollaborationInfo}
 ${interactionInfo}
 
-SOLUTION CODE:
+SOLUTION CODE (for reference only):
 \`\`\`${language || 'javascript'}
 ${code}
 \`\`\`
 
 ${testResults && testResults.length > 0 ? `
 FAILED TESTS DETAILS:
-${testResults.filter((t: any) => !t.passed).map((t: any) => 
-  `- ${t.description}\n  Input: ${JSON.stringify(t.input)}\n  Expected: ${JSON.stringify(t.expected)}\n  Got: ${JSON.stringify(t.actual)}${t.error ? `\n  Error: ${t.error}` : ''}`
-).join('\n\n')}
+${testResults.filter((t: any) => !t.passed).map((t: any) =>
+      `- ${t.description}\n  Input: ${JSON.stringify(t.input)}\n  Expected: ${JSON.stringify(t.expected)}\n  Got: ${JSON.stringify(t.actual)}${t.error ? `\n  Error: ${t.error}` : ''}`
+    ).join('\n\n')}
 ` : ''}
 
-Provide an EXTREMELY COMPREHENSIVE and DETAILED analysis. Structure your response with clear sections and subsections.
-
-Include:
-- Detailed correctness analysis with specific edge cases
-- Step-by-step complexity analysis with explanations
-- In-depth code quality assessment
-- REASONING & EXPLANATION ASSESSMENT (did they think before coding? Did they explain well?)
-- AI collaboration assessment (Meta pilot program style)
-- Specific optimization opportunities with before/after comparisons
-- Detailed score breakdown (Correctness, Efficiency, Code Quality, Reasoning, Problem Solving Process, AI Collaboration, Overall)
-- Actionable improvement recommendations including AI collaboration best practices
-- Learning resources and next steps
-
-Format your response with clear markdown headers and structure. Be thorough and honest - this feedback should be comprehensive enough to help the candidate improve significantly. Call out weaknesses directly but constructively.`
+Remember:
+- Be explicit when tests pass but collaboration/explanation was missing; enforce the score caps as stated.
+- Only include insights that materially change the candidate’s next interview.
+- Keep every section lean—if there’s nothing meaningful to say, write “No major findings.”
+- If tests failed, highlight the most critical fix inside “Fix Next”.`
 
     const result = await model.generateContent(prompt)
     const response = await result.response
@@ -200,9 +121,15 @@ Format your response with clear markdown headers and structure. Be thorough and 
 
     // Extract performance score (look for rating in feedback)
     let performanceScore = 7 // Default
-    const scoreMatch = feedback.match(/rating[:\s]+(\d+)/i) || feedback.match(/(\d+)\/10/i)
-    if (scoreMatch) {
-      performanceScore = parseInt(scoreMatch[1], 10)
+    const overallMatch = feedback.match(/Overall:\s*(\d+)\/10/i)
+    const genericMatch = feedback.match(/(\d+)\/10/)
+    const ratingMatch = feedback.match(/rating[:\s]+(\d+)/i)
+    if (overallMatch) {
+      performanceScore = parseInt(overallMatch[1], 10)
+    } else if (ratingMatch) {
+      performanceScore = parseInt(ratingMatch[1], 10)
+    } else if (genericMatch) {
+      performanceScore = parseInt(genericMatch[1], 10)
     }
 
     return NextResponse.json({

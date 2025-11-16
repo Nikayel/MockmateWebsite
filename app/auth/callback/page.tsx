@@ -2,28 +2,27 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { auth } from "@/lib/firebase"
-import { onAuthStateChanged } from "firebase/auth"
-import { generateVSCodeDeepLink, convertFirebaseUser } from "@/lib/auth"
+import { useAuth } from "@/lib/auth-context"
+import { generateVSCodeDeepLink } from "@/lib/auth"
 import { createOrUpdateProfile } from "@/lib/firestore-helpers"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle, ExternalLink, Download } from "lucide-react"
-import { User } from "@/lib/types"
 
 export default function AuthCallback() {
   const router = useRouter()
+  const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading")
-  const [user, setUser] = useState<User | null>(null)
   const [deepLink, setDeepLink] = useState<string>("")
   const [redirectUrl, setRedirectUrl] = useState<string>("")
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    // Wait for auth to initialize
+    if (authLoading || !initialized) return
+
+    const handleAuthCallback = async () => {
       try {
-        if (firebaseUser) {
-          const convertedUser = convertFirebaseUser(firebaseUser)
-          setUser(convertedUser)
+        if (firebaseUser && user) {
           setStatus("success")
           
           // Create/update profile in Firestore immediately
@@ -86,10 +85,10 @@ export default function AuthCallback() {
         console.error("Auth callback error:", error)
         setStatus("error")
       }
-    })
+    }
 
-    return () => unsubscribe()
-  }, [router])
+    handleAuthCallback()
+  }, [router, firebaseUser, user, authLoading, initialized])
 
   const handleOpenVSCode = () => {
     window.location.href = deepLink

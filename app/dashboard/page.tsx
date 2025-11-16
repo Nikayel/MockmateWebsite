@@ -64,23 +64,23 @@ export default function DashboardPage() {
         const userProfile = await getUserProfile(firebaseUser.uid)
         if (userProfile) {
           setProfile(userProfile)
-          
+
           // Auto-sync subscription if user has Stripe IDs but tier is "free"
           // This fixes Pro users who were incorrectly reset
-          if ((userProfile.stripe_subscription_id || userProfile.stripe_customer_id) && 
-              userProfile.subscription_tier === "free") {
+          if ((userProfile.stripe_subscription_id || userProfile.stripe_customer_id) &&
+            userProfile.subscription_tier === "free") {
             console.log("Auto-syncing subscription for user with Stripe IDs but free tier")
             try {
               const token = await firebaseUser.getIdToken()
               const syncResponse = await fetch("/api/sync-subscription", {
                 method: "POST",
-                headers: { 
+                headers: {
                   "Content-Type": "application/json",
                   "Authorization": `Bearer ${token}`
                 },
                 body: JSON.stringify({ userId: firebaseUser.uid }),
               })
-              
+
               if (syncResponse.ok) {
                 const syncData = await syncResponse.json()
                 if (syncData.success && syncData.profile.subscription_tier === "pro") {
@@ -124,7 +124,7 @@ export default function DashboardPage() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
-  }, [router, firebaseUser, authLoading, initialized])
+  }, [router, firebaseUser, authLoading, initialized, authCheckComplete])
 
   if (authLoading || !initialized || !authCheckComplete || dataLoading) {
     return (
