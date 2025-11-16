@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { CodeViewerSidePanel } from "@/components/CodeViewerSidePanel"
+import PracticeFeedback from "@/components/PracticeFeedback"
 import {
   Play,
   RotateCcw,
@@ -1888,87 +1889,21 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   </div>
                 </div>
               ) : (
-                <div className="max-w-5xl mx-auto py-10 px-4 space-y-8">
-                  <div className="text-center space-y-4">
-                    <CheckCircle className="h-16 w-16 text-green-400 mx-auto" />
-                    <div>
-                      <h2 className="text-3xl font-heading font-bold text-white mb-2">Interview Complete!</h2>
-                      <p className="text-gray-300">
-                        Brutally honest review incoming. Scroll through the full breakdown, then jump back into practice
-                        or head to your dashboard.
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
-                      <Card className="bg-gray-900/60 border-gray-700 glass-effect">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-white text-sm flex items-center justify-between">
-                            Overall Score
-                            <TrendingUp className="h-4 w-4 text-[#ff5733]" />
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-4xl font-bold text-white">
-                            {performanceScore !== null ? `${Math.round(performanceScore)}/10` : "—"}
-                          </p>
-                          <p className="text-gray-400 text-sm mt-1">
-                            {performanceScore !== null ? "Based on interviewer rubric" : "Score pending analysis"}
-                          </p>
-                        </CardContent>
-                      </Card>
-                      <Card className="bg-gray-900/60 border-gray-700 glass-effect">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-white text-sm">Test Coverage</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-4xl font-bold text-white">
-                            {testSummary.total > 0 ? `${testSummary.passed}/${testSummary.total}` : "—"}
-                          </p>
-                          <p className="text-gray-400 text-sm mt-1">Passing unit tests</p>
-                        </CardContent>
-                      </Card>
-                      <Card className="bg-gray-900/60 border-gray-700 glass-effect sm:col-span-2 lg:col-span-1">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-white text-sm">Complexity Callout</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          {efficiencyMetrics ? (
-                            <div className="space-y-1 text-sm text-gray-300">
-                              <p>Time: <span className="text-white">{efficiencyMetrics.estimatedTimeComplexity}</span></p>
-                              <p>Space: <span className="text-white">{efficiencyMetrics.estimatedSpaceComplexity}</span></p>
-                              <p>Efficiency: <span className="text-white">{efficiencyMetrics.efficiencyScore}/100</span></p>
-                            </div>
-                          ) : (
-                            <p className="text-gray-400 text-sm">Run tests to capture efficiency metrics.</p>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </div>
-                  
-                  {/* Comprehensive Feedback */}
-                  {comprehensiveFeedback && (
-                    <Card className="bg-gray-900/70 border-gray-700 glass-effect">
-                      <CardHeader>
-                        <CardTitle className="text-white flex items-center space-x-2">
-                          <TrendingUp className="h-5 w-5 text-[#ff5733]" />
-                          <span>Brutal Debrief & Action Plan</span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="prose prose-invert max-w-none max-h-[70vh] overflow-y-auto pr-2">
-                          <div className="text-gray-200 whitespace-pre-wrap text-sm leading-relaxed">
-                            {comprehensiveFeedback}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  <div className="flex flex-wrap justify-center gap-4 pt-4">
+                <>
+                  <PracticeFeedback
+                    feedback={comprehensiveFeedback || ""}
+                    performanceScore={performanceScore || 0}
+                    testsPassed={testSummary.passed}
+                    testsTotal={testSummary.total}
+                    timeComplexity={efficiencyMetrics?.estimatedTimeComplexity}
+                    spaceComplexity={efficiencyMetrics?.estimatedSpaceComplexity}
+                    efficiencyScore={efficiencyMetrics?.efficiencyScore}
+                  />
+                  <div className="flex flex-wrap justify-center gap-4 pb-10">
                     <Button
                       onClick={() => router.push("/dashboard")}
                       variant="outline"
-                      className="border-[#ff5733] text-white hover:bg-[#ff5733]/10"
+                      className="border-white/20 text-white hover:bg-white/10"
                     >
                       Back to Dashboard
                     </Button>
@@ -1976,7 +1911,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       Try Another Problem
                     </Button>
                   </div>
-                </div>
+                </>
               )}
             </div>
           </div>

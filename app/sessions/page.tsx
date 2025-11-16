@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/auth-context"
+import SessionFeedbackCard from "@/components/SessionFeedbackCard"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
 import { Clock, Calendar, Target, TrendingUp, Terminal, ArrowRight, Play, ChevronDown, ChevronUp, FileText } from "lucide-react"
@@ -188,7 +189,7 @@ export default function SessionsPage() {
                             <Button
                               onClick={() => setExpandedSessionId(isExpanded ? null : session.id)}
                               variant="outline"
-                              className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white"
+                              className="w-full border-white/20 text-gray-300 hover:bg-white/10 hover:text-white"
                             >
                               <FileText className="mr-2 h-4 w-4" />
                               {isExpanded ? "Hide Feedback" : "View Feedback"}
@@ -200,11 +201,11 @@ export default function SessionsPage() {
                             </Button>
 
                             {isExpanded && (
-                              <div className="mt-3 p-3 bg-gray-800/50 border border-gray-700 rounded-lg max-h-96 overflow-y-auto">
-                                <h4 className="text-sm font-semibold text-white mb-2">Interview Feedback</h4>
-                                <div className="text-xs text-gray-300 whitespace-pre-wrap leading-relaxed">
-                                  {session.feedback}
-                                </div>
+                              <div className="mt-3">
+                                <SessionFeedbackCard
+                                  feedback={session.feedback || ""}
+                                  performanceScore={session.performance_score}
+                                />
                               </div>
                             )}
                           </>
