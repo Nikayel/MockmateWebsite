@@ -78,6 +78,7 @@ export default function InterviewPage() {
   const [showFeedback, setShowFeedback] = useState(false)
   const [showPostInterviewDiscussion, setShowPostInterviewDiscussion] = useState(false)
   const [comprehensiveFeedback, setComprehensiveFeedback] = useState<string>("")
+  const [performanceScore, setPerformanceScore] = useState<number | null>(null)
   const [isGeneratingDiscussion, setIsGeneratingDiscussion] = useState(false)
   const [code, setCode] = useState("")
   const [selectedLanguage, setSelectedLanguage] = useState<"javascript" | "typescript" | "python" | "java" | "cpp" | "csharp" | "go" | "rust">("javascript")
@@ -532,7 +533,7 @@ Let's continue!`
     try {
       // Generate comprehensive feedback first
       let comprehensiveFeedback = `Completed ${selectedScenario?.title} with ${summary.passed}/${summary.total} tests passing`
-      let performanceScore = summary.passRate * 10
+      let calculatedPerformanceScore = summary.passRate * 10
 
       if (currentSessionId && user && code.trim()) {
         try {
@@ -552,8 +553,9 @@ Let's continue!`
           if (feedbackResponse.ok) {
             const feedbackData = await feedbackResponse.json()
             comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
-            performanceScore = feedbackData.performanceScore || performanceScore
+            calculatedPerformanceScore = feedbackData.performanceScore || calculatedPerformanceScore
             setComprehensiveFeedback(comprehensiveFeedback)
+            setPerformanceScore(calculatedPerformanceScore)
           }
         } catch (feedbackError) {
           console.error("Error generating feedback:", feedbackError)
@@ -614,9 +616,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       // Update session with completion data
       if (currentSessionId && user) {
         try {
+          // performanceScore is 0-10, convert to percentage (0-100)
+          const scoreToSave = calculatedPerformanceScore * 10
           await updateInterviewSession(
             currentSessionId,
-            performanceScore,
+            scoreToSave,
             comprehensiveFeedback
           )
         } catch (error) {
@@ -755,9 +759,11 @@ Let's have a great interview! How would you like to approach this problem?`
     // Update session if it exists and was completed
     if (currentSessionId && (showFeedback || showPostInterviewDiscussion) && testSummary.total > 0) {
       try {
+        // Use performance score if available, otherwise use pass rate
+        const scoreToSave = performanceScore !== null ? performanceScore * 10 : testSummary.passRate
         await updateInterviewSession(
           currentSessionId,
-          testSummary.passRate,
+          scoreToSave,
           comprehensiveFeedback || `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
         )
       } catch (error) {
@@ -769,6 +775,7 @@ Let's have a great interview! How would you like to approach this problem?`
     setShowFeedback(false)
     setShowPostInterviewDiscussion(false)
     setComprehensiveFeedback("")
+    setPerformanceScore(null)
     setIsGeneratingDiscussion(false)
     setShowScenarioBrowser(true)
     setCode("")
@@ -1749,11 +1756,11 @@ Let's have a great interview! How would you like to approach this problem?`
                       <CardHeader>
                         <CardTitle className="text-white flex items-center space-x-2">
                           <TrendingUp className="h-5 w-5 text-[#ff5733]" />
-                          <span>Performance Feedback</span>
+                          <span>Performance Evaluation</span>
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="prose prose-invert max-w-none">
+                        <div className="prose prose-invert max-w-none max-h-[600px] overflow-y-auto pr-2">
                           <div className="text-gray-200 whitespace-pre-wrap text-sm leading-relaxed">
                             {comprehensiveFeedback}
                           </div>
