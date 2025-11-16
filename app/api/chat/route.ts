@@ -30,6 +30,20 @@ export async function POST(request: NextRequest) {
 
     // Build user context string for personalized responses
     const userInfo = userContext as UserContext
+    // Extract first name or last name from full_name or email
+    let userName = "there"
+    if (userInfo?.full_name) {
+      const nameParts = userInfo.full_name.trim().split(/\s+/)
+      // Use first name if available, otherwise use last name
+      userName = nameParts[0] || (nameParts.length > 1 ? nameParts[nameParts.length - 1] : "")
+    } else if (userInfo?.email) {
+      const emailName = userInfo.email.split("@")[0]
+      const nameParts = emailName.split(".")
+      if (nameParts.length > 0) {
+        userName = nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1)
+      }
+    }
+    
     const userContextString = userInfo
       ? `
 CANDIDATE INFORMATION:
