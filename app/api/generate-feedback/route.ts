@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { code, scenarioTitle, scenarioType, testResults, language, timeSpent } = await request.json()
+    const { code, scenarioTitle, scenarioType, testResults, language, timeSpent, aiCollaborationMetrics, interactionMetrics } = await request.json()
 
     if (!code || !scenarioTitle) {
       return NextResponse.json({ error: "Code and scenario title are required" }, { status: 400 })
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      systemInstruction: `You are an experienced technical interviewer providing comprehensive, detailed feedback on a coding interview solution.
+      systemInstruction: `You are an experienced technical interviewer providing comprehensive, detailed feedback on a coding interview solution, similar to Meta's interview evaluation style.
       
 Your feedback should be extremely thorough, constructive, and similar to what a senior engineer at a top tech company (Google, Meta, Amazon) would provide in a real interview debrief.
 
@@ -65,32 +65,45 @@ Provide a STRUCTURED, DETAILED analysis covering:
    - Performance bottlenecks identified
    - Before/after complexity comparisons
 
-5. **BEST PRACTICES & DESIGN PATTERNS**
+5. **AI COLLABORATION ASSESSMENT** (Meta pilot program style)
+   - How effectively did they use AI assistance (if available)?
+   - Quality of questions asked to AI: Were they specific? Did they show understanding?
+   - Did they understand and properly implement AI suggestions?
+   - Were they overly dependent on AI or did they use it strategically?
+   - Could they distinguish good AI suggestions from bad ones?
+   - How well did they integrate AI help with their own problem-solving?
+   - Rate their AI collaboration skills: X/10 (with detailed explanation)
+
+6. **BEST PRACTICES & DESIGN PATTERNS**
    - Language-specific best practices followed/missed
    - Design patterns that could be applied
    - Code organization improvements
 
-6. **STRENGTHS** (What they did well)
+7. **STRENGTHS** (What they did well)
    - Specific positive aspects
    - Good decisions made
    - Areas of strong performance
+   - Strong AI collaboration (if applicable)
 
-7. **AREAS FOR IMPROVEMENT** (Actionable)
+8. **AREAS FOR IMPROVEMENT** (Actionable)
    - Specific, actionable suggestions
    - Concrete examples of how to improve
    - Learning resources or topics to study
+   - AI collaboration improvements (if applicable)
 
-8. **SCORE BREAKDOWN** (Detailed)
+9. **SCORE BREAKDOWN** (Detailed)
    - Correctness: X/10 (with explanation)
    - Efficiency: X/10 (with explanation)
    - Code Quality: X/10 (with explanation)
    - Problem Solving: X/10 (with explanation)
+   - AI Collaboration: X/10 (with explanation) - How well they collaborated with AI tools
    - Overall: X/10 (weighted average)
 
-9. **RECOMMENDATIONS**
+10. **RECOMMENDATIONS**
    - What to study next
    - Specific topics to focus on
    - Practice problems to try
+   - AI collaboration best practices (if applicable)
 
 Be professional, encouraging, but honest and thorough. Provide actionable feedback that helps the candidate improve significantly.`,
     })
@@ -101,12 +114,39 @@ Be professional, encouraging, but honest and thorough. Provide actionable feedba
 
     const timeInfo = timeSpent ? `\n\nTIME SPENT: ${Math.floor(timeSpent / 60)} minutes ${timeSpent % 60} seconds\n` : ""
 
+    const aiCollaborationInfo = aiCollaborationMetrics ? `
+AI COLLABORATION METRICS:
+- Partner messages sent: ${aiCollaborationMetrics.partnerMessagesSent || 0}
+- Partner messages received: ${aiCollaborationMetrics.partnerMessagesReceived || 0}
+- Hints requested: ${aiCollaborationMetrics.partnerHintsRequested || 0}
+- Code suggestions accepted: ${aiCollaborationMetrics.partnerCodeSuggestionsAccepted || 0}
+- AI collaboration quality: ${aiCollaborationMetrics.aiCollaborationQuality || 'Not assessed'}
+- AI questions quality: ${aiCollaborationMetrics.aiQuestionsQuality || 'Not assessed'}
+- AI suggestions understood: ${aiCollaborationMetrics.aiSuggestionsUnderstood || 0}
+- AI suggestions misunderstood: ${aiCollaborationMetrics.aiSuggestionsMisunderstood || 0}
+- Strategic AI usage: ${aiCollaborationMetrics.strategicAiUsage || 'Not assessed'}
+- AI over-dependency: ${aiCollaborationMetrics.aiOverDependency || 'Not assessed'}
+` : ""
+
+    const interactionInfo = interactionMetrics ? `
+INTERACTION METRICS:
+- Interviewer questions answered: ${interactionMetrics.interviewerQuestionsAnswered || 0}
+- Clarifications requested: ${interactionMetrics.interviewerClarificationsRequested || 0}
+- Feedback acknowledged: ${interactionMetrics.interviewerFeedbackAcknowledged || 0}
+- Proactive interactions: ${interactionMetrics.proactiveInteractions || 0}
+- Problem difficulty: ${interactionMetrics.problemDifficulty || 'Not specified'}
+- Problem type: ${interactionMetrics.problemType || 'Not specified'}
+- Skills demonstrated: ${interactionMetrics.skillsDemonstrated?.join(', ') || 'Not tracked'}
+` : ""
+
     const prompt = `Please provide comprehensive interview feedback for the following coding solution:
 
 PROBLEM: ${scenarioTitle}${scenarioType ? ` (${scenarioType})` : ''}
 LANGUAGE: ${language || 'JavaScript'}
 ${timeInfo}
 ${testResultsSummary}
+${aiCollaborationInfo}
+${interactionInfo}
 
 SOLUTION CODE:
 \`\`\`${language || 'javascript'}
@@ -126,9 +166,10 @@ Include:
 - Detailed correctness analysis with specific edge cases
 - Step-by-step complexity analysis with explanations
 - In-depth code quality assessment
+- AI collaboration assessment (Meta pilot program style) - evaluate how well they used AI tools
 - Specific optimization opportunities with before/after comparisons
-- Detailed score breakdown (Correctness, Efficiency, Code Quality, Problem Solving, Overall)
-- Actionable improvement recommendations
+- Detailed score breakdown (Correctness, Efficiency, Code Quality, Problem Solving, AI Collaboration, Overall)
+- Actionable improvement recommendations including AI collaboration best practices
 - Learning resources and next steps
 
 Format your response with clear markdown headers and structure. Be thorough - this feedback should be comprehensive enough to help the candidate significantly improve.`

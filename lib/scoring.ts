@@ -4,11 +4,19 @@
  */
 
 export interface InteractionMetrics {
-  // Coding Partner Interactions
+  // Coding Partner (AI) Interactions
   partnerMessagesSent: number
   partnerMessagesReceived: number
   partnerHintsRequested: number
   partnerCodeSuggestionsAccepted: number
+  
+  // AI Collaboration Quality Metrics
+  aiCollaborationQuality: number // 0-100, assessed by interviewer
+  aiQuestionsQuality: number // 0-100, quality of questions asked to AI
+  aiSuggestionsUnderstood: number // Count of AI suggestions properly understood/implemented
+  aiSuggestionsMisunderstood: number // Count of AI suggestions misunderstood or poorly implemented
+  aiOverDependency: number // 0-100, how overly dependent on AI (lower is better)
+  strategicAiUsage: number // 0-100, how strategically AI is used
   
   // AI Interviewer Interactions
   interviewerQuestionsAnswered: number
@@ -21,6 +29,11 @@ export interface InteractionMetrics {
   testCasesTotal: number
   codeEfficiencyScore: number
   codeQualityScore: number
+  
+  // Problem-Specific Metrics
+  problemDifficulty: 'easy' | 'medium' | 'hard'
+  problemType: 'dsa' | 'bugfix' | 'system-design'
+  skillsDemonstrated: string[] // e.g., ['arrays', 'dynamic-programming', 'debugging']
   
   // Time Metrics
   timeSpent: number // in seconds
@@ -38,6 +51,7 @@ export interface ScoreBreakdown {
   codeQualityScore: number // 0-100
   efficiencyScore: number // 0-100
   communicationScore: number // 0-100
+  aiCollaborationScore: number // 0-100 - NEW: How well they collaborate with AI
   problemSolvingScore: number // 0-100
   overallScore: number // 0-100
 }
@@ -87,36 +101,58 @@ export function calculateUserScore(metrics: InteractionMetrics): ScoreBreakdown 
     (metrics.codeEfficiencyScore * 0.5)
   )
   
-  // 4. Communication Score (15% weight)
-  // Measures how well user communicates and collaborates
+  // 4. Communication Score (10% weight)
+  // Measures how well user communicates with interviewer
   const questionQuality = Math.min(100, metrics.interviewerClarificationsRequested * 15)
   const feedbackEngagement = Math.min(100, metrics.interviewerFeedbackAcknowledged * 20)
   
   const communicationScore = (questionQuality * 0.5) + (feedbackEngagement * 0.5)
   
-  // 5. Problem Solving Score (10% weight)
+  // 5. AI Collaboration Score (15% weight) - NEW
+  // Measures how effectively user collaborates with AI tools (Meta pilot program style)
+  const aiQuestionQuality = metrics.aiQuestionsQuality || 0
+  const aiUnderstanding = metrics.aiSuggestionsUnderstood > 0
+    ? Math.min(100, (metrics.aiSuggestionsUnderstood / (metrics.aiSuggestionsUnderstood + metrics.aiSuggestionsMisunderstood)) * 100)
+    : 50
+  const aiStrategicUsage = metrics.strategicAiUsage || 50
+  const aiDependencyPenalty = Math.max(0, 100 - (metrics.aiOverDependency || 0))
+  
+  const aiCollaborationScore = (
+    (aiQuestionQuality * 0.3) +
+    (aiUnderstanding * 0.3) +
+    (aiStrategicUsage * 0.25) +
+    (aiDependencyPenalty * 0.15)
+  )
+  
+  // 6. Problem Solving Score (15% weight)
   // For bugfix: workspace context usage is important
   // For DSA: algorithm correctness and optimization
+  // Adjust based on problem difficulty
   let problemSolvingScore = 0
+  const difficultyMultiplier = metrics.problemDifficulty === 'hard' ? 1.2 : metrics.problemDifficulty === 'medium' ? 1.0 : 0.8
   
   if (metrics.workspaceContextUsed) {
     // Bugfix scenario - reward using workspace context
     const workspaceUsage = metrics.workspaceFilesTotal > 0
       ? (metrics.workspaceFilesViewed / metrics.workspaceFilesTotal) * 100
       : 0
-    problemSolvingScore = workspaceUsage * 0.5 + (testPassRate * 0.5)
+    problemSolvingScore = (workspaceUsage * 0.5 + (testPassRate * 0.5)) * difficultyMultiplier
   } else {
     // DSA scenario - focus on solution quality
-    problemSolvingScore = testPassRate
+    problemSolvingScore = testPassRate * difficultyMultiplier
   }
+  
+  // Ensure score doesn't exceed 100
+  problemSolvingScore = Math.min(100, problemSolvingScore)
   
   // Calculate overall weighted score
   const overallScore = (
-    interactionScore * 0.30 +
-    codeQualityScore * 0.25 +
-    efficiencyScore * 0.20 +
-    communicationScore * 0.15 +
-    problemSolvingScore * 0.10
+    interactionScore * 0.25 +
+    codeQualityScore * 0.20 +
+    efficiencyScore * 0.15 +
+    communicationScore * 0.10 +
+    aiCollaborationScore * 0.15 +
+    problemSolvingScore * 0.15
   )
   
   return {
@@ -124,6 +160,7 @@ export function calculateUserScore(metrics: InteractionMetrics): ScoreBreakdown 
     codeQualityScore: Math.round(codeQualityScore),
     efficiencyScore: Math.round(efficiencyScore),
     communicationScore: Math.round(communicationScore),
+    aiCollaborationScore: Math.round(aiCollaborationScore),
     problemSolvingScore: Math.round(problemSolvingScore),
     overallScore: Math.round(overallScore),
   }
@@ -174,6 +211,10 @@ export function getPerformanceFeedback(score: ScoreBreakdown): {
     recommendations.push("Practice explaining your approach and asking clarifying questions during interviews")
   }
   
+  if (score.aiCollaborationScore < 60) {
+    recommendations.push("Improve your AI collaboration skills: ask more specific questions, understand suggestions before implementing, use AI strategically rather than dependently")
+  }
+  
   return { level, feedback, recommendations }
 }
 
@@ -194,6 +235,15 @@ export function vectorizeMetrics(metrics: InteractionMetrics): number[] {
     metrics.hintsRevealed / Math.max(1, metrics.hintsTotal),
     metrics.workspaceFilesViewed / Math.max(1, metrics.workspaceFilesTotal),
     metrics.workspaceContextUsed ? 1 : 0,
+    // AI Collaboration metrics
+    metrics.aiCollaborationQuality / 100,
+    metrics.aiQuestionsQuality / 100,
+    metrics.aiSuggestionsUnderstood / Math.max(1, metrics.aiSuggestionsUnderstood + metrics.aiSuggestionsMisunderstood),
+    metrics.aiOverDependency / 100,
+    metrics.strategicAiUsage / 100,
+    // Problem context
+    metrics.problemDifficulty === 'easy' ? 0 : metrics.problemDifficulty === 'medium' ? 0.5 : 1,
+    metrics.problemType === 'dsa' ? 0 : metrics.problemType === 'bugfix' ? 0.5 : 1,
   ]
 }
 
