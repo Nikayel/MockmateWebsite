@@ -53,13 +53,35 @@ async function executeJavaScript(code: string, testCase: any, scenarioType: stri
         // Strategy 2: Code might be a function declaration, try wrapping differently
         try {
           // Try as an IIFE that returns a function
+          // For bugfix scenarios, try to find any function that matches common patterns
           const wrapped = runInNewContext(`
             (function() {
               ${trimmedCode}
               // Try to find and return the function
+              // Check common function names first
               if (typeof solution === 'function') return solution;
               if (typeof twoSum === 'function') return twoSum;
               if (typeof main === 'function') return main;
+
+              // For bugfix scenarios, find the last defined function (usually the main one)
+              // that's not an export/helper function
+              const functionNames = Object.getOwnPropertyNames(this).filter(name =>
+                typeof this[name] === 'function' &&
+                name !== 'constructor' &&
+                !name.startsWith('is') && // Skip helper functions like isSignificantChange
+                !name.includes('calculate') && // Skip utility functions like calculateChange
+                !name.includes('validate') // Skip validation functions
+              );
+
+              // Also check for specific bugfix function names
+              if (typeof processAdjacentPairs === 'function') return processAdjacentPairs;
+              if (typeof getUserEmailFormatted === 'function') return getUserEmailFormatted;
+
+              // Return the first non-utility function found
+              if (functionNames.length > 0) {
+                return this[functionNames[0]];
+              }
+
               throw new Error('No function found in code');
             })()
           `, sandbox, { timeout: 5000 })
@@ -357,6 +379,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No test cases defined for this scenario" }, { status: 400 })
     }
 
+    // For bugfix scenarios, prepend codebase files to provide supporting functions
+    let fullCode = code
+    if (scenario.type === 'bugfix') {
+      const scenarioWithCodebase = scenario as any
+      const codebaseFiles = scenarioWithCodebase.codebaseFiles?.[language] || []
+
+      if (codebaseFiles.length > 0) {
+        const supportingCode = codebaseFiles
+          .map((file: any) => {
+            let fileContent = file.content
+
+            // For JavaScript/TypeScript, remove ES6 export/import statements
+            // since we're running in a non-module context
+            if (language === 'javascript' || language === 'typescript') {
+              // Remove export statements (export function, export const, etc.)
+              fileContent = fileContent.replace(/export\s+(function|const|let|var|class|default)\s+/g, '$1 ')
+              // Remove standalone export { ... }
+              fileContent = fileContent.replace(/export\s*\{[^}]*\}/g, '')
+              // Remove import statements
+              fileContent = fileContent.replace(/import\s+.*?from\s+['"][^'"]*['"]\s*;?/g, '')
+              fileContent = fileContent.replace(/import\s+['"][^'"]*['"]\s*;?/g, '')
+            }
+
+            // Add a comment header for context
+            const header = language === 'python'
+              ? `# File: ${file.fileName}\n`
+              : `// File: ${file.fileName}\n`
+            return header + fileContent
+          })
+          .join('\n\n')
+
+        fullCode = supportingCode + '\n\n' + code
+      }
+    }
+
     const results = []
     let allPassed = true
     let executionError = null
@@ -371,12 +428,12 @@ export async function POST(request: NextRequest) {
         // Execute based on language
         switch (language) {
           case 'python':
-            executionResult = await executePython(code, testCase, scenario.type)
+            executionResult = await executePython(fullCode, testCase, scenario.type)
             break
           case 'javascript':
           case 'typescript':
           default:
-            executionResult = await executeJavaScript(code, testCase, scenario.type)
+            executionResult = await executeJavaScript(fullCode, testCase, scenario.type)
             break
         }
 
