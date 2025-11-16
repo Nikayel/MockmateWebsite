@@ -1180,8 +1180,8 @@ Let's have a great interview! How would you like to approach this problem?`
       {/* Interview Interface */}
       {!showScenarioBrowser && (
         <section className="pt-2 pb-2 bg-gradient-to-b from-gray-900 to-black h-screen flex flex-col overflow-hidden">
-          <div className="container mx-auto px-4 flex-1 flex flex-col overflow-hidden">
-            <div className="max-w-[1920px] mx-auto flex-1 flex flex-col gap-2 overflow-hidden">
+          <div className="container mx-auto px-2 flex-1 flex flex-col overflow-hidden">
+            <div className="w-full mx-auto flex-1 flex flex-col gap-1 overflow-hidden">
               {/* Compact Top Bar */}
               <div className="flex items-center justify-between flex-shrink-0 pt-2">
                 <div className="flex items-center space-x-3">
@@ -1232,9 +1232,9 @@ Let's have a great interview! How would you like to approach this problem?`
 
               {/* Main Interface - Three Column Layout */}
               {!showFeedback && !showPostInterviewDiscussion ? (
-                <div className={`grid grid-cols-12 gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${isCodeViewerOpen ? 'ml-[600px]' : ''}`}>
+                <div className={`grid grid-cols-12 gap-1 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${isCodeViewerOpen ? 'ml-[600px]' : ''}`}>
                   {/* Left: Problem Description / File Upload */}
-                  <div className="col-span-12 lg:col-span-3 flex flex-col min-h-0">
+                  <div className="col-span-12 lg:col-span-2 flex flex-col min-h-0">
                     <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden">
                       <CardHeader className="pb-2 flex-shrink-0">
                         <CardTitle className="text-white flex items-center space-x-2 text-sm">
@@ -1381,7 +1381,7 @@ Let's have a great interview! How would you like to approach this problem?`
                   </div>
 
                   {/* Center: Code Editor with Partner at Bottom */}
-                  <div className="col-span-12 lg:col-span-5 flex flex-col min-h-0 overflow-hidden">
+                  <div className="col-span-12 lg:col-span-7 flex flex-col min-h-0 overflow-hidden">
                     <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden">
                       <CardHeader className="pb-2 flex-shrink-0">
                         <CardTitle className="text-white flex items-center justify-between text-xs">
@@ -1517,7 +1517,7 @@ Let's have a great interview! How would you like to approach this problem?`
                   </div>
 
                   {/* Right: AI Interviewer Panel - Fixed Height */}
-                  <div className="col-span-12 lg:col-span-4 flex flex-col min-h-0 overflow-hidden">
+                  <div className="col-span-12 lg:col-span-3 flex flex-col min-h-0 overflow-hidden">
                     <Card className="bg-gray-900/50 border-gray-700 glass-effect h-full flex flex-col overflow-hidden">
                       <CardHeader className="pb-2 flex-shrink-0">
                         <CardTitle className="text-white flex items-center space-x-2 text-sm">
