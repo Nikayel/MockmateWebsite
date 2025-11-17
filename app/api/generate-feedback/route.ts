@@ -40,11 +40,12 @@ Tone: candid, data-backed, encouraging. Never rant, never waffle.
 HARD RULES
 - Limit yourself to ~350 words. Omit fluff and generic advice.
 - Tie every comment to observed signals (tests, time spent, interaction counts, hints, efficiency metrics, etc.).
-- If time spent < 120 seconds OR the user never messaged the interviewer/AI partner, assume they did NOT walk through their thinking. Explicitly call this out and cap BOTH "Reasoning & Explanation" and "AI Collaboration" at 4/10. Also cap the overall score at 9/10 in this situation, even if all tests pass.
+- If time spent < 120 seconds OR the user never messaged the interviewer/AI partner, assume they did NOT walk through their thinking. Explicitly call this out and cap BOTH "Reasoning & Explanation" and "AI Collaboration" at 40/100. Also cap the overall score at 90/100 in this situation, even if all tests pass.
+- If the user has NO collaboration (no interviewer messages AND no AI partner messages), cap the overall score at 45-50/100 maximum. If they also rushed (< 90 seconds), cap at 45/100. This is a critical failure in interview communication.
 - If time spent ≥ 120 seconds but interviewer message count from the user is 0, still mention the missing walkthrough.
 - Use markdown with the exact sections below, in order, no extras:
   1. **TL;DR** – 1-2 sentences summarizing outcome + top risk.
-  2. **Score Snapshot** – bullet list of the six ratings (Correctness, Efficiency, Code Quality, Reasoning & Explanation, AI Collaboration, Overall) formatted as “Label: X/10 – justification”.
+  2. **Score Snapshot** – bullet list of the six ratings (Correctness, Efficiency, Code Quality, Reasoning & Explanation, AI Collaboration, Overall) formatted as "Label: X/100 – justification". All scores should be on a 0-100 scale.
   3. **What Worked** – up to 3 bullets, each ≤1 sentence describing concrete wins.
   4. **Fix Next** – up to 3 prioritized bullets focused on the highest-impact gaps.
   5. **Action Plan** – numbered list of exactly 3 steps, each with an owner suggestion (e.g., “You”) and a timeframe (“today”, “this week”).
@@ -151,16 +152,25 @@ Remember:
     const feedback = response.text()
 
     // Extract performance score (look for rating in feedback)
-    let performanceScore = 7 // Default
-    const overallMatch = feedback.match(/Overall:\s*(\d+)\/10/i)
-    const genericMatch = feedback.match(/(\d+)\/10/)
+    // Scores are now on 0-100 scale, but feedback may still say X/10, so convert
+    let performanceScore = 70 // Default (70/100)
+    const overallMatch100 = feedback.match(/Overall:\s*(\d+)\/100/i)
+    const overallMatch10 = feedback.match(/Overall:\s*(\d+)\/10/i)
+    const genericMatch10 = feedback.match(/(\d+)\/10/)
     const ratingMatch = feedback.match(/rating[:\s]+(\d+)/i)
-    if (overallMatch) {
-      performanceScore = parseInt(overallMatch[1], 10)
+    if (overallMatch100) {
+      performanceScore = parseInt(overallMatch100[1], 10)
+    } else if (overallMatch10) {
+      // Convert from 0-10 to 0-100 scale
+      performanceScore = parseInt(overallMatch10[1], 10) * 10
     } else if (ratingMatch) {
-      performanceScore = parseInt(ratingMatch[1], 10)
-    } else if (genericMatch) {
-      performanceScore = parseInt(genericMatch[1], 10)
+      // Assume rating is 0-10, convert to 0-100
+      const rating = parseInt(ratingMatch[1], 10)
+      performanceScore = rating <= 10 ? rating * 10 : rating
+    } else if (genericMatch10) {
+      // Convert from 0-10 to 0-100 scale
+      const score = parseInt(genericMatch10[1], 10)
+      performanceScore = score <= 10 ? score * 10 : score
     }
 
     return NextResponse.json({
