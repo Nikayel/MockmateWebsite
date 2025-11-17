@@ -1584,10 +1584,12 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         <div className="flex items-center justify-end gap-2 flex-shrink-0">
                           <Button
                             onClick={runCode}
-                            disabled={isRunningTests || showFeedback}
+                            disabled={showFeedback}
+                            loading={isRunningTests}
                             className="bg-green-600 hover:bg-green-700 text-white text-xs h-7"
+                            aria-label={isRunningTests ? "Running tests" : "Run tests"}
                           >
-                            <PlayCircle className="mr-1 h-3 w-3" />
+                            {!isRunningTests && <PlayCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
                             {isRunningTests ? "Running..." : "Run Tests"}
                           </Button>
                         </div>
@@ -1628,13 +1630,15 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                               className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-xs h-7"
                               onKeyPress={(e) => e.key === "Enter" && !isLoadingChat && handleSendMessage(false)}
                               disabled={isLoadingChat}
+                              aria-label="Chat with AI partner"
                             />
                             <Button
                               onClick={() => handleSendMessage(false)}
                               className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white h-7 px-2"
-                              disabled={isLoadingChat}
+                              loading={isLoadingChat}
+                              aria-label={isLoadingChat ? "Sending message" : "Send message"}
                             >
-                              <Send className="h-3 w-3" />
+                              {!isLoadingChat && <Send className="h-3 w-3" aria-hidden="true" />}
                             </Button>
                           </div>
                         </div>
@@ -1697,13 +1701,15 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                               className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-xs h-7"
                               onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
                               disabled={isLoadingInterviewer || isGeneratingDiscussion}
+                              aria-label="Chat with interviewer"
                             />
                             <Button
                               onClick={() => handleSendMessage(true)}
                               className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white h-7 px-2"
-                              disabled={isLoadingInterviewer || isGeneratingDiscussion}
+                              loading={isLoadingInterviewer || isGeneratingDiscussion}
+                              aria-label={(isLoadingInterviewer || isGeneratingDiscussion) ? "Sending message" : "Send message"}
                             >
-                              <Send className="h-3 w-3" />
+                              {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-3 w-3" aria-hidden="true" />}
                             </Button>
                           </div>
                         )}
@@ -1864,13 +1870,15 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
                           onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
                           disabled={isLoadingInterviewer || isGeneratingDiscussion}
+                          aria-label="Chat with interviewer"
                         />
                         <Button
                           onClick={() => handleSendMessage(true)}
                           className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
-                          disabled={isLoadingInterviewer || isGeneratingDiscussion}
+                          loading={isLoadingInterviewer || isGeneratingDiscussion}
+                          aria-label={(isLoadingInterviewer || isGeneratingDiscussion) ? "Sending message" : "Send message"}
                         >
-                          <Send className="h-4 w-4" />
+                          {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-4 w-4" aria-hidden="true" />}
                         </Button>
                       </div>
                     </CardContent>

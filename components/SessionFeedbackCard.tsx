@@ -1,8 +1,11 @@
 "use client"
 
+import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Target, Zap, Code, MessageSquare } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { CheckCircle, Target, Zap, Code, MessageSquare, ChevronDown, ChevronUp } from "lucide-react"
 import {
   RadarChart,
   PolarGrid,
@@ -128,6 +131,12 @@ function parseFeedback(feedback: string): FeedbackSection {
 export default function SessionFeedbackCard({ feedback, performanceScore }: SessionFeedbackCardProps) {
   const sections = parseFeedback(feedback)
 
+  // Progressive disclosure state
+  const [showRadarChart, setShowRadarChart] = useState(false)
+  const [showWhatWorked, setShowWhatWorked] = useState(false)
+  const [showActionPlan, setShowActionPlan] = useState(false)
+  const [showAIWatchlist, setShowAIWatchlist] = useState(false)
+
   // Fallback: If scores weren't parsed, use overall score as baseline and adjust based on feedback content
   const hasParsedScores = sections.scores.correctness > 0 || sections.scores.efficiency > 0 || 
                           sections.scores.codeQuality > 0 || sections.scores.reasoning > 0 || 
@@ -188,20 +197,20 @@ export default function SessionFeedbackCard({ feedback, performanceScore }: Sess
 
   return (
     <div className="space-y-3 sm:space-y-4">
-      {/* TL;DR & Score */}
+      {/* TL;DR & Score - Always Visible */}
       <Card className="bg-black border border-white/10">
         <div className="p-3 sm:p-4 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <p className="text-xs text-gray-400 mb-1 uppercase tracking-wider">TL;DR</p>
-              <p className="text-xs sm:text-sm text-gray-200 leading-relaxed line-clamp-2">
+              <p className="text-xs sm:text-sm text-gray-200 leading-relaxed">
                 {sections.tldr || "Review complete"}
               </p>
             </div>
             <div className="text-center flex-shrink-0">
               <div className="flex items-baseline gap-1">
-                <span className="text-2xl sm:text-3xl font-bold text-white">{performanceScore || sections.scores.overall}</span>
-                <span className="text-sm text-gray-500">/10</span>
+                <span className="text-2xl sm:text-3xl font-bold text-white" aria-label={`Score: ${performanceScore || sections.scores.overall} out of 10`}>{performanceScore || sections.scores.overall}</span>
+                <span className="text-sm text-gray-500" aria-hidden="true">/10</span>
               </div>
               <Badge className={`${getScoreBgColor(performanceScore || sections.scores.overall)} text-white text-[10px] mt-1`}>
                 {(performanceScore || sections.scores.overall) >= 8 ? "Excellent" : (performanceScore || sections.scores.overall) >= 6 ? "Good" : "Improve"}
@@ -209,22 +218,7 @@ export default function SessionFeedbackCard({ feedback, performanceScore }: Sess
             </div>
           </div>
 
-          {/* Radar Chart */}
-          <div className="h-[180px] sm:h-[200px] -mx-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={radarData}>
-                <PolarGrid stroke="#374151" />
-                <PolarAngleAxis
-                  dataKey="subject"
-                  tick={{ fill: "#9ca3af", fontSize: 9 }}
-                />
-                <PolarRadiusAxis angle={90} domain={[0, 10]} tick={{ fill: "#6b7280", fontSize: 8 }} />
-                <Radar name="Score" dataKey="value" stroke="#ff5733" fill="#ff5733" fillOpacity={0.6} />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Quick Stats */}
+          {/* Quick Stats - Always Visible */}
           <div className="grid grid-cols-5 gap-1 sm:gap-2 text-center border-t border-white/10 pt-3">
             <div>
               <div className="text-xs sm:text-sm font-bold text-white">{sections.scores.correctness}</div>
@@ -247,41 +241,94 @@ export default function SessionFeedbackCard({ feedback, performanceScore }: Sess
               <div className="text-[9px] sm:text-[10px] text-gray-400">AI</div>
             </div>
           </div>
+
+          {/* Radar Chart - Collapsible */}
+          <Collapsible open={showRadarChart} onOpenChange={setShowRadarChart}>
+            <div className="border-t border-white/10 pt-3">
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-between hover:bg-white/5"
+                  aria-expanded={showRadarChart}
+                  aria-label={showRadarChart ? "Hide radar chart" : "Show radar chart"}
+                >
+                  <span className="text-xs text-gray-300">Radar Chart</span>
+                  {showRadarChart ? (
+                    <ChevronUp className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="h-[180px] sm:h-[200px] -mx-2 mt-2" role="img" aria-label="Radar chart showing score distribution">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart data={radarData}>
+                      <PolarGrid stroke="#374151" />
+                      <PolarAngleAxis
+                        dataKey="subject"
+                        tick={{ fill: "#9ca3af", fontSize: 9 }}
+                      />
+                      <PolarRadiusAxis angle={90} domain={[0, 10]} tick={{ fill: "#6b7280", fontSize: 8 }} />
+                      <Radar name="Score" dataKey="value" stroke="#ff5733" fill="#ff5733" fillOpacity={0.6} />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CollapsibleContent>
+            </div>
+          </Collapsible>
         </div>
       </Card>
 
-      {/* What Worked */}
+      {/* What Worked - Collapsible */}
       {sections.whatWorked.length > 0 && (
-        <Card className="bg-black border border-white/10">
-          <div className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 flex-shrink-0" />
-              <h4 className="text-xs sm:text-sm font-semibold text-white">What Worked</h4>
-            </div>
-            <ul className="space-y-1.5 sm:space-y-2">
-              {sections.whatWorked.slice(0, 3).map((item, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <span className="text-green-500 mt-0.5 flex-shrink-0 text-xs">✓</span>
-                  <span className="text-[10px] sm:text-xs text-gray-200 leading-relaxed">{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Card>
+        <Collapsible open={showWhatWorked} onOpenChange={setShowWhatWorked}>
+          <Card className="bg-black border border-white/10">
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full justify-between p-3 sm:p-4 hover:bg-white/5 rounded-lg transition-colors"
+                aria-expanded={showWhatWorked}
+                aria-label={showWhatWorked ? "Hide what worked" : "Show what worked"}
+              >
+                <span className="text-xs sm:text-sm text-white flex items-center gap-2">
+                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 flex-shrink-0" aria-hidden="true" />
+                  What Worked
+                </span>
+                {showWhatWorked ? (
+                  <ChevronUp className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-3 pb-3 sm:px-4 sm:pb-4">
+              <ul className="space-y-1.5 sm:space-y-2 mt-2" role="list">
+                {sections.whatWorked.slice(0, 3).map((item, index) => (
+                  <li key={index} className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5 flex-shrink-0 text-xs" aria-hidden="true">✓</span>
+                    <span className="text-[10px] sm:text-xs text-gray-200 leading-relaxed">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
       )}
 
-      {/* Fix Next */}
+      {/* Fix Next - Always Visible */}
       {sections.fixNext.length > 0 && (
         <Card className="bg-black border border-white/10">
           <div className="p-3 sm:p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Target className="h-3 w-3 sm:h-4 sm:w-4 text-red-500 flex-shrink-0" />
+              <Target className="h-3 w-3 sm:h-4 sm:w-4 text-red-500 flex-shrink-0" aria-hidden="true" />
               <h4 className="text-xs sm:text-sm font-semibold text-white">Fix Next</h4>
             </div>
-            <ul className="space-y-1.5 sm:space-y-2">
+            <ul className="space-y-1.5 sm:space-y-2" role="list">
               {sections.fixNext.slice(0, 3).map((item, index) => (
                 <li key={index} className="flex items-start gap-2">
-                  <span className="bg-red-500/20 text-red-500 rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
+                  <span className="bg-red-500/20 text-red-500 rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold flex-shrink-0" aria-hidden="true">
                     {index + 1}
                   </span>
                   <span className="text-[10px] sm:text-xs text-gray-200 leading-relaxed">{item}</span>
@@ -292,39 +339,71 @@ export default function SessionFeedbackCard({ feedback, performanceScore }: Sess
         </Card>
       )}
 
-      {/* Action Plan */}
+      {/* Action Plan - Collapsible */}
       {sections.actionPlan.length > 0 && (
-        <Card className="bg-black border border-white/10">
-          <div className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Zap className="h-3 w-3 sm:h-4 sm:w-4 text-[#ff5733] flex-shrink-0" />
-              <h4 className="text-xs sm:text-sm font-semibold text-white">Action Plan</h4>
-            </div>
-            <div className="space-y-2">
-              {sections.actionPlan.slice(0, 3).map((item, index) => (
-                <div key={index} className="flex items-start gap-2 p-2 bg-white/5 rounded border border-white/10">
-                  <div className="bg-[#ff5733] text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
-                    {index + 1}
+        <Collapsible open={showActionPlan} onOpenChange={setShowActionPlan}>
+          <Card className="bg-black border border-white/10">
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full justify-between p-3 sm:p-4 hover:bg-white/5 rounded-lg transition-colors"
+                aria-expanded={showActionPlan}
+                aria-label={showActionPlan ? "Hide action plan" : "Show action plan"}
+              >
+                <span className="text-xs sm:text-sm text-white flex items-center gap-2">
+                  <Zap className="h-3 w-3 sm:h-4 sm:w-4 text-[#ff5733] flex-shrink-0" aria-hidden="true" />
+                  Action Plan
+                </span>
+                {showActionPlan ? (
+                  <ChevronUp className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-3 pb-3 sm:px-4 sm:pb-4">
+              <div className="space-y-2 mt-2">
+                {sections.actionPlan.slice(0, 3).map((item, index) => (
+                  <div key={index} className="flex items-start gap-2 p-2 bg-white/5 rounded border border-white/10">
+                    <div className="bg-[#ff5733] text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-[9px] font-bold flex-shrink-0" aria-hidden="true">
+                      {index + 1}
+                    </div>
+                    <span className="text-[10px] sm:text-xs text-gray-200 leading-relaxed pt-0.5">{item}</span>
                   </div>
-                  <span className="text-[10px] sm:text-xs text-gray-200 leading-relaxed pt-0.5">{item}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
       )}
 
-      {/* AI Watchlist */}
+      {/* AI Watchlist - Collapsible */}
       {sections.aiWatchlist && (
-        <Card className="bg-black border border-white/10">
-          <div className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500 flex-shrink-0" />
-              <h4 className="text-xs sm:text-sm font-semibold text-white">AI & Communication</h4>
-            </div>
-            <p className="text-[10px] sm:text-xs text-gray-200 leading-relaxed">{sections.aiWatchlist}</p>
-          </div>
-        </Card>
+        <Collapsible open={showAIWatchlist} onOpenChange={setShowAIWatchlist}>
+          <Card className="bg-black border border-white/10">
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full justify-between p-3 sm:p-4 hover:bg-white/5 rounded-lg transition-colors"
+                aria-expanded={showAIWatchlist}
+                aria-label={showAIWatchlist ? "Hide AI watchlist" : "Show AI watchlist"}
+              >
+                <span className="text-xs sm:text-sm text-white flex items-center gap-2">
+                  <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500 flex-shrink-0" aria-hidden="true" />
+                  AI & Communication
+                </span>
+                {showAIWatchlist ? (
+                  <ChevronUp className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-3 pb-3 sm:px-4 sm:pb-4">
+              <p className="text-[10px] sm:text-xs text-gray-200 leading-relaxed mt-2">{sections.aiWatchlist}</p>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
       )}
     </div>
   )
