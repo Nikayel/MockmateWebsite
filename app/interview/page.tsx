@@ -587,18 +587,29 @@ Let's continue!`
 
       const applyCollaborationPenalty = (score: number) => {
         let adjustedScore = score
-        if (noInterviewerWalkthrough || noAiPartnerCollab || rushedSession) {
-          adjustedScore = Math.min(adjustedScore, 9)
+        // If no collaboration at all, cap at 45-50/100 (very strict penalty)
+        if (noInterviewerWalkthrough && noAiPartnerCollab) {
+          adjustedScore = Math.min(adjustedScore, 50)
+          // If they also rushed, make it even lower
+          if (rushedSession) {
+            adjustedScore = Math.min(adjustedScore, 45)
+          }
         }
-        if ((noInterviewerWalkthrough && noAiPartnerCollab) || rushedSession) {
-          adjustedScore = Math.min(adjustedScore, 8)
+        // If missing one form of collaboration, cap at 60/100
+        else if (noInterviewerWalkthrough || noAiPartnerCollab) {
+          adjustedScore = Math.min(adjustedScore, 60)
+        }
+        // Rushed session penalty (if they have some collaboration)
+        if (rushedSession && !(noInterviewerWalkthrough && noAiPartnerCollab)) {
+          adjustedScore = Math.min(adjustedScore, 65)
         }
         return Math.max(0, adjustedScore)
       }
 
       // Generate comprehensive feedback first
       let comprehensiveFeedback = `Completed ${selectedScenario?.title} with ${summary.passed}/${summary.total} tests passing`
-      let calculatedPerformanceScore = summary.passRate / 10
+      // Convert pass rate (0-100) to 0-100 score scale
+      let calculatedPerformanceScore = summary.passRate
 
       if (currentSessionId && user && code.trim()) {
         try {
@@ -635,7 +646,7 @@ Let's continue!`
       const userProfile = user ? await getUserProfile(user.id) : null
       const metrics = analyzeCodeEfficiency(code)
       
-      const discussionPrompt = `[POST-INTERVIEW DISCUSSION] The candidate has completed the coding solution. All tests are passing.
+      const discussionPrompt = `[POST-INTERVIEW DISCUSSION - CONTINUE CONVERSATION] This is a continuation of our interview conversation. The candidate has just completed their coding solution.
 
 TEST RESULTS: ${summary.passed}/${summary.total} tests passed (${summary.passRate}% pass rate)
 TIME SPENT: ${Math.floor(elapsedTime / 60)} minutes ${elapsedTime % 60} seconds
@@ -646,18 +657,13 @@ EFFICIENCY METRICS:
 - Code Complexity: ${metrics.complexity}
 - Lines of Code: ${metrics.linesOfCode}
 
-Please:
-1. Congratulate them on completing the solution
-2. Analyze their solution's time and space complexity
-3. Discuss optimization opportunities if the solution isn't optimal
-4. Point out what they did well
-5. Suggest specific improvements
-6. Ask if they want to optimize further or discuss the solution
+IMPORTANT: This is a POST-INTERVIEW DISCUSSION phase. You should:
+1. Continue the conversation naturally - reference previous discussion points if relevant
+2. Discuss the results and solution quality
+3. Ask if they have questions about the solution, complexity, or optimizations
+4. Be conversational - this is a debrief, not a restart
 
-Tone requirements:
-- Be brutally honest yet professional; call out gaps directly.
-- Explicitly mention whether they walked through their work and collaborated with the AI partner (or if they failed to do so).
-- If you lack evidence for either point, state that and remind them to narrate and collaborate next time.
+Do NOT reintroduce yourself. Continue as if we're in the middle of a discussion about their completed solution.
 
 Be conversational and thorough - like a real interviewer debriefing after a coding interview.`
 
@@ -690,8 +696,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       // Update session with completion data
       if (currentSessionId && user) {
         try {
-          // performanceScore is 0-10, convert to percentage (0-100)
-          const scoreToSave = calculatedPerformanceScore * 10
+          // performanceScore is now 0-100, save directly
+          const scoreToSave = calculatedPerformanceScore
           await updateInterviewSession(
             currentSessionId,
             scoreToSave,
