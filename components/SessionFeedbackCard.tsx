@@ -54,16 +54,41 @@ function parseFeedback(feedback: string): FeedbackSection {
   const tldrMatch = feedback.match(/\*\*TL;DR\*\*[:\s]*([\s\S]+?)(?=\n\*\*|$)/)
   if (tldrMatch) sections.tldr = tldrMatch[1].trim()
 
-  // Extract scores
-  const scoreSection = feedback.match(/\*\*Score Snapshot\*\*[:\s]*([\s\S]+?)(?=\n\*\*|$)/)
+  // Extract scores - improved regex to handle various formats
+  const scoreSection = feedback.match(/\*\*Score Snapshot\*\*[:\s]*([\s\S]+?)(?=\n\*\*|$)/i)
   if (scoreSection) {
     const scoreText = scoreSection[1]
-    sections.scores.correctness = parseInt(scoreText.match(/Correctness[:\s]*(\d+)\/10/i)?.[1] || "0")
-    sections.scores.efficiency = parseInt(scoreText.match(/Efficiency[:\s]*(\d+)\/10/i)?.[1] || "0")
-    sections.scores.codeQuality = parseInt(scoreText.match(/Code Quality[:\s]*(\d+)\/10/i)?.[1] || "0")
-    sections.scores.reasoning = parseInt(scoreText.match(/Reasoning.*?[:\s]*(\d+)\/10/i)?.[1] || "0")
-    sections.scores.aiCollaboration = parseInt(scoreText.match(/AI Collaboration[:\s]*(\d+)\/10/i)?.[1] || "0")
-    sections.scores.overall = parseInt(scoreText.match(/Overall[:\s]*(\d+)\/10/i)?.[1] || "0")
+    
+    // More flexible regex patterns that handle:
+    // - "Correctness: 10/10" or "Correctness: 10/10 – justification"
+    // - Bullet points: "- Correctness: 10/10"
+    // - Variations in spacing and dashes
+    
+    const correctnessMatch = scoreText.match(/Correctness[:\s–-]*(\d+)\s*\/\s*10/i)
+    sections.scores.correctness = correctnessMatch ? parseInt(correctnessMatch[1]) : 0
+    
+    const efficiencyMatch = scoreText.match(/Efficiency[:\s–-]*(\d+)\s*\/\s*10/i)
+    sections.scores.efficiency = efficiencyMatch ? parseInt(efficiencyMatch[1]) : 0
+    
+    const codeQualityMatch = scoreText.match(/Code\s+Quality[:\s–-]*(\d+)\s*\/\s*10/i)
+    sections.scores.codeQuality = codeQualityMatch ? parseInt(codeQualityMatch[1]) : 0
+    
+    // Handle "Reasoning & Explanation" or just "Reasoning"
+    const reasoningMatch = scoreText.match(/Reasoning(?:\s+&\s+Explanation)?[:\s–-]*(\d+)\s*\/\s*10/i)
+    sections.scores.reasoning = reasoningMatch ? parseInt(reasoningMatch[1]) : 0
+    
+    const aiCollaborationMatch = scoreText.match(/AI\s+Collaboration[:\s–-]*(\d+)\s*\/\s*10/i)
+    sections.scores.aiCollaboration = aiCollaborationMatch ? parseInt(aiCollaborationMatch[1]) : 0
+    
+    const overallMatch = scoreText.match(/Overall[:\s–-]*(\d+)\s*\/\s*10/i)
+    sections.scores.overall = overallMatch ? parseInt(overallMatch[1]) : 0
+    
+    // Debug: log if scores are still 0 after parsing
+    if (sections.scores.correctness === 0 && sections.scores.efficiency === 0 && 
+        sections.scores.codeQuality === 0 && sections.scores.reasoning === 0 && 
+        sections.scores.aiCollaboration === 0) {
+      console.warn("Failed to parse scores from feedback. Score text:", scoreText.substring(0, 200))
+    }
   }
 
   // Extract What Worked
@@ -103,12 +128,56 @@ function parseFeedback(feedback: string): FeedbackSection {
 export default function SessionFeedbackCard({ feedback, performanceScore }: SessionFeedbackCardProps) {
   const sections = parseFeedback(feedback)
 
+  // Fallback: If scores weren't parsed, use overall score as baseline and adjust based on feedback content
+  const hasParsedScores = sections.scores.correctness > 0 || sections.scores.efficiency > 0 || 
+                          sections.scores.codeQuality > 0 || sections.scores.reasoning > 0 || 
+                          sections.scores.aiCollaboration > 0
+
+  if (!hasParsedScores && (performanceScore || sections.scores.overall) > 0) {
+    // Use overall score as starting point
+    const baseScore = sections.scores.overall || performanceScore || 7
+    
+    // Check feedback for hints about reasoning and AI collaboration
+    const feedbackLower = feedback.toLowerCase()
+    const hasReasoningIssues = feedbackLower.includes('walk through') || feedbackLower.includes('narrate') || 
+                               feedbackLower.includes('explain') || feedbackLower.includes('reasoning') ||
+                               feedbackLower.includes('proactive communication') || feedbackLower.includes('thought process')
+    const hasAiIssues = feedbackLower.includes('ai partner') || feedbackLower.includes('ai collaboration') ||
+                        feedbackLower.includes('engage with ai') || feedbackLower.includes('engage with the ai') ||
+                        feedbackLower.includes('use the ai partner')
+    
+    // If overall is 10 but there are improvement suggestions, adjust scores accordingly
+    if (baseScore >= 9) {
+      // High scores but with improvement suggestions means some areas need work
+      sections.scores.correctness = baseScore
+      sections.scores.efficiency = hasReasoningIssues || hasAiIssues ? baseScore - 1 : baseScore
+      sections.scores.codeQuality = baseScore
+      sections.scores.reasoning = hasReasoningIssues ? Math.max(6, baseScore - 3) : baseScore
+      sections.scores.aiCollaboration = hasAiIssues ? Math.max(6, baseScore - 3) : baseScore
+    } else {
+      // Lower overall score - distribute more evenly
+      sections.scores.correctness = baseScore
+      sections.scores.efficiency = baseScore
+      sections.scores.codeQuality = baseScore
+      sections.scores.reasoning = hasReasoningIssues ? Math.max(4, baseScore - 2) : baseScore
+      sections.scores.aiCollaboration = hasAiIssues ? Math.max(4, baseScore - 2) : baseScore
+    }
+    
+    // Ensure scores don't exceed overall and are within valid range
+    const maxScore = Math.min(baseScore, 10)
+    sections.scores.correctness = Math.min(Math.max(sections.scores.correctness, 0), maxScore)
+    sections.scores.efficiency = Math.min(Math.max(sections.scores.efficiency, 0), maxScore)
+    sections.scores.codeQuality = Math.min(Math.max(sections.scores.codeQuality, 0), maxScore)
+    sections.scores.reasoning = Math.min(Math.max(sections.scores.reasoning, 0), maxScore)
+    sections.scores.aiCollaboration = Math.min(Math.max(sections.scores.aiCollaboration, 0), maxScore)
+  }
+
   const radarData = [
-    { subject: "Correctness", value: sections.scores.correctness, fullMark: 10 },
-    { subject: "Efficiency", value: sections.scores.efficiency, fullMark: 10 },
-    { subject: "Code Quality", value: sections.scores.codeQuality, fullMark: 10 },
-    { subject: "Reasoning", value: sections.scores.reasoning, fullMark: 10 },
-    { subject: "AI Collab", value: sections.scores.aiCollaboration, fullMark: 10 },
+    { subject: "Correctness", value: sections.scores.correctness || 0, fullMark: 10 },
+    { subject: "Efficiency", value: sections.scores.efficiency || 0, fullMark: 10 },
+    { subject: "Code Quality", value: sections.scores.codeQuality || 0, fullMark: 10 },
+    { subject: "Reasoning", value: sections.scores.reasoning || 0, fullMark: 10 },
+    { subject: "AI Collab", value: sections.scores.aiCollaboration || 0, fullMark: 10 },
   ]
 
   const getScoreBgColor = (score: number) => {
