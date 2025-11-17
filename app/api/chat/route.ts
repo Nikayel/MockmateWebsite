@@ -97,11 +97,17 @@ Your approach:
 
 INTERVIEW STYLE (Professional and Constructive):
 - Guide them to explain their approach: "Before we dive into coding, can you walk me through how you're thinking about this problem?" "I'd like to understand your approach first."
-- Explore complexity together: "What's the time complexity of this solution?" "This looks like O(n²) - is there a way we could optimize this?" "Let's think about the space complexity here."
-- Discuss edge cases collaboratively: "What edge cases should we consider? Empty input? Null values? Negative numbers?"
-- Explore scalability: "How would this perform with a million elements?" "What happens at scale?" "What's the worst-case scenario here?"
+- **CRITICAL: Ask technical questions DURING coding, not after they finish:**
+  - Time/Space Complexity: "What's the time complexity of your solution?" "What about space complexity?" "Can you walk me through the Big O analysis?" - ASK THIS WHEN THEY HAVE SUBSTANTIAL CODE
+  - Edge Cases: "What edge cases should we consider? Empty input? Null values? Negative numbers?" "What happens if the input is empty?"
+  - Optimization: "Is there a way to optimize this?" "Could we use a different data structure?" "What's the bottleneck here?"
+  - Scalability: "How would this perform with a million elements?" "What happens at scale?" "What's the worst-case scenario here?"
+  - Design Decisions: "Why did you choose this approach?" "What are the tradeoffs?" "How would this scale?"
+  - Testing: "How would you test this?" "What test cases would you write?" "Can you trace through an example?"
 - Review code thoughtfully: "I notice this might be inefficient. What if we tried a different data structure?" "There's a potential issue here - let's trace through this together."
 - Help them think through problems: "Let's think about this differently. What if we approached it from this angle?" "Have you considered X? It might help here."
+
+IMPORTANT TIMING: Ask complexity and optimization questions WHILE they're coding, not after they submit. Real interviewers ask these questions during the coding phase to understand their thought process.
 
 EVALUATION OF REASONING & EXPLANATION:
 - Did they walk through their approach before coding? If not, gently guide them: "It's helpful to think through the approach first. Can you walk me through your plan?"
@@ -131,7 +137,7 @@ IMPORTANT:
   - Ask about design decisions based on their existing code
   - Point out inconsistencies or improvements
   - Make the interview feel realistic and contextual
-- Ask questions naturally during the interview, not just at the end
+- Ask technical questions (complexity, edge cases, optimization) DURING the interview while they're coding, not after they finish. This is how real technical interviews work.
 - Be conversational, professional, and constructive - like a real interviewer who wants to understand the candidate's abilities
 - If they're stuck, ask leading questions and help guide their thinking: "What if we tried X?" "Have you considered Y?" "Let's think about this step by step."
 - Track and note AI collaboration quality in your observations - observe and provide feedback constructively
@@ -214,23 +220,29 @@ Keep responses brief, actionable, and helpful. You're a tool they can use, but t
     let fullUserMessage = ""
 
     if (isProactive && role === "interviewer") {
-      // Proactive interviewer message - analyze code and jump in with context-aware feedback
+      // Proactive interviewer message - analyze code and ask technical questions
       const timeSpent = elapsedTime || 0
       const minutesSpent = Math.floor(timeSpent / 60)
+      const hasSubstantialCode = currentCode && currentCode.trim().length > 50
 
-      fullUserMessage = `[PROACTIVE MODE - CONTEXT-AWARE] The candidate has been working on their solution${minutesSpent > 0 ? ` for ${minutesSpent} minute${minutesSpent !== 1 ? 's' : ''}` : ''}. 
+      fullUserMessage = `[PROACTIVE MODE - TECHNICAL INTERVIEW QUESTIONS] The candidate has been working on their solution${minutesSpent > 0 ? ` for ${minutesSpent} minute${minutesSpent !== 1 ? 's' : ''}` : ''}. 
 
-Please analyze their CURRENT code carefully and provide a RELEVANT, SPECIFIC comment based on what they're actually doing. Look for:
-- Specific patterns they're using (loops, recursion, data structures)
-- Potential issues or optimizations in their current approach
-- Questions about their design decisions
-- Encouragement if they're on the right track
+${hasSubstantialCode ? `They have written code. This is the PERFECT time to ask technical interview questions BEFORE they finish.` : `They're still working on their solution.`}
 
-Be CONVERSATIONAL and NATURAL - like a real interviewer watching their screen in real-time. Don't be generic - reference specific parts of their code.
+As a real technical interviewer, you should ask questions like:
+1. **Time & Space Complexity**: "What's the time complexity of your solution?" "What about space complexity?" "Can you walk me through the Big O analysis?"
+2. **Edge Cases**: "What edge cases should we consider?" "What happens with empty input?" "How does your solution handle null/undefined values?"
+3. **Optimization**: "Is there a way to optimize this?" "Could we use a different data structure?" "What's the bottleneck here?"
+4. **Design Decisions**: "Why did you choose this approach?" "What are the tradeoffs?" "How would this scale?"
+5. **Testing**: "How would you test this?" "What test cases would you write?" "Can you trace through an example?"
+
+PRIORITY: If they have substantial code but haven't been asked about complexity yet, ASK ABOUT TIME/SPACE COMPLEXITY NOW. This is a critical interview question that should come BEFORE they finish.
+
+Be CONVERSATIONAL and NATURAL - like a real interviewer. Ask ONE focused question at a time. Reference their specific code when relevant.
 
 ${workspaceContextStr}${currentCodeContext}
 
-Based on their current code, what specific, relevant comment or question would you like to make right now?`
+What technical question should you ask them right now based on their current code?`
     } else {
       // Regular message
       fullUserMessage = message
@@ -249,8 +261,7 @@ Based on their current code, what specific, relevant comment or question would y
     })
 
     // Send message and get response with retry logic
-    let result
-    let lastError
+    let result: any = null
     const maxRetries = 3
     const baseDelay = 1000 // 1 second
 
@@ -259,8 +270,6 @@ Based on their current code, what specific, relevant comment or question would y
         result = await chat.sendMessage(fullUserMessage)
         break // Success, exit retry loop
       } catch (error: any) {
-        lastError = error
-
         // Check if it's a retryable error (503, 429, or 500 with overload message)
         const isRetryable =
           error?.status === 503 ||
@@ -277,6 +286,10 @@ Based on their current code, what specific, relevant comment or question would y
         const delay = baseDelay * Math.pow(2, attempt)
         await new Promise(resolve => setTimeout(resolve, delay))
       }
+    }
+
+    if (!result) {
+      throw new Error("Failed to send message after retries")
     }
 
     const response = await result.response
