@@ -139,6 +139,7 @@ export function MagneticButton({
         'inline-flex items-center justify-center gap-2',
         'font-medium rounded-lg',
         'border transition-all duration-300',
+        'cursor-pointer',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
         variantStyles[variant],

@@ -353,7 +353,7 @@ export default function PracticeFeedback({
               <CollapsibleTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="w-full justify-between p-4 hover:bg-white/5 rounded-lg transition-colors border border-gray-700"
+                  className="w-full justify-between p-4 hover:bg-white/5 rounded-lg transition-colors border border-gray-700 cursor-pointer"
                   aria-expanded={showGraph}
                 >
                   <span className="text-white flex items-center gap-2">
@@ -381,7 +381,7 @@ export default function PracticeFeedback({
                             tick={{ fill: "#9ca3af", fontSize: 10 }}
                           />
                           <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: "#6b7280", fontSize: 8 }} />
-                          <Radar name="Score" dataKey="value" stroke="#ff5733" fill="#ff5733" fillOpacity={0.6} />
+                          <Radar name="Score" dataKey="value" stroke="#00d9ff" fill="#00d9ff" fillOpacity={0.6} />
                         </RadarChart>
                       </ResponsiveContainer>
                     </div>
@@ -447,7 +447,7 @@ export default function PracticeFeedback({
                   URL.revokeObjectURL(url)
                 })}
                 variant="outline"
-                className="flex-1 border-blue-500/50 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300"
+                className="flex-1 border-accent/50 text-accent hover:bg-accent/10 hover:text-accent cursor-pointer"
               >
                 <FileText className="mr-2 h-4 w-4" />
                 Export Report (JSON)
@@ -455,14 +455,14 @@ export default function PracticeFeedback({
               <Button
                 onClick={onRetry}
                 variant="outline"
-                className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white"
+                className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white cursor-pointer"
               >
                 <RotateCcw className="mr-2 h-4 w-4" />
                 Retry Session
               </Button>
               <Button
                 onClick={onNewProblem}
-                className="flex-1 bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
+                className="flex-1 bg-accent hover:bg-accent/80 text-black cursor-pointer"
               >
                 <Play className="mr-2 h-4 w-4" />
                 New Problem
