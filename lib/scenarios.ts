@@ -1635,6 +1635,1236 @@ An island is surrounded by water and is formed by connecting adjacent lands hori
       },
     ],
   },
+  {
+    id: 'dsa-lru-cache',
+    title: 'LRU Cache',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ['Google', 'Amazon', 'Meta', 'Microsoft'],
+    description: 'Design a data structure that follows Least Recently Used (LRU) cache constraints',
+    tags: ['hash-table', 'linked-list', 'design'],
+    estimatedTime: 30,
+    problemStatement: `Design a data structure that follows the constraints of a Least Recently Used (LRU) cache.
+
+Implement the LRUCache class:
+- LRUCache(int capacity) Initialize the LRU cache with positive size capacity.
+- int get(int key) Return the value of the key if the key exists, otherwise return -1.
+- void put(int key, int value) Update the value of the key if the key exists. Otherwise, add the key-value pair to the cache. If the number of keys exceeds the capacity from this operation, evict the least recently used key.
+
+The functions get and put must each run in O(1) average time complexity.`,
+    examples: [
+      {
+        input: 'LRUCache(2); put(1,1); put(2,2); get(1); put(3,3); get(2)',
+        output: '1, -1',
+        explanation: 'Cache is {1=1, 2=2}. get(1) returns 1. put(3,3) evicts key 2. get(2) returns -1 (not found).',
+      },
+    ],
+    constraints: [
+      '1 <= capacity <= 3000',
+      '0 <= key <= 10^4',
+      '0 <= value <= 10^5',
+      'At most 2 * 10^5 calls will be made to get and put',
+    ],
+    hints: [
+      'Use a HashMap for O(1) access',
+      'Use a Doubly Linked List to maintain order of use',
+      'Most recently used items should be at the front',
+    ],
+    starterCode: {
+      javascript: `class LRUCache {
+  constructor(capacity) {
+    // Your implementation
+  }
+
+  get(key) {
+    // Your implementation
+  }
+
+  put(key, value) {
+    // Your implementation
+  }
+}`,
+      typescript: `class LRUCache {
+  constructor(capacity: number) {
+    // Your implementation
+  }
+
+  get(key: number): number {
+    // Your implementation
+    return -1;
+  }
+
+  put(key: number, value: number): void {
+    // Your implementation
+  }
+}`,
+      python: `class LRUCache:
+    def __init__(self, capacity: int):
+        # Your implementation
+        pass
+
+    def get(self, key: int) -> int:
+        # Your implementation
+        return -1
+
+    def put(self, key: int, value: int) -> None:
+        # Your implementation
+        pass`,
+      java: `class LRUCache {
+    public LRUCache(int capacity) {
+        // Your implementation
+    }
+
+    public int get(int key) {
+        // Your implementation
+        return -1;
+    }
+
+    public void put(int key, int value) {
+        // Your implementation
+    }
+}`,
+      cpp: `class LRUCache {
+public:
+    LRUCache(int capacity) {
+        // Your implementation
+    }
+
+    int get(int key) {
+        // Your implementation
+        return -1;
+    }
+
+    void put(int key, int value) {
+        // Your implementation
+    }
+};`,
+      csharp: `public class LRUCache {
+    public LRUCache(int capacity) {
+        // Your implementation
+    }
+
+    public int Get(int key) {
+        // Your implementation
+        return -1;
+    }
+
+    public void Put(int key, int value) {
+        // Your implementation
+    }
+}`,
+      go: `type LRUCache struct {
+    // Your implementation
+}
+
+func Constructor(capacity int) LRUCache {
+    // Your implementation
+    return LRUCache{}
+}
+
+func (this *LRUCache) Get(key int) int {
+    // Your implementation
+    return -1
+}
+
+func (this *LRUCache) Put(key int, value int) {
+    // Your implementation
+}`,
+      rust: `struct LRUCache {
+    // Your implementation
+}
+
+impl LRUCache {
+    fn new(capacity: i32) -> Self {
+        // Your implementation
+        LRUCache {}
+    }
+
+    fn get(&self, key: i32) -> i32 {
+        // Your implementation
+        -1
+    }
+
+    fn put(&mut self, key: i32, value: i32) {
+        // Your implementation
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(1)',
+      space: 'O(capacity)',
+    },
+    testCases: [
+      {
+        input: { operations: ['LRUCache', 'put', 'put', 'get', 'put', 'get', 'put', 'get', 'get', 'get'], values: [[2], [1,1], [2,2], [1], [3,3], [2], [4,4], [1], [3], [4]] },
+        expected: [null, null, null, 1, null, -1, null, -1, 3, 4],
+        description: 'Basic LRU operations with capacity 2',
+      },
+    ],
+  },
+  {
+    id: 'dsa-trapping-rain-water',
+    title: 'Trapping Rain Water',
+    type: 'dsa',
+    difficulty: 'hard',
+    companies: ['Google', 'Meta', 'Amazon', 'Microsoft'],
+    description: 'Calculate how much water can be trapped after raining given an elevation map',
+    tags: ['array', 'two-pointers', 'dynamic-programming', 'stack'],
+    estimatedTime: 30,
+    problemStatement: `Given n non-negative integers representing an elevation map where the width of each bar is 1, compute how much water it can trap after raining.`,
+    examples: [
+      {
+        input: 'height = [0,1,0,2,1,0,1,3,2,1,2,1]',
+        output: '6',
+        explanation: 'The elevation map traps 6 units of rain water.',
+      },
+      {
+        input: 'height = [4,2,0,3,2,5]',
+        output: '9',
+      },
+    ],
+    constraints: [
+      'n == height.length',
+      '1 <= n <= 2 * 10^4',
+      '0 <= height[i] <= 10^5',
+    ],
+    hints: [
+      'For each position, water level is determined by min(max_left, max_right) - height[i]',
+      'Use two pointers from both ends',
+      'Track the maximum heights seen so far from left and right',
+    ],
+    starterCode: {
+      javascript: `function trap(height) {
+  // Write your solution here
+
+}`,
+      typescript: `function trap(height: number[]): number {
+  // Write your solution here
+
+}`,
+      python: `def trap(height):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public int trap(int[] height) {
+        // Write your solution here
+        return 0;
+    }
+}`,
+      cpp: `class Solution {
+public:
+    int trap(vector<int>& height) {
+        // Write your solution here
+        return 0;
+    }
+};`,
+      csharp: `public class Solution {
+    public int Trap(int[] height) {
+        // Write your solution here
+        return 0;
+    }
+}`,
+      go: `func trap(height []int) int {
+    // Write your solution here
+    return 0
+}`,
+      rust: `impl Solution {
+    pub fn trap(height: Vec<i32>) -> i32 {
+        // Write your solution here
+        0
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(1)',
+    },
+    testCases: [
+      {
+        input: { height: [0,1,0,2,1,0,1,3,2,1,2,1] },
+        expected: 6,
+        description: 'Example 1: Complex elevation',
+      },
+      {
+        input: { height: [4,2,0,3,2,5] },
+        expected: 9,
+        description: 'Example 2: Another pattern',
+      },
+      {
+        input: { height: [4,2,3] },
+        expected: 1,
+        description: 'Small array with single trap',
+      },
+      {
+        input: { height: [5,4,3,2,1] },
+        expected: 0,
+        description: 'Descending - no water trapped',
+      },
+    ],
+  },
+  {
+    id: 'dsa-min-stack',
+    title: 'Min Stack',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Microsoft', 'Apple', 'Meta'],
+    description: 'Design a stack that supports push, pop, top, and retrieving the minimum element in constant time',
+    tags: ['stack', 'design'],
+    estimatedTime: 20,
+    problemStatement: `Design a stack that supports push, pop, top, and retrieving the minimum element in constant time.
+
+Implement the MinStack class:
+- MinStack() initializes the stack object.
+- void push(int val) pushes the element val onto the stack.
+- void pop() removes the element on the top of the stack.
+- int top() gets the top element of the stack.
+- int getMin() retrieves the minimum element in the stack.
+
+You must implement a solution with O(1) time complexity for each function.`,
+    examples: [
+      {
+        input: 'MinStack(); push(-2); push(0); push(-3); getMin(); pop(); top(); getMin()',
+        output: '-3, 0, -2',
+        explanation: 'getMin() returns -3. After pop, top is 0 and min is -2.',
+      },
+    ],
+    constraints: [
+      '-2^31 <= val <= 2^31 - 1',
+      'Methods pop, top and getMin will always be called on non-empty stacks',
+      'At most 3 * 10^4 calls will be made to push, pop, top, and getMin',
+    ],
+    hints: [
+      'Use two stacks: one for values, one for minimums',
+      'When pushing, also track the current minimum',
+      'When popping, update the minimum accordingly',
+    ],
+    starterCode: {
+      javascript: `class MinStack {
+  constructor() {
+    // Your implementation
+  }
+
+  push(val) {
+    // Your implementation
+  }
+
+  pop() {
+    // Your implementation
+  }
+
+  top() {
+    // Your implementation
+  }
+
+  getMin() {
+    // Your implementation
+  }
+}`,
+      typescript: `class MinStack {
+  constructor() {
+    // Your implementation
+  }
+
+  push(val: number): void {
+    // Your implementation
+  }
+
+  pop(): void {
+    // Your implementation
+  }
+
+  top(): number {
+    // Your implementation
+    return 0;
+  }
+
+  getMin(): number {
+    // Your implementation
+    return 0;
+  }
+}`,
+      python: `class MinStack:
+    def __init__(self):
+        # Your implementation
+        pass
+
+    def push(self, val: int) -> None:
+        # Your implementation
+        pass
+
+    def pop(self) -> None:
+        # Your implementation
+        pass
+
+    def top(self) -> int:
+        # Your implementation
+        return 0
+
+    def getMin(self) -> int:
+        # Your implementation
+        return 0`,
+      java: `class MinStack {
+    public MinStack() {
+        // Your implementation
+    }
+
+    public void push(int val) {
+        // Your implementation
+    }
+
+    public void pop() {
+        // Your implementation
+    }
+
+    public int top() {
+        // Your implementation
+        return 0;
+    }
+
+    public int getMin() {
+        // Your implementation
+        return 0;
+    }
+}`,
+      cpp: `class MinStack {
+public:
+    MinStack() {
+        // Your implementation
+    }
+
+    void push(int val) {
+        // Your implementation
+    }
+
+    void pop() {
+        // Your implementation
+    }
+
+    int top() {
+        // Your implementation
+        return 0;
+    }
+
+    int getMin() {
+        // Your implementation
+        return 0;
+    }
+};`,
+      csharp: `public class MinStack {
+    public MinStack() {
+        // Your implementation
+    }
+
+    public void Push(int val) {
+        // Your implementation
+    }
+
+    public void Pop() {
+        // Your implementation
+    }
+
+    public int Top() {
+        // Your implementation
+        return 0;
+    }
+
+    public int GetMin() {
+        // Your implementation
+        return 0;
+    }
+}`,
+      go: `type MinStack struct {
+    // Your implementation
+}
+
+func Constructor() MinStack {
+    // Your implementation
+    return MinStack{}
+}
+
+func (this *MinStack) Push(val int) {
+    // Your implementation
+}
+
+func (this *MinStack) Pop() {
+    // Your implementation
+}
+
+func (this *MinStack) Top() int {
+    // Your implementation
+    return 0
+}
+
+func (this *MinStack) GetMin() int {
+    // Your implementation
+    return 0
+}`,
+      rust: `struct MinStack {
+    // Your implementation
+}
+
+impl MinStack {
+    fn new() -> Self {
+        // Your implementation
+        MinStack {}
+    }
+
+    fn push(&mut self, val: i32) {
+        // Your implementation
+    }
+
+    fn pop(&mut self) {
+        // Your implementation
+    }
+
+    fn top(&self) -> i32 {
+        // Your implementation
+        0
+    }
+
+    fn get_min(&self) -> i32 {
+        // Your implementation
+        0
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(1)',
+      space: 'O(n)',
+    },
+    testCases: [
+      {
+        input: { operations: ['MinStack', 'push', 'push', 'push', 'getMin', 'pop', 'top', 'getMin'], values: [[], [-2], [0], [-3], [], [], [], []] },
+        expected: [null, null, null, null, -3, null, 0, -2],
+        description: 'Basic min stack operations',
+      },
+    ],
+  },
+  {
+    id: 'dsa-course-schedule',
+    title: 'Course Schedule',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Meta', 'Google', 'Microsoft'],
+    description: 'Determine if you can finish all courses given prerequisites',
+    tags: ['graph', 'topological-sort', 'dfs', 'bfs'],
+    estimatedTime: 25,
+    problemStatement: `There are a total of numCourses courses you have to take, labeled from 0 to numCourses - 1. You are given an array prerequisites where prerequisites[i] = [ai, bi] indicates that you must take course bi first if you want to take course ai.
+
+For example, the pair [0, 1], indicates that to take course 0 you have to first take course 1.
+
+Return true if you can finish all courses. Otherwise, return false.`,
+    examples: [
+      {
+        input: 'numCourses = 2, prerequisites = [[1,0]]',
+        output: 'true',
+        explanation: 'Take course 0, then course 1.',
+      },
+      {
+        input: 'numCourses = 2, prerequisites = [[1,0],[0,1]]',
+        output: 'false',
+        explanation: 'To take course 1 you need course 0, and vice versa. Cycle detected.',
+      },
+    ],
+    constraints: [
+      '1 <= numCourses <= 2000',
+      '0 <= prerequisites.length <= 5000',
+      'prerequisites[i].length == 2',
+      '0 <= ai, bi < numCourses',
+      'All pairs prerequisites[i] are unique',
+    ],
+    hints: [
+      'This problem is equivalent to detecting a cycle in a directed graph',
+      'Use topological sorting (Kahn\'s algorithm or DFS)',
+      'Track visited nodes and nodes in current path',
+    ],
+    starterCode: {
+      javascript: `function canFinish(numCourses, prerequisites) {
+  // Write your solution here
+
+}`,
+      typescript: `function canFinish(numCourses: number, prerequisites: number[][]): boolean {
+  // Write your solution here
+
+}`,
+      python: `def canFinish(numCourses, prerequisites):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public boolean canFinish(int numCourses, int[][] prerequisites) {
+        // Write your solution here
+        return true;
+    }
+}`,
+      cpp: `class Solution {
+public:
+    bool canFinish(int numCourses, vector<vector<int>>& prerequisites) {
+        // Write your solution here
+        return true;
+    }
+};`,
+      csharp: `public class Solution {
+    public bool CanFinish(int numCourses, int[][] prerequisites) {
+        // Write your solution here
+        return true;
+    }
+}`,
+      go: `func canFinish(numCourses int, prerequisites [][]int) bool {
+    // Write your solution here
+    return true
+}`,
+      rust: `impl Solution {
+    pub fn can_finish(num_courses: i32, prerequisites: Vec<Vec<i32>>) -> bool {
+        // Write your solution here
+        true
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(V + E)',
+      space: 'O(V + E)',
+    },
+    testCases: [
+      {
+        input: { numCourses: 2, prerequisites: [[1,0]] },
+        expected: true,
+        description: 'Simple linear dependency',
+      },
+      {
+        input: { numCourses: 2, prerequisites: [[1,0],[0,1]] },
+        expected: false,
+        description: 'Cycle detected',
+      },
+      {
+        input: { numCourses: 4, prerequisites: [[1,0],[2,0],[3,1],[3,2]] },
+        expected: true,
+        description: 'Multiple dependencies, no cycle',
+      },
+      {
+        input: { numCourses: 3, prerequisites: [[0,1],[1,2],[2,0]] },
+        expected: false,
+        description: 'Three-node cycle',
+      },
+    ],
+  },
+  {
+    id: 'dsa-kth-largest-element',
+    title: 'Kth Largest Element in an Array',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Meta', 'Google', 'Apple'],
+    description: 'Find the kth largest element in an unsorted array',
+    tags: ['array', 'heap', 'quickselect', 'sorting'],
+    estimatedTime: 20,
+    problemStatement: `Given an integer array nums and an integer k, return the kth largest element in the array.
+
+Note that it is the kth largest element in the sorted order, not the kth distinct element.
+
+Can you solve it without sorting?`,
+    examples: [
+      {
+        input: 'nums = [3,2,1,5,6,4], k = 2',
+        output: '5',
+        explanation: 'The second largest element is 5.',
+      },
+      {
+        input: 'nums = [3,2,3,1,2,4,5,5,6], k = 4',
+        output: '4',
+        explanation: 'The fourth largest element is 4.',
+      },
+    ],
+    constraints: [
+      '1 <= k <= nums.length <= 10^5',
+      '-10^4 <= nums[i] <= 10^4',
+    ],
+    hints: [
+      'Use a min heap of size k',
+      'Alternative: QuickSelect algorithm for O(n) average time',
+      'Keep only k largest elements in the heap',
+    ],
+    starterCode: {
+      javascript: `function findKthLargest(nums, k) {
+  // Write your solution here
+
+}`,
+      typescript: `function findKthLargest(nums: number[], k: number): number {
+  // Write your solution here
+
+}`,
+      python: `def findKthLargest(nums, k):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public int findKthLargest(int[] nums, int k) {
+        // Write your solution here
+        return 0;
+    }
+}`,
+      cpp: `class Solution {
+public:
+    int findKthLargest(vector<int>& nums, int k) {
+        // Write your solution here
+        return 0;
+    }
+};`,
+      csharp: `public class Solution {
+    public int FindKthLargest(int[] nums, int k) {
+        // Write your solution here
+        return 0;
+    }
+}`,
+      go: `func findKthLargest(nums []int, k int) int {
+    // Write your solution here
+    return 0
+}`,
+      rust: `impl Solution {
+    pub fn find_kth_largest(nums: Vec<i32>, k: i32) -> i32 {
+        // Write your solution here
+        0
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(1)',
+    },
+    testCases: [
+      {
+        input: { nums: [3,2,1,5,6,4], k: 2 },
+        expected: 5,
+        description: 'Basic case: k=2',
+      },
+      {
+        input: { nums: [3,2,3,1,2,4,5,5,6], k: 4 },
+        expected: 4,
+        description: 'Array with duplicates',
+      },
+      {
+        input: { nums: [1], k: 1 },
+        expected: 1,
+        description: 'Single element',
+      },
+      {
+        input: { nums: [7,6,5,4,3,2,1], k: 5 },
+        expected: 3,
+        description: 'Descending array',
+      },
+    ],
+  },
+  {
+    id: 'dsa-word-search',
+    title: 'Word Search',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Meta', 'Microsoft', 'Apple'],
+    description: 'Search for a word in a 2D board using backtracking',
+    tags: ['array', 'backtracking', 'matrix'],
+    estimatedTime: 25,
+    problemStatement: `Given an m x n grid of characters board and a string word, return true if word exists in the grid.
+
+The word can be constructed from letters of sequentially adjacent cells, where adjacent cells are horizontally or vertically neighboring. The same letter cell may not be used more than once.`,
+    examples: [
+      {
+        input: 'board = [["A","B","C","E"],["S","F","C","S"],["A","D","E","E"]], word = "ABCCED"',
+        output: 'true',
+      },
+      {
+        input: 'board = [["A","B","C","E"],["S","F","C","S"],["A","D","E","E"]], word = "SEE"',
+        output: 'true',
+      },
+      {
+        input: 'board = [["A","B","C","E"],["S","F","C","S"],["A","D","E","E"]], word = "ABCB"',
+        output: 'false',
+      },
+    ],
+    constraints: [
+      'm == board.length',
+      'n = board[i].length',
+      '1 <= m, n <= 6',
+      '1 <= word.length <= 15',
+      'board and word consists of only lowercase and uppercase English letters',
+    ],
+    hints: [
+      'Use backtracking to explore all paths',
+      'Mark visited cells temporarily to avoid reuse',
+      'Restore state after each recursive call',
+    ],
+    starterCode: {
+      javascript: `function exist(board, word) {
+  // Write your solution here
+
+}`,
+      typescript: `function exist(board: string[][], word: string): boolean {
+  // Write your solution here
+
+}`,
+      python: `def exist(board, word):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public boolean exist(char[][] board, String word) {
+        // Write your solution here
+        return false;
+    }
+}`,
+      cpp: `class Solution {
+public:
+    bool exist(vector<vector<char>>& board, string word) {
+        // Write your solution here
+        return false;
+    }
+};`,
+      csharp: `public class Solution {
+    public bool Exist(char[][] board, string word) {
+        // Write your solution here
+        return false;
+    }
+}`,
+      go: `func exist(board [][]byte, word string) bool {
+    // Write your solution here
+    return false
+}`,
+      rust: `impl Solution {
+    pub fn exist(board: Vec<Vec<char>>, word: String) -> bool {
+        // Write your solution here
+        false
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(m * n * 4^L)',
+      space: 'O(L)',
+    },
+    testCases: [
+      {
+        input: { board: [["A","B","C","E"],["S","F","C","S"],["A","D","E","E"]], word: "ABCCED" },
+        expected: true,
+        description: 'Word exists in board',
+      },
+      {
+        input: { board: [["A","B","C","E"],["S","F","C","S"],["A","D","E","E"]], word: "SEE" },
+        expected: true,
+        description: 'Short word exists',
+      },
+      {
+        input: { board: [["A","B","C","E"],["S","F","C","S"],["A","D","E","E"]], word: "ABCB" },
+        expected: false,
+        description: 'Word does not exist (would require reusing cell)',
+      },
+    ],
+  },
+  {
+    id: 'dsa-longest-increasing-subsequence',
+    title: 'Longest Increasing Subsequence',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ['Google', 'Amazon', 'Microsoft', 'Meta'],
+    description: 'Find the length of the longest strictly increasing subsequence',
+    tags: ['array', 'binary-search', 'dynamic-programming'],
+    estimatedTime: 25,
+    problemStatement: `Given an integer array nums, return the length of the longest strictly increasing subsequence.
+
+A subsequence is a sequence that can be derived from an array by deleting some or no elements without changing the order of the remaining elements.`,
+    examples: [
+      {
+        input: 'nums = [10,9,2,5,3,7,101,18]',
+        output: '4',
+        explanation: 'The longest increasing subsequence is [2,3,7,101], therefore the length is 4.',
+      },
+      {
+        input: 'nums = [0,1,0,3,2,3]',
+        output: '4',
+      },
+      {
+        input: 'nums = [7,7,7,7,7,7,7]',
+        output: '1',
+      },
+    ],
+    constraints: [
+      '1 <= nums.length <= 2500',
+      '-10^4 <= nums[i] <= 10^4',
+    ],
+    hints: [
+      'DP solution: dp[i] = length of longest subsequence ending at i',
+      'For better complexity, use binary search with patience sorting',
+      'Maintain array of smallest tail elements for each length',
+    ],
+    starterCode: {
+      javascript: `function lengthOfLIS(nums) {
+  // Write your solution here
+
+}`,
+      typescript: `function lengthOfLIS(nums: number[]): number {
+  // Write your solution here
+
+}`,
+      python: `def lengthOfLIS(nums):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public int lengthOfLIS(int[] nums) {
+        // Write your solution here
+        return 0;
+    }
+}`,
+      cpp: `class Solution {
+public:
+    int lengthOfLIS(vector<int>& nums) {
+        // Write your solution here
+        return 0;
+    }
+};`,
+      csharp: `public class Solution {
+    public int LengthOfLIS(int[] nums) {
+        // Write your solution here
+        return 0;
+    }
+}`,
+      go: `func lengthOfLIS(nums []int) int {
+    // Write your solution here
+    return 0
+}`,
+      rust: `impl Solution {
+    pub fn length_of_lis(nums: Vec<i32>) -> i32 {
+        // Write your solution here
+        0
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n log n)',
+      space: 'O(n)',
+    },
+    testCases: [
+      {
+        input: { nums: [10,9,2,5,3,7,101,18] },
+        expected: 4,
+        description: 'Example with multiple subsequences',
+      },
+      {
+        input: { nums: [0,1,0,3,2,3] },
+        expected: 4,
+        description: 'Subsequence with duplicates nearby',
+      },
+      {
+        input: { nums: [7,7,7,7,7,7,7] },
+        expected: 1,
+        description: 'All same elements',
+      },
+      {
+        input: { nums: [1,3,6,7,9,4,10,5,6] },
+        expected: 6,
+        description: 'Complex pattern',
+      },
+    ],
+  },
+  {
+    id: 'dsa-rotate-image',
+    title: 'Rotate Image',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Apple', 'Microsoft', 'Meta'],
+    description: 'Rotate an N x N 2D matrix by 90 degrees clockwise in-place',
+    tags: ['array', 'matrix', 'math'],
+    estimatedTime: 20,
+    problemStatement: `You are given an n x n 2D matrix representing an image, rotate the image by 90 degrees (clockwise).
+
+You have to rotate the image in-place, which means you have to modify the input 2D matrix directly. DO NOT allocate another 2D matrix and do the rotation.`,
+    examples: [
+      {
+        input: 'matrix = [[1,2,3],[4,5,6],[7,8,9]]',
+        output: '[[7,4,1],[8,5,2],[9,6,3]]',
+      },
+      {
+        input: 'matrix = [[5,1,9,11],[2,4,8,10],[13,3,6,7],[15,14,12,16]]',
+        output: '[[15,13,2,5],[14,3,4,1],[12,6,8,9],[16,7,10,11]]',
+      },
+    ],
+    constraints: [
+      'n == matrix.length == matrix[i].length',
+      '1 <= n <= 20',
+      '-1000 <= matrix[i][j] <= 1000',
+    ],
+    hints: [
+      'Transpose the matrix first (swap rows and columns)',
+      'Then reverse each row',
+      'Alternative: Rotate in layers from outside to inside',
+    ],
+    starterCode: {
+      javascript: `function rotate(matrix) {
+  // Write your solution here (modify matrix in-place)
+
+}`,
+      typescript: `function rotate(matrix: number[][]): void {
+  // Write your solution here (modify matrix in-place)
+
+}`,
+      python: `def rotate(matrix):
+    # Write your solution here (modify matrix in-place)
+    pass`,
+      java: `class Solution {
+    public void rotate(int[][] matrix) {
+        // Write your solution here
+    }
+}`,
+      cpp: `class Solution {
+public:
+    void rotate(vector<vector<int>>& matrix) {
+        // Write your solution here
+    }
+};`,
+      csharp: `public class Solution {
+    public void Rotate(int[][] matrix) {
+        // Write your solution here
+    }
+}`,
+      go: `func rotate(matrix [][]int) {
+    // Write your solution here
+}`,
+      rust: `impl Solution {
+    pub fn rotate(matrix: &mut Vec<Vec<i32>>) {
+        // Write your solution here
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n^2)',
+      space: 'O(1)',
+    },
+    testCases: [
+      {
+        input: { matrix: [[1,2,3],[4,5,6],[7,8,9]] },
+        expected: [[7,4,1],[8,5,2],[9,6,3]],
+        description: '3x3 matrix rotation',
+      },
+      {
+        input: { matrix: [[1]] },
+        expected: [[1]],
+        description: '1x1 matrix',
+      },
+      {
+        input: { matrix: [[1,2],[3,4]] },
+        expected: [[3,1],[4,2]],
+        description: '2x2 matrix',
+      },
+    ],
+  },
+  {
+    id: 'dsa-combination-sum',
+    title: 'Combination Sum',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Meta', 'Apple', 'Google'],
+    description: 'Find all unique combinations that sum to a target',
+    tags: ['array', 'backtracking'],
+    estimatedTime: 25,
+    problemStatement: `Given an array of distinct integers candidates and a target integer target, return a list of all unique combinations of candidates where the chosen numbers sum to target. You may return the combinations in any order.
+
+The same number may be chosen from candidates an unlimited number of times. Two combinations are unique if the frequency of at least one of the chosen numbers is different.
+
+The test cases are generated such that the number of unique combinations that sum up to target is less than 150 combinations for the given input.`,
+    examples: [
+      {
+        input: 'candidates = [2,3,6,7], target = 7',
+        output: '[[2,2,3],[7]]',
+        explanation: '2+2+3=7 and 7=7 are the only combinations.',
+      },
+      {
+        input: 'candidates = [2,3,5], target = 8',
+        output: '[[2,2,2,2],[2,3,3],[3,5]]',
+      },
+    ],
+    constraints: [
+      '1 <= candidates.length <= 30',
+      '2 <= candidates[i] <= 40',
+      'All elements of candidates are distinct',
+      '1 <= target <= 40',
+    ],
+    hints: [
+      'Use backtracking to explore all combinations',
+      'For each candidate, decide to include it 0 or more times',
+      'Prune branches where sum exceeds target',
+    ],
+    starterCode: {
+      javascript: `function combinationSum(candidates, target) {
+  // Write your solution here
+
+}`,
+      typescript: `function combinationSum(candidates: number[], target: number): number[][] {
+  // Write your solution here
+
+}`,
+      python: `def combinationSum(candidates, target):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public List<List<Integer>> combinationSum(int[] candidates, int target) {
+        // Write your solution here
+        return new ArrayList<>();
+    }
+}`,
+      cpp: `class Solution {
+public:
+    vector<vector<int>> combinationSum(vector<int>& candidates, int target) {
+        // Write your solution here
+        return {};
+    }
+};`,
+      csharp: `public class Solution {
+    public IList<IList<int>> CombinationSum(int[] candidates, int target) {
+        // Write your solution here
+        return new List<IList<int>>();
+    }
+}`,
+      go: `func combinationSum(candidates []int, target int) [][]int {
+    // Write your solution here
+    return [][]int{}
+}`,
+      rust: `impl Solution {
+    pub fn combination_sum(candidates: Vec<i32>, target: i32) -> Vec<Vec<i32>> {
+        // Write your solution here
+        vec![]
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(N^(T/M))',
+      space: 'O(T/M)',
+    },
+    testCases: [
+      {
+        input: { candidates: [2,3,6,7], target: 7 },
+        expected: [[2,2,3],[7]],
+        description: 'Basic combination sum',
+      },
+      {
+        input: { candidates: [2,3,5], target: 8 },
+        expected: [[2,2,2,2],[2,3,3],[3,5]],
+        description: 'Multiple combinations',
+      },
+      {
+        input: { candidates: [2], target: 1 },
+        expected: [],
+        description: 'No valid combinations',
+      },
+    ],
+  },
+  {
+    id: 'dsa-search-rotated-sorted-array',
+    title: 'Search in Rotated Sorted Array',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Meta', 'Microsoft', 'Google'],
+    description: 'Search for a target value in a rotated sorted array',
+    tags: ['array', 'binary-search'],
+    estimatedTime: 20,
+    problemStatement: `There is an integer array nums sorted in ascending order (with distinct values).
+
+Prior to being passed to your function, nums is possibly rotated at an unknown pivot index k (1 <= k < nums.length) such that the resulting array is [nums[k], nums[k+1], ..., nums[n-1], nums[0], nums[1], ..., nums[k-1]] (0-indexed). For example, [0,1,2,4,5,6,7] might be rotated at pivot index 3 and become [4,5,6,7,0,1,2].
+
+Given the array nums after the possible rotation and an integer target, return the index of target if it is in nums, or -1 if it is not in nums.
+
+You must write an algorithm with O(log n) runtime complexity.`,
+    examples: [
+      {
+        input: 'nums = [4,5,6,7,0,1,2], target = 0',
+        output: '4',
+      },
+      {
+        input: 'nums = [4,5,6,7,0,1,2], target = 3',
+        output: '-1',
+      },
+      {
+        input: 'nums = [1], target = 0',
+        output: '-1',
+      },
+    ],
+    constraints: [
+      '1 <= nums.length <= 5000',
+      '-10^4 <= nums[i] <= 10^4',
+      'All values of nums are unique',
+      'nums is an ascending array that is possibly rotated',
+      '-10^4 <= target <= 10^4',
+    ],
+    hints: [
+      'Use modified binary search',
+      'Determine which half is sorted, then decide which half to search',
+      'Check if target is in the sorted half range',
+    ],
+    starterCode: {
+      javascript: `function search(nums, target) {
+  // Write your solution here
+
+}`,
+      typescript: `function search(nums: number[], target: number): number {
+  // Write your solution here
+
+}`,
+      python: `def search(nums, target):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public int search(int[] nums, int target) {
+        // Write your solution here
+        return -1;
+    }
+}`,
+      cpp: `class Solution {
+public:
+    int search(vector<int>& nums, int target) {
+        // Write your solution here
+        return -1;
+    }
+};`,
+      csharp: `public class Solution {
+    public int Search(int[] nums, int target) {
+        // Write your solution here
+        return -1;
+    }
+}`,
+      go: `func search(nums []int, target int) int {
+    // Write your solution here
+    return -1
+}`,
+      rust: `impl Solution {
+    pub fn search(nums: Vec<i32>, target: i32) -> i32 {
+        // Write your solution here
+        -1
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(log n)',
+      space: 'O(1)',
+    },
+    testCases: [
+      {
+        input: { nums: [4,5,6,7,0,1,2], target: 0 },
+        expected: 4,
+        description: 'Target in rotated section',
+      },
+      {
+        input: { nums: [4,5,6,7,0,1,2], target: 3 },
+        expected: -1,
+        description: 'Target not in array',
+      },
+      {
+        input: { nums: [1], target: 0 },
+        expected: -1,
+        description: 'Single element, not found',
+      },
+      {
+        input: { nums: [1], target: 1 },
+        expected: 0,
+        description: 'Single element, found',
+      },
+      {
+        input: { nums: [5,1,3], target: 5 },
+        expected: 0,
+        description: 'Small rotated array',
+      },
+    ],
+  },
   // ==================== Bug Fix Scenarios ====================
   {
     id: 'bugfix-off-by-one-array',
@@ -9878,6 +11108,534 @@ public class ErrorHandlingTest {
       {
         input: 'Database connection failure',
         expected: '500 error without exposing internal details',
+      },
+    ],
+  },
+  {
+    id: 'bugfix-react-hook-dependency',
+    title: 'React useEffect Dependency Bug',
+    type: 'bugfix',
+    difficulty: 'medium',
+    companies: ['Meta', 'Airbnb', 'Netflix', 'Google'],
+    description: 'Fix missing dependencies in useEffect causing stale closures and infinite loops',
+    tags: ['react', 'hooks', 'closure', 'dependencies'],
+    estimatedTime: 20,
+    problemStatement: `A React component has a useEffect hook with missing dependencies, causing stale closures and unexpected behavior. The component fetches user data but shows outdated information when the user ID changes.`,
+    buggyCode: {
+      javascript: `import { useState, useEffect } from 'react';
+
+function UserProfile({ userId }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // BUG: Missing userId in dependency array
+  useEffect(() => {
+    setLoading(true);
+    fetch(\`/api/users/\${userId}\`)
+      .then(res => res.json())
+      .then(data => {
+        setUser(data);
+        setLoading(false);
+      });
+  }, []); // BUG: Empty dependency array
+
+  if (loading) return <div>Loading...</div>;
+  if (!user) return <div>No user</div>;
+
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      <p>ID: {user.id}</p>
+    </div>
+  );
+}`,
+      typescript: `import { useState, useEffect } from 'react';
+
+interface User {
+  id: number;
+  name: string;
+}
+
+interface UserProfileProps {
+  userId: number;
+}
+
+function UserProfile({ userId }: UserProfileProps) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // BUG: Missing userId in dependency array
+  useEffect(() => {
+    setLoading(true);
+    fetch(\`/api/users/\${userId}\`)
+      .then(res => res.json())
+      .then(data => {
+        setUser(data);
+        setLoading(false);
+      });
+  }, []); // BUG: Empty dependency array
+
+  if (loading) return <div>Loading...</div>;
+  if (!user) return <div>No user</div>;
+
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      <p>ID: {user.id}</p>
+    </div>
+  );
+}`,
+    },
+    codebaseFiles: {
+      javascript: [
+        {
+          fileName: 'App.jsx',
+          content: `import { useState } from 'react';
+import UserProfile from './UserProfile';
+
+function App() {
+  const [currentUserId, setCurrentUserId] = useState(1);
+
+  return (
+    <div>
+      <button onClick={() => setCurrentUserId(1)}>User 1</button>
+      <button onClick={() => setCurrentUserId(2)}>User 2</button>
+      <button onClick={() => setCurrentUserId(3)}>User 3</button>
+      <UserProfile userId={currentUserId} />
+    </div>
+  );
+}`,
+          description: 'Parent component that changes user ID',
+        },
+      ],
+      typescript: [
+        {
+          fileName: 'App.tsx',
+          content: `import { useState } from 'react';
+import UserProfile from './UserProfile';
+
+function App() {
+  const [currentUserId, setCurrentUserId] = useState(1);
+
+  return (
+    <div>
+      <button onClick={() => setCurrentUserId(1)}>User 1</button>
+      <button onClick={() => setCurrentUserId(2)}>User 2</button>
+      <button onClick={() => setCurrentUserId(3)}>User 3</button>
+      <UserProfile userId={currentUserId} />
+    </div>
+  );
+}`,
+          description: 'Parent component that changes user ID',
+        },
+      ],
+    },
+    expectedBehavior: 'When userId prop changes, the component should fetch and display the new user data',
+    bugDescription: 'The useEffect has an empty dependency array, so it only runs once on mount. When userId changes, the effect doesn\'t re-run, showing stale data.',
+    hints: [
+      'Add userId to the useEffect dependency array',
+      'Consider adding cleanup function to cancel pending requests',
+      'Use AbortController to prevent race conditions',
+    ],
+    testCases: [
+      {
+        input: 'userId changes from 1 to 2',
+        expected: 'Component fetches and displays user 2 data',
+      },
+      {
+        input: 'Rapid userId changes',
+        expected: 'Only the latest user data is displayed (no race conditions)',
+      },
+    ],
+  },
+  {
+    id: 'bugfix-sql-injection',
+    title: 'SQL Injection Vulnerability',
+    type: 'bugfix',
+    difficulty: 'hard',
+    companies: ['Amazon', 'Google', 'Microsoft', 'Shopify'],
+    description: 'Fix SQL injection vulnerabilities in database queries',
+    tags: ['security', 'sql', 'injection', 'database'],
+    estimatedTime: 25,
+    problemStatement: `An API endpoint for searching products has a SQL injection vulnerability. User input is directly concatenated into SQL queries, allowing attackers to execute malicious SQL commands.`,
+    buggyCode: {
+      javascript: `const express = require('express');
+const mysql = require('mysql');
+const app = express();
+
+const connection = mysql.createConnection({
+  host: 'localhost',
+  user: 'root',
+  password: 'password',
+  database: 'shop'
+});
+
+// BUG: SQL Injection vulnerability
+app.get('/products/search', (req, res) => {
+  const searchTerm = req.query.q;
+  const category = req.query.category;
+
+  // BUG: Direct string concatenation
+  const query = \`SELECT * FROM products WHERE name LIKE '%\${searchTerm}%' AND category = '\${category}'\`;
+
+  connection.query(query, (error, results) => {
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+    res.json(results);
+  });
+});
+
+// BUG: Another injection point
+app.get('/users/:id', (req, res) => {
+  const userId = req.params.id;
+
+  // BUG: Direct interpolation in query
+  connection.query(\`SELECT * FROM users WHERE id = \${userId}\`, (error, results) => {
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+    res.json(results[0]);
+  });
+});`,
+      typescript: `import express from 'express';
+import mysql from 'mysql';
+
+const app = express();
+
+const connection = mysql.createConnection({
+  host: 'localhost',
+  user: 'root',
+  password: 'password',
+  database: 'shop'
+});
+
+// BUG: SQL Injection vulnerability
+app.get('/products/search', (req, res) => {
+  const searchTerm = req.query.q as string;
+  const category = req.query.category as string;
+
+  // BUG: Direct string concatenation
+  const query = \`SELECT * FROM products WHERE name LIKE '%\${searchTerm}%' AND category = '\${category}'\`;
+
+  connection.query(query, (error, results) => {
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+    res.json(results);
+  });
+});
+
+// BUG: Another injection point
+app.get('/users/:id', (req, res) => {
+  const userId = req.params.id;
+
+  // BUG: Direct interpolation in query
+  connection.query(\`SELECT * FROM users WHERE id = \${userId}\`, (error, results) => {
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+    res.json(results[0]);
+  });
+});`,
+      python: `from flask import Flask, request, jsonify
+import mysql.connector
+
+app = Flask(__name__)
+
+connection = mysql.connector.connect(
+    host='localhost',
+    user='root',
+    password='password',
+    database='shop'
+)
+
+# BUG: SQL Injection vulnerability
+@app.route('/products/search')
+def search_products():
+    search_term = request.args.get('q')
+    category = request.args.get('category')
+
+    # BUG: Direct string formatting
+    query = f"SELECT * FROM products WHERE name LIKE '%{search_term}%' AND category = '{category}'"
+
+    cursor = connection.cursor()
+    cursor.execute(query)  # BUG: Vulnerable query
+    results = cursor.fetchall()
+    return jsonify(results)
+
+# BUG: Another injection point
+@app.route('/users/<user_id>')
+def get_user(user_id):
+    # BUG: Direct interpolation
+    query = f"SELECT * FROM users WHERE id = {user_id}"
+
+    cursor = connection.cursor()
+    cursor.execute(query)  # BUG: Vulnerable query
+    result = cursor.fetchone()
+    return jsonify(result)`,
+    },
+    codebaseFiles: {
+      javascript: [
+        {
+          fileName: 'malicious-requests.txt',
+          content: `Example malicious requests:
+
+1. GET /products/search?q=laptop&category=' OR '1'='1
+   Result: Returns all products (bypasses category filter)
+
+2. GET /products/search?q='; DROP TABLE products; --&category=electronics
+   Result: Could delete the products table
+
+3. GET /users/1 OR 1=1
+   Result: Returns all users instead of just user 1
+
+4. GET /users/1 UNION SELECT username, password FROM admin_users
+   Result: Exposes sensitive data from other tables`,
+          description: 'Examples of SQL injection attacks',
+        },
+      ],
+      typescript: [
+        {
+          fileName: 'malicious-requests.txt',
+          content: `Example malicious requests:
+
+1. GET /products/search?q=laptop&category=' OR '1'='1
+   Result: Returns all products (bypasses category filter)
+
+2. GET /products/search?q='; DROP TABLE products; --&category=electronics
+   Result: Could delete the products table
+
+3. GET /users/1 OR 1=1
+   Result: Returns all users instead of just user 1`,
+          description: 'Examples of SQL injection attacks',
+        },
+      ],
+      python: [
+        {
+          fileName: 'malicious-requests.txt',
+          content: `Example malicious requests:
+
+1. GET /products/search?q=laptop&category=' OR '1'='1
+   Result: Returns all products (bypasses category filter)
+
+2. GET /products/search?q='; DROP TABLE products; --&category=electronics
+   Result: Could delete the products table`,
+          description: 'Examples of SQL injection attacks',
+        },
+      ],
+    },
+    expectedBehavior: 'All database queries should use parameterized statements to prevent SQL injection attacks',
+    bugDescription: 'User input is directly concatenated into SQL queries without sanitization or parameterization, allowing SQL injection attacks',
+    hints: [
+      'Use parameterized queries / prepared statements',
+      'Never concatenate user input directly into SQL',
+      'For JavaScript: use ? placeholders and pass values as array',
+      'For Python: use %s placeholders with tuple/list of values',
+      'Validate and sanitize input as defense-in-depth',
+    ],
+    testCases: [
+      {
+        input: 'Malicious category: \' OR \'1\'=\'1',
+        expected: 'Query safely escapes input, no injection occurs',
+      },
+      {
+        input: 'Search with special chars: O\'Reilly',
+        expected: 'Query handles apostrophes safely',
+      },
+    ],
+  },
+  {
+    id: 'bugfix-n-plus-one-query',
+    title: 'N+1 Query Problem',
+    type: 'bugfix',
+    difficulty: 'medium',
+    companies: ['Airbnb', 'Shopify', 'Amazon', 'Walmart'],
+    description: 'Fix N+1 database query problem causing performance issues',
+    tags: ['database', 'performance', 'orm', 'optimization'],
+    estimatedTime: 20,
+    problemStatement: `An API endpoint that returns a list of blog posts with their authors is experiencing severe performance issues. The code makes 1 query to fetch posts, then N additional queries to fetch each post's author (N+1 query problem).`,
+    buggyCode: {
+      javascript: `// Using Sequelize ORM
+const { Post, User } = require('./models');
+
+// BUG: N+1 Query Problem
+async function getBlogPosts(req, res) {
+  // Query 1: Fetch all posts
+  const posts = await Post.findAll();
+
+  // BUG: N additional queries (one per post)
+  const postsWithAuthors = await Promise.all(
+    posts.map(async (post) => {
+      // Query 2, 3, 4, ... N+1: Fetch author for each post
+      const author = await User.findByPk(post.userId);
+      return {
+        id: post.id,
+        title: post.title,
+        content: post.content,
+        author: {
+          id: author.id,
+          name: author.name,
+          email: author.email
+        }
+      };
+    })
+  );
+
+  res.json(postsWithAuthors);
+}
+
+// BUG: Similar issue with comments
+async function getPostWithComments(req, res) {
+  const post = await Post.findByPk(req.params.id);
+  const comments = await Comment.findAll({ where: { postId: post.id } });
+
+  // BUG: N+1 for comment authors
+  const commentsWithAuthors = await Promise.all(
+    comments.map(async (comment) => {
+      const author = await User.findByPk(comment.userId);
+      return { ...comment.toJSON(), author };
+    })
+  );
+
+  res.json({ ...post.toJSON(), comments: commentsWithAuthors });
+}`,
+      typescript: `// Using Prisma ORM
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+// BUG: N+1 Query Problem
+async function getBlogPosts(req, res) {
+  // Query 1: Fetch all posts
+  const posts = await prisma.post.findMany();
+
+  // BUG: N additional queries (one per post)
+  const postsWithAuthors = await Promise.all(
+    posts.map(async (post) => {
+      // Query 2, 3, 4, ... N+1: Fetch author for each post
+      const author = await prisma.user.findUnique({
+        where: { id: post.userId }
+      });
+      return {
+        ...post,
+        author
+      };
+    })
+  );
+
+  res.json(postsWithAuthors);
+}`,
+      python: `# Using Django ORM
+from django.http import JsonResponse
+from .models import Post, User
+
+# BUG: N+1 Query Problem
+def get_blog_posts(request):
+    # Query 1: Fetch all posts
+    posts = Post.objects.all()
+
+    # BUG: N additional queries (one per post)
+    posts_with_authors = []
+    for post in posts:
+        # Query 2, 3, 4, ... N+1: Fetch author for each post
+        author = User.objects.get(id=post.user_id)
+        posts_with_authors.append({
+            'id': post.id,
+            'title': post.title,
+            'content': post.content,
+            'author': {
+                'id': author.id,
+                'name': author.name,
+                'email': author.email
+            }
+        })
+
+    return JsonResponse(posts_with_authors, safe=False)`,
+    },
+    codebaseFiles: {
+      javascript: [
+        {
+          fileName: 'models.js',
+          content: `const { Sequelize, DataTypes } = require('sequelize');
+
+const Post = sequelize.define('Post', {
+  title: DataTypes.STRING,
+  content: DataTypes.TEXT,
+  userId: DataTypes.INTEGER
+});
+
+const User = sequelize.define('User', {
+  name: DataTypes.STRING,
+  email: DataTypes.STRING
+});
+
+const Comment = sequelize.define('Comment', {
+  content: DataTypes.TEXT,
+  postId: DataTypes.INTEGER,
+  userId: DataTypes.INTEGER
+});
+
+// Define associations
+Post.belongsTo(User, { foreignKey: 'userId', as: 'author' });
+Comment.belongsTo(User, { foreignKey: 'userId', as: 'author' });`,
+          description: 'Sequelize models with associations',
+        },
+      ],
+      typescript: [
+        {
+          fileName: 'schema.prisma',
+          content: `model Post {
+  id      Int    @id @default(autoincrement())
+  title   String
+  content String
+  userId  Int
+  author  User   @relation(fields: [userId], references: [id])
+}
+
+model User {
+  id    Int    @id @default(autoincrement())
+  name  String
+  email String
+  posts Post[]
+}`,
+          description: 'Prisma schema with relations',
+        },
+      ],
+      python: [
+        {
+          fileName: 'models.py',
+          content: `from django.db import models
+
+class User(models.Model):
+    name = models.CharField(max_length=200)
+    email = models.EmailField()
+
+class Post(models.Model):
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')`,
+          description: 'Django models with foreign keys',
+        },
+      ],
+    },
+    expectedBehavior: 'Should fetch all posts with their authors in a single query (or minimal queries) using eager loading/joins',
+    bugDescription: 'Makes 1 + N database queries: 1 for posts, then 1 for each post\'s author. With 100 posts, this means 101 queries instead of 1-2 queries.',
+    hints: [
+      'Use eager loading / include / joins to fetch related data',
+      'Sequelize: use include option in findAll',
+      'Prisma: use include in findMany',
+      'Django: use select_related or prefetch_related',
+      'Consider using DataLoader for GraphQL',
+    ],
+    testCases: [
+      {
+        input: '100 blog posts',
+        expected: '2-3 queries total instead of 101 queries',
+      },
+      {
+        input: 'Posts with comments and authors',
+        expected: 'Use nested eager loading to minimize queries',
       },
     ],
   },

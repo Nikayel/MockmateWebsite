@@ -841,8 +841,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     // Update session if it exists and was completed
     if (currentSessionId && (showFeedback || showPostInterviewDiscussion) && testSummary.total > 0) {
       try {
-        // Use performance score if available, otherwise use pass rate
-        const scoreToSave = performanceScore !== null ? performanceScore * 10 : testSummary.passRate
+        // Use performance score if available (already 0-100), otherwise use pass rate
+        const scoreToSave = performanceScore !== null ? performanceScore : testSummary.passRate
         await updateInterviewSession(
           currentSessionId,
           scoreToSave,
@@ -1115,7 +1115,24 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-4">
                   Select Interview Scenario
                 </h1>
-                <p className="text-xl text-gray-300">Choose a problem to practice</p>
+                <p className="text-xl text-gray-300 mb-6">Choose a problem to practice</p>
+                <div className="flex flex-wrap justify-center gap-4 text-sm">
+                  <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700">
+                    <div className="w-2 h-2 rounded-full bg-[#00d9ff]"></div>
+                    <span className="text-white font-semibold">{scenarios.filter(s => s.type === 'dsa').length}</span>
+                    <span className="text-gray-400">DSA Questions</span>
+                  </div>
+                  <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700">
+                    <div className="w-2 h-2 rounded-full bg-[#00ff88]"></div>
+                    <span className="text-white font-semibold">{scenarios.filter(s => s.type === 'bugfix').length}</span>
+                    <span className="text-gray-400">Bug Fix Scenarios</span>
+                  </div>
+                  <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700">
+                    <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                    <span className="text-white font-semibold">{scenarios.filter(s => s.type !== 'dsa' && s.type !== 'bugfix').length}</span>
+                    <span className="text-gray-400">Other</span>
+                  </div>
+                </div>
               </div>
 
               {/* Filters */}
@@ -1199,16 +1216,23 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     }`}
                   >
                     <CardHeader>
-                      <div className="flex items-start justify-between mb-2">
-                        <CardTitle className="text-white">{scenario.title}</CardTitle>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge className={`${
+                          scenario.type === "dsa" ? "bg-[#00d9ff] text-black" :
+                          scenario.type === "bugfix" ? "bg-[#00ff88] text-black" :
+                          "bg-purple-500 text-white"
+                        } text-xs font-semibold`}>
+                          {scenario.type === "dsa" ? "DSA" : scenario.type === "bugfix" ? "BUG FIX" : scenario.type.toUpperCase()}
+                        </Badge>
                         <Badge className={`${
                           scenario.difficulty === "easy" ? "bg-green-600" :
                           scenario.difficulty === "medium" ? "bg-yellow-600" :
                           "bg-red-600"
-                        }`}>
+                        } text-xs`}>
                           {scenario.difficulty.toUpperCase()}
                         </Badge>
                       </div>
+                      <CardTitle className="text-white mb-2">{scenario.title}</CardTitle>
                       <p className="text-gray-400 text-sm">{scenario.description}</p>
                     </CardHeader>
                     <CardContent>
