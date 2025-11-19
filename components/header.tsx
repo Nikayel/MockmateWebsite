@@ -86,16 +86,16 @@ export function Header() {
               </>
             ) : (
               <>
-                <a href="/#features" className="text-white/90 hover:text-accent transition-colors duration-300">
+                <a href="/#features" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
                   Features
                 </a>
-                <Link href="/pricing" className="text-white/90 hover:text-accent transition-colors duration-300">
+                <Link href="/pricing" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
                   Pricing
                 </Link>
-                <Link href="/demo" className="text-white/90 hover:text-accent transition-colors duration-300">
+                <Link href="/demo" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
                   Demo
                 </Link>
-                <Link href="/docs" className="text-white/90 hover:text-accent transition-colors duration-300">
+                <Link href="/docs" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
                   Docs
                 </Link>
                 <Link href="/login">
@@ -111,7 +111,7 @@ export function Header() {
           </nav>
 
           {/* Mobile Menu Button */}
-          <button className="md:hidden text-white" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+          <button className="md:hidden text-white cursor-pointer" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
             {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>
@@ -177,28 +177,28 @@ export function Header() {
                 <>
                   <a
                     href="/#features"
-                    className="text-white/90 hover:text-accent transition-colors duration-300"
+                    className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Features
                   </a>
                   <Link
                     href="/pricing"
-                    className="text-white/90 hover:text-accent transition-colors duration-300"
+                    className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Pricing
                   </Link>
                   <Link
                     href="/demo"
-                    className="text-white/90 hover:text-accent transition-colors duration-300"
+                    className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Demo
                   </Link>
                   <Link
                     href="/docs"
-                    className="text-white/90 hover:text-accent transition-colors duration-300"
+                    className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Docs

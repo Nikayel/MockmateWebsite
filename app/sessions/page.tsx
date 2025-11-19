@@ -8,10 +8,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/auth-context"
-import SessionFeedbackCard from "@/components/SessionFeedbackCard"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
-import { Clock, Calendar, Target, TrendingUp, Terminal, ArrowRight, Play, ChevronDown, ChevronUp, FileText } from "lucide-react"
+import { Clock, Calendar, Target, TrendingUp, Terminal, ArrowRight, Play, FileText } from "lucide-react"
 import { User as UserType, InterviewSession } from "@/lib/types"
 import Link from "next/link"
 import { getScenarioById } from "@/lib/scenarios"
@@ -21,7 +20,6 @@ export default function SessionsPage() {
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [sessions, setSessions] = useState<InterviewSession[]>([])
   const [loading, setLoading] = useState(true)
-  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
 
   // Separate effect to handle auth check with delay to prevent race condition on refresh
@@ -106,7 +104,7 @@ export default function SessionsPage() {
               <p className="text-gray-400">View your practice history and performance</p>
             </div>
             <Link href="/interview">
-              <Button className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white">
+              <Button className="bg-accent hover:bg-accent/80 text-black cursor-pointer">
                 <Terminal className="mr-2 h-4 w-4" />
                 Start New Session
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -122,7 +120,7 @@ export default function SessionsPage() {
                 <h3 className="text-xl font-semibold text-white mb-2">No Sessions Yet</h3>
                 <p className="text-gray-400 mb-6">Start practicing to see your interview sessions here</p>
                 <Link href="/interview">
-                  <Button className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white">
+                  <Button className="bg-accent hover:bg-accent/80 text-black cursor-pointer">
                     <Terminal className="mr-2 h-4 w-4" />
                     Start Your First Session
                   </Button>
@@ -134,7 +132,6 @@ export default function SessionsPage() {
               {sessions.map((session) => {
                 const isInProgress = !session.completed_at
                 const canReopen = isInProgress && session.scenario_id
-                const isExpanded = expandedSessionId === session.id
                 const hasFeedback = session.feedback && session.completed_at
 
                 return (
@@ -161,7 +158,7 @@ export default function SessionsPage() {
                           <div className="flex items-center justify-between">
                             <span className="text-gray-400 text-sm">Performance</span>
                             <div className="flex items-center space-x-2">
-                              <TrendingUp className="h-4 w-4 text-[#ff5733]" />
+                              <TrendingUp className="h-4 w-4 text-accent" />
                               <span className="text-white font-semibold">{Math.round(session.performance_score)}%</span>
                             </div>
                           </div>
@@ -183,32 +180,17 @@ export default function SessionsPage() {
                           </div>
                         )}
 
-                        {/* Feedback Section */}
+                        {/* View Details Button */}
                         {hasFeedback && (
-                          <>
+                          <Link href={`/sessions/${session.id}`} className="block">
                             <Button
-                              onClick={() => setExpandedSessionId(isExpanded ? null : session.id)}
                               variant="outline"
-                              className="w-full border-white/20 text-gray-300 hover:bg-white/10 hover:text-white"
+                              className="w-full border-white/20 text-gray-300 hover:bg-white/10 hover:text-white cursor-pointer"
                             >
                               <FileText className="mr-2 h-4 w-4" />
-                              {isExpanded ? "Hide Feedback" : "View Feedback"}
-                              {isExpanded ? (
-                                <ChevronUp className="ml-auto h-4 w-4" />
-                              ) : (
-                                <ChevronDown className="ml-auto h-4 w-4" />
-                              )}
+                              View Full Breakdown
                             </Button>
-
-                            {isExpanded && (
-                              <div className="mt-3">
-                                <SessionFeedbackCard
-                                  feedback={session.feedback || ""}
-                                  performanceScore={session.performance_score}
-                                />
-                              </div>
-                            )}
-                          </>
+                          </Link>
                         )}
 
                         {canReopen && (
@@ -217,7 +199,7 @@ export default function SessionsPage() {
                               // Navigate to interview page with scenario ID
                               router.push(`/interview?session=${session.id}&scenario=${session.scenario_id}`)
                             }}
-                            className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
+                            className="w-full bg-accent hover:bg-accent/80 text-black cursor-pointer"
                           >
                             <Play className="mr-2 h-4 w-4" />
                             Continue Practice

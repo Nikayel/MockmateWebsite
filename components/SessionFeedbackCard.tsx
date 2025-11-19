@@ -249,7 +249,7 @@ export default function SessionFeedbackCard({ feedback, performanceScore }: Sess
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full justify-between hover:bg-white/5"
+                  className="w-full justify-between hover:bg-white/5 cursor-pointer"
                   aria-expanded={showRadarChart}
                   aria-label={showRadarChart ? "Hide radar chart" : "Show radar chart"}
                 >
@@ -271,7 +271,7 @@ export default function SessionFeedbackCard({ feedback, performanceScore }: Sess
                         tick={{ fill: "#9ca3af", fontSize: 9 }}
                       />
                       <PolarRadiusAxis angle={90} domain={[0, 10]} tick={{ fill: "#6b7280", fontSize: 8 }} />
-                      <Radar name="Score" dataKey="value" stroke="#ff5733" fill="#ff5733" fillOpacity={0.6} />
+                      <Radar name="Score" dataKey="value" stroke="#00d9ff" fill="#00d9ff" fillOpacity={0.6} />
                     </RadarChart>
                   </ResponsiveContainer>
                 </div>
@@ -288,7 +288,7 @@ export default function SessionFeedbackCard({ feedback, performanceScore }: Sess
             <CollapsibleTrigger asChild>
               <Button
                 variant="ghost"
-                className="w-full justify-between p-3 sm:p-4 hover:bg-white/5 rounded-lg transition-colors"
+                className="w-full justify-between p-3 sm:p-4 hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
                 aria-expanded={showWhatWorked}
                 aria-label={showWhatWorked ? "Hide what worked" : "Show what worked"}
               >
@@ -346,12 +346,12 @@ export default function SessionFeedbackCard({ feedback, performanceScore }: Sess
             <CollapsibleTrigger asChild>
               <Button
                 variant="ghost"
-                className="w-full justify-between p-3 sm:p-4 hover:bg-white/5 rounded-lg transition-colors"
+                className="w-full justify-between p-3 sm:p-4 hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
                 aria-expanded={showActionPlan}
                 aria-label={showActionPlan ? "Hide action plan" : "Show action plan"}
               >
                 <span className="text-xs sm:text-sm text-white flex items-center gap-2">
-                  <Zap className="h-3 w-3 sm:h-4 sm:w-4 text-[#ff5733] flex-shrink-0" aria-hidden="true" />
+                  <Zap className="h-3 w-3 sm:h-4 sm:w-4 text-accent flex-shrink-0" aria-hidden="true" />
                   Action Plan
                 </span>
                 {showActionPlan ? (
@@ -365,7 +365,7 @@ export default function SessionFeedbackCard({ feedback, performanceScore }: Sess
               <div className="space-y-2 mt-2">
                 {sections.actionPlan.slice(0, 3).map((item, index) => (
                   <div key={index} className="flex items-start gap-2 p-2 bg-white/5 rounded border border-white/10">
-                    <div className="bg-[#ff5733] text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-[9px] font-bold flex-shrink-0" aria-hidden="true">
+                    <div className="bg-accent text-black rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-[9px] font-bold flex-shrink-0" aria-hidden="true">
                       {index + 1}
                     </div>
                     <span className="text-[10px] sm:text-xs text-gray-200 leading-relaxed pt-0.5">{item}</span>
@@ -384,12 +384,12 @@ export default function SessionFeedbackCard({ feedback, performanceScore }: Sess
             <CollapsibleTrigger asChild>
               <Button
                 variant="ghost"
-                className="w-full justify-between p-3 sm:p-4 hover:bg-white/5 rounded-lg transition-colors"
+                className="w-full justify-between p-3 sm:p-4 hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
                 aria-expanded={showAIWatchlist}
                 aria-label={showAIWatchlist ? "Hide AI watchlist" : "Show AI watchlist"}
               >
                 <span className="text-xs sm:text-sm text-white flex items-center gap-2">
-                  <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500 flex-shrink-0" aria-hidden="true" />
+                  <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 text-accent flex-shrink-0" aria-hidden="true" />
                   AI & Communication
                 </span>
                 {showAIWatchlist ? (
