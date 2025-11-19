@@ -1912,19 +1912,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     timeComplexity={efficiencyMetrics?.estimatedTimeComplexity}
                     spaceComplexity={efficiencyMetrics?.estimatedSpaceComplexity}
                     efficiencyScore={efficiencyMetrics?.efficiencyScore}
+                    elapsedTime={elapsedTime}
+                    onRetry={resetInterview}
+                    onNewProblem={resetInterview}
                   />
-                  <div className="flex flex-wrap justify-center gap-4 pb-10">
-                    <Button
-                      onClick={() => router.push("/dashboard")}
-                      variant="outline"
-                      className="border-white/20 text-white hover:bg-white/10"
-                    >
-                      Back to Dashboard
-                    </Button>
-                    <Button onClick={resetInterview} className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8">
-                      Try Another Problem
-                    </Button>
-                  </div>
                 </>
               )}
             </div>

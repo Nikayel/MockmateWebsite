@@ -15,6 +15,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-11-20.acacia",
 })
 
+// Mark route as dynamic to avoid build-time issues with server-only packages
+export const dynamic = 'force-dynamic'
+
 /**
  * API endpoint to create a Stripe Customer Portal session
  * Allows users to manage their subscription, update payment methods, and cancel

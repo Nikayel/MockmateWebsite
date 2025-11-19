@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { getUserIdFromRequest } from "@/lib/auth-server"
 import { syncSubscriptionFromStripe } from "@/lib/stripe-helpers"
 
+// Mark route as dynamic to avoid build-time issues with server-only packages
+export const dynamic = 'force-dynamic'
+
 /**
  * API endpoint to manually sync subscription status from Stripe
  * Useful for debugging or forcing a sync
