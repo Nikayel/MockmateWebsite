@@ -8,7 +8,7 @@ export function Footer() {
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
-              <Code className="h-6 w-6 text-[#ff5733]" />
+              <Code className="h-6 w-6 text-[#00d9ff]" />
               <span className="text-xl font-heading font-bold text-white">MockMate</span>
             </div>
             <p className="text-gray-400 text-sm">

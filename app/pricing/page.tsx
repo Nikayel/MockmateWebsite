@@ -17,7 +17,7 @@ export default function PricingPage() {
       <section className="pt-24 pb-12 bg-gradient-to-br from-black via-gray-900 to-black">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
-            <Badge className="bg-[#ff5733]/20 text-[#ff5733] border-[#ff5733]/30 mb-6">Simple Pricing</Badge>
+            <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30 mb-6">Simple Pricing</Badge>
             <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-6">
               Choose Your
               <span className="text-gradient"> Plan</span>
@@ -62,13 +62,13 @@ export default function PricingPage() {
               </Card>
 
               {/* Pro Plan */}
-              <Card className="bg-gray-900/50 border-[#ff5733] glass-effect relative">
+              <Card className="bg-gray-900/50 border-[#00d9ff] glass-effect relative">
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <Badge className="bg-[#ff5733] text-white px-4 py-1">Most Popular</Badge>
+                  <Badge className="bg-[#00d9ff] text-white px-4 py-1">Most Popular</Badge>
                 </div>
                 <CardHeader className="text-center pb-8">
                   <div className="flex justify-center mb-4">
-                    <Zap className="h-12 w-12 text-[#ff5733]" />
+                    <Zap className="h-12 w-12 text-[#00d9ff]" />
                   </div>
                   <CardTitle className="text-2xl font-heading text-white mb-2">{proPricing.name}</CardTitle>
                   <div className="text-4xl font-bold text-white mb-2">{proPricing.priceDisplay}</div>
@@ -87,7 +87,7 @@ export default function PricingPage() {
                     ))}
                   </ul>
                   <Link href="/upgrade">
-                    <Button className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80 text-white">
+                    <Button className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
                       {PRICING_CONFIG.pro.buttonText}
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>

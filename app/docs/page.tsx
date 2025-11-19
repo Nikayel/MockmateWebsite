@@ -25,7 +25,7 @@ export default function DocsPage() {
       <section className="pt-24 pb-12 bg-gradient-to-br from-black via-gray-900 to-black">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
-            <Badge className="bg-[#ff5733]/20 text-[#ff5733] border-[#ff5733]/30 mb-6">Documentation</Badge>
+            <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30 mb-6">Documentation</Badge>
             <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-6">
               MockMate
               <span className="text-gradient"> Documentation</span>
@@ -46,7 +46,7 @@ export default function DocsPage() {
               <Card className="bg-gray-900/50 border-gray-700 glass-effect text-center">
                 <CardHeader>
                   <div className="flex justify-center mb-4">
-                    <Download className="h-12 w-12 text-[#ff5733]" />
+                    <Download className="h-12 w-12 text-[#00d9ff]" />
                   </div>
                   <CardTitle className="text-white">1. Install</CardTitle>
                 </CardHeader>
@@ -58,7 +58,7 @@ export default function DocsPage() {
               <Card className="bg-gray-900/50 border-gray-700 glass-effect text-center">
                 <CardHeader>
                   <div className="flex justify-center mb-4">
-                    <Settings className="h-12 w-12 text-[#ff5733]" />
+                    <Settings className="h-12 w-12 text-[#00d9ff]" />
                   </div>
                   <CardTitle className="text-white">2. Setup</CardTitle>
                 </CardHeader>
@@ -70,7 +70,7 @@ export default function DocsPage() {
               <Card className="bg-gray-900/50 border-gray-700 glass-effect text-center">
                 <CardHeader>
                   <div className="flex justify-center mb-4">
-                    <Play className="h-12 w-12 text-[#ff5733]" />
+                    <Play className="h-12 w-12 text-[#00d9ff]" />
                   </div>
                   <CardTitle className="text-white">3. Practice</CardTitle>
                 </CardHeader>
@@ -82,7 +82,7 @@ export default function DocsPage() {
               <Card className="bg-gray-900/50 border-gray-700 glass-effect text-center">
                 <CardHeader>
                   <div className="flex justify-center mb-4">
-                    <BarChart3 className="h-12 w-12 text-[#ff5733]" />
+                    <BarChart3 className="h-12 w-12 text-[#00d9ff]" />
                   </div>
                   <CardTitle className="text-white">4. Improve</CardTitle>
                 </CardHeader>
@@ -103,7 +103,7 @@ export default function DocsPage() {
             <Card className="bg-gray-900/50 border-gray-700 glass-effect">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
-                  <Download className="h-6 w-6 text-[#ff5733]" />
+                  <Download className="h-6 w-6 text-[#00d9ff]" />
                   <span>Installation & Setup</span>
                 </CardTitle>
               </CardHeader>
@@ -139,14 +139,14 @@ export default function DocsPage() {
             <Card className="bg-gray-900/50 border-gray-700 glass-effect">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
-                  <Zap className="h-6 w-6 text-[#ff5733]" />
+                  <Zap className="h-6 w-6 text-[#00d9ff]" />
                   <span>Core Features</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-gray-300 space-y-6">
                 <div>
                   <h4 className="text-white font-semibold flex items-center space-x-2 mb-3">
-                    <MessageSquare className="h-5 w-5 text-[#ff5733]" />
+                    <MessageSquare className="h-5 w-5 text-[#00d9ff]" />
                     <span>AI Interviewer</span>
                   </h4>
                   <p>
@@ -163,7 +163,7 @@ export default function DocsPage() {
 
                 <div>
                   <h4 className="text-white font-semibold flex items-center space-x-2 mb-3">
-                    <Code className="h-5 w-5 text-[#ff5733]" />
+                    <Code className="h-5 w-5 text-[#00d9ff]" />
                     <span>Coding Challenges</span>
                   </h4>
                   <p>Practice with a curated collection of coding problems from easy to hard difficulty levels.</p>
@@ -177,7 +177,7 @@ export default function DocsPage() {
 
                 <div>
                   <h4 className="text-white font-semibold flex items-center space-x-2 mb-3">
-                    <BarChart3 className="h-5 w-5 text-[#ff5733]" />
+                    <BarChart3 className="h-5 w-5 text-[#00d9ff]" />
                     <span>Performance Analytics</span>
                   </h4>
                   <p>Track your progress with detailed analytics and personalized improvement recommendations.</p>
@@ -195,7 +195,7 @@ export default function DocsPage() {
             <Card className="bg-gray-900/50 border-gray-700 glass-effect">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
-                  <BookOpen className="h-6 w-6 text-[#ff5733]" />
+                  <BookOpen className="h-6 w-6 text-[#00d9ff]" />
                   <span>Commands & Shortcuts</span>
                 </CardTitle>
               </CardHeader>
@@ -242,7 +242,7 @@ export default function DocsPage() {
             <Card className="bg-gray-900/50 border-gray-700 glass-effect">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
-                  <Settings className="h-6 w-6 text-[#ff5733]" />
+                  <Settings className="h-6 w-6 text-[#00d9ff]" />
                   <span>Troubleshooting</span>
                 </CardTitle>
               </CardHeader>
@@ -290,7 +290,7 @@ export default function DocsPage() {
             Install MockMate now and start practicing your coding interviews with AI-powered feedback.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-4 text-lg">
+            <Button size="lg" className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white px-8 py-4 text-lg">
               Install Extension
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>

@@ -223,7 +223,7 @@ export default function ProfilePage() {
   if (loading || authLoading || !initialized) {
     return (
       <main className="min-h-screen bg-black flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff5733]"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
       </main>
     )
   }
@@ -334,7 +334,7 @@ export default function ProfilePage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <Link href="/interview">
-                  <Button className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80">
+                  <Button className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80">
                     <Terminal className="mr-2 h-4 w-4" />
                     Start Practice
                   </Button>

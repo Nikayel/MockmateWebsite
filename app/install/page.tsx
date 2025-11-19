@@ -63,7 +63,7 @@ export default function InstallPage() {
       <section className="pt-24 pb-12 bg-gradient-to-br from-black via-gray-900 to-black">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
-            <Badge className="bg-[#ff5733]/20 text-[#ff5733] border-[#ff5733]/30 mb-6">VS Code Integration</Badge>
+            <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30 mb-6">VS Code Integration</Badge>
             <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-6">
               Install MockMate in
               <span className="text-gradient"> VS Code</span>
@@ -76,7 +76,7 @@ export default function InstallPage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
                 size="lg"
-                className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-4 text-lg"
+                className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white px-8 py-4 text-lg"
                 onClick={() =>
                   window.open("https://marketplace.visualstudio.com/items?itemName=mockmate.mockmate", "_blank")
                 }
@@ -109,7 +109,7 @@ export default function InstallPage() {
                   <CardContent className="p-6">
                     <div className="flex items-start space-x-4">
                       <div className="flex-shrink-0">
-                        <div className="w-10 h-10 bg-[#ff5733] rounded-full flex items-center justify-center text-white font-bold">
+                        <div className="w-10 h-10 bg-[#00d9ff] rounded-full flex items-center justify-center text-white font-bold">
                           {index + 1}
                         </div>
                       </div>
@@ -120,7 +120,7 @@ export default function InstallPage() {
                         </div>
                         <p className="text-gray-300 mb-3">{step.description}</p>
                         <div className="bg-black/50 rounded-lg p-3 flex items-center justify-between">
-                          <code className="text-[#ff5733] font-mono text-sm">{step.command}</code>
+                          <code className="text-[#00d9ff] font-mono text-sm">{step.command}</code>
                           <Button
                             size="sm"
                             variant="ghost"
@@ -152,7 +152,7 @@ export default function InstallPage() {
               <Card className="bg-gray-900/50 border-gray-700 glass-effect">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center space-x-2">
-                    <Terminal className="h-5 w-5 text-[#ff5733]" />
+                    <Terminal className="h-5 w-5 text-[#00d9ff]" />
                     <span>Start Your First Interview</span>
                   </CardTitle>
                 </CardHeader>
@@ -161,9 +161,9 @@ export default function InstallPage() {
                     Once installed, open the Command Palette and type "MockMate" to see available commands.
                   </p>
                   <div className="bg-black/50 rounded-lg p-3">
-                    <code className="text-[#ff5733] font-mono text-sm">Ctrl+Shift+P → "MockMate: Start Interview"</code>
+                    <code className="text-[#00d9ff] font-mono text-sm">Ctrl+Shift+P → "MockMate: Start Interview"</code>
                   </div>
-                  <Button className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80 text-white">
+                  <Button className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
                     Try Your First Interview
                   </Button>
                 </CardContent>
@@ -172,7 +172,7 @@ export default function InstallPage() {
               <Card className="bg-gray-900/50 border-gray-700 glass-effect">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center space-x-2">
-                    <Settings className="h-5 w-5 text-[#ff5733]" />
+                    <Settings className="h-5 w-5 text-[#00d9ff]" />
                     <span>Configure Settings</span>
                   </CardTitle>
                 </CardHeader>
@@ -181,7 +181,7 @@ export default function InstallPage() {
                     Customize your interview experience with difficulty levels, programming languages, and more.
                   </p>
                   <div className="bg-black/50 rounded-lg p-3">
-                    <code className="text-[#ff5733] font-mono text-sm">File → Preferences → Settings → MockMate</code>
+                    <code className="text-[#00d9ff] font-mono text-sm">File → Preferences → Settings → MockMate</code>
                   </div>
                   <Button
                     variant="outline"
@@ -242,7 +242,7 @@ export default function InstallPage() {
               <p className="text-gray-400 mb-4">Still having issues?</p>
               <Button
                 variant="outline"
-                className="border-[#ff5733] text-[#ff5733] hover:bg-[#ff5733] hover:text-white bg-transparent"
+                className="border-[#00d9ff] text-[#00d9ff] hover:bg-[#00d9ff] hover:text-white bg-transparent"
               >
                 Contact Support
               </Button>

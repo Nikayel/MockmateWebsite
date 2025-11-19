@@ -89,7 +89,9 @@ export function HeroSection() {
             variants={staggerItem}
             className="text-lg sm:text-xl md:text-2xl text-gray-400 mb-12 max-w-3xl mx-auto leading-relaxed font-light"
           >
-            Practice realistic coding interviews in VS Code with an AI interviewer.
+            Practice realistic coding interviews with an AI interviewer—available as a{" "}
+            <span className="text-accent font-medium">VS Code extension</span> or on the{" "}
+            <span className="text-neural font-medium">web</span>.
             <br className="hidden sm:block" />
             <span className="text-white/90">Get real-time feedback. Land your dream job.</span>
           </motion.p>
@@ -137,7 +139,7 @@ export function HeroSection() {
               </MagneticButton>
             </Link>
 
-            <Link href="/demo">
+            <Link href="/interview">
               <MagneticButton
                 size="lg"
                 variant="outline"
@@ -145,7 +147,7 @@ export function HeroSection() {
                 className="group"
               >
                 <Play className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                Watch Demo
+                Try on Web
               </MagneticButton>
             </Link>
           </motion.div>

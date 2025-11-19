@@ -129,7 +129,7 @@ export default function DashboardPage() {
   if (authLoading || !initialized || !authCheckComplete || dataLoading) {
     return (
       <main className="min-h-screen bg-black flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff5733]"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
       </main>
     )
   }
@@ -190,7 +190,7 @@ export default function DashboardPage() {
                 </Badge>
                 {!isPro && (
                   <Link href="/upgrade" className="block mt-3">
-                    <Button size="sm" className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80 text-white">
+                    <Button size="sm" className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
                       Upgrade
                     </Button>
                   </Link>
@@ -208,7 +208,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <Link href="/interview">
-                  <Button className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80 text-white">
+                  <Button className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
                     Start Practice
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
@@ -236,7 +236,7 @@ export default function DashboardPage() {
             <CardHeader>
               <CardTitle className="text-white flex items-center justify-between">
                 <span className="flex items-center">
-                  <Clock className="h-5 w-5 mr-2 text-[#ff5733]" />
+                  <Clock className="h-5 w-5 mr-2 text-[#00d9ff]" />
                   Recent Activity
                 </span>
                 <Link href="/sessions">
@@ -252,7 +252,7 @@ export default function DashboardPage() {
                 <p className="text-gray-400">No recent sessions</p>
                 <p className="text-gray-500 text-sm mt-2">Start practicing to see your activity here</p>
                 <Link href="/interview" className="block mt-4">
-                  <Button className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white">
+                  <Button className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
                     <Terminal className="mr-2 h-4 w-4" />
                     Start Practice Session
                   </Button>

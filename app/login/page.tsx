@@ -185,9 +185,9 @@ export default function LoginPage() {
                 {/* Animated Logo/Icon */}
                 <div className="mb-4 sm:mb-6 flex justify-center">
                   <div className="relative">
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 border-4 border-[#ff5733]/30 border-t-[#ff5733] rounded-full animate-spin"></div>
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 border-4 border-[#00d9ff]/30 border-t-[#00d9ff] rounded-full animate-spin"></div>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <Terminal className="h-6 w-6 sm:h-8 sm:w-8 text-[#ff5733]" />
+                      <Terminal className="h-6 w-6 sm:h-8 sm:w-8 text-[#00d9ff]" />
                     </div>
                   </div>
                 </div>
@@ -210,7 +210,7 @@ export default function LoginPage() {
                   <div className={`flex items-center space-x-2 sm:space-x-3 ${authStatus !== "idle" ? "opacity-100" : "opacity-50"}`}>
                     <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center ${
                       authStatus === "authenticating" || authStatus === "creating-profile" || authStatus === "complete"
-                        ? "bg-[#ff5733] text-white"
+                        ? "bg-[#00d9ff] text-white"
                         : "bg-gray-700 text-gray-400"
                     }`}>
                       {authStatus !== "idle" && <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />}
@@ -223,15 +223,15 @@ export default function LoginPage() {
                   }`}>
                     <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center ${
                       authStatus === "creating-profile" || authStatus === "complete"
-                        ? "bg-[#ff5733] text-white"
+                        ? "bg-[#00d9ff] text-white"
                         : authStatus === "authenticating"
-                        ? "bg-[#ff5733]/20 border-2 border-[#ff5733] animate-pulse"
+                        ? "bg-[#00d9ff]/20 border-2 border-[#00d9ff] animate-pulse"
                         : "bg-gray-700 text-gray-400"
                     }`}>
                       {authStatus === "creating-profile" || authStatus === "complete" ? (
                         <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                       ) : authStatus === "authenticating" ? (
-                        <div className="w-2 h-2 bg-[#ff5733] rounded-full animate-pulse"></div>
+                        <div className="w-2 h-2 bg-[#00d9ff] rounded-full animate-pulse"></div>
                       ) : null}
                     </div>
                     <span className="text-xs sm:text-sm text-gray-300">Profile Setup</span>
@@ -242,15 +242,15 @@ export default function LoginPage() {
                   }`}>
                     <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center ${
                       authStatus === "complete"
-                        ? "bg-[#ff5733] text-white"
+                        ? "bg-[#00d9ff] text-white"
                         : authStatus === "creating-profile"
-                        ? "bg-[#ff5733]/20 border-2 border-[#ff5733] animate-pulse"
+                        ? "bg-[#00d9ff]/20 border-2 border-[#00d9ff] animate-pulse"
                         : "bg-gray-700 text-gray-400"
                     }`}>
                       {authStatus === "complete" ? (
                         <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                       ) : authStatus === "creating-profile" ? (
-                        <div className="w-2 h-2 bg-[#ff5733] rounded-full animate-pulse"></div>
+                        <div className="w-2 h-2 bg-[#00d9ff] rounded-full animate-pulse"></div>
                       ) : null}
                     </div>
                     <span className="text-xs sm:text-sm text-gray-300">Ready to go!</span>
@@ -260,7 +260,7 @@ export default function LoginPage() {
                 {/* Loading Bar */}
                 <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
                   <div 
-                    className={`h-full bg-gradient-to-r from-[#ff5733] to-[#ff8c69] transition-all duration-500 ${
+                    className={`h-full bg-gradient-to-r from-[#00d9ff] to-[#ff8c69] transition-all duration-500 ${
                       authStatus === "authenticating" ? "w-1/3" :
                       authStatus === "creating-profile" ? "w-2/3" :
                       authStatus === "complete" ? "w-full" : "w-0"
@@ -278,7 +278,7 @@ export default function LoginPage() {
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="max-w-2xl mx-auto text-center lg:text-left">
-              <Badge className="bg-[#ff5733]/20 text-[#ff5733] border-[#ff5733]/30 mb-6">Secure Login</Badge>
+              <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30 mb-6">Secure Login</Badge>
               <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-6">
                 Sign in to
                 <span className="text-gradient"> MockMate</span>
@@ -295,7 +295,7 @@ export default function LoginPage() {
                   { icon: Star, title: "Premium prep", body: "Unlock system design, bug-fix, and optimization drills." },
                 ].map((item, idx) => (
                   <div key={idx} className="flex items-start space-x-3">
-                    <item.icon className="h-6 w-6 text-[#ff5733] flex-shrink-0" />
+                    <item.icon className="h-6 w-6 text-[#00d9ff] flex-shrink-0" />
                     <div>
                       <p className="text-white font-semibold">{item.title}</p>
                       <p className="text-gray-400 text-sm">{item.body}</p>
@@ -396,7 +396,7 @@ export default function LoginPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <Card className="bg-gray-900/50 border-gray-700 glass-effect text-center">
                 <CardContent className="p-6">
-                  <Sync className="h-12 w-12 text-[#ff5733] mx-auto mb-4" />
+                  <Sync className="h-12 w-12 text-[#00d9ff] mx-auto mb-4" />
                   <h3 className="text-white font-semibold mb-3">Sync Across Devices</h3>
                   <p className="text-gray-400 text-sm">
                     Access your interview progress, settings, and performance history from any VS Code installation.
@@ -406,7 +406,7 @@ export default function LoginPage() {
 
               <Card className="bg-gray-900/50 border-gray-700 glass-effect text-center">
                 <CardContent className="p-6">
-                  <BarChart3 className="h-12 w-12 text-[#ff5733] mx-auto mb-4" />
+                  <BarChart3 className="h-12 w-12 text-[#00d9ff] mx-auto mb-4" />
                   <h3 className="text-white font-semibold mb-3">Detailed Analytics</h3>
                   <p className="text-gray-400 text-sm">
                     Get comprehensive performance insights, progress tracking, and personalized improvement
@@ -417,7 +417,7 @@ export default function LoginPage() {
 
               <Card className="bg-gray-900/50 border-gray-700 glass-effect text-center">
                 <CardContent className="p-6">
-                  <Star className="h-12 w-12 text-[#ff5733] mx-auto mb-4" />
+                  <Star className="h-12 w-12 text-[#00d9ff] mx-auto mb-4" />
                   <h3 className="text-white font-semibold mb-3">Premium Features</h3>
                   <p className="text-gray-400 text-sm">
                     Unlock advanced coding challenges, system design interviews, and unlimited practice sessions.
@@ -445,21 +445,21 @@ export default function LoginPage() {
                 </p>
                 <ul className="space-y-4">
                   <li className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-[#ff5733] rounded-full mt-2 flex-shrink-0"></div>
+                    <div className="w-2 h-2 bg-[#00d9ff] rounded-full mt-2 flex-shrink-0"></div>
                     <div>
                       <p className="text-white font-medium">Performance Timeline</p>
                       <p className="text-gray-400 text-sm">Track your improvement over time with detailed metrics</p>
                     </div>
                   </li>
                   <li className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-[#ff5733] rounded-full mt-2 flex-shrink-0"></div>
+                    <div className="w-2 h-2 bg-[#00d9ff] rounded-full mt-2 flex-shrink-0"></div>
                     <div>
                       <p className="text-white font-medium">Skill Assessment</p>
                       <p className="text-gray-400 text-sm">Identify strengths and weaknesses across different topics</p>
                     </div>
                   </li>
                   <li className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-[#ff5733] rounded-full mt-2 flex-shrink-0"></div>
+                    <div className="w-2 h-2 bg-[#00d9ff] rounded-full mt-2 flex-shrink-0"></div>
                     <div>
                       <p className="text-white font-medium">Custom Recommendations</p>
                       <p className="text-gray-400 text-sm">Get personalized practice suggestions based on your goals</p>
@@ -470,7 +470,7 @@ export default function LoginPage() {
               <div className="relative">
                 <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6 glass-effect">
                   <div className="flex items-center space-x-3 mb-6">
-                    <div className="w-10 h-10 bg-[#ff5733] rounded-full flex items-center justify-center">
+                    <div className="w-10 h-10 bg-[#00d9ff] rounded-full flex items-center justify-center">
                       <Github className="h-5 w-5 text-white" />
                     </div>
                     <div>
@@ -482,10 +482,10 @@ export default function LoginPage() {
                     <div className="bg-gray-800/50 p-4 rounded-lg">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-white text-sm">This Week's Progress</span>
-                        <span className="text-[#ff5733] text-sm">7/10 sessions</span>
+                        <span className="text-[#00d9ff] text-sm">7/10 sessions</span>
                       </div>
                       <div className="w-full bg-gray-700 rounded-full h-2">
-                        <div className="bg-[#ff5733] h-2 rounded-full" style={{ width: "70%" }}></div>
+                        <div className="bg-[#00d9ff] h-2 rounded-full" style={{ width: "70%" }}></div>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -518,7 +518,7 @@ export default function LoginPage() {
               onClick={handleGitHubLogin}
               disabled={isLoading}
               size="lg"
-              className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-4 text-lg"
+              className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white px-8 py-4 text-lg"
             >
               <Github className="mr-2 h-5 w-5" />
               {isLoading ? "Signing in..." : "Sign In with GitHub"}

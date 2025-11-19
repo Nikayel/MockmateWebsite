@@ -21,6 +21,8 @@ import {
   Clock,
   User,
   Bot,
+  Brain,
+  Sparkles,
   Lightbulb,
   Target,
   TrendingUp,
@@ -1193,7 +1195,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     key={scenario.id}
                     onClick={() => setSelectedScenario(scenario)}
                     className={`bg-gray-900/50 border-gray-700 glass-effect scenario-card cursor-pointer transition-all duration-200 hover:border-gray-600 ${
-                      selectedScenario?.id === scenario.id ? "border-[#ff5733] ring-2 ring-[#ff5733]/50 selected" : ""
+                      selectedScenario?.id === scenario.id ? "border-[#00d9ff] ring-2 ring-[#00d9ff]/50 selected" : ""
                     }`}
                   >
                     <CardHeader>
@@ -1243,7 +1245,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                               startInterview()
                             }}
                             disabled={usageLimit && !usageLimit.allowed && scenario.type !== 'dsa'}
-                            className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80 text-white disabled:opacity-50 disabled:cursor-not-allowed h-12 text-lg font-semibold shadow-lg"
+                            className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white disabled:opacity-50 disabled:cursor-not-allowed h-12 text-lg font-semibold shadow-lg"
                           >
                             <Play className="mr-2 h-5 w-5" />
                             Start Interview
@@ -1306,7 +1308,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   <select
                     value={selectedLanguage}
                     onChange={(e) => setSelectedLanguage(e.target.value as typeof selectedLanguage)}
-                    className="bg-gray-800 border border-gray-600 text-white rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#ff5733]"
+                    className="bg-gray-800 border border-gray-600 text-white rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#00d9ff]"
                   >
                     <option value="javascript">JavaScript</option>
                     <option value="typescript">TypeScript</option>
@@ -1321,7 +1323,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 <div className="flex items-center space-x-3">
                   {isInterviewStarted && (
                     <div className="flex items-center space-x-2 text-white bg-gray-800 px-3 py-1 rounded-lg">
-                      <Clock className="h-3 w-3 text-[#ff5733]" />
+                      <Clock className="h-3 w-3 text-[#00d9ff]" />
                       <span className="text-sm font-mono">{formatTime(elapsedTime)}</span>
                     </div>
                   )}
@@ -1349,7 +1351,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden">
                       <CardHeader className="pb-2 flex-shrink-0">
                         <CardTitle className="text-white flex items-center space-x-2 text-sm">
-                          <Target className="h-4 w-4 text-[#ff5733]" />
+                          <Target className="h-4 w-4 text-[#00d9ff]" />
                           <span>Problem</span>
                         </CardTitle>
                       </CardHeader>
@@ -1497,7 +1499,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       <CardHeader className="pb-2 flex-shrink-0">
                         <CardTitle className="text-white flex items-center justify-between text-xs">
                           <div className="flex items-center space-x-1">
-                            <Code className="h-3 w-3 text-[#ff5733]" />
+                            <Code className="h-3 w-3 text-[#00d9ff]" />
                             <span>{selectedScenario?.title.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}.{selectedLanguage === "javascript" ? "js" : selectedLanguage === "typescript" ? "ts" : "py"}</span>
                           </div>
                           {isInterviewStarted && (
@@ -1597,7 +1599,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         {/* AI Coding Partner - Fixed Height */}
                         <div className="flex flex-col border-t border-gray-700 pt-2" style={{ height: '35%' }}>
                           <div className="flex items-center space-x-1 mb-1 flex-shrink-0">
-                            <Lightbulb className="h-3 w-3 text-[#ff5733]" />
+                            <Lightbulb className="h-3 w-3 text-[#00d9ff]" />
                             <span className="text-white text-xs font-medium">AI Partner</span>
                           </div>
                           <div className="flex-1 overflow-y-auto space-y-1 mb-2 p-2 bg-gray-800/30 rounded min-h-0">
@@ -1612,9 +1614,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                     {msg.type === "user" ? (
                                       <User className="h-2.5 w-2.5" />
                                     ) : (
-                                      <Bot className="h-2.5 w-2.5 text-[#ff5733]" />
+                                      <Brain className="h-2.5 w-2.5 text-[#00d9ff] animate-neural-pulse" />
                                     )}
-                                    <span className="text-xs opacity-75">{msg.type === "user" ? "You" : "Partner"}</span>
+                                    <span className="text-xs opacity-75">{msg.type === "user" ? "You" : "AI Partner"}</span>
                                   </div>
                                   <p className="text-xs leading-tight">{msg.message}</p>
                                 </div>
@@ -1634,7 +1636,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             />
                             <Button
                               onClick={() => handleSendMessage(false)}
-                              className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white h-7 px-2"
+                              className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white h-7 px-2"
                               loading={isLoadingChat}
                               aria-label={isLoadingChat ? "Sending message" : "Send message"}
                             >
@@ -1651,8 +1653,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     <Card className="bg-gray-900/50 border-gray-700 glass-effect h-full flex flex-col overflow-hidden">
                       <CardHeader className="pb-2 flex-shrink-0">
                         <CardTitle className="text-white flex items-center space-x-2 text-sm">
-                          <Bot className="h-4 w-4 text-[#ff5733]" />
-                          <span>Sable</span>
+                          <div className="relative">
+                            <Brain className="h-4 w-4 text-[#00d9ff] animate-neural-pulse" />
+                            <div className="absolute inset-0 bg-[#00d9ff] rounded-full blur-md opacity-30"></div>
+                          </div>
+                          <span className="bg-gradient-to-r from-[#00d9ff] to-[#00ff88] bg-clip-text text-transparent font-bold">MockMate AI</span>
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="flex flex-col flex-1 min-h-0 overflow-hidden p-3">
@@ -1678,10 +1683,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                       {msg.type === "user" ? (
                                         <User className="h-3 w-3" />
                                       ) : (
-                                        <Bot className="h-3 w-3 text-[#ff5733]" />
+                                        <Brain className="h-3 w-3 text-[#00d9ff] animate-neural-pulse" />
                                       )}
                                       <span className="text-xs opacity-75">
-                                        {msg.type === "user" ? "You" : "Interviewer"}
+                                        {msg.type === "user" ? "You" : "MockMate AI"}
                                       </span>
                                     </div>
                                     <p className="text-xs whitespace-pre-wrap leading-relaxed">{msg.message}</p>
@@ -1705,7 +1710,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             />
                             <Button
                               onClick={() => handleSendMessage(true)}
-                              className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white h-7 px-2"
+                              className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white h-7 px-2"
                               loading={isLoadingInterviewer || isGeneratingDiscussion}
                               aria-label={(isLoadingInterviewer || isGeneratingDiscussion) ? "Sending message" : "Send message"}
                             >
@@ -1757,7 +1762,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     >
                       <CardTitle className="text-white flex items-center justify-between">
                         <div className="flex items-center space-x-2">
-                          <Code className="h-5 w-5 text-[#ff5733]" />
+                          <Code className="h-5 w-5 text-[#00d9ff]" />
                           <span>Your Solution</span>
                           <Badge variant="outline" className="border-gray-600 text-gray-400">
                             {selectedLanguage}
@@ -1815,8 +1820,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-6">
                     <CardHeader>
                       <CardTitle className="text-white flex items-center space-x-2">
-                        <Bot className="h-5 w-5 text-[#ff5733]" />
-                        <span>Post-Interview Discussion</span>
+                        <div className="relative">
+                          <Brain className="h-5 w-5 text-[#00d9ff] animate-neural-pulse" />
+                          <div className="absolute inset-0 bg-[#00d9ff] rounded-full blur-md opacity-30"></div>
+                        </div>
+                        <span className="bg-gradient-to-r from-[#00d9ff] to-[#00ff88] bg-clip-text text-transparent font-bold">Post-Interview Discussion</span>
                         {isGeneratingDiscussion && (
                           <span className="text-xs text-gray-400 ml-2">(Analyzing your solution...)</span>
                         )}
@@ -1838,10 +1846,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                 {msg.type === "user" ? (
                                   <User className="h-4 w-4" />
                                 ) : (
-                                  <Bot className="h-4 w-4 text-[#ff5733]" />
+                                  <Brain className="h-4 w-4 text-[#00d9ff] animate-neural-pulse" />
                                 )}
                                 <span className="text-sm font-medium">
-                                  {msg.type === "user" ? "You" : "Interviewer"}
+                                  {msg.type === "user" ? "You" : "MockMate AI"}
                                 </span>
                               </div>
                               <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.message}</p>
@@ -1852,7 +1860,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           <div className="flex justify-start">
                             <div className="bg-gray-800 p-3 rounded-lg">
                               <div className="flex items-center space-x-2">
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#ff5733]"></div>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#00d9ff]"></div>
                                 <span className="text-sm text-gray-300">Interviewer is analyzing your solution...</span>
                               </div>
                             </div>
@@ -1874,7 +1882,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         />
                         <Button
                           onClick={() => handleSendMessage(true)}
-                          className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
+                          className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white"
                           loading={isLoadingInterviewer || isGeneratingDiscussion}
                           aria-label={(isLoadingInterviewer || isGeneratingDiscussion) ? "Sending message" : "Send message"}
                         >
@@ -1888,7 +1896,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   <div className="flex justify-center gap-4">
                     <Button
                       onClick={proceedToFinalFeedback}
-                      className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-6"
+                      className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white px-6"
                     >
                       View Detailed Feedback
                       <ArrowRight className="ml-2 h-4 w-4" />
@@ -1954,7 +1962,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 setShowCloseDialog(false)
                 resetInterview()
               }}
-              className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white"
+              className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white"
             >
               Close Interview
             </AlertDialogAction>
