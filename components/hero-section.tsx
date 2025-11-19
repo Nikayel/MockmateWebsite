@@ -1,123 +1,195 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Play, ArrowRight, Terminal, Zap } from "lucide-react"
+import { useState, useEffect, Suspense, lazy } from "react"
+import { MagneticButton } from "@/components/ui/magnetic-button"
+import { Play, ArrowRight, Code2, Sparkles, Cpu } from "lucide-react"
 import Link from "next/link"
+import { motion } from "framer-motion"
+import { staggerContainer, staggerItem } from "@/lib/motion"
+
+// Lazy load Three.js component for performance
+const NeuralNetwork = lazy(() => import("@/components/NeuralNetwork"))
 
 export function HeroSection() {
   const [typedText, setTypedText] = useState("")
-  const fullText = 'function solveProblem() { return "success"; }'
+  const codeSnippets = [
+    'const solve = (problem) => optimal(solution);',
+    'function ace() { return "interview"; }',
+    'const skill = practice + AI_feedback;'
+  ]
+  const [snippetIndex, setSnippetIndex] = useState(0)
+  const currentSnippet = codeSnippets[snippetIndex]
 
   useEffect(() => {
     let i = 0
     const timer = setInterval(() => {
-      if (i < fullText.length) {
-        setTypedText(fullText.slice(0, i + 1))
+      if (i < currentSnippet.length) {
+        setTypedText(currentSnippet.slice(0, i + 1))
         i++
       } else {
         clearInterval(timer)
         setTimeout(() => {
           setTypedText("")
           i = 0
+          setSnippetIndex((prev) => (prev + 1) % codeSnippets.length)
         }, 2000)
       }
-    }, 100)
+    }, 80)
 
     return () => clearInterval(timer)
-  }, [])
+  }, [snippetIndex, currentSnippet])
 
   return (
-    <section className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      {/* Animated Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900 to-black">
-        <div className="absolute inset-0 bg-[url('/abstract-geometric-pattern.png')] opacity-5"></div>
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-black">
+      {/* Neural Network Background - Three.js */}
+      <Suspense fallback={<div className="absolute inset-0 bg-black" />}>
+        <div className="absolute inset-0 z-0">
+          <NeuralNetwork className="w-full h-full" nodeCount={60} enableMouse={true} />
+        </div>
+      </Suspense>
+
+      {/* Vignette overlay */}
+      <div className="absolute inset-0 bg-gradient-radial from-transparent via-black/30 to-black/80 z-[1]" />
+
+      {/* Scan line effect (subtle CRT) */}
+      <div className="absolute inset-0 z-[2] pointer-events-none opacity-20">
+        <div className="absolute inset-0 animate-scan bg-gradient-to-b from-transparent via-accent/5 to-transparent h-[2px]" />
       </div>
 
-      {/* Floating Elements */}
-      <div className="absolute top-20 left-10 animate-float">
-        <Terminal className="h-12 w-12 text-white/20" />
-      </div>
-      <div className="absolute top-40 right-20 animate-float" style={{ animationDelay: "2s" }}>
-        <Zap className="h-8 w-8 text-[#ff5733]/30" />
-      </div>
-      <div className="absolute bottom-40 left-20 animate-float" style={{ animationDelay: "4s" }}>
-        <div className="w-4 h-4 bg-white/20 rounded-full"></div>
-      </div>
+      {/* Content */}
+      <motion.div
+        className="container mx-auto px-4 text-center relative z-10"
+        variants={staggerContainer}
+        initial="initial"
+        animate="animate"
+      >
+        <div className="max-w-5xl mx-auto">
+          {/* Eyebrow */}
+          <motion.div variants={staggerItem} className="mb-6">
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-accent/30 bg-accent/5 text-accent text-sm font-medium backdrop-blur-sm">
+              <Sparkles className="w-4 h-4" />
+              AI-Powered Interview Training
+            </span>
+          </motion.div>
 
-      <div className="container mx-auto px-4 text-center relative z-10">
-        <div className="max-w-4xl mx-auto">
           {/* Main Headline */}
-          <h1 className="text-5xl md:text-7xl font-heading font-bold mb-6 leading-tight">
-            <span className="text-white">Unleash Your</span>
+          <motion.h1
+            variants={staggerItem}
+            className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-heading font-black mb-6 leading-[1.1] tracking-tight"
+          >
+            <span className="text-white">Master Technical</span>
             <br />
-            <span className="text-gradient animate-gradient">Coding Potential</span>
-          </h1>
+            <span className="text-glow bg-gradient-to-r from-accent via-neural to-accent bg-clip-text text-transparent">
+              Interviews
+            </span>
+          </motion.h1>
 
           {/* Subheadline */}
-          <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto leading-relaxed">
-            Practice realistic interviews in VS Code with an AI interviewer and coding partner. Transform your
-            development experience with seamless coding, enhanced productivity, and innovative features.
-          </p>
+          <motion.p
+            variants={staggerItem}
+            className="text-lg sm:text-xl md:text-2xl text-gray-400 mb-12 max-w-3xl mx-auto leading-relaxed font-light"
+          >
+            Practice realistic coding interviews in VS Code with an AI interviewer.
+            <br className="hidden sm:block" />
+            <span className="text-white/90">Get real-time feedback. Land your dream job.</span>
+          </motion.p>
 
-          {/* Code Animation */}
-          <div className="bg-gray-900/50 rounded-lg p-6 mb-8 max-w-2xl mx-auto glass-effect">
-            <div className="flex items-center space-x-2 mb-4">
-              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-              <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+          {/* Code Terminal */}
+          <motion.div
+            variants={staggerItem}
+            className="mb-12 max-w-2xl mx-auto group"
+          >
+            <div className="glass-minimal rounded-xl p-6 border border-accent/20 transition-all duration-500 hover:border-accent/40 hover:shadow-[0_0_40px_rgba(0,217,255,0.15)]">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-3 h-3 bg-destructive rounded-full" />
+                <div className="w-3 h-3 bg-[#ffbf00] rounded-full" />
+                <div className="w-3 h-3 bg-neural rounded-full" />
+                <span className="ml-auto text-xs text-muted-foreground font-mono">mockmate.ai</span>
+              </div>
+              <div className="text-left font-mono text-sm sm:text-base">
+                <span className="text-muted-foreground">// Your AI interview partner</span>
+                <br />
+                <span className="text-accent">const</span>{" "}
+                <span className="text-white">
+                  {typedText}
+                  <span className="inline-block w-2 h-5 bg-accent/80 ml-1 animate-pulse" />
+                </span>
+              </div>
             </div>
-            <div className="text-left">
-              <span className="text-gray-500">// MockMate AI Interview</span>
-              <br />
-              <span className="text-[#ff5733]">const</span>{" "}
-              <span className="text-white font-mono">
-                {typedText}
-                <span className="animate-pulse">|</span>
-              </span>
-            </div>
-          </div>
+          </motion.div>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <motion.div
+            variants={staggerItem}
+            className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16"
+          >
             <Link href="/install">
-              <Button
+              <MagneticButton
                 size="lg"
-                className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-4 text-lg font-semibold animate-pulse-glow group"
+                variant="primary"
+                glowColor="accent"
+                strength={0.5}
+                className="group"
               >
-                Start in VS Code
-                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-              </Button>
+                <Code2 className="w-5 h-5" />
+                Start Free in VS Code
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </MagneticButton>
             </Link>
+
             <Link href="/demo">
-              <Button
+              <MagneticButton
                 size="lg"
                 variant="outline"
-                className="border-white text-white hover:bg-white hover:text-black px-8 py-4 text-lg group bg-transparent"
+                glowColor="none"
+                className="group"
               >
-                <Play className="mr-2 h-5 w-5 group-hover:scale-110 transition-transform" />
+                <Play className="w-5 h-5 group-hover:scale-110 transition-transform" />
                 Watch Demo
-              </Button>
+              </MagneticButton>
             </Link>
-          </div>
+          </motion.div>
 
-          {/* Features Highlight */}
-          <div className="grid grid-cols-3 gap-8 mt-16 max-w-2xl mx-auto">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-[#ff5733] mb-2">AI-Powered</div>
-              <div className="text-gray-400">Smart Interviewer</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-[#ff5733] mb-2">Real-Time</div>
-              <div className="text-gray-400">Code Feedback</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-[#ff5733] mb-2">In VS Code</div>
-              <div className="text-gray-400">Native Integration</div>
-            </div>
-          </div>
+          {/* Stats - Modern Bento Style */}
+          <motion.div
+            variants={staggerContainer}
+            className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto"
+          >
+            <motion.div
+              variants={staggerItem}
+              className="glass-minimal rounded-xl p-6 border border-white/[0.08] hover:border-accent/30 transition-all duration-500 group"
+            >
+              <div className="flex items-center justify-center mb-2">
+                <Cpu className="w-6 h-6 text-accent group-hover:animate-neural-pulse" />
+              </div>
+              <div className="text-3xl font-bold text-white mb-1">AI-Powered</div>
+              <div className="text-sm text-muted-foreground">Smart Interviewer</div>
+            </motion.div>
+
+            <motion.div
+              variants={staggerItem}
+              className="glass-minimal rounded-xl p-6 border border-white/[0.08] hover:border-neural/30 transition-all duration-500 group"
+            >
+              <div className="flex items-center justify-center mb-2">
+                <Sparkles className="w-6 h-6 text-neural group-hover:animate-neural-glow" />
+              </div>
+              <div className="text-3xl font-bold text-white mb-1">Real-Time</div>
+              <div className="text-sm text-muted-foreground">Code Feedback</div>
+            </motion.div>
+
+            <motion.div
+              variants={staggerItem}
+              className="glass-minimal rounded-xl p-6 border border-white/[0.08] hover:border-accent/30 transition-all duration-500 group"
+            >
+              <div className="flex items-center justify-center mb-2">
+                <Code2 className="w-6 h-6 text-accent group-hover:animate-neural-pulse" />
+              </div>
+              <div className="text-3xl font-bold text-white mb-1">Native</div>
+              <div className="text-sm text-muted-foreground">VS Code Extension</div>
+            </motion.div>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
     </section>
   )
 }
