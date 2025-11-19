@@ -172,7 +172,7 @@ export default function AccountPage() {
   if (authLoading || dataLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff5733]"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
       </div>
     )
   }
@@ -313,7 +313,7 @@ export default function AccountPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <Button
-                  className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80"
+                  className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80"
                   onClick={() => (window.location.href = "vscode://nikayel.MockMate")}
                 >
                   <ExternalLink className="mr-2 h-4 w-4" />

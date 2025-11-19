@@ -13,7 +13,7 @@ export default function LegalPage() {
       <section className="pt-24 pb-12 bg-gradient-to-br from-black via-gray-900 to-black">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
-            <Badge className="bg-[#ff5733]/20 text-[#ff5733] border-[#ff5733]/30 mb-6">Legal Information</Badge>
+            <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30 mb-6">Legal Information</Badge>
             <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-6">
               Legal &<span className="text-gradient"> Privacy</span>
             </h1>
@@ -32,7 +32,7 @@ export default function LegalPage() {
             <Card className="bg-gray-900/50 border-gray-700 glass-effect">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
-                  <Eye className="h-6 w-6 text-[#ff5733]" />
+                  <Eye className="h-6 w-6 text-[#00d9ff]" />
                   <span>Privacy Policy</span>
                 </CardTitle>
               </CardHeader>
@@ -70,7 +70,7 @@ export default function LegalPage() {
             <Card className="bg-gray-900/50 border-gray-700 glass-effect">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
-                  <FileText className="h-6 w-6 text-[#ff5733]" />
+                  <FileText className="h-6 w-6 text-[#00d9ff]" />
                   <span>Terms of Service</span>
                 </CardTitle>
               </CardHeader>
@@ -106,7 +106,7 @@ export default function LegalPage() {
             <Card className="bg-gray-900/50 border-gray-700 glass-effect">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
-                  <Lock className="h-6 w-6 text-[#ff5733]" />
+                  <Lock className="h-6 w-6 text-[#00d9ff]" />
                   <span>Data Processing Agreement</span>
                 </CardTitle>
               </CardHeader>
@@ -135,7 +135,7 @@ export default function LegalPage() {
             <Card className="bg-gray-900/50 border-gray-700 glass-effect">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
-                  <Shield className="h-6 w-6 text-[#ff5733]" />
+                  <Shield className="h-6 w-6 text-[#00d9ff]" />
                   <span>Contact & Compliance</span>
                 </CardTitle>
               </CardHeader>

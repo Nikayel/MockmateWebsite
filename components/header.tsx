@@ -92,9 +92,6 @@ export function Header() {
                 <Link href="/pricing" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
                   Pricing
                 </Link>
-                <Link href="/demo" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
-                  Demo
-                </Link>
                 <Link href="/docs" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
                   Docs
                 </Link>
@@ -188,13 +185,6 @@ export function Header() {
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Pricing
-                  </Link>
-                  <Link
-                    href="/demo"
-                    className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Demo
                   </Link>
                   <Link
                     href="/docs"

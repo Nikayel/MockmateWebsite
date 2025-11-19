@@ -30,7 +30,7 @@ export default function TwoSumExcellentPage() {
       <section className="pt-24 pb-8 bg-gradient-to-br from-black via-gray-900 to-black">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
-            <Link href="/samples" className="inline-flex items-center text-[#ff5733] hover:text-[#ff5733]/80 mb-6">
+            <Link href="/samples" className="inline-flex items-center text-[#00d9ff] hover:text-[#00d9ff]/80 mb-6">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Samples
             </Link>
@@ -39,7 +39,7 @@ export default function TwoSumExcellentPage() {
               <div>
                 <div className="flex items-center space-x-4 mb-2">
                   <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Easy</Badge>
-                  <Badge className="bg-[#ff5733]/20 text-[#ff5733] border-[#ff5733]/30">Completed</Badge>
+                  <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30">Completed</Badge>
                 </div>
                 <h1 className="text-4xl font-heading font-bold text-white">Two Sum Problem</h1>
                 <p className="text-gray-300 mt-2">Array manipulation with hash map optimization</p>
@@ -103,7 +103,7 @@ export default function TwoSumExcellentPage() {
               <Card className="bg-gray-900/50 border-gray-700 glass-effect">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center space-x-2">
-                    <Code className="h-5 w-5 text-[#ff5733]" />
+                    <Code className="h-5 w-5 text-[#00d9ff]" />
                     <span>Your Solution</span>
                   </CardTitle>
                 </CardHeader>
@@ -148,7 +148,7 @@ export default function TwoSumExcellentPage() {
               <Card className="bg-gray-900/50 border-gray-700 glass-effect">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center space-x-2">
-                    <MessageSquare className="h-5 w-5 text-[#ff5733]" />
+                    <MessageSquare className="h-5 w-5 text-[#00d9ff]" />
                     <span>AI Feedback</span>
                   </CardTitle>
                 </CardHeader>
@@ -184,7 +184,7 @@ export default function TwoSumExcellentPage() {
             <Card className="mt-8 bg-gray-900/50 border-gray-700 glass-effect">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-2">
-                  <BarChart3 className="h-5 w-5 text-[#ff5733]" />
+                  <BarChart3 className="h-5 w-5 text-[#00d9ff]" />
                   <span>Detailed Performance Metrics</span>
                 </CardTitle>
               </CardHeader>
@@ -228,11 +228,11 @@ export default function TwoSumExcellentPage() {
                     <Download className="mr-2 h-4 w-4" />
                     Export Report (JSON)
                   </Button>
-                  <Button className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white flex-1">
+                  <Button className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white flex-1">
                     <RotateCcw className="mr-2 h-4 w-4" />
                     Retry Session
                   </Button>
-                  <Button className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white flex-1">
+                  <Button className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white flex-1">
                     <Plus className="mr-2 h-4 w-4" />
                     New Problem
                   </Button>

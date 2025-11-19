@@ -47,7 +47,7 @@ export default function SamplesPage() {
       <section className="pt-24 pb-12 bg-gradient-to-br from-black via-gray-900 to-black">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
-            <Badge className="bg-[#ff5733]/20 text-[#ff5733] border-[#ff5733]/30 mb-6">Sample Feedback Reports</Badge>
+            <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30 mb-6">Sample Feedback Reports</Badge>
             <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-6">
               Real Interview
               <span className="text-gradient"> Feedback Examples</span>
@@ -70,7 +70,7 @@ export default function SamplesPage() {
               {sampleSessions.map((session) => (
                 <Card
                   key={session.id}
-                  className="bg-gray-900/50 border-gray-700 glass-effect hover:border-[#ff5733]/50 transition-all duration-300"
+                  className="bg-gray-900/50 border-gray-700 glass-effect hover:border-[#00d9ff]/50 transition-all duration-300"
                 >
                   <CardHeader>
                     <div className="flex items-center justify-between mb-2">
@@ -108,7 +108,7 @@ export default function SamplesPage() {
                     </div>
 
                     <Link href={`/samples/${session.id}`}>
-                      <Button className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80 text-white">
+                      <Button className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
                         View Full Report
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>
@@ -130,7 +130,7 @@ export default function SamplesPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/install">
-              <Button size="lg" className="bg-[#ff5733] hover:bg-[#ff5733]/80 text-white px-8 py-4 text-lg">
+              <Button size="lg" className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white px-8 py-4 text-lg">
                 Install MockMate
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>

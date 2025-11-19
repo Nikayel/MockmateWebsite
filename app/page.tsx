@@ -55,7 +55,7 @@ export default function HomePage() {
   if (authLoading || !initialized) {
     return (
       <main className="min-h-screen bg-black flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff5733]"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
       </main>
     )
   }
@@ -108,7 +108,7 @@ export default function HomePage() {
                   </Badge>
                   {!isPro && (
                     <Link href="/upgrade" className="block mt-3">
-                      <Button size="sm" className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80 text-white">
+                      <Button size="sm" className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
                         Upgrade
                       </Button>
                     </Link>
@@ -125,7 +125,7 @@ export default function HomePage() {
                 </CardHeader>
                 <CardContent>
                   <Link href="/interview">
-                    <Button className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80 text-white">
+                    <Button className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
                       Start Practice
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
@@ -139,7 +139,7 @@ export default function HomePage() {
               <CardHeader>
                 <CardTitle className="text-white flex items-center justify-between">
                   <span className="flex items-center">
-                    <Terminal className="h-5 w-5 mr-2 text-[#ff5733]" />
+                    <Terminal className="h-5 w-5 mr-2 text-[#00d9ff]" />
                     Coding Practice
                   </span>
                   {!usage?.allowed && (
@@ -156,7 +156,7 @@ export default function HomePage() {
                       Ready to practice? Start a new interview session and work on real coding problems with AI guidance.
                     </p>
                     <Link href="/interview">
-                      <Button className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80 text-white py-6 text-lg">
+                      <Button className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white py-6 text-lg">
                         <Terminal className="mr-2 h-5 w-5" />
                         Start New Practice Session
                         <ArrowRight className="ml-2 h-5 w-5" />

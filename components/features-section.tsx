@@ -58,12 +58,12 @@ const features = [
     icon: <Shield className="w-8 h-8" />,
     title: "Secure & Private",
     description:
-      "Your code and practice sessions remain completely private and secure within your VS Code environment. Zero data leaves your machine.",
+      "Your code and practice sessions remain completely private and secure. Practice in VS Code or on the web with enterprise-grade security.",
     span: "default" as const,
     features: [
       "Local-first architecture",
       "End-to-end encryption",
-      "No cloud storage"
+      "Secure cloud storage"
     ],
   },
 ]
@@ -150,8 +150,8 @@ export function FeaturesSection() {
               <div className="absolute inset-0 bg-gradient-to-t from-accent/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             </div>
 
-            <div className="flex justify-center">
-              <Link href="/demo">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link href="/interview">
                 <MagneticButton
                   size="lg"
                   variant="primary"
@@ -159,7 +159,18 @@ export function FeaturesSection() {
                   className="group/btn"
                 >
                   <Play className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />
-                  Try Interactive Demo
+                  Try on Web
+                </MagneticButton>
+              </Link>
+              <Link href="/install">
+                <MagneticButton
+                  size="lg"
+                  variant="outline"
+                  glowColor="none"
+                  className="group/btn"
+                >
+                  <Code2 className="w-5 h-5" />
+                  Download for VS Code
                 </MagneticButton>
               </Link>
             </div>

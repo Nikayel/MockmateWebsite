@@ -98,7 +98,7 @@ export default function AuthCallback() {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-white text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff5733] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff] mx-auto mb-4"></div>
           <p>Completing sign in...</p>
         </div>
       </div>
@@ -132,12 +132,12 @@ export default function AuthCallback() {
             {redirectUrl ? (
               <Button
                 onClick={() => (window.location.href = redirectUrl)}
-                className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80"
+                className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80"
               >
                 Continue to {redirectUrl.replace("/", "")}
               </Button>
             ) : (
-              <Button onClick={handleOpenVSCode} className="w-full bg-[#ff5733] hover:bg-[#ff5733]/80">
+              <Button onClick={handleOpenVSCode} className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80">
                 <ExternalLink className="mr-2 h-4 w-4" />
                 Open MockMate in VS Code
               </Button>
@@ -154,7 +154,7 @@ export default function AuthCallback() {
 
           <div className="text-center text-sm text-gray-400">
             <p>Don't have the extension installed?</p>
-            <Button variant="link" className="text-[#ff5733] p-0" onClick={() => (window.location.href = "/install")}>
+            <Button variant="link" className="text-[#00d9ff] p-0" onClick={() => (window.location.href = "/install")}>
               <Download className="mr-1 h-3 w-3" />
               Install MockMate Extension
             </Button>
