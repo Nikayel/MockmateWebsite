@@ -1,83 +1,148 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Check, Star } from "lucide-react"
-import { PRICING_CONFIG } from "@/lib/config"
+import { MagneticButton } from "@/components/ui/magnetic-button"
+import { Check, Zap, Crown, Sparkles } from "lucide-react"
+import { PRICING_CONFIG, getProPricing } from "@/lib/config"
 import Link from "next/link"
+import { motion } from "framer-motion"
+import { ScrollReveal } from "@/lib/motion"
 
-const plans = [PRICING_CONFIG.free, PRICING_CONFIG.pro]
+// Flatten the pro config for website
+const proPlan = {
+  ...getProPricing('website'),
+  features: PRICING_CONFIG.pro.features,
+  buttonText: PRICING_CONFIG.pro.buttonText,
+  popular: PRICING_CONFIG.pro.popular,
+}
+
+const plans = [PRICING_CONFIG.free, proPlan]
 
 export function PricingSection() {
   return (
-    <section id="pricing" className="py-20 bg-gradient-to-b from-gray-900 to-black">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-heading font-bold text-white mb-6">
-            Simple, Transparent
-            <span className="text-gradient"> Pricing</span>
-          </h2>
-          <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-            Choose the plan that fits your interview preparation needs. Start free and upgrade when you're ready for
-            more.
-          </p>
-        </div>
+    <section id="pricing" className="relative py-24 md:py-32 bg-black overflow-hidden">
+      {/* Background elements */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black via-neural/5 to-black pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,217,255,0.03),transparent_50%)]" />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+      <div className="container mx-auto px-4 relative z-10">
+        {/* Section Header */}
+        <ScrollReveal className="text-center mb-16 md:mb-20">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-neural/30 bg-neural/5 text-neural text-sm font-medium mb-6">
+              <Zap className="w-4 h-4" />
+              Simple & Transparent
+            </span>
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading font-black text-white mb-6">
+              Invest in Your
+              <br />
+              <span className="bg-gradient-to-r from-accent via-neural to-accent bg-clip-text text-transparent">
+                Career Success
+              </span>
+            </h2>
+            <p className="text-lg md:text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
+              Start free and scale when you're ready.
+              <br className="hidden sm:block" />
+              No credit card required.
+            </p>
+          </motion.div>
+        </ScrollReveal>
+
+        {/* Pricing Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 max-w-5xl mx-auto mb-12">
           {plans.map((plan, index) => (
-            <Card
-              key={index}
-              className={`relative bg-gray-900/50 border-gray-700 transition-all duration-300 hover:scale-105 glass-effect ${
-                plan.popular ? "border-[#ff5733] ring-2 ring-[#ff5733]/20" : ""
-              }`}
-            >
-              {plan.popular && (
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <div className="bg-[#ff5733] text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center space-x-1">
-                    <Star className="h-4 w-4" />
-                    <span>Most Popular</span>
+            <ScrollReveal key={index} delay={index * 0.1}>
+              <motion.div
+                className={`relative rounded-3xl p-8 md:p-10 border transition-all duration-500 group ${
+                  plan.popular
+                    ? "bg-gradient-to-br from-accent/10 to-neural/10 border-accent/50 hover:border-accent hover:shadow-[0_0_50px_rgba(0,217,255,0.2)]"
+                    : "glass-minimal border-white/[0.08] hover:border-accent/30 hover:shadow-[0_0_40px_rgba(0,217,255,0.1)]"
+                }`}
+                whileHover={{ y: -8 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              >
+                {/* Plan Badge */}
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-2">
+                    {plan.popular ? (
+                      <Crown className="w-6 h-6 text-accent" />
+                    ) : (
+                      <Sparkles className="w-6 h-6 text-neural" />
+                    )}
+                    <h3 className="text-2xl font-heading font-bold text-white">{plan.name}</h3>
                   </div>
                 </div>
-              )}
 
-              <CardHeader className="text-center pb-8">
-                <CardTitle className="text-2xl font-heading font-bold text-white mb-2">{plan.name}</CardTitle>
-                <div className="flex items-baseline justify-center space-x-1">
-                  <span className="text-4xl font-bold text-[#ff5733]">{plan.priceDisplay}</span>
-                  <span className="text-gray-400">{plan.period}</span>
+                {/* Price */}
+                <div className="mb-6">
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <span className={`text-5xl md:text-6xl font-black ${
+                      plan.popular ? "text-accent" : "text-white"
+                    }`}>
+                      {plan.priceDisplay}
+                    </span>
+                    {plan.period && (
+                      <span className="text-gray-400 text-lg">
+                        {plan.period}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-gray-400">{plan.description}</p>
                 </div>
-                <p className="text-gray-300 mt-2">{plan.description}</p>
-              </CardHeader>
 
-              <CardContent className="space-y-6">
-                <ul className="space-y-3">
+                {/* Features */}
+                <ul className="space-y-4 mb-8">
                   {plan.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-center space-x-3">
-                      <Check className="h-5 w-5 text-[#ff5733] flex-shrink-0" />
-                      <span className="text-gray-300">{feature}</span>
-                    </li>
+                    <motion.li
+                      key={featureIndex}
+                      className="flex items-start gap-3"
+                      initial={{ opacity: 0, x: -10 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: featureIndex * 0.05 }}
+                    >
+                      <Check className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                        plan.popular ? "text-accent" : "text-neural"
+                      }`} />
+                      <span className="text-gray-300 leading-relaxed">{feature}</span>
+                    </motion.li>
                   ))}
                 </ul>
 
-                <Link href={plan.popular ? "/upgrade" : "/install"}>
-                  <Button
-                    className={`w-full py-3 text-lg font-semibold transition-all duration-300 ${
-                      plan.popular
-                        ? "bg-[#ff5733] hover:bg-[#ff5733]/80 text-white animate-pulse-glow"
-                        : "bg-gray-800 hover:bg-gray-700 text-white border border-gray-600"
-                    }`}
+                {/* CTA Button */}
+                <Link href={plan.popular ? "/upgrade" : "/install"} className="block">
+                  <MagneticButton
+                    variant={plan.popular ? "primary" : "outline"}
+                    glowColor={plan.popular ? "accent" : "none"}
+                    className="w-full justify-center"
+                    size="lg"
+                    strength={0.3}
                   >
                     {plan.buttonText}
-                  </Button>
+                  </MagneticButton>
                 </Link>
-              </CardContent>
-            </Card>
+
+                {/* Decorative corner */}
+                {plan.popular && (
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-accent/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-3xl pointer-events-none" />
+                )}
+              </motion.div>
+            </ScrollReveal>
           ))}
         </div>
 
-        <div className="text-center mt-12">
-          <p className="text-gray-400">All plans include a 7-day free trial. No credit card required for Free plan.</p>
-        </div>
+        {/* Bottom Note */}
+        <ScrollReveal>
+          <div className="text-center">
+            <p className="text-gray-500 text-sm md:text-base">
+              7-day free trial included • Cancel anytime • No hidden fees
+            </p>
+          </div>
+        </ScrollReveal>
       </div>
     </section>
   )

@@ -31,18 +31,20 @@ export function Header() {
 
   return (
     <header
-      className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-        isScrolled ? "glass-effect" : "bg-transparent"
+      className={`fixed top-0 w-full z-50 transition-all duration-500 ${
+        isScrolled ? "glass-minimal border-b border-accent/10" : "bg-transparent"
       }`}
     >
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-2">
+          <Link href="/" className="flex items-center space-x-3 group">
             <div className="relative">
-              <Code className="h-8 w-8 text-white animate-pulse-glow" />
-              <div className="absolute inset-0 bg-[#ff5733] rounded-full blur-lg opacity-30 animate-pulse"></div>
+              <Code className="h-8 w-8 text-accent group-hover:animate-neural-pulse transition-all" />
+              <div className="absolute inset-0 bg-accent rounded-full blur-lg opacity-20 group-hover:opacity-40 transition-opacity duration-300"></div>
             </div>
-            <span className="text-2xl font-heading font-bold text-gradient">MockMate</span>
+            <span className="text-2xl font-heading font-bold bg-gradient-to-r from-white via-accent to-white bg-clip-text text-transparent">
+              MockMate
+            </span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -53,29 +55,29 @@ export function Header() {
               </div>
             ) : user ? (
               <>
-                <Link href="/dashboard" className="text-white hover:text-[#ff5733] transition-colors duration-300 flex items-center space-x-1">
+                <Link href="/dashboard" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
                   <LayoutDashboard className="h-4 w-4" />
                   <span>Dashboard</span>
                 </Link>
-                <Link href="/profile" className="text-white hover:text-[#ff5733] transition-colors duration-300 flex items-center space-x-1">
+                <Link href="/profile" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
                   <User className="h-4 w-4" />
                   <span>Profile</span>
                 </Link>
-                <Link href="/sessions" className="text-white hover:text-[#ff5733] transition-colors duration-300 flex items-center space-x-1">
+                <Link href="/sessions" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
                   <Clock className="h-4 w-4" />
                   <span>Sessions</span>
                 </Link>
-                <Link href="/interview" className="text-white hover:text-[#ff5733] transition-colors duration-300 flex items-center space-x-1">
+                <Link href="/interview" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
                   <Terminal className="h-4 w-4" />
                   <span>Practice</span>
                 </Link>
-                <div className="flex items-center space-x-3 pl-4 border-l border-white/20">
-                  <span className="text-sm text-gray-300">{user.user_metadata?.full_name || user.email}</span>
+                <div className="flex items-center space-x-3 pl-4 border-l border-white/10">
+                  <span className="text-sm text-gray-400">{user.user_metadata?.full_name || user.email}</span>
                   <Button
                     onClick={handleSignOut}
                     variant="outline"
                     size="sm"
-                    className="border-white/50 text-white hover:bg-white hover:text-black transition-all duration-300 bg-transparent"
+                    className="border-accent/50 text-accent hover:bg-accent hover:text-black transition-all duration-300 bg-transparent"
                   >
                     <LogOut className="h-4 w-4 mr-1" />
                     Sign Out
@@ -84,22 +86,22 @@ export function Header() {
               </>
             ) : (
               <>
-                <a href="/#features" className="text-white hover:text-[#ff5733] transition-colors duration-300">
+                <a href="/#features" className="text-white/90 hover:text-accent transition-colors duration-300">
                   Features
                 </a>
-                <Link href="/pricing" className="text-white hover:text-[#ff5733] transition-colors duration-300">
+                <Link href="/pricing" className="text-white/90 hover:text-accent transition-colors duration-300">
                   Pricing
                 </Link>
-                <Link href="/demo" className="text-white hover:text-[#ff5733] transition-colors duration-300">
+                <Link href="/demo" className="text-white/90 hover:text-accent transition-colors duration-300">
                   Demo
                 </Link>
-                <Link href="/docs" className="text-white hover:text-[#ff5733] transition-colors duration-300">
+                <Link href="/docs" className="text-white/90 hover:text-accent transition-colors duration-300">
                   Docs
                 </Link>
                 <Link href="/login">
                   <Button
                     variant="outline"
-                    className="border-white text-white hover:bg-white hover:text-black transition-all duration-300 bg-transparent"
+                    className="border-accent/50 text-accent hover:bg-accent hover:text-black transition-all duration-300 bg-transparent"
                   >
                     Login
                   </Button>
@@ -126,7 +128,7 @@ export function Header() {
                 <>
                   <Link
                     href="/dashboard"
-                    className="text-white hover:text-[#ff5733] transition-colors duration-300 flex items-center space-x-2"
+                    className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-2"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <LayoutDashboard className="h-4 w-4" />
@@ -134,7 +136,7 @@ export function Header() {
                   </Link>
                   <Link
                     href="/profile"
-                    className="text-white hover:text-[#ff5733] transition-colors duration-300 flex items-center space-x-2"
+                    className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-2"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <User className="h-4 w-4" />
@@ -142,7 +144,7 @@ export function Header() {
                   </Link>
                   <Link
                     href="/sessions"
-                    className="text-white hover:text-[#ff5733] transition-colors duration-300 flex items-center space-x-2"
+                    className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-2"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <Clock className="h-4 w-4" />
@@ -150,21 +152,21 @@ export function Header() {
                   </Link>
                   <Link
                     href="/interview"
-                    className="text-white hover:text-[#ff5733] transition-colors duration-300 flex items-center space-x-2"
+                    className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-2"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <Terminal className="h-4 w-4" />
                     <span>Practice</span>
                   </Link>
-                  <div className="pt-4 border-t border-white/20">
-                    <p className="text-sm text-gray-300 mb-2">{user.user_metadata?.full_name || user.email}</p>
+                  <div className="pt-4 border-t border-white/10">
+                    <p className="text-sm text-gray-400 mb-2">{user.user_metadata?.full_name || user.email}</p>
                     <Button
                       onClick={() => {
                         handleSignOut()
                         setIsMobileMenuOpen(false)
                       }}
                       variant="outline"
-                      className="border-white/50 text-white hover:bg-white hover:text-black transition-all duration-300 w-fit bg-transparent"
+                      className="border-accent/50 text-accent hover:bg-accent hover:text-black transition-all duration-300 w-fit bg-transparent"
                     >
                       <LogOut className="h-4 w-4 mr-2" />
                       Sign Out
@@ -175,28 +177,28 @@ export function Header() {
                 <>
                   <a
                     href="/#features"
-                    className="text-white hover:text-[#ff5733] transition-colors duration-300"
+                    className="text-white/90 hover:text-accent transition-colors duration-300"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Features
                   </a>
                   <Link
                     href="/pricing"
-                    className="text-white hover:text-[#ff5733] transition-colors duration-300"
+                    className="text-white/90 hover:text-accent transition-colors duration-300"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Pricing
                   </Link>
                   <Link
                     href="/demo"
-                    className="text-white hover:text-[#ff5733] transition-colors duration-300"
+                    className="text-white/90 hover:text-accent transition-colors duration-300"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Demo
                   </Link>
                   <Link
                     href="/docs"
-                    className="text-white hover:text-[#ff5733] transition-colors duration-300"
+                    className="text-white/90 hover:text-accent transition-colors duration-300"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Docs
@@ -204,7 +206,7 @@ export function Header() {
                   <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
                     <Button
                       variant="outline"
-                      className="border-white text-white hover:bg-white hover:text-black transition-all duration-300 w-fit bg-transparent"
+                      className="border-accent/50 text-accent hover:bg-accent hover:text-black transition-all duration-300 w-fit bg-transparent"
                     >
                       Login
                     </Button>
