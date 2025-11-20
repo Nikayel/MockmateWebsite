@@ -1536,7 +1536,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       </CardHeader>
                       <CardContent className="flex flex-col flex-1 min-h-0 gap-2 p-3">
                         {/* Code Editor */}
-                        <div className="flex-1 border border-gray-700 rounded-lg overflow-hidden min-h-0" style={{ height: '45%' }}>
+                        <div className="flex-1 overflow-hidden min-h-0 rounded" style={{ height: '45%' }}>
                           <Editor
                             height="100%"
                             language={selectedLanguage}
@@ -1572,7 +1572,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
                         {/* Test Results & Efficiency - Compact */}
                         {testResults.length > 0 && (
-                          <div className="flex-shrink-0 bg-gray-800/30 p-2 rounded border border-gray-700" style={{ maxHeight: '15%' }}>
+                          <div className="flex-shrink-0 bg-gray-800/30 p-2 rounded" style={{ maxHeight: '15%' }}>
                             <div className="flex items-center justify-between mb-1">
                               <h3 className="text-white font-semibold text-xs">Results</h3>
                               <div className="flex items-center space-x-2">
