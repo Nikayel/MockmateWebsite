@@ -5,7 +5,7 @@
 
 export type ScenarioType = 'dsa' | 'bugfix' | 'optimization' | 'security' | 'system-design';
 export type DifficultyLevel = 'easy' | 'medium' | 'hard';
-export type Company = 'Google' | 'Meta' | 'Amazon' | 'Netflix' | 'Apple' | 'Microsoft' | 'Startup' | 'Generic' | 'Airbnb' | 'Shopify' | 'Walmart';
+export type Company = 'Google' | 'Meta' | 'Amazon' | 'Netflix' | 'Apple' | 'Microsoft' | 'Startup' | 'Generic' | 'Airbnb' | 'Shopify' | 'Walmart' | 'Stripe' | 'Slack';
 
 export interface BaseScenario {
   id: string;
@@ -66,7 +66,31 @@ export interface BugFixScenario extends BaseScenario {
   }[];
 }
 
-export type Scenario = DSAScenario | BugFixScenario;
+export interface SystemDesignScenario extends BaseScenario {
+  type: 'system-design';
+  problemStatement: string;
+  functionalRequirements: string[];
+  nonFunctionalRequirements: string[];
+  constraints: string[];
+  keyComponents: string[];
+  hints: string[];
+  evaluationCriteria: {
+    category: string;
+    description: string;
+    weight: number; // percentage
+  }[];
+  exampleSolution: {
+    overview: string;
+    architecture: string[];
+    dataModel: string[];
+    apiDesign: string[];
+    scalability: string[];
+    tradeoffs: string[];
+  };
+  discussionPoints: string[];
+}
+
+export type Scenario = DSAScenario | BugFixScenario | SystemDesignScenario;
 
 export const scenarios: Scenario[] = [
   {
@@ -11636,6 +11660,1872 @@ class Post(models.Model):
       {
         input: 'Posts with comments and authors',
         expected: 'Use nested eager loading to minimize queries',
+      },
+    ],
+  },
+  // System Design Scenarios
+  {
+    id: 'system-design-url-shortener',
+    title: 'Design a URL Shortener',
+    type: 'system-design',
+    difficulty: 'easy',
+    companies: ['Google', 'Amazon', 'Meta', 'Microsoft'],
+    description: 'Design a scalable URL shortening service like bit.ly or tinyurl.com',
+    tags: ['system-design', 'scalability', 'distributed-systems', 'hashing'],
+    estimatedTime: 45,
+    problemStatement: `Design a URL shortening service that converts long URLs into short, shareable links. Users should be able to create short URLs, and when someone visits a short URL, they should be redirected to the original URL.
+
+The service should handle millions of URL shortenings per day and billions of redirections per month. Consider how you would design the system to be scalable, reliable, and performant.`,
+    functionalRequirements: [
+      'Users can submit a long URL and get back a shortened URL',
+      'When users visit a short URL, they are redirected to the original long URL',
+      'Short URLs should be as short as possible (ideally 6-8 characters)',
+      'Users should optionally be able to customize their short URL',
+      'Short URLs should never expire (or have a configurable expiration)',
+      'Analytics: track how many times each short URL has been clicked',
+    ],
+    nonFunctionalRequirements: [
+      'System should be highly available (99.9% uptime)',
+      'Redirection should happen with minimal latency (< 100ms)',
+      'System should be scalable to handle millions of requests',
+      'Short URLs should be unique and not guessable',
+      'Service should be resilient to failures',
+    ],
+    constraints: [
+      'Expected 100M new URLs per month',
+      'Expected 10B redirections per month',
+      'Data should be stored for at least 5 years',
+      'Read:Write ratio is 100:1',
+      'Traffic is not evenly distributed (some URLs are very popular)',
+    ],
+    keyComponents: [
+      'API Gateway / Load Balancer',
+      'Application Servers',
+      'Database (SQL or NoSQL)',
+      'Cache Layer (Redis/Memcached)',
+      'Short URL Generation Service',
+      'Analytics Service',
+      'Monitoring & Logging',
+    ],
+    hints: [
+      'Start with defining the API endpoints: POST /shorten and GET /{shortUrl}',
+      'Consider using a hash function (MD5, Base62) for generating short URLs',
+      'Think about how to handle collisions when generating short URLs',
+      'A cache layer can significantly reduce database reads for popular URLs',
+      'Consider using a NoSQL database for better horizontal scalability',
+      'Pre-generate a pool of unique short codes for better performance',
+      'Use consistent hashing for distributing cache across multiple servers',
+    ],
+    evaluationCriteria: [
+      {
+        category: 'Requirements Gathering',
+        description: 'Clarified functional and non-functional requirements',
+        weight: 15,
+      },
+      {
+        category: 'High-Level Architecture',
+        description: 'Proposed clear architecture with major components',
+        weight: 25,
+      },
+      {
+        category: 'Data Model',
+        description: 'Designed appropriate database schema',
+        weight: 15,
+      },
+      {
+        category: 'API Design',
+        description: 'Defined clean and RESTful API endpoints',
+        weight: 10,
+      },
+      {
+        category: 'Scalability',
+        description: 'Addressed scaling concerns (caching, sharding, CDN)',
+        weight: 20,
+      },
+      {
+        category: 'Trade-offs',
+        description: 'Discussed trade-offs and alternative approaches',
+        weight: 15,
+      },
+    ],
+    exampleSolution: {
+      overview: 'A distributed URL shortening service using Base62 encoding for short code generation, Redis for caching popular URLs, and a NoSQL database for persistent storage. The system uses consistent hashing for cache distribution and database sharding for horizontal scalability.',
+      architecture: [
+        'Load Balancer: Distributes incoming requests across multiple app servers',
+        'Application Servers: Stateless servers handling URL creation and redirection',
+        'Redis Cache Cluster: Caches popular URLs to reduce database load',
+        'Database Cluster: Sharded NoSQL database (Cassandra/DynamoDB) for URL mappings',
+        'Analytics Service: Async service for tracking click events',
+        'Short Code Generator: Pre-generates unique short codes using Base62',
+      ],
+      dataModel: [
+        'URL Table: { shortCode (PK), longUrl, createdAt, expiresAt, userId, clicks }',
+        'Analytics Table: { shortCode, timestamp, userAgent, ipAddress, location }',
+        'User Table: { userId, email, createdAt, tier }',
+        'Index on shortCode for O(1) lookups',
+        'Sharding key: hash(shortCode) for distributing data',
+      ],
+      apiDesign: [
+        'POST /api/v1/shorten - Body: { longUrl, customAlias?, userId? } - Returns: { shortUrl, shortCode }',
+        'GET /{shortCode} - Redirects to long URL (302 redirect)',
+        'GET /api/v1/analytics/{shortCode} - Returns click statistics',
+        'DELETE /api/v1/{shortCode} - Deletes a short URL',
+      ],
+      scalability: [
+        'Horizontal scaling: Add more app servers behind load balancer',
+        'Database sharding: Partition data by hash(shortCode) across multiple DB nodes',
+        'Caching: Cache popular URLs in Redis (80-20 rule: 20% URLs get 80% traffic)',
+        'CDN: Serve static content and potentially cache redirects geographically',
+        'Rate limiting: Prevent abuse by limiting requests per user/IP',
+        'Async analytics: Use message queue (Kafka) to handle click tracking asynchronously',
+      ],
+      tradeoffs: [
+        'Short code generation: Random generation vs Counter-based vs Hash-based',
+        'Database choice: SQL (ACID guarantees) vs NoSQL (better scalability)',
+        'Cache eviction: LRU vs LFU vs TTL-based',
+        'Redirect type: 301 (permanent, cached by browsers) vs 302 (temporary, always hits server)',
+        'Custom aliases: Allow customization but need to handle conflicts',
+        'Analytics granularity: Real-time vs batch processing',
+      ],
+    },
+    discussionPoints: [
+      'How would you generate unique short codes? What are the pros/cons of different approaches?',
+      'How would you handle a short URL that goes viral and gets millions of requests?',
+      'What happens if the database goes down? How do you ensure availability?',
+      'How would you prevent abuse (e.g., someone creating millions of short URLs)?',
+      'How would you implement custom aliases while ensuring uniqueness?',
+      'What metrics would you track to monitor system health?',
+      'How would you handle URL expiration and cleanup?',
+      'What security concerns should you address (malicious URLs, DDoS)?',
+    ],
+  },
+  {
+    id: 'system-design-rate-limiter',
+    title: 'Design a Rate Limiter',
+    type: 'system-design',
+    difficulty: 'medium',
+    companies: ['Google', 'Amazon', 'Stripe', 'Shopify'],
+    description: 'Design a distributed rate limiting system to prevent API abuse',
+    tags: ['system-design', 'distributed-systems', 'algorithms', 'redis'],
+    estimatedTime: 45,
+    problemStatement: `Design a rate limiting system that can be used to limit the number of requests a user can make to an API within a given time window. The system should work in a distributed environment with multiple API servers.
+
+Consider different rate limiting algorithms, how to handle distributed state, and how to make the system efficient and fault-tolerant.`,
+    functionalRequirements: [
+      'Limit requests per user/IP/API key within a time window',
+      'Support multiple rate limit rules (e.g., 100 req/min, 1000 req/hour)',
+      'Return meaningful error messages when rate limit is exceeded',
+      'Support different rate limits for different user tiers (free, premium)',
+      'Provide APIs to check remaining quota',
+      'Allow temporary rate limit overrides for specific users',
+    ],
+    nonFunctionalRequirements: [
+      'Low latency: Rate limit check should add < 5ms overhead',
+      'High availability: Should work even if some nodes fail',
+      'Accurate: Should not allow significantly more requests than the limit',
+      'Scalable: Handle millions of requests per second',
+      'Distributed: Work across multiple API servers',
+    ],
+    constraints: [
+      'System serves 10,000 API servers',
+      'Need to support 1 million unique users',
+      'Rate limit decisions must be made in < 10ms',
+      'System should handle server failures gracefully',
+    ],
+    keyComponents: [
+      'Rate Limiter Service',
+      'Distributed Cache (Redis Cluster)',
+      'API Gateway',
+      'Configuration Service',
+      'Monitoring & Alerting',
+    ],
+    hints: [
+      'Consider different algorithms: Token Bucket, Leaky Bucket, Fixed Window, Sliding Window',
+      'Redis is commonly used for distributed rate limiting due to atomic operations',
+      'Use Redis INCR and EXPIRE commands with Lua scripts for atomicity',
+      'Sliding window log provides accuracy but uses more memory',
+      'Consider hybrid approaches for better trade-offs',
+      'Cache rate limit rules locally to reduce latency',
+      'Handle Redis failures gracefully (fail-open vs fail-closed)',
+    ],
+    evaluationCriteria: [
+      {
+        category: 'Algorithm Selection',
+        description: 'Chose appropriate rate limiting algorithm(s) and explained trade-offs',
+        weight: 25,
+      },
+      {
+        category: 'Distributed Design',
+        description: 'Addressed challenges of distributed rate limiting',
+        weight: 25,
+      },
+      {
+        category: 'Performance',
+        description: 'Optimized for low latency and high throughput',
+        weight: 20,
+      },
+      {
+        category: 'Fault Tolerance',
+        description: 'Handled failures and edge cases',
+        weight: 15,
+      },
+      {
+        category: 'Scalability',
+        description: 'System can scale to handle increasing load',
+        weight: 15,
+      },
+    ],
+    exampleSolution: {
+      overview: 'A distributed rate limiter using Redis cluster with Sliding Window Counter algorithm. The system uses Lua scripts for atomic operations, local caching for rules, and graceful degradation on Redis failures.',
+      architecture: [
+        'API Gateway: Intercepts all requests and invokes rate limiter',
+        'Rate Limiter Service: Embedded in each API server for low latency',
+        'Redis Cluster: Stores rate limit counters with sharding for scalability',
+        'Config Service: Manages rate limit rules and user tiers',
+        'Monitoring: Tracks rate limit violations and system health',
+      ],
+      dataModel: [
+        'Redis Key Pattern: "rate_limit:{userId}:{window_timestamp}" -> counter',
+        'Redis TTL: Set to window duration for automatic cleanup',
+        'Config Store: { userId/tier -> { limit, windowSize, burstAllowed } }',
+        'Example: "rate_limit:user123:1699999800" -> 45 (45 requests in current minute)',
+      ],
+      apiDesign: [
+        'POST /api/check-rate-limit - Body: { userId, resource } - Returns: { allowed: boolean, remaining: number, resetAt: timestamp }',
+        'GET /api/rate-limit-status/{userId} - Returns current quota status',
+        'POST /api/admin/set-rate-limit - Body: { userId, limit, windowSize } - Admin API to configure limits',
+      ],
+      scalability: [
+        'Redis Cluster: Shard data by userId hash across multiple Redis nodes',
+        'Local cache: Cache rate limit rules in-memory to avoid config service calls',
+        'Stateless rate limiter: Each API server can check rate limits independently',
+        'Batch processing: Use pipelines for multiple rate limit checks',
+        'Read replicas: Use Redis replicas for read-heavy workloads',
+      ],
+      tradeoffs: [
+        'Fixed Window: Simple but has burst problem at window boundaries',
+        'Sliding Window Log: Accurate but memory-intensive (stores all timestamps)',
+        'Sliding Window Counter: Good balance of accuracy and memory efficiency',
+        'Token Bucket: Allows controlled bursts, more complex to implement',
+        'Fail-open vs Fail-closed: When Redis is down, allow all requests or block all?',
+        'Consistency vs Availability: Strict rate limiting vs some over-limit allowance',
+      ],
+    },
+    discussionPoints: [
+      'What are the pros and cons of different rate limiting algorithms?',
+      'How do you handle clock synchronization issues in a distributed system?',
+      'What happens when Redis goes down? How do you ensure availability?',
+      'How would you implement different rate limits for different API endpoints?',
+      'How would you handle rate limiting for a single user with multiple devices?',
+      'How would you implement gradual backoff vs hard limits?',
+      'What metrics would you monitor to detect attacks or system issues?',
+      'How would you implement IP-based rate limiting vs user-based?',
+    ],
+  },
+  {
+    id: 'system-design-instagram',
+    title: 'Design Instagram/Photo Sharing Service',
+    type: 'system-design',
+    difficulty: 'hard',
+    companies: ['Meta', 'Google', 'Amazon', 'Netflix'],
+    description: 'Design a photo sharing and social networking service like Instagram',
+    tags: ['system-design', 'scalability', 'social-network', 'distributed-systems', 'cdn'],
+    estimatedTime: 60,
+    problemStatement: `Design a photo-sharing social networking service like Instagram. Users should be able to upload photos, follow other users, like and comment on photos, and see a feed of photos from people they follow.
+
+The system should handle hundreds of millions of users and billions of photos. Consider how you would store and serve images efficiently, generate personalized feeds, and handle the massive scale of social interactions.`,
+    functionalRequirements: [
+      'Users can upload photos with captions and hashtags',
+      'Users can follow/unfollow other users',
+      'Users can like and comment on photos',
+      'Users see a personalized feed of photos from people they follow',
+      'Users can search for photos by hashtags or users',
+      'Users can view their own profile and others\' profiles',
+      'Support stories (photos that disappear after 24 hours)',
+      'Send notifications for likes, comments, follows',
+    ],
+    nonFunctionalRequirements: [
+      'System should support 500M daily active users',
+      'Low latency: Feed should load in < 2 seconds',
+      'High availability: 99.99% uptime',
+      'Photos should be uploaded and available quickly',
+      'System should be globally distributed',
+      'Handle viral posts (photos that get millions of likes)',
+    ],
+    constraints: [
+      '200M photos uploaded per day',
+      'Average photo size: 2MB',
+      'Average user follows 200 people',
+      'Average user has 100 followers',
+      'Read:Write ratio is 100:1',
+      'Need to store photos for 10+ years',
+    ],
+    keyComponents: [
+      'API Gateway / Load Balancer',
+      'Application Servers',
+      'Image Upload Service',
+      'Image Storage (S3/Blob Storage)',
+      'CDN for image delivery',
+      'Databases (User, Posts, Relationships)',
+      'Feed Generation Service',
+      'Search Service',
+      'Notification Service',
+      'Cache Layer',
+    ],
+    hints: [
+      'Separate image storage from metadata storage',
+      'Use object storage (S3) and CDN for serving images globally',
+      'Pre-generate feeds asynchronously rather than on-demand',
+      'Use graph database or adjacency list for follow relationships',
+      'Consider sharding strategies: by userId, by geography',
+      'Use message queues for async tasks (notifications, feed updates)',
+      'Cache user feeds, popular posts, and user profiles',
+      'Consider using a ranking algorithm for feed ordering (chronological vs engagement-based)',
+    ],
+    evaluationCriteria: [
+      {
+        category: 'Requirements & Scope',
+        description: 'Properly scoped the problem and clarified requirements',
+        weight: 10,
+      },
+      {
+        category: 'High-Level Architecture',
+        description: 'Designed comprehensive architecture with all major components',
+        weight: 25,
+      },
+      {
+        category: 'Data Model & Storage',
+        description: 'Designed scalable data model for users, posts, relationships',
+        weight: 20,
+      },
+      {
+        category: 'Scalability & Performance',
+        description: 'Addressed scalability challenges (sharding, caching, CDN)',
+        weight: 25,
+      },
+      {
+        category: 'Trade-offs & Deep Dives',
+        description: 'Discussed trade-offs and deep-dived into complex areas',
+        weight: 20,
+      },
+    ],
+    exampleSolution: {
+      overview: 'A distributed photo-sharing platform using microservices architecture. Images are stored in S3 and served via CDN. User metadata and relationships are stored in sharded databases. Feeds are pre-generated asynchronously and cached. The system uses Kafka for event streaming and async processing.',
+      architecture: [
+        'Client Apps: iOS, Android, Web',
+        'CDN: CloudFront/Cloudflare for serving images globally',
+        'Load Balancer: Distributes traffic across API servers',
+        'API Gateway: Rate limiting, authentication, routing',
+        'Microservices: Upload Service, Feed Service, User Service, Search Service, Notification Service',
+        'Message Queue: Kafka for async event processing',
+        'Cache Layer: Redis for feeds, user data, popular posts',
+        'Databases: PostgreSQL (sharded) for metadata, Cassandra for feeds',
+        'Object Storage: S3 for original and processed images',
+        'Search: Elasticsearch for hashtag and user search',
+      ],
+      dataModel: [
+        'Users: { userId (PK), username, email, profilePicUrl, bio, followerCount, followingCount, createdAt }',
+        'Posts: { postId (PK), userId, imageUrl, caption, hashtags[], createdAt, likeCount, commentCount }',
+        'Follows: { followerId, followeeId, createdAt } - Composite PK',
+        'Likes: { postId, userId, createdAt } - Composite PK',
+        'Comments: { commentId (PK), postId, userId, text, createdAt }',
+        'Feed: { userId, postId, score, createdAt } - Pre-computed feeds',
+        'Sharding: Shard Users and Posts by userId hash',
+        'Indexes: On userId, postId, hashtags, createdAt',
+      ],
+      apiDesign: [
+        'POST /api/v1/posts - Upload photo: { image, caption, hashtags }',
+        'GET /api/v1/feed - Get personalized feed: { cursor, limit }',
+        'POST /api/v1/posts/{postId}/like - Like a post',
+        'POST /api/v1/posts/{postId}/comments - Comment: { text }',
+        'POST /api/v1/users/{userId}/follow - Follow a user',
+        'GET /api/v1/users/{userId} - Get user profile',
+        'GET /api/v1/search?q={query}&type={users|hashtags} - Search',
+      ],
+      scalability: [
+        'Image Upload: Client uploads directly to S3 via pre-signed URLs, reducing server load',
+        'Image Processing: Async workers resize images to multiple sizes (thumbnail, medium, full)',
+        'Feed Generation: Fanout-on-write for users with few followers, fanout-on-read for celebrities',
+        'Database Sharding: Shard by userId for data locality',
+        'Cache Strategy: Cache user feeds (Redis), popular posts, user profiles',
+        'CDN: Serve images from edge locations for low latency globally',
+        'Read Replicas: Multiple DB replicas for read-heavy operations',
+        'Async Processing: Use Kafka for feed updates, notifications, analytics',
+      ],
+      tradeoffs: [
+        'Fanout-on-write vs Fanout-on-read: Pre-generate feeds vs generate on-demand',
+        'SQL vs NoSQL: PostgreSQL for complex queries vs Cassandra for write-heavy workloads',
+        'Chronological vs Ranked feed: Simple timeline vs engagement-based ranking',
+        'Normalization: Store like count in Posts table (denormalized) for performance',
+        'Consistency: Eventual consistency for like counts vs strong consistency',
+        'Celebrity problem: Special handling for users with millions of followers',
+      ],
+    },
+    discussionPoints: [
+      'How would you handle a celebrity with 100M followers posting a photo?',
+      'How would you generate and rank the personalized feed?',
+      'How would you implement the search functionality for hashtags and users?',
+      'How would you ensure high availability during region failures?',
+      'How would you handle image storage and delivery efficiently?',
+      'What metrics would you track to monitor system health and user engagement?',
+      'How would you implement stories (disappearing content)?',
+      'How would you prevent spam and abusive content?',
+      'How would you handle GDPR and user data deletion requests?',
+    ],
+  },
+  {
+    id: 'system-design-distributed-cache',
+    title: 'Design a Distributed Cache',
+    type: 'system-design',
+    difficulty: 'medium',
+    companies: ['Google', 'Amazon', 'Meta', 'Netflix', 'Microsoft'],
+    description: 'Design a distributed caching system like Redis or Memcached',
+    tags: ['system-design', 'distributed-systems', 'caching', 'performance'],
+    estimatedTime: 45,
+    problemStatement: `Design a distributed in-memory caching system similar to Redis or Memcached. The system should allow applications to store and retrieve key-value pairs with very low latency.
+
+Consider how you would distribute data across multiple cache servers, handle server failures, and ensure high performance and availability.`,
+    functionalRequirements: [
+      'Store and retrieve key-value pairs (strings, integers, objects)',
+      'Support TTL (time-to-live) for automatic expiration',
+      'Support eviction policies (LRU, LFU, FIFO)',
+      'Atomic operations: increment, decrement, compare-and-swap',
+      'Support for data structures: lists, sets, sorted sets, hashes',
+      'Provide APIs: GET, SET, DELETE, EXISTS, EXPIRE',
+    ],
+    nonFunctionalRequirements: [
+      'Low latency: < 1ms for read/write operations',
+      'High throughput: millions of operations per second',
+      'High availability: tolerate node failures',
+      'Scalability: easily add/remove cache nodes',
+      'Consistency: handle concurrent updates correctly',
+    ],
+    constraints: [
+      'Support up to 100 cache nodes in a cluster',
+      'Each node can store up to 100GB of data',
+      'Network latency between nodes: 1-5ms',
+      'Client applications can send millions of requests per second',
+    ],
+    keyComponents: [
+      'Cache Client Library',
+      'Cache Servers (Nodes)',
+      'Consistent Hashing Ring',
+      'Replication Manager',
+      'Cluster Manager',
+      'Monitoring & Health Checks',
+    ],
+    hints: [
+      'Use consistent hashing to distribute keys across cache nodes',
+      'Consistent hashing minimizes data movement when nodes are added/removed',
+      'Consider replication for high availability (master-slave or multi-master)',
+      'Use virtual nodes to balance load more evenly',
+      'Implement client-side caching for frequently accessed keys',
+      'Use write-through or write-behind strategies for persistence',
+      'Handle network partitions with quorum-based reads/writes',
+    ],
+    evaluationCriteria: [
+      {
+        category: 'Core Functionality',
+        description: 'Designed basic cache operations and data structures',
+        weight: 20,
+      },
+      {
+        category: 'Distribution Strategy',
+        description: 'Chose appropriate data distribution mechanism (consistent hashing)',
+        weight: 25,
+      },
+      {
+        category: 'High Availability',
+        description: 'Addressed replication and failure handling',
+        weight: 20,
+      },
+      {
+        category: 'Performance',
+        description: 'Optimized for low latency and high throughput',
+        weight: 20,
+      },
+      {
+        category: 'Trade-offs',
+        description: 'Discussed CAP theorem and consistency trade-offs',
+        weight: 15,
+      },
+    ],
+    exampleSolution: {
+      overview: 'A distributed cache using consistent hashing for data distribution, master-slave replication for availability, and client-side sharding for performance. The system uses virtual nodes for balanced load distribution and supports automatic failover.',
+      architecture: [
+        'Cache Clients: Smart clients with embedded hashing logic',
+        'Cache Nodes: Multiple cache servers forming a cluster',
+        'Consistent Hash Ring: Virtual ring for key distribution',
+        'Replication: Each key replicated to N nodes (typically 3)',
+        'Cluster Manager: Monitors node health and manages cluster membership',
+        'Configuration Service: Stores cluster topology (ZooKeeper/etcd)',
+      ],
+      dataModel: [
+        'In-Memory Hash Table: { key -> value, ttl, lastAccessed }',
+        'LRU List: Doubly linked list for eviction policy',
+        'Expiration Heap: Min-heap ordered by expiration time',
+        'Key Format: string keys, values can be strings, integers, serialized objects',
+        'Metadata: Each entry stores size, creation time, access count',
+      ],
+      apiDesign: [
+        'GET key - Retrieve value for key - Returns: value or null',
+        'SET key value [EX seconds] - Store key-value with optional TTL',
+        'DELETE key - Remove key from cache',
+        'EXISTS key - Check if key exists - Returns: boolean',
+        'INCR key - Atomically increment integer value',
+        'EXPIRE key seconds - Set TTL on existing key',
+        'TTL key - Get remaining TTL - Returns: seconds or -1',
+      ],
+      scalability: [
+        'Consistent Hashing: Use hash(key) % ring_size to determine node',
+        'Virtual Nodes: Each physical node gets 100-200 virtual nodes for even distribution',
+        'Client-Side Sharding: Clients calculate target node, reducing server load',
+        'Horizontal Scaling: Add nodes to ring; only 1/N keys need to be redistributed',
+        'Connection Pooling: Maintain persistent connections to cache nodes',
+        'Pipelining: Batch multiple operations in a single network round trip',
+      ],
+      tradeoffs: [
+        'Consistency vs Availability: CAP theorem - choose AP over CP for caching',
+        'Replication: More replicas = higher availability but more memory usage',
+        'Eviction Policy: LRU (recency) vs LFU (frequency) vs TTL-based',
+        'Write Strategy: Write-through (slower writes, consistent) vs write-behind (faster, risk of data loss)',
+        'Data Persistence: In-memory only vs periodic snapshots vs AOF log',
+        'Hashing: Simple modulo (simple but poor scaling) vs consistent hashing (complex but better scaling)',
+      ],
+    },
+    discussionPoints: [
+      'How does consistent hashing work and why is it better than simple modulo hashing?',
+      'What happens when a cache node fails? How do you ensure availability?',
+      'How would you handle the thundering herd problem (many clients requesting same expired key)?',
+      'How would you implement cache warming (pre-populating cache)?',
+      'What eviction policy would you use and why?',
+      'How would you handle large objects that don\'t fit in memory?',
+      'How would you monitor cache hit rate and optimize it?',
+      'How would you handle network partitions in the cluster?',
+    ],
+  },
+  {
+    id: 'system-design-chat-system',
+    title: 'Design a Real-time Chat System',
+    type: 'system-design',
+    difficulty: 'medium',
+    companies: ['Meta', 'Google', 'Slack', 'Microsoft'],
+    description: 'Design a real-time messaging system like WhatsApp or Slack',
+    tags: ['system-design', 'real-time', 'websockets', 'distributed-systems', 'messaging'],
+    estimatedTime: 50,
+    problemStatement: `Design a real-time chat messaging system that supports one-on-one conversations and group chats. Users should be able to send text messages, images, and files. Messages should be delivered in real-time with support for read receipts and online status.
+
+The system should handle millions of concurrent users and ensure messages are delivered reliably even when users are offline.`,
+    functionalRequirements: [
+      'Users can send and receive text messages in real-time',
+      'Support one-on-one and group chats (up to 256 members)',
+      'Send images, videos, and files',
+      'Show online/offline status of users',
+      'Show read receipts (delivered, read)',
+      'Show typing indicators',
+      'Store message history',
+      'Support message search',
+      'Send notifications for new messages when user is offline',
+    ],
+    nonFunctionalRequirements: [
+      'Real-time: Messages delivered within 1 second',
+      'Highly available: 99.99% uptime',
+      'Support 100M daily active users',
+      'Support 1M concurrent WebSocket connections per server',
+      'Messages should be persisted and never lost',
+      'End-to-end encryption for privacy',
+    ],
+    constraints: [
+      '50M messages sent per day',
+      'Average message size: 100 bytes (text) to 10MB (files)',
+      'Users can be part of up to 100 group chats',
+      'Message history stored for 1 year',
+      'Global user base across multiple regions',
+    ],
+    keyComponents: [
+      'WebSocket Servers (for real-time connections)',
+      'API Gateway / Load Balancer',
+      'Chat Service',
+      'Message Queue (Kafka/RabbitMQ)',
+      'Database (Message Storage)',
+      'Presence Service (online/offline status)',
+      'Notification Service',
+      'Media Storage (S3)',
+      'CDN',
+    ],
+    hints: [
+      'Use WebSockets for bidirectional real-time communication',
+      'Store messages in a database partitioned by conversation ID',
+      'Use message queues to handle message delivery and retries',
+      'Maintain user-to-server mapping for routing messages',
+      'Consider using Cassandra or similar for message storage (write-heavy)',
+      'Use Redis for presence tracking and online status',
+      'Implement message acknowledgments to ensure delivery',
+      'Use CDN and object storage for media files',
+    ],
+    evaluationCriteria: [
+      {
+        category: 'Real-time Architecture',
+        description: 'Designed proper WebSocket-based architecture for real-time messaging',
+        weight: 25,
+      },
+      {
+        category: 'Message Delivery',
+        description: 'Ensured reliable message delivery and ordering',
+        weight: 20,
+      },
+      {
+        category: 'Scalability',
+        description: 'System can scale to millions of concurrent connections',
+        weight: 20,
+      },
+      {
+        category: 'Data Storage',
+        description: 'Designed efficient storage for messages and media',
+        weight: 15,
+      },
+      {
+        category: 'Additional Features',
+        description: 'Covered presence, notifications, encryption',
+        weight: 20,
+      },
+    ],
+    exampleSolution: {
+      overview: 'A distributed real-time chat system using WebSocket servers for persistent connections, Kafka for message routing, Cassandra for message storage, and Redis for presence tracking. The system uses consistent hashing to route users to servers and supports horizontal scaling.',
+      architecture: [
+        'Client Apps: Mobile and web clients with WebSocket connections',
+        'Load Balancer: Routes WebSocket connections to chat servers',
+        'WebSocket Servers: Maintain persistent connections with users',
+        'Message Router: Routes messages to appropriate WebSocket servers',
+        'Message Queue (Kafka): Ensures reliable message delivery',
+        'Chat Service: Business logic for sending/receiving messages',
+        'Database (Cassandra): Stores message history',
+        'Presence Service (Redis): Tracks user online/offline status',
+        'Notification Service: Sends push notifications for offline users',
+        'Object Storage (S3): Stores images, videos, files',
+      ],
+      dataModel: [
+        'Messages: { messageId (PK), conversationId, senderId, receiverId, content, timestamp, status, type }',
+        'Conversations: { conversationId (PK), participantIds[], type, createdAt, lastMessageAt }',
+        'Users: { userId (PK), username, lastSeen, publicKey }',
+        'Presence: Redis - { userId -> { status, lastSeen, connectedServerId } }',
+        'UserConnections: { userId -> WebSocketServerId } - for message routing',
+        'Partition by conversationId for message queries',
+      ],
+      apiDesign: [
+        'WebSocket Events: onConnect, onMessage, onTyping, onReadReceipt, onDisconnect',
+        'POST /api/v1/messages - Send message: { conversationId, recipientIds, content, type }',
+        'GET /api/v1/messages/{conversationId}?cursor={}&limit={} - Fetch message history',
+        'POST /api/v1/conversations - Create group chat: { name, participantIds }',
+        'GET /api/v1/conversations - List user\'s conversations',
+        'PUT /api/v1/messages/{messageId}/read - Mark message as read',
+        'GET /api/v1/users/{userId}/presence - Get online status',
+      ],
+      scalability: [
+        'WebSocket Servers: Horizontal scaling - each server handles 1M connections',
+        'Consistent Hashing: Route users to servers based on userId hash',
+        'Message Queue: Use Kafka partitions for parallel message processing',
+        'Database Sharding: Shard messages by conversationId for data locality',
+        'Redis Cluster: Shard presence data by userId',
+        'Read Replicas: For message history queries',
+        'CDN: Serve media files globally for low latency',
+        'Service Discovery: Use ZooKeeper/Consul for tracking server locations',
+      ],
+      tradeoffs: [
+        'WebSockets vs Long Polling: WebSockets for low latency but requires persistent connections',
+        'Message Ordering: Guaranteed ordering per conversation vs eventual consistency',
+        'Presence Accuracy: Real-time presence vs periodic heartbeats (tradeoff between accuracy and load)',
+        'Group Chat Fanout: Send to all members immediately vs batch delivery',
+        'Database Choice: Cassandra (write-optimized) vs PostgreSQL (strong consistency)',
+        'Encryption: End-to-end (more secure, complex) vs transport-level (simpler, less secure)',
+      ],
+    },
+    discussionPoints: [
+      'How would you ensure message ordering in a distributed system?',
+      'What happens if a user is connected to multiple devices?',
+      'How would you handle offline message delivery?',
+      'How would you implement group chat with thousands of members?',
+      'How would you scale WebSocket connections to millions of users?',
+      'How would you implement end-to-end encryption?',
+      'How would you handle message search efficiently?',
+      'How would you detect and handle network failures?',
+      'How would you implement message reactions and threading?',
+    ],
+  },
+  // AI/ML Debugging Scenarios
+  {
+    id: 'bugfix-ml-prediction-pipeline',
+    title: 'ML Model Prediction Pipeline Bug',
+    type: 'bugfix',
+    difficulty: 'medium',
+    companies: ['Google', 'Meta', 'Amazon', 'Netflix'],
+    description: 'Debug a machine learning prediction pipeline that returns incorrect predictions',
+    tags: ['ai', 'ml', 'debugging', 'tensorflow', 'numpy'],
+    estimatedTime: 35,
+    problemStatement: `A machine learning prediction service is deployed, but users are reporting that predictions are wildly incorrect. The model was trained and validated with good accuracy, but something is wrong in the production prediction pipeline.
+
+Your task is to identify and fix the bug causing incorrect predictions.`,
+    buggyCode: {
+      python: `import numpy as np
+import tensorflow as tf
+
+class ModelPredictor:
+    def __init__(self, model_path):
+        self.model = tf.keras.models.load_model(model_path)
+        self.feature_names = ['age', 'income', 'credit_score', 'loan_amount']
+
+    def preprocess(self, raw_data):
+        """Preprocess raw input data for model prediction"""
+        # Extract features in order
+        features = []
+        for name in self.feature_names:
+            features.append(raw_data[name])
+
+        # Convert to numpy array
+        X = np.array([features])
+
+        # Normalize features (min-max scaling)
+        X_normalized = (X - X.min()) / (X.max() - X.min())
+
+        return X_normalized
+
+    def predict(self, raw_data):
+        """Make prediction on raw input data"""
+        X = self.preprocess(raw_data)
+        prediction = self.model.predict(X)
+        return prediction[0][0]
+
+# Example usage
+predictor = ModelPredictor('loan_approval_model.h5')
+
+# Test case 1: Should predict ~0.85 (high approval probability)
+test_input_1 = {
+    'age': 35,
+    'income': 75000,
+    'credit_score': 750,
+    'loan_amount': 20000
+}
+print(f"Prediction 1: {predictor.predict(test_input_1)}")
+
+# Test case 2: Should predict ~0.15 (low approval probability)
+test_input_2 = {
+    'age': 22,
+    'income': 25000,
+    'credit_score': 550,
+    'loan_amount': 50000
+}
+print(f"Prediction 2: {predictor.predict(test_input_2)}")`,
+      javascript: `const tf = require('@tensorflow/tfjs-node');
+
+class ModelPredictor {
+    constructor(modelPath) {
+        this.modelPath = modelPath;
+        this.model = null;
+        this.featureNames = ['age', 'income', 'credit_score', 'loan_amount'];
+    }
+
+    async loadModel() {
+        this.model = await tf.loadLayersModel(this.modelPath);
+    }
+
+    preprocess(rawData) {
+        // Extract features in order
+        const features = this.featureNames.map(name => rawData[name]);
+
+        // Convert to tensor
+        const X = tf.tensor2d([features]);
+
+        // Normalize features (min-max scaling)
+        const min = X.min();
+        const max = X.max();
+        const XNormalized = X.sub(min).div(max.sub(min));
+
+        return XNormalized;
+    }
+
+    async predict(rawData) {
+        const X = this.preprocess(rawData);
+        const prediction = await this.model.predict(X);
+        const result = prediction.dataSync()[0];
+
+        // Clean up tensors
+        X.dispose();
+        prediction.dispose();
+
+        return result;
+    }
+}
+
+// Example usage
+async function main() {
+    const predictor = new ModelPredictor('file://./loan_approval_model/model.json');
+    await predictor.loadModel();
+
+    // Test case 1: Should predict ~0.85 (high approval probability)
+    const testInput1 = {
+        age: 35,
+        income: 75000,
+        credit_score: 750,
+        loan_amount: 20000
+    };
+    console.log(\`Prediction 1: \${await predictor.predict(testInput1)}\`);
+
+    // Test case 2: Should predict ~0.15 (low approval probability)
+    const testInput2 = {
+        age: 22,
+        income: 25000,
+        credit_score: 550,
+        loan_amount: 50000
+    };
+    console.log(\`Prediction 2: \${await predictor.predict(testInput2)}\`);
+}
+
+main();`,
+    },
+    codebaseFiles: {
+      python: [
+        {
+          fileName: 'training_pipeline.py',
+          content: `import numpy as np
+from sklearn.preprocessing import StandardScaler
+import tensorflow as tf
+
+# Training pipeline showing how data was preprocessed during training
+def train_model(X_train, y_train):
+    # Feature names
+    feature_names = ['age', 'income', 'credit_score', 'loan_amount']
+
+    # Normalize using StandardScaler (z-score normalization)
+    scaler = StandardScaler()
+    X_train_normalized = scaler.fit_transform(X_train)
+
+    # Build model
+    model = tf.keras.Sequential([
+        tf.keras.layers.Dense(64, activation='relu', input_shape=(4,)),
+        tf.keras.layers.Dense(32, activation='relu'),
+        tf.keras.layers.Dense(1, activation='sigmoid')
+    ])
+
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    model.fit(X_train_normalized, y_train, epochs=50, batch_size=32)
+
+    return model, scaler
+
+# Training statistics
+print("Training data statistics:")
+print("Mean: age=38.5, income=55000, credit_score=680, loan_amount=30000")
+print("Std: age=12.3, income=25000, credit_score=85, loan_amount=15000")`,
+          description: 'Training pipeline showing preprocessing method used',
+        },
+      ],
+      javascript: [
+        {
+          fileName: 'training_pipeline.js',
+          content: `const tf = require('@tensorflow/tfjs-node');
+
+// Training pipeline showing how data was preprocessed during training
+async function trainModel(XTrain, yTrain) {
+    // Feature names
+    const featureNames = ['age', 'income', 'credit_score', 'loan_amount'];
+
+    // Calculate mean and std for StandardScaler (z-score normalization)
+    const mean = XTrain.mean(0);
+    const std = XTrain.sub(mean).square().mean(0).sqrt();
+
+    // Normalize using StandardScaler
+    const XTrainNormalized = XTrain.sub(mean).div(std);
+
+    // Build model
+    const model = tf.sequential({
+        layers: [
+            tf.layers.dense({ units: 64, activation: 'relu', inputShape: [4] }),
+            tf.layers.dense({ units: 32, activation: 'relu' }),
+            tf.layers.dense({ units: 1, activation: 'sigmoid' })
+        ]
+    });
+
+    model.compile({ optimizer: 'adam', loss: 'binaryCrossentropy', metrics: ['accuracy'] });
+    await model.fit(XTrainNormalized, yTrain, { epochs: 50, batchSize: 32 });
+
+    return { model, mean, std };
+}
+
+// Training statistics
+console.log("Training data statistics:");
+console.log("Mean: age=38.5, income=55000, credit_score=680, loan_amount=30000");
+console.log("Std: age=12.3, income=25000, credit_score=85, loan_amount=15000");`,
+          description: 'Training pipeline showing preprocessing method used',
+        },
+      ],
+    },
+    expectedBehavior: 'The predictor should use the same normalization method (StandardScaler with training statistics) as was used during training to get accurate predictions.',
+    bugDescription: 'The bug is in the preprocessing step: the code uses min-max normalization on individual samples, but the model was trained using StandardScaler (z-score normalization) on the entire training dataset. This mismatch causes predictions to be incorrect because the model receives inputs in a completely different scale than what it was trained on.',
+    hints: [
+      'Compare the preprocessing in the prediction pipeline with the training pipeline',
+      'What normalization method was used during training?',
+      'Min-max normalization on a single sample will give different results than on a dataset',
+      'You need to store and reuse the training statistics (mean and std) for consistent normalization',
+      'StandardScaler uses (x - mean) / std, not (x - min) / (max - min)',
+    ],
+    testCases: [
+      {
+        input: { age: 35, income: 75000, credit_score: 750, loan_amount: 20000 },
+        expected: 'Should return ~0.85 (high approval probability)',
+        description: 'High quality applicant',
+      },
+      {
+        input: { age: 22, income: 25000, credit_score: 550, loan_amount: 50000 },
+        expected: 'Should return ~0.15 (low approval probability)',
+        description: 'Low quality applicant',
+      },
+    ],
+  },
+  {
+    id: 'bugfix-data-preprocessing-race',
+    title: 'Data Preprocessing Race Condition',
+    type: 'bugfix',
+    difficulty: 'hard',
+    companies: ['Google', 'Meta', 'Netflix', 'Amazon'],
+    description: 'Fix a race condition in parallel data preprocessing for ML training',
+    tags: ['ai', 'ml', 'concurrency', 'debugging', 'multithreading'],
+    estimatedTime: 40,
+    problemStatement: `A data preprocessing pipeline for training machine learning models is producing corrupted data batches intermittently. The issue only occurs when processing data in parallel, and it's causing training to fail randomly with NaN losses.
+
+Your task is to identify and fix the race condition in the data preprocessing pipeline.`,
+    buggyCode: {
+      python: `import numpy as np
+from concurrent.futures import ThreadPoolExecutor
+import time
+
+class DataPreprocessor:
+    def __init__(self):
+        self.scaler_mean = None
+        self.scaler_std = None
+        self.total_samples = 0
+
+    def fit_scaler(self, data):
+        """Fit the scaler on training data"""
+        self.scaler_mean = np.mean(data, axis=0)
+        self.scaler_std = np.std(data, axis=0)
+
+    def normalize(self, data):
+        """Normalize data using fitted scaler"""
+        if self.scaler_mean is None:
+            raise ValueError("Scaler not fitted")
+        return (data - self.scaler_mean) / (self.scaler_std + 1e-8)
+
+    def augment(self, sample):
+        """Apply data augmentation (add random noise)"""
+        noise = np.random.normal(0, 0.1, size=sample.shape)
+        return sample + noise
+
+    def process_batch(self, batch):
+        """Process a batch of data with augmentation and normalization"""
+        # Apply augmentation
+        augmented = np.array([self.augment(sample) for sample in batch])
+
+        # Normalize
+        normalized = self.normalize(augmented)
+
+        # Update count
+        self.total_samples += len(batch)
+
+        return normalized
+
+    def process_dataset_parallel(self, data, batch_size=32, num_workers=4):
+        """Process entire dataset in parallel"""
+        # First fit the scaler
+        self.fit_scaler(data)
+        self.total_samples = 0
+
+        # Split data into batches
+        batches = [data[i:i+batch_size] for i in range(0, len(data), batch_size)]
+
+        # Process batches in parallel
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+            processed_batches = list(executor.map(self.process_batch, batches))
+
+        # Concatenate results
+        result = np.concatenate(processed_batches, axis=0)
+
+        return result, self.total_samples
+
+# Test the preprocessor
+np.random.seed(42)
+data = np.random.randn(1000, 10)  # 1000 samples, 10 features
+
+preprocessor = DataPreprocessor()
+processed_data, count = preprocessor.process_dataset_parallel(data, batch_size=32, num_workers=4)
+
+print(f"Processed {count} samples")
+print(f"Expected: 1000 samples")
+print(f"Data shape: {processed_data.shape}")
+print(f"Contains NaN: {np.isnan(processed_data).any()}")`,
+      javascript: `class DataPreprocessor {
+    constructor() {
+        this.scalerMean = null;
+        this.scalerStd = null;
+        this.totalSamples = 0;
+    }
+
+    fitScaler(data) {
+        // Calculate mean and std
+        const sum = data.reduce((acc, row) =>
+            row.map((val, i) => (acc[i] || 0) + val), []);
+        this.scalerMean = sum.map(s => s / data.length);
+
+        const sqDiff = data.map(row =>
+            row.map((val, i) => Math.pow(val - this.scalerMean[i], 2)));
+        const variance = sqDiff.reduce((acc, row) =>
+            row.map((val, i) => (acc[i] || 0) + val), [])
+            .map(s => s / data.length);
+        this.scalerStd = variance.map(Math.sqrt);
+    }
+
+    normalize(data) {
+        if (!this.scalerMean) {
+            throw new Error('Scaler not fitted');
+        }
+        return data.map(row =>
+            row.map((val, i) => (val - this.scalerMean[i]) / (this.scalerStd[i] + 1e-8))
+        );
+    }
+
+    augment(sample) {
+        // Add random noise
+        return sample.map(val => val + (Math.random() - 0.5) * 0.2);
+    }
+
+    processBatch(batch) {
+        // Apply augmentation
+        const augmented = batch.map(sample => this.augment(sample));
+
+        // Normalize
+        const normalized = this.normalize(augmented);
+
+        // Update count
+        this.totalSamples += batch.length;
+
+        return normalized;
+    }
+
+    async processDatasetParallel(data, batchSize = 32) {
+        // First fit the scaler
+        this.fitScaler(data);
+        this.totalSamples = 0;
+
+        // Split data into batches
+        const batches = [];
+        for (let i = 0; i < data.length; i += batchSize) {
+            batches.push(data.slice(i, i + batchSize));
+        }
+
+        // Process batches in parallel
+        const processedBatches = await Promise.all(
+            batches.map(batch => Promise.resolve(this.processBatch(batch)))
+        );
+
+        // Concatenate results
+        const result = processedBatches.flat();
+
+        return { data: result, count: this.totalSamples };
+    }
+}
+
+// Test the preprocessor
+function generateData(samples, features) {
+    return Array.from({ length: samples }, () =>
+        Array.from({ length: features }, () => Math.random() * 2 - 1)
+    );
+}
+
+async function test() {
+    const data = generateData(1000, 10);
+
+    const preprocessor = new DataPreprocessor();
+    const { data: processedData, count } = await preprocessor.processDatasetParallel(data, 32);
+
+    console.log(\`Processed \${count} samples\`);
+    console.log(\`Expected: 1000 samples\`);
+    console.log(\`Data length: \${processedData.length}\`);
+}
+
+test();`,
+    },
+    codebaseFiles: {
+      python: [
+        {
+          fileName: 'utils.py',
+          content: `import threading
+
+class ThreadSafeCounter:
+    """Thread-safe counter implementation"""
+    def __init__(self):
+        self.value = 0
+        self.lock = threading.Lock()
+
+    def increment(self, amount=1):
+        with self.lock:
+            self.value += amount
+
+    def get(self):
+        with self.lock:
+            return self.value`,
+          description: 'Thread-safe counter utility',
+        },
+      ],
+      javascript: [
+        {
+          fileName: 'utils.js',
+          content: `class ThreadSafeCounter {
+    constructor() {
+        this.value = 0;
+        this.lock = Promise.resolve();
+    }
+
+    async increment(amount = 1) {
+        // Queue the increment operation
+        this.lock = this.lock.then(async () => {
+            this.value += amount;
+        });
+        await this.lock;
+    }
+
+    getValue() {
+        return this.value;
+    }
+}
+
+module.exports = { ThreadSafeCounter };`,
+          description: 'Thread-safe counter utility',
+        },
+      ],
+    },
+    expectedBehavior: 'The preprocessor should correctly count all samples and avoid race conditions when updating shared state (total_samples) from multiple threads.',
+    bugDescription: 'The bug is a race condition on self.total_samples. Multiple threads are reading and writing to this shared variable without synchronization, causing incorrect counts and potential data corruption. The fix is to use thread-safe operations (locks, atomic operations, or avoiding shared mutable state altogether).',
+    hints: [
+      'Multiple threads are modifying self.total_samples simultaneously',
+      'Look at what state is shared between threads',
+      'Consider using locks or atomic operations for thread-safe updates',
+      'Alternatively, collect counts from each batch and sum them afterwards',
+      'The utils.py file provides a ThreadSafeCounter class that might be useful',
+    ],
+    testCases: [
+      {
+        input: '1000 samples processed in parallel',
+        expected: 'Should count exactly 1000 samples, no race condition',
+        description: 'Parallel processing test',
+      },
+      {
+        input: 'Run multiple times',
+        expected: 'Should produce consistent results across runs',
+        description: 'Consistency test',
+      },
+    ],
+  },
+  {
+    id: 'bugfix-model-inference-memory-leak',
+    title: 'Model Inference Memory Leak',
+    type: 'bugfix',
+    difficulty: 'hard',
+    companies: ['Google', 'Amazon', 'Meta', 'Microsoft'],
+    description: 'Debug and fix a memory leak in a production ML inference service',
+    tags: ['ai', 'ml', 'memory-leak', 'tensorflow', 'performance'],
+    estimatedTime: 40,
+    problemStatement: `A production machine learning inference service is experiencing memory leaks. The memory usage grows continuously over time until the service crashes. The issue is affecting the SLA as the service needs to be restarted frequently.
+
+Your task is to identify and fix the memory leak in the inference code.`,
+    buggyCode: {
+      python: `import tensorflow as tf
+import numpy as np
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+class ImageClassifier:
+    def __init__(self, model_path):
+        self.model = tf.keras.models.load_model(model_path)
+        self.class_names = ['cat', 'dog', 'bird', 'fish']
+
+    def preprocess_image(self, image_bytes):
+        """Preprocess image for model input"""
+        # Decode image
+        image = tf.image.decode_jpeg(image_bytes, channels=3)
+
+        # Resize to model input size
+        image = tf.image.resize(image, [224, 224])
+
+        # Normalize to [0, 1]
+        image = image / 255.0
+
+        # Add batch dimension
+        image = tf.expand_dims(image, 0)
+
+        return image
+
+    def predict(self, image_bytes):
+        """Run inference on image"""
+        # Preprocess
+        image_tensor = self.preprocess_image(image_bytes)
+
+        # Run inference
+        predictions = self.model(image_tensor, training=False)
+
+        # Get top prediction
+        class_idx = tf.argmax(predictions[0]).numpy()
+        confidence = float(predictions[0][class_idx].numpy())
+
+        return {
+            'class': self.class_names[class_idx],
+            'confidence': confidence
+        }
+
+# Initialize classifier
+classifier = ImageClassifier('image_classifier.h5')
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    """API endpoint for image classification"""
+    image_bytes = request.data
+    result = classifier.predict(image_bytes)
+    return jsonify(result)
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Health check endpoint"""
+    return jsonify({'status': 'healthy'})
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)`,
+      javascript: `const tf = require('@tensorflow/tfjs-node');
+const express = require('express');
+const multer = require('multer');
+
+const app = express();
+const upload = multer();
+
+class ImageClassifier {
+    constructor(modelPath) {
+        this.modelPath = modelPath;
+        this.model = null;
+        this.classNames = ['cat', 'dog', 'bird', 'fish'];
+    }
+
+    async loadModel() {
+        this.model = await tf.loadLayersModel(this.modelPath);
+    }
+
+    preprocessImage(imageBuffer) {
+        // Decode image
+        const imageTensor = tf.node.decodeImage(imageBuffer, 3);
+
+        // Resize to model input size
+        const resized = tf.image.resizeBilinear(imageTensor, [224, 224]);
+
+        // Normalize to [0, 1]
+        const normalized = resized.div(255.0);
+
+        // Add batch dimension
+        const batched = normalized.expandDims(0);
+
+        return batched;
+    }
+
+    async predict(imageBuffer) {
+        // Preprocess
+        const imageTensor = this.preprocessImage(imageBuffer);
+
+        // Run inference
+        const predictions = await this.model.predict(imageTensor);
+
+        // Get top prediction
+        const predArray = await predictions.data();
+        const classIdx = predArray.indexOf(Math.max(...predArray));
+        const confidence = predArray[classIdx];
+
+        return {
+            class: this.classNames[classIdx],
+            confidence: confidence
+        };
+    }
+}
+
+// Initialize classifier
+const classifier = new ImageClassifier('file://./model/model.json');
+
+app.post('/predict', upload.single('image'), async (req, res) => {
+    try {
+        const result = await classifier.predict(req.file.buffer);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/health', (req, res) => {
+    res.json({ status: 'healthy' });
+});
+
+async function start() {
+    await classifier.loadModel();
+    app.listen(5000, () => {
+        console.log('Server running on port 5000');
+    });
+}
+
+start();`,
+    },
+    codebaseFiles: {
+      python: [
+        {
+          fileName: 'load_test.py',
+          content: `import requests
+import time
+
+def load_test(num_requests=1000):
+    """Simulate load on the inference service"""
+    with open('test_image.jpg', 'rb') as f:
+        image_bytes = f.read()
+
+    for i in range(num_requests):
+        response = requests.post('http://localhost:5000/predict', data=image_bytes)
+        if i % 100 == 0:
+            print(f"Request {i}: {response.json()}")
+
+load_test()`,
+          description: 'Load testing script to reproduce memory leak',
+        },
+      ],
+      javascript: [
+        {
+          fileName: 'load_test.js',
+          content: `const axios = require('axios');
+const fs = require('fs');
+
+async function loadTest(numRequests = 1000) {
+    const imageBuffer = fs.readFileSync('test_image.jpg');
+
+    for (let i = 0; i < numRequests; i++) {
+        const formData = new FormData();
+        formData.append('image', new Blob([imageBuffer]));
+
+        const response = await axios.post('http://localhost:5000/predict', formData);
+
+        if (i % 100 === 0) {
+            console.log(\`Request \${i}: \${JSON.stringify(response.data)}\`);
+        }
+    }
+}
+
+loadTest();`,
+          description: 'Load testing script to reproduce memory leak',
+        },
+      ],
+    },
+    expectedBehavior: 'The service should maintain constant memory usage over time by properly cleaning up TensorFlow tensors after each inference.',
+    bugDescription: 'The bug is a TensorFlow tensor memory leak. Intermediate tensors created during preprocessing (image, resized, normalized, batched) are not being disposed. In TensorFlow/TF.js, tensors must be explicitly disposed or managed with tf.tidy() to free GPU/CPU memory. Without cleanup, each inference accumulates tensors in memory.',
+    hints: [
+      'TensorFlow tensors need to be explicitly cleaned up',
+      'Look at all the intermediate tensors created during preprocessing',
+      'In Python, consider using context managers or explicit tensor cleanup',
+      'In JavaScript, use tensor.dispose() or tf.tidy() to manage tensor memory',
+      'The memory leak happens on every prediction request',
+    ],
+    testCases: [
+      {
+        input: '1000 sequential prediction requests',
+        expected: 'Memory usage should remain constant',
+        description: 'Memory leak test',
+      },
+      {
+        input: 'Monitor memory over time',
+        expected: 'No continuous memory growth',
+        description: 'Long-running stability test',
+      },
+    ],
+  },
+  {
+    id: 'bugfix-feature-engineering-nan',
+    title: 'Feature Engineering NaN Handling',
+    type: 'bugfix',
+    difficulty: 'easy',
+    companies: ['Amazon', 'Airbnb', 'Shopify', 'Walmart'],
+    description: 'Fix NaN propagation bug in feature engineering pipeline',
+    tags: ['ai', 'ml', 'data-processing', 'pandas', 'debugging'],
+    estimatedTime: 25,
+    problemStatement: `A feature engineering pipeline is producing NaN values that propagate through the entire dataset, causing model training to fail. The issue occurs when calculating derived features from raw data.
+
+Your task is to identify why NaN values are being produced and fix the feature engineering code.`,
+    buggyCode: {
+      python: `import pandas as pd
+import numpy as np
+
+class FeatureEngineer:
+    def __init__(self):
+        self.feature_names = []
+
+    def engineer_features(self, df):
+        """Create derived features from raw data"""
+        result = df.copy()
+
+        # Feature 1: Age group
+        result['age_group'] = pd.cut(df['age'], bins=[0, 18, 30, 50, 100],
+                                      labels=['minor', 'young', 'middle', 'senior'])
+
+        # Feature 2: Income per year of age (income efficiency)
+        result['income_per_age'] = df['income'] / df['age']
+
+        # Feature 3: Debt to income ratio
+        result['debt_to_income'] = df['debt'] / df['income']
+
+        # Feature 4: Log of income (for normalization)
+        result['log_income'] = np.log(df['income'])
+
+        # Feature 5: Credit utilization (debt / credit_limit)
+        result['credit_utilization'] = df['debt'] / df['credit_limit']
+
+        # Feature 6: Savings rate
+        result['savings_rate'] = (df['income'] - df['expenses']) / df['income']
+
+        self.feature_names = result.columns.tolist()
+        return result
+
+    def validate_features(self, df):
+        """Check for invalid values in features"""
+        nan_counts = df.isna().sum()
+        inf_counts = np.isinf(df.select_dtypes(include=[np.number])).sum()
+
+        print("NaN counts per column:")
+        print(nan_counts[nan_counts > 0])
+        print("\\nInf counts per column:")
+        print(inf_counts[inf_counts > 0])
+
+        return df
+
+# Test data
+data = pd.DataFrame({
+    'age': [25, 30, 0, 45, 35, 28],
+    'income': [50000, 75000, 0, 90000, 60000, 55000],
+    'debt': [5000, 10000, 0, 15000, 8000, 6000],
+    'credit_limit': [10000, 20000, 0, 30000, 15000, 12000],
+    'expenses': [40000, 60000, 500, 70000, 50000, 45000]
+})
+
+engineer = FeatureEngineer()
+features = engineer.engineer_features(data)
+engineer.validate_features(features)
+
+print("\\nFeature summary:")
+print(features.describe())`,
+      javascript: `class FeatureEngineer {
+    constructor() {
+        this.featureNames = [];
+    }
+
+    engineerFeatures(data) {
+        const result = data.map(row => ({ ...row }));
+
+        for (let i = 0; i < result.length; i++) {
+            const row = result[i];
+
+            // Feature 1: Age group
+            if (row.age < 18) row.age_group = 'minor';
+            else if (row.age < 30) row.age_group = 'young';
+            else if (row.age < 50) row.age_group = 'middle';
+            else row.age_group = 'senior';
+
+            // Feature 2: Income per year of age
+            row.income_per_age = row.income / row.age;
+
+            // Feature 3: Debt to income ratio
+            row.debt_to_income = row.debt / row.income;
+
+            // Feature 4: Log of income
+            row.log_income = Math.log(row.income);
+
+            // Feature 5: Credit utilization
+            row.credit_utilization = row.debt / row.credit_limit;
+
+            // Feature 6: Savings rate
+            row.savings_rate = (row.income - row.expenses) / row.income;
+        }
+
+        return result;
+    }
+
+    validateFeatures(data) {
+        const nanCounts = {};
+        const infCounts = {};
+
+        for (const row of data) {
+            for (const [key, value] of Object.entries(row)) {
+                if (typeof value === 'number') {
+                    if (isNaN(value)) {
+                        nanCounts[key] = (nanCounts[key] || 0) + 1;
+                    }
+                    if (!isFinite(value)) {
+                        infCounts[key] = (infCounts[key] || 0) + 1;
+                    }
+                }
+            }
+        }
+
+        console.log('NaN counts per column:');
+        console.log(nanCounts);
+        console.log('\\nInf counts per column:');
+        console.log(infCounts);
+
+        return data;
+    }
+}
+
+// Test data
+const data = [
+    { age: 25, income: 50000, debt: 5000, credit_limit: 10000, expenses: 40000 },
+    { age: 30, income: 75000, debt: 10000, credit_limit: 20000, expenses: 60000 },
+    { age: 0, income: 0, debt: 0, credit_limit: 0, expenses: 500 },
+    { age: 45, income: 90000, debt: 15000, credit_limit: 30000, expenses: 70000 },
+    { age: 35, income: 60000, debt: 8000, credit_limit: 15000, expenses: 50000 },
+    { age: 28, income: 55000, debt: 6000, credit_limit: 12000, expenses: 45000 }
+];
+
+const engineer = new FeatureEngineer();
+const features = engineer.engineerFeatures(data);
+engineer.validateFeatures(features);
+
+console.log('\\nSample features:');
+console.log(features[0]);`,
+    },
+    codebaseFiles: {
+      python: [
+        {
+          fileName: 'constants.py',
+          content: `# Constants for feature engineering
+MIN_AGE = 1
+MIN_INCOME = 1
+MIN_CREDIT_LIMIT = 1
+
+# Default fill values for missing data
+DEFAULT_FILL_VALUES = {
+    'age': 30,
+    'income': 50000,
+    'debt': 0,
+    'credit_limit': 10000,
+    'expenses': 30000
+}`,
+          description: 'Constants and default values',
+        },
+      ],
+      javascript: [
+        {
+          fileName: 'constants.js',
+          content: `// Constants for feature engineering
+const MIN_AGE = 1;
+const MIN_INCOME = 1;
+const MIN_CREDIT_LIMIT = 1;
+
+// Default fill values for missing data
+const DEFAULT_FILL_VALUES = {
+    age: 30,
+    income: 50000,
+    debt: 0,
+    credit_limit: 10000,
+    expenses: 30000
+};
+
+module.exports = { MIN_AGE, MIN_INCOME, MIN_CREDIT_LIMIT, DEFAULT_FILL_VALUES };`,
+          description: 'Constants and default values',
+        },
+      ],
+    },
+    expectedBehavior: 'Feature engineering should handle edge cases like division by zero and log of zero/negative numbers by either filtering invalid rows, imputing values, or using safe operations.',
+    bugDescription: 'Multiple bugs causing NaN/Inf values: 1) Division by zero when age/income/credit_limit is 0, 2) Log of zero or negative income, 3) No validation or handling of edge cases in input data. The fix requires adding proper validation, handling edge cases (zero values), and either filtering invalid data or using safe mathematical operations (e.g., np.log1p, adding epsilon to denominators).',
+    hints: [
+      'What happens when you divide by zero?',
+      'What happens when you take log of zero or negative numbers?',
+      'Look at the test data - are there any invalid values?',
+      'Consider adding validation for input data before feature engineering',
+      'You can either filter out invalid rows or handle them gracefully',
+      'Use np.log1p() instead of np.log() for more robust log transformation',
+    ],
+    testCases: [
+      {
+        input: 'Data with age=0, income=0, credit_limit=0',
+        expected: 'Should handle gracefully without producing NaN/Inf',
+        description: 'Edge case handling',
+      },
+      {
+        input: 'Normal data',
+        expected: 'Should produce valid features',
+        description: 'Normal case',
+      },
+    ],
+  },
+  {
+    id: 'bugfix-batch-dimension-mismatch',
+    title: 'Batch Processing Dimension Mismatch',
+    type: 'bugfix',
+    difficulty: 'medium',
+    companies: ['Google', 'Amazon', 'Meta', 'Microsoft'],
+    description: 'Fix dimension mismatch bug in batched model inference',
+    tags: ['ai', 'ml', 'tensorflow', 'numpy', 'debugging'],
+    estimatedTime: 30,
+    problemStatement: `A batch inference service works correctly for single samples but crashes with dimension mismatch errors when processing batches of multiple samples. The error occurs intermittently and seems related to batch size.
+
+Your task is to identify and fix the dimension handling bug in the batch inference code.`,
+    buggyCode: {
+      python: `import numpy as np
+import tensorflow as tf
+
+class BatchPredictor:
+    def __init__(self, model_path):
+        self.model = tf.keras.models.load_model(model_path)
+        self.input_shape = (10,)  # Model expects 10 features
+
+    def preprocess_sample(self, sample):
+        """Preprocess a single sample"""
+        # Ensure sample is numpy array
+        if not isinstance(sample, np.ndarray):
+            sample = np.array(sample)
+
+        # Validate shape
+        if sample.shape != self.input_shape:
+            raise ValueError(f"Expected shape {self.input_shape}, got {sample.shape}")
+
+        # Normalize
+        normalized = (sample - sample.mean()) / (sample.std() + 1e-8)
+
+        return normalized
+
+    def predict_batch(self, samples):
+        """Predict on a batch of samples"""
+        # Preprocess each sample
+        processed_samples = [self.preprocess_sample(s) for s in samples]
+
+        # Convert to batch tensor
+        batch = np.array(processed_samples)
+
+        # Run inference
+        predictions = self.model.predict(batch, verbose=0)
+
+        return predictions
+
+    def predict_single(self, sample):
+        """Predict on a single sample"""
+        # Preprocess
+        processed = self.preprocess_sample(sample)
+
+        # Add batch dimension
+        batch = np.expand_dims(processed, axis=0)
+
+        # Run inference
+        prediction = self.model.predict(batch, verbose=0)
+
+        # Remove batch dimension
+        return prediction[0]
+
+# Create a simple test model
+def create_test_model():
+    model = tf.keras.Sequential([
+        tf.keras.layers.Dense(64, activation='relu', input_shape=(10,)),
+        tf.keras.layers.Dense(32, activation='relu'),
+        tf.keras.layers.Dense(1, activation='sigmoid')
+    ])
+    model.compile(optimizer='adam', loss='binary_crossentropy')
+    return model
+
+# Test the predictor
+model = create_test_model()
+model.save('test_model.h5')
+
+predictor = BatchPredictor('test_model.h5')
+
+# Test single prediction - works fine
+sample1 = np.random.randn(10)
+print("Single prediction:")
+result1 = predictor.predict_single(sample1)
+print(f"Result: {result1}")
+
+# Test batch prediction - may crash
+print("\\nBatch prediction:")
+samples = [np.random.randn(10) for _ in range(5)]
+results = predictor.predict_batch(samples)
+print(f"Results shape: {results.shape}")`,
+      javascript: `const tf = require('@tensorflow/tfjs-node');
+
+class BatchPredictor {
+    constructor(model) {
+        this.model = model;
+        this.inputShape = [10];  // Model expects 10 features
+    }
+
+    preprocessSample(sample) {
+        // Ensure sample is tensor
+        let sampleTensor;
+        if (sample instanceof tf.Tensor) {
+            sampleTensor = sample;
+        } else {
+            sampleTensor = tf.tensor1d(sample);
+        }
+
+        // Validate shape
+        if (sampleTensor.shape[0] !== this.inputShape[0]) {
+            throw new Error(\`Expected shape [\${this.inputShape}], got [\${sampleTensor.shape}]\`);
+        }
+
+        // Normalize
+        const mean = sampleTensor.mean();
+        const std = tf.moments(sampleTensor).variance.sqrt();
+        const normalized = sampleTensor.sub(mean).div(std.add(1e-8));
+
+        return normalized;
+    }
+
+    async predictBatch(samples) {
+        // Preprocess each sample
+        const processedSamples = samples.map(s => this.preprocessSample(s));
+
+        // Stack into batch tensor
+        const batch = tf.stack(processedSamples);
+
+        // Run inference
+        const predictions = await this.model.predict(batch);
+        const results = await predictions.array();
+
+        // Cleanup
+        batch.dispose();
+        predictions.dispose();
+        processedSamples.forEach(t => t.dispose());
+
+        return results;
+    }
+
+    async predictSingle(sample) {
+        // Preprocess
+        const processed = this.preprocessSample(sample);
+
+        // Add batch dimension
+        const batch = processed.expandDims(0);
+
+        // Run inference
+        const prediction = await this.model.predict(batch);
+        const result = await prediction.array();
+
+        // Cleanup
+        batch.dispose();
+        prediction.dispose();
+        processed.dispose();
+
+        // Remove batch dimension
+        return result[0];
+    }
+}
+
+// Create test model
+function createTestModel() {
+    const model = tf.sequential({
+        layers: [
+            tf.layers.dense({ units: 64, activation: 'relu', inputShape: [10] }),
+            tf.layers.dense({ units: 32, activation: 'relu' }),
+            tf.layers.dense({ units: 1, activation: 'sigmoid' })
+        ]
+    });
+    model.compile({ optimizer: 'adam', loss: 'binaryCrossentropy' });
+    return model;
+}
+
+// Test the predictor
+async function test() {
+    const model = createTestModel();
+    const predictor = new BatchPredictor(model);
+
+    // Test single prediction
+    console.log('Single prediction:');
+    const sample1 = Array.from({ length: 10 }, () => Math.random());
+    const result1 = await predictor.predictSingle(sample1);
+    console.log('Result:', result1);
+
+    // Test batch prediction
+    console.log('\\nBatch prediction:');
+    const samples = Array.from({ length: 5 }, () =>
+        Array.from({ length: 10 }, () => Math.random())
+    );
+    const results = await predictor.predictBatch(samples);
+    console.log('Results:', results);
+}
+
+test();`,
+    },
+    codebaseFiles: {
+      python: [
+        {
+          fileName: 'test_cases.py',
+          content: `import numpy as np
+
+# Test cases that reveal the bug
+test_cases = {
+    'single_sample': np.random.randn(10),
+    'batch_2': [np.random.randn(10) for _ in range(2)],
+    'batch_5': [np.random.randn(10) for _ in range(5)],
+    'batch_10': [np.random.randn(10) for _ in range(10)],
+}
+
+# Edge cases
+edge_cases = {
+    'all_zeros': [np.zeros(10) for _ in range(3)],
+    'constant_value': [np.ones(10) * 5 for _ in range(3)],
+    'mixed': [np.random.randn(10), np.zeros(10), np.ones(10)]
+}`,
+          description: 'Test cases to reproduce the bug',
+        },
+      ],
+      javascript: [
+        {
+          fileName: 'test_cases.js',
+          content: `// Test cases that reveal the bug
+const testCases = {
+    singleSample: Array.from({ length: 10 }, () => Math.random()),
+    batch2: Array.from({ length: 2 }, () => Array.from({ length: 10 }, () => Math.random())),
+    batch5: Array.from({ length: 5 }, () => Array.from({ length: 10 }, () => Math.random())),
+    batch10: Array.from({ length: 10 }, () => Array.from({ length: 10 }, () => Math.random())),
+};
+
+// Edge cases
+const edgeCases = {
+    allZeros: Array.from({ length: 3 }, () => Array.from({ length: 10 }, () => 0)),
+    constantValue: Array.from({ length: 3 }, () => Array.from({ length: 10 }, () => 5)),
+    mixed: [
+        Array.from({ length: 10 }, () => Math.random()),
+        Array.from({ length: 10 }, () => 0),
+        Array.from({ length: 10 }, () => 1)
+    ]
+};
+
+module.exports = { testCases, edgeCases };`,
+          description: 'Test cases to reproduce the bug',
+        },
+      ],
+    },
+    expectedBehavior: 'Batch prediction should normalize each sample independently (per-sample statistics) or use global statistics, not compute statistics across the entire batch which changes dimensions.',
+    bugDescription: 'The bug is in preprocess_sample: it computes normalization statistics (mean, std) on individual samples of shape (10,), which works for single predictions. But when called within predict_batch, the normalization with sample.mean() and sample.std() is applied per-sample. The issue appears when samples have zero std (constant values) or when the normalization isn\'t applied consistently. The actual bug is that normalization should use the same statistics for all samples (fitted on training data), not per-sample statistics which can vary.',
+    hints: [
+      'Compare how single prediction and batch prediction preprocess data',
+      'What normalization statistics are being used?',
+      'Should normalization use per-sample statistics or global statistics?',
+      'What happens if a sample has constant values (std = 0)?',
+      'Consider storing training set statistics for normalization',
+      'In batch processing, normalization should be consistent across all samples',
+    ],
+    testCases: [
+      {
+        input: 'Batch of 5 samples',
+        expected: 'Should process without dimension errors',
+        description: 'Normal batch',
+      },
+      {
+        input: 'Batch with constant value samples',
+        expected: 'Should handle gracefully without NaN or errors',
+        description: 'Edge case with zero std',
       },
     ],
   },
