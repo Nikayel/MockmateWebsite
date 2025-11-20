@@ -1371,8 +1371,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   } lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)_320px]`}
                 >
                   {/* Left: Problem Description / File Upload */}
-                  <div className="flex flex-col min-h-0 order-1">
-                    <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden">
+                  <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden order-1">
                       <CardHeader className="pb-2 flex-shrink-0">
                         <CardTitle className="text-white flex items-center space-x-2 text-sm">
                           <Target className="h-4 w-4 text-[#00d9ff]" />
@@ -1514,167 +1513,163 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           )}
                         </div>
                       </CardContent>
-                    </Card>
-                  </div>
+                  </Card>
 
                   {/* Center: Code Editor with Partner at Bottom */}
-                  <div className="flex flex-col min-h-0 overflow-hidden order-2">
-                    <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden">
-                      <CardHeader className="pb-2 flex-shrink-0">
-                        <CardTitle className="text-white flex items-center justify-between text-xs">
-                          <div className="flex items-center space-x-1">
-                            <Code className="h-3 w-3 text-[#00d9ff]" />
-                            <span>{selectedScenario?.title.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}.{selectedLanguage === "javascript" ? "js" : selectedLanguage === "typescript" ? "ts" : "py"}</span>
-                          </div>
-                          {isInterviewStarted && (
-                            <div className="flex items-center space-x-1">
-                              <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                              <span className="text-green-400 text-xs">LIVE</span>
-                            </div>
-                          )}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="flex flex-col flex-1 min-h-0 gap-2 p-3">
-                        {/* Code Editor */}
-                        <div className="flex-1 overflow-hidden min-h-0 rounded" style={{ height: '45%' }}>
-                          <Editor
-                            height="100%"
-                            language={selectedLanguage}
-                            value={code}
-                            onChange={(value) => {
-                              const newCode = value || ""
-                              
-                              // Enforce code protection if enabled
-                              if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
-                                const validation = validateCodeProtection(newCode, protectedElements, selectedLanguage)
-                                
-                                if (!validation.valid) {
-                                  // Show error and prevent the change
-                                  toast.error(`Cannot remove required code: ${validation.errors[0]}`)
-                                  return // Don't update code
-                                }
-                              }
-                              
-                              setCode(newCode)
-                            }}
-                            theme="vs-dark"
-                            options={{
-                              minimap: { enabled: false },
-                              fontSize: 13,
-                              lineNumbers: "on",
-                              scrollBeyondLastLine: false,
-                              automaticLayout: true,
-                              tabSize: 2,
-                              readOnly: !isInterviewStarted || showFeedback,
-                            }}
-                          />
+                  <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden order-2">
+                    <CardHeader className="pb-2 flex-shrink-0">
+                      <CardTitle className="text-white flex items-center justify-between text-xs">
+                        <div className="flex items-center space-x-1">
+                          <Code className="h-3 w-3 text-[#00d9ff]" />
+                          <span>{selectedScenario?.title.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}.{selectedLanguage === "javascript" ? "js" : selectedLanguage === "typescript" ? "ts" : "py"}</span>
                         </div>
+                        {isInterviewStarted && (
+                          <div className="flex items-center space-x-1">
+                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                            <span className="text-green-400 text-xs">LIVE</span>
+                          </div>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col flex-1 min-h-0 gap-2 p-3">
+                      {/* Code Editor */}
+                      <div className="flex-[2] overflow-hidden min-h-0 rounded">
+                        <Editor
+                          height="100%"
+                          language={selectedLanguage}
+                          value={code}
+                          onChange={(value) => {
+                            const newCode = value || ""
 
-                        {/* Test Results & Efficiency - Compact */}
-                        {testResults.length > 0 && (
-                          <div className="flex-shrink-0 bg-gray-800/30 p-2 rounded" style={{ maxHeight: '15%' }}>
-                            <div className="flex items-center justify-between mb-1">
-                              <h3 className="text-white font-semibold text-xs">Results</h3>
-                              <div className="flex items-center space-x-2">
-                                <Badge
-                                  className={`${
-                                    testSummary.passRate === 100 ? "bg-green-600" :
-                                    testSummary.passRate >= 60 ? "bg-yellow-600" : "bg-red-600"
-                                  } text-xs h-4`}
-                                >
-                                  {testSummary.passed}/{testSummary.total}
-                                </Badge>
-                                {efficiencyMetrics && (
-                                  <Badge className={`${
-                                    efficiencyMetrics.efficiencyScore >= 80 ? "bg-green-600" :
-                                    efficiencyMetrics.efficiencyScore >= 60 ? "bg-yellow-600" : "bg-red-600"
-                                  } text-xs h-4`}>
-                                    Eff: {efficiencyMetrics.efficiencyScore}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex gap-1 text-xs text-gray-400">
+                            // Enforce code protection if enabled
+                            if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
+                              const validation = validateCodeProtection(newCode, protectedElements, selectedLanguage)
+
+                              if (!validation.valid) {
+                                // Show error and prevent the change
+                                toast.error(`Cannot remove required code: ${validation.errors[0]}`)
+                                return // Don't update code
+                              }
+                            }
+
+                            setCode(newCode)
+                          }}
+                          theme="vs-dark"
+                          options={{
+                            minimap: { enabled: false },
+                            fontSize: 13,
+                            lineNumbers: "on",
+                            scrollBeyondLastLine: false,
+                            automaticLayout: true,
+                            tabSize: 2,
+                            readOnly: !isInterviewStarted || showFeedback,
+                          }}
+                        />
+                      </div>
+
+                      {/* Test Results & Efficiency - Compact */}
+                      {testResults.length > 0 && (
+                        <div className="flex-shrink-0 bg-gray-800/30 p-2 rounded max-h-24">
+                          <div className="flex items-center justify-between mb-1">
+                            <h3 className="text-white font-semibold text-xs">Results</h3>
+                            <div className="flex items-center space-x-2">
+                              <Badge
+                                className={`${
+                                  testSummary.passRate === 100 ? "bg-green-600" :
+                                  testSummary.passRate >= 60 ? "bg-yellow-600" : "bg-red-600"
+                                } text-xs h-4`}
+                              >
+                                {testSummary.passed}/{testSummary.total}
+                              </Badge>
                               {efficiencyMetrics && (
-                                <>
-                                  <span>Time: <span className="text-white">{efficiencyMetrics.estimatedTimeComplexity}</span></span>
-                                  <span className="mx-1">•</span>
-                                  <span>Space: <span className="text-white">{efficiencyMetrics.estimatedSpaceComplexity}</span></span>
-                                </>
+                                <Badge className={`${
+                                  efficiencyMetrics.efficiencyScore >= 80 ? "bg-green-600" :
+                                  efficiencyMetrics.efficiencyScore >= 60 ? "bg-yellow-600" : "bg-red-600"
+                                } text-xs h-4`}>
+                                  Eff: {efficiencyMetrics.efficiencyScore}
+                                </Badge>
                               )}
                             </div>
                           </div>
-                        )}
+                          <div className="flex gap-1 text-xs text-gray-400">
+                            {efficiencyMetrics && (
+                              <>
+                                <span>Time: <span className="text-white">{efficiencyMetrics.estimatedTimeComplexity}</span></span>
+                                <span className="mx-1">•</span>
+                                <span>Space: <span className="text-white">{efficiencyMetrics.estimatedSpaceComplexity}</span></span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
-                        {/* Controls */}
-                        <div className="flex items-center justify-end gap-2 flex-shrink-0">
+                      {/* Controls */}
+                      <div className="flex items-center justify-end gap-2 flex-shrink-0">
+                        <Button
+                          onClick={runCode}
+                          disabled={showFeedback}
+                          loading={isRunningTests}
+                          className="bg-green-600 hover:bg-green-700 text-white text-xs h-7"
+                          aria-label={isRunningTests ? "Running tests" : "Run tests"}
+                        >
+                          {!isRunningTests && <PlayCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
+                          {isRunningTests ? "Running..." : "Run Tests"}
+                        </Button>
+                      </div>
+
+                      {/* AI Coding Partner */}
+                      <div className="flex flex-col flex-1 border-t border-gray-700 pt-2 min-h-0">
+                        <div className="flex items-center space-x-1 mb-1 flex-shrink-0">
+                          <Lightbulb className="h-3 w-3 text-[#00d9ff]" />
+                          <span className="text-white text-xs font-medium">AI Partner</span>
+                        </div>
+                        <div className="flex-1 overflow-y-auto space-y-1 mb-2 p-2 bg-gray-800/30 rounded min-h-0">
+                          {chatMessages.map((msg, index) => (
+                            <div key={index} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
+                              <div
+                                className={`max-w-[85%] p-1.5 rounded text-xs ${
+                                  msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-100"
+                                }`}
+                              >
+                                <div className="flex items-center space-x-1 mb-0.5">
+                                  {msg.type === "user" ? (
+                                    <User className="h-2.5 w-2.5" />
+                                  ) : (
+                                    <Brain className="h-2.5 w-2.5 text-[#00d9ff] animate-neural-pulse" />
+                                  )}
+                                  <span className="text-xs opacity-75">{msg.type === "user" ? "You" : "AI Partner"}</span>
+                                </div>
+                                <p className="text-xs leading-tight">{msg.message}</p>
+                              </div>
+                            </div>
+                          ))}
+                          <div ref={chatEndRef} />
+                        </div>
+                        <div className="flex space-x-1 flex-shrink-0">
+                          <Input
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value)}
+                            placeholder="Ask for help..."
+                            className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-xs h-7"
+                            onKeyPress={(e) => e.key === "Enter" && !isLoadingChat && handleSendMessage(false)}
+                            disabled={isLoadingChat}
+                            aria-label="Chat with AI partner"
+                          />
                           <Button
-                            onClick={runCode}
-                            disabled={showFeedback}
-                            loading={isRunningTests}
-                            className="bg-green-600 hover:bg-green-700 text-white text-xs h-7"
-                            aria-label={isRunningTests ? "Running tests" : "Run tests"}
+                            onClick={() => handleSendMessage(false)}
+                            className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white h-7 px-2"
+                            loading={isLoadingChat}
+                            aria-label={isLoadingChat ? "Sending message" : "Send message"}
                           >
-                            {!isRunningTests && <PlayCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
-                            {isRunningTests ? "Running..." : "Run Tests"}
+                            {!isLoadingChat && <Send className="h-3 w-3" aria-hidden="true" />}
                           </Button>
                         </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                        {/* AI Coding Partner - Fixed Height */}
-                        <div className="flex flex-col border-t border-gray-700 pt-2" style={{ height: '35%' }}>
-                          <div className="flex items-center space-x-1 mb-1 flex-shrink-0">
-                            <Lightbulb className="h-3 w-3 text-[#00d9ff]" />
-                            <span className="text-white text-xs font-medium">AI Partner</span>
-                          </div>
-                          <div className="flex-1 overflow-y-auto space-y-1 mb-2 p-2 bg-gray-800/30 rounded min-h-0">
-                            {chatMessages.map((msg, index) => (
-                              <div key={index} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
-                                <div
-                                  className={`max-w-[85%] p-1.5 rounded text-xs ${
-                                    msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-100"
-                                  }`}
-                                >
-                                  <div className="flex items-center space-x-1 mb-0.5">
-                                    {msg.type === "user" ? (
-                                      <User className="h-2.5 w-2.5" />
-                                    ) : (
-                                      <Brain className="h-2.5 w-2.5 text-[#00d9ff] animate-neural-pulse" />
-                                    )}
-                                    <span className="text-xs opacity-75">{msg.type === "user" ? "You" : "AI Partner"}</span>
-                                  </div>
-                                  <p className="text-xs leading-tight">{msg.message}</p>
-                                </div>
-                              </div>
-                            ))}
-                            <div ref={chatEndRef} />
-                          </div>
-                          <div className="flex space-x-1 flex-shrink-0">
-                            <Input
-                              value={chatInput}
-                              onChange={(e) => setChatInput(e.target.value)}
-                              placeholder="Ask for help..."
-                              className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-xs h-7"
-                              onKeyPress={(e) => e.key === "Enter" && !isLoadingChat && handleSendMessage(false)}
-                              disabled={isLoadingChat}
-                              aria-label="Chat with AI partner"
-                            />
-                            <Button
-                              onClick={() => handleSendMessage(false)}
-                              className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white h-7 px-2"
-                              loading={isLoadingChat}
-                              aria-label={isLoadingChat ? "Sending message" : "Send message"}
-                            >
-                              {!isLoadingChat && <Send className="h-3 w-3" aria-hidden="true" />}
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Right: AI Interviewer Panel - Fixed Height */}
-                  <div className="flex flex-col min-h-0 overflow-hidden order-3 lg:col-span-2 xl:col-span-1">
-                    <Card className="bg-gray-900/50 border-gray-700 glass-effect h-full flex flex-col overflow-hidden">
+                  {/* Right: AI Interviewer Panel */}
+                  <Card className="bg-gray-900/50 border-gray-700 glass-effect h-full flex flex-col overflow-hidden order-3 lg:col-span-2 xl:col-span-1">
                       <CardHeader className="pb-2 flex-shrink-0">
                         <CardTitle className="text-white flex items-center space-x-2 text-sm">
                           <div className="relative">
@@ -1743,8 +1738,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           </div>
                         )}
                       </CardContent>
-                    </Card>
-                  </div>
+                  </Card>
                 </div>
               ) : showPostInterviewDiscussion ? (
                 /* Post-Interview Discussion Phase */
