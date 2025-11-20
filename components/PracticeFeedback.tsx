@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { CheckCircle, TrendingUp, Target, Zap, Code, MessageSquare, Activity, ChevronDown, ChevronUp, XCircle, FileText, RotateCcw, Play } from "lucide-react"
+import { CheckCircle, TrendingUp, Target, Zap, Code, MessageSquare, Activity, ChevronDown, ChevronUp, XCircle, FileText, RotateCcw, Play, Download, AlertCircle } from "lucide-react"
 import {
   RadarChart,
   PolarGrid,
@@ -21,6 +21,7 @@ import {
   Tooltip,
   Cell,
 } from "recharts"
+import jsPDF from "jspdf"
 
 interface FeedbackSection {
   tldr: string
@@ -176,6 +177,7 @@ export default function PracticeFeedback({
 
   // Progressive disclosure state
   const [showGraph, setShowGraph] = useState(false)
+  const [openImprovements, setOpenImprovements] = useState<Record<number, boolean>>({})
 
   // Parse feedback for edge cases and alternative solutions
   const feedbackLower = feedback.toLowerCase()
@@ -287,6 +289,121 @@ export default function PracticeFeedback({
     return "bg-red-600"
   }
 
+  const generatePDF = () => {
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const margin = 20
+    let yPosition = 20
+
+    // Title
+    doc.setFontSize(24)
+    doc.setFont("helvetica", "bold")
+    doc.text("MockMate - Interview Feedback Report", margin, yPosition)
+    yPosition += 15
+
+    // Date
+    doc.setFontSize(10)
+    doc.setFont("helvetica", "normal")
+    doc.text(`Generated: ${new Date().toLocaleString()}`, margin, yPosition)
+    yPosition += 15
+
+    // Overall Score - Large and Prominent
+    doc.setFontSize(18)
+    doc.setFont("helvetica", "bold")
+    doc.text("Overall Score", margin, yPosition)
+    yPosition += 10
+    doc.setFontSize(32)
+    const overallScore = sections.scores.overall > 0 ? normalizeScore(sections.scores.overall) : normalizedPerformanceScore
+    doc.text(`${overallScore}/100`, margin, yPosition)
+    yPosition += 15
+
+    // Category Scores
+    doc.setFontSize(16)
+    doc.setFont("helvetica", "bold")
+    doc.text("Category Breakdown", margin, yPosition)
+    yPosition += 10
+
+    const categories = [
+      { name: "Correctness", score: normalizedScores.correctness },
+      { name: "Efficiency", score: normalizedScores.efficiency },
+      { name: "Code Quality", score: normalizedScores.codeQuality },
+      { name: "Reasoning & Explanation", score: normalizedScores.reasoning },
+      { name: "AI Collaboration", score: normalizedScores.aiCollaboration },
+    ]
+
+    doc.setFontSize(11)
+    doc.setFont("helvetica", "normal")
+    categories.forEach(cat => {
+      doc.text(`${cat.name}: ${cat.score}/100`, margin + 5, yPosition)
+      yPosition += 7
+    })
+    yPosition += 8
+
+    // Performance Metrics
+    doc.setFontSize(16)
+    doc.setFont("helvetica", "bold")
+    doc.text("Performance Metrics", margin, yPosition)
+    yPosition += 10
+    doc.setFontSize(11)
+    doc.setFont("helvetica", "normal")
+    doc.text(`Time Taken: ${formatTime(elapsedTime)}`, margin + 5, yPosition)
+    yPosition += 7
+    doc.text(`Complexity Accuracy: ${complexityAccurate ? 'Yes' : 'No'}`, margin + 5, yPosition)
+    yPosition += 7
+    doc.text(`Edge Cases Discussed: ${hasEdgeCases ? 'Yes' : 'No'}`, margin + 5, yPosition)
+    yPosition += 7
+    doc.text(`Alternative Solutions: ${hasAlternatives ? 'Yes' : 'No'}`, margin + 5, yPosition)
+    yPosition += 12
+
+    // What to Improve Section
+    if (sections.fixNext.length > 0) {
+      doc.setFontSize(16)
+      doc.setFont("helvetica", "bold")
+      doc.text("What to Improve", margin, yPosition)
+      yPosition += 10
+      doc.setFontSize(10)
+      doc.setFont("helvetica", "normal")
+
+      sections.fixNext.forEach((item, index) => {
+        if (yPosition > 270) {
+          doc.addPage()
+          yPosition = 20
+        }
+        const lines = doc.splitTextToSize(`${index + 1}. ${item}`, pageWidth - 2 * margin - 10)
+        doc.text(lines, margin + 5, yPosition)
+        yPosition += lines.length * 5 + 3
+      })
+      yPosition += 8
+    }
+
+    // Action Plan
+    if (sections.actionPlan.length > 0) {
+      if (yPosition > 250) {
+        doc.addPage()
+        yPosition = 20
+      }
+      doc.setFontSize(16)
+      doc.setFont("helvetica", "bold")
+      doc.text("Action Plan", margin, yPosition)
+      yPosition += 10
+      doc.setFontSize(10)
+      doc.setFont("helvetica", "normal")
+
+      sections.actionPlan.forEach((item, index) => {
+        if (yPosition > 270) {
+          doc.addPage()
+          yPosition = 20
+        }
+        const lines = doc.splitTextToSize(`${index + 1}. ${item}`, pageWidth - 2 * margin - 10)
+        doc.text(lines, margin + 5, yPosition)
+        yPosition += lines.length * 5 + 3
+      })
+    }
+
+    // Save PDF
+    doc.save(`mockmate-feedback-${Date.now()}.pdf`)
+  }
+
   return (
     <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       {/* Screen reader announcement */}
@@ -317,6 +434,124 @@ export default function PracticeFeedback({
           {/* Title */}
           <h1 className="text-2xl sm:text-3xl font-bold text-white mb-6">Feedback Summary</h1>
 
+          {/* Overall Score - Prominent Display */}
+          <div className="mb-8">
+            <div className="text-center">
+              <div className="text-sm text-gray-400 mb-2">Overall Score</div>
+              <div className={`text-6xl font-bold ${getScoreBgColor(sections.scores.overall > 0 ? normalizeScore(sections.scores.overall) : normalizedPerformanceScore)} bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500`}>
+                {sections.scores.overall > 0 ? normalizeScore(sections.scores.overall) : normalizedPerformanceScore}/100
+              </div>
+            </div>
+          </div>
+
+          {/* Category Scores */}
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold text-white mb-4">Category Scores</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-cyan-400" />
+                    <span className="text-sm text-gray-300">Correctness</span>
+                  </div>
+                  <Badge className={`${getScoreBgColor(normalizedScores.correctness)} text-white`}>
+                    {normalizedScores.correctness}/100
+                  </Badge>
+                </div>
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full ${getScoreBgColor(normalizedScores.correctness)}`}
+                    style={{ width: `${normalizedScores.correctness}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-cyan-400" />
+                    <span className="text-sm text-gray-300">Efficiency</span>
+                  </div>
+                  <Badge className={`${getScoreBgColor(normalizedScores.efficiency)} text-white`}>
+                    {normalizedScores.efficiency}/100
+                  </Badge>
+                </div>
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full ${getScoreBgColor(normalizedScores.efficiency)}`}
+                    style={{ width: `${normalizedScores.efficiency}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Code className="h-4 w-4 text-cyan-400" />
+                    <span className="text-sm text-gray-300">Code Quality</span>
+                  </div>
+                  <Badge className={`${getScoreBgColor(normalizedScores.codeQuality)} text-white`}>
+                    {normalizedScores.codeQuality}/100
+                  </Badge>
+                </div>
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full ${getScoreBgColor(normalizedScores.codeQuality)}`}
+                    style={{ width: `${normalizedScores.codeQuality}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-cyan-400" />
+                    <span className="text-sm text-gray-300">Reasoning</span>
+                  </div>
+                  <Badge className={`${getScoreBgColor(normalizedScores.reasoning)} text-white`}>
+                    {normalizedScores.reasoning}/100
+                  </Badge>
+                </div>
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full ${getScoreBgColor(normalizedScores.reasoning)}`}
+                    style={{ width: `${normalizedScores.reasoning}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-cyan-400" />
+                    <span className="text-sm text-gray-300">AI Collaboration</span>
+                  </div>
+                  <Badge className={`${getScoreBgColor(normalizedScores.aiCollaboration)} text-white`}>
+                    {normalizedScores.aiCollaboration}/100
+                  </Badge>
+                </div>
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full ${getScoreBgColor(normalizedScores.aiCollaboration)}`}
+                    style={{ width: `${normalizedScores.aiCollaboration}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-4 w-4 text-cyan-400" />
+                    <span className="text-sm text-gray-300">Edge Cases</span>
+                  </div>
+                  <Badge className={hasEdgeCases ? "bg-green-600 text-white" : "bg-red-600 text-white"}>
+                    {hasEdgeCases ? "Covered" : "Not Covered"}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Performance Overview */}
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-white mb-4">Performance Overview</h2>
@@ -337,12 +572,14 @@ export default function PracticeFeedback({
                 </div>
               </div>
               <div>
-                <div className="text-sm text-gray-400 mb-1">Edge Cases Discussed</div>
-                <div className="text-base text-white">{hasEdgeCases ? "Yes" : "No"}</div>
+                <div className="text-sm text-gray-400 mb-1">Alternative Solutions</div>
+                <div className="text-base text-white">{hasAlternatives ? "Discussed" : "Not Discussed"}</div>
               </div>
               <div>
-                <div className="text-sm text-gray-400 mb-1">Alternative Solutions</div>
-                <div className="text-base text-white">{hasAlternatives ? "Yes" : "No"}</div>
+                <div className="text-sm text-gray-400 mb-1">Interviewer Collaboration</div>
+                <div className="text-base text-white">
+                  {sections.scores.reasoning >= 70 ? "Excellent" : sections.scores.reasoning >= 50 ? "Good" : "Needs Work"}
+                </div>
               </div>
             </div>
           </div>
@@ -421,36 +658,83 @@ export default function PracticeFeedback({
             </div>
           </Collapsible>
 
+          {/* What to Improve Section */}
+          {sections.fixNext.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-500" />
+                What to Improve
+              </h2>
+              <div className="space-y-3">
+                {sections.fixNext.map((item, index) => {
+                  const isOpen = openImprovements[index] || false
+                  return (
+                    <Collapsible
+                      key={index}
+                      open={isOpen}
+                      onOpenChange={(open) => setOpenImprovements(prev => ({ ...prev, [index]: open }))}
+                    >
+                      <CollapsibleTrigger className="w-full">
+                        <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700 hover:border-amber-500/50 transition-colors cursor-pointer">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-3 flex-1">
+                              <span className="text-amber-500 font-semibold text-sm mt-0.5">#{index + 1}</span>
+                              <p className="text-white text-left text-sm font-medium line-clamp-2">
+                                {item.split('.')[0] || item.substring(0, 80)}
+                              </p>
+                            </div>
+                            {isOpen ? (
+                              <ChevronUp className="h-5 w-5 text-gray-400 ml-2 flex-shrink-0" />
+                            ) : (
+                              <ChevronDown className="h-5 w-5 text-gray-400 ml-2 flex-shrink-0" />
+                            )}
+                          </div>
+                        </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-2">
+                        <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-700 ml-8">
+                          <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">
+                            {item}
+                          </p>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Action Plan Section */}
+          {sections.actionPlan.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Target className="h-5 w-5 text-cyan-400" />
+                Action Plan
+              </h2>
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <ol className="space-y-2 list-decimal list-inside">
+                  {sections.actionPlan.map((item, index) => (
+                    <li key={index} className="text-gray-300 text-sm leading-relaxed">
+                      {item}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </div>
+          )}
+
           {/* Actions */}
           <div>
             <h2 className="text-lg font-semibold text-white mb-4">Actions</h2>
             <div className="flex flex-col sm:flex-row gap-3">
               <Button
-                onClick={onExport || (() => {
-                  const data = {
-                    feedback,
-                    performanceScore: normalizedPerformanceScore,
-                    testsPassed,
-                    testsTotal,
-                    timeComplexity,
-                    spaceComplexity,
-                    efficiencyScore,
-                    elapsedTime,
-                    timestamp: new Date().toISOString(),
-                  }
-                  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-                  const url = URL.createObjectURL(blob)
-                  const a = document.createElement('a')
-                  a.href = url
-                  a.download = `mockmate-feedback-${Date.now()}.json`
-                  a.click()
-                  URL.revokeObjectURL(url)
-                })}
+                onClick={onExport || generatePDF}
                 variant="outline"
                 className="flex-1 border-accent/50 text-accent hover:bg-accent/10 hover:text-accent cursor-pointer"
               >
-                <FileText className="mr-2 h-4 w-4" />
-                Export Report (JSON)
+                <Download className="mr-2 h-4 w-4" />
+                Complete Breakdown (PDF)
               </Button>
               <Button
                 onClick={onRetry}
