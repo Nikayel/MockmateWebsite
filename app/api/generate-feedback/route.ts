@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { feedbackRateLimit } from "@/lib/rate-limit"
+import { getCachedModel } from "@/lib/gemini-cache"
 
 const genAI = process.env.GEMINI_API_KEY
   ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
@@ -31,9 +32,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      systemInstruction: `You are a senior interviewer delivering a "Brutal Debrief & Action Plan." Reports were previously bloated—now you must be surgical, time-efficient, and direct.
+    // Define system instruction for feedback generation
+    const systemInstruction = `You are a senior interviewer delivering a "Brutal Debrief & Action Plan." Reports were previously bloated—now you must be surgical, time-efficient, and direct.
 
 Tone: candid, data-backed, encouraging. Never rant, never waffle.
 
@@ -49,15 +49,21 @@ HARD RULES
   2. **Score Snapshot** – bullet list of the six ratings (Correctness, Efficiency, Code Quality, Reasoning & Explanation, AI Collaboration, Overall) formatted as "Label: X/100 – justification". All scores should be on a 0-100 scale.
   3. **What Worked** – up to 3 bullets, each ≤1 sentence describing concrete wins.
   4. **Fix Next** – up to 3 prioritized bullets focused on the highest-impact gaps.
-  5. **Action Plan** – numbered list of exactly 3 steps, each with an owner suggestion (e.g., “You”) and a timeframe (“today”, “this week”).
-  6. **AI & Communication Watchlist** – one concise paragraph calling out collaboration quality. If interaction counts are near zero, state “No evidence you walked the interviewer through your work—narrate next time.”
+  5. **Action Plan** – numbered list of exactly 3 steps, each with an owner suggestion (e.g., "You") and a timeframe ("today", "this week").
+  6. **AI & Communication Watchlist** – one concise paragraph calling out collaboration quality. If interaction counts are near zero, state "No evidence you walked the interviewer through your work—narrate next time."
 
-- Never invent data. If something wasn’t captured, say “No signal captured.”
-- Prefer examples from the candidate’s code/tests over hypothetical ones.
+- Never invent data. If something wasn't captured, say "No signal captured."
+- Prefer examples from the candidate's code/tests over hypothetical ones.
 - Mention edge cases/complexities only if relevant to the observed solution.
-- Keep formatting tight—no tables, no nested sub-bullets, no code fences unless quoting the candidate’s own code.
-`,
-    })
+- Keep formatting tight—no tables, no nested sub-bullets, no code fences unless quoting the candidate's own code.
+`
+
+    // Use cached model with system instruction
+    const model = await getCachedModel(
+      "feedback-system-prompt",
+      systemInstruction,
+      "gemini-2.5-flash"
+    )
 
     const testResultsSummary = testResults && Array.isArray(testResults)
       ? `\n\nTEST RESULTS:\n- Total tests: ${testResults.length}\n- Passed: ${testResults.filter((t: any) => t.passed).length}\n- Failed: ${testResults.filter((t: any) => t.passed === false).length}\n`

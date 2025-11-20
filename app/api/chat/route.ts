@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { chatRateLimit } from "@/lib/rate-limit"
+import { getCachedModel } from "@/lib/gemini-cache"
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
@@ -190,11 +191,10 @@ Keep responses brief, actionable, and helpful. You're a tool they can use, but t
 
     const systemPrompt = systemPrompts[role as keyof typeof systemPrompts] || systemPrompts.partner
 
-    // Initialize the model with system instruction
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      systemInstruction: systemPrompt,
-    })
+    // Initialize the model with cached system instruction
+    // Cache key is based on role to reuse system prompts across sessions
+    const cacheKey = `chat-system-prompt-${role}`
+    const model = await getCachedModel(cacheKey, systemPrompt, "gemini-2.5-flash")
 
     // Build conversation history for Gemini
     // IMPORTANT: Gemini requires history to start with a "user" message, not "model"

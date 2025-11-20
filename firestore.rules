@@ -1,0 +1,244 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================================
+    // HELPER FUNCTIONS
+    // ============================================================================
+
+    /**
+     * Check if the user is authenticated
+     */
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    /**
+     * Check if the authenticated user matches the document's userId
+     */
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    /**
+     * Check if the user is creating their own document
+     */
+    function isCreatingOwnDocument(userId) {
+      return isAuthenticated()
+        && request.auth.uid == userId
+        && request.resource.data.userId == userId;
+    }
+
+    /**
+     * Validate that required fields exist in the document
+     */
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    /**
+     * Check if the document exists
+     */
+    function documentExists() {
+      return resource != null;
+    }
+
+    // ============================================================================
+    // USER PROFILES
+    // ============================================================================
+
+    match /profiles/{userId} {
+      // Users can read their own profile
+      allow read: if isOwner(userId);
+
+      // Users can create their own profile
+      allow create: if isAuthenticated()
+                    && request.auth.uid == userId
+                    && request.resource.data.userId == userId
+                    && hasRequiredFields(['userId', 'email', 'createdAt']);
+
+      // Users can update their own profile (but not change userId)
+      allow update: if isOwner(userId)
+                    && request.resource.data.userId == userId
+                    && resource.data.userId == userId;
+
+      // Users can delete their own profile
+      allow delete: if isOwner(userId);
+    }
+
+    // ============================================================================
+    // INTERVIEW SESSIONS
+    // ============================================================================
+
+    match /sessions/{sessionId} {
+      // Users can read their own sessions
+      allow read: if isAuthenticated()
+                  && documentExists()
+                  && resource.data.userId == request.auth.uid;
+
+      // Users can create their own sessions
+      allow create: if isAuthenticated()
+                    && request.resource.data.userId == request.auth.uid
+                    && hasRequiredFields(['userId', 'scenarioTitle', 'startTime']);
+
+      // Users can update their own sessions
+      allow update: if isAuthenticated()
+                    && documentExists()
+                    && resource.data.userId == request.auth.uid
+                    && request.resource.data.userId == request.auth.uid;
+
+      // Users can delete their own sessions
+      allow delete: if isAuthenticated()
+                    && documentExists()
+                    && resource.data.userId == request.auth.uid;
+
+      // Performance optimization: Create index for common queries
+      // Run in Firebase Console:
+      // firebase firestore:indexes --project=your-project-id
+      //
+      // Composite indexes needed:
+      // 1. Collection: sessions, Fields: userId ASC, startTime DESC
+      // 2. Collection: sessions, Fields: userId ASC, status ASC, startTime DESC
+    }
+
+    // ============================================================================
+    // PROMO CODE USAGE
+    // ============================================================================
+
+    match /promo_code_usage/{docId} {
+      // Users can read their own promo code usage
+      allow read: if isAuthenticated()
+                  && documentExists()
+                  && resource.data.userId == request.auth.uid;
+
+      // Users can create promo code usage records
+      // Document ID must be in format: {userId}_{code}
+      allow create: if isAuthenticated()
+                    && request.resource.data.userId == request.auth.uid
+                    && docId.matches(request.auth.uid + '_.*')
+                    && hasRequiredFields(['userId', 'code', 'usedAt']);
+
+      // Promo code usage records are immutable (no updates or deletes)
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ============================================================================
+    // SUBSCRIPTION DATA (Read-only from client)
+    // ============================================================================
+
+    match /subscriptions/{userId} {
+      // Users can read their own subscription data
+      allow read: if isOwner(userId);
+
+      // Only server can write subscription data (via Admin SDK)
+      // Client cannot create, update, or delete subscriptions
+      allow write: if false;
+    }
+
+    // ============================================================================
+    // ANALYTICS & METRICS (Write-only from client)
+    // ============================================================================
+
+    match /analytics/{document=**} {
+      // No read access from client (only admin)
+      allow read: if false;
+
+      // Users can write their own analytics events
+      allow create: if isAuthenticated()
+                    && request.resource.data.userId == request.auth.uid;
+
+      // No updates or deletes
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ============================================================================
+    // ADMIN COLLECTIONS (Admin SDK only)
+    // ============================================================================
+
+    match /admin/{document=**} {
+      // No client access - only Firebase Admin SDK
+      allow read, write: if false;
+    }
+
+    match /system/{document=**} {
+      // No client access - only Firebase Admin SDK
+      allow read, write: if false;
+    }
+
+    // ============================================================================
+    // DEFAULT DENY ALL
+    // ============================================================================
+
+    // Deny access to all other documents by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// ============================================================================
+// DEPLOYMENT INSTRUCTIONS
+// ============================================================================
+//
+// To deploy these rules to Firebase:
+//
+// 1. Install Firebase CLI (if not already installed):
+//    npm install -g firebase-tools
+//
+// 2. Login to Firebase:
+//    firebase login
+//
+// 3. Initialize Firestore in your project (if not already done):
+//    firebase init firestore
+//    (Select your Firebase project and use firestore.rules as the rules file)
+//
+// 4. Deploy the rules:
+//    firebase deploy --only firestore:rules
+//
+// 5. Verify deployment:
+//    - Go to Firebase Console > Firestore Database > Rules
+//    - Check that the rules are active
+//
+// 6. Test the rules (optional):
+//    firebase emulators:start --only firestore
+//    (Then run your app against the emulator to test)
+//
+// ============================================================================
+// SECURITY BEST PRACTICES
+// ============================================================================
+//
+// 1. Always authenticate users before granting access
+// 2. Verify ownership - users should only access their own data
+// 3. Validate all writes - check required fields and data types
+// 4. Use document IDs that include user IDs for ownership verification
+// 5. Implement read/write limits to prevent abuse
+// 6. Never trust client-provided user IDs - always use request.auth.uid
+// 7. Keep rules simple and maintainable
+// 8. Test rules thoroughly before deploying to production
+// 9. Monitor Firestore usage for suspicious patterns
+// 10. Regularly audit and update security rules
+//
+// ============================================================================
+// COMMON QUERIES AND INDEXES
+// ============================================================================
+//
+// These composite indexes are recommended for optimal performance:
+//
+// Collection: sessions
+// - Fields: userId (Ascending), startTime (Descending)
+// - Query: Get user's recent sessions
+//
+// Collection: sessions
+// - Fields: userId (Ascending), status (Ascending), startTime (Descending)
+// - Query: Get user's active/completed sessions
+//
+// Collection: promo_code_usage
+// - Fields: userId (Ascending), usedAt (Descending)
+// - Query: Get user's promo code history
+//
+// To create indexes, run:
+// firebase firestore:indexes --project=your-project-id
+//
