@@ -1515,7 +1515,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       </CardContent>
                   </Card>
 
-                  {/* Center: Code Editor with Partner at Bottom */}
+                  {/* Center: Code Editor with Terminal/Console */}
                   <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden order-2">
                     <CardHeader className="pb-2 flex-shrink-0">
                       <CardTitle className="text-white flex items-center justify-between text-xs">
@@ -1533,7 +1533,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     </CardHeader>
                     <CardContent className="flex flex-col flex-1 min-h-0 gap-2 p-3">
                       {/* Code Editor */}
-                      <div className="flex-[2] overflow-hidden min-h-0 rounded">
+                      <div className="flex-[2] overflow-hidden min-h-0 rounded border border-gray-700">
                         <Editor
                           height="100%"
                           language={selectedLanguage}
@@ -1567,37 +1567,113 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         />
                       </div>
 
-                      {/* Test Results & Efficiency - Compact */}
+                      {/* Terminal/Console Output - Enhanced */}
                       {testResults.length > 0 && (
-                        <div className="flex-shrink-0 bg-gray-800/30 p-2 rounded max-h-24">
-                          <div className="flex items-center justify-between mb-1">
-                            <h3 className="text-white font-semibold text-xs">Results</h3>
+                        <div className="flex-shrink-0 bg-black border border-gray-700 rounded flex flex-col max-h-48 min-h-[120px]">
+                          {/* Terminal Header */}
+                          <div className="flex items-center justify-between px-3 py-1.5 bg-gray-800 border-b border-gray-700 flex-shrink-0">
+                            <div className="flex items-center space-x-2">
+                              <div className="flex space-x-1.5">
+                                <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                                <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                              </div>
+                              <span className="text-gray-400 text-xs font-mono">Terminal</span>
+                            </div>
                             <div className="flex items-center space-x-2">
                               <Badge
                                 className={`${
                                   testSummary.passRate === 100 ? "bg-green-600" :
                                   testSummary.passRate >= 60 ? "bg-yellow-600" : "bg-red-600"
-                                } text-xs h-4`}
+                                } text-xs h-5`}
                               >
-                                {testSummary.passed}/{testSummary.total}
+                                {testSummary.passed}/{testSummary.total} passed
                               </Badge>
                               {efficiencyMetrics && (
                                 <Badge className={`${
-                                  efficiencyMetrics.efficiencyScore >= 80 ? "bg-green-600" :
-                                  efficiencyMetrics.efficiencyScore >= 60 ? "bg-yellow-600" : "bg-red-600"
-                                } text-xs h-4`}>
-                                  Eff: {efficiencyMetrics.efficiencyScore}
+                                  efficiencyMetrics.efficiencyScore >= 80 ? "bg-green-600/20 text-green-400 border-green-600" :
+                                  efficiencyMetrics.efficiencyScore >= 60 ? "bg-yellow-600/20 text-yellow-400 border-yellow-600" :
+                                  "bg-red-600/20 text-red-400 border-red-600"
+                                } text-xs h-5 border`}>
+                                  {efficiencyMetrics.efficiencyScore}% efficient
                                 </Badge>
                               )}
                             </div>
                           </div>
-                          <div className="flex gap-1 text-xs text-gray-400">
+
+                          {/* Terminal Content */}
+                          <div className="flex-1 overflow-y-auto p-2 space-y-1 font-mono text-xs">
+                            {/* Summary */}
+                            <div className="text-gray-400 mb-2">
+                              <span className="text-[#00d9ff]">$</span> Running tests...
+                            </div>
+
+                            {/* Individual Test Results */}
+                            {testResults.map((result, index) => (
+                              <div key={index} className="mb-2">
+                                <div className={`flex items-center space-x-2 ${result.passed ? 'text-green-400' : 'text-red-400'}`}>
+                                  {result.passed ? (
+                                    <CheckCircle className="h-3 w-3 flex-shrink-0" />
+                                  ) : (
+                                    <XCircle className="h-3 w-3 flex-shrink-0" />
+                                  )}
+                                  <span className="font-semibold">{result.description}</span>
+                                </div>
+
+                                {!result.passed && (
+                                  <div className="ml-5 mt-1 space-y-0.5 text-gray-300">
+                                    <div className="flex items-start space-x-2">
+                                      <span className="text-gray-500">Input:</span>
+                                      <span className="text-blue-300">{JSON.stringify(result.input)}</span>
+                                    </div>
+                                    <div className="flex items-start space-x-2">
+                                      <span className="text-gray-500">Expected:</span>
+                                      <span className="text-green-300">{JSON.stringify(result.expected)}</span>
+                                    </div>
+                                    <div className="flex items-start space-x-2">
+                                      <span className="text-gray-500">Got:</span>
+                                      <span className="text-red-300">{JSON.stringify(result.actual)}</span>
+                                    </div>
+                                    {result.error && (
+                                      <div className="flex items-start space-x-2 mt-1">
+                                        <AlertCircle className="h-3 w-3 flex-shrink-0 text-red-400 mt-0.5" />
+                                        <span className="text-red-300 break-all">{result.error}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+
+                            {/* Efficiency Metrics */}
                             {efficiencyMetrics && (
-                              <>
-                                <span>Time: <span className="text-white">{efficiencyMetrics.estimatedTimeComplexity}</span></span>
-                                <span className="mx-1">•</span>
-                                <span>Space: <span className="text-white">{efficiencyMetrics.estimatedSpaceComplexity}</span></span>
-                              </>
+                              <div className="border-t border-gray-800 pt-2 mt-2 space-y-1">
+                                <div className="text-gray-400">Complexity Analysis:</div>
+                                <div className="ml-2 space-y-0.5 text-gray-300">
+                                  <div>
+                                    <span className="text-gray-500">Time:</span>
+                                    <span className={`ml-2 ${efficiencyMetrics.estimatedTimeComplexity === efficiencyMetrics.optimalTimeComplexity ? 'text-green-400' : 'text-yellow-400'}`}>
+                                      {efficiencyMetrics.estimatedTimeComplexity}
+                                    </span>
+                                    {efficiencyMetrics.optimalTimeComplexity !== "N/A" && (
+                                      <span className="text-gray-500 ml-1">(optimal: {efficiencyMetrics.optimalTimeComplexity})</span>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">Space:</span>
+                                    <span className={`ml-2 ${efficiencyMetrics.estimatedSpaceComplexity === efficiencyMetrics.optimalSpaceComplexity ? 'text-green-400' : 'text-yellow-400'}`}>
+                                      {efficiencyMetrics.estimatedSpaceComplexity}
+                                    </span>
+                                    {efficiencyMetrics.optimalSpaceComplexity !== "N/A" && (
+                                      <span className="text-gray-500 ml-1">(optimal: {efficiencyMetrics.optimalSpaceComplexity})</span>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">Code Quality:</span>
+                                    <span className="ml-2 text-gray-300">{efficiencyMetrics.complexity} complexity, {efficiencyMetrics.linesOfCode} LOC</span>
+                                  </div>
+                                </div>
+                              </div>
                             )}
                           </div>
                         </div>
