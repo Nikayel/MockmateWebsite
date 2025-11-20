@@ -13529,6 +13529,495 @@ module.exports = { testCases, edgeCases };`,
       },
     ],
   },
+  {
+    id: 'bugfix-ai-api-retry-logic',
+    title: 'AI API Retry Logic Bug',
+    type: 'bugfix',
+    difficulty: 'medium',
+    companies: ['Startup', 'Google', 'Microsoft', 'Meta'],
+    description: 'Fix a critical bug in AI API integration where retry logic fails for rate limits and certain error conditions',
+    tags: ['AI', 'API', 'Error Handling', 'Async', 'OpenAI', 'Claude', 'Rate Limiting'],
+    estimatedTime: 20,
+    problemStatement: `Your team has built an AI-powered customer support chatbot that uses OpenAI's GPT API. Users are reporting intermittent failures where the bot stops responding, especially during peak hours. The application crashes with rate limit errors and sometimes returns partial/corrupted responses.
+
+The codebase includes an AI service wrapper that handles API calls with retry logic. However, the retry mechanism is buggy and doesn't properly handle:
+1. Rate limit errors (429 status)
+2. Token streaming interruptions
+3. Exponential backoff timing
+4. Maximum retry limits
+
+Your task is to identify and fix the bugs in the retry logic to make the AI integration robust and production-ready.`,
+    buggyCode: {
+      typescript: `import OpenAI from 'openai';
+
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+interface AIResponse {
+  content: string;
+  tokens: number;
+  model: string;
+}
+
+class AIService {
+  private client: OpenAI;
+  private maxRetries = 3;
+  private baseDelay = 1000; // ms
+
+  constructor(apiKey: string) {
+    this.client = new OpenAI({ apiKey });
+  }
+
+  // BUG: Retry logic doesn't handle all error types correctly
+  async chat(messages: ChatMessage[], options?: { temperature?: number; maxTokens?: number }): Promise<AIResponse> {
+    let retries = 0;
+
+    while (retries < this.maxRetries) {
+      try {
+        const response = await this.client.chat.completions.create({
+          model: 'gpt-4',
+          messages,
+          temperature: options?.temperature || 0.7,
+          max_tokens: options?.maxTokens || 1000,
+        });
+
+        return {
+          content: response.choices[0].message.content,
+          tokens: response.usage.total_tokens,
+          model: response.model,
+        };
+      } catch (error: any) {
+        retries++;
+
+        // BUG 1: Only checks for 429, misses other retryable errors
+        if (error.status === 429) {
+          const delay = this.baseDelay * retries; // BUG 2: Linear backoff instead of exponential
+          await this.sleep(delay);
+          continue;
+        }
+
+        // BUG 3: Throws immediately on any other error, even retryable ones
+        throw error;
+      }
+    }
+
+    throw new Error('Max retries exceeded');
+  }
+
+  // BUG: Doesn't handle stream interruptions or reconnection
+  async chatStream(messages: ChatMessage[], onChunk: (text: string) => void): Promise<AIResponse> {
+    const stream = await this.client.chat.completions.create({
+      model: 'gpt-4',
+      messages,
+      stream: true,
+    });
+
+    let fullContent = '';
+    let totalTokens = 0;
+
+    // BUG 4: No error handling for stream interruptions
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      fullContent += content;
+      onChunk(content);
+      totalTokens++; // BUG 5: Counting chunks as tokens (wrong metric)
+    }
+
+    return {
+      content: fullContent,
+      tokens: totalTokens,
+      model: 'gpt-4',
+    };
+  }
+
+  // BUG: Sleep doesn't handle edge cases
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+export default AIService;`,
+      python: `import openai
+import time
+from typing import List, Dict, Callable, Optional
+
+class AIService:
+    def __init__(self, api_key: str):
+        openai.api_key = api_key
+        self.max_retries = 3
+        self.base_delay = 1.0  # seconds
+
+    # BUG: Retry logic doesn't handle all error types correctly
+    def chat(self, messages: List[Dict[str, str]], temperature: float = 0.7, max_tokens: int = 1000) -> Dict:
+        retries = 0
+
+        while retries < self.max_retries:
+            try:
+                response = openai.ChatCompletion.create(
+                    model="gpt-4",
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+
+                return {
+                    'content': response.choices[0].message.content,
+                    'tokens': response.usage.total_tokens,
+                    'model': response.model
+                }
+            except openai.error.RateLimitError as e:
+                retries += 1
+                # BUG 1: Linear backoff instead of exponential
+                delay = self.base_delay * retries
+                time.sleep(delay)
+                continue
+            except Exception as e:
+                # BUG 2: Throws immediately on any error, even retryable ones
+                raise e
+
+        raise Exception('Max retries exceeded')
+
+    # BUG: Doesn't handle stream interruptions
+    def chat_stream(self, messages: List[Dict[str, str]], on_chunk: Callable[[str], None]) -> Dict:
+        # BUG 3: No error handling for stream interruptions
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=messages,
+            stream=True
+        )
+
+        full_content = ''
+        total_tokens = 0
+
+        for chunk in response:
+            content = chunk.choices[0].delta.get('content', '')
+            full_content += content
+            on_chunk(content)
+            total_tokens += 1  # BUG 4: Counting chunks as tokens
+
+        return {
+            'content': full_content,
+            'tokens': total_tokens,
+            'model': 'gpt-4'
+        }`,
+      javascript: `const OpenAI = require('openai');
+
+class AIService {
+  constructor(apiKey) {
+    this.client = new OpenAI({ apiKey });
+    this.maxRetries = 3;
+    this.baseDelay = 1000; // ms
+  }
+
+  // BUG: Retry logic doesn't handle all error types correctly
+  async chat(messages, options = {}) {
+    let retries = 0;
+
+    while (retries < this.maxRetries) {
+      try {
+        const response = await this.client.chat.completions.create({
+          model: 'gpt-4',
+          messages,
+          temperature: options.temperature || 0.7,
+          max_tokens: options.maxTokens || 1000,
+        });
+
+        return {
+          content: response.choices[0].message.content,
+          tokens: response.usage.total_tokens,
+          model: response.model,
+        };
+      } catch (error) {
+        retries++;
+
+        // BUG 1: Only checks for 429, misses other retryable errors
+        if (error.status === 429) {
+          const delay = this.baseDelay * retries; // BUG 2: Linear backoff instead of exponential
+          await this.sleep(delay);
+          continue;
+        }
+
+        // BUG 3: Throws immediately on any other error
+        throw error;
+      }
+    }
+
+    throw new Error('Max retries exceeded');
+  }
+
+  // BUG: Doesn't handle stream interruptions
+  async chatStream(messages, onChunk) {
+    const stream = await this.client.chat.completions.create({
+      model: 'gpt-4',
+      messages,
+      stream: true,
+    });
+
+    let fullContent = '';
+    let totalTokens = 0;
+
+    // BUG 4: No error handling for stream interruptions
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      fullContent += content;
+      onChunk(content);
+      totalTokens++; // BUG 5: Counting chunks as tokens
+    }
+
+    return {
+      content: fullContent,
+      tokens: totalTokens,
+      model: 'gpt-4',
+    };
+  }
+
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+module.exports = AIService;`,
+    },
+    codebaseFiles: {
+      typescript: [
+        {
+          fileName: 'types.ts',
+          content: `export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface AIResponse {
+  content: string;
+  tokens: number;
+  model: string;
+}
+
+export interface RetryConfig {
+  maxRetries: number;
+  baseDelay: number;
+  maxDelay: number;
+  exponentialBase: number;
+}
+
+// Error types from OpenAI API
+export enum OpenAIErrorType {
+  RATE_LIMIT = 'rate_limit_error',
+  TIMEOUT = 'timeout_error',
+  API_ERROR = 'api_error',
+  INVALID_REQUEST = 'invalid_request_error',
+  AUTH = 'authentication_error',
+  CONNECTION = 'connection_error',
+}`,
+          description: 'Type definitions for AI service',
+        },
+        {
+          fileName: 'test-cases.ts',
+          content: `import AIService from './ai-service';
+
+// Test cases to validate the fix
+export const testCases = {
+  // Should retry on rate limit errors
+  rateLimitError: async (service: AIService) => {
+    const messages = [{ role: 'user' as const, content: 'Hello' }];
+    // Mock to throw rate limit error twice, then succeed
+    return await service.chat(messages);
+  },
+
+  // Should handle timeout errors with retry
+  timeoutError: async (service: AIService) => {
+    const messages = [{ role: 'user' as const, content: 'Test' }];
+    return await service.chat(messages);
+  },
+
+  // Should use exponential backoff
+  exponentialBackoff: async (service: AIService) => {
+    // Test that delays increase exponentially: 1s, 2s, 4s, 8s...
+    const startTime = Date.now();
+    try {
+      await service.chat([{ role: 'user', content: 'Test' }]);
+    } catch (e) {
+      const elapsed = Date.now() - startTime;
+      return elapsed > 7000; // Should have tried multiple times with backoff
+    }
+  },
+
+  // Should handle stream interruptions
+  streamInterruption: async (service: AIService) => {
+    let chunks = [];
+    await service.chatStream(
+      [{ role: 'user', content: 'Tell me a story' }],
+      (chunk) => chunks.push(chunk)
+    );
+    return chunks.length > 0;
+  },
+};`,
+          description: 'Test cases for AI service',
+        },
+        {
+          fileName: 'config.ts',
+          content: `export const AI_CONFIG = {
+  // Retryable HTTP status codes
+  RETRYABLE_STATUS_CODES: [408, 429, 500, 502, 503, 504],
+
+  // Retryable error types
+  RETRYABLE_ERROR_TYPES: [
+    'rate_limit_error',
+    'timeout_error',
+    'api_error',
+    'connection_error',
+  ],
+
+  // Non-retryable error types (fail fast)
+  NON_RETRYABLE_ERROR_TYPES: [
+    'authentication_error',
+    'invalid_request_error',
+    'permission_error',
+  ],
+
+  // Retry configuration
+  RETRY_CONFIG: {
+    maxRetries: 5,
+    baseDelay: 1000, // 1 second
+    maxDelay: 60000, // 60 seconds
+    exponentialBase: 2, // 2^n backoff
+    jitterFactor: 0.1, // Add 10% random jitter
+  },
+};`,
+          description: 'Configuration constants',
+        },
+      ],
+      python: [
+        {
+          fileName: 'types.py',
+          content: `from typing import TypedDict, Literal
+from enum import Enum
+
+class ChatMessage(TypedDict):
+    role: Literal['user', 'assistant', 'system']
+    content: str
+
+class AIResponse(TypedDict):
+    content: str
+    tokens: int
+    model: str
+
+class OpenAIErrorType(Enum):
+    RATE_LIMIT = 'rate_limit_error'
+    TIMEOUT = 'timeout_error'
+    API_ERROR = 'api_error'
+    INVALID_REQUEST = 'invalid_request_error'
+    AUTH = 'authentication_error'
+    CONNECTION = 'connection_error'`,
+          description: 'Type definitions',
+        },
+        {
+          fileName: 'config.py',
+          content: `# Configuration for AI service
+AI_CONFIG = {
+    'RETRYABLE_STATUS_CODES': [408, 429, 500, 502, 503, 504],
+    'RETRYABLE_ERROR_TYPES': [
+        'rate_limit_error',
+        'timeout_error',
+        'api_error',
+        'connection_error',
+    ],
+    'NON_RETRYABLE_ERROR_TYPES': [
+        'authentication_error',
+        'invalid_request_error',
+        'permission_error',
+    ],
+    'RETRY_CONFIG': {
+        'max_retries': 5,
+        'base_delay': 1.0,
+        'max_delay': 60.0,
+        'exponential_base': 2,
+        'jitter_factor': 0.1,
+    },
+}`,
+          description: 'Configuration constants',
+        },
+      ],
+      javascript: [
+        {
+          fileName: 'config.js',
+          content: `module.exports = {
+  RETRYABLE_STATUS_CODES: [408, 429, 500, 502, 503, 504],
+
+  RETRYABLE_ERROR_TYPES: [
+    'rate_limit_error',
+    'timeout_error',
+    'api_error',
+    'connection_error',
+  ],
+
+  NON_RETRYABLE_ERROR_TYPES: [
+    'authentication_error',
+    'invalid_request_error',
+    'permission_error',
+  ],
+
+  RETRY_CONFIG: {
+    maxRetries: 5,
+    baseDelay: 1000,
+    maxDelay: 60000,
+    exponentialBase: 2,
+    jitterFactor: 0.1,
+  },
+};`,
+          description: 'Configuration constants',
+        },
+      ],
+    },
+    expectedBehavior: 'The AI service should gracefully handle rate limits, timeouts, and transient API errors with exponential backoff retry logic. Stream interruptions should be caught and retried. Non-retryable errors like authentication failures should fail fast without retries.',
+    bugDescription: `Multiple bugs in the retry logic:
+1. Only retries on 429 errors, but should retry on other transient errors (500, 502, 503, 504, timeouts)
+2. Uses linear backoff (delay * retries) instead of exponential backoff (baseDelay * 2^retries)
+3. No jitter in retry delays, which can cause thundering herd problem
+4. chatStream has no error handling - any network interruption crashes the stream
+5. Incorrectly counts stream chunks as tokens instead of using actual token usage
+6. No maximum delay cap - could wait indefinitely
+7. Doesn't check for non-retryable errors (auth errors should fail fast)
+8. No retry-after header handling for rate limits`,
+    hints: [
+      'Look at what error types should be retried vs. fail fast',
+      'Exponential backoff formula: baseDelay * (2 ^ attemptNumber)',
+      'Consider adding random jitter to prevent thundering herd',
+      'Check if the API response includes retry-after headers',
+      'Stream errors need try-catch and reconnection logic',
+      'Token counting should use API usage data, not chunk count',
+      'Some errors (auth, invalid request) should never be retried',
+    ],
+    testCases: [
+      {
+        input: 'API returns 429 rate limit error',
+        expected: 'Should retry with exponential backoff and respect retry-after header',
+        description: 'Rate limit handling',
+      },
+      {
+        input: 'API returns 500 server error',
+        expected: 'Should retry with exponential backoff',
+        description: 'Server error handling',
+      },
+      {
+        input: 'API returns 401 auth error',
+        expected: 'Should fail immediately without retries',
+        description: 'Non-retryable error',
+      },
+      {
+        input: 'Stream interrupted mid-response',
+        expected: 'Should catch error and retry stream from beginning',
+        description: 'Stream interruption',
+      },
+      {
+        input: 'Multiple rapid requests',
+        expected: 'Should use jittered backoff to avoid thundering herd',
+        description: 'Concurrent retry behavior',
+      },
+    ],
+  },
 ];
 
 export function filterScenarios(filters: {
