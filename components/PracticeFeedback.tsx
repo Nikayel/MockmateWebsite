@@ -21,7 +21,6 @@ import {
   Tooltip,
   Cell,
 } from "recharts"
-import jsPDF from "jspdf"
 
 interface FeedbackSection {
   tldr: string
@@ -32,6 +31,14 @@ interface FeedbackSection {
     reasoning: number
     aiCollaboration: number
     overall: number
+  }
+  scoreJustifications: {
+    correctness?: string
+    efficiency?: string
+    codeQuality?: string
+    reasoning?: string
+    aiCollaboration?: string
+    overall?: string
   }
   whatWorked: string[]
   fixNext: string[]
@@ -64,6 +71,7 @@ function parseFeedback(feedback: string): FeedbackSection {
       aiCollaboration: 0,
       overall: 0,
     },
+    scoreJustifications: {},
     whatWorked: [],
     fixNext: [],
     actionPlan: [],
@@ -84,7 +92,7 @@ function parseFeedback(feedback: string): FeedbackSection {
     // - Bullet points: "- Correctness: 10/10"
     // - Variations in spacing and dashes
     
-    // Parse scores - handle both /10 and /100 formats
+    // Parse scores - handle both /10 and /100 formats, and extract justifications
     const parseScore = (match: RegExpMatchArray | null, is100: boolean) => {
       if (!match) return 0
       const score = parseInt(match[1], 10)
@@ -92,31 +100,62 @@ function parseFeedback(feedback: string): FeedbackSection {
       return is100 ? score : score * 10
     }
     
+    // Extract score and justification (format: "Label: X/100 – justification" or "- Label: X/100 – justification")
+    const parseScoreWithJustification = (label: string, scoreText: string, is100: boolean = true) => {
+      // Try with justification first (handles "Label: X/100 – justification" or "- Label: X/100 – justification")
+      const regexWithJustification = new RegExp(`[-•]?\\s*${label}[:\s–-]*(\\d+)\\s*\\/\\s*${is100 ? '100' : '10'}[–-\\s]+(.+?)(?=\\n|$)`, 'i')
+      const matchWithJustification = scoreText.match(regexWithJustification)
+      if (matchWithJustification && matchWithJustification[2]?.trim()) {
+        const score = parseInt(matchWithJustification[1], 10)
+        const justification = matchWithJustification[2].trim()
+        return { score: is100 ? score : score * 10, justification }
+      }
+      // Fallback: try without justification
+      const regexWithoutJustification = new RegExp(`[-•]?\\s*${label}[:\s–-]*(\\d+)\\s*\\/\\s*${is100 ? '100' : '10'}`, 'i')
+      const matchWithoutJustification = scoreText.match(regexWithoutJustification)
+      return { score: parseScore(matchWithoutJustification, is100), justification: '' }
+    }
+    
     // Try /100 first, then /10
-    const correctnessMatch100 = scoreText.match(/Correctness[:\s–-]*(\d+)\s*\/\s*100/i)
-    const correctnessMatch10 = scoreText.match(/Correctness[:\s–-]*(\d+)\s*\/\s*10/i)
-    sections.scores.correctness = parseScore(correctnessMatch100, true) || parseScore(correctnessMatch10, false)
+    const correctness100 = parseScoreWithJustification('Correctness', scoreText, true)
+    const correctness10 = correctness100.score === 0 ? parseScoreWithJustification('Correctness', scoreText, false) : correctness100
+    sections.scores.correctness = correctness10.score
+    if (correctness10.justification) sections.scoreJustifications.correctness = correctness10.justification
     
-    const efficiencyMatch100 = scoreText.match(/Efficiency[:\s–-]*(\d+)\s*\/\s*100/i)
-    const efficiencyMatch10 = scoreText.match(/Efficiency[:\s–-]*(\d+)\s*\/\s*10/i)
-    sections.scores.efficiency = parseScore(efficiencyMatch100, true) || parseScore(efficiencyMatch10, false)
+    const efficiency100 = parseScoreWithJustification('Efficiency', scoreText, true)
+    const efficiency10 = efficiency100.score === 0 ? parseScoreWithJustification('Efficiency', scoreText, false) : efficiency100
+    sections.scores.efficiency = efficiency10.score
+    if (efficiency10.justification) sections.scoreJustifications.efficiency = efficiency10.justification
     
-    const codeQualityMatch100 = scoreText.match(/Code\s+Quality[:\s–-]*(\d+)\s*\/\s*100/i)
-    const codeQualityMatch10 = scoreText.match(/Code\s+Quality[:\s–-]*(\d+)\s*\/\s*10/i)
-    sections.scores.codeQuality = parseScore(codeQualityMatch100, true) || parseScore(codeQualityMatch10, false)
+    const codeQuality100 = parseScoreWithJustification('Code\\s+Quality', scoreText, true)
+    const codeQuality10 = codeQuality100.score === 0 ? parseScoreWithJustification('Code\\s+Quality', scoreText, false) : codeQuality100
+    sections.scores.codeQuality = codeQuality10.score
+    if (codeQuality10.justification) sections.scoreJustifications.codeQuality = codeQuality10.justification
     
     // Handle "Reasoning & Explanation" or just "Reasoning"
-    const reasoningMatch100 = scoreText.match(/Reasoning(?:\s+&\s+Explanation)?[:\s–-]*(\d+)\s*\/\s*100/i)
-    const reasoningMatch10 = scoreText.match(/Reasoning(?:\s+&\s+Explanation)?[:\s–-]*(\d+)\s*\/\s*10/i)
-    sections.scores.reasoning = parseScore(reasoningMatch100, true) || parseScore(reasoningMatch10, false)
+    const reasoning100 = parseScoreWithJustification('Reasoning(?:\\s+&\\s+Explanation)?', scoreText, true)
+    const reasoning10 = reasoning100.score === 0 ? parseScoreWithJustification('Reasoning(?:\\s+&\\s+Explanation)?', scoreText, false) : reasoning100
+    sections.scores.reasoning = reasoning10.score
+    if (reasoning10.justification) sections.scoreJustifications.reasoning = reasoning10.justification
     
-    const aiCollaborationMatch100 = scoreText.match(/AI\s+Collaboration[:\s–-]*(\d+)\s*\/\s*100/i)
-    const aiCollaborationMatch10 = scoreText.match(/AI\s+Collaboration[:\s–-]*(\d+)\s*\/\s*10/i)
-    sections.scores.aiCollaboration = parseScore(aiCollaborationMatch100, true) || parseScore(aiCollaborationMatch10, false)
+    const aiCollaboration100 = parseScoreWithJustification('AI\\s+Collaboration', scoreText, true)
+    const aiCollaboration10 = aiCollaboration100.score === 0 ? parseScoreWithJustification('AI\\s+Collaboration', scoreText, false) : aiCollaboration100
+    sections.scores.aiCollaboration = aiCollaboration10.score
+    if (aiCollaboration10.justification) sections.scoreJustifications.aiCollaboration = aiCollaboration10.justification
     
-    const overallMatch100 = scoreText.match(/Overall[:\s–-]*(\d+)\s*\/\s*100/i)
-    const overallMatch10 = scoreText.match(/Overall[:\s–-]*(\d+)\s*\/\s*10/i)
-    sections.scores.overall = parseScore(overallMatch100, true) || parseScore(overallMatch10, false)
+    const overall100 = parseScoreWithJustification('Overall', scoreText, true)
+    const overall10 = overall100.score === 0 ? parseScoreWithJustification('Overall', scoreText, false) : overall100
+    sections.scores.overall = overall10.score
+    if (overall10.justification) sections.scoreJustifications.overall = overall10.justification
+    
+    // Explicitly check for 0 scores in feedback text (in case AI mentions "0/100" explicitly)
+    const feedbackLower = feedback.toLowerCase()
+    if (feedbackLower.includes('reasoning') && feedbackLower.includes('0/100')) {
+      sections.scores.reasoning = 0
+    }
+    if (feedbackLower.includes('ai collaboration') && feedbackLower.includes('0/100')) {
+      sections.scores.aiCollaboration = 0
+    }
     
     // Debug: log if scores are still 0 after parsing
     if (sections.scores.correctness === 0 && sections.scores.efficiency === 0 && 
@@ -178,6 +217,7 @@ export default function PracticeFeedback({
   // Progressive disclosure state
   const [showGraph, setShowGraph] = useState(false)
   const [openImprovements, setOpenImprovements] = useState<Record<number, boolean>>({})
+  const [showCodeQualityDetails, setShowCodeQualityDetails] = useState(false)
 
   // Parse feedback for edge cases and alternative solutions
   const feedbackLower = feedback.toLowerCase()
@@ -222,19 +262,30 @@ export default function PracticeFeedback({
                         feedbackLower.includes('engage with ai') || feedbackLower.includes('engage with the ai') ||
                         feedbackLower.includes('use the ai partner')
     
+    // Check for zero collaboration indicators - these should get 0, not 40
+    const noCollaboration = feedbackLower.includes('no collaboration') || 
+                           feedbackLower.includes('never messaged') || 
+                           feedbackLower.includes('no evidence') ||
+                           feedbackLower.includes('did not collaborate') ||
+                           feedbackLower.includes('zero collaboration') ||
+                           (feedbackLower.includes('reasoning') && feedbackLower.includes('0/100')) ||
+                           (feedbackLower.includes('ai collaboration') && feedbackLower.includes('0/100'))
+    
     // If overall is high but there are improvement suggestions, adjust scores accordingly (0-100 scale)
     if (baseScore >= 90) {
       // High scores but with improvement suggestions means some areas need work
       sections.scores.efficiency = hasReasoningIssues || hasAiIssues ? baseScore - 10 : baseScore
       sections.scores.codeQuality = baseScore
-      sections.scores.reasoning = hasReasoningIssues ? Math.max(60, baseScore - 30) : baseScore
-      sections.scores.aiCollaboration = hasAiIssues ? Math.max(60, baseScore - 30) : baseScore
+      // If no collaboration detected, give 0, not a reduced score
+      sections.scores.reasoning = noCollaboration ? 0 : (hasReasoningIssues ? Math.max(0, baseScore - 30) : baseScore)
+      sections.scores.aiCollaboration = noCollaboration ? 0 : (hasAiIssues ? Math.max(0, baseScore - 30) : baseScore)
     } else {
       // Lower overall score - distribute more evenly
       sections.scores.efficiency = baseScore
       sections.scores.codeQuality = baseScore
-      sections.scores.reasoning = hasReasoningIssues ? Math.max(40, baseScore - 20) : baseScore
-      sections.scores.aiCollaboration = hasAiIssues ? Math.max(40, baseScore - 20) : baseScore
+      // If no collaboration detected, give 0, not 40
+      sections.scores.reasoning = noCollaboration ? 0 : (hasReasoningIssues ? Math.max(0, baseScore - 20) : baseScore)
+      sections.scores.aiCollaboration = noCollaboration ? 0 : (hasAiIssues ? Math.max(0, baseScore - 20) : baseScore)
     }
     
     // Ensure scores don't exceed overall and are within valid range (0-100 scale)
@@ -289,7 +340,8 @@ export default function PracticeFeedback({
     return "bg-red-600"
   }
 
-  const generatePDF = () => {
+  const generatePDF = async () => {
+    const { default: jsPDF } = await import("jspdf")
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
     const margin = 20
@@ -484,23 +536,46 @@ export default function PracticeFeedback({
                 </div>
               </div>
 
-              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Code className="h-4 w-4 text-cyan-400" />
-                    <span className="text-sm text-gray-300">Code Quality</span>
-                  </div>
-                  <Badge className={`${getScoreBgColor(normalizedScores.codeQuality)} text-white`}>
-                    {normalizedScores.codeQuality}/100
-                  </Badge>
+              <Collapsible open={showCodeQualityDetails} onOpenChange={setShowCodeQualityDetails}>
+                <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                  <CollapsibleTrigger asChild>
+                    <div className={sections.scoreJustifications.codeQuality ? "cursor-pointer" : ""}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Code className="h-4 w-4 text-cyan-400" />
+                          <span className="text-sm text-gray-300">Code Quality</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className={`${getScoreBgColor(normalizedScores.codeQuality)} text-white`}>
+                            {normalizedScores.codeQuality}/100
+                          </Badge>
+                          {sections.scoreJustifications.codeQuality && normalizedScores.codeQuality < 60 && (
+                            showCodeQualityDetails ? (
+                              <ChevronUp className="h-4 w-4 text-gray-400" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-gray-400" />
+                            )
+                          )}
+                        </div>
+                      </div>
+                      <div className="w-full bg-gray-700 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full ${getScoreBgColor(normalizedScores.codeQuality)}`}
+                          style={{ width: `${normalizedScores.codeQuality}%` }}
+                        />
+                      </div>
+                    </div>
+                  </CollapsibleTrigger>
+                  {sections.scoreJustifications.codeQuality && normalizedScores.codeQuality < 60 && (
+                    <CollapsibleContent className="mt-3 pt-3 border-t border-gray-700">
+                      <div className="text-xs text-gray-400 mb-1">Why the score is low:</div>
+                      <p className="text-sm text-gray-300 leading-relaxed">
+                        {sections.scoreJustifications.codeQuality}
+                      </p>
+                    </CollapsibleContent>
+                  )}
                 </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${getScoreBgColor(normalizedScores.codeQuality)}`}
-                    style={{ width: `${normalizedScores.codeQuality}%` }}
-                  />
-                </div>
-              </div>
+              </Collapsible>
 
               <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
                 <div className="flex items-center justify-between mb-2">

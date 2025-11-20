@@ -40,9 +40,10 @@ Tone: candid, data-backed, encouraging. Never rant, never waffle.
 HARD RULES
 - Limit yourself to ~350 words. Omit fluff and generic advice.
 - Tie every comment to observed signals (tests, time spent, interaction counts, hints, efficiency metrics, etc.).
-- If time spent < 120 seconds OR the user never messaged the interviewer/AI partner, assume they did NOT walk through their thinking. Explicitly call this out and cap BOTH "Reasoning & Explanation" and "AI Collaboration" at 40/100. Also cap the overall score at 90/100 in this situation, even if all tests pass.
-- If the user has NO collaboration (no interviewer messages AND no AI partner messages), cap the overall score at 45-50/100 maximum. If they also rushed (< 90 seconds), cap at 45/100. This is a critical failure in interview communication.
-- If time spent ≥ 120 seconds but interviewer message count from the user is 0, still mention the missing walkthrough.
+- If the user has NO collaboration (no interviewer messages AND no AI partner messages), give BOTH "Reasoning & Explanation" and "AI Collaboration" a score of 0/100. This is a critical failure - they did not collaborate or explain their thinking at all.
+- If the user has minimal collaboration (only 1-2 messages total), score "Reasoning & Explanation" and "AI Collaboration" proportionally based on actual collaboration level (e.g., 1 message = ~20/100, 2 messages = ~40/100, etc.). Never give free points for zero collaboration.
+- If time spent < 120 seconds AND the user never messaged the interviewer/AI partner, assume they did NOT walk through their thinking. Give "Reasoning & Explanation" 0/100 and "AI Collaboration" 0/100 if there were no messages. Also cap the overall score appropriately based on collaboration level.
+- If time spent ≥ 120 seconds but interviewer message count from the user is 0, still mention the missing walkthrough and score "Reasoning & Explanation" at 0/100.
 - Use markdown with the exact sections below, in order, no extras:
   1. **TL;DR** – 1-2 sentences summarizing outcome + top risk.
   2. **Score Snapshot** – bullet list of the six ratings (Correctness, Efficiency, Code Quality, Reasoning & Explanation, AI Collaboration, Overall) formatted as "Label: X/100 – justification". All scores should be on a 0-100 scale.
@@ -111,10 +112,12 @@ ${testResults.filter((t: any) => !t.passed).map((t: any) =>
 ` : ''}
 
 Remember:
-- Be explicit when tests pass but collaboration/explanation was missing; enforce the score caps as stated.
+- Be explicit when tests pass but collaboration/explanation was missing; give 0/100 for Reasoning & Explanation and AI Collaboration if there was zero collaboration.
+- Score collaboration proportionally: 0 messages = 0/100, 1-2 messages = 10-30/100, 3-5 messages = 40-60/100, 6+ quality messages = 70-100/100.
 - Only include insights that materially change the candidate's next interview.
 - Keep every section lean—if there's nothing meaningful to say, write "No major findings."
-- If tests failed, highlight the most critical fix inside "Fix Next".`
+- If tests failed, highlight the most critical fix inside "Fix Next".
+- For Code Quality, if the score is low (< 60/100), include specific reasons why in the justification (e.g., "Code Quality: 45/100 – Missing error handling, unclear variable names, no input validation").`
 
     // Generate content with retry logic
     let result: any = null
