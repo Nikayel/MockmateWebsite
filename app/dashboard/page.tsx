@@ -10,8 +10,10 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { useAuth } from "@/lib/auth-context"
 import { getUserProfile, initializeUserQuota, checkUsageLimit } from "@/lib/firestore-helpers"
-import { Profile, ProfileQuota } from "@/lib/types"
+import { Profile, ProfileQuota, InterviewSession } from "@/lib/types"
 import { PRICING_CONFIG } from "@/lib/config"
+import { db } from "@/lib/firebase"
+import { collection, query, where, getDocs } from "firebase/firestore"
 import {
   User,
   Crown,
@@ -32,6 +34,7 @@ export default function DashboardPage() {
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [usage, setUsage] = useState<{ used: number; limit: number; allowed: boolean } | null>(null)
+  const [sessions, setSessions] = useState<InterviewSession[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
 
@@ -103,6 +106,35 @@ export default function DashboardPage() {
         // Load usage (this will use the correct subscription tier)
         const usageData = await checkUsageLimit(firebaseUser.uid)
         setUsage(usageData)
+
+        // Load recent sessions (limit to 5 most recent)
+        try {
+          const sessionsQuery = query(
+            collection(db, "interview_sessions"),
+            where("user_id", "==", firebaseUser.uid)
+          )
+          const sessionsSnap = await getDocs(sessionsQuery)
+
+          if (!sessionsSnap.empty) {
+            // Sort in memory to avoid composite index requirement
+            const sessionsData = sessionsSnap.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            } as InterviewSession))
+
+            // Sort by started_at descending and take first 5
+            sessionsData.sort((a, b) => {
+              const dateA = new Date(a.started_at).getTime()
+              const dateB = new Date(b.started_at).getTime()
+              return dateB - dateA
+            })
+
+            setSessions(sessionsData.slice(0, 5))
+          }
+        } catch (sessionError) {
+          console.error("Error fetching sessions:", sessionError)
+          // Don't show error to user, just log it
+        }
       } catch (error) {
         console.error("Error loading dashboard:", error)
         toast.error("Failed to load dashboard")
@@ -140,6 +172,12 @@ export default function DashboardPage() {
 
   const isPro = profile?.subscription_tier === "pro"
   const usagePercentage = usage ? (usage.used / usage.limit) * 100 : 0
+
+  // Calculate performance metrics from completed sessions
+  const completedSessions = sessions.filter(s => s.completed_at && s.performance_score !== undefined)
+  const avgPerformance = completedSessions.length > 0
+    ? Math.round(completedSessions.reduce((sum, s) => sum + (s.performance_score || 0), 0) / completedSessions.length)
+    : null
 
   return (
     <main className="min-h-screen bg-black">
@@ -225,8 +263,17 @@ export default function DashboardPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-white mb-1">--</div>
-                <p className="text-xs text-gray-400">Complete sessions to see stats</p>
+                {avgPerformance !== null ? (
+                  <>
+                    <div className="text-3xl font-bold text-white mb-1">{avgPerformance}%</div>
+                    <p className="text-xs text-gray-400">Average score across {completedSessions.length} session{completedSessions.length !== 1 ? 's' : ''}</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-3xl font-bold text-white mb-1">--</div>
+                    <p className="text-xs text-gray-400">Complete sessions to see stats</p>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -247,17 +294,60 @@ export default function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8">
-                <Calendar className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-                <p className="text-gray-400">No recent sessions</p>
-                <p className="text-gray-500 text-sm mt-2">Start practicing to see your activity here</p>
-                <Link href="/interview" className="block mt-4">
-                  <Button className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
-                    <Terminal className="mr-2 h-4 w-4" />
-                    Start Practice Session
-                  </Button>
-                </Link>
-              </div>
+              {sessions.length === 0 ? (
+                <div className="text-center py-8">
+                  <Calendar className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-400">No recent sessions</p>
+                  <p className="text-gray-500 text-sm mt-2">Start practicing to see your activity here</p>
+                  <Link href="/interview" className="block mt-4">
+                    <Button className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
+                      <Terminal className="mr-2 h-4 w-4" />
+                      Start Practice Session
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {sessions.map((session) => (
+                    <Link
+                      key={session.id}
+                      href={session.completed_at ? `/sessions/${session.id}` : `/interview?session=${session.id}&scenario=${session.scenario_id}`}
+                      className="block p-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="text-white font-medium text-sm mb-1">{session.topic}</h4>
+                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(session.started_at).toLocaleDateString()}
+                            {session.completed_at && session.performance_score !== undefined && (
+                              <>
+                                <span>•</span>
+                                <span className="text-[#00d9ff]">{Math.round(session.performance_score)}% score</span>
+                              </>
+                            )}
+                            {!session.completed_at && (
+                              <>
+                                <span>•</span>
+                                <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-xs">
+                                  In Progress
+                                </Badge>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <Badge className={
+                          session.difficulty === "easy" ? "bg-green-600/20 text-green-400 border-green-600/30" :
+                          session.difficulty === "medium" ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30" :
+                          "bg-red-600/20 text-red-400 border-red-600/30"
+                        }>
+                          {session.difficulty.toUpperCase()}
+                        </Badge>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

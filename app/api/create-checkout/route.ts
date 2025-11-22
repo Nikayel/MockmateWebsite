@@ -6,6 +6,8 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
+import { db } from "@/lib/firebase"
+import { doc, getDoc } from "firebase/firestore"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-11-20.acacia", // Use latest Stripe API version
@@ -17,6 +19,26 @@ export async function POST(request: NextRequest) {
 
     if (!userId) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 })
+    }
+
+    // Validate that user has an email before creating checkout
+    try {
+      const profileRef = doc(db, "profiles", userId)
+      const profileSnap = await getDoc(profileRef)
+
+      if (!profileSnap.exists()) {
+        return NextResponse.json({ error: "User profile not found" }, { status: 404 })
+      }
+
+      const profile = profileSnap.data()
+      if (!profile.email || profile.email.trim() === "") {
+        return NextResponse.json({
+          error: "Email address is required for subscription. Please update your profile with a valid email address."
+        }, { status: 400 })
+      }
+    } catch (profileError) {
+      console.error("Error fetching user profile:", profileError)
+      return NextResponse.json({ error: "Failed to validate user profile" }, { status: 500 })
     }
 
     // Determine price based on platform

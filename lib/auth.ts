@@ -1,12 +1,13 @@
-import { 
-  signInWithPopup, 
-  signOut as firebaseSignOut, 
+import {
+  signInWithPopup,
+  signOut as firebaseSignOut,
   GithubAuthProvider,
   GoogleAuthProvider,
   onAuthStateChanged,
   User as FirebaseUser
 } from "firebase/auth"
 import { auth } from "./firebase"
+import { trackLogin, trackSignup } from "./analytics"
 
 export async function signInWithGitHub(redirect?: string) {
   // Store redirect in localStorage to retrieve after auth
@@ -16,9 +17,18 @@ export async function signInWithGitHub(redirect?: string) {
 
   const provider = new GithubAuthProvider()
   provider.addScope('read:user')
-  
+
   try {
     const result = await signInWithPopup(auth, provider)
+
+    // Track login/signup event
+    const isNewUser = result.user.metadata.creationTime === result.user.metadata.lastSignInTime
+    if (isNewUser) {
+      trackSignup("github", result.user.uid)
+    } else {
+      trackLogin("github", result.user.uid)
+    }
+
     return {
       user: result.user,
       providerId: result.providerId,
@@ -38,9 +48,18 @@ export async function signInWithGoogle(redirect?: string) {
   const provider = new GoogleAuthProvider()
   provider.addScope('profile')
   provider.addScope('email')
-  
+
   try {
     const result = await signInWithPopup(auth, provider)
+
+    // Track login/signup event
+    const isNewUser = result.user.metadata.creationTime === result.user.metadata.lastSignInTime
+    if (isNewUser) {
+      trackSignup("google", result.user.uid)
+    } else {
+      trackLogin("google", result.user.uid)
+    }
+
     return {
       user: result.user,
       providerId: result.providerId,

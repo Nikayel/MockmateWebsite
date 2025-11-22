@@ -13,14 +13,16 @@ import { getUserProfile } from "@/lib/firestore-helpers"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore"
 import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle, XCircle } from "lucide-react"
-import { Profile, ProfileQuota } from "@/lib/types"
+import { Profile, ProfileQuota, InterviewSession } from "@/lib/types"
 import { PRICING_CONFIG } from "@/lib/config"
 import { toast } from "sonner"
+import Link from "next/link"
 
 export default function AccountPage() {
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [usage, setUsage] = useState<ProfileQuota | null>(null)
+  const [sessions, setSessions] = useState<InterviewSession[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
@@ -106,6 +108,35 @@ export default function AccountPage() {
         } catch (usageError) {
           console.error("Error fetching usage:", usageError)
           // Usage data might not exist for new users, so don't show error
+        }
+
+        // Fetch recent sessions (limit to 5 most recent)
+        try {
+          const sessionsQuery = query(
+            collection(db, "interview_sessions"),
+            where("user_id", "==", firebaseUser.uid)
+          )
+          const sessionsSnap = await getDocs(sessionsQuery)
+
+          if (!sessionsSnap.empty) {
+            // Sort in memory to avoid composite index requirement
+            const sessionsData = sessionsSnap.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            } as InterviewSession))
+
+            // Sort by started_at descending and take first 5
+            sessionsData.sort((a, b) => {
+              const dateA = new Date(a.started_at).getTime()
+              const dateB = new Date(b.started_at).getTime()
+              return dateB - dateA
+            })
+
+            setSessions(sessionsData.slice(0, 5))
+          }
+        } catch (sessionError) {
+          console.error("Error fetching sessions:", sessionError)
+          // Don't show error to user, just log it
         }
       } catch (error) {
         console.error("Error loading user data:", error)
@@ -407,16 +438,71 @@ export default function AccountPage() {
           {/* Recent Activity */}
           <Card className="bg-gray-900/50 border-gray-700">
             <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <Calendar className="mr-2 h-5 w-5" />
-                Recent Activity
+              <CardTitle className="text-white flex items-center justify-between">
+                <span className="flex items-center">
+                  <Calendar className="mr-2 h-5 w-5" />
+                  Recent Activity
+                </span>
+                <Link href="/sessions">
+                  <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                    View All
+                  </Button>
+                </Link>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8">
-                <p className="text-gray-400">No recent interview sessions</p>
-                <p className="text-gray-500 text-sm mt-2">Start practicing in VS Code to see your activity here</p>
-              </div>
+              {sessions.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-400">No recent interview sessions</p>
+                  <p className="text-gray-500 text-sm mt-2">Start practicing to see your activity here</p>
+                  <Link href="/interview" className="block mt-4">
+                    <Button className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
+                      Start Practice Session
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {sessions.map((session) => (
+                    <Link
+                      key={session.id}
+                      href={session.completed_at ? `/sessions/${session.id}` : `/interview?session=${session.id}&scenario=${session.scenario_id}`}
+                      className="block p-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="text-white font-medium text-sm mb-1">{session.topic}</h4>
+                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(session.started_at).toLocaleDateString()}
+                            {session.completed_at && session.performance_score !== undefined && (
+                              <>
+                                <span>•</span>
+                                <span className="text-[#00d9ff]">{Math.round(session.performance_score)}% score</span>
+                              </>
+                            )}
+                            {!session.completed_at && (
+                              <>
+                                <span>•</span>
+                                <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-xs">
+                                  In Progress
+                                </Badge>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <Badge className={
+                          session.difficulty === "easy" ? "bg-green-600/20 text-green-400 border-green-600/30" :
+                          session.difficulty === "medium" ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30" :
+                          "bg-red-600/20 text-red-400 border-red-600/30"
+                        }>
+                          {session.difficulty.toUpperCase()}
+                        </Badge>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
