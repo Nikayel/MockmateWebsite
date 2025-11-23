@@ -80,7 +80,7 @@ export function CodeViewerDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden rounded-md border border-gray-700">
+        <div className="flex-1 overflow-hidden rounded-md border border-gray-700 editor-wrapper">
           <MonacoEditor
             height="100%"
             language={editorLanguage}
@@ -100,6 +100,29 @@ export function CodeViewerDialog({
                 verticalScrollbarSize: 10,
                 horizontalScrollbarSize: 10,
               },
+              // Disable all widgets to prevent leakage
+              contextmenu: false,
+              quickSuggestions: false,
+              suggestOnTriggerCharacters: false,
+              acceptSuggestionOnEnter: 'off',
+              tabCompletion: 'off',
+              wordBasedSuggestions: 'off',
+              parameterHints: { enabled: false },
+              hover: { enabled: false },
+              links: false,
+              colorDecorators: false,
+              find: {
+                addExtraSpaceOnTop: false,
+                autoFindInSelection: 'never',
+                seedSearchStringFromSelection: 'never',
+              },
+              occurrencesHighlight: false,
+              selectionHighlight: false,
+              codeLens: false,
+              folding: false,
+              foldingHighlight: false,
+              showFoldingControls: 'never',
+              matchBrackets: 'never',
             }}
           />
         </div>
