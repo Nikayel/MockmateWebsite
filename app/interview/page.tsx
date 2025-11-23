@@ -56,7 +56,10 @@ import { extractProtectedElements, validateCodeProtection, enforceCodeProtection
 import { toast } from "sonner"
 
 // Dynamically import Monaco Editor (client-side only)
-const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false })
+const Editor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+  loading: () => <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="text-gray-400">Loading editor...</div></div>
+})
 
 interface ChatMessage {
   type: "user" | "ai"
@@ -136,7 +139,7 @@ export default function InterviewPage() {
   // Code viewer dialog state
   const [selectedFile, setSelectedFile] = useState<{ path: string; content: string } | null>(null)
   const [isCodeViewerOpen, setIsCodeViewerOpen] = useState(false)
-  
+
   // Close confirmation dialog state
   const [showCloseDialog, setShowCloseDialog] = useState(false)
 
@@ -147,6 +150,8 @@ export default function InterviewPage() {
   const chatEndRef = useRef<HTMLDivElement>(null)
   const interviewerEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const editorContainerRef = useRef<HTMLDivElement>(null)
+  const [editorHeight, setEditorHeight] = useState(400)
 
   // Separate effect to handle auth check with delay to prevent race condition on refresh
   useEffect(() => {
@@ -169,15 +174,15 @@ export default function InterviewPage() {
         router.push("/login?redirect=interview")
         return
       }
-      
+
       // Check usage limit
       const usage = await checkUsageLimit(firebaseUser.uid)
       setUsageLimit(usage)
-      
+
       // Check if we're reopening a session
       const sessionId = searchParams?.get("session")
       const scenarioId = searchParams?.get("scenario")
-      
+
       if (sessionId && scenarioId) {
         // Load the scenario and reopen the session
         const scenario = getScenarioById(scenarioId)
@@ -188,7 +193,7 @@ export default function InterviewPage() {
           setIsInterviewStarted(true)
           setShowScenarioBrowser(false)
           setStartTime(Date.now())
-          
+
           // Initialize code based on scenario type
           let initialCode: string
           if (scenario.type === 'bugfix') {
@@ -208,7 +213,7 @@ export default function InterviewPage() {
 }`
           }
           setCode(initialCode)
-          
+
           // Initialize interviewer with welcome message
           const problemType = scenario.type === 'bugfix' ? 'BUG FIX' : scenario.type.toUpperCase()
           const initialMessage = `Welcome back! You're continuing your practice on **${scenario.title}** - a ${scenario.difficulty} ${problemType} problem.
@@ -219,19 +224,19 @@ You can continue where you left off. Feel free to:
 - Ask for hints if you get stuck
 
 Let's continue!`
-          
+
           setInterviewerMessages([{ type: "ai", message: initialMessage }])
           setChatMessages([{
             type: "ai",
             message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
           }])
-          
+
           toast.success("Session resumed")
         } else {
           toast.error("Scenario not found")
         }
       }
-      
+
       setIsLoading(false)
     }
     checkAuth()
@@ -309,6 +314,46 @@ Let's continue!`
     }
   }, [interviewerMessages])
 
+  // Measure editor container height for Monaco Editor
+  useEffect(() => {
+    if (!editorContainerRef.current) return
+
+    const updateHeight = () => {
+      if (editorContainerRef.current) {
+        const height = editorContainerRef.current.clientHeight
+        if (height > 0) {
+          setEditorHeight(height)
+        }
+      }
+    }
+
+    let resizeObserver: ResizeObserver | null = null
+
+    // Use requestAnimationFrame to ensure DOM is laid out
+    const rafId = requestAnimationFrame(() => {
+      updateHeight()
+
+      // Use ResizeObserver to track size changes
+      if (editorContainerRef.current) {
+        resizeObserver = new ResizeObserver(() => {
+          requestAnimationFrame(updateHeight)
+        })
+        resizeObserver.observe(editorContainerRef.current)
+      }
+    })
+
+    // Also listen to window resize
+    window.addEventListener('resize', updateHeight)
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      if (resizeObserver) {
+        resizeObserver.disconnect()
+      }
+      window.removeEventListener('resize', updateHeight)
+    }
+  }, [isInterviewStarted, showFeedback, testResults.length])
+
   // Update code when language changes during interview
   useEffect(() => {
     if (isInterviewStarted && selectedScenario && !showFeedback) {
@@ -349,7 +394,7 @@ Let's continue!`
       if (isEmptyOrStarter) {
         setCode(newCode)
         setStarterCode(newCode)
-        
+
         // Extract protected elements for code protection
         const protectedElementsData = extractProtectedElements(newCode, selectedLanguage)
         setProtectedElements(protectedElementsData)
@@ -363,7 +408,7 @@ Let's continue!`
 
     const codeHash = code.trim().replace(/\s+/g, " ")
     const codeLength = code.trim().length
-    
+
     // More intelligent timing based on code activity
     // Jump in after 15-30 seconds of inactivity, but only if meaningful code exists
     if (codeHash !== lastCodeHash && codeLength > 50 && lastCodeHash.length > 0) {
@@ -466,10 +511,10 @@ Let's continue!`
     try {
       // Get user profile for context
       const userProfile = user ? await getUserProfile(user.id) : null
-      
+
       // Analyze code patterns for context-aware feedback
       const codeAnalysis = analyzeCodeForProactiveFeedback(code)
-      
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -507,48 +552,48 @@ Let's continue!`
   const analyzeCodeForProactiveFeedback = (code: string): string => {
     const analysis: string[] = []
     const codeLower = code.toLowerCase()
-    
+
     // Detect patterns
     if (code.includes("for") && code.includes("for")) {
       analysis.push("Candidate is using nested loops - potential O(n²) complexity")
     }
-    
+
     if (code.match(/sort|\.sort\(/)) {
       analysis.push("Candidate is using sorting - good algorithmic thinking")
     }
-    
+
     if (code.match(/Map|Set|HashMap|HashSet/)) {
       analysis.push("Candidate is using hash-based data structures - efficient approach")
     }
-    
+
     if (code.match(/recursion|function.*\(.*\)\s*{[\s\S]*\1\(/)) {
       analysis.push("Candidate is using recursion - should consider base cases and stack overflow")
     }
-    
+
     if (code.length > 300 && !code.includes("//")) {
       analysis.push("Code is getting lengthy - candidate might benefit from breaking into helper functions")
     }
-    
+
     if (code.match(/if.*if.*if/)) {
       analysis.push("Multiple nested conditionals detected - could indicate complexity")
     }
-    
+
     if (code.match(/\/\/ TODO|\/\/ FIXME|\/\/ HACK/)) {
       analysis.push("Candidate has TODO/FIXME comments - they're aware of incomplete parts")
     }
-    
+
     // Time-based context
     const minutesSpent = Math.floor(elapsedTime / 60)
     if (minutesSpent > 10 && code.length < 100) {
       analysis.push(`Candidate has been working for ${minutesSpent} minutes but code is still minimal - might need guidance`)
     }
-    
+
     return analysis.length > 0 ? analysis.join("\n") : ""
   }
 
   const triggerPostInterviewDiscussion = async (testResults: TestResult[], summary: any) => {
     setIsGeneratingDiscussion(true)
-    
+
     try {
       if (!selectedScenario) {
         return
@@ -647,7 +692,7 @@ Let's continue!`
       // Now trigger interviewer to discuss the solution
       const userProfile = user ? await getUserProfile(user.id) : null
       const metrics = analyzeCodeEfficiency(code)
-      
+
       const discussionPrompt = `[POST-INTERVIEW DISCUSSION - CONTINUE CONVERSATION] This is a continuation of our interview conversation. The candidate has just completed their coding solution.
 
 TEST RESULTS: ${summary.passed}/${summary.total} tests passed (${summary.passRate}% pass rate)
@@ -771,7 +816,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           selectedScenario.id
         )
         setCurrentSessionId(sessionId)
-        
+
         // Only increment usage for non-DSA questions
         if (selectedScenario.type !== 'dsa') {
           await incrementSessionUsage(user.id)
@@ -814,7 +859,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     }
     setCode(initialCode)
     setStarterCode(initialCode)
-    
+
     // Extract protected elements for code protection
     const protectedElementsData = extractProtectedElements(initialCode, selectedLanguage)
     setProtectedElements(protectedElementsData)
@@ -852,7 +897,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         console.error("Error updating session:", error)
       }
     }
-    
+
     setIsInterviewStarted(false)
     setShowFeedback(false)
     setShowPostInterviewDiscussion(false)
@@ -899,10 +944,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       try {
         // Get user profile for context
         const userProfile = user ? await getUserProfile(user.id) : null
-        
+
         // Extract name for personalization
         let userName = user?.user_metadata?.full_name || userProfile?.full_name || user?.email?.split("@")[0] || ""
-        
+
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -957,7 +1002,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
     // Estimate time complexity based on nested loops
     const nestedLoopCount = (code.match(/for.*{[^}]*for/gs) || []).length +
-                           (code.match(/while.*{[^}]*while/gs) || []).length
+      (code.match(/while.*{[^}]*while/gs) || []).length
     let estimatedTimeComplexity = "O(n)"
     if (nestedLoopCount >= 2) {
       estimatedTimeComplexity = "O(n³)"
@@ -1057,7 +1102,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           // Start post-interview discussion phase instead of immediately showing feedback
           setIsRunningTests(false)
           setShowPostInterviewDiscussion(true)
-          
+
           // Trigger interviewer to analyze the solution
           triggerPostInterviewDiscussion(data.results, data.summary)
         }
@@ -1101,7 +1146,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
   // Determine if we should hide the header (during interview mode)
   const isInterviewMode = !showScenarioBrowser && (isInterviewStarted || selectedScenario !== null)
   const isResultView = showFeedback || showPostInterviewDiscussion
-  
+
   return (
     <main className="min-h-screen bg-black">
       {!isInterviewMode && <Header />}
@@ -1211,24 +1256,21 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   <Card
                     key={scenario.id}
                     onClick={() => setSelectedScenario(scenario)}
-                    className={`bg-gray-900/50 border-gray-700 glass-effect scenario-card cursor-pointer transition-all duration-200 hover:border-gray-600 ${
-                      selectedScenario?.id === scenario.id ? "border-[#00d9ff] ring-2 ring-[#00d9ff]/50 selected" : ""
-                    }`}
+                    className={`bg-gray-900/50 border-gray-700 glass-effect scenario-card cursor-pointer transition-all duration-200 hover:border-gray-600 ${selectedScenario?.id === scenario.id ? "border-[#00d9ff] ring-2 ring-[#00d9ff]/50 selected" : ""
+                      }`}
                   >
                     <CardHeader>
                       <div className="flex items-center gap-2 mb-2">
-                        <Badge className={`${
-                          scenario.type === "dsa" ? "bg-[#00d9ff] text-black" :
+                        <Badge className={`${scenario.type === "dsa" ? "bg-[#00d9ff] text-black" :
                           scenario.type === "bugfix" ? "bg-[#00ff88] text-black" :
-                          "bg-purple-500 text-white"
-                        } text-xs font-semibold`}>
+                            "bg-purple-500 text-white"
+                          } text-xs font-semibold`}>
                           {scenario.type === "dsa" ? "DSA" : scenario.type === "bugfix" ? "BUG FIX" : scenario.type.toUpperCase()}
                         </Badge>
-                        <Badge className={`${
-                          scenario.difficulty === "easy" ? "bg-green-600" :
+                        <Badge className={`${scenario.difficulty === "easy" ? "bg-green-600" :
                           scenario.difficulty === "medium" ? "bg-yellow-600" :
-                          "bg-red-600"
-                        } text-xs`}>
+                            "bg-red-600"
+                          } text-xs`}>
                           {scenario.difficulty.toUpperCase()}
                         </Badge>
                       </div>
@@ -1309,9 +1351,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       {/* Interview Interface */}
       {!showScenarioBrowser && (
         <section
-          className={`pt-2 pb-2 bg-gradient-to-b from-gray-900 to-black flex flex-col ${
-            isResultView ? "min-h-screen overflow-x-hidden overflow-y-auto" : "h-screen overflow-hidden"
-          }`}
+          className={`pt-2 pb-2 bg-gradient-to-b from-gray-900 to-black flex flex-col ${isResultView ? "min-h-screen overflow-x-hidden overflow-y-auto" : "h-screen overflow-hidden"
+            }`}
         >
           <div className={`container mx-auto px-2 flex-1 flex flex-col ${isResultView ? "overflow-visible" : "overflow-hidden"}`}>
             <div className={`w-full mx-auto flex-1 flex flex-col gap-1 ${isResultView ? "overflow-visible" : "overflow-hidden"}`}>
@@ -1321,11 +1362,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   <h2 className="text-white text-sm font-semibold truncate max-w-md">
                     {selectedScenario?.title}
                   </h2>
-                  <Badge className={`${
-                    selectedScenario?.difficulty === "easy" ? "bg-green-600/20 text-green-400" :
+                  <Badge className={`${selectedScenario?.difficulty === "easy" ? "bg-green-600/20 text-green-400" :
                     selectedScenario?.difficulty === "medium" ? "bg-yellow-600/20 text-yellow-400" :
-                    "bg-red-600/20 text-red-400"
-                  } text-xs`}>
+                      "bg-red-600/20 text-red-400"
+                    } text-xs`}>
                     {selectedScenario?.difficulty?.toUpperCase()}
                   </Badge>
                   {/* Language Selector */}
@@ -1366,95 +1406,131 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               {/* Main Interface - Three Column Layout */}
               {!showFeedback && !showPostInterviewDiscussion ? (
                 <div
-                  className={`grid grid-cols-1 gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${
-                    isCodeViewerOpen ? "xl:ml-[600px]" : ""
-                  } lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)_320px]`}
+                  className={`grid grid-cols-1 gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${isCodeViewerOpen ? "xl:ml-[600px]" : ""
+                    } lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)_320px]`}
                 >
                   {/* Left: Problem Description / File Upload */}
                   <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden order-1">
-                      <CardHeader className="pb-2 flex-shrink-0">
-                        <CardTitle className="text-white flex items-center space-x-2 text-sm">
-                          <Target className="h-4 w-4 text-[#00d9ff]" />
-                          <span>Problem</span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="flex-1 min-h-0 overflow-y-auto text-xs sm:text-sm leading-relaxed space-y-4 pr-1">
-                        {selectedScenario && (
-                          <>
-                            <div>
-                              <h3 className="text-white font-semibold mb-1">Description</h3>
-                              <p className="text-gray-300 leading-relaxed">{selectedScenario.problemStatement}</p>
-                            </div>
+                    <CardHeader className="pb-2 flex-shrink-0">
+                      <CardTitle className="text-white flex items-center space-x-2 text-sm">
+                        <Target className="h-4 w-4 text-[#00d9ff]" />
+                        <span>Problem</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-1 min-h-0 overflow-y-auto text-xs sm:text-sm leading-relaxed space-y-4 pr-1">
+                      {selectedScenario && (
+                        <>
+                          <div>
+                            <h3 className="text-white font-semibold mb-1">Description</h3>
+                            <p className="text-gray-300 leading-relaxed">{selectedScenario.problemStatement}</p>
+                          </div>
 
-                            {selectedScenario.type === 'dsa' && selectedScenario.examples && selectedScenario.examples.length > 0 && (
-                              <div>
-                                <h3 className="text-white font-semibold mb-1">Examples</h3>
+                          {selectedScenario.type === 'dsa' && selectedScenario.examples && selectedScenario.examples.length > 0 && (
+                            <div>
+                              <h3 className="text-white font-semibold mb-1">Examples</h3>
+                              <div className="space-y-2">
+                                {selectedScenario.examples.slice(0, 2).map((ex, i) => (
+                                  <div key={i} className="bg-gray-800/50 p-2 rounded text-xs">
+                                    <div className="text-gray-400">Input: <span className="text-green-400">{ex.input}</span></div>
+                                    <div className="text-gray-400">Output: <span className="text-blue-400">{ex.output}</span></div>
+                                    {ex.explanation && <div className="text-gray-500 mt-1 text-xs">{ex.explanation}</div>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {selectedScenario.type === 'dsa' && selectedScenario.constraints && selectedScenario.constraints.length > 0 && (
+                            <div>
+                              <h3 className="text-white font-semibold mb-1">Constraints</h3>
+                              <ul className="text-gray-300 space-y-1 list-disc list-inside">
+                                {selectedScenario.constraints.slice(0, 3).map((c, i) => (
+                                  <li key={i} className="text-xs">{c}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Hints Section */}
+                          {isInterviewStarted && (selectedScenario as any).hints && (selectedScenario as any).hints.length > 0 && (
+                            <div className="border-t border-gray-700 pt-3 mt-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-white font-semibold flex items-center space-x-1 text-xs">
+                                  <Lightbulb className="h-3 w-3 text-yellow-400" />
+                                  <span>Hints ({revealedHints}/{(selectedScenario as any).hints.length})</span>
+                                </h3>
+                                {revealedHints < (selectedScenario as any).hints.length && (
+                                  <span className="text-xs text-gray-400">
+                                    Next in {Math.ceil((180 - (elapsedTime % 180)) / 60)}m
+                                  </span>
+                                )}
+                              </div>
+                              {revealedHints > 0 ? (
                                 <div className="space-y-2">
-                                  {selectedScenario.examples.slice(0, 2).map((ex, i) => (
-                                    <div key={i} className="bg-gray-800/50 p-2 rounded text-xs">
-                                      <div className="text-gray-400">Input: <span className="text-green-400">{ex.input}</span></div>
-                                      <div className="text-gray-400">Output: <span className="text-blue-400">{ex.output}</span></div>
-                                      {ex.explanation && <div className="text-gray-500 mt-1 text-xs">{ex.explanation}</div>}
+                                  {(selectedScenario as any).hints.slice(0, revealedHints).map((hint: string, i: number) => (
+                                    <div key={i} className="bg-yellow-500/10 border border-yellow-500/20 rounded p-2">
+                                      <p className="text-yellow-200 text-xs leading-relaxed">
+                                        <span className="font-semibold">Hint {i + 1}:</span> {hint}
+                                      </p>
                                     </div>
                                   ))}
                                 </div>
-                              </div>
-                            )}
+                              ) : (
+                                <p className="text-gray-400 text-xs italic">
+                                  Hints will unlock every 3 minutes as you work on the problem
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
 
-                            {selectedScenario.type === 'dsa' && selectedScenario.constraints && selectedScenario.constraints.length > 0 && (
-                              <div>
-                                <h3 className="text-white font-semibold mb-1">Constraints</h3>
-                                <ul className="text-gray-300 space-y-1 list-disc list-inside">
-                                  {selectedScenario.constraints.slice(0, 3).map((c, i) => (
-                                    <li key={i} className="text-xs">{c}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-
-                            {/* Hints Section */}
-                            {isInterviewStarted && (selectedScenario as any).hints && (selectedScenario as any).hints.length > 0 && (
-                              <div className="border-t border-gray-700 pt-3 mt-3">
-                                <div className="flex items-center justify-between mb-2">
-                                  <h3 className="text-white font-semibold flex items-center space-x-1 text-xs">
-                                    <Lightbulb className="h-3 w-3 text-yellow-400" />
-                                    <span>Hints ({revealedHints}/{(selectedScenario as any).hints.length})</span>
-                                  </h3>
-                                  {revealedHints < (selectedScenario as any).hints.length && (
-                                    <span className="text-xs text-gray-400">
-                                      Next in {Math.ceil((180 - (elapsedTime % 180)) / 60)}m
-                                    </span>
-                                  )}
-                                </div>
-                                {revealedHints > 0 ? (
-                                  <div className="space-y-2">
-                                    {(selectedScenario as any).hints.slice(0, revealedHints).map((hint: string, i: number) => (
-                                      <div key={i} className="bg-yellow-500/10 border border-yellow-500/20 rounded p-2">
-                                        <p className="text-yellow-200 text-xs leading-relaxed">
-                                          <span className="font-semibold">Hint {i + 1}:</span> {hint}
-                                        </p>
-                                      </div>
-                                    ))}
+                      {/* Upload Codebase Section */}
+                      <div className="border-t border-gray-700 pt-3 mt-3">
+                        <h3 className="text-white font-semibold mb-2">Workspace Files</h3>
+                        {selectedScenario.type === 'bugfix' && workspaceContext.length > 0 ? (
+                          <div className="mb-2">
+                            <p className="text-xs text-green-400 mb-2">
+                              ✓ {workspaceContext.length} codebase file(s) loaded automatically
+                            </p>
+                            <div className="space-y-1 max-h-32 overflow-y-auto">
+                              {workspaceContext.map((file, idx) => (
+                                <button
+                                  key={idx}
+                                  onClick={() => {
+                                    setSelectedFile(file)
+                                    setIsCodeViewerOpen(true)
+                                  }}
+                                  className="w-full text-left text-xs text-gray-300 bg-gray-800/50 px-2 py-1 rounded border border-gray-700 hover:bg-gray-700/50 hover:border-blue-500 transition-colors cursor-pointer"
+                                >
+                                  <div className="font-semibold text-blue-400 flex items-center gap-1">
+                                    <Code className="h-3 w-3" />
+                                    {file.path}
                                   </div>
-                                ) : (
-                                  <p className="text-gray-400 text-xs italic">
-                                    Hints will unlock every 3 minutes as you work on the problem
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                          </>
-                        )}
-
-                        {/* Upload Codebase Section */}
-                        <div className="border-t border-gray-700 pt-3 mt-3">
-                          <h3 className="text-white font-semibold mb-2">Workspace Files</h3>
-                          {selectedScenario.type === 'bugfix' && workspaceContext.length > 0 ? (
-                            <div className="mb-2">
-                              <p className="text-xs text-green-400 mb-2">
-                                ✓ {workspaceContext.length} codebase file(s) loaded automatically
-                              </p>
-                              <div className="space-y-1 max-h-32 overflow-y-auto">
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              multiple
+                              accept=".js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.h,.json,.md,.txt,text/*"
+                              onChange={handleFileUpload}
+                              className="hidden"
+                            />
+                            <Button
+                              onClick={() => fileInputRef.current?.click()}
+                              variant="outline"
+                              className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent text-xs h-7"
+                            >
+                              <Code className="mr-1 h-3 w-3" />
+                              Upload Files
+                            </Button>
+                            {workspaceContext.length > 0 && (
+                              <div className="mt-2 space-y-1">
                                 {workspaceContext.map((file, idx) => (
                                   <button
                                     key={idx}
@@ -1462,62 +1538,25 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                       setSelectedFile(file)
                                       setIsCodeViewerOpen(true)
                                     }}
-                                    className="w-full text-left text-xs text-gray-300 bg-gray-800/50 px-2 py-1 rounded border border-gray-700 hover:bg-gray-700/50 hover:border-blue-500 transition-colors cursor-pointer"
+                                    className="w-full text-left text-xs text-gray-400 bg-gray-800/30 px-2 py-1 rounded hover:bg-gray-700/30 hover:text-blue-400 transition-colors cursor-pointer"
                                   >
-                                    <div className="font-semibold text-blue-400 flex items-center gap-1">
-                                      <Code className="h-3 w-3" />
+                                    <div className="truncate flex items-center gap-1">
+                                      <Code className="h-3 w-3 flex-shrink-0" />
                                       {file.path}
                                     </div>
                                   </button>
                                 ))}
                               </div>
-                            </div>
-                          ) : (
-                            <>
-                              <input
-                                ref={fileInputRef}
-                                type="file"
-                                multiple
-                                accept=".js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.h,.json,.md,.txt,text/*"
-                                onChange={handleFileUpload}
-                                className="hidden"
-                              />
-                              <Button
-                                onClick={() => fileInputRef.current?.click()}
-                                variant="outline"
-                                className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent text-xs h-7"
-                              >
-                                <Code className="mr-1 h-3 w-3" />
-                                Upload Files
-                              </Button>
-                              {workspaceContext.length > 0 && (
-                                <div className="mt-2 space-y-1">
-                                  {workspaceContext.map((file, idx) => (
-                                    <button
-                                      key={idx}
-                                      onClick={() => {
-                                        setSelectedFile(file)
-                                        setIsCodeViewerOpen(true)
-                                      }}
-                                      className="w-full text-left text-xs text-gray-400 bg-gray-800/30 px-2 py-1 rounded hover:bg-gray-700/30 hover:text-blue-400 transition-colors cursor-pointer"
-                                    >
-                                      <div className="truncate flex items-center gap-1">
-                                        <Code className="h-3 w-3 flex-shrink-0" />
-                                        {file.path}
-                                      </div>
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </CardContent>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </CardContent>
                   </Card>
 
                   {/* Center: Code Editor with Terminal/Console */}
                   <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden order-2">
-                    <CardHeader className="pb-2 flex-shrink-0">
+                    <CardHeader className="pb-2 flex-shrink-0 px-6">
                       <CardTitle className="text-white flex items-center justify-between text-xs">
                         <div className="flex items-center space-x-1">
                           <Code className="h-3 w-3 text-[#00d9ff]" />
@@ -1531,11 +1570,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         )}
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="flex flex-col flex-1 min-h-0 gap-2 p-3">
-                      {/* Code Editor */}
-                      <div className="flex-[2] overflow-hidden min-h-0 rounded border border-gray-700">
+                    {/* Code Editor - Direct in Card, no CardContent wrapper */}
+                    <div className="flex flex-col flex-1 min-h-0 gap-2 px-3 pb-3">
+                      <div ref={editorContainerRef} className="flex-1 min-h-0 rounded border border-gray-700 editor-wrapper">
                         <Editor
-                          height="100%"
+                          height={editorHeight}
                           language={selectedLanguage}
                           value={code}
                           onChange={(value) => {
@@ -1558,11 +1597,53 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           options={{
                             minimap: { enabled: false },
                             fontSize: 13,
+                            lineHeight: 21,
+                            letterSpacing: 0.5,
                             lineNumbers: "on",
                             scrollBeyondLastLine: false,
                             automaticLayout: true,
                             tabSize: 2,
                             readOnly: !isInterviewStarted || showFeedback,
+                            contextmenu: false,
+                            quickSuggestions: false,
+                            suggestOnTriggerCharacters: false,
+                            acceptSuggestionOnEnter: 'off',
+                            tabCompletion: 'off',
+                            wordBasedSuggestions: 'off',
+                            parameterHints: { enabled: false },
+                            hover: { enabled: false },
+                            links: false,
+                            colorDecorators: false,
+                            glyphMargin: false,
+                            lineDecorationsWidth: 0,
+                            lineNumbersMinChars: 3,
+                            padding: { top: 10, bottom: 10 },
+                            renderWhitespace: 'none',
+                            fontLigatures: false,
+                            // Disable all widgets and popups
+                            find: {
+                              addExtraSpaceOnTop: false,
+                              autoFindInSelection: 'never',
+                              seedSearchStringFromSelection: 'never',
+                            },
+                            occurrencesHighlight: false,
+                            renderLineHighlight: 'none',
+                            selectionHighlight: false,
+                            codeLens: false,
+                            folding: false,
+                            foldingHighlight: false,
+                            showFoldingControls: 'never',
+                            matchBrackets: 'never',
+                            overviewRulerLanes: 0,
+                            overviewRulerBorder: false,
+                            hideCursorInOverviewRuler: true,
+                            scrollbar: {
+                              vertical: 'auto',
+                              horizontal: 'auto',
+                              useShadows: false,
+                              verticalHasArrows: false,
+                              horizontalHasArrows: false,
+                            },
                           }}
                         />
                       </div>
@@ -1582,19 +1663,17 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             </div>
                             <div className="flex items-center space-x-2">
                               <Badge
-                                className={`${
-                                  testSummary.passRate === 100 ? "bg-green-600" :
+                                className={`${testSummary.passRate === 100 ? "bg-green-600" :
                                   testSummary.passRate >= 60 ? "bg-yellow-600" : "bg-red-600"
-                                } text-xs h-5`}
+                                  } text-xs h-5`}
                               >
                                 {testSummary.passed}/{testSummary.total} passed
                               </Badge>
                               {efficiencyMetrics && (
-                                <Badge className={`${
-                                  efficiencyMetrics.efficiencyScore >= 80 ? "bg-green-600/20 text-green-400 border-green-600" :
+                                <Badge className={`${efficiencyMetrics.efficiencyScore >= 80 ? "bg-green-600/20 text-green-400 border-green-600" :
                                   efficiencyMetrics.efficiencyScore >= 60 ? "bg-yellow-600/20 text-yellow-400 border-yellow-600" :
-                                  "bg-red-600/20 text-red-400 border-red-600"
-                                } text-xs h-5 border`}>
+                                    "bg-red-600/20 text-red-400 border-red-600"
+                                  } text-xs h-5 border`}>
                                   {efficiencyMetrics.efficiencyScore}% efficient
                                 </Badge>
                               )}
@@ -1703,9 +1782,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           {chatMessages.map((msg, index) => (
                             <div key={index} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
                               <div
-                                className={`max-w-[85%] p-1.5 rounded text-xs ${
-                                  msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-100"
-                                }`}
+                                className={`max-w-[85%] p-1.5 rounded text-xs ${msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-100"
+                                  }`}
                               >
                                 <div className="flex items-center space-x-1 mb-0.5">
                                   {msg.type === "user" ? (
@@ -1741,79 +1819,78 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           </Button>
                         </div>
                       </div>
-                    </CardContent>
+                    </div>
                   </Card>
 
                   {/* Right: AI Interviewer Panel */}
                   <Card className="bg-gray-900/50 border-gray-700 glass-effect h-full flex flex-col overflow-hidden order-3 lg:col-span-2 xl:col-span-1">
-                      <CardHeader className="pb-2 flex-shrink-0">
-                        <CardTitle className="text-white flex items-center space-x-2 text-sm">
-                          <div className="relative">
-                            <Brain className="h-4 w-4 text-[#00d9ff] animate-neural-pulse" />
-                            <div className="absolute inset-0 bg-[#00d9ff] rounded-full blur-md opacity-30"></div>
-                          </div>
-                          <span className="bg-gradient-to-r from-[#00d9ff] to-[#00ff88] bg-clip-text text-transparent font-bold">MockMate AI</span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="flex flex-col flex-1 min-h-0 overflow-hidden p-3">
-                        <div className="flex-1 overflow-y-auto space-y-2 mb-2 min-h-0 pr-2">
-                          {interviewerMessages.length === 0 ? (
-                            <div className="text-center py-8 text-gray-400">
-                              <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                              <p className="text-xs">Interview will begin when you start...</p>
-                            </div>
-                          ) : (
-                            <>
-                              {interviewerMessages.map((msg, index) => (
-                                <div
-                                  key={index}
-                                  className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
-                                >
-                                  <div
-                                    className={`max-w-[90%] p-2 rounded-lg ${
-                                      msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-100"
-                                    }`}
-                                  >
-                                    <div className="flex items-center space-x-1 mb-1">
-                                      {msg.type === "user" ? (
-                                        <User className="h-3 w-3" />
-                                      ) : (
-                                        <Brain className="h-3 w-3 text-[#00d9ff] animate-neural-pulse" />
-                                      )}
-                                      <span className="text-xs opacity-75">
-                                        {msg.type === "user" ? "You" : "MockMate AI"}
-                                      </span>
-                                    </div>
-                                    <p className="text-xs whitespace-pre-wrap leading-relaxed">{msg.message}</p>
-                                  </div>
-                                </div>
-                              ))}
-                              <div ref={interviewerEndRef} />
-                            </>
-                          )}
+                    <CardHeader className="pb-2 flex-shrink-0">
+                      <CardTitle className="text-white flex items-center space-x-2 text-sm">
+                        <div className="relative">
+                          <Brain className="h-4 w-4 text-[#00d9ff] animate-neural-pulse" />
+                          <div className="absolute inset-0 bg-[#00d9ff] rounded-full blur-md opacity-30"></div>
                         </div>
-                        {(isInterviewStarted || showPostInterviewDiscussion) && (
-                          <div className="flex space-x-1 flex-shrink-0 border-t border-gray-700 pt-2">
-                            <Input
-                              value={interviewerInput}
-                              onChange={(e) => setInterviewerInput(e.target.value)}
-                              placeholder={showPostInterviewDiscussion ? "Ask about optimization or improvements..." : "Ask a question..."}
-                              className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-xs h-7"
-                              onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
-                              disabled={isLoadingInterviewer || isGeneratingDiscussion}
-                              aria-label="Chat with interviewer"
-                            />
-                            <Button
-                              onClick={() => handleSendMessage(true)}
-                              className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white h-7 px-2"
-                              loading={isLoadingInterviewer || isGeneratingDiscussion}
-                              aria-label={(isLoadingInterviewer || isGeneratingDiscussion) ? "Sending message" : "Send message"}
-                            >
-                              {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-3 w-3" aria-hidden="true" />}
-                            </Button>
+                        <span className="bg-gradient-to-r from-[#00d9ff] to-[#00ff88] bg-clip-text text-transparent font-bold">MockMate AI</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col flex-1 min-h-0 overflow-hidden p-3">
+                      <div className="flex-1 overflow-y-auto space-y-2 mb-2 min-h-0 pr-2">
+                        {interviewerMessages.length === 0 ? (
+                          <div className="text-center py-8 text-gray-400">
+                            <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-xs">Interview will begin when you start...</p>
                           </div>
+                        ) : (
+                          <>
+                            {interviewerMessages.map((msg, index) => (
+                              <div
+                                key={index}
+                                className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
+                              >
+                                <div
+                                  className={`max-w-[90%] p-2 rounded-lg ${msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-100"
+                                    }`}
+                                >
+                                  <div className="flex items-center space-x-1 mb-1">
+                                    {msg.type === "user" ? (
+                                      <User className="h-3 w-3" />
+                                    ) : (
+                                      <Brain className="h-3 w-3 text-[#00d9ff] animate-neural-pulse" />
+                                    )}
+                                    <span className="text-xs opacity-75">
+                                      {msg.type === "user" ? "You" : "MockMate AI"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs whitespace-pre-wrap leading-relaxed">{msg.message}</p>
+                                </div>
+                              </div>
+                            ))}
+                            <div ref={interviewerEndRef} />
+                          </>
                         )}
-                      </CardContent>
+                      </div>
+                      {(isInterviewStarted || showPostInterviewDiscussion) && (
+                        <div className="flex space-x-1 flex-shrink-0 border-t border-gray-700 pt-2">
+                          <Input
+                            value={interviewerInput}
+                            onChange={(e) => setInterviewerInput(e.target.value)}
+                            placeholder={showPostInterviewDiscussion ? "Ask about optimization or improvements..." : "Ask a question..."}
+                            className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-xs h-7"
+                            onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
+                            disabled={isLoadingInterviewer || isGeneratingDiscussion}
+                            aria-label="Chat with interviewer"
+                          />
+                          <Button
+                            onClick={() => handleSendMessage(true)}
+                            className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white h-7 px-2"
+                            loading={isLoadingInterviewer || isGeneratingDiscussion}
+                            aria-label={(isLoadingInterviewer || isGeneratingDiscussion) ? "Sending message" : "Send message"}
+                          >
+                            {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-3 w-3" aria-hidden="true" />}
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
                   </Card>
                 </div>
               ) : showPostInterviewDiscussion ? (
@@ -1830,10 +1907,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         </Badge>
                         {efficiencyMetrics && (
                           <>
-                            <Badge className={`${
-                              efficiencyMetrics.efficiencyScore >= 80 ? "bg-green-600" :
+                            <Badge className={`${efficiencyMetrics.efficiencyScore >= 80 ? "bg-green-600" :
                               efficiencyMetrics.efficiencyScore >= 60 ? "bg-yellow-600" : "bg-red-600"
-                            } text-white`}>
+                              } text-white`}>
                               Efficiency: {efficiencyMetrics.efficiencyScore}/100
                             </Badge>
                             <Badge variant="outline" className="border-gray-600 text-gray-300">
@@ -1891,11 +1967,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             {testResults.map((result, index) => (
                               <div
                                 key={index}
-                                className={`p-2 rounded border ${
-                                  result.passed
-                                    ? "bg-green-900/20 border-green-700"
-                                    : "bg-red-900/20 border-red-700"
-                                }`}
+                                className={`p-2 rounded border ${result.passed
+                                  ? "bg-green-900/20 border-green-700"
+                                  : "bg-red-900/20 border-red-700"
+                                  }`}
                               >
                                 <div className="flex items-center justify-between text-xs">
                                   <span className={result.passed ? "text-green-400" : "text-red-400"}>
@@ -1932,9 +2007,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
                           >
                             <div
-                              className={`max-w-[85%] p-3 rounded-lg ${
-                                msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-100"
-                              }`}
+                              className={`max-w-[85%] p-3 rounded-lg ${msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-100"
+                                }`}
                             >
                               <div className="flex items-center space-x-2 mb-1">
                                 {msg.type === "user" ? (

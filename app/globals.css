@@ -328,6 +328,186 @@
   transform: translateY(-2px);
 }
 
+/* Monaco Editor - Completely isolated, no extra divs */
+.editor-wrapper {
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Target Monaco's root wrapper div created by @monaco-editor/react */
+.editor-wrapper > div {
+  height: 100% !important;
+  width: 100% !important;
+  position: relative !important;
+  display: flex !important;
+  flex: 1 1 auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+}
+
+/* Monaco editor container */
+.editor-wrapper .monaco-editor {
+  height: 100% !important;
+  width: 100% !important;
+  position: relative !important;
+  overflow: visible !important;
+  flex: 1 1 auto !important;
+}
+
+/* Ensure all Monaco internal containers are properly sized */
+.editor-wrapper .monaco-editor .overflow-guard {
+  height: 100% !important;
+  width: 100% !important;
+  position: relative !important;
+}
+
+.editor-wrapper .monaco-editor .monaco-scrollable-element {
+  position: relative !important;
+  height: 100% !important;
+  width: 100% !important;
+}
+
+.editor-wrapper .monaco-editor .monaco-editor-background {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* View lines - where code is rendered */
+.editor-wrapper .monaco-editor .view-lines {
+  position: relative !important;
+}
+
+/* Cursor layer - must be absolutely positioned correctly */
+.editor-wrapper .monaco-editor .cursors-layer {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none !important;
+  z-index: 10 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.editor-wrapper .monaco-editor .cursors-layer .cursor {
+  position: absolute !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Hide ALL Monaco Editor widgets to prevent leakage */
+.editor-wrapper .find-widget,
+.editor-wrapper .suggest-widget,
+.editor-wrapper .parameter-hints-widget,
+.editor-wrapper .hover-widget,
+.editor-wrapper .peekview-widget,
+.editor-wrapper .context-view,
+.editor-wrapper .suggest-details,
+.editor-wrapper .suggest-status-bar,
+.editor-wrapper .monaco-hover,
+.editor-wrapper .monaco-list,
+.editor-wrapper .monaco-inputbox,
+.editor-wrapper .monaco-button,
+.editor-wrapper .monaco-action-bar,
+.editor-wrapper .monaco-menu,
+.editor-wrapper .monaco-dropdown,
+.editor-wrapper .monaco-toolbar {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  left: -9999px !important;
+  top: -9999px !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  z-index: -1 !important;
+}
+
+/* Target widgets at any nesting level within editor-wrapper */
+.editor-wrapper .monaco-editor .find-widget,
+.editor-wrapper .monaco-editor .suggest-widget,
+.editor-wrapper .monaco-editor .parameter-hints-widget,
+.editor-wrapper .monaco-editor .hover-widget,
+.editor-wrapper .monaco-editor .peekview-widget,
+.editor-wrapper .monaco-editor .context-view {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Hide input elements from find/replace and other widgets */
+.editor-wrapper .find-widget input,
+.editor-wrapper .find-widget textarea,
+.editor-wrapper .suggest-widget input,
+.editor-wrapper .parameter-hints-widget input,
+.editor-wrapper .monaco-inputbox input,
+.editor-wrapper .monaco-inputbox textarea {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  left: -9999px !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Ensure isolation - prevent any Monaco widgets from escaping */
+.editor-wrapper {
+  contain: layout style paint !important;
+  isolation: isolate !important;
+}
+
+/* Global hide for all Monaco widgets - catch any that escape */
+.editor-wrapper * .find-widget,
+.editor-wrapper * .suggest-widget,
+.editor-wrapper * .parameter-hints-widget,
+.editor-wrapper * .hover-widget,
+.editor-wrapper * .peekview-widget,
+.editor-wrapper * .context-view {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  position: absolute !important;
+  left: -9999px !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  z-index: -9999 !important;
+}
+
+/* Hide widgets even if they're direct children of body (Monaco sometimes appends to body) */
+body > .find-widget,
+body > .suggest-widget,
+body > .parameter-hints-widget,
+body > .hover-widget,
+body > .peekview-widget,
+body > .context-view,
+body > .monaco-hover {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  position: absolute !important;
+  left: -9999px !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  z-index: -9999 !important;
+}
+
 /* Responsive improvements */
 @media (max-width: 1024px) {
   .interview-grid {
