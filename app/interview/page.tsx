@@ -2100,9 +2100,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       )}
 
       {/* Code Viewer Side Panel */}
-      {selectedFile && (
+      {isCodeViewerOpen && selectedFile && (
         <CodeViewerSidePanel
-          isOpen={isCodeViewerOpen}
+          key={selectedFile.path}
+          isOpen={true}
           onClose={() => {
             setIsCodeViewerOpen(false)
             setSelectedFile(null)
