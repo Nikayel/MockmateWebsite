@@ -3,6 +3,7 @@ import { getScenarioById } from "@/lib/scenarios"
 import { runInNewContext } from "vm"
 import { executeRateLimit } from "@/lib/rate-limit"
 import { spawn } from "child_process"
+import { trackCodeExecutionServer } from "@/lib/analytics-server"
 
 // Mark route as dynamic to avoid build-time issues
 export const dynamic = 'force-dynamic'
@@ -271,7 +272,10 @@ function validateResult(actual: any, expected: any, testCase: any, scenarioType:
       // Two-sum style: verify the result points to values that sum to target
       if (actual.length === 2) {
         const nums = testCase.input.nums
-        if (actual[0] >= 0 && actual[0] < nums.length && actual[1] >= 0 && actual[1] < nums.length) {
+        // Ensure indices are valid and different
+        if (actual[0] >= 0 && actual[0] < nums.length &&
+            actual[1] >= 0 && actual[1] < nums.length &&
+            actual[0] !== actual[1]) { // Indices must be different
           return nums[actual[0]] + nums[actual[1]] === testCase.input.target
         }
       }
@@ -354,8 +358,10 @@ export async function POST(request: NextRequest) {
     return rateLimitResponse
   }
 
+  const startTime = Date.now()
+
   try {
-    const { code, scenarioId, language = 'javascript' } = await request.json()
+    const { code, scenarioId, language = 'javascript', sessionId, userId } = await request.json()
 
     if (!code) {
       return NextResponse.json({ error: "Code is required" }, { status: 400 })
@@ -421,35 +427,30 @@ export async function POST(request: NextRequest) {
     // Execute each test case with timeout protection
     for (const testCase of testCases) {
       let executionResult: any
-      const startTime = Date.now()
       const TIMEOUT_MS = 10000 // 10 second timeout per test case
 
       try {
-        // Execute based on language
-        switch (language) {
-          case 'python':
-            executionResult = await executePython(fullCode, testCase, scenario.type)
-            break
-          case 'javascript':
-          case 'typescript':
-          default:
-            executionResult = await executeJavaScript(fullCode, testCase, scenario.type)
-            break
-        }
+        // Create a timeout promise
+        const timeoutPromise = new Promise<{ result: null; error: string }>((resolve) => {
+          setTimeout(() => {
+            resolve({ result: null, error: 'Execution timeout: code took too long to execute' })
+          }, TIMEOUT_MS)
+        })
 
-        // Check for timeout
-        if (Date.now() - startTime > TIMEOUT_MS) {
-          allPassed = false
-          results.push({
-            description: testCase.description,
-            input: testCase.input,
-            expected: testCase.expected,
-            actual: null,
-            passed: false,
-            error: 'Execution timeout: code took too long to execute',
-          })
-          continue
-        }
+        // Execute based on language with Promise.race to enforce timeout
+        const executionPromise = (async () => {
+          switch (language) {
+            case 'python':
+              return await executePython(fullCode, testCase, scenario.type)
+            case 'javascript':
+            case 'typescript':
+            default:
+              return await executeJavaScript(fullCode, testCase, scenario.type)
+          }
+        })()
+
+        // Race between execution and timeout
+        executionResult = await Promise.race([executionPromise, timeoutPromise])
 
         if (executionResult.error) {
           allPassed = false
@@ -496,6 +497,20 @@ export async function POST(request: NextRequest) {
     const passedCount = results.filter((r) => r.passed).length
     const totalCount = testCases.length
     const passRate = totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0
+    const executionTimeMs = Date.now() - startTime
+
+    // Track code execution analytics
+    trackCodeExecutionServer({
+      sessionId,
+      userId,
+      language,
+      scenarioId,
+      scenarioType: scenario.type,
+      passed: allPassed,
+      totalTests: totalCount,
+      passedTests: passedCount,
+      executionTimeMs,
+    }).catch(err => console.error("Analytics tracking error:", err))
 
     return NextResponse.json({
       success: !executionError && allPassed,

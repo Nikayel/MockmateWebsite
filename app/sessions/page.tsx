@@ -131,7 +131,9 @@ export default function SessionsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {sessions.map((session) => {
                 const isInProgress = !session.completed_at
-                const canReopen = isInProgress && session.scenario_id
+                // Validate scenario exists before allowing reopen
+                const scenarioExists = session.scenario_id ? !!getScenarioById(session.scenario_id) : false
+                const canReopen = isInProgress && session.scenario_id && scenarioExists
                 const hasFeedback = session.feedback && session.completed_at
 
                 return (
@@ -154,7 +156,7 @@ export default function SessionsPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {session.performance_score && (
+                        {session.performance_score !== undefined && (
                           <div className="flex items-center justify-between">
                             <span className="text-gray-400 text-sm">Performance</span>
                             <div className="flex items-center space-x-2">

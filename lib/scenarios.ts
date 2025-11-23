@@ -14018,6 +14018,2087 @@ AI_CONFIG = {
       },
     ],
   },
+{
+  id: 'dsa-container-with-most-water',
+  title: 'Container With Most Water',
+  type: 'dsa',
+  difficulty: 'medium',
+  companies: ['Amazon', 'Google', 'Meta'],
+  description: 'Find two lines that together with the x-axis form a container that holds the most water.',
+  tags: ['array', 'two-pointers', 'greedy'],
+  estimatedTime: 20,
+  problemStatement: `Given n non-negative integers a1, a2, ..., an, where each represents a point at coordinate (i, ai). n vertical lines are drawn such that the two endpoints of the line i is at (i, ai) and (i, 0). Find two lines, which, together with the x-axis forms a container, such that the container contains the most water.
+
+Notice that you may not slant the container.`,
+  examples: [
+    {
+      input: 'height = [1,8,6,2,5,4,8,3,7]',
+      output: '49',
+      explanation: 'The maximum area is between index 1 and 8 (height 8 and 7), area = min(8,7) * (8-1) = 7 * 7 = 49'
+    },
+    {
+      input: 'height = [1,1]',
+      output: '1',
+      explanation: 'Area = min(1,1) * (1-0) = 1'
+    }
+  ],
+  constraints: [
+    'n == height.length',
+    '2 <= n <= 10^5',
+    '0 <= height[i] <= 10^4'
+  ],
+  hints: [
+    'Use two pointers starting from both ends',
+    'Move the pointer with smaller height inward',
+    'Track maximum area seen so far'
+  ],
+  starterCode: {
+    javascript: `function maxArea(height) {
+  // Your code here
+}`,
+    python: `def maxArea(height):
+    # Your code here
+    pass`,
+    typescript: `function maxArea(height: number[]): number {
+  // Your code here
+}`
+  },
+  optimalComplexity: {
+    time: 'O(n)',
+    space: 'O(1)'
+  },
+  testCases: [
+    {
+      input: { height: [1,8,6,2,5,4,8,3,7] },
+      expected: 49,
+      description: 'Standard case with varying heights'
+    },
+    {
+      input: { height: [1,1] },
+      expected: 1,
+      description: 'Minimum length array'
+    },
+    {
+      input: { height: [4,3,2,1,4] },
+      expected: 16,
+      description: 'First and last elements form max area'
+    },
+    {
+      input: { height: [1,2,1] },
+      expected: 2,
+      description: 'Small ascending then descending'
+    }
+  ]
+},
+
+{
+  id: 'dsa-3sum',
+  title: '3Sum',
+  type: 'dsa',
+  difficulty: 'medium',
+  companies: ['Amazon', 'Google', 'Meta', 'Microsoft'],
+  description: 'Find all unique triplets in the array which gives the sum of zero.',
+  tags: ['array', 'two-pointers', 'sorting'],
+  estimatedTime: 30,
+  problemStatement: `Given an integer array nums, return all the triplets [nums[i], nums[j], nums[k]] such that i != j, i != k, and j != k, and nums[i] + nums[j] + nums[k] == 0.
+
+Notice that the solution set must not contain duplicate triplets.`,
+  examples: [
+    {
+      input: 'nums = [-1,0,1,2,-1,-4]',
+      output: '[[-1,-1,2],[-1,0,1]]',
+      explanation: 'The distinct triplets that sum to 0 are [-1,0,1] and [-1,-1,2]'
+    },
+    {
+      input: 'nums = [0,1,1]',
+      output: '[]',
+      explanation: 'No triplet sums to 0'
+    }
+  ],
+  constraints: [
+    '3 <= nums.length <= 3000',
+    '-10^5 <= nums[i] <= 10^5'
+  ],
+  hints: [
+    'Sort the array first',
+    'Fix one element and use two-pointer approach for the rest',
+    'Skip duplicates to avoid duplicate triplets'
+  ],
+  starterCode: {
+    javascript: `function threeSum(nums) {
+  // Your code here
+}`,
+    python: `def threeSum(nums):
+    # Your code here
+    pass`
+  },
+  optimalComplexity: {
+    time: 'O(n²)',
+    space: 'O(1) excluding output'
+  },
+  testCases: [
+    {
+      input: { nums: [-1,0,1,2,-1,-4] },
+      expected: [[-1,-1,2],[-1,0,1]],
+      description: 'Multiple valid triplets',
+      orderMatters: false
+    },
+    {
+      input: { nums: [0,1,1] },
+      expected: [],
+      description: 'No valid triplets'
+    },
+    {
+      input: { nums: [0,0,0] },
+      expected: [[0,0,0]],
+      description: 'All zeros'
+    }
+  ]
+},
+
+{
+  id: 'dsa-product-except-self',
+  title: 'Product of Array Except Self',
+  type: 'dsa',
+  difficulty: 'medium',
+  companies: ['Amazon', 'Meta', 'Microsoft', 'Apple'],
+  description: 'Return an array where each element is the product of all other elements except itself.',
+  tags: ['array', 'prefix-product'],
+  estimatedTime: 20,
+  problemStatement: `Given an integer array nums, return an array answer such that answer[i] is equal to the product of all the elements of nums except nums[i].
+
+The product of any prefix or suffix of nums is guaranteed to fit in a 32-bit integer.
+
+You must write an algorithm that runs in O(n) time and without using the division operation.`,
+  examples: [
+    {
+      input: 'nums = [1,2,3,4]',
+      output: '[24,12,8,6]',
+      explanation: 'answer[0] = 2*3*4 = 24, answer[1] = 1*3*4 = 12, etc.'
+    },
+    {
+      input: 'nums = [-1,1,0,-3,3]',
+      output: '[0,0,9,0,0]'
+    }
+  ],
+  constraints: [
+    '2 <= nums.length <= 10^5',
+    '-30 <= nums[i] <= 30',
+    'Product of any prefix or suffix fits in 32-bit integer'
+  ],
+  hints: [
+    'Think about prefix and suffix products',
+    'Can you do it in O(1) extra space (excluding output)?',
+    'Build answer array with left products, then multiply with right products'
+  ],
+  starterCode: {
+    javascript: `function productExceptSelf(nums) {
+  // Your code here
+}`,
+    python: `def productExceptSelf(nums):
+    # Your code here
+    pass`
+  },
+  optimalComplexity: {
+    time: 'O(n)',
+    space: 'O(1) excluding output array'
+  },
+  testCases: [
+    {
+      input: { nums: [1,2,3,4] },
+      expected: [24,12,8,6],
+      description: 'Standard case'
+    },
+    {
+      input: { nums: [-1,1,0,-3,3] },
+      expected: [0,0,9,0,0],
+      description: 'Contains zero'
+    },
+    {
+      input: { nums: [2,3] },
+      expected: [3,2],
+      description: 'Minimum length'
+    }
+  ]
+},
+
+{
+  id: 'dsa-maximum-subarray',
+  title: 'Maximum Subarray (Kadane\'s Algorithm)',
+  type: 'dsa',
+  difficulty: 'medium',
+  companies: ['Amazon', 'Google', 'Meta', 'Microsoft', 'Netflix'],
+  description: 'Find the contiguous subarray with the maximum sum.',
+  tags: ['array', 'dynamic-programming', 'divide-and-conquer'],
+  estimatedTime: 20,
+  problemStatement: `Given an integer array nums, find the subarray with the largest sum, and return its sum.
+
+A subarray is a contiguous non-empty sequence of elements within an array.`,
+  examples: [
+    {
+      input: 'nums = [-2,1,-3,4,-1,2,1,-5,4]',
+      output: '6',
+      explanation: 'The subarray [4,-1,2,1] has the largest sum 6'
+    },
+    {
+      input: 'nums = [1]',
+      output: '1'
+    },
+    {
+      input: 'nums = [5,4,-1,7,8]',
+      output: '23',
+      explanation: 'The entire array has the maximum sum'
+    }
+  ],
+  constraints: [
+    '1 <= nums.length <= 10^5',
+    '-10^4 <= nums[i] <= 10^4'
+  ],
+  hints: [
+    'Use Kadane\'s algorithm',
+    'Keep track of current sum and maximum sum',
+    'If current sum becomes negative, restart from next element'
+  ],
+  starterCode: {
+    javascript: `function maxSubArray(nums) {
+  // Your code here
+}`,
+    python: `def maxSubArray(nums):
+    # Your code here
+    pass`
+  },
+  optimalComplexity: {
+    time: 'O(n)',
+    space: 'O(1)'
+  },
+  testCases: [
+    {
+      input: { nums: [-2,1,-3,4,-1,2,1,-5,4] },
+      expected: 6,
+      description: 'Mixed positive and negative'
+    },
+    {
+      input: { nums: [1] },
+      expected: 1,
+      description: 'Single element'
+    },
+    {
+      input: { nums: [5,4,-1,7,8] },
+      expected: 23,
+      description: 'Entire array is max'
+    },
+    {
+      input: { nums: [-1,-2,-3] },
+      expected: -1,
+      description: 'All negative numbers'
+    }
+  ]
+},
+
+{
+  id: 'dsa-merge-intervals',
+  title: 'Merge Intervals',
+  type: 'dsa',
+  difficulty: 'medium',
+  companies: ['Amazon', 'Meta', 'Google', 'Microsoft'],
+  description: 'Merge all overlapping intervals.',
+  tags: ['array', 'sorting', 'intervals'],
+  estimatedTime: 25,
+  problemStatement: `Given an array of intervals where intervals[i] = [starti, endi], merge all overlapping intervals, and return an array of the non-overlapping intervals that cover all the intervals in the input.`,
+  examples: [
+    {
+      input: 'intervals = [[1,3],[2,6],[8,10],[15,18]]',
+      output: '[[1,6],[8,10],[15,18]]',
+      explanation: 'Intervals [1,3] and [2,6] overlap, so merge them into [1,6]'
+    },
+    {
+      input: 'intervals = [[1,4],[4,5]]',
+      output: '[[1,5]]',
+      explanation: 'Intervals [1,4] and [4,5] are considered overlapping'
+    }
+  ],
+  constraints: [
+    '1 <= intervals.length <= 10^4',
+    'intervals[i].length == 2',
+    '0 <= starti <= endi <= 10^4'
+  ],
+  hints: [
+    'Sort intervals by start time',
+    'Iterate through sorted intervals',
+    'Merge if current interval overlaps with previous'
+  ],
+  starterCode: {
+    javascript: `function merge(intervals) {
+  // Your code here
+}`,
+    python: `def merge(intervals):
+    # Your code here
+    pass`
+  },
+  optimalComplexity: {
+    time: 'O(n log n)',
+    space: 'O(n)'
+  },
+  testCases: [
+    {
+      input: { intervals: [[1,3],[2,6],[8,10],[15,18]] },
+      expected: [[1,6],[8,10],[15,18]],
+      description: 'Multiple merges needed'
+    },
+    {
+      input: { intervals: [[1,4],[4,5]] },
+      expected: [[1,5]],
+      description: 'Touching intervals'
+    },
+    {
+      input: { intervals: [[1,4],[2,3]] },
+      expected: [[1,4]],
+      description: 'One interval contains another'
+    }
+  ]
+},
+
+// ========== STRINGS ==========
+
+{
+  id: 'dsa-longest-palindromic-substring',
+  title: 'Longest Palindromic Substring',
+  type: 'dsa',
+  difficulty: 'medium',
+  companies: ['Amazon', 'Meta', 'Google', 'Microsoft'],
+  description: 'Find the longest palindromic substring in a string.',
+  tags: ['string', 'dynamic-programming', 'two-pointers'],
+  estimatedTime: 25,
+  problemStatement: `Given a string s, return the longest palindromic substring in s.
+
+A palindromic string reads the same backward as forward.`,
+  examples: [
+    {
+      input: 's = "babad"',
+      output: '"bab"',
+      explanation: '"aba" is also a valid answer'
+    },
+    {
+      input: 's = "cbbd"',
+      output: '"bb"'
+    }
+  ],
+  constraints: [
+    '1 <= s.length <= 1000',
+    's consist of only digits and English letters'
+  ],
+  hints: [
+    'Expand around center for each possible center',
+    'Consider both odd and even length palindromes',
+    'Track the longest palindrome found'
+  ],
+  starterCode: {
+    javascript: `function longestPalindrome(s) {
+  // Your code here
+}`,
+    python: `def longestPalindrome(s):
+    # Your code here
+    pass`
+  },
+  optimalComplexity: {
+    time: 'O(n²)',
+    space: 'O(1)'
+  },
+  testCases: [
+    {
+      input: { s: "babad" },
+      expected: "bab",
+      description: 'Multiple palindromes of same length'
+    },
+    {
+      input: { s: "cbbd" },
+      expected: "bb",
+      description: 'Even length palindrome'
+    },
+    {
+      input: { s: "a" },
+      expected: "a",
+      description: 'Single character'
+    },
+    {
+      input: { s: "ac" },
+      expected: "a",
+      description: 'No palindrome longer than 1'
+    }
+  ]
+},
+
+{
+  id: 'dsa-group-anagrams',
+  title: 'Group Anagrams',
+  type: 'dsa',
+  difficulty: 'medium',
+  companies: ['Amazon', 'Meta', 'Google'],
+  description: 'Group strings that are anagrams of each other.',
+  tags: ['string', 'hash-table', 'sorting'],
+  estimatedTime: 20,
+  problemStatement: `Given an array of strings strs, group the anagrams together. You can return the answer in any order.
+
+An Anagram is a word or phrase formed by rearranging the letters of a different word or phrase, typically using all the original letters exactly once.`,
+  examples: [
+    {
+      input: 'strs = ["eat","tea","tan","ate","nat","bat"]',
+      output: '[["bat"],["nat","tan"],["ate","eat","tea"]]'
+    },
+    {
+      input: 'strs = [""]',
+      output: '[[""]]'
+    },
+    {
+      input: 'strs = ["a"]',
+      output: '[["a"]]'
+    }
+  ],
+  constraints: [
+    '1 <= strs.length <= 10^4',
+    '0 <= strs[i].length <= 100',
+    'strs[i] consists of lowercase English letters'
+  ],
+  hints: [
+    'Use a hash map with sorted string as key',
+    'All anagrams will have the same sorted string',
+    'Group strings with same sorted key together'
+  ],
+  starterCode: {
+    javascript: `function groupAnagrams(strs) {
+  // Your code here
+}`,
+    python: `def groupAnagrams(strs):
+    # Your code here
+    pass`
+  },
+  optimalComplexity: {
+    time: 'O(n * k log k) where k is max string length',
+    space: 'O(n * k)'
+  },
+  testCases: [
+    {
+      input: { strs: ["eat","tea","tan","ate","nat","bat"] },
+      expected: [["bat"],["nat","tan"],["ate","eat","tea"]],
+      description: 'Multiple anagram groups',
+      orderMatters: false
+    },
+    {
+      input: { strs: [""] },
+      expected: [[""]],
+      description: 'Empty string'
+    },
+    {
+      input: { strs: ["a"] },
+      expected: [["a"]],
+      description: 'Single character'
+    }
+  ]
+},
+
+{
+  id: 'dsa-valid-parentheses',
+  title: 'Valid Parentheses',
+  type: 'dsa',
+  difficulty: 'easy',
+  companies: ['Amazon', 'Meta', 'Google', 'Microsoft'],
+  description: 'Determine if the input string has valid parentheses pairing.',
+  tags: ['string', 'stack'],
+  estimatedTime: 15,
+  problemStatement: `Given a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.
+
+An input string is valid if:
+1. Open brackets must be closed by the same type of brackets.
+2. Open brackets must be closed in the correct order.
+3. Every close bracket has a corresponding open bracket of the same type.`,
+  examples: [
+    {
+      input: 's = "()"',
+      output: 'true'
+    },
+    {
+      input: 's = "()[]{}"',
+      output: 'true'
+    },
+    {
+      input: 's = "(]"',
+      output: 'false'
+    }
+  ],
+  constraints: [
+    '1 <= s.length <= 10^4',
+    's consists of parentheses only \'()[]{}\'.'
+  ],
+  hints: [
+    'Use a stack to track opening brackets',
+    'When you see a closing bracket, check if it matches the top of stack',
+    'At the end, stack should be empty'
+  ],
+  starterCode: {
+    javascript: `function isValid(s) {
+  // Your code here
+}`,
+    python: `def isValid(s):
+    # Your code here
+    pass`
+  },
+  optimalComplexity: {
+    time: 'O(n)',
+    space: 'O(n)'
+  },
+  testCases: [
+    {
+      input: { s: "()" },
+      expected: true,
+      description: 'Simple valid case'
+    },
+    {
+      input: { s: "()[]{}" },
+      expected: true,
+      description: 'Multiple types'
+    },
+    {
+      input: { s: "(]" },
+      expected: false,
+      description: 'Wrong bracket type'
+    },
+    {
+      input: { s: "([)]" },
+      expected: false,
+      description: 'Wrong order'
+    },
+    {
+      input: { s: "{[]}" },
+      expected: true,
+      description: 'Nested brackets'
+    }
+  ]
+},
+
+{
+  id: 'dsa-longest-substring-without-repeating',
+  title: 'Longest Substring Without Repeating Characters',
+  type: 'dsa',
+  difficulty: 'medium',
+  companies: ['Amazon', 'Meta', 'Google', 'Microsoft', 'Apple'],
+  description: 'Find the length of the longest substring without repeating characters.',
+  tags: ['string', 'sliding-window', 'hash-table'],
+  estimatedTime: 25,
+  problemStatement: `Given a string s, find the length of the longest substring without repeating characters.`,
+  examples: [
+    {
+      input: 's = "abcabcbb"',
+      output: '3',
+      explanation: 'The answer is "abc", with the length of 3'
+    },
+    {
+      input: 's = "bbbbb"',
+      output: '1',
+      explanation: 'The answer is "b", with the length of 1'
+    },
+    {
+      input: 's = "pwwkew"',
+      output: '3',
+      explanation: 'The answer is "wke", with the length of 3'
+    }
+  ],
+  constraints: [
+    '0 <= s.length <= 5 * 10^4',
+    's consists of English letters, digits, symbols and spaces'
+  ],
+  hints: [
+    'Use sliding window with two pointers',
+    'Use a set or map to track characters in current window',
+    'When duplicate found, shrink window from left'
+  ],
+  starterCode: {
+    javascript: `function lengthOfLongestSubstring(s) {
+  // Your code here
+}`,
+    python: `def lengthOfLongestSubstring(s):
+    # Your code here
+    pass`
+  },
+  optimalComplexity: {
+    time: 'O(n)',
+    space: 'O(min(n, m)) where m is charset size'
+  },
+  testCases: [
+    {
+      input: { s: "abcabcbb" },
+      expected: 3,
+      description: 'Repeating pattern'
+    },
+    {
+      input: { s: "bbbbb" },
+      expected: 1,
+      description: 'All same character'
+    },
+    {
+      input: { s: "pwwkew" },
+      expected: 3,
+      description: 'Multiple substrings of same length'
+    },
+    {
+      input: { s: "" },
+      expected: 0,
+      description: 'Empty string'
+    }
+  ]
+},
+
+{
+  id: 'dsa-string-to-integer-atoi',
+  title: 'String to Integer (atoi)',
+  type: 'dsa',
+  difficulty: 'medium',
+  companies: ['Amazon', 'Meta', 'Microsoft'],
+  description: 'Implement the myAtoi(string s) function which converts a string to a 32-bit signed integer.',
+  tags: ['string', 'implementation'],
+  estimatedTime: 30,
+  problemStatement: `Implement the myAtoi(string s) function, which converts a string to a 32-bit signed integer (similar to C/C++'s atoi function).
+
+The algorithm for myAtoi(string s) is as follows:
+
+1. Read in and ignore any leading whitespace.
+2. Check if the next character (if not already at the end of the string) is '-' or '+'. Read this character in if it is either. This determines if the final result is negative or positive respectively. Assume the result is positive if neither is present.
+3. Read in next the characters until the next non-digit character or the end of the input is reached. The rest of the string is ignored.
+4. Convert these digits into an integer (i.e. "123" -> 123, "0032" -> 32). If no digits were read, then the integer is 0. Change the sign as necessary (from step 2).
+5. If the integer is out of the 32-bit signed integer range [-2^31, 2^31 - 1], then clamp the integer so that it remains in the range. Specifically, integers less than -2^31 should be clamped to -2^31, and integers greater than 2^31 - 1 should be clamped to 2^31 - 1.
+6. Return the integer as the final result.`,
+  examples: [
+    {
+      input: 's = "42"',
+      output: '42'
+    },
+    {
+      input: 's = "   -42"',
+      output: '-42',
+      explanation: 'Leading whitespace is ignored, then "-" is read so result is negative'
+    },
+    {
+      input: 's = "4193 with words"',
+      output: '4193',
+      explanation: 'Reading stops at first non-digit character'
+    }
+  ],
+  constraints: [
+    '0 <= s.length <= 200',
+    's consists of English letters (lower-case and upper-case), digits (0-9), \' \', \'+\', \'-\', and \'.\'.'
+  ],
+  hints: [
+    'Handle edge cases: leading whitespace, sign, overflow',
+    'Stop reading at first non-digit character',
+    'Clamp to 32-bit integer range'
+  ],
+  starterCode: {
+    javascript: `function myAtoi(s) {
+  // Your code here
+}`,
+    python: `def myAtoi(s):
+    # Your code here
+    pass`
+  },
+  optimalComplexity: {
+    time: 'O(n)',
+    space: 'O(1)'
+  },
+  testCases: [
+    {
+      input: { s: "42" },
+      expected: 42,
+      description: 'Simple positive number'
+    },
+    {
+      input: { s: "   -42" },
+      expected: -42,
+      description: 'Leading whitespace with negative'
+    },
+    {
+      input: { s: "4193 with words" },
+      expected: 4193,
+      description: 'Stop at non-digit'
+    },
+    {
+      input: { s: "words and 987" },
+      expected: 0,
+      description: 'Leading non-digits'
+    }
+  ]
+}
+,
+
+  {
+    id: 'dsa-reverse-linked-list',
+    title: 'Reverse Linked List',
+    type: 'dsa',
+    difficulty: 'easy',
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: 'Reverse a singly linked list.',
+    tags: ["linked-list", "recursion", "iteration"],
+    estimatedTime: 15,
+    problemStatement: `Given the head of a singly linked list, reverse the list, and return the reversed list.`,
+    examples: [
+    {
+      input: 'head = [1,2,3,4,5]',
+      output: '[5,4,3,2,1]'
+    },
+    {
+      input: 'head = [1,2]',
+      output: '[2,1]'
+    },
+    {
+      input: 'head = []',
+      output: '[]'
+    }
+  ],
+    constraints: [
+    'The number of nodes in the list is the range [0, 5000].',
+    '-5000 <= Node.val <= 5000'
+  ],
+    hints: [
+    'Think about iterative approach with three pointers',
+    'Consider recursive solution as well',
+    'Handle edge cases: empty list, single node'
+  ],
+    starterCode: {
+      javascript: `function reverse_linked_list() {
+  // Your code here
+}`,
+      python: `def reverse_linked_list():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(1) iterative, O(n) recursive'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-merge-two-sorted-lists',
+    title: 'Merge Two Sorted Lists',
+    type: 'dsa',
+    difficulty: 'easy',
+    companies: ["Amazon", "Google", "Meta"],
+    description: 'Merge two sorted linked lists into one sorted list.',
+    tags: ["linked-list", "recursion", "two-pointers"],
+    estimatedTime: 20,
+    problemStatement: `You are given the heads of two sorted linked lists list1 and list2. Merge the two lists into one sorted list. The list should be made by splicing together the nodes of the first two lists. Return the head of the merged linked list.`,
+    examples: [
+    {
+      input: 'list1 = [1,2,4], list2 = [1,3,4]',
+      output: '[1,1,2,3,4,4]'
+    },
+    {
+      input: 'list1 = [], list2 = []',
+      output: '[]'
+    },
+    {
+      input: 'list1 = [], list2 = [0]',
+      output: '[0]'
+    }
+  ],
+    constraints: [
+    'The number of nodes in both lists is in the range [0, 50].',
+    '-100 <= Node.val <= 100',
+    'Both list1 and list2 are sorted in non-decreasing order.'
+  ],
+    hints: [
+    'Use a dummy node to simplify edge cases',
+    'Compare values and link smaller node',
+    'Don't forget to link remaining nodes'
+  ],
+    starterCode: {
+      javascript: `function merge_two_sorted_lists() {
+  // Your code here
+}`,
+      python: `def merge_two_sorted_lists():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n + m)',
+      space: 'O(1)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-linked-list-cycle',
+    title: 'Linked List Cycle',
+    type: 'dsa',
+    difficulty: 'easy',
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: 'Detect if a linked list has a cycle.',
+    tags: ["linked-list", "two-pointers", "hash-table"],
+    estimatedTime: 15,
+    problemStatement: `Given head, the head of a linked list, determine if the linked list has a cycle in it. There is a cycle in a linked list if there is some node in the list that can be reached again by continuously following the next pointer.`,
+    examples: [
+    {
+      input: 'head = [3,2,0,-4], pos = 1',
+      output: 'true',
+      explanation: 'There is a cycle where tail connects to the 1st node (0-indexed)'
+    },
+    {
+      input: 'head = [1,2], pos = 0',
+      output: 'true'
+    },
+    {
+      input: 'head = [1], pos = -1',
+      output: 'false'
+    }
+  ],
+    constraints: [
+    'The number of nodes in the list is in the range [0, 10^4].',
+    '-10^5 <= Node.val <= 10^5',
+    'pos is -1 or a valid index in the linked-list.'
+  ],
+    hints: [
+    'Use Floyd's cycle detection (tortoise and hare)',
+    'Use two pointers: slow (1 step) and fast (2 steps)',
+    'If they meet, there's a cycle'
+  ],
+    starterCode: {
+      javascript: `function linked_list_cycle() {
+  // Your code here
+}`,
+      python: `def linked_list_cycle():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(1)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-lru-cache',
+    title: 'LRU Cache',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: 'Design and implement a Least Recently Used (LRU) cache.',
+    tags: ["linked-list", "hash-table", "design"],
+    estimatedTime: 30,
+    problemStatement: `Design a data structure that follows the constraints of a Least Recently Used (LRU) cache. Implement the LRUCache class with get(key) and put(key, value) methods. Both operations should run in O(1) time.`,
+    examples: [
+    {
+      input: 'LRUCache(2), put(1,1), put(2,2), get(1), put(3,3), get(2)',
+      output: '1, -1',
+      explanation: 'Cache is full, evict key 2'
+    },
+    {
+      input: 'get(1), put(1,1), get(1)',
+      output: '-1, 1'
+    }
+  ],
+    constraints: [
+    '1 <= capacity <= 3000',
+    '0 <= key <= 10^4',
+    '0 <= value <= 10^5',
+    'At most 2 * 10^5 calls will be made to get and put.'
+  ],
+    hints: [
+    'Use HashMap + Doubly Linked List',
+    'HashMap for O(1) lookup, DLL for O(1) removal',
+    'Move accessed items to front, evict from back'
+  ],
+    starterCode: {
+      javascript: `function lru_cache() {
+  // Your code here
+}`,
+      python: `def lru_cache():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(1)',
+      space: 'O(capacity)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-copy-list-random-pointer',
+    title: 'Copy List with Random Pointer',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ["Amazon", "Google", "Meta"],
+    description: 'Deep copy a linked list with random pointers.',
+    tags: ["linked-list", "hash-table"],
+    estimatedTime: 25,
+    problemStatement: `A linked list of length n is given such that each node contains an additional random pointer, which could point to any node in the list, or null. Construct a deep copy of the list.`,
+    examples: [
+    {
+      input: '[[7,null],[13,0],[11,4],[10,2],[1,0]]',
+      output: '[[7,null],[13,0],[11,4],[10,2],[1,0]]'
+    }
+  ],
+    constraints: [
+    '0 <= n <= 1000',
+    '-10^4 <= Node.val <= 10^4',
+    'Node.random is null or is pointing to some node in the linked list.'
+  ],
+    hints: [
+    'Use HashMap to map old nodes to new nodes',
+    'First pass: create all nodes',
+    'Second pass: connect next and random pointers'
+  ],
+    starterCode: {
+      javascript: `function copy_list_random_pointer() {
+  // Your code here
+}`,
+      python: `def copy_list_random_pointer():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(n)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-binary-tree-inorder',
+    title: 'Binary Tree Inorder Traversal',
+    type: 'dsa',
+    difficulty: 'easy',
+    companies: ["Amazon", "Google", "Meta"],
+    description: 'Return the inorder traversal of a binary tree's nodes' values.',
+    tags: ["tree", "dfs", "stack", "recursion"],
+    estimatedTime: 15,
+    problemStatement: `Given the root of a binary tree, return the inorder traversal of its nodes' values.`,
+    examples: [
+    {
+      input: 'root = [1,null,2,3]',
+      output: '[1,3,2]'
+    },
+    {
+      input: 'root = []',
+      output: '[]'
+    },
+    {
+      input: 'root = [1]',
+      output: '[1]'
+    }
+  ],
+    constraints: [
+    'The number of nodes in the tree is in the range [0, 100].',
+    '-100 <= Node.val <= 100'
+  ],
+    hints: [
+    'Inorder: left -> root -> right',
+    'Can solve recursively or iteratively with stack',
+    'Morris traversal for O(1) space'
+  ],
+    starterCode: {
+      javascript: `function binary_tree_inorder() {
+  // Your code here
+}`,
+      python: `def binary_tree_inorder():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(n) recursive, O(1) Morris'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-validate-bst',
+    title: 'Validate Binary Search Tree',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: 'Determine if a binary tree is a valid binary search tree.',
+    tags: ["tree", "dfs", "bst"],
+    estimatedTime: 20,
+    problemStatement: `Given the root of a binary tree, determine if it is a valid binary search tree (BST). A valid BST is defined as follows: The left subtree of a node contains only nodes with keys less than the node's key. The right subtree of a node contains only nodes with keys greater than the node's key. Both the left and right subtrees must also be binary search trees.`,
+    examples: [
+    {
+      input: 'root = [2,1,3]',
+      output: 'true'
+    },
+    {
+      input: 'root = [5,1,4,null,null,3,6]',
+      output: 'false',
+      explanation: 'The root node's value is 5 but its right child's value is 4.'
+    }
+  ],
+    constraints: [
+    'The number of nodes in the tree is in the range [1, 10^4].',
+    '-2^31 <= Node.val <= 2^31 - 1'
+  ],
+    hints: [
+    'Keep track of valid range for each node',
+    'Use inorder traversal - should be strictly increasing',
+    'Pass min and max values down the tree'
+  ],
+    starterCode: {
+      javascript: `function validate_bst() {
+  // Your code here
+}`,
+      python: `def validate_bst():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(n)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-lowest-common-ancestor',
+    title: 'Lowest Common Ancestor of Binary Tree',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: 'Find the lowest common ancestor of two nodes in a binary tree.',
+    tags: ["tree", "dfs", "recursion"],
+    estimatedTime: 25,
+    problemStatement: `Given a binary tree, find the lowest common ancestor (LCA) of two given nodes in the tree. The LCA is defined as the lowest node that has both nodes as descendants.`,
+    examples: [
+    {
+      input: 'root = [3,5,1,6,2,0,8,null,null,7,4], p = 5, q = 1',
+      output: '3'
+    },
+    {
+      input: 'root = [3,5,1,6,2,0,8,null,null,7,4], p = 5, q = 4',
+      output: '5'
+    }
+  ],
+    constraints: [
+    'The number of nodes in the tree is in the range [2, 10^5].',
+    'All Node.val are unique.',
+    'p != q',
+    'p and q will exist in the tree.'
+  ],
+    hints: [
+    'Use recursive DFS approach',
+    'If current node is p or q, return it',
+    'If both left and right subtrees return non-null, current is LCA'
+  ],
+    starterCode: {
+      javascript: `function lowest_common_ancestor() {
+  // Your code here
+}`,
+      python: `def lowest_common_ancestor():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(n)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-serialize-deserialize-tree',
+    title: 'Serialize and Deserialize Binary Tree',
+    type: 'dsa',
+    difficulty: 'hard',
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: 'Design an algorithm to serialize and deserialize a binary tree.',
+    tags: ["tree", "dfs", "bfs", "design"],
+    estimatedTime: 35,
+    problemStatement: `Design an algorithm to serialize and deserialize a binary tree. Serialization is converting a tree to a string. Deserialization is converting the string back to the original tree structure.`,
+    examples: [
+    {
+      input: 'root = [1,2,3,null,null,4,5]',
+      output: '[1,2,3,null,null,4,5]'
+    }
+  ],
+    constraints: [
+    'The number of nodes in the tree is in the range [0, 10^4].',
+    '-1000 <= Node.val <= 1000'
+  ],
+    hints: [
+    'Use preorder traversal with null markers',
+    'Serialize: visit node, left, right (record nulls)',
+    'Deserialize: recursively build tree from serialized string'
+  ],
+    starterCode: {
+      javascript: `function serialize_deserialize_tree() {
+  // Your code here
+}`,
+      python: `def serialize_deserialize_tree():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(n)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-binary-tree-max-path-sum',
+    title: 'Binary Tree Maximum Path Sum',
+    type: 'dsa',
+    difficulty: 'hard',
+    companies: ["Amazon", "Google", "Meta"],
+    description: 'Find the maximum path sum in a binary tree.',
+    tags: ["tree", "dfs", "recursion"],
+    estimatedTime: 30,
+    problemStatement: `A path in a binary tree is a sequence of nodes where each pair of adjacent nodes has an edge. A node can only appear once in the sequence. The path sum is the sum of the node values. Return the maximum path sum of any non-empty path.`,
+    examples: [
+    {
+      input: 'root = [1,2,3]',
+      output: '6',
+      explanation: 'Path is 2->1->3'
+    },
+    {
+      input: 'root = [-10,9,20,null,null,15,7]',
+      output: '42',
+      explanation: 'Path is 15->20->7'
+    }
+  ],
+    constraints: [
+    'The number of nodes in the tree is in the range [1, 3 * 10^4].',
+    '-1000 <= Node.val <= 1000'
+  ],
+    hints: [
+    'For each node, calculate max path through that node',
+    'Max path = node.val + max(left_path, 0) + max(right_path, 0)',
+    'Return max single path to parent: node.val + max(left, right, 0)'
+  ],
+    starterCode: {
+      javascript: `function binary_tree_max_path_sum() {
+  // Your code here
+}`,
+      python: `def binary_tree_max_path_sum():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(n)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-kth-smallest-bst',
+    title: 'Kth Smallest Element in BST',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ["Amazon", "Google", "Meta"],
+    description: 'Find the kth smallest element in a BST.',
+    tags: ["tree", "dfs", "bst"],
+    estimatedTime: 20,
+    problemStatement: `Given the root of a binary search tree and an integer k, return the kth smallest value (1-indexed) in the tree.`,
+    examples: [
+    {
+      input: 'root = [3,1,4,null,2], k = 1',
+      output: '1'
+    },
+    {
+      input: 'root = [5,3,6,2,4,null,null,1], k = 3',
+      output: '3'
+    }
+  ],
+    constraints: [
+    'The number of nodes in the tree is n.',
+    '1 <= k <= n <= 10^4',
+    '0 <= Node.val <= 10^4'
+  ],
+    hints: [
+    'Inorder traversal of BST gives sorted order',
+    'Return the kth element during inorder traversal',
+    'Can optimize with counter variable'
+  ],
+    starterCode: {
+      javascript: `function kth_smallest_bst() {
+  // Your code here
+}`,
+      python: `def kth_smallest_bst():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(n)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-number-of-islands',
+    title: 'Number of Islands',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: 'Count the number of islands in a 2D grid.',
+    tags: ["graph", "dfs", "bfs", "union-find"],
+    estimatedTime: 25,
+    problemStatement: `Given an m x n 2D binary grid which represents a map of '1's (land) and '0's (water), return the number of islands. An island is surrounded by water and is formed by connecting adjacent lands horizontally or vertically.`,
+    examples: [
+    {
+      input: 'grid = [["1","1","1","1","0"],["1","1","0","1","0"],["1","1","0","0","0"],["0","0","0","0","0"]]',
+      output: '1'
+    },
+    {
+      input: 'grid = [["1","1","0","0","0"],["1","1","0","0","0"],["0","0","1","0","0"],["0","0","0","1","1"]]',
+      output: '3'
+    }
+  ],
+    constraints: [
+    'm == grid.length',
+    'n == grid[i].length',
+    '1 <= m, n <= 300',
+    'grid[i][j] is '0' or '1'.'
+  ],
+    hints: [
+    'Use DFS or BFS to explore each island',
+    'Mark visited cells to avoid counting twice',
+    'Increment counter for each new island found'
+  ],
+    starterCode: {
+      javascript: `function number_of_islands() {
+  // Your code here
+}`,
+      python: `def number_of_islands():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(m * n)',
+      space: 'O(m * n)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-course-schedule',
+    title: 'Course Schedule',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ["Amazon", "Google", "Meta"],
+    description: 'Determine if you can finish all courses given prerequisites.',
+    tags: ["graph", "dfs", "bfs", "topological-sort"],
+    estimatedTime: 25,
+    problemStatement: `There are a total of numCourses courses you have to take, labeled from 0 to numCourses - 1. You are given an array prerequisites where prerequisites[i] = [ai, bi] indicates that you must take course bi first if you want to take course ai. Return true if you can finish all courses. Otherwise, return false.`,
+    examples: [
+    {
+      input: 'numCourses = 2, prerequisites = [[1,0]]',
+      output: 'true',
+      explanation: 'Take course 0, then course 1'
+    },
+    {
+      input: 'numCourses = 2, prerequisites = [[1,0],[0,1]]',
+      output: 'false',
+      explanation: 'Circular dependency'
+    }
+  ],
+    constraints: [
+    '1 <= numCourses <= 2000',
+    '0 <= prerequisites.length <= 5000',
+    'prerequisites[i].length == 2',
+    '0 <= ai, bi < numCourses'
+  ],
+    hints: [
+    'This is cycle detection in a directed graph',
+    'Use topological sort or DFS with visited states',
+    'If there's a cycle, return false'
+  ],
+    starterCode: {
+      javascript: `function course_schedule() {
+  // Your code here
+}`,
+      python: `def course_schedule():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(V + E)',
+      space: 'O(V + E)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-clone-graph',
+    title: 'Clone Graph',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: 'Deep clone an undirected graph.',
+    tags: ["graph", "dfs", "bfs", "hash-table"],
+    estimatedTime: 25,
+    problemStatement: `Given a reference of a node in a connected undirected graph, return a deep copy (clone) of the graph. Each node contains a value and a list of its neighbors.`,
+    examples: [
+    {
+      input: 'adjList = [[2,4],[1,3],[2,4],[1,3]]',
+      output: '[[2,4],[1,3],[2,4],[1,3]]'
+    },
+    {
+      input: 'adjList = [[]]',
+      output: '[[]]'
+    }
+  ],
+    constraints: [
+    'The number of nodes in the graph is in the range [0, 100].',
+    '1 <= Node.val <= 100',
+    'Node.val is unique for each node.'
+  ],
+    hints: [
+    'Use HashMap to track old to new node mapping',
+    'Use DFS or BFS to traverse graph',
+    'Create new nodes and clone neighbors recursively'
+  ],
+    starterCode: {
+      javascript: `function clone_graph() {
+  // Your code here
+}`,
+      python: `def clone_graph():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(V + E)',
+      space: 'O(V)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-word-ladder',
+    title: 'Word Ladder',
+    type: 'dsa',
+    difficulty: 'hard',
+    companies: ["Amazon", "Google", "Meta"],
+    description: 'Find shortest transformation sequence from begin word to end word.',
+    tags: ["graph", "bfs", "hash-table"],
+    estimatedTime: 35,
+    problemStatement: `A transformation sequence from word beginWord to word endWord is a sequence of words where each adjacent pair differs by a single letter, and every word in the sequence is in the wordList. Return the number of words in the shortest transformation sequence, or 0 if no such sequence exists.`,
+    examples: [
+    {
+      input: 'beginWord = hot, endWord = dog, wordList = [hot,dot,dog,lot,log,cog]',
+      output: '5',
+      explanation: 'hot -> dot -> dog'
+    },
+    {
+      input: 'beginWord = hit, endWord = cog, wordList = [hot,dot,dog,lot,log,cog]',
+      output: '0'
+    }
+  ],
+    constraints: [
+    '1 <= beginWord.length <= 10',
+    'endWord.length == beginWord.length',
+    '1 <= wordList.length <= 5000',
+    'All strings consist of lowercase English letters.'
+  ],
+    hints: [
+    'Model as graph: words are nodes, edges connect words differing by 1 letter',
+    'Use BFS for shortest path',
+    'Optimize by creating pattern map (h*t -> hot, hit)'
+  ],
+    starterCode: {
+      javascript: `function word_ladder() {
+  // Your code here
+}`,
+      python: `def word_ladder():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(M^2 * N)',
+      space: 'O(M^2 * N)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-climbing-stairs',
+    title: 'Climbing Stairs',
+    type: 'dsa',
+    difficulty: 'easy',
+    companies: ["Amazon", "Google", "Meta"],
+    description: 'Count ways to climb n stairs taking 1 or 2 steps at a time.',
+    tags: ["dynamic-programming", "math", "memoization"],
+    estimatedTime: 15,
+    problemStatement: `You are climbing a staircase. It takes n steps to reach the top. Each time you can either climb 1 or 2 steps. In how many distinct ways can you climb to the top?`,
+    examples: [
+    {
+      input: 'n = 2',
+      output: '2',
+      explanation: '1 step + 1 step or 2 steps'
+    },
+    {
+      input: 'n = 3',
+      output: '3',
+      explanation: '1+1+1, 1+2, or 2+1'
+    }
+  ],
+    constraints: [
+    '1 <= n <= 45'
+  ],
+    hints: [
+    'This is Fibonacci sequence',
+    'ways(n) = ways(n-1) + ways(n-2)',
+    'Can optimize space to O(1)'
+  ],
+    starterCode: {
+      javascript: `function climbing_stairs() {
+  // Your code here
+}`,
+      python: `def climbing_stairs():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(1)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-coin-change',
+    title: 'Coin Change',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ["Amazon", "Google", "Meta"],
+    description: 'Find fewest coins needed to make amount.',
+    tags: ["dynamic-programming", "array"],
+    estimatedTime: 25,
+    problemStatement: `You are given an integer array coins representing coins of different denominations and an integer amount representing a total amount of money. Return the fewest number of coins that you need to make up that amount. If that amount of money cannot be made up by any combination of the coins, return -1.`,
+    examples: [
+    {
+      input: 'coins = [1,2,5], amount = 11',
+      output: '3',
+      explanation: '11 = 5 + 5 + 1'
+    },
+    {
+      input: 'coins = [2], amount = 3',
+      output: '-1'
+    },
+    {
+      input: 'coins = [1], amount = 0',
+      output: '0'
+    }
+  ],
+    constraints: [
+    '1 <= coins.length <= 12',
+    '1 <= coins[i] <= 2^31 - 1',
+    '0 <= amount <= 10^4'
+  ],
+    hints: [
+    'Use bottom-up DP',
+    'dp[i] = min coins needed for amount i',
+    'dp[i] = min(dp[i - coin] + 1) for all coins'
+  ],
+    starterCode: {
+      javascript: `function coin_change() {
+  // Your code here
+}`,
+      python: `def coin_change():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(amount * coins)',
+      space: 'O(amount)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-longest-increasing-subsequence',
+    title: 'Longest Increasing Subsequence',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: 'Find length of longest strictly increasing subsequence.',
+    tags: ["dynamic-programming", "binary-search", "array"],
+    estimatedTime: 30,
+    problemStatement: `Given an integer array nums, return the length of the longest strictly increasing subsequence.`,
+    examples: [
+    {
+      input: 'nums = [10,9,2,5,3,7,101,18]',
+      output: '4',
+      explanation: '[2,3,7,101]'
+    },
+    {
+      input: 'nums = [0,1,0,3,2,3]',
+      output: '4'
+    },
+    {
+      input: 'nums = [7,7,7,7,7,7,7]',
+      output: '1'
+    }
+  ],
+    constraints: [
+    '1 <= nums.length <= 2500',
+    '-10^4 <= nums[i] <= 10^4'
+  ],
+    hints: [
+    'DP approach: dp[i] = longest LIS ending at i',
+    'For each element, check all previous elements',
+    'Can optimize with binary search to O(n log n)'
+  ],
+    starterCode: {
+      javascript: `function longest_increasing_subsequence() {
+  // Your code here
+}`,
+      python: `def longest_increasing_subsequence():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n²) DP, O(n log n) binary search',
+      space: 'O(n)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-unique-paths',
+    title: 'Unique Paths',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ["Amazon", "Google", "Meta"],
+    description: 'Count unique paths from top-left to bottom-right in grid.',
+    tags: ["dynamic-programming", "math", "combinatorics"],
+    estimatedTime: 20,
+    problemStatement: `There is a robot on an m x n grid. The robot starts at the top-left corner and wants to reach the bottom-right corner. The robot can only move down or right. How many unique paths are there?`,
+    examples: [
+    {
+      input: 'm = 3, n = 7',
+      output: '28'
+    },
+    {
+      input: 'm = 3, n = 2',
+      output: '3'
+    }
+  ],
+    constraints: [
+    '1 <= m, n <= 100'
+  ],
+    hints: [
+    '2D DP: dp[i][j] = paths to reach cell (i,j)',
+    'dp[i][j] = dp[i-1][j] + dp[i][j-1]',
+    'Can optimize space to O(n) using 1D array'
+  ],
+    starterCode: {
+      javascript: `function unique_paths() {
+  // Your code here
+}`,
+      python: `def unique_paths():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(m * n)',
+      space: 'O(n)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-edit-distance',
+    title: 'Edit Distance',
+    type: 'dsa',
+    difficulty: 'hard',
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: 'Find minimum edit distance to convert one string to another.',
+    tags: ["dynamic-programming", "string"],
+    estimatedTime: 35,
+    problemStatement: `Given two strings word1 and word2, return the minimum number of operations required to convert word1 to word2. You can insert, delete, or replace any character.`,
+    examples: [
+    {
+      input: 'word1 = horse, word2 = ros',
+      output: '3',
+      explanation: 'horse -> rorse -> rose -> ros'
+    },
+    {
+      input: 'word1 = intention, word2 = execution',
+      output: '5'
+    }
+  ],
+    constraints: [
+    '0 <= word1.length, word2.length <= 500',
+    'word1 and word2 consist of lowercase English letters.'
+  ],
+    hints: [
+    '2D DP: dp[i][j] = min operations to convert word1[0..i] to word2[0..j]',
+    'If chars match: dp[i][j] = dp[i-1][j-1]',
+    'Else: min of insert, delete, replace operations'
+  ],
+    starterCode: {
+      javascript: `function edit_distance() {
+  // Your code here
+}`,
+      python: `def edit_distance():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(m * n)',
+      space: 'O(m * n)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-word-break',
+    title: 'Word Break',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ["Amazon", "Google", "Meta"],
+    description: 'Determine if string can be segmented into dictionary words.',
+    tags: ["dynamic-programming", "hash-table", "string"],
+    estimatedTime: 25,
+    problemStatement: `Given a string s and a dictionary of strings wordDict, return true if s can be segmented into a space-separated sequence of one or more dictionary words.`,
+    examples: [
+    {
+      input: 's = leetcode, wordDict = [leet,code]',
+      output: 'true',
+      explanation: 'leetcode can be segmented as leet code'
+    },
+    {
+      input: 's = applepenapple, wordDict = [apple,pen]',
+      output: 'true'
+    },
+    {
+      input: 's = catsandog, wordDict = [cats,dog,sand,and,cat]',
+      output: 'false'
+    }
+  ],
+    constraints: [
+    '1 <= s.length <= 300',
+    '1 <= wordDict.length <= 1000',
+    'All strings consist of lowercase English letters.'
+  ],
+    hints: [
+    '1D DP: dp[i] = true if s[0..i] can be segmented',
+    'For each position, check all possible words ending there',
+    'Use HashSet for O(1) word lookup'
+  ],
+    starterCode: {
+      javascript: `function word_break() {
+  // Your code here
+}`,
+      python: `def word_break():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n^2)',
+      space: 'O(n)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-house-robber',
+    title: 'House Robber',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ["Amazon", "Google", "Meta"],
+    description: 'Maximize amount robbed without robbing adjacent houses.',
+    tags: ["dynamic-programming", "array"],
+    estimatedTime: 20,
+    problemStatement: `You are a robber planning to rob houses along a street. Each house has money, but adjacent houses have security that alerts police. Return the maximum amount you can rob without alerting police.`,
+    examples: [
+    {
+      input: 'nums = [1,2,3,1]',
+      output: '4',
+      explanation: 'Rob house 1 and 3'
+    },
+    {
+      input: 'nums = [2,7,9,3,1]',
+      output: '12',
+      explanation: 'Rob houses 1, 3, and 5'
+    }
+  ],
+    constraints: [
+    '1 <= nums.length <= 100',
+    '0 <= nums[i] <= 400'
+  ],
+    hints: [
+    '1D DP: dp[i] = max money robbing up to house i',
+    'Choice: rob current (nums[i] + dp[i-2]) or skip (dp[i-1])',
+    'Can optimize space to O(1) using two variables'
+  ],
+    starterCode: {
+      javascript: `function house_robber() {
+  // Your code here
+}`,
+      python: `def house_robber():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(1)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-kth-largest-element',
+    title: 'Kth Largest Element in Array',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: 'Find the kth largest element in an unsorted array.',
+    tags: ["heap", "quickselect", "sorting"],
+    estimatedTime: 20,
+    problemStatement: `Given an integer array nums and an integer k, return the kth largest element in the array. Note that it is the kth largest element in sorted order, not the kth distinct element.`,
+    examples: [
+    {
+      input: 'nums = [3,2,1,5,6,4], k = 2',
+      output: '5'
+    },
+    {
+      input: 'nums = [3,2,3,1,2,4,5,5,6], k = 4',
+      output: '4'
+    }
+  ],
+    constraints: [
+    '1 <= k <= nums.length <= 10^5',
+    '-10^4 <= nums[i] <= 10^4'
+  ],
+    hints: [
+    'Use min heap of size k',
+    'Or use quickselect algorithm for O(n) average',
+    'Heap approach: O(n log k), Quickselect: O(n) average'
+  ],
+    starterCode: {
+      javascript: `function kth_largest_element() {
+  // Your code here
+}`,
+      python: `def kth_largest_element():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n log k) heap, O(n) quickselect',
+      space: 'O(k)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-merge-k-sorted-lists',
+    title: 'Merge K Sorted Lists',
+    type: 'dsa',
+    difficulty: 'hard',
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: 'Merge k sorted linked lists into one sorted list.',
+    tags: ["heap", "linked-list", "divide-and-conquer"],
+    estimatedTime: 30,
+    problemStatement: `You are given an array of k linked-lists, each linked-list is sorted in ascending order. Merge all the linked-lists into one sorted linked-list and return it.`,
+    examples: [
+    {
+      input: 'lists = [[1,4,5],[1,3,4],[2,6]]',
+      output: '[1,1,2,3,4,4,5,6]'
+    },
+    {
+      input: 'lists = []',
+      output: '[]'
+    }
+  ],
+    constraints: [
+    'k == lists.length',
+    '0 <= k <= 10^4',
+    '0 <= lists[i].length <= 500',
+    '-10^4 <= lists[i][j] <= 10^4'
+  ],
+    hints: [
+    'Use min heap to track smallest elements from each list',
+    'Pop smallest, add to result, push next from that list',
+    'Alternative: divide and conquer merge pairs'
+  ],
+    starterCode: {
+      javascript: `function merge_k_sorted_lists() {
+  // Your code here
+}`,
+      python: `def merge_k_sorted_lists():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(N log k)',
+      space: 'O(k)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-find-median-data-stream',
+    title: 'Find Median from Data Stream',
+    type: 'dsa',
+    difficulty: 'hard',
+    companies: ["Amazon", "Google", "Meta"],
+    description: 'Design a data structure that supports finding median in O(1).',
+    tags: ["heap", "design", "two-heaps"],
+    estimatedTime: 35,
+    problemStatement: `Design a data structure that supports addNum(int num) and findMedian() operations. addNum adds an integer to the data structure, and findMedian returns the median of all elements.`,
+    examples: [
+    {
+      input: 'addNum(1), addNum(2), findMedian(), addNum(3), findMedian()',
+      output: '1.5, 2.0'
+    }
+  ],
+    constraints: [
+    '-10^5 <= num <= 10^5',
+    'At most 5 * 10^4 calls to addNum and findMedian'
+  ],
+    hints: [
+    'Use two heaps: max heap for smaller half, min heap for larger half',
+    'Keep heaps balanced: sizes differ by at most 1',
+    'Median is top of larger heap or average of both tops'
+  ],
+    starterCode: {
+      javascript: `function find_median_data_stream() {
+  // Your code here
+}`,
+      python: `def find_median_data_stream():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(log n) add, O(1) find',
+      space: 'O(n)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-top-k-frequent',
+    title: 'Top K Frequent Elements',
+    type: 'dsa',
+    difficulty: 'medium',
+    companies: ["Amazon", "Google", "Meta"],
+    description: 'Find k most frequent elements in array.',
+    tags: ["heap", "hash-table", "bucket-sort"],
+    estimatedTime: 25,
+    problemStatement: `Given an integer array nums and an integer k, return the k most frequent elements. The answer can be returned in any order.`,
+    examples: [
+    {
+      input: 'nums = [1,1,1,2,2,3], k = 2',
+      output: '[1,2]'
+    },
+    {
+      input: 'nums = [1], k = 1',
+      output: '[1]'
+    }
+  ],
+    constraints: [
+    '1 <= nums.length <= 10^5',
+    '1 <= k <= number of unique elements',
+    '-10^4 <= nums[i] <= 10^4'
+  ],
+    hints: [
+    'Count frequencies with HashMap',
+    'Use min heap of size k to track top k',
+    'Or use bucket sort: O(n) time'
+  ],
+    starterCode: {
+      javascript: `function top_k_frequent() {
+  // Your code here
+}`,
+      python: `def top_k_frequent():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n log k) heap, O(n) bucket',
+      space: 'O(n)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-trapping-rain-water',
+    title: 'Trapping Rain Water',
+    type: 'dsa',
+    difficulty: 'hard',
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: 'Calculate how much rain water can be trapped between bars.',
+    tags: ["array", "two-pointers", "stack"],
+    estimatedTime: 30,
+    problemStatement: `Given n non-negative integers representing an elevation map where the width of each bar is 1, compute how much water it can trap after raining.`,
+    examples: [
+    {
+      input: 'height = [0,1,0,2,1,0,1,3,2,1,2,1]',
+      output: '6'
+    },
+    {
+      input: 'height = [4,2,0,3,2,5]',
+      output: '9'
+    }
+  ],
+    constraints: [
+    'n == height.length',
+    '1 <= n <= 2 * 10^4',
+    '0 <= height[i] <= 10^5'
+  ],
+    hints: [
+    'Water level at position = min(max_left, max_right) - height',
+    'Two pointer approach: track left_max and right_max',
+    'Or use stack to track bars'
+  ],
+    starterCode: {
+      javascript: `function trapping_rain_water() {
+  // Your code here
+}`,
+      python: `def trapping_rain_water():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(1)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-sliding-window-maximum',
+    title: 'Sliding Window Maximum',
+    type: 'dsa',
+    difficulty: 'hard',
+    companies: ["Amazon", "Google", "Meta"],
+    description: 'Find maximum in each sliding window of size k.',
+    tags: ["array", "deque", "sliding-window"],
+    estimatedTime: 30,
+    problemStatement: `Given an array nums and a sliding window of size k which moves from left to right. You can only see the k numbers in the window. Return the max value in each window.`,
+    examples: [
+    {
+      input: 'nums = [1,3,-1,-3,5,3,6,7], k = 3',
+      output: '[3,3,5,5,6,7]'
+    }
+  ],
+    constraints: [
+    '1 <= nums.length <= 10^5',
+    '1 <= k <= nums.length',
+    '-10^4 <= nums[i] <= 10^4'
+  ],
+    hints: [
+    'Use deque to maintain window in decreasing order',
+    'Remove elements outside window from front',
+    'Remove smaller elements from back before adding new'
+  ],
+    starterCode: {
+      javascript: `function sliding_window_maximum() {
+  // Your code here
+}`,
+      python: `def sliding_window_maximum():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(k)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-minimum-window-substring',
+    title: 'Minimum Window Substring',
+    type: 'dsa',
+    difficulty: 'hard',
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: 'Find minimum window in s containing all chars from t.',
+    tags: ["string", "sliding-window", "hash-table"],
+    estimatedTime: 35,
+    problemStatement: `Given two strings s and t, return the minimum window substring of s such that every character in t (including duplicates) is included in the window. If no such substring exists, return empty string.`,
+    examples: [
+    {
+      input: 's = ADOBECODEBANC, t = ABC',
+      output: 'BANC'
+    },
+    {
+      input: 's = a, t = a',
+      output: 'a'
+    }
+  ],
+    constraints: [
+    '1 <= s.length, t.length <= 10^5',
+    's and t consist of uppercase and lowercase English letters.'
+  ],
+    hints: [
+    'Use sliding window with two pointers',
+    'Expand right to include chars, contract left to minimize',
+    'Use HashMap to track character frequencies'
+  ],
+    starterCode: {
+      javascript: `function minimum_window_substring() {
+  // Your code here
+}`,
+      python: `def minimum_window_substring():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(|s| + |t|)',
+      space: 'O(|s| + |t|)'
+    },
+    testCases: []
+  },
+
+  {
+    id: 'dsa-first-missing-positive',
+    title: 'First Missing Positive',
+    type: 'dsa',
+    difficulty: 'hard',
+    companies: ["Amazon", "Google", "Meta"],
+    description: 'Find smallest missing positive integer in O(n) time and O(1) space.',
+    tags: ["array", "hash-table"],
+    estimatedTime: 30,
+    problemStatement: `Given an unsorted integer array nums, return the smallest missing positive integer. Must run in O(n) time and use O(1) auxiliary space.`,
+    examples: [
+    {
+      input: 'nums = [1,2,0]',
+      output: '3'
+    },
+    {
+      input: 'nums = [3,4,-1,1]',
+      output: '2'
+    },
+    {
+      input: 'nums = [7,8,9,11,12]',
+      output: '1'
+    }
+  ],
+    constraints: [
+    '1 <= nums.length <= 10^5',
+    '-2^31 <= nums[i] <= 2^31 - 1'
+  ],
+    hints: [
+    'Use array itself as hash table',
+    'Place each number n at index n-1 if possible',
+    'First index i where nums[i] != i+1 is the answer'
+  ],
+    starterCode: {
+      javascript: `function first_missing_positive() {
+  // Your code here
+}`,
+      python: `def first_missing_positive():
+    # Your code here
+    pass`
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(1)'
+    },
+    testCases: []
+  },
 ];
 
 export function filterScenarios(filters: {

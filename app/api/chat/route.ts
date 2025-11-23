@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { chatRateLimit } from "@/lib/rate-limit"
 import { getCachedModel } from "@/lib/gemini-cache"
+import { trackAIChatServer } from "@/lib/analytics-server"
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
@@ -21,8 +22,10 @@ export async function POST(request: NextRequest) {
     return rateLimitResponse
   }
 
+  const startTime = Date.now()
+
   try {
-    const { message, context, role, userContext, workspaceContext, currentCode, isProactive, scenarioTitle, scenarioType, elapsedTime } = await request.json()
+    const { message, context, role, userContext, workspaceContext, currentCode, isProactive, scenarioTitle, scenarioType, elapsedTime, sessionId, userId } = await request.json()
 
     // For proactive messages (interviewer jumping in), message might be empty
     if (!message && !isProactive) {
@@ -294,6 +297,16 @@ What technical question should you ask them right now based on their current cod
 
     const response = await result.response
     const reply = response.text()
+    const responseTimeMs = Date.now() - startTime
+
+    // Track AI chat interaction
+    trackAIChatServer({
+      sessionId,
+      userId,
+      interactionType: role === "interviewer" ? "interviewer" : "partner",
+      messageLength: message?.length || 0,
+      responseTimeMs,
+    }).catch(err => console.error("Analytics tracking error:", err))
 
     return NextResponse.json({ reply })
   } catch (error) {
