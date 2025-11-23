@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import React, { useEffect } from "react"
 import dynamic from "next/dynamic"
 import {
   Dialog,
@@ -69,6 +69,22 @@ export function CodeViewerDialog({
   language,
 }: CodeViewerDialogProps) {
   const editorLanguage = language || getLanguageFromFileName(fileName)
+
+  // Cleanup Monaco editor models on unmount
+  useEffect(() => {
+    return () => {
+      // Dispose any Monaco models to prevent memory leaks
+      if (typeof window !== 'undefined' && (window as any).monaco?.editor) {
+        const models = (window as any).monaco.editor.getModels()
+        models.forEach((model: any) => {
+          // Only dispose models that aren't part of the main editor
+          if (model.uri.path.includes(fileName)) {
+            model.dispose()
+          }
+        })
+      }
+    }
+  }, [fileName])
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
