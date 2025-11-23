@@ -3,6 +3,7 @@ import { getScenarioById } from "@/lib/scenarios"
 import { runInNewContext } from "vm"
 import { executeRateLimit } from "@/lib/rate-limit"
 import { spawn } from "child_process"
+import { trackCodeExecutionServer } from "@/lib/analytics-server"
 
 // Mark route as dynamic to avoid build-time issues
 export const dynamic = 'force-dynamic'
@@ -357,8 +358,10 @@ export async function POST(request: NextRequest) {
     return rateLimitResponse
   }
 
+  const startTime = Date.now()
+
   try {
-    const { code, scenarioId, language = 'javascript' } = await request.json()
+    const { code, scenarioId, language = 'javascript', sessionId, userId } = await request.json()
 
     if (!code) {
       return NextResponse.json({ error: "Code is required" }, { status: 400 })
@@ -494,6 +497,20 @@ export async function POST(request: NextRequest) {
     const passedCount = results.filter((r) => r.passed).length
     const totalCount = testCases.length
     const passRate = totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0
+    const executionTimeMs = Date.now() - startTime
+
+    // Track code execution analytics
+    trackCodeExecutionServer({
+      sessionId,
+      userId,
+      language,
+      scenarioId,
+      scenarioType: scenario.type,
+      passed: allPassed,
+      totalTests: totalCount,
+      passedTests: passedCount,
+      executionTimeMs,
+    }).catch(err => console.error("Analytics tracking error:", err))
 
     return NextResponse.json({
       success: !executionError && allPassed,

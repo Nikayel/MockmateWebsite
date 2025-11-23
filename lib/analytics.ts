@@ -150,3 +150,26 @@ export function trackError(params: {
 }) {
   trackEvent("error", params)
 }
+
+/**
+ * Track feedback generation
+ */
+export function trackFeedbackGeneration(params: {
+  sessionId: string
+  scenarioType: string
+  performanceScore: number
+  durationMinutes: number
+}) {
+  trackEvent("feedback_generated", params)
+}
+
+/**
+ * Track user upgrade flow
+ */
+export function trackUpgradeFlow(params: {
+  userId: string
+  step: "view_pricing" | "click_upgrade" | "start_checkout" | "complete_checkout"
+  tier?: string
+}) {
+  trackEvent("upgrade_flow", params)
+}
