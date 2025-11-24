@@ -151,7 +151,26 @@ export default function InterviewPage() {
   const interviewerEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const editorContainerRef = useRef<HTMLDivElement>(null)
+  const editorRef = useRef<any>(null) // Monaco editor instance ref
   const [editorHeight, setEditorHeight] = useState(400)
+
+  // Monaco Editor cleanup on unmount - dispose all models to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      // Dispose editor instance
+      if (editorRef.current) {
+        editorRef.current.dispose()
+        editorRef.current = null
+      }
+      // Dispose all Monaco models
+      if (typeof window !== 'undefined' && (window as any).monaco?.editor) {
+        const models = (window as any).monaco.editor.getModels()
+        models.forEach((model: any) => {
+          model.dispose()
+        })
+      }
+    }
+  }, [])
 
   // Separate effect to handle auth check with delay to prevent race condition on refresh
   useEffect(() => {
@@ -898,6 +917,14 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       }
     }
 
+    // Monaco cleanup - dispose all models to prevent memory leaks on interview reset
+    if (typeof window !== 'undefined' && (window as any).monaco?.editor) {
+      const models = (window as any).monaco.editor.getModels()
+      models.forEach((model: any) => {
+        model.dispose()
+      })
+    }
+
     setIsInterviewStarted(false)
     setShowFeedback(false)
     setShowPostInterviewDiscussion(false)
@@ -1577,6 +1604,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           height={editorHeight}
                           language={selectedLanguage}
                           value={code}
+                          onMount={(editor) => {
+                            editorRef.current = editor
+                          }}
                           onChange={(value) => {
                             const newCode = value || ""
 

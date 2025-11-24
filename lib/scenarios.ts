@@ -14808,7 +14808,7 @@ The algorithm for myAtoi(string s) is as follows:
     hints: [
     'Use a dummy node to simplify edge cases',
     'Compare values and link smaller node',
-    'Don't forget to link remaining nodes'
+    "Don't forget to link remaining nodes"
   ],
     starterCode: {
       javascript: `function merge_two_sorted_lists() {
@@ -14856,9 +14856,9 @@ The algorithm for myAtoi(string s) is as follows:
     'pos is -1 or a valid index in the linked-list.'
   ],
     hints: [
-    'Use Floyd's cycle detection (tortoise and hare)',
+    "Use Floyd's cycle detection (tortoise and hare)",
     'Use two pointers: slow (1 step) and fast (2 steps)',
-    'If they meet, there's a cycle'
+    "If they meet, there's a cycle"
   ],
     starterCode: {
       javascript: `function linked_list_cycle() {
@@ -14969,7 +14969,7 @@ The algorithm for myAtoi(string s) is as follows:
     type: 'dsa',
     difficulty: 'easy',
     companies: ["Amazon", "Google", "Meta"],
-    description: 'Return the inorder traversal of a binary tree's nodes' values.',
+    description: "Return the inorder traversal of a binary tree's nodes' values.",
     tags: ["tree", "dfs", "stack", "recursion"],
     estimatedTime: 15,
     problemStatement: `Given the root of a binary tree, return the inorder traversal of its nodes' values.`,

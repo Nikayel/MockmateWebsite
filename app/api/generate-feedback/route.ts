@@ -1,11 +1,156 @@
 import { NextRequest, NextResponse } from "next/server"
-import { GoogleGenerativeAI } from "@google/generative-ai"
 import { feedbackRateLimit } from "@/lib/rate-limit"
-import { getCachedModel } from "@/lib/gemini-cache"
+import { generateFeedbackResponse } from "@/lib/ai-providers"
+import { trackFeedbackGenerationServer } from "@/lib/analytics-server"
 
-const genAI = process.env.GEMINI_API_KEY
-  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-  : null
+// Structured feedback schema for reliable extraction
+interface FeedbackScores {
+  correctness: number
+  efficiency: number
+  codeQuality: number
+  reasoningExplanation: number
+  aiCollaboration: number
+  overall: number
+}
+
+interface StructuredFeedback {
+  scores: FeedbackScores
+  tldr: string
+  whatWorked: string[]
+  fixNext: string[]
+  actionPlan: string[]
+  aiWatchlist: string
+  rawFeedback: string
+}
+
+/**
+ * Extract scores from feedback text using multiple patterns
+ * Falls back to intelligent defaults based on context
+ */
+function extractScores(feedback: string, metrics: {
+  testsPassed: number
+  testsTotal: number
+  timeSpent: number
+  collaborationMessages: number
+}): FeedbackScores {
+  const scores: FeedbackScores = {
+    correctness: 70,
+    efficiency: 70,
+    codeQuality: 70,
+    reasoningExplanation: 70,
+    aiCollaboration: 70,
+    overall: 70,
+  }
+
+  // Pattern: "Label: X/100" or "Label: X/10"
+  const patterns = [
+    { key: 'correctness', patterns: [/Correctness[:\s]+(\d+)\/100/i, /Correctness[:\s]+(\d+)\/10/i] },
+    { key: 'efficiency', patterns: [/Efficiency[:\s]+(\d+)\/100/i, /Efficiency[:\s]+(\d+)\/10/i] },
+    { key: 'codeQuality', patterns: [/Code\s*Quality[:\s]+(\d+)\/100/i, /Code\s*Quality[:\s]+(\d+)\/10/i] },
+    { key: 'reasoningExplanation', patterns: [/Reasoning\s*(?:&|and)?\s*Explanation[:\s]+(\d+)\/100/i, /Reasoning\s*(?:&|and)?\s*Explanation[:\s]+(\d+)\/10/i] },
+    { key: 'aiCollaboration', patterns: [/AI\s*Collaboration[:\s]+(\d+)\/100/i, /AI\s*Collaboration[:\s]+(\d+)\/10/i] },
+    { key: 'overall', patterns: [/Overall[:\s]+(\d+)\/100/i, /Overall[:\s]+(\d+)\/10/i] },
+  ]
+
+  for (const { key, patterns: patternList } of patterns) {
+    for (const pattern of patternList) {
+      const match = feedback.match(pattern)
+      if (match) {
+        let value = parseInt(match[1], 10)
+        // Convert /10 scale to /100
+        if (pattern.toString().includes('/10')) {
+          value = value * 10
+        }
+        scores[key as keyof FeedbackScores] = Math.min(100, Math.max(0, value))
+        break
+      }
+    }
+  }
+
+  // Apply penalties based on actual metrics if scores weren't extracted properly
+  if (metrics.collaborationMessages === 0) {
+    // No collaboration = 0 for these categories
+    scores.reasoningExplanation = Math.min(scores.reasoningExplanation, 0)
+    scores.aiCollaboration = Math.min(scores.aiCollaboration, 0)
+  } else if (metrics.collaborationMessages <= 2) {
+    // Minimal collaboration = capped scores
+    scores.reasoningExplanation = Math.min(scores.reasoningExplanation, 30)
+    scores.aiCollaboration = Math.min(scores.aiCollaboration, 30)
+  }
+
+  // Test-based correctness adjustment
+  if (metrics.testsTotal > 0) {
+    const passRate = (metrics.testsPassed / metrics.testsTotal) * 100
+    // If tests failed but score is high, adjust
+    if (passRate < 50 && scores.correctness > 60) {
+      scores.correctness = Math.min(scores.correctness, passRate + 20)
+    }
+  }
+
+  // Recalculate overall if needed
+  const avgScore = Math.round(
+    (scores.correctness + scores.efficiency + scores.codeQuality +
+     scores.reasoningExplanation + scores.aiCollaboration) / 5
+  )
+
+  // If extracted overall seems wrong, use calculated average
+  if (Math.abs(scores.overall - avgScore) > 30) {
+    scores.overall = avgScore
+  }
+
+  return scores
+}
+
+/**
+ * Parse structured sections from feedback
+ */
+function parseFeedbackSections(feedback: string): Partial<StructuredFeedback> {
+  const sections: Partial<StructuredFeedback> = {}
+
+  // Extract TL;DR
+  const tldrMatch = feedback.match(/\*\*TL;DR\*\*[:\s]*([^\n*]+)/i)
+  if (tldrMatch) {
+    sections.tldr = tldrMatch[1].trim()
+  }
+
+  // Extract What Worked (bullet points)
+  const whatWorkedMatch = feedback.match(/\*\*What Worked\*\*[\s\S]*?((?:-[^\n]+\n?)+)/i)
+  if (whatWorkedMatch) {
+    sections.whatWorked = whatWorkedMatch[1]
+      .split('\n')
+      .filter(line => line.trim().startsWith('-'))
+      .map(line => line.replace(/^-\s*/, '').trim())
+      .filter(line => line.length > 0)
+  }
+
+  // Extract Fix Next
+  const fixNextMatch = feedback.match(/\*\*Fix Next\*\*[\s\S]*?((?:-[^\n]+\n?)+)/i)
+  if (fixNextMatch) {
+    sections.fixNext = fixNextMatch[1]
+      .split('\n')
+      .filter(line => line.trim().startsWith('-'))
+      .map(line => line.replace(/^-\s*/, '').trim())
+      .filter(line => line.length > 0)
+  }
+
+  // Extract Action Plan
+  const actionMatch = feedback.match(/\*\*Action Plan\*\*[\s\S]*?((?:\d+\.[^\n]+\n?)+)/i)
+  if (actionMatch) {
+    sections.actionPlan = actionMatch[1]
+      .split('\n')
+      .filter(line => /^\d+\./.test(line.trim()))
+      .map(line => line.replace(/^\d+\.\s*/, '').trim())
+      .filter(line => line.length > 0)
+  }
+
+  // Extract AI Watchlist
+  const watchlistMatch = feedback.match(/\*\*AI\s*(?:&|and)?\s*Communication Watchlist\*\*[:\s]*([^\n]+(?:\n[^*\n]+)*)/i)
+  if (watchlistMatch) {
+    sections.aiWatchlist = watchlistMatch[1].trim()
+  }
+
+  return sections
+}
 
 export async function POST(request: NextRequest) {
   // Apply rate limiting
@@ -14,26 +159,27 @@ export async function POST(request: NextRequest) {
     return rateLimitResponse
   }
 
+  const startTime = Date.now()
+
   try {
-    const { code, scenarioTitle, scenarioType, testResults, language, timeSpent, aiCollaborationMetrics, interactionMetrics } = await request.json()
+    const { code, scenarioTitle, scenarioType, testResults, language, timeSpent, aiCollaborationMetrics, interactionMetrics, sessionId, userId } = await request.json()
 
     if (!code || !scenarioTitle) {
       return NextResponse.json({ error: "Code and scenario title are required" }, { status: 400 })
     }
 
-    if (!genAI || !process.env.GEMINI_API_KEY) {
-      console.error("GEMINI_API_KEY is not configured")
-      return NextResponse.json(
-        {
-          error: "Feedback generation is temporarily unavailable. Please check API configuration.",
-          feedback: `## Feedback for ${scenarioTitle}\n\nFeedback generation service is currently unavailable. Your solution has been submitted successfully.`
-        },
-        { status: 503 }
-      )
-    }
+    // Calculate collaboration message count
+    const collaborationMessages = (aiCollaborationMetrics?.partnerMessagesSent || 0) +
+      (interactionMetrics?.interviewerQuestionsAnswered || 0)
 
-    // Define system instruction for feedback generation
-    const systemInstruction = `You are a senior interviewer delivering a "Brutal Debrief & Action Plan." Reports were previously bloated—now you must be surgical, time-efficient, and direct.
+    // Calculate test metrics
+    const testsPassed = testResults?.filter((t: any) => t.passed).length || 0
+    const testsTotal = testResults?.length || 0
+
+    // Define system instruction for feedback generation (with structured output guidance)
+    const systemInstruction = `You are a senior interviewer delivering a "Brutal Debrief & Action Plan." You must be surgical, time-efficient, and direct.
+
+CRITICAL: Output scores in EXACT format "Label: X/100" for reliable parsing.
 
 Tone: candid, data-backed, encouraging. Never rant, never waffle.
 
@@ -42,38 +188,54 @@ HARD RULES
 - Tie every comment to observed signals (tests, time spent, interaction counts, hints, efficiency metrics, etc.).
 - If the user has NO collaboration (no interviewer messages AND no AI partner messages), give BOTH "Reasoning & Explanation" and "AI Collaboration" a score of 0/100. This is a critical failure - they did not collaborate or explain their thinking at all.
 - If the user has minimal collaboration (only 1-2 messages total), score "Reasoning & Explanation" and "AI Collaboration" proportionally based on actual collaboration level (e.g., 1 message = ~20/100, 2 messages = ~40/100, etc.). Never give free points for zero collaboration.
-- If time spent < 120 seconds AND the user never messaged the interviewer/AI partner, assume they did NOT walk through their thinking. Give "Reasoning & Explanation" 0/100 and "AI Collaboration" 0/100 if there were no messages. Also cap the overall score appropriately based on collaboration level.
-- If time spent ≥ 120 seconds but interviewer message count from the user is 0, still mention the missing walkthrough and score "Reasoning & Explanation" at 0/100.
+- If time spent < 120 seconds AND the user never messaged the interviewer/AI partner, assume they did NOT walk through their thinking. Give "Reasoning & Explanation" 0/100 and "AI Collaboration" 0/100 if there were no messages.
 - Use markdown with the exact sections below, in order, no extras:
-  1. **TL;DR** – 1-2 sentences summarizing outcome + top risk.
-  2. **Score Snapshot** – bullet list of the six ratings (Correctness, Efficiency, Code Quality, Reasoning & Explanation, AI Collaboration, Overall) formatted as "Label: X/100 – justification". All scores should be on a 0-100 scale.
-  3. **What Worked** – up to 3 bullets, each ≤1 sentence describing concrete wins.
-  4. **Fix Next** – up to 3 prioritized bullets focused on the highest-impact gaps.
-  5. **Action Plan** – numbered list of exactly 3 steps, each with an owner suggestion (e.g., "You") and a timeframe ("today", "this week").
-  6. **AI & Communication Watchlist** – one concise paragraph calling out collaboration quality. If interaction counts are near zero, state "No evidence you walked the interviewer through your work—narrate next time."
 
+## REQUIRED OUTPUT FORMAT
+
+**TL;DR** – 1-2 sentences summarizing outcome + top risk.
+
+**Score Snapshot**
+- Correctness: X/100 – justification
+- Efficiency: X/100 – justification
+- Code Quality: X/100 – justification
+- Reasoning & Explanation: X/100 – justification
+- AI Collaboration: X/100 – justification
+- Overall: X/100 – justification
+
+**What Worked**
+- bullet 1
+- bullet 2
+- bullet 3 (max 3)
+
+**Fix Next**
+- bullet 1
+- bullet 2
+- bullet 3 (max 3, prioritized)
+
+**Action Plan**
+1. Step with owner and timeframe
+2. Step with owner and timeframe
+3. Step with owner and timeframe
+
+**AI & Communication Watchlist** – one concise paragraph calling out collaboration quality. If interaction counts are near zero, state "No evidence you walked the interviewer through your work—narrate next time."
+
+IMPORTANT SCORING RULES:
+- ALL scores MUST be in X/100 format
+- Zero collaboration = 0/100 for Reasoning & Explanation AND AI Collaboration
+- Failed tests should cap Correctness score
 - Never invent data. If something wasn't captured, say "No signal captured."
-- Prefer examples from the candidate's code/tests over hypothetical ones.
-- Mention edge cases/complexities only if relevant to the observed solution.
-- Keep formatting tight—no tables, no nested sub-bullets, no code fences unless quoting the candidate's own code.
 `
 
-    // Use cached model with system instruction
-    const model = await getCachedModel(
-      "feedback-system-prompt",
-      systemInstruction,
-      "gemini-2.5-flash"
-    )
-
     const testResultsSummary = testResults && Array.isArray(testResults)
-      ? `\n\nTEST RESULTS:\n- Total tests: ${testResults.length}\n- Passed: ${testResults.filter((t: any) => t.passed).length}\n- Failed: ${testResults.filter((t: any) => t.passed === false).length}\n`
+      ? `\n\nTEST RESULTS:\n- Total tests: ${testsTotal}\n- Passed: ${testsPassed}\n- Failed: ${testsTotal - testsPassed}\n`
       : ""
 
     const timeInfo = timeSpent ? `\n\nTIME SPENT: ${Math.floor(timeSpent / 60)} minutes ${timeSpent % 60} seconds\n` : ""
 
     const aiCollaborationInfo = aiCollaborationMetrics ? `
 AI COLLABORATION METRICS:
-- Partner messages sent: ${aiCollaborationMetrics.partnerMessagesSent || 0}
+- Partner messages sent by user: ${aiCollaborationMetrics.partnerMessagesSent || 0}
 - Partner messages received: ${aiCollaborationMetrics.partnerMessagesReceived || 0}
 - Hints requested: ${aiCollaborationMetrics.partnerHintsRequested || 0}
 - Code suggestions accepted: ${aiCollaborationMetrics.partnerCodeSuggestionsAccepted || 0}
@@ -83,18 +245,26 @@ AI COLLABORATION METRICS:
 - AI suggestions misunderstood: ${aiCollaborationMetrics.aiSuggestionsMisunderstood || 0}
 - Strategic AI usage: ${aiCollaborationMetrics.strategicAiUsage || 'Not assessed'}
 - AI over-dependency: ${aiCollaborationMetrics.aiOverDependency || 'Not assessed'}
-` : ""
+` : `
+AI COLLABORATION METRICS:
+- Partner messages sent by user: 0
+- No collaboration data available
+`
 
     const interactionInfo = interactionMetrics ? `
-INTERACTION METRICS:
-- Interviewer questions answered: ${interactionMetrics.interviewerQuestionsAnswered || 0}
+INTERVIEWER INTERACTION METRICS:
+- Questions answered by candidate: ${interactionMetrics.interviewerQuestionsAnswered || 0}
 - Clarifications requested: ${interactionMetrics.interviewerClarificationsRequested || 0}
 - Feedback acknowledged: ${interactionMetrics.interviewerFeedbackAcknowledged || 0}
 - Proactive interactions: ${interactionMetrics.proactiveInteractions || 0}
 - Problem difficulty: ${interactionMetrics.problemDifficulty || 'Not specified'}
 - Problem type: ${interactionMetrics.problemType || 'Not specified'}
 - Skills demonstrated: ${interactionMetrics.skillsDemonstrated?.join(', ') || 'Not tracked'}
-` : ""
+` : `
+INTERVIEWER INTERACTION METRICS:
+- Questions answered by candidate: 0
+- No interaction data available
+`
 
     const prompt = `Provide a concise, brutally honest interview debrief using the exact structure from the system instruction.
 
@@ -105,86 +275,76 @@ ${testResultsSummary}
 ${aiCollaborationInfo}
 ${interactionInfo}
 
+TOTAL COLLABORATION MESSAGES FROM USER: ${collaborationMessages}
+
 SOLUTION CODE (for reference only):
 \`\`\`${language || 'javascript'}
-${code}
+${code.length > 5000 ? code.slice(0, 5000) + '\n// ... [truncated]' : code}
 \`\`\`
 
 ${testResults && testResults.length > 0 ? `
 FAILED TESTS DETAILS:
-${testResults.filter((t: any) => !t.passed).map((t: any) =>
+${testResults.filter((t: any) => !t.passed).slice(0, 5).map((t: any) =>
       `- ${t.description}\n  Input: ${JSON.stringify(t.input)}\n  Expected: ${JSON.stringify(t.expected)}\n  Got: ${JSON.stringify(t.actual)}${t.error ? `\n  Error: ${t.error}` : ''}`
     ).join('\n\n')}
 ` : ''}
 
 Remember:
-- Be explicit when tests pass but collaboration/explanation was missing; give 0/100 for Reasoning & Explanation and AI Collaboration if there was zero collaboration.
-- Score collaboration proportionally: 0 messages = 0/100, 1-2 messages = 10-30/100, 3-5 messages = 40-60/100, 6+ quality messages = 70-100/100.
-- Only include insights that materially change the candidate's next interview.
-- Keep every section lean—if there's nothing meaningful to say, write "No major findings."
-- If tests failed, highlight the most critical fix inside "Fix Next".
-- For Code Quality, if the score is low (< 60/100), include specific reasons why in the justification (e.g., "Code Quality: 45/100 – Missing error handling, unclear variable names, no input validation").`
+- Output ALL scores in exact "Label: X/100" format
+- Be explicit when tests pass but collaboration/explanation was missing
+- Score collaboration proportionally: 0 messages = 0/100, 1-2 messages = 10-30/100, 3-5 messages = 40-60/100, 6+ quality messages = 70-100/100
+- Only include insights that materially change the candidate's next interview`
 
-    // Generate content with retry logic
-    let result: any = null
-    const maxRetries = 3
-    const baseDelay = 1000 // 1 second
+    // Use AI provider abstraction with complex task type for quality
+    const aiResponse = await generateFeedbackResponse(
+      systemInstruction,
+      prompt,
+      [] // No history needed for feedback
+    )
 
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        result = await model.generateContent(prompt)
-        break // Success, exit retry loop
-      } catch (error: any) {
-        // Check if it's a retryable error (503, 429, or 500 with overload message)
-        const isRetryable =
-          error?.status === 503 ||
-          error?.status === 429 ||
-          (error?.status === 500 && error?.message?.includes('overloaded')) ||
-          error?.message?.includes('503') ||
-          error?.message?.includes('Service Unavailable')
+    const feedback = aiResponse.text
 
-        if (!isRetryable || attempt === maxRetries - 1) {
-          throw error // Don't retry non-retryable errors or if last attempt
-        }
+    // Extract scores using robust parsing
+    const scores = extractScores(feedback, {
+      testsPassed,
+      testsTotal,
+      timeSpent: timeSpent || 0,
+      collaborationMessages,
+    })
 
-        // Exponential backoff: 1s, 2s, 4s
-        const delay = baseDelay * Math.pow(2, attempt)
-        await new Promise(resolve => setTimeout(resolve, delay))
-      }
+    // Parse structured sections
+    const sections = parseFeedbackSections(feedback)
+
+    // Build structured response
+    const structuredFeedback: StructuredFeedback = {
+      scores,
+      tldr: sections.tldr || 'Feedback generated successfully.',
+      whatWorked: sections.whatWorked || [],
+      fixNext: sections.fixNext || [],
+      actionPlan: sections.actionPlan || [],
+      aiWatchlist: sections.aiWatchlist || 'No watchlist items captured.',
+      rawFeedback: feedback,
     }
 
-    if (!result) {
-      throw new Error("Failed to generate content after retries")
-    }
-
-    const response = await result.response
-    const feedback = response.text()
-
-    // Extract performance score (look for rating in feedback)
-    // Scores are now on 0-100 scale, but feedback may still say X/10, so convert
-    let performanceScore = 70 // Default (70/100)
-    const overallMatch100 = feedback.match(/Overall:\s*(\d+)\/100/i)
-    const overallMatch10 = feedback.match(/Overall:\s*(\d+)\/10/i)
-    const genericMatch10 = feedback.match(/(\d+)\/10/)
-    const ratingMatch = feedback.match(/rating[:\s]+(\d+)/i)
-    if (overallMatch100) {
-      performanceScore = parseInt(overallMatch100[1], 10)
-    } else if (overallMatch10) {
-      // Convert from 0-10 to 0-100 scale
-      performanceScore = parseInt(overallMatch10[1], 10) * 10
-    } else if (ratingMatch) {
-      // Assume rating is 0-10, convert to 0-100
-      const rating = parseInt(ratingMatch[1], 10)
-      performanceScore = rating <= 10 ? rating * 10 : rating
-    } else if (genericMatch10) {
-      // Convert from 0-10 to 0-100 scale
-      const score = parseInt(genericMatch10[1], 10)
-      performanceScore = score <= 10 ? score * 10 : score
+    // Track feedback generation
+    const durationMinutes = Math.round((Date.now() - startTime) / 60000)
+    if (sessionId) {
+      trackFeedbackGenerationServer({
+        sessionId,
+        userId,
+        scenarioType: scenarioType || 'unknown',
+        performanceScore: scores.overall,
+        durationMinutes,
+      }).catch(err => console.error("Analytics tracking error:", err))
     }
 
     return NextResponse.json({
-      feedback,
-      performanceScore,
+      feedback: feedback,
+      performanceScore: scores.overall,
+      scores: scores, // Full score breakdown
+      structured: structuredFeedback, // Full structured data
+      provider: aiResponse.provider,
+      latencyMs: aiResponse.latencyMs,
     })
   } catch (error) {
     console.error("Feedback generation error:", error)
@@ -194,4 +354,3 @@ Remember:
     )
   }
 }
-

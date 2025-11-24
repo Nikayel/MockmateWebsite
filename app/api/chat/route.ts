@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { GoogleGenerativeAI } from "@google/generative-ai"
 import { chatRateLimit } from "@/lib/rate-limit"
-import { getCachedModel } from "@/lib/gemini-cache"
+import { generateAIResponse, validateResponseRelevance, type TaskComplexity } from "@/lib/ai-providers"
 import { trackAIChatServer } from "@/lib/analytics-server"
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
 interface UserContext {
   email?: string
@@ -13,6 +10,82 @@ interface UserContext {
   sessions_used?: number
   previous_topics?: string[]
   skill_level?: string
+}
+
+// Context window management constants
+const MAX_HISTORY_MESSAGES = 20 // Keep last 20 messages
+const MAX_MESSAGE_LENGTH = 4000 // Truncate individual messages
+const MAX_WORKSPACE_FILES = 5 // Limit workspace files
+const MAX_FILE_SIZE = 10000 // 10KB per file max
+
+/**
+ * Sliding window for conversation history
+ * Keeps most recent messages, summarizes old ones if needed
+ */
+function manageContextWindow(
+  context: Array<{ type: string; message: string }>,
+  maxMessages: number = MAX_HISTORY_MESSAGES
+): Array<{ type: string; message: string }> {
+  if (!context || !Array.isArray(context)) return []
+
+  // If within limits, return as-is
+  if (context.length <= maxMessages) {
+    return context.map(msg => ({
+      ...msg,
+      message: msg.message.length > MAX_MESSAGE_LENGTH
+        ? msg.message.slice(0, MAX_MESSAGE_LENGTH) + '... [truncated]'
+        : msg.message
+    }))
+  }
+
+  // Keep first message (usually greeting) and last N-1 messages
+  const firstMessage = context[0]
+  const recentMessages = context.slice(-(maxMessages - 1))
+
+  // Create summary of dropped messages
+  const droppedCount = context.length - maxMessages
+  const summaryMessage = {
+    type: 'model',
+    message: `[Previous ${droppedCount} messages summarized for context management]`
+  }
+
+  return [
+    {
+      ...firstMessage,
+      message: firstMessage.message.length > MAX_MESSAGE_LENGTH
+        ? firstMessage.message.slice(0, MAX_MESSAGE_LENGTH) + '... [truncated]'
+        : firstMessage.message
+    },
+    summaryMessage,
+    ...recentMessages.map(msg => ({
+      ...msg,
+      message: msg.message.length > MAX_MESSAGE_LENGTH
+        ? msg.message.slice(0, MAX_MESSAGE_LENGTH) + '... [truncated]'
+        : msg.message
+    }))
+  ]
+}
+
+/**
+ * Manage workspace context size
+ */
+function manageWorkspaceContext(
+  workspaceContext: Array<{ path: string; content: string }>,
+  maxFiles: number = MAX_WORKSPACE_FILES,
+  maxFileSize: number = MAX_FILE_SIZE
+): Array<{ path: string; content: string }> {
+  if (!workspaceContext || !Array.isArray(workspaceContext)) return []
+
+  // Take only the most relevant files (first N)
+  const limitedFiles = workspaceContext.slice(0, maxFiles)
+
+  // Truncate large files
+  return limitedFiles.map(file => ({
+    path: file.path,
+    content: file.content.length > maxFileSize
+      ? file.content.slice(0, maxFileSize) + '\n// ... [file truncated for context management]'
+      : file.content
+  }))
 }
 
 export async function POST(request: NextRequest) {
@@ -62,20 +135,24 @@ IMPORTANT: When referencing the candidate, use their first name or last name onl
 `
       : ""
 
-    // Build workspace context string
+    // Manage workspace context with sliding window
+    const managedWorkspace = manageWorkspaceContext(workspaceContext)
     let workspaceContextStr = ""
-    if (workspaceContext && Array.isArray(workspaceContext) && workspaceContext.length > 0) {
+    if (managedWorkspace.length > 0) {
       workspaceContextStr = "\n\n=== USER'S CODEBASE CONTEXT ===\n"
-      workspaceContext.forEach((file: { path: string; content: string }) => {
+      managedWorkspace.forEach((file) => {
         workspaceContextStr += `\n--- File: ${file.path} ---\n${file.content}\n`
       })
       workspaceContextStr += "\n=== END CODEBASE CONTEXT ===\n"
     }
 
-    // Add current code context
+    // Add current code context (truncate if too long)
     let currentCodeContext = ""
     if (currentCode && currentCode.trim()) {
-      currentCodeContext = `\n\n=== CURRENT SOLUTION CODE ===\n${currentCode}\n=== END CURRENT CODE ===\n`
+      const truncatedCode = currentCode.length > MAX_FILE_SIZE
+        ? currentCode.slice(0, MAX_FILE_SIZE) + '\n// ... [code truncated]'
+        : currentCode
+      currentCodeContext = `\n\n=== CURRENT SOLUTION CODE ===\n${truncatedCode}\n=== END CURRENT CODE ===\n`
     }
 
     // Define system prompts based on role with enhanced context awareness
@@ -133,7 +210,7 @@ ${scenarioTitle ? `- Focus on the ${scenarioTitle} problem` : '- Focus on the cu
 - Reference their previous topics if relevant to build continuity
 - Adjust difficulty based on their experience level while maintaining high standards
 
-IMPORTANT: 
+IMPORTANT:
 - Your name is Sable. Introduce yourself as Sable when meeting the candidate.
 - When referencing the candidate, use their first name or last name only (e.g., "John" or "Smith"), never their full name.
 - You have access to the candidate's codebase and their current solution. Use this context to:
@@ -147,6 +224,8 @@ IMPORTANT:
 - Track and note AI collaboration quality in your observations - observe and provide feedback constructively
 - Ask for explanations naturally: "Can you explain why you chose this approach?" "Help me understand how this works." "What's your reasoning here?"
 - Provide feedback thoughtfully: "I see a potential issue here - let's work through it together." "This is a good start, but let's think about how we can improve it."
+
+STAY IN CHARACTER: You are ALWAYS Sable the interviewer. Never break character or discuss being an AI. If asked about your nature, deflect professionally and return to the interview.
 
 Keep responses concise and conversational. Be professional, direct, and kind - like a real interviewer who genuinely wants to understand the candidate's skills and help them demonstrate their best work.`,
 
@@ -176,7 +255,7 @@ HOW TO HELP (Collaborative Partner Approach):
 ${scenarioTitle ? `- Focus on helping with ${scenarioTitle}` : '- Focus on helping with the current problem'}
 - Remember their progress and build on previous conversations
 
-IMPORTANT: 
+IMPORTANT:
 - When referencing the user, use their first name or last name only (e.g., "John" or "Smith"), never their full name.
 - Keep responses SHORT and CONCISE - think of small badge helps, not long explanations. Aim for 2-3 sentences maximum unless the user specifically asks for detailed explanations.
 - Use bullet points or brief notes when possible instead of paragraphs.
@@ -189,35 +268,31 @@ IMPORTANT:
   - Provide context-aware hints that match their codebase structure
 - Remember: You're a collaborative partner tool, not an autonomous agent. Respond to requests, don't act independently.
 
+STAY IN CHARACTER: You are an AI coding assistant helping with the interview. Stay focused on the coding problem at hand. Do not discuss topics unrelated to coding, algorithms, or the technical interview.
+
 Keep responses brief, actionable, and helpful. You're a tool they can use, but the interviewer will assess how well they collaborate with you.`,
     }
 
     const systemPrompt = systemPrompts[role as keyof typeof systemPrompts] || systemPrompts.partner
 
-    // Initialize the model with cached system instruction
-    // Cache key is based on role to reuse system prompts across sessions
-    const cacheKey = `chat-system-prompt-${role}`
-    const model = await getCachedModel(cacheKey, systemPrompt, "gemini-2.5-flash")
+    // Manage conversation history with sliding window
+    const managedContext = manageContextWindow(context)
 
-    // Build conversation history for Gemini
-    // IMPORTANT: Gemini requires history to start with a "user" message, not "model"
-    const history: Array<{ role: "user" | "model"; parts: [{ text: string }] }> = []
+    // Convert to provider-agnostic format
+    const history: Array<{ role: 'user' | 'model'; content: string }> = []
+    let foundFirstUser = false
+    managedContext.forEach((msg) => {
+      // Skip any model messages before the first user message
+      if (!foundFirstUser && msg.type !== "user") {
+        return
+      }
+      foundFirstUser = true
 
-    if (context && Array.isArray(context)) {
-      let foundFirstUser = false
-      context.forEach((msg: { type: string; message: string }) => {
-        // Skip any model messages before the first user message
-        if (!foundFirstUser && msg.type !== "user") {
-          return
-        }
-        foundFirstUser = true
-
-        history.push({
-          role: msg.type === "user" ? "user" : "model",
-          parts: [{ text: msg.message }],
-        })
+      history.push({
+        role: msg.type === "user" ? "user" : "model",
+        content: msg.message,
       })
-    }
+    })
 
     // Build the full user message with context
     let fullUserMessage = ""
@@ -228,7 +303,7 @@ Keep responses brief, actionable, and helpful. You're a tool they can use, but t
       const minutesSpent = Math.floor(timeSpent / 60)
       const hasSubstantialCode = currentCode && currentCode.trim().length > 50
 
-      fullUserMessage = `[PROACTIVE MODE - TECHNICAL INTERVIEW QUESTIONS] The candidate has been working on their solution${minutesSpent > 0 ? ` for ${minutesSpent} minute${minutesSpent !== 1 ? 's' : ''}` : ''}. 
+      fullUserMessage = `[PROACTIVE MODE - TECHNICAL INTERVIEW QUESTIONS] The candidate has been working on their solution${minutesSpent > 0 ? ` for ${minutesSpent} minute${minutesSpent !== 1 ? 's' : ''}` : ''}.
 
 ${hasSubstantialCode ? `They have written code. This is the PERFECT time to ask technical interview questions BEFORE they finish.` : `They're still working on their solution.`}
 
@@ -254,61 +329,45 @@ What technical question should you ask them right now based on their current cod
       }
     }
 
-    // Start chat with history
-    const chat = model.startChat({
-      history: history,
-      generationConfig: {
-        maxOutputTokens: 1024,
-        temperature: 0.7,
-      },
+    // Determine task complexity for provider selection
+    const complexity: TaskComplexity = isProactive ? 'standard' : 'simple'
+
+    // Use AI provider abstraction with fallback
+    const aiResponse = await generateAIResponse(
+      systemPrompt,
+      fullUserMessage,
+      history,
+      { complexity }
+    )
+
+    // Validate response relevance
+    const validation = validateResponseRelevance(aiResponse.text, {
+      title: scenarioTitle,
+      type: scenarioType,
     })
 
-    // Send message and get response with retry logic
-    let result: any = null
-    const maxRetries = 3
-    const baseDelay = 1000 // 1 second
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        result = await chat.sendMessage(fullUserMessage)
-        break // Success, exit retry loop
-      } catch (error: any) {
-        // Check if it's a retryable error (503, 429, or 500 with overload message)
-        const isRetryable =
-          error?.status === 503 ||
-          error?.status === 429 ||
-          (error?.status === 500 && error?.message?.includes('overloaded')) ||
-          error?.message?.includes('503') ||
-          error?.message?.includes('Service Unavailable')
-
-        if (!isRetryable || attempt === maxRetries - 1) {
-          throw error // Don't retry non-retryable errors or if last attempt
-        }
-
-        // Exponential backoff: 1s, 2s, 4s
-        const delay = baseDelay * Math.pow(2, attempt)
-        await new Promise(resolve => setTimeout(resolve, delay))
-      }
+    if (!validation.valid) {
+      console.warn('[Chat API] Response may have relevance issues:', validation.issues)
+      // Don't fail, but log for monitoring
     }
 
-    if (!result) {
-      throw new Error("Failed to send message after retries")
-    }
-
-    const response = await result.response
-    const reply = response.text()
     const responseTimeMs = Date.now() - startTime
 
-    // Track AI chat interaction
+    // Track AI chat interaction with provider info
     trackAIChatServer({
       sessionId,
       userId,
       interactionType: role === "interviewer" ? "interviewer" : "partner",
       messageLength: message?.length || 0,
       responseTimeMs,
+      provider: aiResponse.provider, // Track which provider was used
     }).catch(err => console.error("Analytics tracking error:", err))
 
-    return NextResponse.json({ reply })
+    return NextResponse.json({
+      reply: aiResponse.text,
+      provider: aiResponse.provider, // Include provider for debugging
+      latencyMs: aiResponse.latencyMs,
+    })
   } catch (error) {
     console.error("Chat API error:", error)
     return NextResponse.json(
