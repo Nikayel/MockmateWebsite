@@ -38,6 +38,8 @@ import {
   ArrowLeft,
   ChevronDown,
   ChevronUp,
+  Mic,
+  MicOff,
 } from "lucide-react"
 import {
   AlertDialog,
@@ -106,6 +108,11 @@ export default function InterviewPage() {
   const [interviewerInput, setInterviewerInput] = useState("")
   const [isLoadingChat, setIsLoadingChat] = useState(false)
   const [isLoadingInterviewer, setIsLoadingInterviewer] = useState(false)
+
+  // Voice recording states
+  const [isRecordingPartner, setIsRecordingPartner] = useState(false)
+  const [isRecordingInterviewer, setIsRecordingInterviewer] = useState(false)
+  const recognitionRef = useRef<any>(null)
 
   // Test states
   const [testResults, setTestResults] = useState<TestResult[]>([])
@@ -953,6 +960,68 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
   const proceedToFinalFeedback = async () => {
     setShowPostInterviewDiscussion(false)
     setShowFeedback(true)
+  }
+
+  // Voice recording with Web Speech API
+  const toggleVoiceRecording = (isInterviewer: boolean) => {
+    const isRecording = isInterviewer ? isRecordingInterviewer : isRecordingPartner
+    const setIsRecording = isInterviewer ? setIsRecordingInterviewer : setIsRecordingPartner
+    const setInput = isInterviewer ? setInterviewerInput : setChatInput
+
+    if (isRecording) {
+      // Stop recording
+      if (recognitionRef.current) {
+        recognitionRef.current.stop()
+        recognitionRef.current = null
+      }
+      setIsRecording(false)
+      return
+    }
+
+    // Check for browser support
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      toast.error("Voice input is not supported in your browser. Try Chrome or Edge.")
+      return
+    }
+
+    // Start recording
+    const recognition = new SpeechRecognition()
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.lang = 'en-US'
+
+    recognition.onstart = () => {
+      setIsRecording(true)
+      toast.info("Listening... Speak now")
+    }
+
+    recognition.onresult = (event: any) => {
+      let transcript = ''
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript
+      }
+      setInput(transcript)
+    }
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error)
+      if (event.error === 'not-allowed') {
+        toast.error("Microphone access denied. Please allow microphone access.")
+      } else if (event.error !== 'aborted') {
+        toast.error("Voice recognition error. Please try again.")
+      }
+      setIsRecording(false)
+      recognitionRef.current = null
+    }
+
+    recognition.onend = () => {
+      setIsRecording(false)
+      recognitionRef.current = null
+    }
+
+    recognitionRef.current = recognition
+    recognition.start()
   }
 
   const handleSendMessage = async (isInterviewer = false) => {
@@ -1833,12 +1902,20 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           <Input
                             value={chatInput}
                             onChange={(e) => setChatInput(e.target.value)}
-                            placeholder="Ask for help..."
+                            placeholder={isRecordingPartner ? "Listening..." : "Ask for help..."}
                             className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-xs h-7"
                             onKeyPress={(e) => e.key === "Enter" && !isLoadingChat && handleSendMessage(false)}
-                            disabled={isLoadingChat}
+                            disabled={isLoadingChat || isRecordingPartner}
                             aria-label="Chat with AI partner"
                           />
+                          <Button
+                            onClick={() => toggleVoiceRecording(false)}
+                            className={`h-7 px-2 ${isRecordingPartner ? 'bg-red-500 hover:bg-red-600 animate-pulse' : 'bg-gray-700 hover:bg-gray-600'} text-white`}
+                            aria-label={isRecordingPartner ? "Stop recording" : "Start voice input"}
+                            disabled={isLoadingChat}
+                          >
+                            {isRecordingPartner ? <MicOff className="h-3 w-3" aria-hidden="true" /> : <Mic className="h-3 w-3" aria-hidden="true" />}
+                          </Button>
                           <Button
                             onClick={() => handleSendMessage(false)}
                             className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white h-7 px-2"
@@ -1904,12 +1981,20 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           <Input
                             value={interviewerInput}
                             onChange={(e) => setInterviewerInput(e.target.value)}
-                            placeholder={showPostInterviewDiscussion ? "Ask about optimization or improvements..." : "Ask a question..."}
+                            placeholder={isRecordingInterviewer ? "Listening..." : (showPostInterviewDiscussion ? "Ask about optimization or improvements..." : "Ask a question...")}
                             className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-xs h-7"
                             onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
-                            disabled={isLoadingInterviewer || isGeneratingDiscussion}
+                            disabled={isLoadingInterviewer || isGeneratingDiscussion || isRecordingInterviewer}
                             aria-label="Chat with interviewer"
                           />
+                          <Button
+                            onClick={() => toggleVoiceRecording(true)}
+                            className={`h-7 px-2 ${isRecordingInterviewer ? 'bg-red-500 hover:bg-red-600 animate-pulse' : 'bg-gray-700 hover:bg-gray-600'} text-white`}
+                            aria-label={isRecordingInterviewer ? "Stop recording" : "Start voice input"}
+                            disabled={isLoadingInterviewer || isGeneratingDiscussion}
+                          >
+                            {isRecordingInterviewer ? <MicOff className="h-3 w-3" aria-hidden="true" /> : <Mic className="h-3 w-3" aria-hidden="true" />}
+                          </Button>
                           <Button
                             onClick={() => handleSendMessage(true)}
                             className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white h-7 px-2"
@@ -2072,12 +2157,20 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         <Input
                           value={interviewerInput}
                           onChange={(e) => setInterviewerInput(e.target.value)}
-                          placeholder="Ask about optimization, complexity, or improvements..."
+                          placeholder={isRecordingInterviewer ? "Listening..." : "Ask about optimization, complexity, or improvements..."}
                           className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
                           onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
-                          disabled={isLoadingInterviewer || isGeneratingDiscussion}
+                          disabled={isLoadingInterviewer || isGeneratingDiscussion || isRecordingInterviewer}
                           aria-label="Chat with interviewer"
                         />
+                        <Button
+                          onClick={() => toggleVoiceRecording(true)}
+                          className={`${isRecordingInterviewer ? 'bg-red-500 hover:bg-red-600 animate-pulse' : 'bg-gray-700 hover:bg-gray-600'} text-white`}
+                          aria-label={isRecordingInterviewer ? "Stop recording" : "Start voice input"}
+                          disabled={isLoadingInterviewer || isGeneratingDiscussion}
+                        >
+                          {isRecordingInterviewer ? <MicOff className="h-4 w-4" aria-hidden="true" /> : <Mic className="h-4 w-4" aria-hidden="true" />}
+                        </Button>
                         <Button
                           onClick={() => handleSendMessage(true)}
                           className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white"
