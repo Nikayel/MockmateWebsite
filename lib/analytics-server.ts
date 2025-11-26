@@ -52,6 +52,7 @@ export async function trackAIChatServer(params: {
   interactionType: "partner" | "interviewer"
   messageLength: number
   responseTimeMs?: number
+  provider?: string // Track which AI provider was used
 }) {
   await trackEventServer("ai_chat", params)
 }
