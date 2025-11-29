@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Work_Sans, Open_Sans } from "next/font/google"
 import { Toaster } from "sonner"
 import { AuthProvider } from "@/lib/auth-context"
+import { CookieConsent } from "@/components/CookieConsent"
 import "./globals.css"
 
 const workSans = Work_Sans({
@@ -42,6 +43,7 @@ html {
         <AuthProvider>
           {children}
           <Toaster position="top-right" richColors />
+          <CookieConsent />
         </AuthProvider>
       </body>
     </html>

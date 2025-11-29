@@ -2,17 +2,32 @@
  * Firebase Analytics helper functions
  *
  * Tracks key user events for product analytics and insights
+ * Respects user cookie consent preferences (GDPR/CCPA compliant)
  */
 
 import { analytics } from "./firebase"
 import { logEvent as firebaseLogEvent } from "firebase/analytics"
+import { hasAnalyticsConsent } from "@/components/CookieConsent"
 
 /**
- * Track a custom event
+ * Check if analytics tracking is allowed based on user consent
+ */
+function isAnalyticsAllowed(): boolean {
+  // Always check consent before tracking
+  return hasAnalyticsConsent()
+}
+
+/**
+ * Track a custom event (only if user has consented)
  */
 export function trackEvent(eventName: string, params?: Record<string, any>) {
   if (!analytics) {
     // Analytics not available (SSR or disabled)
+    return
+  }
+
+  // Check user consent before tracking
+  if (!isAnalyticsAllowed()) {
     return
   }
 

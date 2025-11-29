@@ -38,19 +38,29 @@ export default function LegalPage() {
               </CardHeader>
               <CardContent className="text-gray-300 space-y-4">
                 <p>
-                  <strong>Last updated:</strong> January 2024
+                  <strong>Last updated:</strong> November 2025
                 </p>
                 <p>
                   MockMate respects your privacy and is committed to protecting your personal data. This privacy policy
-                  explains how we collect, use, and protect your information when you use our VS Code extension.
+                  explains how we collect, use, and protect your information when you use our web application and VS Code extension.
                 </p>
                 <h4 className="text-white font-semibold mt-6 mb-3">Information We Collect</h4>
                 <ul className="list-disc list-inside space-y-2">
                   <li>Code practice sessions and performance metrics</li>
-                  <li>Usage analytics to improve our service</li>
-                  <li>Account information (email, GitHub profile)</li>
+                  <li>Usage analytics to improve our service (with your consent)</li>
+                  <li>Account information (email, GitHub/Google profile)</li>
                   <li>Technical data for debugging and optimization</li>
+                  <li>Payment information (processed securely by Stripe)</li>
                 </ul>
+                <h4 className="text-white font-semibold mt-6 mb-3">Cookies We Use</h4>
+                <ul className="list-disc list-inside space-y-2">
+                  <li><strong>Necessary:</strong> Authentication tokens, CSRF protection, session management</li>
+                  <li><strong>Analytics:</strong> Firebase Analytics (only with your consent)</li>
+                  <li><strong>Functional:</strong> User preferences and settings</li>
+                </ul>
+                <p className="text-gray-400 text-sm mt-2">
+                  You can manage your cookie preferences at any time using the cookie banner at the bottom of the page.
+                </p>
                 <h4 className="text-white font-semibold mt-6 mb-3">How We Use Your Information</h4>
                 <ul className="list-disc list-inside space-y-2">
                   <li>Provide personalized interview practice experiences</li>
@@ -76,11 +86,11 @@ export default function LegalPage() {
               </CardHeader>
               <CardContent className="text-gray-300 space-y-4">
                 <p>
-                  <strong>Last updated:</strong> January 2024
+                  <strong>Last updated:</strong> November 2025
                 </p>
                 <p>
                   By using MockMate, you agree to these terms of service. Please read them carefully before using our
-                  extension.
+                  web application or VS Code extension.
                 </p>
                 <h4 className="text-white font-semibold mt-6 mb-3">Acceptable Use</h4>
                 <ul className="list-disc list-inside space-y-2">
@@ -112,7 +122,7 @@ export default function LegalPage() {
               </CardHeader>
               <CardContent className="text-gray-300 space-y-4">
                 <p>
-                  <strong>Last updated:</strong> January 2024
+                  <strong>Last updated:</strong> November 2025
                 </p>
                 <p>
                   For enterprise customers, we provide a comprehensive Data Processing Agreement (DPA) that outlines how
@@ -123,10 +133,21 @@ export default function LegalPage() {
                   MockMate is fully compliant with GDPR regulations. EU users have the right to access, rectify, or
                   delete their personal data at any time.
                 </p>
+                <h4 className="text-white font-semibold mt-6 mb-3">Your Data Rights</h4>
+                <ul className="list-disc list-inside space-y-2">
+                  <li><strong>Access:</strong> Request a copy of your personal data</li>
+                  <li><strong>Rectification:</strong> Correct inaccurate personal data</li>
+                  <li><strong>Erasure:</strong> Request deletion of your personal data</li>
+                  <li><strong>Portability:</strong> Export your data in a machine-readable format</li>
+                  <li><strong>Object:</strong> Object to processing of your personal data</li>
+                </ul>
+                <p className="text-gray-400 text-sm mt-2">
+                  You can exercise these rights from your Account Settings page or by contacting privacy@mockmate.dev.
+                </p>
                 <h4 className="text-white font-semibold mt-6 mb-3">Data Retention</h4>
                 <p>
                   We retain user data for as long as necessary to provide our services. Users can request data deletion
-                  at any time through their account settings.
+                  at any time through their account settings or by contacting us.
                 </p>
               </CardContent>
             </Card>
