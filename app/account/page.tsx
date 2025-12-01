@@ -12,11 +12,21 @@ import { signOut } from "@/lib/auth"
 import { getUserProfile } from "@/lib/firestore-helpers"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore"
-import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle, XCircle } from "lucide-react"
+import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle, XCircle, Shield, Download, Trash2, Cookie } from "lucide-react"
 import { Profile, ProfileQuota, InterviewSession } from "@/lib/types"
 import { PRICING_CONFIG } from "@/lib/config"
 import { toast } from "sonner"
 import Link from "next/link"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 export default function AccountPage() {
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
@@ -26,6 +36,9 @@ export default function AccountPage() {
   const [dataLoading, setDataLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
   // Separate effect to handle auth check with delay to prevent race condition on refresh
   useEffect(() => {
@@ -200,6 +213,97 @@ export default function AccountPage() {
     }
   }
 
+  const handleExportData = async () => {
+    if (!firebaseUser) return
+
+    setIsExporting(true)
+    try {
+      // Collect all user data
+      const exportData: Record<string, any> = {
+        exportDate: new Date().toISOString(),
+        profile: profile || {},
+        usage: usage || {},
+        sessions: [],
+      }
+
+      // Fetch all sessions (not just recent 5)
+      const sessionsQuery = query(
+        collection(db, "interview_sessions"),
+        where("user_id", "==", firebaseUser.uid)
+      )
+      const sessionsSnap = await getDocs(sessionsQuery)
+      exportData.sessions = sessionsSnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+
+      // Create and download JSON file
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `mockmate-data-export-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      toast.success("Data exported successfully", {
+        description: "Your data has been downloaded as a JSON file",
+      })
+    } catch (error) {
+      console.error("Export error:", error)
+      toast.error("Failed to export data", {
+        description: error instanceof Error ? error.message : "Please try again",
+      })
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    if (!firebaseUser) return
+
+    setIsDeleting(true)
+    try {
+      const idToken = await firebaseUser.getIdToken()
+
+      // Call delete account API
+      const response = await fetch("/api/delete-account", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success("Account deleted successfully")
+        // Sign out and redirect
+        await signOut()
+        window.location.href = "/"
+      } else {
+        throw new Error(data.error || "Failed to delete account")
+      }
+    } catch (error) {
+      console.error("Delete account error:", error)
+      toast.error("Failed to delete account", {
+        description: error instanceof Error ? error.message : "Please try again or contact support",
+      })
+    } finally {
+      setIsDeleting(false)
+      setShowDeleteDialog(false)
+    }
+  }
+
+  const handleOpenCookieSettings = () => {
+    // Clear consent to re-show cookie banner
+    localStorage.removeItem("mockmate_cookie_consent")
+    window.location.reload()
+  }
+
   if (authLoading || dataLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -372,6 +476,62 @@ export default function AccountPage() {
             </Card>
           </div>
 
+          {/* Privacy & Data Section */}
+          <Card className="bg-gray-900/50 border-gray-700 mb-6">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center">
+                <Shield className="mr-2 h-5 w-5" />
+                Privacy & Data
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-400 text-sm mb-4">
+                Manage your data and privacy settings. You have the right to export or delete your personal data at any time.
+              </p>
+              <div className="space-y-3">
+                <Button
+                  variant="outline"
+                  className="w-full border-gray-600 text-white hover:bg-gray-800 bg-transparent justify-start"
+                  onClick={handleExportData}
+                  disabled={isExporting}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  {isExporting ? "Exporting..." : "Export My Data"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full border-gray-600 text-white hover:bg-gray-800 bg-transparent justify-start"
+                  onClick={handleOpenCookieSettings}
+                >
+                  <Cookie className="mr-2 h-4 w-4" />
+                  Cookie Preferences
+                </Button>
+                <Link href="/legal" className="block">
+                  <Button
+                    variant="outline"
+                    className="w-full border-gray-600 text-white hover:bg-gray-800 bg-transparent justify-start"
+                  >
+                    <Shield className="mr-2 h-4 w-4" />
+                    Privacy Policy
+                  </Button>
+                </Link>
+                <div className="pt-3 border-t border-gray-700">
+                  <Button
+                    variant="outline"
+                    className="w-full border-red-600/50 text-red-400 hover:bg-red-900/20 bg-transparent justify-start"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete My Account
+                  </Button>
+                  <p className="text-gray-500 text-xs mt-2">
+                    This action is permanent and cannot be undone.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Subscription Details - Show for Pro users */}
           {isPro && profile && (
             <Card className="bg-gray-900/50 border-gray-700 mb-6">
@@ -509,6 +669,41 @@ export default function AccountPage() {
       </div>
 
       <Footer />
+
+      {/* Delete Account Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="bg-gray-900 border-gray-700">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white flex items-center">
+              <Trash2 className="mr-2 h-5 w-5 text-red-400" />
+              Delete Account
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-400">
+              Are you sure you want to delete your account? This action is <strong className="text-red-400">permanent</strong> and cannot be undone.
+              <br /><br />
+              This will delete:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Your profile and account information</li>
+                <li>All interview sessions and history</li>
+                <li>Performance data and analytics</li>
+                <li>Any active subscriptions will be cancelled</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-transparent border-gray-600 text-white hover:bg-gray-800">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAccount}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isDeleting ? "Deleting..." : "Delete Account"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   )
 }
