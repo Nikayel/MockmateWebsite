@@ -1,19 +1,9 @@
 "use client"
 
-import React, { useEffect, useRef, useCallback } from "react"
-import dynamic from "next/dynamic"
+import React, { useEffect } from "react"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-
-// Dynamically import Monaco Editor to avoid SSR issues
-const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-full">
-      <div className="text-gray-400">Loading editor...</div>
-    </div>
-  ),
-})
+import { MonacoEditor } from "@/components/editor"
 
 interface CodeViewerSidePanelProps {
   isOpen: boolean
@@ -25,36 +15,36 @@ interface CodeViewerSidePanelProps {
 
 // Map file extensions to Monaco Editor language IDs
 const getLanguageFromFileName = (fileName: string): string => {
-  const extension = fileName.split('.').pop()?.toLowerCase()
+  const extension = fileName.split(".").pop()?.toLowerCase()
 
   const languageMap: Record<string, string> = {
-    'js': 'javascript',
-    'jsx': 'javascript',
-    'ts': 'typescript',
-    'tsx': 'typescript',
-    'py': 'python',
-    'java': 'java',
-    'cpp': 'cpp',
-    'c': 'c',
-    'h': 'cpp',
-    'hpp': 'cpp',
-    'cs': 'csharp',
-    'go': 'go',
-    'rs': 'rust',
-    'json': 'json',
-    'md': 'markdown',
-    'html': 'html',
-    'css': 'css',
-    'scss': 'scss',
-    'xml': 'xml',
-    'yaml': 'yaml',
-    'yml': 'yaml',
-    'sql': 'sql',
-    'sh': 'shell',
-    'bash': 'shell',
+    js: "javascript",
+    jsx: "javascript",
+    ts: "typescript",
+    tsx: "typescript",
+    py: "python",
+    java: "java",
+    cpp: "cpp",
+    c: "c",
+    h: "cpp",
+    hpp: "cpp",
+    cs: "csharp",
+    go: "go",
+    rs: "rust",
+    json: "json",
+    md: "markdown",
+    html: "html",
+    css: "css",
+    scss: "scss",
+    xml: "xml",
+    yaml: "yaml",
+    yml: "yaml",
+    sql: "sql",
+    sh: "shell",
+    bash: "shell",
   }
 
-  return languageMap[extension || ''] || 'plaintext'
+  return languageMap[extension || ""] || "plaintext"
 }
 
 export function CodeViewerSidePanel({
@@ -65,8 +55,6 @@ export function CodeViewerSidePanel({
   language,
 }: CodeViewerSidePanelProps) {
   const editorLanguage = language || getLanguageFromFileName(fileName)
-  const editorRef = useRef<any>(null)
-  const modelUriRef = useRef<string>(`file:///${fileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`)
 
   // Handle ESC key to close
   useEffect(() => {
@@ -81,45 +69,6 @@ export function CodeViewerSidePanel({
     window.addEventListener("keydown", handleEscape)
     return () => window.removeEventListener("keydown", handleEscape)
   }, [isOpen, onClose])
-
-  // Cleanup Monaco editor on unmount or when file changes
-  useEffect(() => {
-    return () => {
-      // Dispose editor instance
-      if (editorRef.current) {
-        try {
-          editorRef.current.dispose()
-        } catch (e) {
-          // Editor may already be disposed
-        }
-        editorRef.current = null
-      }
-
-      // Dispose the specific model for this file
-      if (typeof window !== 'undefined' && (window as any).monaco?.editor) {
-        try {
-          const models = (window as any).monaco.editor.getModels()
-          models.forEach((model: any) => {
-            try {
-              // Only dispose models that match this file's URI pattern
-              if (model.uri?.path?.includes(fileName.replace(/[^a-zA-Z0-9.-]/g, '_')) && !model.isDisposed()) {
-                model.dispose()
-              }
-            } catch (e) {
-              // Model may already be disposed
-            }
-          })
-        } catch (e) {
-          console.warn('Error disposing CodeViewer Monaco models:', e)
-        }
-      }
-    }
-  }, [fileName])
-
-  // Handle editor mount
-  const handleEditorMount = useCallback((editor: any, monaco: any) => {
-    editorRef.current = editor
-  }, [])
 
   if (!isOpen) return null
 
@@ -141,52 +90,19 @@ export function CodeViewerSidePanel({
         </Button>
       </div>
 
-      {/* Editor */}
+      {/* Editor - Using shared MonacoEditor component */}
       <div className="flex-1 overflow-hidden editor-wrapper">
         <MonacoEditor
-          key={`code-viewer-${fileName}`}
+          uniqueKey={`code-viewer-${fileName}`}
           height="100%"
           language={editorLanguage}
           value={content}
-          theme="vs-dark"
-          onMount={handleEditorMount}
+          readOnly
           options={{
-            readOnly: true,
             minimap: { enabled: true },
-            fontSize: 13,
-            lineNumbers: 'on',
-            scrollBeyondLastLine: false,
-            automaticLayout: true,
-            wordWrap: 'on',
+            wordWrap: "on",
             padding: { top: 10, bottom: 10 },
-            renderLineHighlight: 'all',
-            scrollbar: {
-              verticalScrollbarSize: 10,
-              horizontalScrollbarSize: 10,
-            },
-            // Disable all widgets to prevent leakage
-            contextmenu: false,
-            quickSuggestions: false,
-            suggestOnTriggerCharacters: false,
-            acceptSuggestionOnEnter: 'off',
-            tabCompletion: 'off',
-            wordBasedSuggestions: 'off',
-            parameterHints: { enabled: false },
-            hover: { enabled: false },
-            links: false,
-            colorDecorators: false,
-            find: {
-              addExtraSpaceOnTop: false,
-              autoFindInSelection: 'never',
-              seedSearchStringFromSelection: 'never',
-            },
-            occurrencesHighlight: false,
-            selectionHighlight: false,
-            codeLens: false,
-            folding: false,
-            foldingHighlight: false,
-            showFoldingControls: 'never',
-            matchBrackets: 'never',
+            renderLineHighlight: "all",
           }}
         />
       </div>
@@ -194,9 +110,8 @@ export function CodeViewerSidePanel({
       {/* Footer */}
       <div className="flex justify-between items-center px-4 py-2 border-t border-gray-700 bg-gray-800/50 text-xs text-gray-400 flex-shrink-0">
         <span>Language: {editorLanguage}</span>
-        <span>{content.split('\n').length} lines</span>
+        <span>{content.split("\n").length} lines</span>
       </div>
     </div>
   )
 }
-
