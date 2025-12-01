@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect } from "react"
+import React, { useEffect, useRef, useCallback } from "react"
 import dynamic from "next/dynamic"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -65,6 +65,8 @@ export function CodeViewerSidePanel({
   language,
 }: CodeViewerSidePanelProps) {
   const editorLanguage = language || getLanguageFromFileName(fileName)
+  const editorRef = useRef<any>(null)
+  const modelUriRef = useRef<string>(`file:///${fileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`)
 
   // Handle ESC key to close
   useEffect(() => {
@@ -80,21 +82,44 @@ export function CodeViewerSidePanel({
     return () => window.removeEventListener("keydown", handleEscape)
   }, [isOpen, onClose])
 
-  // Cleanup Monaco editor models on unmount
+  // Cleanup Monaco editor on unmount or when file changes
   useEffect(() => {
     return () => {
-      // Dispose any Monaco models to prevent memory leaks
+      // Dispose editor instance
+      if (editorRef.current) {
+        try {
+          editorRef.current.dispose()
+        } catch (e) {
+          // Editor may already be disposed
+        }
+        editorRef.current = null
+      }
+
+      // Dispose the specific model for this file
       if (typeof window !== 'undefined' && (window as any).monaco?.editor) {
-        const models = (window as any).monaco.editor.getModels()
-        models.forEach((model: any) => {
-          // Only dispose models that aren't part of the main editor
-          if (model.uri.path.includes(fileName)) {
-            model.dispose()
-          }
-        })
+        try {
+          const models = (window as any).monaco.editor.getModels()
+          models.forEach((model: any) => {
+            try {
+              // Only dispose models that match this file's URI pattern
+              if (model.uri?.path?.includes(fileName.replace(/[^a-zA-Z0-9.-]/g, '_')) && !model.isDisposed()) {
+                model.dispose()
+              }
+            } catch (e) {
+              // Model may already be disposed
+            }
+          })
+        } catch (e) {
+          console.warn('Error disposing CodeViewer Monaco models:', e)
+        }
       }
     }
   }, [fileName])
+
+  // Handle editor mount
+  const handleEditorMount = useCallback((editor: any, monaco: any) => {
+    editorRef.current = editor
+  }, [])
 
   if (!isOpen) return null
 
@@ -119,10 +144,12 @@ export function CodeViewerSidePanel({
       {/* Editor */}
       <div className="flex-1 overflow-hidden editor-wrapper">
         <MonacoEditor
+          key={`code-viewer-${fileName}`}
           height="100%"
           language={editorLanguage}
           value={content}
           theme="vs-dark"
+          onMount={handleEditorMount}
           options={{
             readOnly: true,
             minimap: { enabled: true },
