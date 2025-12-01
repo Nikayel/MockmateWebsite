@@ -14223,7 +14223,7 @@ You must write an algorithm that runs in O(n) time and without using the divisio
 },
 
 {
-  id: 'dsa-maximum-subarray-2',
+  id: 'dsa-maximum-subarray',
   title: 'Maximum Subarray (Kadane\'s Algorithm)',
   type: 'dsa',
   difficulty: 'medium',
@@ -14296,7 +14296,7 @@ A subarray is a contiguous non-empty sequence of elements within an array.`,
 },
 
 {
-  id: 'dsa-merge-intervals-2',
+  id: 'dsa-merge-intervals',
   title: 'Merge Intervals',
   type: 'dsa',
   difficulty: 'medium',
@@ -14429,7 +14429,7 @@ A palindromic string reads the same backward as forward.`,
 },
 
 {
-  id: 'dsa-group-anagrams-2',
+  id: 'dsa-group-anagrams',
   title: 'Group Anagrams',
   type: 'dsa',
   difficulty: 'medium',
@@ -14729,7 +14729,7 @@ The algorithm for myAtoi(string s) is as follows:
 ,
 
   {
-    id: 'dsa-reverse-linked-list-2',
+    id: 'dsa-reverse-linked-list',
     title: 'Reverse Linked List',
     type: 'dsa',
     difficulty: 'easy',
@@ -14826,7 +14826,7 @@ The algorithm for myAtoi(string s) is as follows:
   },
 
   {
-    id: 'dsa-linked-list-cycle-2',
+    id: 'dsa-linked-list-cycle',
     title: 'Linked List Cycle',
     type: 'dsa',
     difficulty: 'easy',
@@ -14876,7 +14876,7 @@ The algorithm for myAtoi(string s) is as follows:
   },
 
   {
-    id: 'dsa-lru-cache-2',
+    id: 'dsa-lru-cache',
     title: 'LRU Cache',
     type: 'dsa',
     difficulty: 'medium',
@@ -15234,7 +15234,7 @@ The algorithm for myAtoi(string s) is as follows:
   },
 
   {
-    id: 'dsa-number-of-islands-2',
+    id: 'dsa-number-of-islands',
     title: 'Number of Islands',
     type: 'dsa',
     difficulty: 'medium',
@@ -15280,7 +15280,7 @@ The algorithm for myAtoi(string s) is as follows:
   },
 
   {
-    id: 'dsa-course-schedule-2',
+    id: 'dsa-course-schedule',
     title: 'Course Schedule',
     type: 'dsa',
     difficulty: 'medium',
@@ -15420,7 +15420,7 @@ The algorithm for myAtoi(string s) is as follows:
   },
 
   {
-    id: 'dsa-climbing-stairs-2',
+    id: 'dsa-climbing-stairs',
     title: 'Climbing Stairs',
     type: 'dsa',
     difficulty: 'easy',
@@ -15465,7 +15465,7 @@ The algorithm for myAtoi(string s) is as follows:
   },
 
   {
-    id: 'dsa-coin-change-2',
+    id: 'dsa-coin-change',
     title: 'Coin Change',
     type: 'dsa',
     difficulty: 'medium',
@@ -15515,7 +15515,7 @@ The algorithm for myAtoi(string s) is as follows:
   },
 
   {
-    id: 'dsa-longest-increasing-subsequence-2',
+    id: 'dsa-longest-increasing-subsequence',
     title: 'Longest Increasing Subsequence',
     type: 'dsa',
     difficulty: 'medium',
@@ -15923,7 +15923,7 @@ The algorithm for myAtoi(string s) is as follows:
   },
 
   {
-    id: 'dsa-trapping-rain-water-2',
+    id: 'dsa-trapping-rain-water',
     title: 'Trapping Rain Water',
     type: 'dsa',
     difficulty: 'hard',
