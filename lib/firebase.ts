@@ -18,17 +18,30 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || ""
 }
 
+// Log Firebase config (without sensitive values)
+console.log('Initializing Firebase with config:', {
+  projectId: firebaseConfig.projectId,
+  authDomain: firebaseConfig.authDomain,
+  storageBucket: firebaseConfig.storageBucket
+})
+
 // Initialize Firebase (only if not already initialized)
 let app: FirebaseApp
 if (getApps().length === 0) {
+  console.log('Initializing new Firebase app instance')
   app = initializeApp(firebaseConfig)
 } else {
+  console.log('Using existing Firebase app instance')
   app = getApps()[0]
 }
 
 // Initialize Firebase services
+console.log('Initializing Firebase Auth and Firestore')
 export const auth = getAuth(app)
+console.log('Firebase Auth initialized')
+
 export const db = getFirestore(app)
+console.log('Firestore initialized')
 
 // Initialize Analytics only on client side
 export const analytics: Analytics | null =

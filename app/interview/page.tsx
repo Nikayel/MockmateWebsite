@@ -1694,15 +1694,29 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           }}
                           theme="vs-dark"
                           options={{
-                            minimap: { enabled: false },
-                            fontSize: 13,
-                            lineHeight: 21,
-                            letterSpacing: 0.5,
-                            lineNumbers: "on",
-                            scrollBeyondLastLine: false,
+                            // Layout
                             automaticLayout: true,
-                            tabSize: 2,
-                            readOnly: !isInterviewStarted || showFeedback,
+                            scrollBeyondLastLine: false,
+                            scrollbar: { vertical: 'hidden', horizontal: 'hidden', handleMouseWheel: true },
+                            overviewRulerLanes: 0,
+                            overviewRulerBorder: false,
+                            hideCursorInOverviewRuler: true,
+                            
+                            // Minimize UI elements
+                            minimap: { enabled: false },
+                            lineNumbers: 'on',
+                            lineNumbersMinChars: 3,
+                            lineDecorationsWidth: 0,
+                            glyphMargin: false,
+                            folding: false,
+                            foldingHighlight: false,
+                            showFoldingControls: 'never',
+                            renderLineHighlight: 'none',
+                            renderWhitespace: 'none',
+                            renderIndentGuides: false,
+                            renderLineHighlightOnlyWhenFocus: true,
+                            
+                            // Disable features
                             contextmenu: false,
                             quickSuggestions: false,
                             suggestOnTriggerCharacters: false,
@@ -1713,35 +1727,28 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             hover: { enabled: false },
                             links: false,
                             colorDecorators: false,
-                            glyphMargin: false,
-                            lineDecorationsWidth: 0,
-                            lineNumbersMinChars: 3,
-                            padding: { top: 10, bottom: 10 },
-                            renderWhitespace: 'none',
+                            codeLens: false,
+                            occurrencesHighlight: false,
+                            selectionHighlight: false,
+                            matchBrackets: 'never',
+                            
+                            // Styling
+                            fontSize: 13,
+                            lineHeight: 21,
+                            letterSpacing: 0.5,
+                            tabSize: 2,
                             fontLigatures: false,
+                            readOnly: !isInterviewStarted || showFeedback,
+                            
+                            // Padding and layout
+                            padding: { top: 0, bottom: 0 },
+                            fixedOverflowWidgets: true,
+                            
                             // Disable all widgets and popups
                             find: {
                               addExtraSpaceOnTop: false,
                               autoFindInSelection: 'never',
                               seedSearchStringFromSelection: 'never',
-                            },
-                            occurrencesHighlight: false,
-                            renderLineHighlight: 'none',
-                            selectionHighlight: false,
-                            codeLens: false,
-                            folding: false,
-                            foldingHighlight: false,
-                            showFoldingControls: 'never',
-                            matchBrackets: 'never',
-                            overviewRulerLanes: 0,
-                            overviewRulerBorder: false,
-                            hideCursorInOverviewRuler: true,
-                            scrollbar: {
-                              vertical: 'auto',
-                              horizontal: 'auto',
-                              useShadows: false,
-                              verticalHasArrows: false,
-                              horizontalHasArrows: false,
                             },
                           }}
                         />
