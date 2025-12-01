@@ -166,18 +166,54 @@ export default function InterviewPage() {
     return () => {
       // Dispose editor instance
       if (editorRef.current) {
-        editorRef.current.dispose()
+        try {
+          editorRef.current.dispose()
+        } catch (e) {
+          console.warn('Error disposing editor:', e)
+        }
         editorRef.current = null
       }
       // Dispose all Monaco models
       if (typeof window !== 'undefined' && (window as any).monaco?.editor) {
-        const models = (window as any).monaco.editor.getModels()
-        models.forEach((model: any) => {
-          model.dispose()
-        })
+        try {
+          const models = (window as any).monaco.editor.getModels()
+          models.forEach((model: any) => {
+            try {
+              model.dispose()
+            } catch (e) {
+              // Model may already be disposed
+            }
+          })
+        } catch (e) {
+          console.warn('Error disposing Monaco models:', e)
+        }
       }
     }
   }, [])
+
+  // Update URL when interview starts (for refresh persistence)
+  useEffect(() => {
+    if (isInterviewStarted && selectedScenario && currentSessionId && typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      url.searchParams.set('session', currentSessionId)
+      url.searchParams.set('scenario', selectedScenario.id)
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [isInterviewStarted, selectedScenario, currentSessionId])
+
+  // Warn user before leaving page during active interview
+  useEffect(() => {
+    if (!isInterviewStarted || showFeedback) return
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = 'You have an active interview session. Are you sure you want to leave?'
+      return e.returnValue
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [isInterviewStarted, showFeedback])
 
   // Separate effect to handle auth check with delay to prevent race condition on refresh
   useEffect(() => {
@@ -428,12 +464,26 @@ Let's continue!`
     }
   }, [selectedLanguage, isInterviewStarted, selectedScenario, showFeedback])
 
-  // Proactive interviewer - improved with context-aware timing
+  // Track last activity timestamps for proactive interviewer
+  const lastCodeChangeRef = useRef<number>(Date.now())
+  const lastInterviewerMessageRef = useRef<number>(Date.now())
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const hasTriggeredInactivityRef = useRef<boolean>(false)
+  const hasTriggeredSilenceRef = useRef<boolean>(false)
+
+  // Proactive interviewer - improved with context-aware timing (code change detection)
   useEffect(() => {
     if (!isInterviewStarted || showFeedback || showPostInterviewDiscussion) return
 
     const codeHash = code.trim().replace(/\s+/g, " ")
     const codeLength = code.trim().length
+
+    // Track code changes
+    if (codeHash !== lastCodeHash) {
+      lastCodeChangeRef.current = Date.now()
+      hasTriggeredInactivityRef.current = false // Reset inactivity trigger on new code
+    }
 
     // More intelligent timing based on code activity
     // Jump in after 15-30 seconds of inactivity, but only if meaningful code exists
@@ -462,6 +512,115 @@ Let's continue!`
       }
     }
   }, [code, isInterviewStarted, showFeedback, showPostInterviewDiscussion, lastCodeHash])
+
+  // Proactive interviewer - INACTIVITY detection (user not typing for too long)
+  useEffect(() => {
+    if (!isInterviewStarted || showFeedback || showPostInterviewDiscussion) return
+
+    // Clear existing inactivity timer
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current)
+    }
+
+    // Set up inactivity check every 45 seconds
+    const INACTIVITY_THRESHOLD = 45000 // 45 seconds of no code changes
+    const CHECK_INTERVAL = 15000 // Check every 15 seconds
+
+    const checkInactivity = () => {
+      const timeSinceLastChange = Date.now() - lastCodeChangeRef.current
+      const codeLength = code.trim().length
+
+      // If user hasn't typed in 45+ seconds and hasn't been prompted yet
+      if (timeSinceLastChange > INACTIVITY_THRESHOLD && !hasTriggeredInactivityRef.current) {
+        hasTriggeredInactivityRef.current = true
+
+        // Different prompts based on code state
+        if (codeLength < 30) {
+          // User hasn't started coding yet
+          triggerProactiveInterviewerWithContext("inactivity_no_code")
+        } else if (codeLength < 100) {
+          // User started but seems stuck
+          triggerProactiveInterviewerWithContext("inactivity_stuck")
+        } else {
+          // User was coding but stopped
+          triggerProactiveInterviewerWithContext("inactivity_paused")
+        }
+      }
+    }
+
+    // Start checking after initial 30 seconds
+    const initialDelay = setTimeout(() => {
+      checkInactivity()
+      inactivityTimerRef.current = setInterval(checkInactivity, CHECK_INTERVAL) as unknown as NodeJS.Timeout
+    }, 30000)
+
+    return () => {
+      clearTimeout(initialDelay)
+      if (inactivityTimerRef.current) {
+        clearInterval(inactivityTimerRef.current)
+      }
+    }
+  }, [isInterviewStarted, showFeedback, showPostInterviewDiscussion, code])
+
+  // Proactive interviewer - SILENCE detection (user not communicating)
+  useEffect(() => {
+    if (!isInterviewStarted || showFeedback || showPostInterviewDiscussion) return
+
+    // Update last interviewer message time when user sends a message
+    const userMessages = interviewerMessages.filter(m => m.type === 'user')
+    if (userMessages.length > 0) {
+      lastInterviewerMessageRef.current = Date.now()
+      hasTriggeredSilenceRef.current = false
+    }
+
+    // Clear existing silence timer
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current)
+    }
+
+    // Set up silence check - if user hasn't talked to interviewer in 2 minutes
+    const SILENCE_THRESHOLD = 120000 // 2 minutes
+    const CHECK_INTERVAL = 30000 // Check every 30 seconds
+
+    const checkSilence = () => {
+      const timeSinceLastMessage = Date.now() - lastInterviewerMessageRef.current
+      const userMessageCount = interviewerMessages.filter(m => m.type === 'user').length
+
+      // If user hasn't communicated with interviewer in 2+ minutes
+      if (timeSinceLastMessage > SILENCE_THRESHOLD && !hasTriggeredSilenceRef.current && elapsedTime > 60) {
+        hasTriggeredSilenceRef.current = true
+
+        if (userMessageCount === 0) {
+          // User hasn't said anything at all
+          triggerProactiveInterviewerWithContext("silence_no_communication")
+        } else {
+          // User stopped communicating
+          triggerProactiveInterviewerWithContext("silence_stopped")
+        }
+      }
+    }
+
+    // Start checking after 60 seconds
+    const initialDelay = setTimeout(() => {
+      checkSilence()
+      silenceTimerRef.current = setInterval(checkSilence, CHECK_INTERVAL) as unknown as NodeJS.Timeout
+    }, 60000)
+
+    return () => {
+      clearTimeout(initialDelay)
+      if (silenceTimerRef.current) {
+        clearInterval(silenceTimerRef.current)
+      }
+    }
+  }, [isInterviewStarted, showFeedback, showPostInterviewDiscussion, interviewerMessages, elapsedTime])
+
+  // Cleanup all proactive timers on unmount
+  useEffect(() => {
+    return () => {
+      if (inactivityTimerRef.current) clearInterval(inactivityTimerRef.current)
+      if (silenceTimerRef.current) clearInterval(silenceTimerRef.current)
+    }
+  }, [])
 
   // Auto-save session data every 30 seconds
   useEffect(() => {
@@ -550,6 +709,120 @@ Let's continue!`
           role: "interviewer",
           userContext: userProfile ? {
             email: user.email,
+            subscription_tier: userProfile.subscription_tier,
+            sessions_used: usageLimit?.used || 0,
+          } : undefined,
+          workspaceContext: workspaceContext,
+          currentCode: code,
+          scenarioTitle: selectedScenario?.title,
+          scenarioType: selectedScenario?.type,
+          isProactive: true,
+          elapsedTime: elapsedTime,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.reply) {
+        setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+      }
+    } catch (error) {
+      console.error("Proactive interviewer error:", error)
+    } finally {
+      setIsLoadingInterviewer(false)
+    }
+  }
+
+  // Context-aware proactive interviewer for different scenarios
+  const triggerProactiveInterviewerWithContext = async (contextType: string) => {
+    if (isLoadingInterviewer || showFeedback || showPostInterviewDiscussion) return
+
+    setIsLoadingInterviewer(true)
+    try {
+      const userProfile = user ? await getUserProfile(user.id) : null
+      const minutesSpent = Math.floor(elapsedTime / 60)
+
+      // Build context-specific prompt
+      let contextPrompt = ""
+      switch (contextType) {
+        case "inactivity_no_code":
+          contextPrompt = `[INTERVIEWER INTERVENTION - CANDIDATE NOT STARTED]
+The candidate has been in the interview for ${minutesSpent} minute(s) but hasn't written any meaningful code yet.
+
+As a supportive but direct interviewer, you should:
+1. Check in with them - ask if they understand the problem
+2. Ask them to walk through their approach before coding
+3. Offer to clarify any requirements
+4. Remind them that thinking out loud helps you assess their problem-solving skills
+
+Be encouraging but also note that time is passing. Keep it natural and conversational.`
+          break
+
+        case "inactivity_stuck":
+          contextPrompt = `[INTERVIEWER INTERVENTION - CANDIDATE SEEMS STUCK]
+The candidate started coding but seems stuck. They've been inactive for a while with minimal code written.
+
+As a helpful interviewer, you should:
+1. Ask what they're thinking about
+2. Offer a gentle hint or ask a guiding question
+3. Suggest breaking down the problem into smaller steps
+4. Ask if they want to discuss their approach
+
+Be supportive - getting stuck is normal. Help them move forward.`
+          break
+
+        case "inactivity_paused":
+          contextPrompt = `[INTERVIEWER INTERVENTION - CODING PAUSED]
+The candidate was making progress but has paused coding for a while.
+
+As an observant interviewer, you should:
+1. Ask about their current thinking
+2. If they have substantial code, ask about time/space complexity
+3. Ask about edge cases they're considering
+4. Check if they're debugging mentally or need help
+
+Keep the conversation flowing - interviews should be collaborative.`
+          break
+
+        case "silence_no_communication":
+          contextPrompt = `[INTERVIEWER INTERVENTION - NO COMMUNICATION]
+The candidate hasn't communicated with you at all during the interview (${minutesSpent}+ minutes).
+
+This is a problem in real interviews. As a direct interviewer, you should:
+1. Remind them that communication is crucial in technical interviews
+2. Ask them to walk you through what they're doing
+3. Explain that you want to understand their thought process, not just see code
+4. Note that silence hurts their collaboration score
+
+Be direct but professional - this is important feedback.`
+          break
+
+        case "silence_stopped":
+          contextPrompt = `[INTERVIEWER INTERVENTION - STOPPED COMMUNICATING]
+The candidate was communicating earlier but has gone silent.
+
+As an engaged interviewer, you should:
+1. Check in with them - ask what they're working on
+2. Ask about any challenges they're facing
+3. Probe their current thinking about the solution
+4. Keep the dialogue going
+
+Interviews are conversations, not just coding exercises.`
+          break
+
+        default:
+          contextPrompt = analyzeCodeForProactiveFeedback(code)
+      }
+
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: contextPrompt,
+          context: interviewerMessages,
+          role: "interviewer",
+          userContext: userProfile ? {
+            email: user?.email,
             subscription_tier: userProfile.subscription_tier,
             sessions_used: usageLimit?.used || 0,
           } : undefined,
@@ -924,13 +1197,60 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       }
     }
 
-    // Monaco cleanup - dispose all models to prevent memory leaks on interview reset
-    if (typeof window !== 'undefined' && (window as any).monaco?.editor) {
-      const models = (window as any).monaco.editor.getModels()
-      models.forEach((model: any) => {
-        model.dispose()
-      })
+    // Monaco cleanup - dispose editor and all models to prevent memory leaks
+    if (editorRef.current) {
+      try {
+        editorRef.current.dispose()
+      } catch (e) {
+        console.warn('Error disposing editor on reset:', e)
+      }
+      editorRef.current = null
     }
+
+    if (typeof window !== 'undefined' && (window as any).monaco?.editor) {
+      try {
+        const models = (window as any).monaco.editor.getModels()
+        models.forEach((model: any) => {
+          try {
+            if (!model.isDisposed()) {
+              model.dispose()
+            }
+          } catch (e) {
+            // Model may already be disposed
+          }
+        })
+      } catch (e) {
+        console.warn('Error disposing Monaco models on reset:', e)
+      }
+    }
+
+    // Clear URL params when resetting
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('session')
+      url.searchParams.delete('scenario')
+      window.history.replaceState({}, '', url.toString())
+    }
+
+    // Clear all proactive interview timers
+    if (proactiveTimer) {
+      clearTimeout(proactiveTimer)
+      setProactiveTimer(null)
+    }
+    if (inactivityTimerRef.current) {
+      clearInterval(inactivityTimerRef.current)
+      inactivityTimerRef.current = null
+    }
+    if (silenceTimerRef.current) {
+      clearInterval(silenceTimerRef.current)
+      silenceTimerRef.current = null
+    }
+
+    // Reset proactive trigger flags
+    hasTriggeredInactivityRef.current = false
+    hasTriggeredSilenceRef.current = false
+    lastCodeChangeRef.current = Date.now()
+    lastInterviewerMessageRef.current = Date.now()
 
     setIsInterviewStarted(false)
     setShowFeedback(false)
@@ -951,10 +1271,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     setRevealedHints(0)
     setWorkspaceContext([])
     setEfficiencyMetrics(null)
-    if (proactiveTimer) {
-      clearTimeout(proactiveTimer)
-      setProactiveTimer(null)
-    }
+    setProtectedElements(null)
+    setStarterCode("")
   }
 
   const proceedToFinalFeedback = async () => {
@@ -1670,14 +1988,42 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     <div className="flex flex-col flex-1 min-h-0 gap-2 px-3 pb-3">
                       <div ref={editorContainerRef} className="flex-1 min-h-0 rounded border border-gray-700 editor-wrapper">
                         <Editor
+                          key={`editor-${selectedLanguage}-${selectedScenario?.id || 'none'}`}
                           height={editorHeight}
                           language={selectedLanguage}
                           value={code}
-                          onMount={(editor) => {
+                          onMount={(editor, monaco) => {
+                            // Dispose old editor reference if exists
+                            if (editorRef.current && editorRef.current !== editor) {
+                              try {
+                                editorRef.current.dispose()
+                              } catch (e) {
+                                // Editor may already be disposed
+                              }
+                            }
                             editorRef.current = editor
+
+                            // Clean up any orphaned models (except the current one)
+                            const currentModel = editor.getModel()
+                            const allModels = monaco.editor.getModels()
+                            allModels.forEach((model: any) => {
+                              if (model !== currentModel && !model.isDisposed()) {
+                                try {
+                                  model.dispose()
+                                } catch (e) {
+                                  // Model may already be disposed
+                                }
+                              }
+                            })
                           }}
-                          onChange={(value) => {
+                          onChange={(value, event) => {
                             const newCode = value || ""
+
+                            // Skip validation for programmatic changes (like language switches)
+                            if (event?.isFlush) {
+                              setCode(newCode)
+                              return
+                            }
 
                             // Enforce code protection if enabled
                             if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
