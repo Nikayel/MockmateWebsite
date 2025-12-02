@@ -342,16 +342,18 @@ export default function PracticeFeedback({
     { name: "AI Collab", score: normalizedScores.aiCollaboration },
   ]
 
+  // Use consistent platform colors - accent cyan for all score indicators
+  // Opacity/intensity varies based on score level for visual hierarchy
   const getScoreColor = (score: number) => {
-    if (score >= 80) return "#10b981" // green
-    if (score >= 60) return "#eab308" // yellow
-    return "#ef4444" // red
+    if (score >= 80) return "#00d9ff" // cyan accent - excellent
+    if (score >= 60) return "#00d9ff" // cyan accent - good
+    return "#94a3b8" // slate gray - needs improvement
   }
 
   const getScoreBgColor = (score: number) => {
-    if (score >= 80) return "bg-green-600"
-    if (score >= 60) return "bg-yellow-600"
-    return "bg-red-600"
+    if (score >= 80) return "bg-[#00d9ff]"
+    if (score >= 60) return "bg-[#00d9ff]/70"
+    return "bg-gray-500"
   }
 
   const generatePDF = async () => {
@@ -633,7 +635,7 @@ export default function PracticeFeedback({
                     <Target className="h-4 w-4 text-cyan-400" />
                     <span className="text-sm text-gray-300">Edge Cases</span>
                   </div>
-                  <Badge className={hasEdgeCases ? "bg-green-600 text-white" : "bg-red-600 text-white"}>
+                  <Badge className={hasEdgeCases ? "bg-[#00d9ff] text-black" : "bg-gray-600 text-white"}>
                     {hasEdgeCases ? "Covered" : "Not Covered"}
                   </Badge>
                 </div>
@@ -653,9 +655,9 @@ export default function PracticeFeedback({
                 <div className="text-sm text-gray-400 mb-1">Complexity Accuracy</div>
                 <div className="flex items-center gap-2">
                   {complexityAccurate ? (
-                    <CheckCircle className="h-5 w-5 text-green-500" />
+                    <CheckCircle className="h-5 w-5 text-[#00d9ff]" />
                   ) : (
-                    <XCircle className="h-5 w-5 text-red-500" />
+                    <XCircle className="h-5 w-5 text-gray-400" />
                   )}
                   <span className="text-base text-white">{complexityAccurate ? "Yes" : "No"}</span>
                 </div>
@@ -751,7 +753,7 @@ export default function PracticeFeedback({
           {sections.fixNext.length > 0 && (
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-amber-500" />
+                <AlertCircle className="h-5 w-5 text-[#00d9ff]" />
                 What to Improve
               </h2>
               <div className="space-y-3">
@@ -764,10 +766,10 @@ export default function PracticeFeedback({
                       onOpenChange={(open) => setOpenImprovements(prev => ({ ...prev, [index]: open }))}
                     >
                       <CollapsibleTrigger className="w-full">
-                        <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700 hover:border-amber-500/50 transition-colors cursor-pointer">
+                        <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700 hover:border-[#00d9ff]/50 transition-colors cursor-pointer">
                           <div className="flex items-start justify-between">
                             <div className="flex items-start gap-3 flex-1">
-                              <span className="text-amber-500 font-semibold text-sm mt-0.5">#{index + 1}</span>
+                              <span className="text-[#00d9ff] font-semibold text-sm mt-0.5">#{index + 1}</span>
                               <p className="text-white text-left text-sm font-medium line-clamp-2">
                                 {item.split('.')[0] || item.substring(0, 80)}
                               </p>
@@ -817,7 +819,7 @@ export default function PracticeFeedback({
           {userId && (
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-yellow-500" />
+                <Sparkles className="h-5 w-5 text-[#00d9ff]" />
                 Personalized Learning Path
               </h2>
               <LearningRecommendations
