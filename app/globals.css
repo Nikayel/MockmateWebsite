@@ -571,20 +571,38 @@
   contain: strict;
 }
 
+/* CRITICAL: Reset Tailwind's global * styles for Monaco internal elements */
+/* The @layer base { * { @apply border-border outline-ring/50; } } leaks into Monaco */
+.monaco-wrapper *,
+.editor-wrapper *,
+.monaco-wrapper .monaco-editor *,
+.editor-wrapper .monaco-editor * {
+  border-color: transparent;
+  outline-color: transparent;
+}
+
 /* CRITICAL: Hide Monaco's internal input elements that can "leak" visually */
 /* These are invisible input handlers for IME/keyboard/accessibility */
 .monaco-wrapper .monaco-editor textarea.ime-text-area,
 .editor-wrapper .monaco-editor textarea.ime-text-area,
 .monaco-wrapper .monaco-editor .inputarea,
-.editor-wrapper .monaco-editor .inputarea {
+.editor-wrapper .monaco-editor .inputarea,
+.monaco-wrapper .monaco-editor textarea,
+.editor-wrapper .monaco-editor textarea {
   opacity: 0 !important;
   background: transparent !important;
   color: transparent !important;
   caret-color: transparent !important;
   border: none !important;
+  border-width: 0 !important;
+  border-style: none !important;
+  border-color: transparent !important;
   outline: none !important;
+  outline-width: 0 !important;
   box-shadow: none !important;
   resize: none !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
 }
 
 /* Hide native edit context overlay */
@@ -595,18 +613,10 @@
   opacity: 0 !important;
   background: transparent !important;
   color: transparent !important;
-  pointer-events: none !important;
-}
-
-/* Ensure Monaco's hidden textarea stays hidden */
-.monaco-wrapper .monaco-editor textarea,
-.editor-wrapper .monaco-editor textarea {
-  opacity: 0 !important;
-  position: absolute !important;
-  background: transparent !important;
-  color: transparent !important;
   border: none !important;
+  border-width: 0 !important;
   outline: none !important;
+  pointer-events: none !important;
 }
 
 /* Fix for any absolute positioned children */
