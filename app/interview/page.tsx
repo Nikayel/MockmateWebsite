@@ -848,43 +848,61 @@ Interviews are conversations, not just coding exercises.`
   }
 
   // Analyze code for context-aware proactive feedback
+  // IMPORTANT: This analysis is NEUTRAL - do not praise patterns until correctness is verified
   const analyzeCodeForProactiveFeedback = (code: string): string => {
     const analysis: string[] = []
-    const codeLower = code.toLowerCase()
+    const observations: string[] = []
 
-    // Detect patterns
+    // Detect patterns - use NEUTRAL language, NOT praise
     if (code.includes("for") && code.includes("for")) {
-      analysis.push("Candidate is using nested loops - potential O(n²) complexity")
+      observations.push("Candidate is using nested loops - ASK about time complexity implications")
     }
 
     if (code.match(/sort|\.sort\(/)) {
-      analysis.push("Candidate is using sorting - good algorithmic thinking")
+      observations.push("Candidate is using sorting - ASK about the complexity tradeoffs")
     }
 
     if (code.match(/Map|Set|HashMap|HashSet/)) {
-      analysis.push("Candidate is using hash-based data structures - efficient approach")
+      observations.push("Candidate is using hash-based data structures - ASK if they understand the space tradeoff")
     }
 
     if (code.match(/recursion|function.*\(.*\)\s*{[\s\S]*\1\(/)) {
-      analysis.push("Candidate is using recursion - should consider base cases and stack overflow")
+      observations.push("Candidate is using recursion - ASK about base cases and stack limits")
     }
 
     if (code.length > 300 && !code.includes("//")) {
-      analysis.push("Code is getting lengthy - candidate might benefit from breaking into helper functions")
+      observations.push("Code is getting lengthy without comments - ASK about code organization")
     }
 
     if (code.match(/if.*if.*if/)) {
-      analysis.push("Multiple nested conditionals detected - could indicate complexity")
+      observations.push("Multiple nested conditionals detected - ASK about simplifying the logic")
     }
 
     if (code.match(/\/\/ TODO|\/\/ FIXME|\/\/ HACK/)) {
-      analysis.push("Candidate has TODO/FIXME comments - they're aware of incomplete parts")
+      observations.push("Candidate has TODO/FIXME comments - ASK about their plan to address these")
     }
 
     // Time-based context
     const minutesSpent = Math.floor(elapsedTime / 60)
     if (minutesSpent > 10 && code.length < 100) {
-      analysis.push(`Candidate has been working for ${minutesSpent} minutes but code is still minimal - might need guidance`)
+      observations.push(`Candidate has been working for ${minutesSpent} minutes but code is still minimal - might need guidance`)
+    }
+
+    // Build the context prompt for the interviewer
+    if (observations.length > 0) {
+      analysis.push(`[INTERVIEWER OBSERVATION - CODE ANALYSIS]
+The candidate has written code. Here are observations for you to probe:
+
+${observations.join("\n")}
+
+CRITICAL RULES:
+1. DO NOT praise the code until tests have been run and passed
+2. Ask probing questions about their approach and design decisions
+3. If they haven't run tests yet, suggest they test their solution
+4. If they haven't explained their approach, ask them to walk you through it
+5. Focus on understanding their thought process, NOT validating their code
+
+Ask ONE focused question based on these observations.`)
     }
 
     return analysis.length > 0 ? analysis.join("\n") : ""
@@ -957,6 +975,9 @@ Interviews are conversations, not just coding exercises.`
       // Convert pass rate (0-100) to 0-100 score scale
       let calculatedPerformanceScore = summary.passRate
 
+      // Calculate efficiency metrics for feedback
+      const efficiencyData = analyzeCodeEfficiency(code)
+
       if (currentSessionId && user && code.trim()) {
         try {
           const feedbackResponse = await fetch("/api/generate-feedback", {
@@ -971,6 +992,10 @@ Interviews are conversations, not just coding exercises.`
               timeSpent: elapsedTime,
               aiCollaborationMetrics,
               interactionMetrics,
+              // Pass efficiency metrics for accurate feedback
+              efficiencyMetrics: efficiencyData,
+              sessionId: currentSessionId,
+              userId: user.id,
             }),
           })
 
@@ -1049,6 +1074,35 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             scoreToSave,
             comprehensiveFeedback
           )
+
+          // Vectorize session for RAG features (async, non-blocking)
+          fetch("/api/vectorize-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: user.id,
+              sessionId: currentSessionId,
+              scenarioId: selectedScenario?.id,
+              scenarioTitle: selectedScenario?.title,
+              language: selectedLanguage,
+              code,
+              testResults,
+              timeSpent: elapsedTime,
+              aiCollaborationMetrics,
+              interactionMetrics,
+              efficiencyMetrics: efficiencyData,
+              scores: {
+                correctness: (testResults.filter((t: TestResult) => t.passed).length / testResults.length) * 100,
+                efficiency: efficiencyData.efficiencyScore,
+                codeQuality: 70, // Default, would need more analysis
+                reasoningExplanation: aiCollaborationMetrics.partnerMessagesSent > 0 ? 50 : 0,
+                aiCollaboration: aiCollaborationMetrics.partnerMessagesSent > 0 ? 50 : 0,
+                overall: calculatedPerformanceScore,
+              },
+            }),
+          }).catch((err) => {
+            console.error("Vectorization error (non-blocking):", err)
+          })
         } catch (error) {
           console.error("Error updating session on completion:", error)
         }

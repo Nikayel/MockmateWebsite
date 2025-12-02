@@ -223,9 +223,15 @@ async function callProvider(
   provider: AIProvider,
   systemPrompt: string,
   userMessage: string,
-  history: Array<{ role: 'user' | 'model'; content: string }>
+  history: Array<{ role: 'user' | 'model'; content: string }>,
+  temperatureOverride?: number
 ): Promise<string> {
-  const config = PROVIDERS[provider]
+  const config = { ...PROVIDERS[provider] }
+
+  // Apply temperature override if provided
+  if (temperatureOverride !== undefined) {
+    config.temperature = temperatureOverride
+  }
 
   if (!config.enabled || !config.apiKey) {
     throw new Error(`Provider ${provider} is not configured`)
@@ -254,12 +260,14 @@ export async function generateAIResponse(
     complexity?: TaskComplexity
     preferredProvider?: AIProvider
     maxRetries?: number
+    temperature?: number // Override default temperature (0.0-1.0)
   } = {}
 ): Promise<AIResponse> {
   const {
     complexity = 'standard',
     preferredProvider,
     maxRetries = MAX_RETRIES,
+    temperature,
   } = options
 
   const startTime = Date.now()
@@ -288,7 +296,7 @@ export async function generateAIResponse(
       try {
         console.log(`[AI Provider] Trying ${provider} (attempt ${attempt + 1}/${maxRetries})`)
 
-        const text = await callProvider(provider, systemPrompt, userMessage, history)
+        const text = await callProvider(provider, systemPrompt, userMessage, history, temperature)
 
         const latencyMs = Date.now() - startTime
         console.log(`[AI Provider] Success with ${provider} in ${latencyMs}ms`)
@@ -345,13 +353,17 @@ export async function generateInterviewResponse(
 
 /**
  * Convenience function for feedback generation (complex - needs quality)
+ * Uses lower temperature (0.3) for more consistent, deterministic feedback
  */
 export async function generateFeedbackResponse(
   systemPrompt: string,
   userMessage: string,
   history: Array<{ role: 'user' | 'model'; content: string }> = []
 ): Promise<AIResponse> {
-  return generateAIResponse(systemPrompt, userMessage, history, { complexity: 'complex' })
+  return generateAIResponse(systemPrompt, userMessage, history, {
+    complexity: 'complex',
+    temperature: 0.3, // Lower temperature for consistent, data-driven feedback
+  })
 }
 
 /**

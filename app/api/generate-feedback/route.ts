@@ -32,6 +32,13 @@ function extractScores(feedback: string, metrics: {
   testsTotal: number
   timeSpent: number
   collaborationMessages: number
+  efficiencyMetrics?: {
+    efficiencyScore?: number
+    estimatedTimeComplexity?: string
+    optimalTimeComplexity?: string
+    estimatedSpaceComplexity?: string
+    optimalSpaceComplexity?: string
+  }
 }): FeedbackScores {
   const scores: FeedbackScores = {
     correctness: 70,
@@ -84,6 +91,35 @@ function extractScores(feedback: string, metrics: {
     // If tests failed but score is high, adjust
     if (passRate < 50 && scores.correctness > 60) {
       scores.correctness = Math.min(scores.correctness, passRate + 20)
+    }
+    // If all tests failed, cap correctness very low
+    if (passRate === 0) {
+      scores.correctness = Math.min(scores.correctness, 15)
+    }
+  }
+
+  // Efficiency-based adjustments using actual code analysis
+  if (metrics.efficiencyMetrics) {
+    const eff = metrics.efficiencyMetrics
+    const timeOptimal = eff.estimatedTimeComplexity === eff.optimalTimeComplexity
+    const spaceOptimal = eff.estimatedSpaceComplexity === eff.optimalSpaceComplexity
+
+    // Cap efficiency based on actual complexity analysis
+    if (!timeOptimal && !spaceOptimal) {
+      // Both suboptimal - cap at 50
+      scores.efficiency = Math.min(scores.efficiency, 50)
+    } else if (!timeOptimal) {
+      // Time suboptimal - cap at 70
+      scores.efficiency = Math.min(scores.efficiency, 70)
+    } else if (!spaceOptimal) {
+      // Space suboptimal - cap at 80
+      scores.efficiency = Math.min(scores.efficiency, 80)
+    }
+
+    // Use actual efficiency score as a floor/ceiling reference
+    if (eff.efficiencyScore !== undefined) {
+      // Don't let AI score be more than 15 points higher than calculated
+      scores.efficiency = Math.min(scores.efficiency, eff.efficiencyScore + 15)
     }
   }
 
@@ -162,7 +198,7 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
-    const { code, scenarioTitle, scenarioType, testResults, language, timeSpent, aiCollaborationMetrics, interactionMetrics, sessionId, userId } = await request.json()
+    const { code, scenarioTitle, scenarioType, testResults, language, timeSpent, aiCollaborationMetrics, interactionMetrics, efficiencyMetrics, sessionId, userId } = await request.json()
 
     if (!code || !scenarioTitle) {
       return NextResponse.json({ error: "Code and scenario title are required" }, { status: 400 })
@@ -224,6 +260,11 @@ IMPORTANT SCORING RULES:
 - ALL scores MUST be in X/100 format
 - Zero collaboration = 0/100 for Reasoning & Explanation AND AI Collaboration
 - Failed tests should cap Correctness score
+- Suboptimal time/space complexity should reduce Efficiency score (use the efficiency metrics provided)
+- If time complexity is suboptimal (doesn't match optimal), cap Efficiency at 70/100 max
+- If both time AND space complexity are suboptimal, cap Efficiency at 50/100 max
+- NEVER praise code patterns if tests are failing - focus on what's broken first
+- If efficiency score is below 70, explicitly mention what complexity improvements are needed
 - Never invent data. If something wasn't captured, say "No signal captured."
 `
 
@@ -266,6 +307,22 @@ INTERVIEWER INTERACTION METRICS:
 - No interaction data available
 `
 
+    const efficiencyInfo = efficiencyMetrics ? `
+CODE EFFICIENCY ANALYSIS:
+- Lines of code: ${efficiencyMetrics.linesOfCode || 'N/A'}
+- Code complexity level: ${efficiencyMetrics.complexity || 'N/A'}
+- Estimated time complexity: ${efficiencyMetrics.estimatedTimeComplexity || 'N/A'}
+- Optimal time complexity: ${efficiencyMetrics.optimalTimeComplexity || 'N/A'}
+- Estimated space complexity: ${efficiencyMetrics.estimatedSpaceComplexity || 'N/A'}
+- Optimal space complexity: ${efficiencyMetrics.optimalSpaceComplexity || 'N/A'}
+- Efficiency score: ${efficiencyMetrics.efficiencyScore || 'N/A'}/100
+- Time complexity match: ${efficiencyMetrics.estimatedTimeComplexity === efficiencyMetrics.optimalTimeComplexity ? 'YES - Optimal' : 'NO - Suboptimal'}
+- Space complexity match: ${efficiencyMetrics.estimatedSpaceComplexity === efficiencyMetrics.optimalSpaceComplexity ? 'YES - Optimal' : 'NO - Suboptimal'}
+` : `
+CODE EFFICIENCY ANALYSIS:
+- No efficiency data available
+`
+
     const prompt = `Provide a concise, brutally honest interview debrief using the exact structure from the system instruction.
 
 PROBLEM: ${scenarioTitle}${scenarioType ? ` (${scenarioType})` : ''}
@@ -274,6 +331,7 @@ ${timeInfo}
 ${testResultsSummary}
 ${aiCollaborationInfo}
 ${interactionInfo}
+${efficiencyInfo}
 
 TOTAL COLLABORATION MESSAGES FROM USER: ${collaborationMessages}
 
@@ -304,12 +362,19 @@ Remember:
 
     const feedback = aiResponse.text
 
-    // Extract scores using robust parsing
+    // Extract scores using robust parsing with efficiency validation
     const scores = extractScores(feedback, {
       testsPassed,
       testsTotal,
       timeSpent: timeSpent || 0,
       collaborationMessages,
+      efficiencyMetrics: efficiencyMetrics ? {
+        efficiencyScore: efficiencyMetrics.efficiencyScore,
+        estimatedTimeComplexity: efficiencyMetrics.estimatedTimeComplexity,
+        optimalTimeComplexity: efficiencyMetrics.optimalTimeComplexity,
+        estimatedSpaceComplexity: efficiencyMetrics.estimatedSpaceComplexity,
+        optimalSpaceComplexity: efficiencyMetrics.optimalSpaceComplexity,
+      } : undefined,
     })
 
     // Parse structured sections
