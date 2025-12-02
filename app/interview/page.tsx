@@ -1971,7 +1971,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               {!showFeedback && !showPostInterviewDiscussion ? (
                 <div
                   className={`grid grid-cols-1 gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${isCodeViewerOpen ? "xl:ml-[600px]" : ""
-                    } lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)_320px]`}
+                    } md:grid-cols-[240px_minmax(0,1fr)] lg:grid-cols-[260px_minmax(0,1fr)_260px] xl:grid-cols-[300px_minmax(0,1fr)_300px] 2xl:grid-cols-[340px_minmax(0,1fr)_340px]`}
                 >
                   {/* Left: Problem Description / File Upload */}
                   <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden order-1">
@@ -2128,8 +2128,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         </div>
                         {isInterviewStarted && (
                           <div className="flex items-center space-x-1">
-                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                            <span className="text-green-400 text-xs">LIVE</span>
+                            <div className="w-1.5 h-1.5 bg-[#00d9ff] rounded-full animate-pulse"></div>
+                            <span className="text-[#00d9ff] text-xs">LIVE</span>
                           </div>
                         )}
                       </CardTitle>
@@ -2265,16 +2265,16 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             </div>
                             <div className="flex items-center space-x-2">
                               <Badge
-                                className={`${testSummary.passRate === 100 ? "bg-green-600" :
-                                  testSummary.passRate >= 60 ? "bg-yellow-600" : "bg-red-600"
-                                  } text-xs h-5`}
+                                className={`${testSummary.passRate === 100 ? "bg-[#00d9ff]" :
+                                  testSummary.passRate >= 60 ? "bg-[#00d9ff]/70" : "bg-gray-600"
+                                  } text-xs h-5 text-black`}
                               >
                                 {testSummary.passed}/{testSummary.total} passed
                               </Badge>
                               {efficiencyMetrics && (
-                                <Badge className={`${efficiencyMetrics.efficiencyScore >= 80 ? "bg-green-600/20 text-green-400 border-green-600" :
-                                  efficiencyMetrics.efficiencyScore >= 60 ? "bg-yellow-600/20 text-yellow-400 border-yellow-600" :
-                                    "bg-red-600/20 text-red-400 border-red-600"
+                                <Badge className={`${efficiencyMetrics.efficiencyScore >= 80 ? "bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]" :
+                                  efficiencyMetrics.efficiencyScore >= 60 ? "bg-[#00d9ff]/10 text-[#00d9ff]/70 border-[#00d9ff]/50" :
+                                    "bg-gray-600/20 text-gray-400 border-gray-600"
                                   } text-xs h-5 border`}>
                                   {efficiencyMetrics.efficiencyScore}% efficient
                                 </Badge>
@@ -2292,7 +2292,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             {/* Individual Test Results */}
                             {testResults.map((result, index) => (
                               <div key={index} className="mb-2">
-                                <div className={`flex items-center space-x-2 ${result.passed ? 'text-green-400' : 'text-red-400'}`}>
+                                <div className={`flex items-center space-x-2 ${result.passed ? 'text-[#00d9ff]' : 'text-gray-400'}`}>
                                   {result.passed ? (
                                     <CheckCircle className="h-3 w-3 flex-shrink-0" />
                                   ) : (
@@ -2491,8 +2491,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     </div>
                   </Card>
 
-                  {/* Right: AI Interviewer Panel */}
-                  <Card className="bg-gray-900/50 border-gray-700 glass-effect h-full flex flex-col overflow-hidden order-3 lg:col-span-2 xl:col-span-1">
+                  {/* Right: AI Interviewer Panel - Hidden on md, visible on lg+ */}
+                  <Card className="bg-gray-900/50 border-gray-700 glass-effect h-full flex-col overflow-hidden order-3 hidden lg:flex">
                     <CardHeader className="pb-2 flex-shrink-0">
                       <CardTitle className="text-white flex items-center space-x-2 text-sm">
                         <div className="relative">
@@ -2574,19 +2574,19 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 /* Post-Interview Discussion Phase */
                 <div className="max-w-7xl mx-auto py-8 px-4">
                   <div className="text-center mb-6">
-                    <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-3" />
+                    <CheckCircle className="h-12 w-12 text-[#00d9ff] mx-auto mb-3" />
                     <h2 className="text-2xl font-heading font-bold text-white mb-2">Solution Complete!</h2>
                     <p className="text-gray-300 mb-4">All tests passed! Let's discuss your solution with the interviewer.</p>
                     {testSummary.total > 0 && (
                       <div className="flex items-center justify-center gap-4 mb-4">
-                        <Badge className="bg-green-600 text-white">
+                        <Badge className="bg-[#00d9ff] text-black">
                           {testSummary.passed}/{testSummary.total} Tests Passed
                         </Badge>
                         {efficiencyMetrics && (
                           <>
-                            <Badge className={`${efficiencyMetrics.efficiencyScore >= 80 ? "bg-green-600" :
-                              efficiencyMetrics.efficiencyScore >= 60 ? "bg-yellow-600" : "bg-red-600"
-                              } text-white`}>
+                            <Badge className={`${efficiencyMetrics.efficiencyScore >= 80 ? "bg-[#00d9ff]" :
+                              efficiencyMetrics.efficiencyScore >= 60 ? "bg-[#00d9ff]/70" : "bg-gray-600"
+                              } text-black`}>
                               Efficiency: {efficiencyMetrics.efficiencyScore}/100
                             </Badge>
                             <Badge variant="outline" className="border-gray-600 text-gray-300">

@@ -38,14 +38,14 @@ export default function TwoSumExcellentPage() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <div className="flex items-center space-x-4 mb-2">
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Easy</Badge>
+                  <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30">Easy</Badge>
                   <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30">Completed</Badge>
                 </div>
                 <h1 className="text-4xl font-heading font-bold text-white">Two Sum Problem</h1>
                 <p className="text-gray-300 mt-2">Array manipulation with hash map optimization</p>
               </div>
               <div className="text-right">
-                <div className="text-4xl font-bold text-green-400 mb-1">A+</div>
+                <div className="text-4xl font-bold text-[#00d9ff] mb-1">A+</div>
                 <div className="text-gray-400">Overall Grade</div>
               </div>
             </div>
@@ -68,7 +68,7 @@ export default function TwoSumExcellentPage() {
                       <div className="text-gray-400 text-sm">Time Taken</div>
                       <div className="text-white text-xl font-semibold">8 minutes</div>
                     </div>
-                    <Clock className="h-8 w-8 text-green-400" />
+                    <Clock className="h-8 w-8 text-[#00d9ff]" />
                   </div>
 
                   <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
@@ -76,7 +76,7 @@ export default function TwoSumExcellentPage() {
                       <div className="text-gray-400 text-sm">Complexity Accuracy</div>
                       <div className="text-white text-xl font-semibold">Perfect</div>
                     </div>
-                    <CheckCircle className="h-8 w-8 text-green-400" />
+                    <CheckCircle className="h-8 w-8 text-[#00d9ff]" />
                   </div>
 
                   <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
@@ -84,7 +84,7 @@ export default function TwoSumExcellentPage() {
                       <div className="text-gray-400 text-sm">Edge Cases Discussed</div>
                       <div className="text-white text-xl font-semibold">Yes</div>
                     </div>
-                    <CheckCircle className="h-8 w-8 text-green-400" />
+                    <CheckCircle className="h-8 w-8 text-[#00d9ff]" />
                   </div>
 
                   <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
@@ -92,7 +92,7 @@ export default function TwoSumExcellentPage() {
                       <div className="text-gray-400 text-sm">Alternative Solutions</div>
                       <div className="text-white text-xl font-semibold">Discussed</div>
                     </div>
-                    <CheckCircle className="h-8 w-8 text-green-400" />
+                    <CheckCircle className="h-8 w-8 text-[#00d9ff]" />
                   </div>
                 </div>
               </CardContent>
@@ -129,16 +129,16 @@ export default function TwoSumExcellentPage() {
                   </div>
                   <div className="mt-4 space-y-2">
                     <div className="flex items-center space-x-2">
-                      <CheckCircle className="h-4 w-4 text-green-400" />
-                      <span className="text-green-400 text-sm">Optimal O(n) time complexity</span>
+                      <CheckCircle className="h-4 w-4 text-[#00d9ff]" />
+                      <span className="text-[#00d9ff] text-sm">Optimal O(n) time complexity</span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <CheckCircle className="h-4 w-4 text-green-400" />
-                      <span className="text-green-400 text-sm">Clean, readable code structure</span>
+                      <CheckCircle className="h-4 w-4 text-[#00d9ff]" />
+                      <span className="text-[#00d9ff] text-sm">Clean, readable code structure</span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <CheckCircle className="h-4 w-4 text-green-400" />
-                      <span className="text-green-400 text-sm">Proper edge case handling</span>
+                      <CheckCircle className="h-4 w-4 text-[#00d9ff]" />
+                      <span className="text-[#00d9ff] text-sm">Proper edge case handling</span>
                     </div>
                   </div>
                 </CardContent>
@@ -153,10 +153,10 @@ export default function TwoSumExcellentPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+                  <div className="bg-[#00d9ff]/10 border border-[#00d9ff]/20 rounded-lg p-4">
                     <div className="flex items-center space-x-2 mb-2">
-                      <TrendingUp className="h-4 w-4 text-green-400" />
-                      <span className="text-green-400 font-semibold">Strengths</span>
+                      <TrendingUp className="h-4 w-4 text-[#00d9ff]" />
+                      <span className="text-[#00d9ff] font-semibold">Strengths</span>
                     </div>
                     <ul className="text-gray-300 text-sm space-y-1">
                       <li>• Immediately identified optimal hash map approach</li>
@@ -166,10 +166,10 @@ export default function TwoSumExcellentPage() {
                     </ul>
                   </div>
 
-                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                  <div className="bg-[#00d9ff]/5 border border-[#00d9ff]/10 rounded-lg p-4">
                     <div className="flex items-center space-x-2 mb-2">
-                      <Lightbulb className="h-4 w-4 text-blue-400" />
-                      <span className="text-blue-400 font-semibold">Additional Insights</span>
+                      <Lightbulb className="h-4 w-4 text-[#00d9ff]" />
+                      <span className="text-[#00d9ff] font-semibold">Additional Insights</span>
                     </div>
                     <p className="text-gray-300 text-sm">
                       Your solution demonstrates strong algorithmic thinking. You correctly identified that the brute
@@ -193,7 +193,7 @@ export default function TwoSumExcellentPage() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-gray-300">Problem Understanding</span>
-                      <span className="text-green-400 font-semibold">95%</span>
+                      <span className="text-[#00d9ff] font-semibold">95%</span>
                     </div>
                     <Progress value={95} className="h-2 bg-gray-800" />
                   </div>
@@ -201,7 +201,7 @@ export default function TwoSumExcellentPage() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-gray-300">Code Quality</span>
-                      <span className="text-green-400 font-semibold">98%</span>
+                      <span className="text-[#00d9ff] font-semibold">98%</span>
                     </div>
                     <Progress value={98} className="h-2 bg-gray-800" />
                   </div>
@@ -209,7 +209,7 @@ export default function TwoSumExcellentPage() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-gray-300">Communication</span>
-                      <span className="text-green-400 font-semibold">92%</span>
+                      <span className="text-[#00d9ff] font-semibold">92%</span>
                     </div>
                     <Progress value={92} className="h-2 bg-gray-800" />
                   </div>

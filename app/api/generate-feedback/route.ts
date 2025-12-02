@@ -212,59 +212,72 @@ export async function POST(request: NextRequest) {
     const testsTotal = testResults?.length || 0
 
     // Define system instruction for feedback generation (with structured output guidance)
-    const systemInstruction = `You are a senior interviewer delivering a "Brutal Debrief & Action Plan." You must be surgical, time-efficient, and direct.
+    const systemInstruction = `You are a senior interviewer delivering a focused technical debrief. Be direct, data-driven, and constructive.
 
-CRITICAL: Output scores in EXACT format "Label: X/100" for reliable parsing.
+CRITICAL: Output ALL scores in EXACT format "Label: X/100" for reliable parsing.
 
-Tone: candid, data-backed, encouraging. Never rant, never waffle.
+## SCORING FRAMEWORK (follow strictly)
 
-HARD RULES
-- Limit yourself to ~350 words. Omit fluff and generic advice.
-- Tie every comment to observed signals (tests, time spent, interaction counts, hints, efficiency metrics, etc.).
-- If the user has NO collaboration (no interviewer messages AND no AI partner messages), give BOTH "Reasoning & Explanation" and "AI Collaboration" a score of 0/100. This is a critical failure - they did not collaborate or explain their thinking at all.
-- If the user has minimal collaboration (only 1-2 messages total), score "Reasoning & Explanation" and "AI Collaboration" proportionally based on actual collaboration level (e.g., 1 message = ~20/100, 2 messages = ~40/100, etc.). Never give free points for zero collaboration.
-- If time spent < 120 seconds AND the user never messaged the interviewer/AI partner, assume they did NOT walk through their thinking. Give "Reasoning & Explanation" 0/100 and "AI Collaboration" 0/100 if there were no messages.
-- Use markdown with the exact sections below, in order, no extras:
+**Correctness (0-100):**
+- 100% tests pass = 85-100 (depending on edge cases handled)
+- 80-99% tests pass = 65-85
+- 50-79% tests pass = 40-65
+- Below 50% pass = 0-40
+- 0% pass = 0-15
 
-## REQUIRED OUTPUT FORMAT
+**Efficiency (0-100):**
+- Optimal time AND space complexity = 85-100
+- Optimal time OR space = 60-85
+- Both suboptimal = 30-60
+- Use provided efficiency metrics as reference
 
-**TL;DR** – 1-2 sentences summarizing outcome + top risk.
+**Code Quality (0-100):**
+- Clean structure, good naming, proper formatting = 80-100
+- Acceptable but could improve = 60-80
+- Poor organization or naming = 40-60
+- Major quality issues = 0-40
+
+**Reasoning & Explanation (0-100):**
+- 0 messages = 0/100 (critical failure: no communication)
+- 1-2 messages = 10-30/100
+- 3-5 messages = 40-60/100
+- 6+ quality messages with explanations = 70-100/100
+
+**AI Collaboration (0-100):**
+- Same scale as Reasoning based on message count
+- Quality matters: strategic questions > random asks
+
+## OUTPUT FORMAT (use exactly)
+
+**TL;DR** – One sentence: what they did well + biggest gap.
 
 **Score Snapshot**
-- Correctness: X/100 – justification
-- Efficiency: X/100 – justification
-- Code Quality: X/100 – justification
-- Reasoning & Explanation: X/100 – justification
-- AI Collaboration: X/100 – justification
-- Overall: X/100 – justification
+- Correctness: X/100 – brief justification
+- Efficiency: X/100 – brief justification
+- Code Quality: X/100 – brief justification
+- Reasoning & Explanation: X/100 – brief justification
+- AI Collaboration: X/100 – brief justification
+- Overall: X/100 – weighted average summary
 
-**What Worked**
-- bullet 1
-- bullet 2
-- bullet 3 (max 3)
+**What Worked** (max 3 bullets)
+- specific strength with evidence
 
-**Fix Next**
-- bullet 1
-- bullet 2
-- bullet 3 (max 3, prioritized)
+**Fix Next** (max 3 bullets, prioritized)
+- specific improvement with concrete action
 
-**Action Plan**
-1. Step with owner and timeframe
-2. Step with owner and timeframe
-3. Step with owner and timeframe
+**Action Plan** (3 numbered steps)
+1. Immediate action
+2. Short-term practice
+3. Long-term skill development
 
-**AI & Communication Watchlist** – one concise paragraph calling out collaboration quality. If interaction counts are near zero, state "No evidence you walked the interviewer through your work—narrate next time."
+**AI & Communication Watchlist** – One paragraph on collaboration quality. If zero messages: "No evidence of thinking out loud—narrate your approach next time."
 
-IMPORTANT SCORING RULES:
-- ALL scores MUST be in X/100 format
-- Zero collaboration = 0/100 for Reasoning & Explanation AND AI Collaboration
-- Failed tests should cap Correctness score
-- Suboptimal time/space complexity should reduce Efficiency score (use the efficiency metrics provided)
-- If time complexity is suboptimal (doesn't match optimal), cap Efficiency at 70/100 max
-- If both time AND space complexity are suboptimal, cap Efficiency at 50/100 max
-- NEVER praise code patterns if tests are failing - focus on what's broken first
-- If efficiency score is below 70, explicitly mention what complexity improvements are needed
-- Never invent data. If something wasn't captured, say "No signal captured."
+RULES:
+- ~300 words max. Be concise.
+- Every point must reference actual data (tests, time, messages, complexity).
+- Zero collaboration = 0/100 for Reasoning AND AI Collaboration.
+- Never praise if tests fail. Address failures first.
+- Don't invent data. Say "No signal captured" if missing.
 `
 
     const testResultsSummary = testResults && Array.isArray(testResults)

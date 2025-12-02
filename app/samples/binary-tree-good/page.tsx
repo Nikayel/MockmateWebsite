@@ -40,14 +40,14 @@ export default function BinaryTreeGoodPage() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <div className="flex items-center space-x-4 mb-2">
-                  <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Medium</Badge>
+                  <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30">Medium</Badge>
                   <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30">Completed</Badge>
                 </div>
                 <h1 className="text-4xl font-heading font-bold text-white">Binary Tree Inorder Traversal</h1>
                 <p className="text-gray-300 mt-2">Tree traversal with recursive and iterative approaches</p>
               </div>
               <div className="text-right">
-                <div className="text-4xl font-bold text-yellow-400 mb-1">B+</div>
+                <div className="text-4xl font-bold text-[#00d9ff] mb-1">B+</div>
                 <div className="text-gray-400">Overall Grade</div>
               </div>
             </div>
@@ -70,7 +70,7 @@ export default function BinaryTreeGoodPage() {
                       <div className="text-gray-400 text-sm">Time Taken</div>
                       <div className="text-white text-xl font-semibold">25 minutes</div>
                     </div>
-                    <Clock className="h-8 w-8 text-yellow-400" />
+                    <Clock className="h-8 w-8 text-[#00d9ff]" />
                   </div>
 
                   <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
@@ -78,7 +78,7 @@ export default function BinaryTreeGoodPage() {
                       <div className="text-gray-400 text-sm">Complexity Accuracy</div>
                       <div className="text-white text-xl font-semibold">Good</div>
                     </div>
-                    <CheckCircle className="h-8 w-8 text-yellow-400" />
+                    <CheckCircle className="h-8 w-8 text-[#00d9ff]" />
                   </div>
 
                   <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
@@ -86,7 +86,7 @@ export default function BinaryTreeGoodPage() {
                       <div className="text-gray-400 text-sm">Edge Cases Discussed</div>
                       <div className="text-white text-xl font-semibold">Yes</div>
                     </div>
-                    <CheckCircle className="h-8 w-8 text-green-400" />
+                    <CheckCircle className="h-8 w-8 text-[#00d9ff]" />
                   </div>
 
                   <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
@@ -94,7 +94,7 @@ export default function BinaryTreeGoodPage() {
                       <div className="text-gray-400 text-sm">Alternative Solutions</div>
                       <div className="text-white text-xl font-semibold">Partial</div>
                     </div>
-                    <AlertTriangle className="h-8 w-8 text-yellow-400" />
+                    <AlertTriangle className="h-8 w-8 text-gray-400" />
                   </div>
                 </div>
               </CardContent>
@@ -130,16 +130,16 @@ export default function BinaryTreeGoodPage() {
                   </div>
                   <div className="mt-4 space-y-2">
                     <div className="flex items-center space-x-2">
-                      <CheckCircle className="h-4 w-4 text-green-400" />
-                      <span className="text-green-400 text-sm">Correct recursive approach</span>
+                      <CheckCircle className="h-4 w-4 text-[#00d9ff]" />
+                      <span className="text-[#00d9ff] text-sm">Correct recursive approach</span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <CheckCircle className="h-4 w-4 text-green-400" />
-                      <span className="text-green-400 text-sm">Proper base case handling</span>
+                      <CheckCircle className="h-4 w-4 text-[#00d9ff]" />
+                      <span className="text-[#00d9ff] text-sm">Proper base case handling</span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <AlertTriangle className="h-4 w-4 text-yellow-400" />
-                      <span className="text-yellow-400 text-sm">Could discuss iterative solution</span>
+                      <AlertTriangle className="h-4 w-4 text-gray-400" />
+                      <span className="text-gray-400 text-sm">Could discuss iterative solution</span>
                     </div>
                   </div>
                 </CardContent>
@@ -154,10 +154,10 @@ export default function BinaryTreeGoodPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+                  <div className="bg-[#00d9ff]/10 border border-[#00d9ff]/20 rounded-lg p-4">
                     <div className="flex items-center space-x-2 mb-2">
-                      <TrendingUp className="h-4 w-4 text-green-400" />
-                      <span className="text-green-400 font-semibold">Strengths</span>
+                      <TrendingUp className="h-4 w-4 text-[#00d9ff]" />
+                      <span className="text-[#00d9ff] font-semibold">Strengths</span>
                     </div>
                     <ul className="text-gray-300 text-sm space-y-1">
                       <li>• Solid understanding of tree traversal concepts</li>
@@ -167,10 +167,10 @@ export default function BinaryTreeGoodPage() {
                     </ul>
                   </div>
 
-                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                  <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-4">
                     <div className="flex items-center space-x-2 mb-2">
-                      <Target className="h-4 w-4 text-yellow-400" />
-                      <span className="text-yellow-400 font-semibold">Areas for Improvement</span>
+                      <Target className="h-4 w-4 text-gray-400" />
+                      <span className="text-gray-400 font-semibold">Areas for Improvement</span>
                     </div>
                     <ul className="text-gray-300 text-sm space-y-1">
                       <li>• Could have discussed iterative approach with stack</li>
@@ -179,10 +179,10 @@ export default function BinaryTreeGoodPage() {
                     </ul>
                   </div>
 
-                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                  <div className="bg-[#00d9ff]/5 border border-[#00d9ff]/10 rounded-lg p-4">
                     <div className="flex items-center space-x-2 mb-2">
-                      <Lightbulb className="h-4 w-4 text-blue-400" />
-                      <span className="text-blue-400 font-semibold">Next Steps</span>
+                      <Lightbulb className="h-4 w-4 text-[#00d9ff]" />
+                      <span className="text-[#00d9ff] font-semibold">Next Steps</span>
                     </div>
                     <p className="text-gray-300 text-sm">
                       Practice implementing iterative tree traversals using explicit stacks. This will help you
@@ -206,7 +206,7 @@ export default function BinaryTreeGoodPage() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-gray-300">Problem Understanding</span>
-                      <span className="text-yellow-400 font-semibold">85%</span>
+                      <span className="text-[#00d9ff] font-semibold">85%</span>
                     </div>
                     <Progress value={85} className="h-2 bg-gray-800" />
                   </div>
@@ -214,7 +214,7 @@ export default function BinaryTreeGoodPage() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-gray-300">Code Quality</span>
-                      <span className="text-yellow-400 font-semibold">82%</span>
+                      <span className="text-[#00d9ff] font-semibold">82%</span>
                     </div>
                     <Progress value={82} className="h-2 bg-gray-800" />
                   </div>
@@ -222,7 +222,7 @@ export default function BinaryTreeGoodPage() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-gray-300">Communication</span>
-                      <span className="text-yellow-400 font-semibold">78%</span>
+                      <span className="text-[#00d9ff] font-semibold">78%</span>
                     </div>
                     <Progress value={78} className="h-2 bg-gray-800" />
                   </div>
