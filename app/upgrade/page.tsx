@@ -52,8 +52,20 @@ function UpgradePageContent() {
         const success = searchParams?.get("success")
         const canceled = searchParams?.get("canceled")
 
+        // DEBUG: Log all relevant state
+        console.log("=== Upgrade Page Debug ===")
+        console.log("URL params:", { success, canceled, sessionId: searchParams?.get("session_id") })
+        console.log("Auth state:", {
+          hasUser: !!user,
+          userId: user?.id,
+          hasFirebaseUser: !!firebaseUser,
+          authLoading,
+          initialized
+        })
+
         if (success === "true") {
           const sessionId = searchParams?.get("session_id")
+          console.log("Processing successful payment, sessionId:", sessionId)
           toast.success("Payment successful! Syncing your account...")
 
           // IMPORTANT: Save user info BEFORE any state changes
@@ -62,15 +74,20 @@ function UpgradePageContent() {
           const currentFirebaseUser = firebaseUser
 
           // Sync subscription with retries to handle webhook race condition
+          console.log("Checking sync conditions:", { sessionId, hasFirebaseUser: !!currentFirebaseUser, userId: currentUserId })
+
           if (sessionId && currentFirebaseUser && currentUserId) {
+            console.log("Starting sync process...")
             let syncSuccess = false
             let attempts = 0
             const maxAttempts = 5
 
             while (!syncSuccess && attempts < maxAttempts) {
               attempts++
+              console.log(`Sync attempt ${attempts} starting...`)
               try {
                 const token = await currentFirebaseUser.getIdToken(true) // Force refresh token
+                console.log("Got Firebase token, calling sync API...")
 
                 // Call sync API to check Stripe and update profile
                 const syncResponse = await fetch("/api/sync-subscription", {
