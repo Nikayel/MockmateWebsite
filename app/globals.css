@@ -375,6 +375,142 @@
   overflow: hidden !important;
 }
 
+/* CRITICAL: Hide all Monaco widgets and overlays that cause visual glitches */
+.monaco-wrapper .monaco-editor .monaco-hover,
+.editor-wrapper .monaco-editor .monaco-hover,
+.monaco-wrapper .monaco-editor .suggest-widget,
+.editor-wrapper .monaco-editor .suggest-widget,
+.monaco-wrapper .monaco-editor .parameter-hints-widget,
+.editor-wrapper .monaco-editor .parameter-hints-widget,
+.monaco-wrapper .monaco-editor .find-widget,
+.editor-wrapper .monaco-editor .find-widget,
+.monaco-wrapper .monaco-editor .rename-box,
+.editor-wrapper .monaco-editor .rename-box,
+.monaco-wrapper .monaco-editor .monaco-editor-overlaymessage,
+.editor-wrapper .monaco-editor .monaco-editor-overlaymessage,
+.monaco-wrapper .monaco-editor .codelens-decoration,
+.editor-wrapper .monaco-editor .codelens-decoration,
+.monaco-wrapper .monaco-editor .accessibilityHelpWidget,
+.editor-wrapper .monaco-editor .accessibilityHelpWidget {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Hide minimap completely */
+.monaco-wrapper .minimap,
+.editor-wrapper .minimap,
+.monaco-wrapper .minimap-slider,
+.editor-wrapper .minimap-slider {
+  display: none !important;
+  width: 0 !important;
+  visibility: hidden !important;
+}
+
+/* Hide overview ruler (right-side scrollbar decorations) */
+.monaco-wrapper .decorationsOverviewRuler,
+.editor-wrapper .decorationsOverviewRuler,
+.monaco-wrapper .monaco-editor .overview-ruler,
+.editor-wrapper .monaco-editor .overview-ruler {
+  display: none !important;
+  width: 0 !important;
+}
+
+/* Fix context view widgets that may appear outside */
+.context-view,
+.monaco-menu-container,
+.shadow-root-host {
+  z-index: 9999 !important;
+}
+
+/* Force widgets to be contained */
+.monaco-wrapper .monaco-editor .overlayWidgets,
+.editor-wrapper .monaco-editor .overlayWidgets {
+  position: absolute !important;
+  overflow: hidden !important;
+  contain: strict !important;
+}
+
+/* Hide any stray decorations */
+.monaco-wrapper .monaco-editor .view-overlays > div,
+.editor-wrapper .monaco-editor .view-overlays > div {
+  contain: strict;
+}
+
+/* Specifically target the current-line highlight that may overflow */
+.monaco-wrapper .monaco-editor .current-line,
+.editor-wrapper .monaco-editor .current-line {
+  display: none !important;
+}
+
+/* Hide sticky scroll (can cause rectangle glitches) */
+.monaco-wrapper .monaco-editor .sticky-widget,
+.editor-wrapper .monaco-editor .sticky-widget,
+.monaco-wrapper .monaco-editor .sticky-line-number,
+.editor-wrapper .monaco-editor .sticky-line-number,
+.monaco-wrapper .monaco-editor .stickyScroll,
+.editor-wrapper .monaco-editor .stickyScroll {
+  display: none !important;
+  height: 0 !important;
+}
+
+/* Hide zone widgets (like inline diffs) */
+.monaco-wrapper .monaco-editor .zone-widget,
+.editor-wrapper .monaco-editor .zone-widget,
+.monaco-wrapper .monaco-editor .view-zones,
+.editor-wrapper .monaco-editor .view-zones {
+  display: none !important;
+}
+
+/* Hide any content widgets */
+.monaco-wrapper .monaco-editor .contentWidgets,
+.editor-wrapper .monaco-editor .contentWidgets {
+  display: none !important;
+}
+
+/* Hide editor message and action widgets */
+.monaco-wrapper .monaco-editor .editor-actions,
+.editor-wrapper .monaco-editor .editor-actions,
+.monaco-wrapper .monaco-editor .message,
+.editor-wrapper .monaco-editor .message {
+  display: none !important;
+}
+
+/* Ensure lines content is properly positioned */
+.monaco-wrapper .monaco-editor .lines-content,
+.editor-wrapper .monaco-editor .lines-content {
+  position: relative !important;
+  top: 0 !important;
+}
+
+/* Fix Monaco loading container */
+.monaco-wrapper [data-keybinding-context],
+.editor-wrapper [data-keybinding-context] {
+  contain: strict !important;
+}
+
+/* Ensure the section wrapper doesn't cause overflow */
+.monaco-wrapper section,
+.editor-wrapper section {
+  position: absolute !important;
+  inset: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Hide placeholder/loading artifacts */
+.monaco-wrapper > div:first-child:empty,
+.editor-wrapper > div:first-child:empty {
+  display: none !important;
+}
+
+/* Fix potential padding issues from react-monaco-editor wrapper */
+.monaco-wrapper > section > div,
+.editor-wrapper > section > div {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
 /* Editor background */
 .monaco-wrapper .monaco-editor-background,
 .editor-wrapper .monaco-editor-background {
