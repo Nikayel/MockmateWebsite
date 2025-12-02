@@ -1,7 +1,8 @@
 "use client"
 
-import React, { useEffect, useRef, useCallback, useState, Component, ReactNode } from "react"
+import React, { useEffect, useRef, useCallback, useState, Component, ReactNode, memo } from "react"
 import dynamic from "next/dynamic"
+import type { editor as MonacoEditorType } from "monaco-editor"
 
 // Types for Monaco Editor
 export interface MonacoEditorProps {
@@ -12,10 +13,10 @@ export interface MonacoEditorProps {
   readOnly?: boolean
   theme?: "vs-dark" | "vs-light" | "hc-black"
   options?: Record<string, any>
-  onMount?: (editor: any, monaco: any) => void
+  onMount?: (editor: MonacoEditorType.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) => void
   className?: string
-  uniqueKey?: string // For forcing remount
-  minimal?: boolean // Use minimal config for performance
+  uniqueKey?: string
+  minimal?: boolean
 }
 
 // Error Boundary for Monaco Editor
@@ -65,14 +66,15 @@ class MonacoErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySta
 }
 
 // Loading component
-const EditorLoading = () => (
-  <div className="flex items-center justify-center h-full bg-gray-900">
+const EditorLoading = memo(() => (
+  <div className="flex items-center justify-center h-full bg-gray-900 min-h-[200px]">
     <div className="flex flex-col items-center gap-2">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00d9ff]" />
       <span className="text-gray-400 text-sm">Loading editor...</span>
     </div>
   </div>
-)
+))
+EditorLoading.displayName = "EditorLoading"
 
 // Dynamically import Monaco Editor (client-side only)
 const Editor = dynamic(() => import("@monaco-editor/react"), {
@@ -80,40 +82,40 @@ const Editor = dynamic(() => import("@monaco-editor/react"), {
   loading: () => <EditorLoading />,
 })
 
-// Default editor options for interview context
-const DEFAULT_OPTIONS = {
+// Default editor options for interview context - optimized for performance
+const DEFAULT_OPTIONS: MonacoEditorType.IStandaloneEditorConstructionOptions = {
   // Layout
   automaticLayout: true,
   scrollBeyondLastLine: false,
 
   // Minimize UI elements
   minimap: { enabled: false },
-  lineNumbers: "on" as const,
+  lineNumbers: "on",
   lineNumbersMinChars: 3,
   lineDecorationsWidth: 0,
   glyphMargin: false,
   folding: false,
   foldingHighlight: false,
-  showFoldingControls: "never" as const,
-  renderLineHighlight: "none" as const,
-  renderWhitespace: "none" as const,
+  showFoldingControls: "never",
+  renderLineHighlight: "none",
+  renderWhitespace: "none",
   renderLineHighlightOnlyWhenFocus: true,
 
-  // Disable features for cleaner experience
+  // Disable features for cleaner experience and better performance
   contextmenu: false,
   quickSuggestions: false,
   suggestOnTriggerCharacters: false,
-  acceptSuggestionOnEnter: "off" as const,
-  tabCompletion: "off" as const,
-  wordBasedSuggestions: "off" as const,
+  acceptSuggestionOnEnter: "off",
+  tabCompletion: "off",
+  wordBasedSuggestions: "off",
   parameterHints: { enabled: false },
   hover: { enabled: false },
   links: false,
   colorDecorators: false,
   codeLens: false,
-  occurrencesHighlight: "off" as const,
+  occurrencesHighlight: "off",
   selectionHighlight: false,
-  matchBrackets: "never" as const,
+  matchBrackets: "never",
 
   // Styling
   fontSize: 13,
@@ -126,12 +128,13 @@ const DEFAULT_OPTIONS = {
   padding: { top: 8, bottom: 8 },
   fixedOverflowWidgets: true,
 
-  // Scrollbar
+  // Scrollbar - simplified for better performance
   scrollbar: {
-    vertical: "auto" as const,
-    horizontal: "auto" as const,
+    vertical: "auto",
+    horizontal: "auto",
     verticalScrollbarSize: 10,
     horizontalScrollbarSize: 10,
+    useShadows: false,
   },
   overviewRulerLanes: 0,
   overviewRulerBorder: false,
@@ -140,27 +143,80 @@ const DEFAULT_OPTIONS = {
   // Find widget
   find: {
     addExtraSpaceOnTop: false,
-    autoFindInSelection: "never" as const,
-    seedSearchStringFromSelection: "never" as const,
+    autoFindInSelection: "never",
+    seedSearchStringFromSelection: "never",
   },
+
+  // Performance optimizations
+  renderValidationDecorations: "off",
+  accessibilitySupport: "off",
+  cursorBlinking: "solid",
+  cursorSmoothCaretAnimation: "off",
+  smoothScrolling: false,
 }
 
 // Read-only options (for code viewers)
-const READONLY_OPTIONS = {
+const READONLY_OPTIONS: MonacoEditorType.IStandaloneEditorConstructionOptions = {
   ...DEFAULT_OPTIONS,
   readOnly: true,
-  minimap: { enabled: true },
-  renderLineHighlight: "all" as const,
-  wordWrap: "on" as const,
+  domReadOnly: true,
+  minimap: { enabled: true, maxColumn: 80 },
+  renderLineHighlight: "all",
+  wordWrap: "on",
+  scrollbar: {
+    ...DEFAULT_OPTIONS.scrollbar,
+    alwaysConsumeMouseWheel: false,
+  },
 }
 
 // Minimal options for performance-critical situations
-const MINIMAL_OPTIONS = {
+const MINIMAL_OPTIONS: MonacoEditorType.IStandaloneEditorConstructionOptions = {
   ...DEFAULT_OPTIONS,
-  scrollbar: { vertical: "hidden" as const, horizontal: "hidden" as const, handleMouseWheel: true },
+  scrollbar: {
+    vertical: "hidden",
+    horizontal: "hidden",
+    handleMouseWheel: true,
+    useShadows: false,
+  },
+  renderLineHighlight: "none",
 }
 
-export function MonacoEditor({
+// Track all editor instances globally for cleanup
+const editorRegistry = new Set<MonacoEditorType.IStandaloneCodeEditor>()
+
+// Cleanup all orphaned models - call this periodically or on navigation
+export function cleanupOrphanedModels(): void {
+  if (typeof window === "undefined") return
+
+  const monaco = (window as any).monaco
+  if (!monaco?.editor) return
+
+  try {
+    const models = monaco.editor.getModels()
+    const activeEditors = Array.from(editorRegistry)
+    const activeModels = new Set(
+      activeEditors
+        .filter(e => !e.getModel()?.isDisposed?.())
+        .map(e => e.getModel())
+        .filter(Boolean)
+    )
+
+    models.forEach((model: any) => {
+      try {
+        if (!model.isDisposed?.() && !activeModels.has(model)) {
+          model.dispose()
+        }
+      } catch {
+        // Ignore disposal errors
+      }
+    })
+  } catch {
+    // Ignore cleanup errors
+  }
+}
+
+// Inner editor component
+function MonacoEditorInner({
   value,
   onChange,
   language,
@@ -173,7 +229,10 @@ export function MonacoEditor({
   uniqueKey,
   minimal = false,
 }: MonacoEditorProps) {
-  const editorRef = useRef<any>(null)
+  const editorRef = useRef<MonacoEditorType.IStandaloneCodeEditor | null>(null)
+  const monacoRef = useRef<typeof import("monaco-editor") | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const mountedRef = useRef(true)
   const [isReady, setIsReady] = useState(false)
 
   // Build final options
@@ -181,124 +240,171 @@ export function MonacoEditor({
   const finalOptions = {
     ...baseOptions,
     readOnly,
+    domReadOnly: readOnly,
     ...options,
   }
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (editorRef.current) {
-        try {
-          // Get the model before disposing
-          const model = editorRef.current.getModel()
-          editorRef.current.dispose()
+  // Convert height to CSS value
+  const cssHeight = typeof height === "number" ? `${height}px` : height
 
-          // Dispose the model if it exists
-          if (model && !model.isDisposed()) {
-            model.dispose()
-          }
-        } catch (e) {
-          console.warn("Error disposing Monaco editor:", e)
-        }
-        editorRef.current = null
-      }
+  // Comprehensive cleanup function
+  const cleanupEditor = useCallback(() => {
+    const editor = editorRef.current
+    if (!editor) return
 
-      // Clean up orphaned models
-      if (typeof window !== "undefined" && (window as any).monaco?.editor) {
-        try {
-          const models = (window as any).monaco.editor.getModels()
-          models.forEach((model: any) => {
-            try {
-              // Only dispose models that are not attached to any editor
-              if (!model.isDisposed() && model.getAttachedEditorCount?.() === 0) {
-                model.dispose()
-              }
-            } catch (e) {
-              // Model may already be disposed
-            }
-          })
-        } catch (e) {
-          // Ignore cleanup errors
-        }
+    try {
+      // Remove from registry
+      editorRegistry.delete(editor)
+
+      // Get model before disposal
+      const model = editor.getModel()
+
+      // Dispose editor first
+      editor.dispose()
+
+      // Then dispose model if it exists and isn't already disposed
+      if (model && !model.isDisposed?.()) {
+        model.dispose()
       }
+    } catch (e) {
+      console.warn("Error during Monaco editor cleanup:", e)
+    } finally {
+      editorRef.current = null
     }
   }, [])
 
+  // Cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true
+
+    return () => {
+      mountedRef.current = false
+      cleanupEditor()
+
+      // Schedule orphaned model cleanup
+      requestAnimationFrame(() => {
+        cleanupOrphanedModels()
+      })
+    }
+  }, [cleanupEditor])
+
   // Handle editor mount
   const handleEditorMount = useCallback(
-    (editor: any, monaco: any) => {
-      // Dispose old reference if exists
-      if (editorRef.current && editorRef.current !== editor) {
+    (editor: MonacoEditorType.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) => {
+      if (!mountedRef.current) {
+        // Component unmounted before editor mounted - dispose immediately
         try {
-          editorRef.current.dispose()
-        } catch (e) {
-          // Editor may already be disposed
+          const model = editor.getModel()
+          editor.dispose()
+          model?.dispose?.()
+        } catch {
+          // Ignore
         }
+        return
+      }
+
+      // Clean up previous editor if it exists (shouldn't happen, but safety check)
+      if (editorRef.current && editorRef.current !== editor) {
+        cleanupEditor()
       }
 
       editorRef.current = editor
-      setIsReady(true)
+      monacoRef.current = monaco
 
-      // Clean up orphaned models (except current one)
-      const currentModel = editor.getModel()
-      const allModels = monaco.editor.getModels()
-      allModels.forEach((model: any) => {
-        if (model !== currentModel && !model.isDisposed()) {
-          try {
-            model.dispose()
-          } catch (e) {
-            // Model may already be disposed
+      // Add to registry for tracking
+      editorRegistry.add(editor)
+
+      // Clean up orphaned models
+      try {
+        const currentModel = editor.getModel()
+        const allModels = monaco.editor.getModels()
+
+        allModels.forEach((model) => {
+          if (model !== currentModel && !model.isDisposed?.()) {
+            // Check if model is used by any registered editor
+            const isUsed = Array.from(editorRegistry).some(
+              e => e.getModel() === model
+            )
+            if (!isUsed) {
+              try {
+                model.dispose()
+              } catch {
+                // Ignore
+              }
+            }
           }
-        }
-      })
+        })
+      } catch {
+        // Ignore cleanup errors
+      }
+
+      setIsReady(true)
 
       // Call user's onMount callback
       onMount?.(editor, monaco)
     },
-    [onMount]
+    [onMount, cleanupEditor]
   )
 
   // Handle onChange with error catching
   const handleChange = useCallback(
     (newValue: string | undefined, event: any) => {
-      if (!onChange) return
+      if (!onChange || !mountedRef.current) return
 
       try {
         onChange(newValue || "", event)
       } catch (e) {
-        console.error("Error in onChange handler:", e)
+        console.error("Error in Monaco onChange handler:", e)
       }
     },
     [onChange]
   )
 
-  // Generate unique key for remounting
+  // Generate stable key for the editor
   const editorKey = uniqueKey || `monaco-${language}`
 
   return (
+    <div
+      ref={containerRef}
+      className={`monaco-editor-container ${className}`}
+      style={{
+        height: cssHeight,
+        width: "100%",
+        overflow: "hidden",
+        position: "relative",
+      }}
+    >
+      <Editor
+        key={editorKey}
+        height="100%"
+        width="100%"
+        language={language}
+        value={value}
+        theme={theme}
+        onMount={handleEditorMount}
+        onChange={handleChange}
+        options={finalOptions}
+        loading={<EditorLoading />}
+      />
+    </div>
+  )
+}
+
+// Memoized wrapper to prevent unnecessary re-renders
+export const MonacoEditor = memo(function MonacoEditorWrapper(props: MonacoEditorProps) {
+  return (
     <MonacoErrorBoundary
       fallback={
-        <div className="flex flex-col items-center justify-center h-full bg-gray-900 text-gray-400 p-4">
+        <div className="flex flex-col items-center justify-center h-full bg-gray-900 text-gray-400 p-4 min-h-[200px]">
           <div className="text-red-400 mb-2">Editor failed to load</div>
           <div className="text-xs">Please refresh the page</div>
         </div>
       }
     >
-      <div className={`monaco-editor-wrapper ${className}`} style={{ height }}>
-        <Editor
-          key={editorKey}
-          height="100%"
-          language={language}
-          value={value}
-          theme={theme}
-          onMount={handleEditorMount}
-          onChange={handleChange}
-          options={finalOptions}
-        />
-      </div>
+      <MonacoEditorInner {...props} />
     </MonacoErrorBoundary>
   )
-}
+})
 
 // Export error boundary for external use
 export { MonacoErrorBoundary }

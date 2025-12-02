@@ -59,9 +59,12 @@ export async function POST(request: NextRequest) {
   // Handle the event
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session
-    
-    // Only process if payment was successful (for subscriptions, this means subscription was created)
-    if (session.payment_status === "paid" && session.mode === "subscription") {
+
+    // Process if payment was successful OR no payment required (100% discount coupon)
+    // When a 100% discount coupon is applied, payment_status is "no_payment_required" not "paid"
+    const paymentSuccessful = session.payment_status === "paid" || session.payment_status === "no_payment_required"
+
+    if (paymentSuccessful && session.mode === "subscription") {
       // Upgrade user to Pro
       const userId = session.metadata?.userId || session.client_reference_id
       
@@ -103,15 +106,20 @@ export async function POST(request: NextRequest) {
           // Update quota to reflect Pro subscription (35 sessions)
           await updateQuotaForSubscriptionTier(userId, "pro")
 
-          console.log(`User ${userId} upgraded to Pro via Stripe`)
-          console.log(`Subscription ID: ${session.subscription}`)
-          console.log(`Customer ID: ${session.customer}`)
-          console.log(`Quota updated to Pro limit (35 sessions)`)
+          console.log(`✅ User ${userId} upgraded to Pro via Stripe`)
+          console.log(`   Payment Status: ${session.payment_status}`)
+          console.log(`   Subscription ID: ${session.subscription}`)
+          console.log(`   Customer ID: ${session.customer}`)
+          console.log(`   Quota updated to Pro limit (35 sessions)`)
         } catch (error) {
-          console.error("Error updating user profile:", error)
+          console.error("❌ Error updating user profile:", error)
           return NextResponse.json({ error: "Failed to update profile" }, { status: 500 })
         }
+      } else {
+        console.warn(`⚠️ checkout.session.completed event missing userId. Session ID: ${session.id}`)
       }
+    } else {
+      console.log(`ℹ️ Skipping checkout.session.completed - payment_status: ${session.payment_status}, mode: ${session.mode}`)
     }
   }
 

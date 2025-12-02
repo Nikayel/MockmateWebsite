@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useEffect } from "react"
+import React, { useEffect, memo, useCallback } from "react"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { MonacoEditor } from "@/components/editor"
+import { MonacoEditor, cleanupOrphanedModels } from "@/components/editor"
 
 interface CodeViewerSidePanelProps {
   isOpen: boolean
@@ -47,7 +47,7 @@ const getLanguageFromFileName = (fileName: string): string => {
   return languageMap[extension || ""] || "plaintext"
 }
 
-export function CodeViewerSidePanel({
+function CodeViewerSidePanelInner({
   isOpen,
   onClose,
   fileName,
@@ -69,6 +69,15 @@ export function CodeViewerSidePanel({
     window.addEventListener("keydown", handleEscape)
     return () => window.removeEventListener("keydown", handleEscape)
   }, [isOpen, onClose])
+
+  // Cleanup Monaco models on unmount
+  useEffect(() => {
+    return () => {
+      requestAnimationFrame(() => {
+        cleanupOrphanedModels()
+      })
+    }
+  }, [])
 
   if (!isOpen) return null
 
@@ -115,3 +124,6 @@ export function CodeViewerSidePanel({
     </div>
   )
 }
+
+// Memoize to prevent unnecessary re-renders
+export const CodeViewerSidePanel = memo(CodeViewerSidePanelInner)

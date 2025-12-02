@@ -1,23 +1,13 @@
 "use client"
 
-import React, { useEffect } from "react"
-import dynamic from "next/dynamic"
+import React, { useEffect, memo, useCallback } from "react"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-
-// Dynamically import Monaco Editor to avoid SSR issues
-const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-full">
-      <div className="text-gray-400">Loading editor...</div>
-    </div>
-  ),
-})
+import { MonacoEditor, cleanupOrphanedModels } from "@/components/editor"
 
 interface CodeViewerDialogProps {
   isOpen: boolean
@@ -62,7 +52,7 @@ const getLanguageFromFileName = (fileName: string): string => {
   return languageMap[extension || ''] || 'plaintext'
 }
 
-export function CodeViewerDialog({
+function CodeViewerDialogInner({
   isOpen,
   onClose,
   fileName,
@@ -71,8 +61,8 @@ export function CodeViewerDialog({
   problemId,
 }: CodeViewerDialogProps) {
   const editorLanguage = language || getLanguageFromFileName(fileName)
-  
-  // Ensure proper content for Two Sum problem
+
+  // Determine initial content based on problem type
   const [editorContent, setEditorContent] = React.useState(() => {
     if (problemId === 'two-sum') {
       return `/**
@@ -87,30 +77,33 @@ function twoSum(nums, target) {
     return content
   })
 
+  // Update content when prop changes
+  useEffect(() => {
+    if (problemId !== 'two-sum') {
+      setEditorContent(content)
+    }
+  }, [content, problemId])
+
   // Handle content changes
-  const handleEditorChange = (value: string | undefined) => {
-    if (value && problemId === 'two-sum') {
+  const handleEditorChange = useCallback((value: string) => {
+    if (problemId === 'two-sum') {
       // Ensure the function name remains 'twoSum'
       const fixedValue = value.replace(/function\s+twoSum\w*\s*\(/g, 'function twoSum(')
       setEditorContent(fixedValue)
-    } else if (value) {
+    } else {
       setEditorContent(value)
     }
-  }
+  }, [problemId])
 
   // Cleanup Monaco editor models on unmount
   useEffect(() => {
     return () => {
-      if (typeof window !== 'undefined' && (window as any).monaco?.editor) {
-        const models = (window as any).monaco.editor.getModels()
-        models.forEach((model: any) => {
-          if (model.uri.path.includes(fileName)) {
-            model.dispose()
-          }
-        })
-      }
+      // Schedule cleanup after unmount
+      requestAnimationFrame(() => {
+        cleanupOrphanedModels()
+      })
     }
-  }, [fileName])
+  }, [])
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -122,74 +115,36 @@ function twoSum(nums, target) {
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-hidden editor-wrapper">
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          <div className="flex-1 overflow-hidden editor-wrapper min-h-0">
             <MonacoEditor
+              uniqueKey={`code-viewer-dialog-${fileName}-${problemId || 'default'}`}
               height="100%"
               language={editorLanguage}
               value={editorContent}
               onChange={handleEditorChange}
-              theme="vs-dark"
+              readOnly
               options={{
-                readOnly: true,
-                minimap: { enabled: false },
-                fontSize: 14,
-                lineNumbers: 'on',
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-                wordWrap: 'on',
+                wordWrap: "on",
                 padding: { top: 10, bottom: 10 },
-                renderLineHighlight: 'all',
+                renderLineHighlight: "all",
+                minimap: { enabled: true, maxColumn: 80 },
                 scrollbar: {
                   verticalScrollbarSize: 8,
                   horizontalScrollbarSize: 8,
                 },
-                contextmenu: false,
-                quickSuggestions: false,
-                suggestOnTriggerCharacters: false,
-                acceptSuggestionOnEnter: 'off',
-                tabCompletion: 'off',
-                wordBasedSuggestions: 'off',
-                parameterHints: { enabled: false },
-                hover: { enabled: false },
-                links: false,
-                colorDecorators: false,
-                find: {
-                  addExtraSpaceOnTop: false,
-                  autoFindInSelection: 'never',
-                  seedSearchStringFromSelection: 'never',
-                },
-                occurrencesHighlight: false,
-                selectionHighlight: false,
-                codeLens: false,
-                folding: 'never',
-                foldingHighlight: false,
-                showFoldingControls: 'never',
-                matchBrackets: 'never',
-                lineNumbersMinChars: 3,
-                lineDecorationsWidth: 10,
-                renderLineHighlightOnlyWhenFocus: true,
-                overviewRulerBorder: false,
-                hideCursorInOverviewRuler: true,
-                renderValidationDecorations: 'off',
-                renderIndentGuides: false,
-                renderWhitespace: 'none',
-                fixedOverflowWidgets: true,
-              }}
-              onMount={(editor) => {
-                // Force a layout update after mount
-                setTimeout(() => {
-                  editor.layout();
-                }, 0);
               }}
             />
           </div>
-          <div className="flex justify-between items-center text-xs text-gray-400 p-3 border-t border-gray-700 bg-gray-800">
+          <div className="flex justify-between items-center text-xs text-gray-400 p-3 border-t border-gray-700 bg-gray-800 flex-shrink-0">
             <span>Language: {editorLanguage}</span>
-            <span>{content.split('\n').length} lines</span>
+            <span>{editorContent.split('\n').length} lines</span>
           </div>
         </div>
       </DialogContent>
     </Dialog>
   )
 }
+
+// Memoize the component to prevent unnecessary re-renders
+export const CodeViewerDialog = memo(CodeViewerDialogInner)

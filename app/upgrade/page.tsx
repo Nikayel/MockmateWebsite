@@ -54,45 +54,79 @@ function UpgradePageContent() {
 
         if (success === "true") {
           const sessionId = searchParams?.get("session_id")
-          toast.success("Payment successful! Your account has been upgraded to Pro.")
-          
-          // Clean URL
+          toast.success("Payment successful! Syncing your account...")
+
+          // Clean URL first
           router.replace("/upgrade")
-          
-          // If we have session ID, verify and sync subscription immediately
+
+          // Sync subscription with retries to handle webhook race condition
           if (sessionId && firebaseUser && user) {
-            try {
-              const token = await firebaseUser.getIdToken()
-              // Call sync API to check Stripe and update profile
-              const syncResponse = await fetch("/api/sync-subscription", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ userId: user.id }),
-              })
-              
-              if (syncResponse.ok) {
-                const syncData = await syncResponse.json()
-                console.log("Subscription synced:", syncData)
+            let syncSuccess = false
+            let attempts = 0
+            const maxAttempts = 5
+
+            while (!syncSuccess && attempts < maxAttempts) {
+              attempts++
+              try {
+                const token = await firebaseUser.getIdToken()
+
+                // Call sync API to check Stripe and update profile
+                const syncResponse = await fetch("/api/sync-subscription", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({ userId: user.id }),
+                })
+
+                if (syncResponse.ok) {
+                  const syncData = await syncResponse.json()
+                  console.log(`Subscription sync attempt ${attempts}:`, syncData)
+
+                  // Check if user is now Pro
+                  if (syncData.profile?.subscription_tier === "pro") {
+                    syncSuccess = true
+                    setProfile(prev => ({
+                      ...prev,
+                      ...syncData.profile,
+                    } as Profile))
+                    toast.success("You're now a Pro member!")
+                  } else {
+                    // Not yet synced, wait and retry
+                    console.log(`Sync attempt ${attempts}: Not yet Pro, waiting...`)
+                    await new Promise(resolve => setTimeout(resolve, 1500))
+                  }
+                } else {
+                  console.error(`Sync attempt ${attempts} failed:`, syncResponse.status)
+                  await new Promise(resolve => setTimeout(resolve, 1000))
+                }
+              } catch (syncError) {
+                console.error(`Sync attempt ${attempts} error:`, syncError)
+                await new Promise(resolve => setTimeout(resolve, 1000))
               }
-            } catch (syncError) {
-              console.error("Error syncing subscription:", syncError)
-              // Continue anyway - webhook will handle it
+            }
+
+            if (!syncSuccess) {
+              console.warn("Could not confirm Pro status after retries - redirecting anyway")
+              toast.info("Redirecting to your account. If Pro status isn't showing, please refresh the page.")
             }
           }
-          
-          // Reload user profile to reflect Pro status
+
+          // Reload user profile and redirect
           setTimeout(async () => {
-            if (firebaseUser) {
-              const userProfile = await getUserProfile(firebaseUser.uid)
-              if (userProfile) {
-                setProfile(userProfile)
+            try {
+              if (firebaseUser) {
+                const userProfile = await getUserProfile(firebaseUser.uid)
+                if (userProfile) {
+                  setProfile(userProfile)
+                }
               }
+            } catch (e) {
+              console.error("Error loading profile:", e)
             }
             router.push("/account")
-          }, 1500)
+          }, 500)
         } else if (canceled === "true") {
           toast.info("Payment canceled. You can try again anytime.")
           // Clean URL params after showing toast

@@ -1,11 +1,11 @@
 "use client"
 
-import { useRef, useEffect, useState } from "react"
+import { useRef, useEffect, useCallback, memo } from "react"
 import { Code, PlayCircle, CheckCircle, XCircle, AlertCircle } from "lucide-react"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { MonacoEditor } from "@/components/editor"
+import { MonacoEditor, cleanupOrphanedModels } from "@/components/editor"
 import { AIChatPartner } from "./InterviewerChat"
 import { useInterviewStore, type Language } from "@/lib/stores"
 import { validateCodeProtection } from "@/lib/code-protection"
@@ -20,7 +20,7 @@ interface InterviewEditorProps {
   onPartnerInputChange: (value: string) => void
 }
 
-export function InterviewEditor({
+function InterviewEditorInner({
   onRunTests,
   onSendPartnerMessage,
   isRecordingPartner,
@@ -29,7 +29,6 @@ export function InterviewEditor({
   onPartnerInputChange,
 }: InterviewEditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null)
-  const [editorHeight, setEditorHeight] = useState(400)
 
   const {
     code,
@@ -46,45 +45,18 @@ export function InterviewEditor({
     starterCode,
   } = useInterviewStore()
 
-  // Measure editor container height
+  // Cleanup orphaned models on unmount
   useEffect(() => {
-    if (!editorContainerRef.current) return
-
-    const updateHeight = () => {
-      if (editorContainerRef.current) {
-        const height = editorContainerRef.current.clientHeight
-        if (height > 0) {
-          setEditorHeight(height)
-        }
-      }
-    }
-
-    let resizeObserver: ResizeObserver | null = null
-
-    const rafId = requestAnimationFrame(() => {
-      updateHeight()
-
-      if (editorContainerRef.current) {
-        resizeObserver = new ResizeObserver(() => {
-          requestAnimationFrame(updateHeight)
-        })
-        resizeObserver.observe(editorContainerRef.current)
-      }
-    })
-
-    window.addEventListener("resize", updateHeight)
-
     return () => {
-      cancelAnimationFrame(rafId)
-      if (resizeObserver) {
-        resizeObserver.disconnect()
-      }
-      window.removeEventListener("resize", updateHeight)
+      // Schedule cleanup after component unmount
+      requestAnimationFrame(() => {
+        cleanupOrphanedModels()
+      })
     }
-  }, [isInterviewStarted, showFeedback, testResults.length])
+  }, [])
 
-  // Handle code change with protection validation
-  const handleCodeChange = (newCode: string, event?: any) => {
+  // Handle code change with protection validation - memoized for performance
+  const handleCodeChange = useCallback((newCode: string, event?: any) => {
     // Skip validation for programmatic changes
     if (event?.isFlush) {
       setCode(newCode)
@@ -102,7 +74,7 @@ export function InterviewEditor({
     }
 
     setCode(newCode)
-  }
+  }, [protectedElements, starterCode, isInterviewStarted, showFeedback, selectedLanguage, setCode])
 
   // Get file extension based on language
   const getFileExtension = (lang: Language) => {
@@ -144,10 +116,11 @@ export function InterviewEditor({
         <div
           ref={editorContainerRef}
           className="flex-1 min-h-0 rounded border border-gray-700 editor-wrapper"
+          style={{ minHeight: "200px" }}
         >
           <MonacoEditor
             uniqueKey={`editor-${selectedLanguage}-${selectedScenario?.id || "none"}`}
-            height={editorHeight}
+            height="100%"
             language={selectedLanguage}
             value={code}
             onChange={handleCodeChange}
@@ -326,3 +299,6 @@ export function InterviewEditor({
     </Card>
   )
 }
+
+// Memoized export to prevent unnecessary re-renders
+export const InterviewEditor = memo(InterviewEditorInner)
