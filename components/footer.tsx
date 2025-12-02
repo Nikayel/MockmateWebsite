@@ -9,10 +9,10 @@ export function Footer() {
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
               <Code className="h-6 w-6 text-[#00d9ff]" />
-              <span className="text-xl font-heading font-bold text-white">MockMate</span>
+              <span className="text-xl font-heading font-bold text-white">Skillon</span>
             </div>
             <p className="text-gray-400 text-sm">
-              AI-powered VS Code extension for coding interview practice. Master technical interviews with realistic
+              AI-powered platform for coding interview practice. Master technical interviews with realistic
               simulations and personalized feedback.
             </p>
             <div className="flex space-x-4">
@@ -32,13 +32,13 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="/install" className="text-gray-400 hover:text-white transition-colors">
-                  Installation
+                <a href="/interview" className="text-gray-400 hover:text-white transition-colors">
+                  Try It Free
                 </a>
               </li>
               <li>
-                <a href="/demo" className="text-gray-400 hover:text-white transition-colors">
-                  Live Demo
+                <a href="/samples" className="text-gray-400 hover:text-white transition-colors">
+                  Sample Reports
                 </a>
               </li>
               <li>
@@ -64,13 +64,13 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="mailto:support@mockmate.dev" className="text-gray-400 hover:text-white transition-colors">
+                <a href="mailto:support@skillon.dev" className="text-gray-400 hover:text-white transition-colors">
                   Contact Support
                 </a>
               </li>
               <li>
                 <a
-                  href="https://github.com/mockmate/issues"
+                  href="https://github.com/nikayel/skillon/issues"
                   className="text-gray-400 hover:text-white transition-colors"
                 >
                   Report Issues
@@ -81,7 +81,7 @@ export function Footer() {
         </div>
 
         <div className="border-t border-gray-800 mt-8 pt-8 text-center">
-          <p className="text-gray-400 text-sm">© 2024 MockMate. All rights reserved. Made with ❤️ for developers.</p>
+          <p className="text-gray-400 text-sm">© 2025 Skillon. All rights reserved. Made with care for developers.</p>
         </div>
       </div>
     </footer>

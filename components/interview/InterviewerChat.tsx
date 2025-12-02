@@ -60,7 +60,7 @@ export function InterviewerChat({
             <div className="absolute inset-0 bg-[#00d9ff] rounded-full blur-md opacity-30"></div>
           </div>
           <span className="bg-gradient-to-r from-[#00d9ff] to-[#00ff88] bg-clip-text text-transparent font-bold">
-            MockMate AI
+            Skillon AI
           </span>
         </CardTitle>
       </CardHeader>
@@ -90,7 +90,7 @@ export function InterviewerChat({
                         <Brain className="h-3 w-3 text-[#00d9ff] animate-neural-pulse" />
                       )}
                       <span className="text-xs opacity-75">
-                        {msg.type === "user" ? "You" : "MockMate AI"}
+                        {msg.type === "user" ? "You" : "Skillon AI"}
                       </span>
                     </div>
                     <p className="text-xs whitespace-pre-wrap leading-relaxed">{msg.message}</p>

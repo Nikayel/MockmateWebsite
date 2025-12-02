@@ -364,7 +364,7 @@ export default function PracticeFeedback({
     // Title
     doc.setFontSize(24)
     doc.setFont("helvetica", "bold")
-    doc.text("MockMate - Interview Feedback Report", margin, yPosition)
+    doc.text("Skillon - Interview Feedback Report", margin, yPosition)
     yPosition += 15
 
     // Date
@@ -467,7 +467,7 @@ export default function PracticeFeedback({
     }
 
     // Save PDF
-    doc.save(`mockmate-feedback-${Date.now()}.pdf`)
+    doc.save(`skillon-feedback-${Date.now()}.pdf`)
   }
 
   return (
@@ -479,11 +479,11 @@ export default function PracticeFeedback({
 
       {/* Main Feedback Card */}
       <Card className="bg-gray-900/50 border-gray-700">
-        {/* Header with MockMate branding */}
+        {/* Header with Skillon branding */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-700">
           <div className="flex items-center gap-2">
             <span className="text-gray-400">•</span>
-            <span className="text-white font-semibold">MockMate</span>
+            <span className="text-white font-semibold">Skillon</span>
           </div>
           <div className="flex items-center gap-4 text-sm text-gray-400">
             <span>Practice</span>

@@ -139,7 +139,7 @@ export default function AuthCallback() {
             ) : (
               <Button onClick={handleOpenVSCode} className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80">
                 <ExternalLink className="mr-2 h-4 w-4" />
-                Open MockMate in VS Code
+                Go to Dashboard
               </Button>
             )}
 
@@ -156,7 +156,7 @@ export default function AuthCallback() {
             <p>Don't have the extension installed?</p>
             <Button variant="link" className="text-[#00d9ff] p-0" onClick={() => (window.location.href = "/install")}>
               <Download className="mr-1 h-3 w-3" />
-              Install MockMate Extension
+              VS Code Extension (Coming Soon)
             </Button>
           </div>
         </CardContent>

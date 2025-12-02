@@ -114,7 +114,7 @@ export function PricingSection() {
                 </ul>
 
                 {/* CTA Button */}
-                <Link href={plan.popular ? "/upgrade" : "/install"} className="block">
+                <Link href={plan.popular ? "/upgrade" : "/interview"} className="block">
                   <MagneticButton
                     variant={plan.popular ? "primary" : "outline"}
                     glowColor={plan.popular ? "accent" : "none"}

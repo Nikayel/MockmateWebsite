@@ -27,11 +27,11 @@ export default function DocsPage() {
           <div className="max-w-4xl mx-auto text-center">
             <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30 mb-6">Documentation</Badge>
             <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-6">
-              MockMate
+              Skillon
               <span className="text-gradient"> Documentation</span>
             </h1>
             <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-              Everything you need to know to get started with MockMate and master your coding interviews.
+              Everything you need to know to get started with Skillon and master your coding interviews.
             </p>
           </div>
         </div>
@@ -51,7 +51,7 @@ export default function DocsPage() {
                   <CardTitle className="text-white">1. Install</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-300 text-sm">Install MockMate from the VS Code Marketplace with one click.</p>
+                  <p className="text-gray-300 text-sm">Sign up for Skillon - no downloads or installations needed.</p>
                 </CardContent>
               </Card>
 
@@ -108,17 +108,17 @@ export default function DocsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-gray-300 space-y-4">
-                <h4 className="text-white font-semibold">Installing from VS Code Marketplace</h4>
+                <h4 className="text-white font-semibold">Getting Started on the Web</h4>
                 <ol className="list-decimal list-inside space-y-2">
-                  <li>Open VS Code</li>
-                  <li>Go to Extensions (Ctrl+Shift+X)</li>
-                  <li>Search for "MockMate"</li>
-                  <li>Click "Install" on the MockMate extension</li>
-                  <li>Reload VS Code when prompted</li>
+                  <li>Visit skillon.dev in your browser</li>
+                  <li>Click "Start Practicing Free"</li>
+                  <li>Sign in with GitHub or Google</li>
+                  <li>Choose your first interview scenario</li>
+                  <li>Start coding and receive AI feedback</li>
                 </ol>
 
                 <h4 className="text-white font-semibold mt-6">Initial Configuration</h4>
-                <p>After installation, you'll see the MockMate icon in your activity bar. Click it to:</p>
+                <p>After signing in, you can customize your experience:</p>
                 <ul className="list-disc list-inside space-y-2">
                   <li>Sign in with your GitHub account</li>
                   <li>Set your experience level (Beginner, Intermediate, Advanced)</li>
@@ -128,8 +128,8 @@ export default function DocsPage() {
 
                 <div className="bg-gray-800/50 p-4 rounded-lg">
                   <p className="text-sm">
-                    <strong>Pro Tip:</strong> Enable GitHub integration to sync your progress across devices and get
-                    personalized recommendations based on your coding history.
+                    <strong>Pro Tip:</strong> Sign in with GitHub to sync your progress across devices and get
+                    personalized recommendations based on your performance.
                   </p>
                 </div>
               </CardContent>
@@ -200,23 +200,23 @@ export default function DocsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-gray-300 space-y-4">
-                <h4 className="text-white font-semibold">Command Palette Commands</h4>
+                <h4 className="text-white font-semibold">Keyboard Shortcuts</h4>
                 <div className="bg-gray-800/50 p-4 rounded-lg space-y-2 font-mono text-sm">
                   <div className="flex justify-between">
-                    <span>MockMate: Start Interview</span>
-                    <span className="text-gray-400">Ctrl+Shift+M</span>
+                    <span>Run Code</span>
+                    <span className="text-gray-400">Ctrl+Enter</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>MockMate: View Progress</span>
-                    <span className="text-gray-400">Ctrl+Shift+P</span>
+                    <span>Request Hint</span>
+                    <span className="text-gray-400">Ctrl+H</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>MockMate: Settings</span>
-                    <span className="text-gray-400">Ctrl+Shift+S</span>
+                    <span>Submit Solution</span>
+                    <span className="text-gray-400">Ctrl+Shift+Enter</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>MockMate: Export Report</span>
-                    <span className="text-gray-400">Ctrl+Shift+E</span>
+                    <span>Toggle Chat Panel</span>
+                    <span className="text-gray-400">Ctrl+/</span>
                   </div>
                 </div>
 
@@ -273,7 +273,7 @@ export default function DocsPage() {
                 <p>If you're still experiencing issues:</p>
                 <ul className="list-disc list-inside space-y-2">
                   <li>Check our GitHub Issues page for known problems</li>
-                  <li>Email support@mockmate.dev with your issue details</li>
+                  <li>Email support@skillon.dev with your issue details</li>
                   <li>Join our Discord community for real-time help</li>
                 </ul>
               </CardContent>
@@ -287,21 +287,25 @@ export default function DocsPage() {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-heading font-bold text-white mb-6">Ready to Get Started?</h2>
           <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Install MockMate now and start practicing your coding interviews with AI-powered feedback.
+            Start practicing now with Skillon and ace your next technical interview with AI-powered feedback.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white px-8 py-4 text-lg">
-              Install Extension
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="border-white text-white hover:bg-white hover:text-black px-8 py-4 text-lg bg-transparent"
-            >
-              View on GitHub
-              <ExternalLink className="ml-2 h-5 w-5" />
-            </Button>
+            <a href="/interview">
+              <Button size="lg" className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white px-8 py-4 text-lg">
+                Start Practicing Free
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </a>
+            <a href="/samples">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-white text-white hover:bg-white hover:text-black px-8 py-4 text-lg bg-transparent"
+              >
+                View Sample Reports
+                <ExternalLink className="ml-2 h-5 w-5" />
+              </Button>
+            </a>
           </div>
         </div>
       </section>

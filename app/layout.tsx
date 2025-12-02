@@ -19,9 +19,9 @@ const openSans = Open_Sans({
 })
 
 export const metadata: Metadata = {
-  title: "MockMate - Practice Realistic Interviews in VS Code",
+  title: "Skillon - AI-Powered Technical Interview Practice",
   description:
-    "Transform your coding interview preparation with AI-powered realistic interviews directly in VS Code. Practice with an intelligent interviewer and coding partner.",
+    "Master coding interviews with AI-powered realistic practice sessions. Get real-time feedback from an intelligent interviewer and land your dream tech job.",
   generator: "v0.app",
 }
 

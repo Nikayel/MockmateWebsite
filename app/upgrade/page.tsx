@@ -437,7 +437,7 @@ function UpgradePageContent() {
               <div className="space-y-4">
                 <div className="inline-flex items-center rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-emerald-200">
                   <CheckCircle className="mr-2 h-5 w-5 text-emerald-400" />
-                  You're already enjoying MockMate Pro!
+                  You're already enjoying Skillon Pro!
                 </div>
                 <Button
                   onClick={() => router.push("/account")}
@@ -447,7 +447,7 @@ function UpgradePageContent() {
                   Manage subscription
                 </Button>
                 <p className="text-gray-400 text-sm">
-                  Need help? Contact support@mockmate.dev
+                  Need help? Contact support@skillon.dev
                 </p>
               </div>
             ) : (

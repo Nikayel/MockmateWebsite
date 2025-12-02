@@ -58,12 +58,12 @@ const features = [
     icon: <Shield className="w-8 h-8" />,
     title: "Secure & Private",
     description:
-      "Your code and practice sessions remain completely private and secure. Practice in VS Code or on the web with enterprise-grade security.",
+      "Your code and practice sessions remain completely private and secure. Enterprise-grade security for peace of mind.",
     span: "default" as const,
     features: [
-      "Local-first architecture",
+      "Secure cloud storage",
       "End-to-end encryption",
-      "Secure cloud storage"
+      "Privacy-first design"
     ],
   },
 ]
@@ -131,7 +131,7 @@ export function FeaturesSection() {
           >
             <div className="text-center mb-8">
               <h3 className="text-3xl md:text-4xl font-heading font-bold text-white mb-4">
-                See MockMate in Action
+                See Skillon in Action
               </h3>
               <p className="text-lg text-gray-400">
                 Watch how our AI interviewer provides real-time feedback
@@ -141,7 +141,7 @@ export function FeaturesSection() {
             <div className="relative aspect-video bg-gradient-to-br from-card to-card/50 rounded-2xl overflow-hidden mb-8 group-hover:shadow-[0_0_50px_rgba(0,217,255,0.15)] transition-all duration-500">
               <Image
                 src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/FeedbackSummeryMockup-GFSpAQsPcwjnrAW21qXk63EEXS2Nv4.png"
-                alt="MockMate Feedback Summary Interface"
+                alt="Skillon Feedback Summary Interface"
                 fill
                 className="object-contain p-4 opacity-90 group-hover:opacity-100 transition-opacity duration-500"
               />
@@ -159,10 +159,10 @@ export function FeaturesSection() {
                   className="group/btn"
                 >
                   <Play className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />
-                  Try on Web
+                  Start Practicing Free
                 </MagneticButton>
               </Link>
-              <Link href="/install">
+              <Link href="/samples">
                 <MagneticButton
                   size="lg"
                   variant="outline"
@@ -170,7 +170,7 @@ export function FeaturesSection() {
                   className="group/btn"
                 >
                   <Code2 className="w-5 h-5" />
-                  Download for VS Code
+                  View Sample Reports
                 </MagneticButton>
               </Link>
             </div>

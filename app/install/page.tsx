@@ -4,55 +4,55 @@ import { useState } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
-  Download,
   Code,
-  Play,
+  Bell,
   CheckCircle,
-  AlertCircle,
-  Terminal,
-  Settings,
-  ExternalLink,
-  Copy,
-  Check,
+  Sparkles,
+  Zap,
+  Globe,
+  ArrowRight,
+  Mail,
 } from "lucide-react"
+import Link from "next/link"
+import { motion } from "framer-motion"
+import { toast } from "sonner"
 
 export default function InstallPage() {
-  const [copiedStep, setCopiedStep] = useState<number | null>(null)
+  const [email, setEmail] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSubscribed, setIsSubscribed] = useState(false)
 
-  const copyToClipboard = (text: string, stepIndex: number) => {
-    navigator.clipboard.writeText(text)
-    setCopiedStep(stepIndex)
-    setTimeout(() => setCopiedStep(null), 2000)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email) return
+
+    setIsSubmitting(true)
+
+    // Simulate API call - replace with actual newsletter signup
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    setIsSubscribed(true)
+    setIsSubmitting(false)
+    toast.success("You're on the list! We'll notify you when the VS Code extension launches.")
   }
 
-  const installSteps = [
-    {
-      title: "Open VS Code Extensions",
-      description: "Launch VS Code and open the Extensions panel",
-      command: "Ctrl+Shift+X (Windows/Linux) or Cmd+Shift+X (Mac)",
-      icon: <Code className="h-5 w-5" />,
-    },
-    {
-      title: "Search for MockMate",
-      description: "Type 'MockMate' in the search bar",
-      command: "MockMate",
-      icon: <Download className="h-5 w-5" />,
-    },
-    {
-      title: "Install Extension",
-      description: "Click 'Install' on the MockMate extension",
-      command: "Click Install Button",
-      icon: <CheckCircle className="h-5 w-5" />,
-    },
-    {
-      title: "Reload VS Code",
-      description: "Restart VS Code to activate MockMate",
-      command: "Ctrl+Shift+P → 'Developer: Reload Window'",
-      icon: <Settings className="h-5 w-5" />,
-    },
+  const webFeatures = [
+    "Full-featured code editor with syntax highlighting",
+    "AI-powered interviewer with real-time feedback",
+    "200+ interview scenarios across all difficulty levels",
+    "Detailed performance analytics and progress tracking",
+    "No installation required - works in any browser",
+  ]
+
+  const comingSoonFeatures = [
+    "Practice interviews directly in your IDE",
+    "Seamless integration with your existing workflow",
+    "Offline mode for practice anywhere",
+    "Custom workspace configurations",
+    "Deep VS Code integration with keybindings",
   ]
 
   return (
@@ -63,132 +63,152 @@ export default function InstallPage() {
       <section className="pt-24 pb-12 bg-gradient-to-br from-black via-gray-900 to-black">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
-            <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30 mb-6">VS Code Integration</Badge>
+            <Badge className="bg-neural/20 text-neural border-neural/30 mb-6">
+              <Bell className="w-3 h-3 mr-1" />
+              Coming Soon
+            </Badge>
             <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-6">
-              Install MockMate in
-              <span className="text-gradient"> VS Code</span>
+              VS Code Extension
+              <span className="text-gradient block mt-2">Coming Soon</span>
             </h1>
             <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-              Get started with MockMate in under 2 minutes. Follow our step-by-step guide to integrate AI-powered
-              interview practice directly into your development environment.
+              We're building a native VS Code extension to bring Skillon directly into your development environment.
+              Get notified when it launches!
             </p>
 
+            {/* Email Signup Form */}
+            {!isSubscribed ? (
+              <motion.form
+                onSubmit={handleSubmit}
+                className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto mb-8"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <div className="relative flex-1">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:border-neural focus:ring-1 focus:ring-neural"
+                    required
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-neural hover:bg-neural/80 text-black font-semibold px-6 py-3"
+                >
+                  {isSubmitting ? (
+                    <span className="flex items-center">
+                      <span className="animate-spin mr-2 h-4 w-4 border-2 border-black border-t-transparent rounded-full" />
+                      Subscribing...
+                    </span>
+                  ) : (
+                    <>
+                      Notify Me
+                      <Bell className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </motion.form>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center justify-center gap-2 text-neural mb-8"
+              >
+                <CheckCircle className="h-6 w-6" />
+                <span className="text-lg font-medium">You're on the list!</span>
+              </motion.div>
+            )}
+
+            {/* CTA to Web Version */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                size="lg"
-                className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white px-8 py-4 text-lg"
-                onClick={() =>
-                  window.open("https://marketplace.visualstudio.com/items?itemName=mockmate.mockmate", "_blank")
-                }
-              >
-                <ExternalLink className="mr-2 h-5 w-5" />
-                Open in VS Code Marketplace
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="border-white text-white hover:bg-white hover:text-black px-8 py-4 text-lg bg-transparent"
-              >
-                <Play className="mr-2 h-5 w-5" />
-                Watch Installation Video
-              </Button>
+              <Link href="/interview">
+                <Button
+                  size="lg"
+                  className="bg-accent hover:bg-accent/80 text-black px-8 py-4 text-lg font-semibold"
+                >
+                  <Globe className="mr-2 h-5 w-5" />
+                  Try Web Version Now
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Installation Steps */}
+      {/* Why Web First Section */}
       <section className="py-16 bg-gradient-to-b from-gray-900 to-black">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
-            <h2 className="text-3xl font-heading font-bold text-white mb-12 text-center">Quick Installation Guide</h2>
-
-            <div className="space-y-6">
-              {installSteps.map((step, index) => (
-                <Card key={index} className="bg-gray-900/50 border-gray-700 glass-effect">
-                  <CardContent className="p-6">
-                    <div className="flex items-start space-x-4">
-                      <div className="flex-shrink-0">
-                        <div className="w-10 h-10 bg-[#00d9ff] rounded-full flex items-center justify-center text-white font-bold">
-                          {index + 1}
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-2">
-                          {step.icon}
-                          <h3 className="text-xl font-semibold text-white">{step.title}</h3>
-                        </div>
-                        <p className="text-gray-300 mb-3">{step.description}</p>
-                        <div className="bg-black/50 rounded-lg p-3 flex items-center justify-between">
-                          <code className="text-[#00d9ff] font-mono text-sm">{step.command}</code>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-gray-400 hover:text-white"
-                            onClick={() => copyToClipboard(step.command, index)}
-                          >
-                            {copiedStep === index ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Getting Started */}
-      <section className="py-16 bg-black">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-3xl font-heading font-bold text-white mb-12 text-center">
-              Getting Started with MockMate
+            <h2 className="text-3xl font-heading font-bold text-white mb-4 text-center">
+              Why Start with the Web?
             </h2>
+            <p className="text-gray-400 text-center mb-12 max-w-2xl mx-auto">
+              Our web platform gives you the full Skillon experience right now, with no installation required.
+            </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <Card className="bg-gray-900/50 border-gray-700 glass-effect">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
-                    <Terminal className="h-5 w-5 text-[#00d9ff]" />
-                    <span>Start Your First Interview</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-gray-300">
-                    Once installed, open the Command Palette and type "MockMate" to see available commands.
-                  </p>
-                  <div className="bg-black/50 rounded-lg p-3">
-                    <code className="text-[#00d9ff] font-mono text-sm">Ctrl+Shift+P → "MockMate: Start Interview"</code>
+              {/* Web Platform */}
+              <Card className="bg-gradient-to-br from-accent/10 to-accent/5 border-accent/30">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center">
+                      <Globe className="h-5 w-5 text-black" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold text-white">Web Platform</h3>
+                      <Badge className="bg-accent/20 text-accent border-accent/30 text-xs">Available Now</Badge>
+                    </div>
                   </div>
-                  <Button className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
-                    Try Your First Interview
-                  </Button>
+                  <ul className="space-y-3">
+                    {webFeatures.map((feature, index) => (
+                      <li key={index} className="flex items-start gap-2 text-gray-300">
+                        <CheckCircle className="h-5 w-5 text-accent flex-shrink-0 mt-0.5" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Link href="/interview" className="block mt-6">
+                    <Button className="w-full bg-accent hover:bg-accent/80 text-black font-semibold">
+                      Start Practicing
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
 
-              <Card className="bg-gray-900/50 border-gray-700 glass-effect">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
-                    <Settings className="h-5 w-5 text-[#00d9ff]" />
-                    <span>Configure Settings</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-gray-300">
-                    Customize your interview experience with difficulty levels, programming languages, and more.
-                  </p>
-                  <div className="bg-black/50 rounded-lg p-3">
-                    <code className="text-[#00d9ff] font-mono text-sm">File → Preferences → Settings → MockMate</code>
+              {/* VS Code Extension */}
+              <Card className="bg-gray-900/50 border-gray-700">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-neural/20 rounded-lg flex items-center justify-center">
+                      <Code className="h-5 w-5 text-neural" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold text-white">VS Code Extension</h3>
+                      <Badge className="bg-neural/20 text-neural border-neural/30 text-xs">Coming Soon</Badge>
+                    </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    className="w-full border-white text-white hover:bg-white hover:text-black bg-transparent"
-                  >
-                    View Configuration Guide
-                  </Button>
+                  <ul className="space-y-3">
+                    {comingSoonFeatures.map((feature, index) => (
+                      <li key={index} className="flex items-start gap-2 text-gray-400">
+                        <Sparkles className="h-5 w-5 text-neural flex-shrink-0 mt-0.5" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-6 p-4 bg-neural/5 border border-neural/20 rounded-lg">
+                    <p className="text-sm text-gray-400 text-center">
+                      <Zap className="inline h-4 w-4 text-neural mr-1" />
+                      Sign up above to get early access
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -196,56 +216,47 @@ export default function InstallPage() {
         </div>
       </section>
 
-      {/* Troubleshooting */}
-      <section className="py-16 bg-gradient-to-b from-black to-gray-900">
+      {/* FAQ Section */}
+      <section className="py-16 bg-black">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-3xl font-heading font-bold text-white mb-12 text-center">Troubleshooting</h2>
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-3xl font-heading font-bold text-white mb-12 text-center">
+              Frequently Asked Questions
+            </h2>
 
             <div className="space-y-6">
-              <Card className="bg-gray-900/50 border-gray-700 glass-effect">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
-                    <AlertCircle className="h-5 w-5 text-yellow-400" />
-                    <span>Extension Not Appearing?</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="text-gray-300 space-y-2">
-                    <li>• Ensure you're using VS Code version 1.74.0 or higher</li>
-                    <li>• Try reloading the window: Ctrl+Shift+P → "Developer: Reload Window"</li>
-                    <li>• Check if the extension is enabled in the Extensions panel</li>
-                    <li>• Restart VS Code completely</li>
-                  </ul>
+              <Card className="bg-gray-900/50 border-gray-700">
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold text-white mb-2">
+                    When will the VS Code extension be available?
+                  </h3>
+                  <p className="text-gray-400">
+                    We're targeting Q1 2025 for our initial release. Sign up for notifications to be among the first to try it.
+                  </p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-gray-900/50 border-gray-700 glass-effect">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
-                    <AlertCircle className="h-5 w-5 text-yellow-400" />
-                    <span>Commands Not Working?</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="text-gray-300 space-y-2">
-                    <li>• Make sure you have an active internet connection</li>
-                    <li>• Check VS Code's output panel for error messages</li>
-                    <li>• Try disabling other extensions temporarily</li>
-                    <li>• Update to the latest version of MockMate</li>
-                  </ul>
+              <Card className="bg-gray-900/50 border-gray-700">
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold text-white mb-2">
+                    Will my progress sync between web and VS Code?
+                  </h3>
+                  <p className="text-gray-400">
+                    Yes! Your account, session history, and progress will seamlessly sync across both platforms.
+                  </p>
                 </CardContent>
               </Card>
-            </div>
 
-            <div className="text-center mt-12">
-              <p className="text-gray-400 mb-4">Still having issues?</p>
-              <Button
-                variant="outline"
-                className="border-[#00d9ff] text-[#00d9ff] hover:bg-[#00d9ff] hover:text-white bg-transparent"
-              >
-                Contact Support
-              </Button>
+              <Card className="bg-gray-900/50 border-gray-700">
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold text-white mb-2">
+                    Is the web version the same as the extension?
+                  </h3>
+                  <p className="text-gray-400">
+                    The web version has all the core features including the AI interviewer, code editor, and feedback system. The extension will add deeper IDE integration and offline capabilities.
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>

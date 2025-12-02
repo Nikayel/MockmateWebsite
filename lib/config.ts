@@ -1,6 +1,6 @@
 /**
  * Shared application configuration
- * Platform-specific pricing: Website ($25) vs VS Code Extension ($19)
+ * Web-first platform with VS Code extension coming soon
  */
 
 export const PRICING_CONFIG = {
@@ -17,17 +17,17 @@ export const PRICING_CONFIG = {
       "Basic coding challenges",
       "AI interviewer feedback",
       "Performance tracking",
-      "VS Code integration",
+      "Web-based code editor",
     ],
     buttonText: "Start Free",
     popular: false,
   },
   pro: {
-    // Platform-specific pricing
+    // Unified pricing
     website: {
       name: "Pro",
-      price: 25,
-      priceDisplay: "$25",
+      price: 19,
+      priceDisplay: "$19",
       period: "/month",
       description: "For serious interview preparation",
     },
@@ -73,10 +73,11 @@ export const PRICING_CONFIG = {
 } as const
 
 export const APP_CONFIG = {
-  name: "MockMate",
-  extensionId: "nikayel.MockMate",
-  supportEmail: "support@mockmate.dev",
-  githubUrl: "https://github.com/nikayel/mockmate",
+  name: "Skillon",
+  extensionId: "nikayel.skillon", // Coming soon
+  extensionComingSoon: true,
+  supportEmail: "support@skillon.dev",
+  githubUrl: "https://github.com/nikayel/skillon",
 } as const
 
 // Helper function to get pricing based on platform

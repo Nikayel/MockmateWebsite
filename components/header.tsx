@@ -43,7 +43,7 @@ export function Header() {
               <div className="absolute inset-0 bg-accent rounded-full blur-lg opacity-20 group-hover:opacity-40 transition-opacity duration-300"></div>
             </div>
             <span className="text-2xl font-heading font-bold bg-gradient-to-r from-white via-accent to-white bg-clip-text text-transparent">
-              MockMate
+              Skillon
             </span>
           </Link>
 

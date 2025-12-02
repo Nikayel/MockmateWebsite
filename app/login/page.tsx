@@ -196,7 +196,7 @@ export default function LoginPage() {
                 <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
                   {authStatus === "authenticating" && "Authenticating..."}
                   {authStatus === "creating-profile" && "Setting up your account..."}
-                  {authStatus === "complete" && "Welcome to MockMate!"}
+                  {authStatus === "complete" && "Welcome to Skillon!"}
                 </h2>
 
                 <p className="text-sm sm:text-base text-gray-400 mb-4 sm:mb-6">
@@ -281,7 +281,7 @@ export default function LoginPage() {
               <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30 mb-6">Secure Login</Badge>
               <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-6">
                 Sign in to
-                <span className="text-gradient"> MockMate</span>
+                <span className="text-gradient"> Skillon</span>
               </h1>
               <p className="text-xl text-gray-300 mb-8">
                 Connect with GitHub or Google to sync your practice sessions, unlock brutal-but-useful feedback, and keep
@@ -309,7 +309,7 @@ export default function LoginPage() {
                 <CardHeader className="text-center pb-8">
                   <CardTitle className="text-2xl font-heading text-white mb-3">Welcome Back</CardTitle>
                   <p className="text-gray-400 text-sm">
-                    Sign in to access your MockMate dashboard and keep every mock interview aligned on any device.
+                    Sign in to access your Skillon dashboard and keep your progress synced across any device.
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -392,14 +392,14 @@ export default function LoginPage() {
       <section className="py-16 bg-black">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
-            <h2 className="text-3xl font-heading font-bold text-white text-center mb-12">Why Sign In to MockMate?</h2>
+            <h2 className="text-3xl font-heading font-bold text-white text-center mb-12">Why Sign In to Skillon?</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <Card className="bg-gray-900/50 border-gray-700 glass-effect text-center">
                 <CardContent className="p-6">
                   <Sync className="h-12 w-12 text-[#00d9ff] mx-auto mb-4" />
                   <h3 className="text-white font-semibold mb-3">Sync Across Devices</h3>
                   <p className="text-gray-400 text-sm">
-                    Access your interview progress, settings, and performance history from any VS Code installation.
+                    Access your interview progress, settings, and performance history from any device.
                   </p>
                 </CardContent>
               </Card>
@@ -511,7 +511,7 @@ export default function LoginPage() {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-heading font-bold text-white mb-6">Ready to Level Up Your Interview Skills?</h2>
           <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Join thousands of developers who are already using MockMate to ace their technical interviews.
+            Join thousands of developers who are already using Skillon to ace their technical interviews.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
