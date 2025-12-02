@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense, lazy } from "react"
 import { MagneticButton } from "@/components/ui/magnetic-button"
-import { Play, ArrowRight, Code2, Sparkles, Cpu } from "lucide-react"
+import { Play, ArrowRight, Sparkles, Cpu, Globe, Bell } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
@@ -89,9 +89,8 @@ export function HeroSection() {
             variants={staggerItem}
             className="text-lg sm:text-xl md:text-2xl text-gray-400 mb-12 max-w-3xl mx-auto leading-relaxed font-light"
           >
-            Practice realistic coding interviews with an AI interviewer—available as a{" "}
-            <span className="text-accent font-medium">VS Code extension</span> or on the{" "}
-            <span className="text-neural font-medium">web</span>.
+            Practice realistic coding interviews with an{" "}
+            <span className="text-accent font-medium">AI interviewer</span> in your browser.
             <br className="hidden sm:block" />
             <span className="text-white/90">Get real-time feedback. Land your dream job.</span>
           </motion.p>
@@ -106,7 +105,7 @@ export function HeroSection() {
                 <div className="w-3 h-3 bg-destructive rounded-full" />
                 <div className="w-3 h-3 bg-[#ffbf00] rounded-full" />
                 <div className="w-3 h-3 bg-neural rounded-full" />
-                <span className="ml-auto text-xs text-muted-foreground font-mono">mockmate.ai</span>
+                <span className="ml-auto text-xs text-muted-foreground font-mono">skillon.dev</span>
               </div>
               <div className="text-left font-mono text-sm sm:text-base">
                 <span className="text-muted-foreground">// Your AI interview partner</span>
@@ -125,7 +124,7 @@ export function HeroSection() {
             variants={staggerItem}
             className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16"
           >
-            <Link href="/install">
+            <Link href="/interview">
               <MagneticButton
                 size="lg"
                 variant="primary"
@@ -133,21 +132,21 @@ export function HeroSection() {
                 strength={0.5}
                 className="group"
               >
-                <Code2 className="w-5 h-5" />
-                Start Free in VS Code
+                <Play className="w-5 h-5" />
+                Start Practicing Free
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </MagneticButton>
             </Link>
 
-            <Link href="/interview">
+            <Link href="/samples">
               <MagneticButton
                 size="lg"
                 variant="outline"
                 glowColor="none"
                 className="group"
               >
-                <Play className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                Try on Web
+                <Sparkles className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                View Sample Reports
               </MagneticButton>
             </Link>
           </motion.div>
@@ -184,11 +183,30 @@ export function HeroSection() {
               className="glass-minimal rounded-xl p-6 border border-white/[0.08] hover:border-accent/30 transition-all duration-500 group"
             >
               <div className="flex items-center justify-center mb-2">
-                <Code2 className="w-6 h-6 text-accent group-hover:animate-neural-pulse" />
+                <Globe className="w-6 h-6 text-accent group-hover:animate-neural-pulse" />
               </div>
-              <div className="text-3xl font-bold text-white mb-1">Native</div>
-              <div className="text-sm text-muted-foreground">VS Code Extension</div>
+              <div className="text-3xl font-bold text-white mb-1">Web-Based</div>
+              <div className="text-sm text-muted-foreground">No Install Needed</div>
             </motion.div>
+          </motion.div>
+
+          {/* VS Code Coming Soon Banner */}
+          <motion.div
+            variants={staggerItem}
+            className="mt-8 max-w-xl mx-auto"
+          >
+            <Link href="/install" className="block">
+              <div className="glass-minimal rounded-lg px-6 py-4 border border-neural/30 hover:border-neural/50 transition-all duration-300 cursor-pointer group">
+                <div className="flex items-center justify-center gap-3">
+                  <Bell className="w-5 h-5 text-neural animate-pulse" />
+                  <span className="text-gray-300 text-sm">
+                    <span className="text-neural font-medium">VS Code Extension</span> coming soon —
+                    <span className="text-white/80 group-hover:text-white transition-colors"> get notified</span>
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-neural group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </Link>
           </motion.div>
         </div>
       </motion.div>

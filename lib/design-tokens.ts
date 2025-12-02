@@ -1,6 +1,6 @@
 /**
  * Neural Minimalism Design System
- * Systemized design tokens for MockMate
+ * Systemized design tokens for Skillon
  *
  * This file contains all design constants used throughout the application.
  * Ensures consistency and makes design updates easier to manage.

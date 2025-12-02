@@ -242,7 +242,7 @@ export default function AccountPage() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `mockmate-data-export-${new Date().toISOString().split('T')[0]}.json`
+      a.download = `skillon-data-export-${new Date().toISOString().split('T')[0]}.json`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -300,7 +300,7 @@ export default function AccountPage() {
 
   const handleOpenCookieSettings = () => {
     // Clear consent to re-show cookie banner
-    localStorage.removeItem("mockmate_cookie_consent")
+    localStorage.removeItem("skillon_cookie_consent")
     window.location.reload()
   }
 
@@ -449,10 +449,10 @@ export default function AccountPage() {
               <CardContent className="space-y-3">
                 <Button
                   className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80"
-                  onClick={() => (window.location.href = "vscode://nikayel.MockMate")}
+                  onClick={() => (window.location.href = "/interview")}
                 >
                   <ExternalLink className="mr-2 h-4 w-4" />
-                  Open in VS Code
+                  Start Practicing
                 </Button>
 
                 {!isPro && (

@@ -41,8 +41,8 @@ export default function LegalPage() {
                   <strong>Last updated:</strong> November 2025
                 </p>
                 <p>
-                  MockMate respects your privacy and is committed to protecting your personal data. This privacy policy
-                  explains how we collect, use, and protect your information when you use our web application and VS Code extension.
+                  Skillon respects your privacy and is committed to protecting your personal data. This privacy policy
+                  explains how we collect, use, and protect your information when you use our web application.
                 </p>
                 <h4 className="text-white font-semibold mt-6 mb-3">Information We Collect</h4>
                 <ul className="list-disc list-inside space-y-2">
@@ -89,12 +89,12 @@ export default function LegalPage() {
                   <strong>Last updated:</strong> November 2025
                 </p>
                 <p>
-                  By using MockMate, you agree to these terms of service. Please read them carefully before using our
+                  By using Skillon, you agree to these terms of service. Please read them carefully before using our
                   web application or VS Code extension.
                 </p>
                 <h4 className="text-white font-semibold mt-6 mb-3">Acceptable Use</h4>
                 <ul className="list-disc list-inside space-y-2">
-                  <li>Use MockMate for legitimate interview practice purposes</li>
+                  <li>Use Skillon for legitimate interview practice purposes</li>
                   <li>Do not attempt to reverse engineer or exploit our AI systems</li>
                   <li>Respect intellectual property rights</li>
                   <li>Do not use the service for any illegal activities</li>
@@ -106,7 +106,7 @@ export default function LegalPage() {
                 </p>
                 <h4 className="text-white font-semibold mt-6 mb-3">Limitation of Liability</h4>
                 <p>
-                  MockMate is provided "as is" without warranties. We are not liable for any damages arising from the
+                  Skillon is provided "as is" without warranties. We are not liable for any damages arising from the
                   use of our service.
                 </p>
               </CardContent>
@@ -130,7 +130,7 @@ export default function LegalPage() {
                 </p>
                 <h4 className="text-white font-semibold mt-6 mb-3">GDPR Compliance</h4>
                 <p>
-                  MockMate is fully compliant with GDPR regulations. EU users have the right to access, rectify, or
+                  Skillon is fully compliant with GDPR regulations. EU users have the right to access, rectify, or
                   delete their personal data at any time.
                 </p>
                 <h4 className="text-white font-semibold mt-6 mb-3">Your Data Rights</h4>
@@ -142,7 +142,7 @@ export default function LegalPage() {
                   <li><strong>Object:</strong> Object to processing of your personal data</li>
                 </ul>
                 <p className="text-gray-400 text-sm mt-2">
-                  You can exercise these rights from your Account Settings page or by contacting privacy@mockmate.dev.
+                  You can exercise these rights from your Account Settings page or by contacting privacy@skillon.dev.
                 </p>
                 <h4 className="text-white font-semibold mt-6 mb-3">Data Retention</h4>
                 <p>
@@ -167,10 +167,10 @@ export default function LegalPage() {
                 </p>
                 <div className="bg-gray-800/50 p-4 rounded-lg">
                   <p>
-                    <strong>Email:</strong> legal@mockmate.dev
+                    <strong>Email:</strong> legal@skillon.dev
                   </p>
                   <p>
-                    <strong>Data Protection Officer:</strong> privacy@mockmate.dev
+                    <strong>Data Protection Officer:</strong> privacy@skillon.dev
                   </p>
                   <p>
                     <strong>Response Time:</strong> Within 72 hours for privacy requests

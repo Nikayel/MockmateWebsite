@@ -53,7 +53,7 @@ export default function SamplesPage() {
               <span className="text-gradient"> Feedback Examples</span>
             </h1>
             <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
-              Explore detailed feedback reports from actual MockMate interview sessions. See how our AI analyzes
+              Explore detailed feedback reports from actual Skillon interview sessions. See how our AI analyzes
               performance, identifies improvement areas, and provides actionable insights.
             </p>
           </div>
@@ -126,22 +126,22 @@ export default function SamplesPage() {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-heading font-bold text-white mb-6">Ready to Get Your Own Detailed Feedback?</h2>
           <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Install MockMate and start receiving comprehensive performance analytics for your coding interviews.
+            Start practicing with Skillon and receive comprehensive performance analytics for your coding interviews.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/install">
+            <Link href="/interview">
               <Button size="lg" className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white px-8 py-4 text-lg">
-                Install MockMate
+                Start Practicing Free
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
-            <Link href="/demo">
+            <Link href="/pricing">
               <Button
                 size="lg"
                 variant="outline"
                 className="border-white text-white hover:bg-white hover:text-black px-8 py-4 text-lg bg-transparent"
               >
-                Try Interactive Demo
+                View Pricing
               </Button>
             </Link>
           </div>

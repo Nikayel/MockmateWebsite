@@ -1,19 +1,22 @@
-# MockMate Website
+# Skillon
 
-The marketing website and user dashboard for MockMate - a VS Code extension for practicing technical interviews with AI assistance.
+The web platform and user dashboard for Skillon - an AI-powered coding interview practice platform.
 
-## What is MockMate?
+## What is Skillon?
 
-MockMate helps developers prepare for technical interviews by simulating realistic coding interviews directly in VS Code. You get an AI interviewer, a coding partner, and full workspace context awareness - just like a real interview.
+Skillon helps developers prepare for technical interviews by simulating realistic coding interviews with an AI interviewer. Practice in your browser with real-time feedback and comprehensive performance analytics.
+
+**VS Code Extension coming soon** - Sign up on the website to get notified when it launches!
 
 ## Features
 
-- **Landing Page** - Marketing site with features, pricing, and demo
-- **User Authentication** - GitHub OAuth via Supabase
+- **Landing Page** - Marketing site with features, pricing, and sample reports
+- **User Authentication** - GitHub/Google OAuth via Firebase
 - **Account Dashboard** - View subscription status, usage, and manage account
 - **Pricing & Upgrades** - Free and Pro tier management
-- **Live Demo** - Try MockMate in your browser before installing
+- **Live Practice** - Practice coding interviews directly in your browser
 - **Documentation** - Complete setup and usage guides
+- **AI Feedback** - Detailed performance analytics and improvement recommendations
 
 ## Tech Stack
 
@@ -22,14 +25,14 @@ MockMate helps developers prepare for technical interviews by simulating realist
 - **Tailwind CSS** - Styling
 - **Firebase** - Authentication and Firestore database
 - **Google Gemini** - AI chat functionality
-- **Monaco Editor** - Code editor for demo
+- **Monaco Editor** - Code editor
 - **Stripe** - Payment processing (proprietary)
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - pnpm (or npm/yarn)
 - Firebase account (for authentication and Firestore)
 - Google Gemini API key
@@ -38,8 +41,8 @@ MockMate helps developers prepare for technical interviews by simulating realist
 
 1. Clone the repo:
 ```bash
-git clone https://github.com/Nikayel/mockmate-website.git
-cd mockmate-website
+git clone https://github.com/Nikayel/skillon-website.git
+cd skillon-website
 ```
 
 2. Install dependencies:
@@ -69,7 +72,6 @@ GEMINI_API_KEY=your_gemini_api_key
 STRIPE_SECRET_KEY=sk_test_...
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 STRIPE_PRICE_ID_WEBSITE=price_...
-STRIPE_PRICE_ID_VSCODE=price_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
@@ -87,7 +89,7 @@ Visit `http://localhost:3000`
 │   ├── api/               # API routes
 │   ├── account/           # User dashboard
 │   ├── auth/              # Auth callbacks
-│   ├── demo/              # Live demo page
+│   ├── interview/         # Interview practice page
 │   ├── docs/              # Documentation
 │   ├── login/             # Login page
 │   ├── pricing/           # Pricing page
@@ -96,20 +98,19 @@ Visit `http://localhost:3000`
 │   ├── ui/               # Reusable UI components
 │   └── ...               # Feature components
 ├── lib/                  # Utilities and config
-├── public/               # Static assets
-└── extension/            # VS Code extension (submodule)
+└── public/               # Static assets
 ```
 
 ## Key Pages
 
 - `/` - Landing page
-- `/login` - GitHub OAuth login
+- `/login` - GitHub/Google OAuth login
 - `/account` - User dashboard
 - `/pricing` - Pricing plans
 - `/upgrade` - Upgrade to Pro
-- `/demo` - Live coding interview demo
+- `/interview` - Live coding interview practice
 - `/docs` - Documentation
-- `/install` - Installation guide
+- `/install` - VS Code extension coming soon page
 
 ## Environment Variables
 
@@ -147,55 +148,11 @@ pnpm lint
 
 The site is deployed on Vercel. Push to `main` branch to deploy automatically.
 
-## Connection to Extension
-
-The website and VS Code extension share:
-- Same Firebase project (authentication & Firestore database)
-- Same user profiles collection
-- Same subscription tiers
-- OAuth flow: Website → Extension via deep links
-
-When users upgrade on the website, their subscription status is immediately available in the extension.
-
 ## Security & Firebase Rules
 
 This project uses Firebase Firestore with Row-Level Security (RLS) rules. See [FIRESTORE_RULES.md](./FIRESTORE_RULES.md) for the complete security rules configuration.
 
-**Important**: Always configure Firestore security rules in your Firebase Console to restrict access to user data. The rules ensure:
-- Users can only read/write their own profile
-- Users can only access their own interview sessions
-- All operations require authentication
-
-## Contributing
-
-1. Fork the repo
-2. Create a feature branch
-3. Make your changes
-4. Submit a PR
-
-## License
-
-This project uses a **hybrid open-source approach**:
-
-- **Core functionality, UI components, and interview features**: MIT License (fully open source)
-- **Payment processing, proprietary algorithms, and advanced features**: All Rights Reserved (proprietary)
-
-See [PRIVATE.md](./PRIVATE.md) for details on what's open source vs proprietary.
-
-### Open Source Components
-- Core UI components and design system
-- Authentication and user management
-- Interview functionality and AI chat
-- Basic dashboard and session management
-- Documentation and setup guides
-
-### Proprietary Components
-- Stripe payment integration
-- Subscription management logic
-- Advanced analytics and algorithms
-- Business-specific features
-
-This hybrid model allows the community to benefit from the core platform while protecting business-critical components.
+**Important**: Always configure Firestore security rules in your Firebase Console to restrict access to user data.
 
 ## API Endpoints
 
@@ -208,10 +165,9 @@ The website provides several API endpoints for core functionality:
 - **`/api/customer-portal`** - Stripe customer portal for subscription management
 - **`/api/sync-subscription`** - Subscription synchronization with Firestore
 - **`/api/promo-code`** - Promotional code validation
-- **`/api/webhook/stripe`** - Stripe webhook handler for payment events
 
 All API endpoints implement rate limiting for security and stability.
 
 ## Support
 
-For issues or questions, open an issue on GitHub or email support@mockmate.dev
+For issues or questions, open an issue on GitHub or email support@skillon.dev
