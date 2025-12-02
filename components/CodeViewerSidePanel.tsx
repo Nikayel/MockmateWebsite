@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useEffect, memo, useCallback } from "react"
+import React, { useEffect, memo } from "react"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { MonacoEditor, cleanupOrphanedModels } from "@/components/editor"
+import { MonacoEditor } from "@/components/editor"
 
 interface CodeViewerSidePanelProps {
   isOpen: boolean
@@ -70,15 +70,6 @@ function CodeViewerSidePanelInner({
     return () => window.removeEventListener("keydown", handleEscape)
   }, [isOpen, onClose])
 
-  // Cleanup Monaco models on unmount
-  useEffect(() => {
-    return () => {
-      requestAnimationFrame(() => {
-        cleanupOrphanedModels()
-      })
-    }
-  }, [])
-
   if (!isOpen) return null
 
   return (
@@ -102,17 +93,10 @@ function CodeViewerSidePanelInner({
       {/* Editor - Using shared MonacoEditor component */}
       <div className="flex-1 overflow-hidden editor-wrapper">
         <MonacoEditor
-          uniqueKey={`code-viewer-${fileName}`}
           height="100%"
           language={editorLanguage}
           value={content}
           readOnly
-          options={{
-            minimap: { enabled: true },
-            wordWrap: "on",
-            padding: { top: 10, bottom: 10 },
-            renderLineHighlight: "all",
-          }}
         />
       </div>
 
