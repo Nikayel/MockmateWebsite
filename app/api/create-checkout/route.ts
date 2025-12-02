@@ -6,8 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
-import { db } from "@/lib/firebase"
-import { doc, getDoc } from "firebase/firestore"
+import { adminDb } from "@/lib/firebase-admin"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-11-20.acacia", // Use latest Stripe API version
@@ -23,10 +22,9 @@ export async function POST(request: NextRequest) {
 
     // Validate that user has an email before creating checkout
     try {
-      const profileRef = doc(db, "profiles", userId)
-      const profileSnap = await getDoc(profileRef)
+      const profileSnap = await adminDb.collection("profiles").doc(userId).get()
 
-      if (!profileSnap.exists()) {
+      if (!profileSnap.exists) {
         return NextResponse.json({ error: "User profile not found" }, { status: 404 })
       }
 

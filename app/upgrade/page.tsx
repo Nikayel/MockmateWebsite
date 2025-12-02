@@ -29,6 +29,7 @@ function UpgradePageContent() {
   const router = useRouter()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [profileLoading, setProfileLoading] = useState(true)
   const [loading, setLoading] = useState(false)
   const [promoCode, setPromoCode] = useState("")
   const [applyingPromo, setApplyingPromo] = useState(false)
@@ -38,6 +39,8 @@ function UpgradePageContent() {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  const isProUser = profile?.subscription_tier === "pro"
 
   useEffect(() => {
     if (authLoading || !initialized) return
@@ -57,12 +60,16 @@ function UpgradePageContent() {
           router.replace("/upgrade")
           
           // If we have session ID, verify and sync subscription immediately
-          if (sessionId && user) {
+          if (sessionId && firebaseUser && user) {
             try {
+              const token = await firebaseUser.getIdToken()
               // Call sync API to check Stripe and update profile
               const syncResponse = await fetch("/api/sync-subscription", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
                 body: JSON.stringify({ userId: user.id }),
               })
               
@@ -99,7 +106,35 @@ function UpgradePageContent() {
     handleStripeRedirect()
   }, [authLoading, mounted, searchParams, router, user, firebaseUser, initialized])
 
+  useEffect(() => {
+    if (authLoading || !initialized || !mounted) return
+
+    const loadProfile = async () => {
+      if (!firebaseUser) {
+        setProfile(null)
+        setProfileLoading(false)
+        return
+      }
+
+      try {
+        const userProfile = await getUserProfile(firebaseUser.uid)
+        setProfile(userProfile)
+      } catch (error) {
+        console.error("Error loading profile on upgrade page:", error)
+      } finally {
+        setProfileLoading(false)
+      }
+    }
+
+    loadProfile()
+  }, [authLoading, initialized, mounted, firebaseUser])
+
   const handlePromoCode = async () => {
+    if (isProUser) {
+      toast.info("You're already a Pro member")
+      return
+    }
+
     if (!user || !promoCode.trim()) {
       toast.error("Please enter a promo code")
       return
@@ -193,6 +228,12 @@ function UpgradePageContent() {
   }
 
   const handleUpgrade = async () => {
+    if (isProUser) {
+      toast.success("You're already on Pro! 🎉")
+      router.push("/account")
+      return
+    }
+
     if (!user) {
       window.location.href = "/login?redirect=upgrade"
       return
@@ -307,7 +348,7 @@ function UpgradePageContent() {
           </div>
 
           {/* Promo Code Section */}
-          {user && (
+          {user && !isProUser && (
             <Card className="bg-gray-900/50 border-gray-700 mb-8">
               <CardContent className="pt-6">
                 <div className="flex flex-col sm:flex-row gap-3 items-center">
@@ -344,25 +385,46 @@ function UpgradePageContent() {
 
           {/* CTA */}
           <div className="text-center">
-            <Button
-              onClick={handleUpgrade}
-              disabled={loading}
-              size="lg"
-              className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-8 py-4 text-lg"
-            >
-              {loading ? (
-                "Processing..."
-              ) : (
-                <>
-                  <Zap className="mr-2 h-5 w-5" />
-                  Upgrade to Pro - {proPricing.priceDisplay}
-                  {proPricing.period}
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </>
-              )}
-            </Button>
+            {isProUser ? (
+              <div className="space-y-4">
+                <div className="inline-flex items-center rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-emerald-200">
+                  <CheckCircle className="mr-2 h-5 w-5 text-emerald-400" />
+                  You're already enjoying MockMate Pro!
+                </div>
+                <Button
+                  onClick={() => router.push("/account")}
+                  size="lg"
+                  className="bg-gray-100 text-black font-semibold px-8 py-4 text-lg hover:bg-white"
+                >
+                  Manage subscription
+                </Button>
+                <p className="text-gray-400 text-sm">
+                  Need help? Contact support@mockmate.dev
+                </p>
+              </div>
+            ) : (
+              <>
+                <Button
+                  onClick={handleUpgrade}
+                  disabled={loading}
+                  size="lg"
+                  className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-8 py-4 text-lg"
+                >
+                  {loading ? (
+                    "Processing..."
+                  ) : (
+                    <>
+                      <Zap className="mr-2 h-5 w-5" />
+                      Upgrade to Pro - {proPricing.priceDisplay}
+                      {proPricing.period}
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </>
+                  )}
+                </Button>
 
-            <p className="text-gray-400 text-sm mt-4">Cancel anytime. No hidden fees. 30-day money-back guarantee.</p>
+                <p className="text-gray-400 text-sm mt-4">Cancel anytime. No hidden fees. 30-day money-back guarantee.</p>
+              </>
+            )}
           </div>
         </div>
       </div>
