@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { CheckCircle, TrendingUp, Target, Zap, Code, MessageSquare, Activity, ChevronDown, ChevronUp, XCircle, FileText, RotateCcw, Play, Download, AlertCircle } from "lucide-react"
+import { CheckCircle, TrendingUp, Target, Zap, Code, MessageSquare, Activity, ChevronDown, ChevronUp, XCircle, FileText, RotateCcw, Play, Download, AlertCircle, Sparkles } from "lucide-react"
+import { LearningRecommendations } from "@/components/LearningRecommendations"
 import {
   RadarChart,
   PolarGrid,
@@ -55,6 +56,9 @@ interface PracticeFeedbackProps {
   spaceComplexity?: string
   efficiencyScore?: number
   elapsedTime?: number
+  userId?: string
+  problemType?: string
+  difficulty?: string
   onRetry?: () => void
   onNewProblem?: () => void
   onExport?: () => void
@@ -145,9 +149,8 @@ function parseFeedback(feedback: string): FeedbackSection {
     
     const overall100 = parseScoreWithJustification('Overall', scoreText, true)
     const overall10 = overall100.score === 0 ? parseScoreWithJustification('Overall', scoreText, false) : overall100
-    sections.scores.overall = overall10.score
     if (overall10.justification) sections.scoreJustifications.overall = overall10.justification
-    
+
     // Explicitly check for 0 scores in feedback text (in case AI mentions "0/100" explicitly)
     const feedbackLower = feedback.toLowerCase()
     if (feedbackLower.includes('reasoning') && feedbackLower.includes('0/100')) {
@@ -156,10 +159,18 @@ function parseFeedback(feedback: string): FeedbackSection {
     if (feedbackLower.includes('ai collaboration') && feedbackLower.includes('0/100')) {
       sections.scores.aiCollaboration = 0
     }
-    
+
+    // ALWAYS recalculate overall from component scores
+    // This ensures 0s in reasoning/collaboration properly affect the overall score
+    const calculatedOverall = Math.round(
+      (sections.scores.correctness + sections.scores.efficiency + sections.scores.codeQuality +
+       sections.scores.reasoning + sections.scores.aiCollaboration) / 5
+    )
+    sections.scores.overall = calculatedOverall
+
     // Debug: log if scores are still 0 after parsing
-    if (sections.scores.correctness === 0 && sections.scores.efficiency === 0 && 
-        sections.scores.codeQuality === 0 && sections.scores.reasoning === 0 && 
+    if (sections.scores.correctness === 0 && sections.scores.efficiency === 0 &&
+        sections.scores.codeQuality === 0 && sections.scores.reasoning === 0 &&
         sections.scores.aiCollaboration === 0) {
       console.warn("Failed to parse scores from feedback. Score text:", scoreText.substring(0, 200))
     }
@@ -208,6 +219,9 @@ export default function PracticeFeedback({
   spaceComplexity,
   efficiencyScore,
   elapsedTime = 0,
+  userId,
+  problemType,
+  difficulty,
   onRetry,
   onNewProblem,
   onExport,
@@ -796,6 +810,23 @@ export default function PracticeFeedback({
                   ))}
                 </ol>
               </div>
+            </div>
+          )}
+
+          {/* Learning Recommendations */}
+          {userId && (
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-yellow-500" />
+                Personalized Learning Path
+              </h2>
+              <LearningRecommendations
+                userId={userId}
+                currentProblemType={problemType}
+                currentDifficulty={difficulty}
+                performanceScore={sections.scores.overall > 0 ? normalizeScore(sections.scores.overall) : normalizedPerformanceScore}
+                onSelectProblem={(type, diff) => onNewProblem?.()}
+              />
             </div>
           )}
 

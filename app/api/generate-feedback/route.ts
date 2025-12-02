@@ -123,16 +123,15 @@ function extractScores(feedback: string, metrics: {
     }
   }
 
-  // Recalculate overall if needed
+  // ALWAYS recalculate overall from component scores to ensure accuracy
+  // This is critical because 0s in reasoning/collaboration MUST affect overall
   const avgScore = Math.round(
     (scores.correctness + scores.efficiency + scores.codeQuality +
      scores.reasoningExplanation + scores.aiCollaboration) / 5
   )
 
-  // If extracted overall seems wrong, use calculated average
-  if (Math.abs(scores.overall - avgScore) > 30) {
-    scores.overall = avgScore
-  }
+  // Always use calculated average - don't trust AI's overall
+  scores.overall = avgScore
 
   return scores
 }
