@@ -6,15 +6,61 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
-import { db } from "@/lib/firebase"
-import { doc, setDoc } from "firebase/firestore"
-import { updateQuotaForSubscriptionTier } from "@/lib/firestore-helpers"
+import { adminDb } from "@/lib/firebase-admin"
+import { PRICING_CONFIG } from "@/lib/config"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2024-11-20.acacia", // Use latest Stripe API version
+  apiVersion: "2024-11-20.acacia",
 })
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || ""
+
+/**
+ * Update user quota for subscription tier using Admin SDK
+ */
+async function updateQuotaForSubscriptionTierAdmin(userId: string, subscriptionTier: "free" | "pro" | "enterprise"): Promise<void> {
+  const now = new Date()
+  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+
+  const sessionsLimit = subscriptionTier === "pro"
+    ? PRICING_CONFIG.pro.sessionsPerMonth
+    : PRICING_CONFIG.free.sessionsPerMonth
+
+  // Query for existing quota
+  const quotaSnapshot = await adminDb.collection("profile_quota")
+    .where("user_id", "==", userId)
+    .get()
+
+  // Find current period quota
+  let currentQuotaDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null
+  quotaSnapshot.docs.forEach(doc => {
+    const data = doc.data()
+    const quotaStart = new Date(data.period_start)
+    if (quotaStart >= periodStart && quotaStart <= periodEnd) {
+      currentQuotaDoc = doc
+    }
+  })
+
+  if (currentQuotaDoc) {
+    // Update existing quota
+    await currentQuotaDoc.ref.update({
+      sessions_limit: sessionsLimit,
+      updated_at: new Date().toISOString(),
+    })
+  } else {
+    // Create new quota
+    await adminDb.collection("profile_quota").add({
+      user_id: userId,
+      sessions_used: 0,
+      sessions_limit: sessionsLimit,
+      period_start: periodStart.toISOString(),
+      period_end: periodEnd.toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+  }
+}
 
 export async function POST(request: NextRequest) {
   const body = await request.text()
@@ -35,17 +81,16 @@ export async function POST(request: NextRequest) {
 
   // Check for idempotency - prevent processing the same event twice
   try {
-    const { collection, doc: firestoreDoc, getDoc, setDoc } = await import("firebase/firestore")
-    const processedEventRef = firestoreDoc(db, "webhook_events", event.id)
-    const processedEventSnap = await getDoc(processedEventRef)
+    const processedEventRef = adminDb.collection("webhook_events").doc(event.id)
+    const processedEventSnap = await processedEventRef.get()
 
-    if (processedEventSnap.exists()) {
+    if (processedEventSnap.exists) {
       console.log(`Event ${event.id} already processed, skipping`)
       return NextResponse.json({ received: true, skipped: true })
     }
 
     // Mark event as processed
-    await setDoc(processedEventRef, {
+    await processedEventRef.set({
       event_id: event.id,
       event_type: event.type,
       processed_at: new Date().toISOString(),
@@ -67,13 +112,13 @@ export async function POST(request: NextRequest) {
     if (paymentSuccessful && session.mode === "subscription") {
       // Upgrade user to Pro
       const userId = session.metadata?.userId || session.client_reference_id
-      
+
       if (userId) {
         try {
           // Fetch subscription details to get dates
           let subscriptionStartDate: string | undefined
           let currentPeriodEnd: string | undefined
-          
+
           if (session.subscription) {
             try {
               const subscription = await stripe.subscriptions.retrieve(
@@ -91,8 +136,9 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          const profileRef = doc(db, "profiles", userId)
-          await setDoc(profileRef, {
+          // Use Admin SDK to update profile (bypasses security rules)
+          const profileRef = adminDb.collection("profiles").doc(userId)
+          await profileRef.set({
             subscription_tier: "pro",
             subscription_platform: session.metadata?.platform || "website",
             stripe_customer_id: session.customer as string,
@@ -104,7 +150,7 @@ export async function POST(request: NextRequest) {
           }, { merge: true })
 
           // Update quota to reflect Pro subscription (35 sessions)
-          await updateQuotaForSubscriptionTier(userId, "pro")
+          await updateQuotaForSubscriptionTierAdmin(userId, "pro")
 
           console.log(`✅ User ${userId} upgraded to Pro via Stripe`)
           console.log(`   Payment Status: ${session.payment_status}`)
@@ -128,20 +174,15 @@ export async function POST(request: NextRequest) {
     const subscription = event.data.object as Stripe.Subscription
 
     try {
-      // Query Firestore to find user by subscription ID
-      const { collection, query, where, getDocs } = await import("firebase/firestore")
+      // Query Firestore to find user by subscription ID using Admin SDK
+      const profilesQuery = await adminDb.collection("profiles")
+        .where("stripe_subscription_id", "==", subscription.id)
+        .get()
 
-      const profilesQuery = query(
-        collection(db, "profiles"),
-        where("stripe_subscription_id", "==", subscription.id)
-      )
-
-      const profilesSnap = await getDocs(profilesQuery)
-
-      if (!profilesSnap.empty) {
-        const profileDoc = profilesSnap.docs[0]
+      if (!profilesQuery.empty) {
+        const profileDoc = profilesQuery.docs[0]
         const userId = profileDoc.id
-        const profileRef = doc(db, "profiles", userId)
+        const profileRef = adminDb.collection("profiles").doc(userId)
 
         // Check subscription status
         const isActive = subscription.status === "active"
@@ -151,7 +192,7 @@ export async function POST(request: NextRequest) {
 
         if (isCanceled) {
           // Downgrade to free tier
-          await setDoc(profileRef, {
+          await profileRef.set({
             subscription_tier: "free",
             subscription_status: subscription.status,
             subscription_current_period_end: subscription.current_period_end
@@ -161,12 +202,12 @@ export async function POST(request: NextRequest) {
           }, { merge: true })
 
           // Reset quota to free tier limits
-          await updateQuotaForSubscriptionTier(userId, "free")
+          await updateQuotaForSubscriptionTierAdmin(userId, "free")
 
           console.log(`User ${userId} downgraded to Free due to subscription ${subscription.status}`)
         } else if (isActive) {
           // Update subscription details (e.g., period end date)
-          await setDoc(profileRef, {
+          await profileRef.set({
             subscription_status: subscription.status,
             subscription_current_period_end: subscription.current_period_end
               ? new Date(subscription.current_period_end * 1000).toISOString()
@@ -187,4 +228,3 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ received: true })
 }
-
