@@ -62,7 +62,7 @@ import { toast } from "sonner"
 // Dynamically import Monaco Editor (client-side only)
 const Editor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
-  loading: () => <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="text-gray-400">Loading editor...</div></div>
+  loading: () => null
 })
 
 interface ChatMessage {

@@ -486,6 +486,25 @@
   display: none !important;
 }
 
+/* Monaco overflow-guard - main internal container */
+.monaco-wrapper .monaco-editor .overflow-guard,
+.editor-wrapper .monaco-editor .overflow-guard {
+  position: absolute !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+}
+
+/* Editor container inside monaco-editor */
+.monaco-wrapper .monaco-editor .editor-container,
+.editor-wrapper .monaco-editor .editor-container {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+}
+
 /* Ensure lines content is properly positioned */
 .monaco-wrapper .monaco-editor .lines-content,
 .editor-wrapper .monaco-editor .lines-content {
@@ -500,18 +519,22 @@
 .editor-wrapper .monaco-editor .view-lines {
   padding-top: 0 !important;
   margin-top: 0 !important;
+  top: 0 !important;
 }
 
 /* Ensure editor scrollable area starts at top */
 .monaco-wrapper .monaco-editor .monaco-scrollable-element,
 .editor-wrapper .monaco-editor .monaco-scrollable-element {
   top: 0 !important;
+  position: absolute !important;
+  inset: 0 !important;
 }
 
-/* Remove any top offset from the editor */
+/* Remove any top offset from the editor-scrollable */
 .monaco-wrapper .monaco-editor .editor-scrollable,
 .editor-wrapper .monaco-editor .editor-scrollable {
   top: 0 !important;
+  position: absolute !important;
 }
 
 /* Fix Monaco loading container */
@@ -520,25 +543,48 @@
   contain: strict !important;
 }
 
-/* Ensure the section wrapper doesn't cause overflow */
-.monaco-wrapper section,
-.editor-wrapper section {
-  position: absolute !important;
-  inset: 0 !important;
+/* Editor wrapper must be positioned for absolute children */
+.monaco-wrapper,
+.editor-wrapper {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
   overflow: hidden !important;
 }
 
-/* Hide placeholder/loading artifacts */
+/* The react-monaco-editor section wrapper */
+.monaco-wrapper > section,
+.editor-wrapper > section {
+  position: absolute !important;
+  inset: 0 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* The first div inside section (react wrapper div) */
+.monaco-wrapper > section > div,
+.editor-wrapper > section > div {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  min-height: 0 !important;
+}
+
+/* The monaco-editor div itself */
+.monaco-wrapper > section > div > .monaco-editor,
+.editor-wrapper > section > div > .monaco-editor {
+  flex: 1 !important;
+  height: 100% !important;
+}
+
+/* Hide any placeholder/loading artifacts that might remain */
 .monaco-wrapper > div:first-child:empty,
 .editor-wrapper > div:first-child:empty {
   display: none !important;
-}
-
-/* Fix potential padding issues from react-monaco-editor wrapper */
-.monaco-wrapper > section > div,
-.editor-wrapper > section > div {
-  padding: 0 !important;
-  margin: 0 !important;
 }
 
 /* Editor background */
