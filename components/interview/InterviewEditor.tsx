@@ -1,11 +1,11 @@
 "use client"
 
-import { useRef, useEffect, useCallback, memo } from "react"
+import { useRef, useCallback, memo } from "react"
 import { Code, PlayCircle, CheckCircle, XCircle, AlertCircle } from "lucide-react"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { MonacoEditor, cleanupOrphanedModels } from "@/components/editor"
+import { MonacoEditor } from "@/components/editor"
 import { AIChatPartner } from "./InterviewerChat"
 import { useInterviewStore, type Language } from "@/lib/stores"
 import { validateCodeProtection } from "@/lib/code-protection"
@@ -45,24 +45,8 @@ function InterviewEditorInner({
     starterCode,
   } = useInterviewStore()
 
-  // Cleanup orphaned models on unmount
-  useEffect(() => {
-    return () => {
-      // Schedule cleanup after component unmount
-      requestAnimationFrame(() => {
-        cleanupOrphanedModels()
-      })
-    }
-  }, [])
-
-  // Handle code change with protection validation - memoized for performance
-  const handleCodeChange = useCallback((newCode: string, event?: any) => {
-    // Skip validation for programmatic changes
-    if (event?.isFlush) {
-      setCode(newCode)
-      return
-    }
-
+  // Handle code change with protection validation
+  const handleCodeChange = useCallback((newCode: string) => {
     // Enforce code protection if enabled
     if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
       const validation = validateCodeProtection(newCode, protectedElements, selectedLanguage)
@@ -116,16 +100,14 @@ function InterviewEditorInner({
         <div
           ref={editorContainerRef}
           className="flex-1 min-h-0 rounded border border-gray-700 editor-wrapper"
-          style={{ minHeight: "200px" }}
+          style={{ minHeight: "250px" }}
         >
           <MonacoEditor
-            uniqueKey={`editor-${selectedLanguage}-${selectedScenario?.id || "none"}`}
             height="100%"
             language={selectedLanguage}
             value={code}
             onChange={handleCodeChange}
             readOnly={!isInterviewStarted || showFeedback}
-            minimal
           />
         </div>
 

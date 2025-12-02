@@ -328,35 +328,126 @@
   transform: translateY(-2px);
 }
 
-/* Monaco Editor container */
+/* ===== MONACO EDITOR STYLES ===== */
+
+/* Main wrapper - critical for containment */
+.monaco-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  contain: strict;
+  isolation: isolate;
+}
+
+/* Editor container wrapper */
 .editor-wrapper {
   position: relative;
   height: 100%;
   width: 100%;
   overflow: hidden;
   border-radius: 6px;
-  background: #111827;
+  background: #1e1e1e;
+  contain: strict;
+  isolation: isolate;
 }
 
-/* Ensure the Monaco canvas stretches to fill */
-.editor-wrapper .monaco-editor,
-.editor-wrapper .monaco-editor .overflow-guard {
+/* Force Monaco to respect container bounds */
+.monaco-wrapper .monaco-editor,
+.editor-wrapper .monaco-editor {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
   width: 100% !important;
   height: 100% !important;
 }
 
-/* Subtle styling tweaks to match the app */
+/* Overflow guard - prevents visual glitches */
+.monaco-wrapper .overflow-guard,
+.editor-wrapper .overflow-guard {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+/* Editor background */
+.monaco-wrapper .monaco-editor-background,
 .editor-wrapper .monaco-editor-background {
-  background: #111827;
+  background: #1e1e1e !important;
 }
 
-.editor-wrapper .margin,
-.editor-wrapper .margin-view-overlays {
-  background: #0f172a;
+/* Margin (line numbers area) */
+.monaco-wrapper .margin,
+.editor-wrapper .margin {
+  background: #1e1e1e !important;
 }
 
+/* Line numbers */
+.monaco-wrapper .line-numbers,
 .editor-wrapper .line-numbers {
-  color: #94a3b8 !important;
+  color: #858585 !important;
+}
+
+/* Active line number */
+.monaco-wrapper .current-line ~ .line-numbers,
+.editor-wrapper .current-line ~ .line-numbers {
+  color: #c6c6c6 !important;
+}
+
+/* Cursor */
+.monaco-wrapper .cursor,
+.editor-wrapper .cursor {
+  background: #aeafad !important;
+  border-color: #aeafad !important;
+}
+
+/* Selection */
+.monaco-wrapper .selected-text,
+.editor-wrapper .selected-text {
+  background: rgba(38, 79, 120, 0.5) !important;
+}
+
+/* Scrollbar styling */
+.monaco-wrapper .scrollbar,
+.editor-wrapper .scrollbar {
+  background: transparent !important;
+}
+
+.monaco-wrapper .slider,
+.editor-wrapper .slider {
+  background: rgba(121, 121, 121, 0.4) !important;
+  border-radius: 4px !important;
+}
+
+.monaco-wrapper .slider:hover,
+.editor-wrapper .slider:hover {
+  background: rgba(121, 121, 121, 0.7) !important;
+}
+
+/* Hide decorations that cause visual issues */
+.monaco-wrapper .view-overlays,
+.editor-wrapper .view-overlays {
+  contain: strict;
+}
+
+/* Fix for any absolute positioned children */
+.monaco-wrapper [class*="monaco-"],
+.editor-wrapper [class*="monaco-"] {
+  box-sizing: border-box;
+}
+
+/* Prevent text selection outside editor */
+.monaco-wrapper {
+  user-select: none;
+}
+
+.monaco-wrapper .view-lines {
+  user-select: text;
 }
 
 /* Responsive improvements */
