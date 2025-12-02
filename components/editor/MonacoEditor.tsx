@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useRef, memo } from "react"
+import React, { useEffect, useRef, memo, useState } from "react"
 import Editor, { OnMount, OnChange } from "@monaco-editor/react"
 import type { editor } from "monaco-editor"
 
@@ -26,17 +26,29 @@ function MonacoEditorComponent({
 }: MonacoEditorProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [isClient, setIsClient] = useState(false)
+
+  // Ensure we're on the client before rendering Monaco
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   // Handle editor mount
   const handleMount: OnMount = (editor, monaco) => {
     editorRef.current = editor
 
-    // Focus the editor
-    editor.focus()
+    // Focus the editor after a brief delay to ensure DOM is ready
+    setTimeout(() => {
+      editor.focus()
+    }, 100)
 
-    // Force layout after mount
+    // Force initial layout after mount with multiple frames to ensure stability
     requestAnimationFrame(() => {
       editor.layout()
+      // Second layout call to handle any delayed container sizing
+      requestAnimationFrame(() => {
+        editor.layout()
+      })
     })
   }
 
@@ -57,20 +69,47 @@ function MonacoEditorComponent({
     }
   }, [])
 
-  // Handle resize
+  // Use ResizeObserver for precise container-based layout updates
+  // This is more reliable than window resize events and doesn't conflict with automaticLayout
   useEffect(() => {
-    const handleResize = () => {
-      if (editorRef.current) {
-        editorRef.current.layout()
-      }
-    }
+    if (!containerRef.current || !isClient) return
 
-    window.addEventListener("resize", handleResize)
-    return () => window.removeEventListener("resize", handleResize)
-  }, [])
+    const resizeObserver = new ResizeObserver((entries) => {
+      // Debounce layout calls to prevent jitter
+      if (editorRef.current) {
+        requestAnimationFrame(() => {
+          editorRef.current?.layout()
+        })
+      }
+    })
+
+    resizeObserver.observe(containerRef.current)
+    return () => resizeObserver.disconnect()
+  }, [isClient])
 
   // Convert height to CSS string
   const cssHeight = typeof height === "number" ? `${height}px` : height
+
+  // Show loading state during SSR/hydration
+  if (!isClient) {
+    return (
+      <div
+        className={`monaco-wrapper ${className}`}
+        style={{
+          height: cssHeight,
+          width: "100%",
+          position: "relative",
+          overflow: "hidden",
+          background: "#1e1e1e",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div className="text-gray-400 text-sm">Loading editor...</div>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -98,7 +137,7 @@ function MonacoEditorComponent({
           lineHeight: 22,
           tabSize: 2,
           scrollBeyondLastLine: false,
-          automaticLayout: true,
+          automaticLayout: false, // Disabled - we use ResizeObserver for precise control
           wordWrap: "off",
           lineNumbers: "on",
           lineNumbersMinChars: 3,

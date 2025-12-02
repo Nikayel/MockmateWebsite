@@ -571,6 +571,44 @@
   contain: strict;
 }
 
+/* CRITICAL: Hide Monaco's internal input elements that can "leak" visually */
+/* These are invisible input handlers for IME/keyboard/accessibility */
+.monaco-wrapper .monaco-editor textarea.ime-text-area,
+.editor-wrapper .monaco-editor textarea.ime-text-area,
+.monaco-wrapper .monaco-editor .inputarea,
+.editor-wrapper .monaco-editor .inputarea {
+  opacity: 0 !important;
+  background: transparent !important;
+  color: transparent !important;
+  caret-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  resize: none !important;
+}
+
+/* Hide native edit context overlay */
+.monaco-wrapper .monaco-editor .native-edit-context,
+.editor-wrapper .monaco-editor .native-edit-context,
+.monaco-wrapper .monaco-editor [class*="native-edit"],
+.editor-wrapper .monaco-editor [class*="native-edit"] {
+  opacity: 0 !important;
+  background: transparent !important;
+  color: transparent !important;
+  pointer-events: none !important;
+}
+
+/* Ensure Monaco's hidden textarea stays hidden */
+.monaco-wrapper .monaco-editor textarea,
+.editor-wrapper .monaco-editor textarea {
+  opacity: 0 !important;
+  position: absolute !important;
+  background: transparent !important;
+  color: transparent !important;
+  border: none !important;
+  outline: none !important;
+}
+
 /* Fix for any absolute positioned children */
 .monaco-wrapper [class*="monaco-"],
 .editor-wrapper [class*="monaco-"] {
