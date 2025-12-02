@@ -40,6 +40,8 @@ import {
   ChevronUp,
   Mic,
   MicOff,
+  HelpCircle,
+  Sparkles,
 } from "lucide-react"
 import {
   AlertDialog,
@@ -113,6 +115,11 @@ export default function InterviewPage() {
   const [isRecordingPartner, setIsRecordingPartner] = useState(false)
   const [isRecordingInterviewer, setIsRecordingInterviewer] = useState(false)
   const recognitionRef = useRef<any>(null)
+
+  // AI hints states
+  const [showAITips, setShowAITips] = useState(false)
+  const [ragHints, setRagHints] = useState<{ level: number; hint: string }[]>([])
+  const [isLoadingHints, setIsLoadingHints] = useState(false)
 
   // Test states
   const [testResults, setTestResults] = useState<TestResult[]>([])
@@ -848,43 +855,61 @@ Interviews are conversations, not just coding exercises.`
   }
 
   // Analyze code for context-aware proactive feedback
+  // IMPORTANT: This analysis is NEUTRAL - do not praise patterns until correctness is verified
   const analyzeCodeForProactiveFeedback = (code: string): string => {
     const analysis: string[] = []
-    const codeLower = code.toLowerCase()
+    const observations: string[] = []
 
-    // Detect patterns
+    // Detect patterns - use NEUTRAL language, NOT praise
     if (code.includes("for") && code.includes("for")) {
-      analysis.push("Candidate is using nested loops - potential O(n²) complexity")
+      observations.push("Candidate is using nested loops - ASK about time complexity implications")
     }
 
     if (code.match(/sort|\.sort\(/)) {
-      analysis.push("Candidate is using sorting - good algorithmic thinking")
+      observations.push("Candidate is using sorting - ASK about the complexity tradeoffs")
     }
 
     if (code.match(/Map|Set|HashMap|HashSet/)) {
-      analysis.push("Candidate is using hash-based data structures - efficient approach")
+      observations.push("Candidate is using hash-based data structures - ASK if they understand the space tradeoff")
     }
 
     if (code.match(/recursion|function.*\(.*\)\s*{[\s\S]*\1\(/)) {
-      analysis.push("Candidate is using recursion - should consider base cases and stack overflow")
+      observations.push("Candidate is using recursion - ASK about base cases and stack limits")
     }
 
     if (code.length > 300 && !code.includes("//")) {
-      analysis.push("Code is getting lengthy - candidate might benefit from breaking into helper functions")
+      observations.push("Code is getting lengthy without comments - ASK about code organization")
     }
 
     if (code.match(/if.*if.*if/)) {
-      analysis.push("Multiple nested conditionals detected - could indicate complexity")
+      observations.push("Multiple nested conditionals detected - ASK about simplifying the logic")
     }
 
     if (code.match(/\/\/ TODO|\/\/ FIXME|\/\/ HACK/)) {
-      analysis.push("Candidate has TODO/FIXME comments - they're aware of incomplete parts")
+      observations.push("Candidate has TODO/FIXME comments - ASK about their plan to address these")
     }
 
     // Time-based context
     const minutesSpent = Math.floor(elapsedTime / 60)
     if (minutesSpent > 10 && code.length < 100) {
-      analysis.push(`Candidate has been working for ${minutesSpent} minutes but code is still minimal - might need guidance`)
+      observations.push(`Candidate has been working for ${minutesSpent} minutes but code is still minimal - might need guidance`)
+    }
+
+    // Build the context prompt for the interviewer
+    if (observations.length > 0) {
+      analysis.push(`[INTERVIEWER OBSERVATION - CODE ANALYSIS]
+The candidate has written code. Here are observations for you to probe:
+
+${observations.join("\n")}
+
+CRITICAL RULES:
+1. DO NOT praise the code until tests have been run and passed
+2. Ask probing questions about their approach and design decisions
+3. If they haven't run tests yet, suggest they test their solution
+4. If they haven't explained their approach, ask them to walk you through it
+5. Focus on understanding their thought process, NOT validating their code
+
+Ask ONE focused question based on these observations.`)
     }
 
     return analysis.length > 0 ? analysis.join("\n") : ""
@@ -957,6 +982,9 @@ Interviews are conversations, not just coding exercises.`
       // Convert pass rate (0-100) to 0-100 score scale
       let calculatedPerformanceScore = summary.passRate
 
+      // Calculate efficiency metrics for feedback
+      const efficiencyData = analyzeCodeEfficiency(code)
+
       if (currentSessionId && user && code.trim()) {
         try {
           const feedbackResponse = await fetch("/api/generate-feedback", {
@@ -971,6 +999,10 @@ Interviews are conversations, not just coding exercises.`
               timeSpent: elapsedTime,
               aiCollaborationMetrics,
               interactionMetrics,
+              // Pass efficiency metrics for accurate feedback
+              efficiencyMetrics: efficiencyData,
+              sessionId: currentSessionId,
+              userId: user.id,
             }),
           })
 
@@ -1049,6 +1081,35 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             scoreToSave,
             comprehensiveFeedback
           )
+
+          // Vectorize session for RAG features (async, non-blocking)
+          fetch("/api/vectorize-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: user.id,
+              sessionId: currentSessionId,
+              scenarioId: selectedScenario?.id,
+              scenarioTitle: selectedScenario?.title,
+              language: selectedLanguage,
+              code,
+              testResults,
+              timeSpent: elapsedTime,
+              aiCollaborationMetrics,
+              interactionMetrics,
+              efficiencyMetrics: efficiencyData,
+              scores: {
+                correctness: (testResults.filter((t: TestResult) => t.passed).length / testResults.length) * 100,
+                efficiency: efficiencyData.efficiencyScore,
+                codeQuality: 70, // Default, would need more analysis
+                reasoningExplanation: aiCollaborationMetrics.partnerMessagesSent > 0 ? 50 : 0,
+                aiCollaboration: aiCollaborationMetrics.partnerMessagesSent > 0 ? 50 : 0,
+                overall: calculatedPerformanceScore,
+              },
+            }),
+          }).catch((err) => {
+            console.error("Vectorization error (non-blocking):", err)
+          })
         } catch (error) {
           console.error("Error updating session on completion:", error)
         }
@@ -1280,8 +1341,66 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     setShowFeedback(true)
   }
 
-  // Voice recording with Web Speech API
-  const toggleVoiceRecording = (isInterviewer: boolean) => {
+  // Fetch RAG hints for the current problem
+  const fetchRAGHints = async () => {
+    if (!selectedScenario) return
+
+    setIsLoadingHints(true)
+    try {
+      const response = await fetch("/api/rag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "get-hints",
+          problemText: selectedScenario.problemStatement,
+          problemTitle: selectedScenario.title,
+          userCode: code,
+          difficulty: selectedScenario.difficulty,
+          problemType: selectedScenario.type,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setRagHints(data.contextualHints || [])
+      }
+    } catch (error) {
+      console.error("Error fetching hints:", error)
+    } finally {
+      setIsLoadingHints(false)
+    }
+  }
+
+  // AI Usage Tips content
+  const aiUsageTips = [
+    {
+      title: "Ask Strategic Questions",
+      description: "Don't ask the AI to solve the problem. Instead, ask about specific concepts: 'What data structure is best for O(1) lookups?' or 'How does the two-pointer technique work?'",
+      good: "What's the time complexity of using a hash map vs array for lookups?",
+      bad: "Can you solve this two-sum problem for me?",
+    },
+    {
+      title: "Explain Your Thinking",
+      description: "Share your approach before asking for help. This shows the interviewer you're thinking, and helps the AI give more relevant hints.",
+      good: "I'm thinking of using nested loops but worried about O(n²). Is there a better approach?",
+      bad: "What should I do?",
+    },
+    {
+      title: "Debug with Context",
+      description: "When debugging, provide specific context about what's failing and what you've tried.",
+      good: "My code returns [1,2] but expected [2,1]. I think the issue is in my sorting logic. Can you help me trace through it?",
+      bad: "Why isn't my code working?",
+    },
+    {
+      title: "Verify Understanding",
+      description: "After getting a hint, explain it back in your own words. This shows the interviewer you understand, not just copy.",
+      good: "So you're suggesting I use a hash map because lookup is O(1)? Let me implement that.",
+      bad: "*copies suggestion without explanation*",
+    },
+  ]
+
+  // Voice recording with Web Speech API - with proper permission handling
+  const toggleVoiceRecording = async (isInterviewer: boolean) => {
     const isRecording = isInterviewer ? isRecordingInterviewer : isRecordingPartner
     const setIsRecording = isInterviewer ? setIsRecordingInterviewer : setIsRecordingPartner
     const setInput = isInterviewer ? setInterviewerInput : setChatInput
@@ -1303,7 +1422,36 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       return
     }
 
-    // Start recording
+    // First, explicitly request microphone permission
+    try {
+      // Check current permission status
+      if (navigator.permissions) {
+        const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName })
+        if (permissionStatus.state === 'denied') {
+          toast.error("Microphone access is blocked. Please enable it in your browser settings.")
+          return
+        }
+      }
+
+      // Request microphone access explicitly before starting speech recognition
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      // Stop the stream immediately - we just needed permission
+      stream.getTracks().forEach(track => track.stop())
+
+      toast.info("Microphone access granted. Starting voice input...")
+    } catch (err: any) {
+      console.error('Microphone permission error:', err)
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        toast.error("Microphone access denied. Please allow microphone access in your browser.")
+      } else if (err.name === 'NotFoundError') {
+        toast.error("No microphone found. Please connect a microphone and try again.")
+      } else {
+        toast.error("Could not access microphone. Please check your browser settings.")
+      }
+      return
+    }
+
+    // Start recording with speech recognition
     const recognition = new SpeechRecognition()
     recognition.continuous = true
     recognition.interimResults = true
@@ -1311,7 +1459,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
     recognition.onstart = () => {
       setIsRecording(true)
-      toast.info("Listening... Speak now")
+      toast.success("Listening... Speak now", { duration: 2000 })
     }
 
     recognition.onresult = (event: any) => {
@@ -1325,7 +1473,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     recognition.onerror = (event: any) => {
       console.error('Speech recognition error:', event.error)
       if (event.error === 'not-allowed') {
-        toast.error("Microphone access denied. Please allow microphone access.")
+        toast.error("Microphone access denied. Please allow microphone access in your browser settings.")
+      } else if (event.error === 'no-speech') {
+        toast.info("No speech detected. Try speaking louder or closer to the microphone.")
       } else if (event.error !== 'aborted') {
         toast.error("Voice recognition error. Please try again.")
       }
@@ -2226,10 +2376,69 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
                       {/* AI Coding Partner */}
                       <div className="flex flex-col flex-1 border-t border-gray-700 pt-2 min-h-0">
-                        <div className="flex items-center space-x-1 mb-1 flex-shrink-0">
-                          <Lightbulb className="h-3 w-3 text-[#00d9ff]" />
-                          <span className="text-white text-xs font-medium">AI Partner</span>
+                        <div className="flex items-center justify-between mb-1 flex-shrink-0">
+                          <div className="flex items-center space-x-1">
+                            <Lightbulb className="h-3 w-3 text-[#00d9ff]" />
+                            <span className="text-white text-xs font-medium">AI Partner</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                fetchRAGHints()
+                                setShowAITips(true)
+                              }}
+                              className="h-5 px-1 text-[#00d9ff] hover:bg-gray-700"
+                              title="How to use AI effectively"
+                            >
+                              <HelpCircle className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
+                        {/* AI Tips Modal */}
+                        {showAITips && (
+                          <div className="mb-2 p-2 bg-gray-800 rounded border border-[#00d9ff]/30">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-xs font-medium text-[#00d9ff] flex items-center gap-1">
+                                <Sparkles className="h-3 w-3" /> How to Use AI Effectively
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowAITips(false)}
+                                className="h-4 w-4 p-0 text-gray-400 hover:text-white"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <div className="space-y-2 max-h-40 overflow-y-auto">
+                              {aiUsageTips.map((tip, idx) => (
+                                <div key={idx} className="text-xs">
+                                  <div className="font-medium text-white">{tip.title}</div>
+                                  <div className="text-gray-400 text-[10px] mb-1">{tip.description}</div>
+                                  <div className="flex gap-2">
+                                    <span className="text-green-400 text-[10px]">✓ "{tip.good.substring(0, 40)}..."</span>
+                                  </div>
+                                </div>
+                              ))}
+                              {/* RAG-generated hints */}
+                              {ragHints.length > 0 && (
+                                <div className="mt-2 pt-2 border-t border-gray-700">
+                                  <div className="font-medium text-[#00ff88] text-xs mb-1">Problem-Specific Hints</div>
+                                  {ragHints.slice(0, 2).map((hint, idx) => (
+                                    <div key={idx} className="text-[10px] text-gray-300 mb-1">
+                                      <span className="text-yellow-400">Hint {hint.level}:</span> {hint.hint}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {isLoadingHints && (
+                                <div className="text-[10px] text-gray-400">Loading personalized hints...</div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                         <div className="flex-1 overflow-y-auto space-y-1 mb-2 p-2 bg-gray-800/30 rounded min-h-0">
                           {chatMessages.map((msg, index) => (
                             <div key={index} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
@@ -2565,6 +2774,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     spaceComplexity={efficiencyMetrics?.estimatedSpaceComplexity}
                     efficiencyScore={efficiencyMetrics?.efficiencyScore}
                     elapsedTime={elapsedTime}
+                    userId={user?.id}
+                    problemType={selectedScenario?.type}
+                    difficulty={selectedScenario?.difficulty}
                     onRetry={resetInterview}
                     onNewProblem={resetInterview}
                   />
