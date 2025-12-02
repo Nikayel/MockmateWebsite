@@ -455,17 +455,26 @@
   height: 0 !important;
 }
 
-/* Hide zone widgets (like inline diffs) */
+/* Hide zone widgets (like inline diffs) - use visibility to preserve layout */
 .monaco-wrapper .monaco-editor .zone-widget,
-.editor-wrapper .monaco-editor .zone-widget,
-.monaco-wrapper .monaco-editor .view-zones,
-.editor-wrapper .monaco-editor .view-zones {
-  display: none !important;
+.editor-wrapper .monaco-editor .zone-widget {
+  visibility: hidden !important;
+  height: 0 !important;
+  overflow: hidden !important;
 }
 
-/* Hide any content widgets */
-.monaco-wrapper .monaco-editor .contentWidgets,
-.editor-wrapper .monaco-editor .contentWidgets {
+/* Don't hide view-zones completely - it can break cursor positioning */
+/* Only hide if they contain actual content */
+.monaco-wrapper .monaco-editor .view-zones > div:not(:empty),
+.editor-wrapper .monaco-editor .view-zones > div:not(:empty) {
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Content widgets are needed for cursor and selection - don't hide */
+/* Only hide specific problematic widgets */
+.monaco-wrapper .monaco-editor .monaco-editor-hover,
+.editor-wrapper .monaco-editor .monaco-editor-hover {
   display: none !important;
 }
 
@@ -481,6 +490,27 @@
 .monaco-wrapper .monaco-editor .lines-content,
 .editor-wrapper .monaco-editor .lines-content {
   position: relative !important;
+  top: 0 !important;
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+/* Fix view-lines to start at top */
+.monaco-wrapper .monaco-editor .view-lines,
+.editor-wrapper .monaco-editor .view-lines {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+/* Ensure editor scrollable area starts at top */
+.monaco-wrapper .monaco-editor .monaco-scrollable-element,
+.editor-wrapper .monaco-editor .monaco-scrollable-element {
+  top: 0 !important;
+}
+
+/* Remove any top offset from the editor */
+.monaco-wrapper .monaco-editor .editor-scrollable,
+.editor-wrapper .monaco-editor .editor-scrollable {
   top: 0 !important;
 }
 

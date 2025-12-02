@@ -2197,7 +2197,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             overviewRulerLanes: 0,
                             overviewRulerBorder: false,
                             hideCursorInOverviewRuler: true,
-                            
+
+                            // Disable sticky scroll (causes space at top)
+                            stickyScroll: { enabled: false },
+
                             // Minimize UI elements
                             minimap: { enabled: false },
                             lineNumbers: 'on',
@@ -2777,6 +2780,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     userId={user?.id}
                     problemType={selectedScenario?.type}
                     difficulty={selectedScenario?.difficulty}
+                    problemTitle={selectedScenario?.title}
+                    code={code}
+                    language={selectedLanguage}
                     onRetry={resetInterview}
                     onNewProblem={resetInterview}
                   />

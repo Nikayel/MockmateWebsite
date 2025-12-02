@@ -5,23 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { CheckCircle, TrendingUp, Target, Zap, Code, MessageSquare, Activity, ChevronDown, ChevronUp, XCircle, FileText, RotateCcw, Play, Download, AlertCircle, Sparkles } from "lucide-react"
+import { CheckCircle, TrendingUp, Target, Zap, Code, MessageSquare, Activity, ChevronDown, ChevronUp, XCircle, FileText, RotateCcw, Play, Download, AlertCircle, Sparkles, Clock, BarChart3, Lightbulb, AlertTriangle } from "lucide-react"
 import { LearningRecommendations } from "@/components/LearningRecommendations"
-import {
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Cell,
-} from "recharts"
+import { Progress } from "@/components/ui/progress"
 
 interface FeedbackSection {
   tldr: string
@@ -59,6 +45,9 @@ interface PracticeFeedbackProps {
   userId?: string
   problemType?: string
   difficulty?: string
+  problemTitle?: string
+  code?: string
+  language?: string
   onRetry?: () => void
   onNewProblem?: () => void
   onExport?: () => void
@@ -222,16 +211,14 @@ export default function PracticeFeedback({
   userId,
   problemType,
   difficulty,
+  problemTitle,
+  code,
+  language = "javascript",
   onRetry,
   onNewProblem,
   onExport,
 }: PracticeFeedbackProps) {
   const sections = parseFeedback(feedback)
-
-  // Progressive disclosure state
-  const [showGraph, setShowGraph] = useState(false)
-  const [openImprovements, setOpenImprovements] = useState<Record<number, boolean>>({})
-  const [showCodeQualityDetails, setShowCodeQualityDetails] = useState(false)
 
   // Parse feedback for edge cases and alternative solutions
   const feedbackLower = feedback.toLowerCase()
@@ -326,22 +313,6 @@ export default function PracticeFeedback({
 
   const normalizedPerformanceScore = normalizeScore(performanceScore)
 
-  const radarData = [
-    { subject: "Correctness", value: normalizedScores.correctness, fullMark: 100 },
-    { subject: "Efficiency", value: normalizedScores.efficiency, fullMark: 100 },
-    { subject: "Code Quality", value: normalizedScores.codeQuality, fullMark: 100 },
-    { subject: "Reasoning", value: normalizedScores.reasoning, fullMark: 100 },
-    { subject: "AI Collab", value: normalizedScores.aiCollaboration, fullMark: 100 },
-  ]
-
-  const barData = [
-    { name: "Correctness", score: normalizedScores.correctness },
-    { name: "Efficiency", score: normalizedScores.efficiency },
-    { name: "Code Quality", score: normalizedScores.codeQuality },
-    { name: "Reasoning", score: normalizedScores.reasoning },
-    { name: "AI Collab", score: normalizedScores.aiCollaboration },
-  ]
-
   // Use consistent platform colors - accent cyan for all score indicators
   // Opacity/intensity varies based on score level for visual hierarchy
   const getScoreColor = (score: number) => {
@@ -355,6 +326,24 @@ export default function PracticeFeedback({
     if (score >= 60) return "bg-[#00d9ff]/70"
     return "bg-gray-500"
   }
+
+  // Calculate letter grade from score
+  const getLetterGrade = (score: number) => {
+    if (score >= 95) return "A+"
+    if (score >= 90) return "A"
+    if (score >= 85) return "A-"
+    if (score >= 80) return "B+"
+    if (score >= 75) return "B"
+    if (score >= 70) return "B-"
+    if (score >= 65) return "C+"
+    if (score >= 60) return "C"
+    if (score >= 55) return "C-"
+    if (score >= 50) return "D"
+    return "F"
+  }
+
+  const overallScore = sections.scores.overall > 0 ? normalizeScore(sections.scores.overall) : normalizedPerformanceScore
+  const letterGrade = getLetterGrade(overallScore)
 
   const generatePDF = async () => {
     const { default: jsPDF } = await import("jspdf")
@@ -473,393 +462,292 @@ export default function PracticeFeedback({
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+    <div className="w-full max-w-6xl mx-auto">
       {/* Screen reader announcement */}
       <div role="status" aria-live="polite" className="sr-only">
-        Interview feedback loaded. Overall score: {normalizedPerformanceScore} out of 100.
+        Interview feedback loaded. Overall grade: {letterGrade}. Score: {overallScore} out of 100.
       </div>
 
-      {/* Main Feedback Card */}
-      <Card className="bg-gray-900/50 border-gray-700">
-        {/* Header with Skillon branding */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-700">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-400">•</span>
-            <span className="text-white font-semibold">Skillon</span>
-          </div>
-          <div className="flex items-center gap-4 text-sm text-gray-400">
-            <span>Practice</span>
-            <span>Simulate</span>
-            <span>Analyze</span>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-gray-600"></div>
-              <div className="w-2 h-2 rounded-full bg-gray-600"></div>
+      {/* Header Section */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <div className="flex items-center space-x-4 mb-2">
+              <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30">
+                {difficulty || "Medium"}
+              </Badge>
+              <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30">Completed</Badge>
             </div>
+            <h1 className="text-3xl font-heading font-bold text-white">
+              {problemTitle || problemType || "Interview Session"}
+            </h1>
+            <p className="text-gray-300 mt-2">
+              {sections.tldr || `${problemType || "Technical"} problem - ${difficulty || "Medium"} difficulty`}
+            </p>
+          </div>
+          <div className="text-right">
+            <div className="text-4xl font-bold text-[#00d9ff] mb-1">{letterGrade}</div>
+            <div className="text-gray-400">Overall Grade</div>
           </div>
         </div>
+      </div>
 
-        <CardContent className="p-6 sm:p-8">
-          {/* Title */}
-          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-6">Feedback Summary</h1>
-
-          {/* Overall Score - Prominent Display */}
-          <div className="mb-8">
-            <div className="text-center">
-              <div className="text-sm text-gray-400 mb-2">Overall Score</div>
-              <div className={`text-6xl font-bold ${getScoreBgColor(sections.scores.overall > 0 ? normalizeScore(sections.scores.overall) : normalizedPerformanceScore)} bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500`}>
-                {sections.scores.overall > 0 ? normalizeScore(sections.scores.overall) : normalizedPerformanceScore}/100
+      {/* Performance Overview Card */}
+      <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-8">
+        <CardHeader>
+          <CardTitle className="text-white text-2xl">Performance Overview</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
+              <div>
+                <div className="text-gray-400 text-sm">Time Taken</div>
+                <div className="text-white text-xl font-semibold">{formatTime(elapsedTime)}</div>
               </div>
+              <Clock className="h-8 w-8 text-[#00d9ff]" />
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
+              <div>
+                <div className="text-gray-400 text-sm">Complexity Accuracy</div>
+                <div className="text-white text-xl font-semibold">{complexityAccurate ? "Good" : "Needs Work"}</div>
+              </div>
+              {complexityAccurate ? (
+                <CheckCircle className="h-8 w-8 text-[#00d9ff]" />
+              ) : (
+                <AlertTriangle className="h-8 w-8 text-gray-400" />
+              )}
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
+              <div>
+                <div className="text-gray-400 text-sm">Edge Cases Discussed</div>
+                <div className="text-white text-xl font-semibold">{hasEdgeCases ? "Yes" : "No"}</div>
+              </div>
+              {hasEdgeCases ? (
+                <CheckCircle className="h-8 w-8 text-[#00d9ff]" />
+              ) : (
+                <AlertTriangle className="h-8 w-8 text-gray-400" />
+              )}
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
+              <div>
+                <div className="text-gray-400 text-sm">Alternative Solutions</div>
+                <div className="text-white text-xl font-semibold">{hasAlternatives ? "Discussed" : "Not Discussed"}</div>
+              </div>
+              {hasAlternatives ? (
+                <CheckCircle className="h-8 w-8 text-[#00d9ff]" />
+              ) : (
+                <AlertTriangle className="h-8 w-8 text-gray-400" />
+              )}
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          {/* Category Scores */}
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Category Scores</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-cyan-400" />
-                    <span className="text-sm text-gray-300">Correctness</span>
+      {/* Two Column Layout: Code + AI Feedback */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        {/* Code Solution */}
+        {code && (
+          <Card className="bg-gray-900/50 border-gray-700 glass-effect">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center space-x-2">
+                <Code className="h-5 w-5 text-[#00d9ff]" />
+                <span>Your Solution</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-black rounded-lg p-4 max-h-[300px] overflow-auto">
+                <pre className="text-sm text-white font-mono leading-relaxed">
+                  <code>{code}</code>
+                </pre>
+              </div>
+              <div className="mt-4 space-y-2">
+                {sections.whatWorked.slice(0, 3).map((item, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <CheckCircle className="h-4 w-4 text-[#00d9ff]" />
+                    <span className="text-[#00d9ff] text-sm">{item}</span>
                   </div>
-                  <Badge className={`${getScoreBgColor(normalizedScores.correctness)} text-white`}>
-                    {normalizedScores.correctness}/100
-                  </Badge>
-                </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${getScoreBgColor(normalizedScores.correctness)}`}
-                    style={{ width: `${normalizedScores.correctness}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-cyan-400" />
-                    <span className="text-sm text-gray-300">Efficiency</span>
+                ))}
+                {sections.fixNext.slice(0, 1).map((item, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <AlertTriangle className="h-4 w-4 text-gray-400" />
+                    <span className="text-gray-400 text-sm">{item.split('.')[0]}</span>
                   </div>
-                  <Badge className={`${getScoreBgColor(normalizedScores.efficiency)} text-white`}>
-                    {normalizedScores.efficiency}/100
-                  </Badge>
-                </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${getScoreBgColor(normalizedScores.efficiency)}`}
-                    style={{ width: `${normalizedScores.efficiency}%` }}
-                  />
-                </div>
+                ))}
               </div>
+            </CardContent>
+          </Card>
+        )}
 
-              <Collapsible open={showCodeQualityDetails} onOpenChange={setShowCodeQualityDetails}>
-                <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-                  <CollapsibleTrigger asChild>
-                    <div className={sections.scoreJustifications.codeQuality ? "cursor-pointer" : ""}>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Code className="h-4 w-4 text-cyan-400" />
-                          <span className="text-sm text-gray-300">Code Quality</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge className={`${getScoreBgColor(normalizedScores.codeQuality)} text-white`}>
-                            {normalizedScores.codeQuality}/100
-                          </Badge>
-                          {sections.scoreJustifications.codeQuality && normalizedScores.codeQuality < 60 && (
-                            showCodeQualityDetails ? (
-                              <ChevronUp className="h-4 w-4 text-gray-400" />
-                            ) : (
-                              <ChevronDown className="h-4 w-4 text-gray-400" />
-                            )
-                          )}
-                        </div>
-                      </div>
-                      <div className="w-full bg-gray-700 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full ${getScoreBgColor(normalizedScores.codeQuality)}`}
-                          style={{ width: `${normalizedScores.codeQuality}%` }}
-                        />
-                      </div>
-                    </div>
-                  </CollapsibleTrigger>
-                  {sections.scoreJustifications.codeQuality && normalizedScores.codeQuality < 60 && (
-                    <CollapsibleContent className="mt-3 pt-3 border-t border-gray-700">
-                      <div className="text-xs text-gray-400 mb-1">Why the score is low:</div>
-                      <p className="text-sm text-gray-300 leading-relaxed">
-                        {sections.scoreJustifications.codeQuality}
-                      </p>
-                    </CollapsibleContent>
-                  )}
+        {/* AI Feedback */}
+        <Card className="bg-gray-900/50 border-gray-700 glass-effect">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center space-x-2">
+              <MessageSquare className="h-5 w-5 text-[#00d9ff]" />
+              <span>AI Feedback</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Strengths */}
+            {sections.whatWorked.length > 0 && (
+              <div className="bg-[#00d9ff]/10 border border-[#00d9ff]/20 rounded-lg p-4">
+                <div className="flex items-center space-x-2 mb-2">
+                  <TrendingUp className="h-4 w-4 text-[#00d9ff]" />
+                  <span className="text-[#00d9ff] font-semibold">Strengths</span>
                 </div>
-              </Collapsible>
-
-              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-cyan-400" />
-                    <span className="text-sm text-gray-300">Reasoning</span>
-                  </div>
-                  <Badge className={`${getScoreBgColor(normalizedScores.reasoning)} text-white`}>
-                    {normalizedScores.reasoning}/100
-                  </Badge>
-                </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${getScoreBgColor(normalizedScores.reasoning)}`}
-                    style={{ width: `${normalizedScores.reasoning}%` }}
-                  />
-                </div>
+                <ul className="text-gray-300 text-sm space-y-1">
+                  {sections.whatWorked.map((item, index) => (
+                    <li key={index}>• {item}</li>
+                  ))}
+                </ul>
               </div>
+            )}
 
-              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-cyan-400" />
-                    <span className="text-sm text-gray-300">AI Collaboration</span>
-                  </div>
-                  <Badge className={`${getScoreBgColor(normalizedScores.aiCollaboration)} text-white`}>
-                    {normalizedScores.aiCollaboration}/100
-                  </Badge>
+            {/* Areas for Improvement */}
+            {sections.fixNext.length > 0 && (
+              <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-4">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Target className="h-4 w-4 text-gray-400" />
+                  <span className="text-gray-400 font-semibold">Areas for Improvement</span>
                 </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${getScoreBgColor(normalizedScores.aiCollaboration)}`}
-                    style={{ width: `${normalizedScores.aiCollaboration}%` }}
-                  />
+                <ul className="text-gray-300 text-sm space-y-1">
+                  {sections.fixNext.map((item, index) => (
+                    <li key={index}>• {item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Next Steps */}
+            {sections.actionPlan.length > 0 && (
+              <div className="bg-[#00d9ff]/5 border border-[#00d9ff]/10 rounded-lg p-4">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Lightbulb className="h-4 w-4 text-[#00d9ff]" />
+                  <span className="text-[#00d9ff] font-semibold">Next Steps</span>
                 </div>
-              </div>
-
-              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Target className="h-4 w-4 text-cyan-400" />
-                    <span className="text-sm text-gray-300">Edge Cases</span>
-                  </div>
-                  <Badge className={hasEdgeCases ? "bg-[#00d9ff] text-black" : "bg-gray-600 text-white"}>
-                    {hasEdgeCases ? "Covered" : "Not Covered"}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Performance Overview */}
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Performance Overview</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-sm text-gray-400 mb-1">Time Taken</div>
-                <div className="text-base text-white">{formatTime(elapsedTime)}</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-400 mb-1">Complexity Accuracy</div>
-                <div className="flex items-center gap-2">
-                  {complexityAccurate ? (
-                    <CheckCircle className="h-5 w-5 text-[#00d9ff]" />
-                  ) : (
-                    <XCircle className="h-5 w-5 text-gray-400" />
-                  )}
-                  <span className="text-base text-white">{complexityAccurate ? "Yes" : "No"}</span>
-                </div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-400 mb-1">Alternative Solutions</div>
-                <div className="text-base text-white">{hasAlternatives ? "Discussed" : "Not Discussed"}</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-400 mb-1">Interviewer Collaboration</div>
-                <div className="text-base text-white">
-                  {sections.scores.reasoning >= 70 ? "Excellent" : sections.scores.reasoning >= 50 ? "Good" : "Needs Work"}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Collapsible Graph Section */}
-          <Collapsible open={showGraph} onOpenChange={setShowGraph}>
-            <div className="mb-6">
-              <CollapsibleTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-between p-4 hover:bg-white/5 rounded-lg transition-colors border border-gray-700 cursor-pointer"
-                  aria-expanded={showGraph}
-                >
-                  <span className="text-white flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-white" />
-                    Performance Graph
-                  </span>
-                  {showGraph ? (
-                    <ChevronUp className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5 text-gray-400" />
-                  )}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-4">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Radar Chart */}
-                  <div>
-                    <h3 className="text-white text-sm font-semibold mb-2">Radar View</h3>
-                    <div className="h-[250px]" role="img" aria-label="Radar chart showing score distribution">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart data={radarData}>
-                          <PolarGrid stroke="#374151" />
-                          <PolarAngleAxis
-                            dataKey="subject"
-                            tick={{ fill: "#9ca3af", fontSize: 10 }}
-                          />
-                          <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: "#6b7280", fontSize: 8 }} />
-                          <Radar name="Score" dataKey="value" stroke="#00d9ff" fill="#00d9ff" fillOpacity={0.6} />
-                        </RadarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  {/* Bar Chart */}
-                  <div>
-                    <h3 className="text-white text-sm font-semibold mb-2">Bar Comparison</h3>
-                    <div className="h-[250px]" role="img" aria-label="Bar chart comparing scores">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={barData} layout="horizontal">
-                          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                          <XAxis type="number" domain={[0, 100]} stroke="#6b7280" tick={{ fontSize: 11 }} />
-                          <YAxis
-                            type="category"
-                            dataKey="name"
-                            stroke="#6b7280"
-                            tick={{ fontSize: 10 }}
-                            width={80}
-                          />
-                          <Tooltip
-                            contentStyle={{ backgroundColor: "#1f2937", border: "1px solid #374151", borderRadius: "8px" }}
-                            labelStyle={{ color: "#fff" }}
-                            itemStyle={{ color: "#fff" }}
-                          />
-                          <Bar dataKey="score" radius={[0, 4, 4, 0]}>
-                            {barData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={getScoreColor(entry.score)} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </div>
-              </CollapsibleContent>
-            </div>
-          </Collapsible>
-
-          {/* What to Improve Section */}
-          {sections.fixNext.length > 0 && (
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-[#00d9ff]" />
-                What to Improve
-              </h2>
-              <div className="space-y-3">
-                {sections.fixNext.map((item, index) => {
-                  const isOpen = openImprovements[index] || false
-                  return (
-                    <Collapsible
-                      key={index}
-                      open={isOpen}
-                      onOpenChange={(open) => setOpenImprovements(prev => ({ ...prev, [index]: open }))}
-                    >
-                      <CollapsibleTrigger className="w-full">
-                        <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700 hover:border-[#00d9ff]/50 transition-colors cursor-pointer">
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-start gap-3 flex-1">
-                              <span className="text-[#00d9ff] font-semibold text-sm mt-0.5">#{index + 1}</span>
-                              <p className="text-white text-left text-sm font-medium line-clamp-2">
-                                {item.split('.')[0] || item.substring(0, 80)}
-                              </p>
-                            </div>
-                            {isOpen ? (
-                              <ChevronUp className="h-5 w-5 text-gray-400 ml-2 flex-shrink-0" />
-                            ) : (
-                              <ChevronDown className="h-5 w-5 text-gray-400 ml-2 flex-shrink-0" />
-                            )}
-                          </div>
-                        </div>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="mt-2">
-                        <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-700 ml-8">
-                          <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">
-                            {item}
-                          </p>
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Action Plan Section */}
-          {sections.actionPlan.length > 0 && (
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Target className="h-5 w-5 text-cyan-400" />
-                Action Plan
-              </h2>
-              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-                <ol className="space-y-2 list-decimal list-inside">
+                <ol className="text-gray-300 text-sm space-y-1 list-decimal list-inside">
                   {sections.actionPlan.map((item, index) => (
-                    <li key={index} className="text-gray-300 text-sm leading-relaxed">
-                      {item}
-                    </li>
+                    <li key={index}>{item}</li>
                   ))}
                 </ol>
               </div>
-            </div>
-          )}
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
-          {/* Learning Recommendations */}
-          {userId && (
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-[#00d9ff]" />
-                Personalized Learning Path
-              </h2>
-              <LearningRecommendations
-                userId={userId}
-                currentProblemType={problemType}
-                currentDifficulty={difficulty}
-                performanceScore={sections.scores.overall > 0 ? normalizeScore(sections.scores.overall) : normalizedPerformanceScore}
-                onSelectProblem={(type, diff) => onNewProblem?.()}
-              />
+      {/* Detailed Performance Metrics */}
+      <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-8">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center space-x-2">
+            <BarChart3 className="h-5 w-5 text-[#00d9ff]" />
+            <span>Detailed Performance Metrics</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-300">Correctness</span>
+                <span className="text-[#00d9ff] font-semibold">{normalizedScores.correctness}%</span>
+              </div>
+              <Progress value={normalizedScores.correctness} className="h-2 bg-gray-800" />
             </div>
-          )}
 
-          {/* Actions */}
-          <div>
-            <h2 className="text-lg font-semibold text-white mb-4">Actions</h2>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button
-                onClick={onExport || generatePDF}
-                variant="outline"
-                className="flex-1 border-accent/50 text-accent hover:bg-accent/10 hover:text-accent cursor-pointer"
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Complete Breakdown (PDF)
-              </Button>
-              <Button
-                onClick={onRetry}
-                variant="outline"
-                className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white cursor-pointer"
-              >
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Retry Session
-              </Button>
-              <Button
-                onClick={onNewProblem}
-                className="flex-1 bg-accent hover:bg-accent/80 text-black cursor-pointer"
-              >
-                <Play className="mr-2 h-4 w-4" />
-                New Problem
-              </Button>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-300">Code Quality</span>
+                <span className="text-[#00d9ff] font-semibold">{normalizedScores.codeQuality}%</span>
+              </div>
+              <Progress value={normalizedScores.codeQuality} className="h-2 bg-gray-800" />
             </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-300">Communication</span>
+                <span className="text-[#00d9ff] font-semibold">{normalizedScores.reasoning}%</span>
+              </div>
+              <Progress value={normalizedScores.reasoning} className="h-2 bg-gray-800" />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-300">Efficiency</span>
+                <span className="text-[#00d9ff] font-semibold">{normalizedScores.efficiency}%</span>
+              </div>
+              <Progress value={normalizedScores.efficiency} className="h-2 bg-gray-800" />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-300">AI Collaboration</span>
+                <span className="text-[#00d9ff] font-semibold">{normalizedScores.aiCollaboration}%</span>
+              </div>
+              <Progress value={normalizedScores.aiCollaboration} className="h-2 bg-gray-800" />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-300">Overall</span>
+                <span className="text-[#00d9ff] font-semibold">{overallScore}%</span>
+              </div>
+              <Progress value={overallScore} className="h-2 bg-gray-800" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Learning Recommendations */}
+      {userId && (
+        <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-8">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center space-x-2">
+              <Sparkles className="h-5 w-5 text-[#00d9ff]" />
+              <span>Personalized Learning Path</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <LearningRecommendations
+              userId={userId}
+              currentProblemType={problemType}
+              currentDifficulty={difficulty}
+              performanceScore={overallScore}
+              onSelectProblem={(type, diff) => onNewProblem?.()}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Actions */}
+      <Card className="bg-gray-900/50 border-gray-700 glass-effect">
+        <CardHeader>
+          <CardTitle className="text-white">Actions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button
+              onClick={onExport || generatePDF}
+              className="bg-gray-700 hover:bg-gray-600 text-white flex-1"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export Report (PDF)
+            </Button>
+            <Button
+              onClick={onRetry}
+              className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black flex-1"
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Retry Session
+            </Button>
+            <Button
+              onClick={onNewProblem}
+              className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black flex-1"
+            >
+              <Play className="mr-2 h-4 w-4" />
+              New Problem
+            </Button>
           </div>
         </CardContent>
       </Card>
