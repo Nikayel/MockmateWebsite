@@ -2,15 +2,15 @@
  * PROPRIETARY CODE - NOT OPEN SOURCE
  * This file contains subscription management logic and is not part of the MIT license.
  * All rights reserved.
- * 
+ *
  * Stripe helper functions for subscription management
+ * Uses Firebase Admin SDK for server-side writes (bypasses security rules)
  */
 
 import Stripe from "stripe"
-import { db } from "./firebase"
-import { doc, getDoc, setDoc } from "firebase/firestore"
+import { adminDb } from "./firebase-admin"
 import { Profile } from "./types"
-import { updateQuotaForSubscriptionTier } from "./firestore-helpers"
+import { PRICING_CONFIG } from "./config"
 
 // Initialize Stripe only if secret key is available
 let stripe: Stripe | null = null
@@ -26,8 +26,56 @@ try {
 }
 
 /**
+ * Update user quota for subscription tier using Admin SDK
+ */
+async function updateQuotaForSubscriptionTierAdmin(userId: string, subscriptionTier: "free" | "pro" | "enterprise"): Promise<void> {
+  const now = new Date()
+  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+
+  const sessionsLimit = subscriptionTier === "pro"
+    ? PRICING_CONFIG.pro.sessionsPerMonth
+    : PRICING_CONFIG.free.sessionsPerMonth
+
+  // Query for existing quota
+  const quotaSnapshot = await adminDb.collection("profile_quota")
+    .where("user_id", "==", userId)
+    .get()
+
+  // Find current period quota
+  let currentQuotaDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null
+  quotaSnapshot.docs.forEach(doc => {
+    const data = doc.data()
+    const quotaStart = new Date(data.period_start)
+    if (quotaStart >= periodStart && quotaStart <= periodEnd) {
+      currentQuotaDoc = doc
+    }
+  })
+
+  if (currentQuotaDoc) {
+    // Update existing quota
+    await currentQuotaDoc.ref.update({
+      sessions_limit: sessionsLimit,
+      updated_at: new Date().toISOString(),
+    })
+  } else {
+    // Create new quota
+    await adminDb.collection("profile_quota").add({
+      user_id: userId,
+      sessions_used: 0,
+      sessions_limit: sessionsLimit,
+      period_start: periodStart.toISOString(),
+      period_end: periodEnd.toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+  }
+}
+
+/**
  * Sync user subscription status from Stripe
  * Checks Stripe subscription and updates Firestore profile accordingly
+ * Uses Firebase Admin SDK to bypass security rules for server-side operations
  */
 export async function syncSubscriptionFromStripe(userId: string): Promise<Profile | null> {
   try {
@@ -35,16 +83,16 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
     if (!stripe) {
       console.warn("Stripe not initialized - cannot sync subscription")
       // Return existing profile if Stripe is not configured
-      const profileRef = doc(db, "profiles", userId)
-      const profileSnap = await getDoc(profileRef)
-      return profileSnap.exists() ? (profileSnap.data() as Profile) : null
+      const profileRef = adminDb.collection("profiles").doc(userId)
+      const profileSnap = await profileRef.get()
+      return profileSnap.exists ? (profileSnap.data() as Profile) : null
     }
 
-    // Get user profile
-    const profileRef = doc(db, "profiles", userId)
-    const profileSnap = await getDoc(profileRef)
-    
-    if (!profileSnap.exists()) {
+    // Get user profile using Admin SDK
+    const profileRef = adminDb.collection("profiles").doc(userId)
+    const profileSnap = await profileRef.get()
+
+    if (!profileSnap.exists) {
       return null
     }
 
@@ -77,7 +125,7 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
           status: "all",
           limit: 1,
         })
-        
+
         if (subscriptions.data.length > 0) {
           subscription = subscriptions.data[0]
         }
@@ -87,15 +135,9 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
     }
 
     // Determine subscription tier based on Stripe status
-    let subscriptionTier: "free" | "pro" | "enterprise" = "free"
-    let subscriptionStatus = "inactive"
-
     if (subscription) {
       // Check if subscription is active
       if (subscription.status === "active" || subscription.status === "trialing") {
-        subscriptionTier = "pro"
-        subscriptionStatus = subscription.status
-        
         // Extract subscription dates
         const subscriptionStartDate = subscription.created
           ? new Date(subscription.created * 1000).toISOString()
@@ -103,9 +145,9 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
         const currentPeriodEnd = subscription.current_period_end
           ? new Date(subscription.current_period_end * 1000).toISOString()
           : undefined
-        
-        // Update profile with latest subscription info including dates
-        await setDoc(profileRef, {
+
+        // Update profile with latest subscription info including dates using Admin SDK
+        await profileRef.set({
           subscription_tier: "pro",
           subscription_status: subscription.status,
           stripe_subscription_id: subscription.id,
@@ -116,49 +158,42 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
         }, { merge: true })
 
         // Update quota to Pro limit
-        await updateQuotaForSubscriptionTier(userId, "pro")
+        await updateQuotaForSubscriptionTierAdmin(userId, "pro")
 
         console.log(`Synced user ${userId} to Pro from Stripe subscription ${subscription.id}`)
       } else {
         // Subscription is canceled, past_due, etc. - downgrade to free
-        subscriptionTier = "free"
-        subscriptionStatus = subscription.status
-
-        await setDoc(profileRef, {
+        await profileRef.set({
           subscription_tier: "free",
           subscription_status: subscription.status,
           updated_at: new Date().toISOString(),
         }, { merge: true })
 
         // Update quota to free limit
-        await updateQuotaForSubscriptionTier(userId, "free")
+        await updateQuotaForSubscriptionTierAdmin(userId, "free")
 
         console.log(`Synced user ${userId} to Free - subscription status: ${subscription.status}`)
       }
     } else {
       // No active subscription found - ensure user is free
       if (profile.subscription_tier === "pro") {
-        await setDoc(profileRef, {
+        await profileRef.set({
           subscription_tier: "free",
           subscription_status: "none",
           updated_at: new Date().toISOString(),
         }, { merge: true })
 
-        await updateQuotaForSubscriptionTier(userId, "free")
+        await updateQuotaForSubscriptionTierAdmin(userId, "free")
 
         console.log(`Synced user ${userId} to Free - no active subscription found`)
       }
     }
 
     // Return updated profile
-    const updatedProfileSnap = await getDoc(profileRef)
-    return updatedProfileSnap.exists() ? (updatedProfileSnap.data() as Profile) : null
+    const updatedProfileSnap = await profileRef.get()
+    return updatedProfileSnap.exists ? (updatedProfileSnap.data() as Profile) : null
   } catch (error) {
     console.error(`Error syncing subscription for user ${userId}:`, error)
-    // Return existing profile if sync fails
-    const profileRef = doc(db, "profiles", userId)
-    const profileSnap = await getDoc(profileRef)
-    return profileSnap.exists() ? (profileSnap.data() as Profile) : null
+    throw error // Re-throw so caller knows sync failed
   }
 }
-
