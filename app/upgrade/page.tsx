@@ -56,11 +56,13 @@ function UpgradePageContent() {
           const sessionId = searchParams?.get("session_id")
           toast.success("Payment successful! Syncing your account...")
 
-          // Clean URL first
-          router.replace("/upgrade")
+          // IMPORTANT: Save user info BEFORE any state changes
+          // router.replace can trigger re-renders that lose auth state
+          const currentUserId = user?.id
+          const currentFirebaseUser = firebaseUser
 
           // Sync subscription with retries to handle webhook race condition
-          if (sessionId && firebaseUser && user) {
+          if (sessionId && currentFirebaseUser && currentUserId) {
             let syncSuccess = false
             let attempts = 0
             const maxAttempts = 5
@@ -68,7 +70,7 @@ function UpgradePageContent() {
             while (!syncSuccess && attempts < maxAttempts) {
               attempts++
               try {
-                const token = await firebaseUser.getIdToken()
+                const token = await currentFirebaseUser.getIdToken(true) // Force refresh token
 
                 // Call sync API to check Stripe and update profile
                 const syncResponse = await fetch("/api/sync-subscription", {
@@ -77,7 +79,7 @@ function UpgradePageContent() {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                   },
-                  body: JSON.stringify({ userId: user.id }),
+                  body: JSON.stringify({ userId: currentUserId }),
                 })
 
                 if (syncResponse.ok) {
@@ -98,7 +100,8 @@ function UpgradePageContent() {
                     await new Promise(resolve => setTimeout(resolve, 1500))
                   }
                 } else {
-                  console.error(`Sync attempt ${attempts} failed:`, syncResponse.status)
+                  const errorText = await syncResponse.text()
+                  console.error(`Sync attempt ${attempts} failed:`, syncResponse.status, errorText)
                   await new Promise(resolve => setTimeout(resolve, 1000))
                 }
               } catch (syncError) {
@@ -111,22 +114,16 @@ function UpgradePageContent() {
               console.warn("Could not confirm Pro status after retries - redirecting anyway")
               toast.info("Redirecting to your account. If Pro status isn't showing, please refresh the page.")
             }
+          } else {
+            console.error("Missing auth info for sync:", {
+              hasSessionId: !!sessionId,
+              hasFirebaseUser: !!currentFirebaseUser,
+              hasUserId: !!currentUserId
+            })
           }
 
-          // Reload user profile and redirect
-          setTimeout(async () => {
-            try {
-              if (firebaseUser) {
-                const userProfile = await getUserProfile(firebaseUser.uid)
-                if (userProfile) {
-                  setProfile(userProfile)
-                }
-              }
-            } catch (e) {
-              console.error("Error loading profile:", e)
-            }
-            router.push("/account")
-          }, 500)
+          // Clean URL and redirect AFTER sync is complete
+          router.replace("/account")
         } else if (canceled === "true") {
           toast.info("Payment canceled. You can try again anytime.")
           // Clean URL params after showing toast
