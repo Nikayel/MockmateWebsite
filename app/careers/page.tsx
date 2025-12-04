@@ -2,7 +2,7 @@
 
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { LightBackground } from "@/components/LightBackground"
+import { GridBackground } from "@/components/GridBackground"
 import { Badge } from "@/components/ui/badge"
 import { Rocket, Code, Mail, Linkedin, ArrowRight } from "lucide-react"
 import { motion } from "framer-motion"
@@ -29,7 +29,7 @@ export default function CareersPage() {
 
       {/* Hero Section */}
       <section className="relative min-h-[60vh] flex items-center overflow-hidden">
-        <LightBackground particleCount={60} />
+        <GridBackground />
         <div className="container mx-auto px-4 relative z-10 py-32">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
