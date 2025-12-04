@@ -41,7 +41,6 @@ import {
   Mic,
   MicOff,
   HelpCircle,
-  Sparkles,
 } from "lucide-react"
 import {
   AlertDialog,
