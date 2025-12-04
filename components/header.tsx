@@ -95,6 +95,9 @@ export function Header() {
                 <Link href="/docs" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
                   Docs
                 </Link>
+                <Link href="/careers" className="text-white/50 hover:text-accent transition-colors duration-300 cursor-pointer text-sm">
+                  Join us
+                </Link>
                 <Link href="/login">
                   <Button
                     variant="outline"
@@ -192,6 +195,13 @@ export function Header() {
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Docs
+                  </Link>
+                  <Link
+                    href="/careers"
+                    className="text-white/50 hover:text-accent transition-colors duration-300 cursor-pointer text-sm"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Join us
                   </Link>
                   <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
                     <Button
