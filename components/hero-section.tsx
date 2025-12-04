@@ -1,14 +1,12 @@
 "use client"
 
-import { useState, useEffect, Suspense, lazy } from "react"
+import { useState, useEffect } from "react"
 import { MagneticButton } from "@/components/ui/magnetic-button"
 import { Play, ArrowRight, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
-
-// Lazy load Three.js component for performance
-const LightBackground = lazy(() => import("@/components/LightBackground"))
+import { GridBackground } from "@/components/GridBackground"
 
 export function HeroSection() {
   const [typedText, setTypedText] = useState("")
@@ -41,10 +39,8 @@ export function HeroSection() {
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-black">
-      {/* Lightweight Three.js Background */}
-      <Suspense fallback={<div className="absolute inset-0 bg-black" />}>
-        <LightBackground particleCount={80} />
-      </Suspense>
+      {/* CSS Background - lightweight and reliable */}
+      <GridBackground />
 
       {/* Content */}
       <motion.div

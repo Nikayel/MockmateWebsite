@@ -2,18 +2,16 @@
 
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { LightBackground } from "@/components/LightBackground"
+import { GridBackground } from "@/components/GridBackground"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  BookOpen,
   Download,
   Settings,
   Play,
   MessageSquare,
   BarChart3,
   Code,
-  Zap,
   ArrowRight,
   ExternalLink,
   Keyboard,
@@ -60,7 +58,7 @@ export default function DocsPage() {
 
       {/* Hero Section */}
       <section className="relative min-h-[50vh] flex items-center overflow-hidden">
-        <LightBackground particleCount={50} />
+        <GridBackground />
         <div className="container mx-auto px-4 relative z-10 py-32">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
