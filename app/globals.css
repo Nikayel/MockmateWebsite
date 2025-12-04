@@ -506,20 +506,17 @@
 }
 
 /* Ensure lines content is properly positioned */
+/* REMOVED: top/padding/margin overrides that break cursor sync */
 .monaco-wrapper .monaco-editor .lines-content,
 .editor-wrapper .monaco-editor .lines-content {
   position: relative !important;
-  top: 0 !important;
-  padding-top: 0 !important;
-  margin-top: 0 !important;
 }
 
-/* Fix view-lines to start at top */
+/* Fix view-lines positioning - let Monaco handle the top offset */
+/* REMOVED: top/padding/margin overrides that break cursor positioning */
 .monaco-wrapper .monaco-editor .view-lines,
 .editor-wrapper .monaco-editor .view-lines {
-  padding-top: 0 !important;
-  margin-top: 0 !important;
-  top: 0 !important;
+  /* Let Monaco calculate positioning */
 }
 
 /* Ensure editor scrollable area starts at top */

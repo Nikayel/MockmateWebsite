@@ -168,7 +168,10 @@ function MonacoEditorComponent({
           guides: { indentation: false },
           bracketPairColorization: { enabled: false },
           matchBrackets: "never",
-          padding: { top: 12, bottom: 12 },
+          padding: { top: 8, bottom: 8 },
+          // Ensure cursor layer syncs with view lines
+          cursorBlinking: "blink",
+          cursorStyle: "line",
         }}
         loading={
           <div className="flex items-center justify-center h-full bg-[#1e1e1e]">

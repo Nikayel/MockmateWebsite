@@ -1,8 +1,7 @@
 "use client"
 
 import { MagneticButton } from "@/components/ui/magnetic-button"
-import { BentoGrid, BentoFeature } from "@/components/ui/bento-grid"
-import { Brain, Code2, MessageSquare, BarChart3, Zap, Shield, Play, TrendingUp } from "lucide-react"
+import { Brain, Code2, MessageSquare, BarChart3, Zap, Shield, Play } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { ScrollReveal } from "@/lib/motion"
@@ -10,169 +9,164 @@ import Image from "next/image"
 
 const features = [
   {
-    icon: <Brain className="w-8 h-8" />,
-    title: "AI-Powered Interviewer",
-    description:
-      "Practice with an intelligent AI that adapts to your skill level and provides realistic interview scenarios tailored to your target companies.",
-    span: "wide" as const,
-    metric: {
-      value: "98%",
-      label: "Accuracy Rate",
-    },
+    icon: Brain,
+    title: "AI Interviewer",
+    description: "Adapts to your skill level with realistic scenarios",
+    color: "#00d9ff",
   },
   {
-    icon: <Code2 className="w-8 h-8" />,
-    title: "Real-Time Coding Partner",
-    description: "Get instant feedback and suggestions as you code, just like having a senior developer reviewing your work.",
-    span: "default" as const,
-    features: [
-      "Live code analysis",
-      "Smart suggestions",
-      "Error detection"
-    ],
+    icon: Code2,
+    title: "Real-Time Feedback",
+    description: "Instant suggestions as you code",
+    color: "#00ff88",
   },
   {
-    icon: <MessageSquare className="w-8 h-8" />,
+    icon: MessageSquare,
     title: "Natural Conversations",
-    description:
-      "Engage in authentic technical discussions about your code, architecture decisions, and problem-solving approach.",
-    span: "default" as const,
+    description: "Discuss your approach like a real interview",
+    color: "#00d9ff",
   },
   {
-    icon: <BarChart3 className="w-8 h-8" />,
-    title: "Performance Analytics",
-    description: "Track your progress with detailed metrics on coding speed, accuracy, and problem-solving efficiency across multiple sessions.",
-    span: "tall" as const,
-    metric: {
-      value: "5x",
-      label: "Faster Improvement",
-    },
+    icon: BarChart3,
+    title: "Progress Tracking",
+    description: "See your improvement over time",
+    color: "#00ff88",
   },
   {
-    icon: <Zap className="w-8 h-8" />,
-    title: "Instant Feedback",
-    description: "Receive immediate insights on code quality, optimization opportunities, and best practices that matter.",
-    span: "default" as const,
+    icon: Zap,
+    title: "Instant Results",
+    description: "Get detailed feedback after each session",
+    color: "#00d9ff",
   },
   {
-    icon: <Shield className="w-8 h-8" />,
-    title: "Secure & Private",
-    description:
-      "Your code and practice sessions remain completely private and secure. Enterprise-grade security for peace of mind.",
-    span: "default" as const,
-    features: [
-      "Secure cloud storage",
-      "End-to-end encryption",
-      "Privacy-first design"
-    ],
+    icon: Shield,
+    title: "Private & Secure",
+    description: "Your code stays yours",
+    color: "#00ff88",
   },
 ]
 
 export function FeaturesSection() {
   return (
-    <section id="features" className="relative py-24 md:py-32 bg-black overflow-hidden">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black via-accent/5 to-black pointer-events-none" />
-
-      {/* Grid pattern overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,black,transparent)]" />
+    <section id="features" className="relative py-32 bg-black overflow-hidden">
+      {/* Subtle background */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-950/50 to-black pointer-events-none" />
 
       <div className="container mx-auto px-4 relative z-10">
         {/* Section Header */}
-        <ScrollReveal className="text-center mb-16 md:mb-20">
+        <ScrollReveal className="max-w-3xl mb-24">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-accent/30 bg-accent/5 text-accent text-sm font-medium mb-6">
-              <TrendingUp className="w-4 h-4" />
-              Built for Success
-            </span>
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading font-black text-white mb-6">
-              Everything You Need
-              <br />
-              <span className="bg-gradient-to-r from-accent via-neural to-accent bg-clip-text text-transparent">
-                To Ace Interviews
+            <p className="text-gray-500 text-sm uppercase tracking-widest mb-6">
+              Why Skillon
+            </p>
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold text-white mb-6 leading-tight">
+              Everything you need
+              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#00d9ff] to-[#00ff88]">
+                to ace interviews
               </span>
             </h2>
-            <p className="text-lg md:text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
-              Powerful features designed to accelerate your interview preparation
-              <br className="hidden sm:block" />
-              and help you land your dream role.
+            <p className="text-xl text-gray-400 max-w-2xl">
+              Practice with AI that understands code, gives meaningful feedback, and helps you improve faster.
             </p>
           </motion.div>
         </ScrollReveal>
 
-        {/* Bento Grid */}
+        {/* Features Grid - Clean minimal style */}
         <ScrollReveal>
-          <BentoGrid className="mb-20">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-16 mb-32">
             {features.map((feature, index) => (
-              <BentoFeature
-                key={index}
-                title={feature.title}
-                description={feature.description}
-                icon={feature.icon}
-                span={feature.span}
-                metric={feature.metric}
-                features={feature.features}
-                index={index}
-              />
+              <motion.div
+                key={feature.title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1 }}
+                className="group"
+              >
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110"
+                  style={{ backgroundColor: `${feature.color}10` }}
+                >
+                  <feature.icon className="w-6 h-6" style={{ color: feature.color }} />
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">
+                  {feature.title}
+                </h3>
+                <p className="text-gray-500 leading-relaxed">
+                  {feature.description}
+                </p>
+              </motion.div>
             ))}
-          </BentoGrid>
+          </div>
         </ScrollReveal>
 
-        {/* Interactive Demo Section */}
+        {/* Demo Section - Cleaner */}
         <ScrollReveal>
           <motion.div
-            className="glass-minimal rounded-3xl p-8 md:p-12 border border-accent/20 max-w-5xl mx-auto group hover:border-accent/40 transition-all duration-500"
-            whileHover={{ y: -4 }}
+            className="max-w-5xl mx-auto"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
           >
-            <div className="text-center mb-8">
-              <h3 className="text-3xl md:text-4xl font-heading font-bold text-white mb-4">
-                See Skillon in Action
-              </h3>
-              <p className="text-lg text-gray-400">
-                Watch how our AI interviewer provides real-time feedback
+            <div className="relative">
+              {/* Glow effect */}
+              <div className="absolute -inset-4 bg-gradient-to-r from-[#00d9ff]/20 to-[#00ff88]/20 rounded-3xl blur-3xl opacity-50" />
+
+              <div className="relative bg-gray-950 rounded-2xl border border-gray-800 overflow-hidden">
+                {/* Browser chrome */}
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-800">
+                  <div className="w-3 h-3 rounded-full bg-red-500/60" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
+                  <div className="w-3 h-3 rounded-full bg-green-500/60" />
+                  <div className="flex-1 text-center">
+                    <span className="text-xs text-gray-600 font-mono">skillon.dev/interview</span>
+                  </div>
+                </div>
+
+                {/* Screenshot */}
+                <div className="relative aspect-video">
+                  <Image
+                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/FeedbackSummeryMockup-GFSpAQsPcwjnrAW21qXk63EEXS2Nv4.png"
+                    alt="Skillon Feedback Interface"
+                    fill
+                    className="object-contain p-4"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* CTA below demo */}
+            <div className="text-center mt-12">
+              <p className="text-gray-400 mb-6">
+                See how our AI provides detailed, actionable feedback
               </p>
-            </div>
-
-            <div className="relative aspect-video bg-gradient-to-br from-card to-card/50 rounded-2xl overflow-hidden mb-8 group-hover:shadow-[0_0_50px_rgba(0,217,255,0.15)] transition-all duration-500">
-              <Image
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/FeedbackSummeryMockup-GFSpAQsPcwjnrAW21qXk63EEXS2Nv4.png"
-                alt="Skillon Feedback Summary Interface"
-                fill
-                className="object-contain p-4 opacity-90 group-hover:opacity-100 transition-opacity duration-500"
-              />
-
-              {/* Gradient overlay on hover */}
-              <div className="absolute inset-0 bg-gradient-to-t from-accent/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/interview">
-                <MagneticButton
-                  size="lg"
-                  variant="primary"
-                  glowColor="accent"
-                  className="group/btn"
-                >
-                  <Play className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />
-                  Start Practicing Free
-                </MagneticButton>
-              </Link>
-              <Link href="/samples">
-                <MagneticButton
-                  size="lg"
-                  variant="outline"
-                  glowColor="none"
-                  className="group/btn"
-                >
-                  <Code2 className="w-5 h-5" />
-                  View Sample Reports
-                </MagneticButton>
-              </Link>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link href="/interview">
+                  <MagneticButton
+                    size="lg"
+                    variant="primary"
+                    glowColor="accent"
+                    className="group"
+                  >
+                    <Play className="w-5 h-5" />
+                    Try It Free
+                  </MagneticButton>
+                </Link>
+                <Link href="/samples">
+                  <MagneticButton
+                    size="lg"
+                    variant="outline"
+                    glowColor="none"
+                  >
+                    View Sample Reports
+                  </MagneticButton>
+                </Link>
+              </div>
             </div>
           </motion.div>
         </ScrollReveal>
