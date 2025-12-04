@@ -1,5 +1,6 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { GridBackground } from "@/components/GridBackground"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -8,14 +9,15 @@ import { PRICING_CONFIG, getProPricing } from "@/lib/config"
 import Link from "next/link"
 
 export default function PricingPage() {
-  const proPricing = getProPricing('website') // Website pricing
+  const proPricing = getProPricing('website')
   return (
     <main className="min-h-screen bg-black">
       <Header />
 
       {/* Hero Section */}
-      <section className="pt-24 pb-12 bg-gradient-to-br from-black via-gray-900 to-black">
-        <div className="container mx-auto px-4">
+      <section className="relative pt-24 pb-12 overflow-hidden">
+        <GridBackground />
+        <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30 mb-6">Simple Pricing</Badge>
             <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-6">
@@ -30,12 +32,12 @@ export default function PricingPage() {
       </section>
 
       {/* Pricing Cards */}
-      <section className="py-16 bg-gradient-to-b from-gray-900 to-black">
+      <section className="py-16 bg-black">
         <div className="container mx-auto px-4">
           <div className="max-w-5xl mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {/* Free Plan */}
-              <Card className="bg-gray-900/50 border-gray-700 glass-effect">
+              <Card className="bg-gray-900/50 border-gray-800">
                 <CardHeader className="text-center pb-8">
                   <div className="flex justify-center mb-4">
                     <Star className="h-12 w-12 text-gray-400" />
@@ -53,7 +55,7 @@ export default function PricingPage() {
                       </li>
                     ))}
                   </ul>
-                  <Link href="/install">
+                  <Link href="/interview">
                     <Button className="w-full bg-gray-700 hover:bg-gray-600 text-white">
                       {PRICING_CONFIG.free.buttonText}
                     </Button>
@@ -62,7 +64,7 @@ export default function PricingPage() {
               </Card>
 
               {/* Pro Plan */}
-              <Card className="bg-gray-900/50 border-[#00d9ff] glass-effect relative">
+              <Card className="bg-gray-900/50 border-[#00d9ff] relative">
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                   <Badge className="bg-[#00d9ff] text-white px-4 py-1">Most Popular</Badge>
                 </div>
@@ -73,9 +75,9 @@ export default function PricingPage() {
                   <CardTitle className="text-2xl font-heading text-white mb-2">{proPricing.name}</CardTitle>
                   <div className="text-4xl font-bold text-white mb-2">{proPricing.priceDisplay}</div>
                   <p className="text-gray-400">{proPricing.period}</p>
-                  <Badge className="mt-2 bg-blue-600/20 text-blue-300 border-blue-600/30">
-                    💡 VS Code users: $19/month (install extension)
-                  </Badge>
+                  <p className="mt-3 text-sm text-gray-500">
+                    VS Code extension: $19/mo <span className="text-neural">(coming soon)</span>
+                  </p>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-4 mb-8">
@@ -96,7 +98,7 @@ export default function PricingPage() {
               </Card>
 
               {/* Enterprise Plan */}
-              <Card className="bg-gray-900/50 border-gray-700 glass-effect">
+              <Card className="bg-gray-900/50 border-gray-800">
                 <CardHeader className="text-center pb-8">
                   <div className="flex justify-center mb-4">
                     <Crown className="h-12 w-12 text-yellow-400" />
@@ -130,7 +132,7 @@ export default function PricingPage() {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-16 bg-black">
+      <section className="py-16 bg-black border-t border-gray-900">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto">
             <h2 className="text-3xl font-heading font-bold text-white text-center mb-12">Frequently Asked Questions</h2>

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Code, Menu, X, User, LayoutDashboard, Clock, Terminal, LogOut } from "lucide-react"
+import { Menu, X, User, LayoutDashboard, Clock, Terminal, LogOut } from "lucide-react"
+import { Logo } from "@/components/Logo"
 import Link from "next/link"
 import { signOut } from "@/lib/auth"
 import { useAuth } from "@/lib/auth-context"
@@ -37,12 +38,9 @@ export function Header() {
     >
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-3 group">
-            <div className="relative">
-              <Code className="h-8 w-8 text-accent group-hover:animate-neural-pulse transition-all" />
-              <div className="absolute inset-0 bg-accent rounded-full blur-lg opacity-20 group-hover:opacity-40 transition-opacity duration-300"></div>
-            </div>
-            <span className="text-2xl font-heading font-bold bg-gradient-to-r from-white via-accent to-white bg-clip-text text-transparent">
+          <Link href="/" className="flex items-center space-x-2 group">
+            <Logo size={32} className="text-accent group-hover:scale-105 transition-transform" />
+            <span className="text-2xl font-heading font-bold text-white">
               Skillon
             </span>
           </Link>

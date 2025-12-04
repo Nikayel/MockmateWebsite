@@ -1,5 +1,6 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { GridBackground } from "@/components/GridBackground"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Rocket, Code, Mail, Linkedin } from "lucide-react"
@@ -10,8 +11,9 @@ export default function CareersPage() {
       <Header />
 
       {/* Hero Section */}
-      <section className="pt-24 pb-12 bg-gradient-to-br from-black via-gray-900 to-black">
-        <div className="container mx-auto px-4">
+      <section className="relative pt-24 pb-12 overflow-hidden">
+        <GridBackground />
+        <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30 mb-6">We're Hiring</Badge>
             <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-6">
@@ -26,14 +28,14 @@ export default function CareersPage() {
       </section>
 
       {/* Open Positions */}
-      <section className="py-16 bg-gradient-to-b from-gray-900 to-black">
+      <section className="py-16 bg-black">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto">
             <h2 className="text-3xl font-heading font-bold text-white text-center mb-12">Open Roles</h2>
 
             <div className="space-y-6">
               {/* Growth Role */}
-              <Card className="bg-gray-900/50 border-gray-700 glass-effect">
+              <Card className="bg-gray-900/50 border-gray-800">
                 <CardHeader>
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-[#00d9ff]/20 rounded-lg">
@@ -54,7 +56,7 @@ export default function CareersPage() {
               </Card>
 
               {/* Fullstack Developer Role */}
-              <Card className="bg-gray-900/50 border-gray-700 glass-effect">
+              <Card className="bg-gray-900/50 border-gray-800">
                 <CardHeader>
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-[#00d9ff]/20 rounded-lg">
@@ -79,7 +81,7 @@ export default function CareersPage() {
       </section>
 
       {/* Contact Section */}
-      <section className="py-16 bg-black">
+      <section className="py-16 bg-black border-t border-gray-900">
         <div className="container mx-auto px-4">
           <div className="max-w-2xl mx-auto text-center">
             <h2 className="text-2xl font-heading font-bold text-white mb-6">Interested?</h2>

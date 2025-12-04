@@ -23,11 +23,11 @@ export const PRICING_CONFIG = {
     popular: false,
   },
   pro: {
-    // Unified pricing
+    // Different pricing per platform
     website: {
       name: "Pro",
-      price: 19,
-      priceDisplay: "$19",
+      price: 25,
+      priceDisplay: "$25",
       period: "/month",
       description: "For serious interview preparation",
     },

@@ -1,5 +1,6 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { GridBackground } from "@/components/GridBackground"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -22,8 +23,9 @@ export default function DocsPage() {
       <Header />
 
       {/* Hero Section */}
-      <section className="pt-24 pb-12 bg-gradient-to-br from-black via-gray-900 to-black">
-        <div className="container mx-auto px-4">
+      <section className="relative pt-24 pb-12 overflow-hidden">
+        <GridBackground />
+        <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30 mb-6">Documentation</Badge>
             <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-6">
@@ -38,12 +40,12 @@ export default function DocsPage() {
       </section>
 
       {/* Quick Start Guide */}
-      <section className="py-16 bg-gradient-to-b from-gray-900 to-black">
+      <section className="py-16 bg-black">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
             <h2 className="text-3xl font-heading font-bold text-white text-center mb-12">Quick Start Guide</h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <Card className="bg-gray-900/50 border-gray-700 glass-effect text-center">
+              <Card className="bg-gray-900/50 border-gray-800 text-center">
                 <CardHeader>
                   <div className="flex justify-center mb-4">
                     <Download className="h-12 w-12 text-[#00d9ff]" />
@@ -55,7 +57,7 @@ export default function DocsPage() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-gray-900/50 border-gray-700 glass-effect text-center">
+              <Card className="bg-gray-900/50 border-gray-800 text-center">
                 <CardHeader>
                   <div className="flex justify-center mb-4">
                     <Settings className="h-12 w-12 text-[#00d9ff]" />
@@ -67,7 +69,7 @@ export default function DocsPage() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-gray-900/50 border-gray-700 glass-effect text-center">
+              <Card className="bg-gray-900/50 border-gray-800 text-center">
                 <CardHeader>
                   <div className="flex justify-center mb-4">
                     <Play className="h-12 w-12 text-[#00d9ff]" />
@@ -79,7 +81,7 @@ export default function DocsPage() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-gray-900/50 border-gray-700 glass-effect text-center">
+              <Card className="bg-gray-900/50 border-gray-800 text-center">
                 <CardHeader>
                   <div className="flex justify-center mb-4">
                     <BarChart3 className="h-12 w-12 text-[#00d9ff]" />
@@ -96,11 +98,11 @@ export default function DocsPage() {
       </section>
 
       {/* Detailed Documentation */}
-      <section className="py-16 bg-black">
+      <section className="py-16 bg-black border-t border-gray-900">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto space-y-12">
             {/* Installation */}
-            <Card className="bg-gray-900/50 border-gray-700 glass-effect">
+            <Card className="bg-gray-900/50 border-gray-800">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
                   <Download className="h-6 w-6 text-[#00d9ff]" />
@@ -136,7 +138,7 @@ export default function DocsPage() {
             </Card>
 
             {/* Features Guide */}
-            <Card className="bg-gray-900/50 border-gray-700 glass-effect">
+            <Card className="bg-gray-900/50 border-gray-800">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
                   <Zap className="h-6 w-6 text-[#00d9ff]" />
@@ -192,7 +194,7 @@ export default function DocsPage() {
             </Card>
 
             {/* Commands & Shortcuts */}
-            <Card className="bg-gray-900/50 border-gray-700 glass-effect">
+            <Card className="bg-gray-900/50 border-gray-800">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
                   <BookOpen className="h-6 w-6 text-[#00d9ff]" />
@@ -239,7 +241,7 @@ export default function DocsPage() {
             </Card>
 
             {/* Troubleshooting */}
-            <Card className="bg-gray-900/50 border-gray-700 glass-effect">
+            <Card className="bg-gray-900/50 border-gray-800">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
                   <Settings className="h-6 w-6 text-[#00d9ff]" />
@@ -283,7 +285,7 @@ export default function DocsPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-gradient-to-b from-gray-900 to-black">
+      <section className="py-16 bg-black border-t border-gray-900">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-heading font-bold text-white mb-6">Ready to Get Started?</h2>
           <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">

@@ -1,4 +1,5 @@
-import { Code, Github, Twitter, Mail } from "lucide-react"
+import { Github, Twitter, Mail } from "lucide-react"
+import { Logo } from "@/components/Logo"
 
 export function Footer() {
   return (
@@ -8,7 +9,7 @@ export function Footer() {
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
-              <Code className="h-6 w-6 text-[#00d9ff]" />
+              <Logo size={24} className="text-[#00d9ff]" />
               <span className="text-xl font-heading font-bold text-white">Skillon</span>
             </div>
             <p className="text-gray-400 text-sm">
