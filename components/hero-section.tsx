@@ -1,14 +1,12 @@
 "use client"
 
-import { useState, useEffect, Suspense, lazy } from "react"
+import { useState, useEffect } from "react"
 import { MagneticButton } from "@/components/ui/magnetic-button"
-import { Play, ArrowRight, Sparkles, Cpu, Globe, Bell } from "lucide-react"
+import { Play, ArrowRight, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
-
-// Lazy load Three.js component for performance
-const NeuralNetwork = lazy(() => import("@/components/NeuralNetwork"))
+import { GridBackground } from "@/components/GridBackground"
 
 export function HeroSection() {
   const [typedText, setTypedText] = useState("")
@@ -41,20 +39,8 @@ export function HeroSection() {
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-black">
-      {/* Neural Network Background - Three.js */}
-      <Suspense fallback={<div className="absolute inset-0 bg-black" />}>
-        <div className="absolute inset-0 z-0">
-          <NeuralNetwork className="w-full h-full" nodeCount={60} enableMouse={true} />
-        </div>
-      </Suspense>
-
-      {/* Vignette overlay */}
-      <div className="absolute inset-0 bg-gradient-radial from-transparent via-black/30 to-black/80 z-[1]" />
-
-      {/* Scan line effect (subtle CRT) */}
-      <div className="absolute inset-0 z-[2] pointer-events-none opacity-20">
-        <div className="absolute inset-0 animate-scan bg-gradient-to-b from-transparent via-accent/5 to-transparent h-[2px]" />
-      </div>
+      {/* Lightweight CSS Background */}
+      <GridBackground />
 
       {/* Content */}
       <motion.div
@@ -89,10 +75,10 @@ export function HeroSection() {
             variants={staggerItem}
             className="text-lg sm:text-xl md:text-2xl text-gray-400 mb-12 max-w-3xl mx-auto leading-relaxed font-light"
           >
-            Practice realistic coding interviews with an{" "}
+            Practice coding interviews with an{" "}
             <span className="text-accent font-medium">AI interviewer</span> in your browser.
             <br className="hidden sm:block" />
-            <span className="text-white/90">Get real-time feedback. Land your dream job.</span>
+            <span className="text-white/90">Get feedback. Ship faster. Land the job.</span>
           </motion.p>
 
           {/* Code Terminal */}
@@ -100,15 +86,15 @@ export function HeroSection() {
             variants={staggerItem}
             className="mb-12 max-w-2xl mx-auto group"
           >
-            <div className="glass-minimal rounded-xl p-6 border border-accent/20 transition-all duration-500 hover:border-accent/40 hover:shadow-[0_0_40px_rgba(0,217,255,0.15)]">
+            <div className="bg-gray-950/80 backdrop-blur-sm rounded-xl p-6 border border-white/[0.06] transition-all duration-500 hover:border-white/[0.12]">
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-3 h-3 bg-destructive rounded-full" />
-                <div className="w-3 h-3 bg-[#ffbf00] rounded-full" />
-                <div className="w-3 h-3 bg-neural rounded-full" />
-                <span className="ml-auto text-xs text-muted-foreground font-mono">skillon.dev</span>
+                <div className="w-3 h-3 bg-red-500/80 rounded-full" />
+                <div className="w-3 h-3 bg-yellow-500/80 rounded-full" />
+                <div className="w-3 h-3 bg-green-500/80 rounded-full" />
+                <span className="ml-auto text-xs text-gray-600 font-mono">skillon.dev</span>
               </div>
               <div className="text-left font-mono text-sm sm:text-base">
-                <span className="text-muted-foreground">// Your AI interview partner</span>
+                <span className="text-gray-600">// Your AI interview partner</span>
                 <br />
                 <span className="text-accent">const</span>{" "}
                 <span className="text-white">
@@ -151,60 +137,34 @@ export function HeroSection() {
             </Link>
           </motion.div>
 
-          {/* Stats - Modern Bento Style */}
-          <motion.div
-            variants={staggerContainer}
-            className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto"
-          >
-            <motion.div
-              variants={staggerItem}
-              className="glass-minimal rounded-xl p-6 border border-white/[0.08] hover:border-accent/30 transition-all duration-500 group"
-            >
-              <div className="flex items-center justify-center mb-2">
-                <Cpu className="w-6 h-6 text-accent group-hover:animate-neural-pulse" />
-              </div>
-              <div className="text-3xl font-bold text-white mb-1">AI-Powered</div>
-              <div className="text-sm text-muted-foreground">Smart Interviewer</div>
-            </motion.div>
-
-            <motion.div
-              variants={staggerItem}
-              className="glass-minimal rounded-xl p-6 border border-white/[0.08] hover:border-neural/30 transition-all duration-500 group"
-            >
-              <div className="flex items-center justify-center mb-2">
-                <Sparkles className="w-6 h-6 text-neural group-hover:animate-neural-glow" />
-              </div>
-              <div className="text-3xl font-bold text-white mb-1">Real-Time</div>
-              <div className="text-sm text-muted-foreground">Code Feedback</div>
-            </motion.div>
-
-            <motion.div
-              variants={staggerItem}
-              className="glass-minimal rounded-xl p-6 border border-white/[0.08] hover:border-accent/30 transition-all duration-500 group"
-            >
-              <div className="flex items-center justify-center mb-2">
-                <Globe className="w-6 h-6 text-accent group-hover:animate-neural-pulse" />
-              </div>
-              <div className="text-3xl font-bold text-white mb-1">Web-Based</div>
-              <div className="text-sm text-muted-foreground">No Install Needed</div>
-            </motion.div>
-          </motion.div>
-
-          {/* VS Code Coming Soon Banner */}
+          {/* Features - Simple inline style */}
           <motion.div
             variants={staggerItem}
-            className="mt-8 max-w-xl mx-auto"
+            className="flex flex-wrap justify-center gap-x-8 gap-y-3 text-sm text-gray-500 mb-8"
+          >
+            <span className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+              AI interviewer
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-neural" />
+              Real-time feedback
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+              No install needed
+            </span>
+          </motion.div>
+
+          {/* VS Code Coming Soon - More subtle */}
+          <motion.div
+            variants={staggerItem}
+            className="max-w-md mx-auto"
           >
             <Link href="/install" className="block">
-              <div className="glass-minimal rounded-lg px-6 py-4 border border-neural/30 hover:border-neural/50 transition-all duration-300 cursor-pointer group">
-                <div className="flex items-center justify-center gap-3">
-                  <Bell className="w-5 h-5 text-neural animate-pulse" />
-                  <span className="text-gray-300 text-sm">
-                    <span className="text-neural font-medium">VS Code Extension</span> coming soon —
-                    <span className="text-white/80 group-hover:text-white transition-colors"> get notified</span>
-                  </span>
-                  <ArrowRight className="w-4 h-4 text-neural group-hover:translate-x-1 transition-transform" />
-                </div>
+              <div className="text-sm text-gray-600 hover:text-gray-400 transition-colors">
+                <span className="text-neural">VS Code extension</span> coming soon
+                <ArrowRight className="w-3 h-3 inline-block ml-1" />
               </div>
             </Link>
           </motion.div>
