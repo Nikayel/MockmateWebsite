@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { HeroSection } from "@/components/hero-section"
 import { FeaturesSection } from "@/components/features-section"
+import { AIAssistedSection } from "@/components/ai-assisted-section"
 import { Footer } from "@/components/footer"
 import { useAuth } from "@/lib/auth-context"
 import { getUserProfile, checkUsageLimit } from "@/lib/firestore-helpers"
@@ -192,6 +193,7 @@ export default function HomePage() {
     <main className="min-h-screen bg-black">
       <Header />
       <HeroSection />
+      <AIAssistedSection />
       <FeaturesSection />
       <Footer />
     </main>
