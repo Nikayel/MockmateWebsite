@@ -1,21 +1,23 @@
 import { NextRequest, NextResponse } from "next/server"
-import { db } from "@/lib/firebase"
-import { collection, query, where, getDocs, orderBy, limit as firestoreLimit, Timestamp } from "firebase/firestore"
+import { adminDb } from "@/lib/firebase-admin"
+import { verifyAdminAccess } from "@/lib/admin-auth"
 
 /**
  * Admin Analytics API
  * Returns aggregate metrics for admin dashboard
- *
- * IMPORTANT: In production, add authentication middleware to verify admin access
+ * Requires admin authentication
  */
 
 export async function GET(request: NextRequest) {
   try {
-    // TODO: Add admin authentication check
-    // const isAdmin = await verifyAdminAccess(request)
-    // if (!isAdmin) {
-    //   return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
-    // }
+    // Verify admin access
+    const admin = await verifyAdminAccess(request)
+    if (!admin) {
+      return NextResponse.json(
+        { error: "Unauthorized - Admin access required" },
+        { status: 403 }
+      )
+    }
 
     const { searchParams } = new URL(request.url)
     const timeRange = searchParams.get("timeRange") || "7d" // 7d, 30d, 90d, all
@@ -38,8 +40,8 @@ export async function GET(request: NextRequest) {
         startDate = null
     }
 
-    // Fetch all users
-    const profilesSnapshot = await getDocs(collection(db, "profiles"))
+    // Fetch all users using Admin SDK
+    const profilesSnapshot = await adminDb.collection("profiles").get()
     const totalUsers = profilesSnapshot.size
 
     // Count by subscription tier
@@ -52,18 +54,17 @@ export async function GET(request: NextRequest) {
     profilesSnapshot.forEach((doc) => {
       const profile = doc.data()
       const tier = profile.subscription_tier || "free"
-      tierCounts[tier as keyof typeof tierCounts]++
+      if (tier in tierCounts) {
+        tierCounts[tier as keyof typeof tierCounts]++
+      }
     })
 
     // Fetch sessions (with time range filter if applicable)
-    let sessionsQuery = query(collection(db, "interview_sessions"))
+    let sessionsQuery: FirebaseFirestore.Query = adminDb.collection("interview_sessions")
     if (startDate) {
-      sessionsQuery = query(
-        sessionsQuery,
-        where("started_at", ">=", startDate.toISOString())
-      )
+      sessionsQuery = sessionsQuery.where("started_at", ">=", startDate.toISOString())
     }
-    const sessionsSnapshot = await getDocs(sessionsQuery)
+    const sessionsSnapshot = await sessionsQuery.get()
 
     const totalSessions = sessionsSnapshot.size
     let completedSessions = 0
@@ -99,14 +100,11 @@ export async function GET(request: NextRequest) {
       : 0
 
     // Fetch analytics events
-    let eventsQuery = query(collection(db, "analytics_events"))
+    let eventsQuery: FirebaseFirestore.Query = adminDb.collection("analytics_events")
     if (startDate) {
-      eventsQuery = query(
-        eventsQuery,
-        where("timestamp", ">=", startDate.toISOString())
-      )
+      eventsQuery = eventsQuery.where("timestamp", ">=", startDate.toISOString())
     }
-    const eventsSnapshot = await getDocs(eventsQuery)
+    const eventsSnapshot = await eventsQuery.get()
 
     const eventCounts: Record<string, number> = {}
     let totalCodeExecutions = 0
@@ -133,13 +131,13 @@ export async function GET(request: NextRequest) {
     const mrr = tierCounts.pro * 25 // Monthly Recurring Revenue
 
     // Fetch recent errors (last 100)
-    const errorsQuery = query(
-      collection(db, "analytics_events"),
-      where("event_name", "==", "error"),
-      orderBy("timestamp", "desc"),
-      firestoreLimit(100)
-    )
-    const errorsSnapshot = await getDocs(errorsQuery)
+    const errorsSnapshot = await adminDb
+      .collection("analytics_events")
+      .where("event_name", "==", "error")
+      .orderBy("timestamp", "desc")
+      .limit(100)
+      .get()
+
     const recentErrors = errorsSnapshot.docs.map(doc => ({
       timestamp: doc.data().timestamp,
       errorType: doc.data().properties?.errorType,

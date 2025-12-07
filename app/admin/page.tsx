@@ -19,7 +19,13 @@ import {
   Activity,
   Target,
   Zap,
+  ShieldX,
 } from "lucide-react"
+
+// Admin email whitelist (must match server-side list)
+const ADMIN_EMAILS = [
+  "nikayel.jamal@gmail.com",
+]
 
 interface AnalyticsMetrics {
   users: {
@@ -65,42 +71,66 @@ interface AnalyticsMetrics {
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const { firebaseUser, loading: authLoading } = useAuth()
+  const { firebaseUser, user, loading: authLoading } = useAuth()
   const [metrics, setMetrics] = useState<AnalyticsMetrics | null>(null)
   const [loading, setLoading] = useState(true)
   const [timeRange, setTimeRange] = useState("7d")
+  const [error, setError] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
 
+  // Check if user is admin
+  useEffect(() => {
+    if (authLoading) return
+
+    if (!firebaseUser) {
+      router.push("/login?redirect=admin")
+      return
+    }
+
+    const userEmail = firebaseUser.email?.toLowerCase()
+    const adminStatus = userEmail ? ADMIN_EMAILS.includes(userEmail) : false
+    setIsAdmin(adminStatus)
+
+    if (!adminStatus) {
+      setLoading(false)
+    }
+  }, [authLoading, firebaseUser, router])
+
+  // Load metrics only if admin
   useEffect(() => {
     const loadMetrics = async () => {
-      if (authLoading) return
-
-      // TODO: Add proper admin authentication
-      // For now, any logged-in user can access
-      if (!firebaseUser) {
-        router.push("/login?redirect=admin")
-        return
-      }
+      if (authLoading || !firebaseUser || isAdmin !== true) return
 
       try {
-        const response = await fetch(`/api/admin/analytics?timeRange=${timeRange}`)
+        setError(null)
+        const token = await firebaseUser.getIdToken()
+
+        const response = await fetch(`/api/admin/analytics?timeRange=${timeRange}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
         const data = await response.json()
 
-        if (data.success) {
+        if (response.ok && data.success) {
           setMetrics(data.metrics)
         } else {
+          setError(data.error || "Failed to load metrics")
           console.error("Failed to load metrics:", data.error)
         }
-      } catch (error) {
-        console.error("Error loading admin metrics:", error)
+      } catch (err) {
+        setError("Error loading admin metrics")
+        console.error("Error loading admin metrics:", err)
       } finally {
         setLoading(false)
       }
     }
 
     loadMetrics()
-  }, [authLoading, firebaseUser, router, timeRange])
+  }, [authLoading, firebaseUser, isAdmin, timeRange])
 
-  if (loading || authLoading) {
+  if (loading || authLoading || isAdmin === null) {
     return (
       <main className="min-h-screen bg-black flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
@@ -108,7 +138,39 @@ export default function AdminDashboard() {
     )
   }
 
-  if (!metrics) {
+  // Not an admin - show access denied
+  if (!isAdmin) {
+    return (
+      <main className="min-h-screen bg-black">
+        <Header />
+        <div className="pt-24 pb-16">
+          <div className="container mx-auto px-4 max-w-7xl">
+            <Card className="bg-red-900/20 border-red-500/30">
+              <CardContent className="p-8 text-center">
+                <ShieldX className="h-16 w-16 text-red-400 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-red-400 mb-2">Access Denied</h2>
+                <p className="text-gray-400 mb-4">
+                  You don&apos;t have permission to access the admin dashboard.
+                </p>
+                <p className="text-gray-500 text-sm mb-6">
+                  Logged in as: {firebaseUser?.email}
+                </p>
+                <Button
+                  onClick={() => router.push("/dashboard")}
+                  className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+                >
+                  Go to Dashboard
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+        <Footer />
+      </main>
+    )
+  }
+
+  if (error || !metrics) {
     return (
       <main className="min-h-screen bg-black">
         <Header />
@@ -117,7 +179,8 @@ export default function AdminDashboard() {
             <Card className="bg-red-900/20 border-red-500/30">
               <CardContent className="p-8 text-center">
                 <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-                <p className="text-red-400 font-medium">Failed to load analytics data</p>
+                <p className="text-red-400 font-medium mb-2">Failed to load analytics data</p>
+                <p className="text-gray-500 text-sm">{error}</p>
               </CardContent>
             </Card>
           </div>
