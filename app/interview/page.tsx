@@ -54,7 +54,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/lib/auth-context"
-import { checkUsageLimit, incrementSessionUsage, getUserProfile, createInterviewSession, updateInterviewSession } from "@/lib/firestore-helpers"
+import { checkUsageLimit, recordSessionStart, getUserProfile, createInterviewSession, updateInterviewSession, checkSessionCost } from "@/lib/firestore-helpers"
 import { scenarios, filterScenarios, getScenarioById, type Scenario, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
 import { extractProtectedElements, validateCodeProtection, enforceCodeProtection } from "@/lib/code-protection"
 import { toast } from "sonner"
@@ -118,6 +118,7 @@ export default function InterviewPage() {
 
   // AI hints states
   const [showAITips, setShowAITips] = useState(false)
+  const [isAIPartnerExpanded, setIsAIPartnerExpanded] = useState(false) // Collapsed by default
   const [ragHints, setRagHints] = useState<{ level: number; hint: string }[]>([])
   const [isLoadingHints, setIsLoadingHints] = useState(false)
 
@@ -1177,13 +1178,14 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         )
         setCurrentSessionId(sessionId)
 
-        // Only increment usage for non-DSA questions
-        if (selectedScenario.type !== 'dsa') {
-          await incrementSessionUsage(user.id)
-          // Refresh usage limit
-          const updatedUsage = await checkUsageLimit(user.id)
-          setUsageLimit(updatedUsage)
+        // Record session start (uses free opens or consumes 1 usage)
+        const result = await recordSessionStart(user.id)
+        if (result.usedPaidSession) {
+          toast.success(`Session started! You now have ${result.freeOpensRemaining} free opens.`)
         }
+        // Refresh usage limit
+        const updatedUsage = await checkUsageLimit(user.id)
+        setUsageLimit(updatedUsage)
       } catch (error) {
         console.error("Error creating session:", error)
         toast.error("Failed to track session")
@@ -2381,119 +2383,88 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         </Button>
                       </div>
 
-                      {/* AI Coding Partner */}
-                      <div className="flex flex-col flex-1 border-t border-gray-700 pt-2 min-h-0">
-                        <div className="flex items-center justify-between mb-1 flex-shrink-0">
-                          <div className="flex items-center space-x-1">
-                            <Lightbulb className="h-3 w-3 text-[#00d9ff]" />
-                            <span className="text-white text-xs font-medium">AI Partner</span>
+                      {/* AI Coding Partner - Minimal collapsed by default */}
+                      <div className="border-t border-gray-700 pt-2 flex-shrink-0">
+                        {!isAIPartnerExpanded ? (
+                          /* Collapsed state - just a thin bar */
+                          <div
+                            className="flex items-center justify-between px-2 py-1.5 bg-gray-800/50 rounded cursor-pointer hover:bg-gray-800 transition-colors"
+                            onClick={() => setIsAIPartnerExpanded(true)}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Bot className="h-3 w-3 text-[#00d9ff]" />
+                              <span className="text-[10px] text-gray-400">AI Assistant</span>
+                              <span className="text-[10px] text-gray-600">· optional</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {chatMessages.length > 0 && (
+                                <span className="text-[10px] text-gray-500">{chatMessages.length} msg</span>
+                              )}
+                              <ChevronUp className="h-3 w-3 text-gray-500" />
+                            </div>
                           </div>
-                          <div className="flex items-center space-x-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                fetchRAGHints()
-                                setShowAITips(true)
-                              }}
-                              className="h-5 px-1 text-[#00d9ff] hover:bg-gray-700"
-                              title="How to use AI effectively"
-                            >
-                              <HelpCircle className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                        {/* AI Tips Modal */}
-                        {showAITips && (
-                          <div className="mb-2 p-2 bg-gray-800 rounded border border-[#00d9ff]/30">
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-xs font-medium text-[#00d9ff] flex items-center gap-1">
-                                <Sparkles className="h-3 w-3" /> How to Use AI Effectively
-                              </span>
+                        ) : (
+                          /* Expanded state - compact chat */
+                          <div className="bg-gray-800/30 rounded p-2">
+                            {/* Header with collapse */}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-1.5">
+                                <Bot className="h-3 w-3 text-[#00d9ff]" />
+                                <span className="text-[10px] text-gray-300">AI Assistant</span>
+                                <span className="text-[9px] text-gray-600 bg-gray-800 px-1 rounded">optional</span>
+                              </div>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => setShowAITips(false)}
-                                className="h-4 w-4 p-0 text-gray-400 hover:text-white"
+                                onClick={() => setIsAIPartnerExpanded(false)}
+                                className="h-5 w-5 p-0 text-gray-500 hover:text-white"
                               >
-                                <X className="h-3 w-3" />
+                                <ChevronDown className="h-3 w-3" />
                               </Button>
                             </div>
-                            <div className="space-y-2 max-h-40 overflow-y-auto">
-                              {aiUsageTips.map((tip, idx) => (
-                                <div key={idx} className="text-xs">
-                                  <div className="font-medium text-white">{tip.title}</div>
-                                  <div className="text-gray-400 text-[10px] mb-1">{tip.description}</div>
-                                  <div className="flex gap-2">
-                                    <span className="text-green-400 text-[10px]">✓ "{tip.good.substring(0, 40)}..."</span>
-                                  </div>
-                                </div>
-                              ))}
-                              {/* RAG-generated hints */}
-                              {ragHints.length > 0 && (
-                                <div className="mt-2 pt-2 border-t border-gray-700">
-                                  <div className="font-medium text-[#00ff88] text-xs mb-1">Problem-Specific Hints</div>
-                                  {ragHints.slice(0, 2).map((hint, idx) => (
-                                    <div key={idx} className="text-[10px] text-gray-300 mb-1">
-                                      <span className="text-yellow-400">Hint {hint.level}:</span> {hint.hint}
+
+                            {/* Messages - max height 120px */}
+                            <div className="max-h-[120px] overflow-y-auto space-y-1 mb-2">
+                              {chatMessages.length === 0 ? (
+                                <p className="text-[10px] text-gray-500 text-center py-2">
+                                  Ask for hints, not solutions
+                                </p>
+                              ) : (
+                                chatMessages.slice(-4).map((msg, index) => (
+                                  <div key={index} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
+                                    <div className={`max-w-[85%] px-2 py-1 rounded text-[10px] ${msg.type === "user" ? "bg-blue-600/80 text-white" : "bg-gray-700 text-gray-200"}`}>
+                                      {msg.message.length > 100 ? msg.message.substring(0, 100) + "..." : msg.message}
                                     </div>
-                                  ))}
-                                </div>
+                                  </div>
+                                ))
                               )}
-                              {isLoadingHints && (
-                                <div className="text-[10px] text-gray-400">Loading personalized hints...</div>
-                              )}
+                              <div ref={chatEndRef} />
+                            </div>
+
+                            {/* Input - single line */}
+                            <div className="flex gap-1">
+                              <Input
+                                value={chatInput}
+                                onChange={(e) => setChatInput(e.target.value)}
+                                placeholder="Quick question..."
+                                className="flex-1 bg-gray-900 border-gray-700 text-white text-[10px] h-6 placeholder:text-gray-600"
+                                onKeyPress={(e) => e.key === "Enter" && !isLoadingChat && handleSendMessage(false)}
+                                disabled={isLoadingChat}
+                              />
+                              <Button
+                                onClick={() => handleSendMessage(false)}
+                                disabled={!chatInput.trim() || isLoadingChat}
+                                className="h-6 w-6 p-0 bg-[#00d9ff] hover:bg-[#00d9ff]/80"
+                              >
+                                {isLoadingChat ? (
+                                  <div className="h-2 w-2 border border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                  <Send className="h-2.5 w-2.5" />
+                                )}
+                              </Button>
                             </div>
                           </div>
                         )}
-                        <div className="flex-1 overflow-y-auto space-y-1 mb-2 p-2 bg-gray-800/30 rounded min-h-0">
-                          {chatMessages.map((msg, index) => (
-                            <div key={index} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
-                              <div
-                                className={`max-w-[85%] p-1.5 rounded text-xs ${msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-100"
-                                  }`}
-                              >
-                                <div className="flex items-center space-x-1 mb-0.5">
-                                  {msg.type === "user" ? (
-                                    <User className="h-2.5 w-2.5" />
-                                  ) : (
-                                    <Brain className="h-2.5 w-2.5 text-[#00d9ff] animate-neural-pulse" />
-                                  )}
-                                  <span className="text-xs opacity-75">{msg.type === "user" ? "You" : "AI Partner"}</span>
-                                </div>
-                                <p className="text-xs leading-tight">{msg.message}</p>
-                              </div>
-                            </div>
-                          ))}
-                          <div ref={chatEndRef} />
-                        </div>
-                        <div className="flex space-x-1 flex-shrink-0">
-                          <Input
-                            value={chatInput}
-                            onChange={(e) => setChatInput(e.target.value)}
-                            placeholder={isRecordingPartner ? "Listening..." : "Ask for help..."}
-                            className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-xs h-7"
-                            onKeyPress={(e) => e.key === "Enter" && !isLoadingChat && handleSendMessage(false)}
-                            disabled={isLoadingChat || isRecordingPartner}
-                            aria-label="Chat with AI partner"
-                          />
-                          <Button
-                            onClick={() => toggleVoiceRecording(false)}
-                            className={`h-7 px-2 ${isRecordingPartner ? 'bg-red-500 hover:bg-red-600 animate-pulse' : 'bg-gray-700 hover:bg-gray-600'} text-white`}
-                            aria-label={isRecordingPartner ? "Stop recording" : "Start voice input"}
-                            disabled={isLoadingChat}
-                          >
-                            {isRecordingPartner ? <MicOff className="h-3 w-3" aria-hidden="true" /> : <Mic className="h-3 w-3" aria-hidden="true" />}
-                          </Button>
-                          <Button
-                            onClick={() => handleSendMessage(false)}
-                            className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white h-7 px-2"
-                            loading={isLoadingChat}
-                            aria-label={isLoadingChat ? "Sending message" : "Send message"}
-                          >
-                            {!isLoadingChat && <Send className="h-3 w-3" aria-hidden="true" />}
-                          </Button>
-                        </div>
                       </div>
                     </div>
                   </Card>
