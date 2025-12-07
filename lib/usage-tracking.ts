@@ -13,13 +13,15 @@
 import { adminDb } from './firebase-admin'
 import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 
-// Cost per 1K tokens for each provider (input + output averaged)
+// Cost per 1K tokens for each provider (input + output averaged) - Dec 2025
 export const PROVIDER_COSTS = {
-  gemini: 0.0001,      // $0.10 per 1M tokens (very cheap)
-  deepseek: 0.00014,   // $0.14 per 1M tokens
-  claude: 0.00025,     // $0.25 per 1M tokens (Haiku)
-  'claude-sonnet': 0.003,  // $3 per 1M tokens
-  'gpt-4': 0.01,       // $10 per 1M tokens
+  gemini: 0.000188,         // Gemini 2.5 Flash: $0.075 in + $0.30 out per 1M
+  'gemini-pro': 0.003125,   // Gemini 2.5 Pro: $1.25 in + $5.00 out per 1M
+  deepseek: 0.00021,        // Deepseek: $0.14 in + $0.28 out per 1M
+  claude: 0.0024,           // Claude 3.5 Haiku: $0.80 in + $4.00 out per 1M
+  'claude-sonnet': 0.009,   // Claude Sonnet 4: $3 in + $15 out per 1M
+  'gpt-4o': 0.00625,        // GPT-4o: $2.50 in + $10 out per 1M
+  'gpt-4o-mini': 0.000375,  // GPT-4o mini: $0.15 in + $0.60 out per 1M
 } as const
 
 // Budget caps per subscription tier (per billing cycle)

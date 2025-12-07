@@ -46,44 +46,46 @@ interface ProviderConfig {
   costPer1kTokens: number // For cost tracking
 }
 
-// Provider configurations
+// Provider configurations - Updated Dec 2025 pricing
+// Strategy: Gemini Flash primary (cheapest + good), Deepseek fallback, Claude premium
 const PROVIDERS: Record<AIProvider, ProviderConfig> = {
   gemini: {
     name: 'gemini',
     enabled: true,
     apiKey: process.env.GEMINI_API_KEY,
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.5-flash', // Best value: $0.075/1M input, $0.30/1M output
     maxTokens: 1024,
     temperature: 0.7,
-    costPer1kTokens: 0.0001, // Very cheap
+    costPer1kTokens: 0.000188, // Averaged (input + output) / 2
   },
   deepseek: {
     name: 'deepseek',
     enabled: !!process.env.DEEPSEEK_API_KEY,
     apiKey: process.env.DEEPSEEK_API_KEY,
     baseUrl: 'https://api.deepseek.com/v1',
-    model: 'deepseek-chat',
+    model: 'deepseek-chat', // $0.14/1M input, $0.28/1M output - excellent fallback
     maxTokens: 1024,
     temperature: 0.7,
-    costPer1kTokens: 0.00014, // $0.14 per million tokens
+    costPer1kTokens: 0.00021, // Averaged
   },
   claude: {
     name: 'claude',
     enabled: !!process.env.ANTHROPIC_API_KEY,
     apiKey: process.env.ANTHROPIC_API_KEY,
     baseUrl: 'https://api.anthropic.com/v1',
-    model: 'claude-3-haiku-20240307', // Use Haiku for cost efficiency
+    model: 'claude-3-5-haiku-latest', // $0.80/1M input, $4.00/1M output - quality fallback
     maxTokens: 1024,
     temperature: 0.7,
-    costPer1kTokens: 0.00025, // Haiku is cheap
+    costPer1kTokens: 0.0024, // Averaged - more expensive but best quality
   },
 }
 
 // Fallback order based on task complexity
+// Cost-optimized: Gemini first (best value), Deepseek second (cheap), Claude last (quality)
 const FALLBACK_ORDER: Record<TaskComplexity, AIProvider[]> = {
-  simple: ['deepseek', 'gemini', 'claude'],   // Cheapest first
-  standard: ['gemini', 'deepseek', 'claude'], // Balanced
-  complex: ['gemini', 'claude', 'deepseek'],  // Quality first
+  simple: ['gemini', 'deepseek', 'claude'],   // Chat, hints - cheapest path
+  standard: ['gemini', 'deepseek', 'claude'], // Interview interactions
+  complex: ['gemini', 'claude', 'deepseek'],  // Feedback generation - quality matters
 }
 
 // Retry configuration
