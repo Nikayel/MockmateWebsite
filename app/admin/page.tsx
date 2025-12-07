@@ -19,6 +19,8 @@ import {
   Activity,
   Target,
   Zap,
+  Database,
+  Cpu,
 } from "lucide-react"
 
 interface AnalyticsMetrics {
@@ -63,10 +65,33 @@ interface AnalyticsMetrics {
   }
 }
 
+interface AIUsageData {
+  overview: {
+    totalUsers: number
+    totalCost: number
+    totalRequests: number
+    averageCostPerUser: number
+  }
+  cache: {
+    memoryCacheSize: number
+    memoryHits: number
+  }
+  topUsers: Array<{
+    userId: string
+    email: string
+    tier: string
+    cost: number
+    requests: number
+    budgetUsedPercent: number
+  }>
+  budgetCaps: Record<string, number>
+}
+
 export default function AdminDashboard() {
   const router = useRouter()
   const { firebaseUser, loading: authLoading } = useAuth()
   const [metrics, setMetrics] = useState<AnalyticsMetrics | null>(null)
+  const [aiUsage, setAiUsage] = useState<AIUsageData | null>(null)
   const [loading, setLoading] = useState(true)
   const [timeRange, setTimeRange] = useState("7d")
 
@@ -82,6 +107,7 @@ export default function AdminDashboard() {
       }
 
       try {
+        // Fetch main analytics
         const response = await fetch(`/api/admin/analytics?timeRange=${timeRange}`)
         const data = await response.json()
 
@@ -89,6 +115,19 @@ export default function AdminDashboard() {
           setMetrics(data.metrics)
         } else {
           console.error("Failed to load metrics:", data.error)
+        }
+
+        // Fetch AI usage data
+        try {
+          const usageResponse = await fetch('/api/admin/usage?view=overview', {
+            headers: { Authorization: `Bearer ${firebaseUser?.uid}` },
+          })
+          const usageData = await usageResponse.json()
+          if (usageData.success) {
+            setAiUsage(usageData.data)
+          }
+        } catch (usageError) {
+          console.error("Error loading AI usage:", usageError)
         }
       } catch (error) {
         console.error("Error loading admin metrics:", error)
@@ -363,6 +402,93 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
+
+          {/* AI Usage & Costs */}
+          {aiUsage && (
+            <Card className="bg-gray-900/50 border-gray-700 mb-8">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center">
+                  <Cpu className="h-5 w-5 mr-2 text-[#00ff88]" />
+                  AI Usage & Costs (This Month)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {/* AI Cost Overview */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <div className="text-2xl font-bold text-[#00ff88]">${aiUsage.overview.totalCost.toFixed(4)}</div>
+                    <p className="text-xs text-gray-400">Total AI Cost</p>
+                  </div>
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <div className="text-2xl font-bold text-white">{aiUsage.overview.totalRequests}</div>
+                    <p className="text-xs text-gray-400">AI Requests</p>
+                  </div>
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <div className="text-2xl font-bold text-[#00d9ff]">{aiUsage.cache.memoryCacheSize}</div>
+                    <p className="text-xs text-gray-400">Cache Entries</p>
+                  </div>
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <div className="text-2xl font-bold text-purple-400">{aiUsage.cache.memoryHits}</div>
+                    <p className="text-xs text-gray-400">Cache Hits</p>
+                  </div>
+                </div>
+
+                {/* Budget Caps */}
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-400 mb-3">Budget Caps by Tier</h4>
+                  <div className="flex gap-4">
+                    {aiUsage.budgetCaps && Object.entries(aiUsage.budgetCaps).map(([tier, cap]) => (
+                      <div key={tier} className="bg-gray-800/30 px-3 py-2 rounded">
+                        <span className="text-gray-400 text-xs capitalize">{tier}:</span>
+                        <span className="text-white text-sm font-medium ml-2">${cap}/mo</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Top Users by AI Cost */}
+                {aiUsage.topUsers && aiUsage.topUsers.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-400 mb-3">Top Users by AI Cost</h4>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {aiUsage.topUsers.slice(0, 10).map((user) => (
+                        <div key={user.userId} className="flex items-center justify-between bg-gray-800/30 px-3 py-2 rounded">
+                          <div className="flex items-center gap-3">
+                            <span className="text-white text-sm">{user.email}</span>
+                            <Badge
+                              className={
+                                user.tier === "enterprise"
+                                  ? "bg-purple-600/20 text-purple-400 border-purple-600/30"
+                                  : user.tier === "pro"
+                                  ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
+                                  : "bg-gray-600/20 text-gray-400 border-gray-600/30"
+                              }
+                            >
+                              {user.tier}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className="text-[#00ff88] text-sm font-medium">${user.cost.toFixed(4)}</span>
+                            <div className="w-20 h-2 bg-gray-700 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${
+                                  user.budgetUsedPercent > 80 ? "bg-red-500" :
+                                  user.budgetUsedPercent > 50 ? "bg-yellow-500" :
+                                  "bg-[#00ff88]"
+                                }`}
+                                style={{ width: `${Math.min(100, user.budgetUsedPercent)}%` }}
+                              />
+                            </div>
+                            <span className="text-gray-500 text-xs w-10">{user.budgetUsedPercent.toFixed(0)}%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Recent Errors */}
           {metrics.errors.total > 0 && (

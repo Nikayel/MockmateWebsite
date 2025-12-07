@@ -443,7 +443,23 @@ Let's continue!`
           setWorkspaceContext(contextFiles)
           toast.success(`Loaded ${contextFiles.length} codebase file(s) for ${selectedLanguage}`)
         } else {
-          // Clear workspace if no files available for this language
+          setWorkspaceContext([])
+        }
+      } else if (selectedScenario.type === 'add-functionality') {
+        // For Add Functionality scenarios, use existingCode
+        newCode = (selectedScenario as any).existingCode?.[selectedLanguage] || `// Add functionality code not available for ${selectedLanguage}`
+
+        // Also update workspace files when language changes
+        const codebaseFiles = (selectedScenario as any).codebaseFiles?.[selectedLanguage] || []
+        if (codebaseFiles.length > 0) {
+          const contextFiles = codebaseFiles.map((file: any) => ({
+            path: file.fileName,
+            content: file.content,
+            description: file.description,
+          }))
+          setWorkspaceContext(contextFiles)
+          toast.success(`Loaded ${contextFiles.length} codebase file(s) for ${selectedLanguage}`)
+        } else {
           setWorkspaceContext([])
         }
       } else {
@@ -2103,7 +2119,15 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       {/* Upload Codebase Section */}
                       <div className="border-t border-gray-700 pt-3 mt-3">
                         <h3 className="text-white font-semibold mb-2">Workspace Files</h3>
-                        {selectedScenario.type === 'bugfix' && workspaceContext.length > 0 ? (
+                        {/* Show warning for add-functionality when language has no files */}
+                        {selectedScenario.type === 'add-functionality' && workspaceContext.length === 0 && (
+                          <div className="mb-2 bg-yellow-500/10 border border-yellow-500/30 rounded p-2">
+                            <p className="text-xs text-yellow-300">
+                              ⚠️ This scenario is optimized for <strong>JavaScript/TypeScript</strong>. Switch language for codebase files.
+                            </p>
+                          </div>
+                        )}
+                        {(selectedScenario.type === 'bugfix' || selectedScenario.type === 'add-functionality') && workspaceContext.length > 0 ? (
                           <div className="mb-2">
                             <p className="text-xs text-green-400 mb-2">
                               ✓ {workspaceContext.length} codebase file(s) loaded automatically

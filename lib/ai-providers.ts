@@ -10,9 +10,17 @@
  * - Use Deepseek for simple chat interactions (cheapest)
  * - Use Gemini for standard interviews (balanced)
  * - Use Claude for complex feedback generation (highest quality)
+ *
+ * Includes:
+ * - Response caching to reduce API costs
+ * - Usage tracking for billing and analytics
+ * - Rate limiting per user
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { generateCacheKey, getCachedResponse, setCachedResponse } from './ai-cache'
+import { trackUsageEvent, calculateCost, PROVIDER_COSTS } from './usage-tracking'
+import { checkRateLimit, recordRequestStart, recordRequestEnd, updateTokenCount, RateLimitTier } from './rate-limiter'
 
 // Provider types
 export type AIProvider = 'gemini' | 'deepseek' | 'claude'
@@ -38,44 +46,46 @@ interface ProviderConfig {
   costPer1kTokens: number // For cost tracking
 }
 
-// Provider configurations
+// Provider configurations - Updated Dec 2025 pricing
+// Strategy: Gemini Flash primary (cheapest + good), Deepseek fallback, Claude premium
 const PROVIDERS: Record<AIProvider, ProviderConfig> = {
   gemini: {
     name: 'gemini',
     enabled: true,
     apiKey: process.env.GEMINI_API_KEY,
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.5-flash', // Best value: $0.075/1M input, $0.30/1M output
     maxTokens: 1024,
     temperature: 0.7,
-    costPer1kTokens: 0.0001, // Very cheap
+    costPer1kTokens: 0.000188, // Averaged (input + output) / 2
   },
   deepseek: {
     name: 'deepseek',
     enabled: !!process.env.DEEPSEEK_API_KEY,
     apiKey: process.env.DEEPSEEK_API_KEY,
     baseUrl: 'https://api.deepseek.com/v1',
-    model: 'deepseek-chat',
+    model: 'deepseek-chat', // $0.14/1M input, $0.28/1M output - excellent fallback
     maxTokens: 1024,
     temperature: 0.7,
-    costPer1kTokens: 0.00014, // $0.14 per million tokens
+    costPer1kTokens: 0.00021, // Averaged
   },
   claude: {
     name: 'claude',
     enabled: !!process.env.ANTHROPIC_API_KEY,
     apiKey: process.env.ANTHROPIC_API_KEY,
     baseUrl: 'https://api.anthropic.com/v1',
-    model: 'claude-3-haiku-20240307', // Use Haiku for cost efficiency
+    model: 'claude-3-5-haiku-latest', // $0.80/1M input, $4.00/1M output - quality fallback
     maxTokens: 1024,
     temperature: 0.7,
-    costPer1kTokens: 0.00025, // Haiku is cheap
+    costPer1kTokens: 0.0024, // Averaged - more expensive but best quality
   },
 }
 
 // Fallback order based on task complexity
+// Cost-optimized: Gemini first (best value), Deepseek second (cheap), Claude last (quality)
 const FALLBACK_ORDER: Record<TaskComplexity, AIProvider[]> = {
-  simple: ['deepseek', 'gemini', 'claude'],   // Cheapest first
-  standard: ['gemini', 'deepseek', 'claude'], // Balanced
-  complex: ['gemini', 'claude', 'deepseek'],  // Quality first
+  simple: ['gemini', 'deepseek', 'claude'],   // Chat, hints - cheapest path
+  standard: ['gemini', 'deepseek', 'claude'], // Interview interactions
+  complex: ['gemini', 'claude', 'deepseek'],  // Feedback generation - quality matters
 }
 
 // Retry configuration
@@ -251,6 +261,7 @@ async function callProvider(
 
 /**
  * Main function: Generate AI response with fallback
+ * Now includes caching, rate limiting, and usage tracking
  */
 export async function generateAIResponse(
   systemPrompt: string,
@@ -261,6 +272,14 @@ export async function generateAIResponse(
     preferredProvider?: AIProvider
     maxRetries?: number
     temperature?: number // Override default temperature (0.0-1.0)
+    // New options for tracking and caching
+    userId?: string
+    userTier?: RateLimitTier
+    sessionId?: string
+    scenarioId?: string
+    eventType?: 'chat_message' | 'feedback_generation' | 'hint_request'
+    skipCache?: boolean
+    skipRateLimit?: boolean
   } = {}
 ): Promise<AIResponse> {
   const {
@@ -268,9 +287,64 @@ export async function generateAIResponse(
     preferredProvider,
     maxRetries = MAX_RETRIES,
     temperature,
+    userId,
+    userTier = 'free',
+    sessionId,
+    scenarioId,
+    eventType = 'chat_message',
+    skipCache = false,
+    skipRateLimit = false,
   } = options
 
   const startTime = Date.now()
+
+  // 1. Check rate limit if userId provided
+  if (userId && !skipRateLimit) {
+    const rateLimitCheck = await checkRateLimit(userId, userTier)
+    if (!rateLimitCheck.allowed) {
+      throw new Error(rateLimitCheck.message || 'Rate limit exceeded')
+    }
+  }
+
+  // 2. Check cache if not skipped
+  if (!skipCache) {
+    const cacheKey = generateCacheKey({
+      type: eventType,
+      systemPrompt,
+      userMessage,
+      context: history.map(h => h.content).join('|'),
+      scenarioId,
+    })
+
+    const cached = await getCachedResponse(cacheKey)
+    if (cached.hit && cached.response) {
+      console.log(`[AI Provider] Cache hit (${cached.source})`)
+
+      // Track cached usage (no cost)
+      if (userId) {
+        trackUsageEvent({
+          userId,
+          eventType,
+          cached: true,
+          sessionId,
+          scenarioId,
+          latencyMs: Date.now() - startTime,
+        }).catch(() => {})
+      }
+
+      return {
+        text: cached.response,
+        provider: 'gemini', // Indicate it was from cache
+        latencyMs: Date.now() - startTime,
+        tokensUsed: 0,
+      }
+    }
+  }
+
+  // 3. Record request start for rate limiting
+  if (userId) {
+    recordRequestStart(userId, 500) // Estimate 500 tokens
+  }
 
   // Determine provider order
   let providerOrder: AIProvider[]
@@ -284,6 +358,7 @@ export async function generateAIResponse(
   providerOrder = providerOrder.filter(p => PROVIDERS[p].enabled)
 
   if (providerOrder.length === 0) {
+    if (userId) recordRequestEnd(userId)
     throw new Error('No AI providers are configured. Please set API keys.')
   }
 
@@ -301,10 +376,50 @@ export async function generateAIResponse(
         const latencyMs = Date.now() - startTime
         console.log(`[AI Provider] Success with ${provider} in ${latencyMs}ms`)
 
+        // Estimate tokens (rough estimate: 4 chars per token)
+        const inputTokens = Math.ceil((systemPrompt.length + userMessage.length + history.reduce((sum, h) => sum + h.content.length, 0)) / 4)
+        const outputTokens = Math.ceil(text.length / 4)
+        const totalTokens = inputTokens + outputTokens
+        const cost = calculateCost(inputTokens, outputTokens, provider)
+
+        // 4. Track usage
+        if (userId) {
+          updateTokenCount(userId, totalTokens)
+          recordRequestEnd(userId)
+
+          trackUsageEvent({
+            userId,
+            eventType,
+            provider,
+            model: PROVIDERS[provider].model,
+            inputTokens,
+            outputTokens,
+            totalTokens,
+            cost,
+            latencyMs,
+            cached: false,
+            sessionId,
+            scenarioId,
+          }).catch(() => {})
+        }
+
+        // 5. Cache the response
+        if (!skipCache) {
+          const cacheKey = generateCacheKey({
+            type: eventType,
+            systemPrompt,
+            userMessage,
+            context: history.map(h => h.content).join('|'),
+            scenarioId,
+          })
+          setCachedResponse(cacheKey, text, eventType).catch(() => {})
+        }
+
         return {
           text,
           provider,
           latencyMs,
+          tokensUsed: totalTokens,
         }
       } catch (error: any) {
         lastError = error
@@ -324,6 +439,7 @@ export async function generateAIResponse(
   }
 
   // All providers failed
+  if (userId) recordRequestEnd(userId)
   throw new Error(
     `All AI providers failed. Last error: ${lastError?.message || 'Unknown error'}`
   )
