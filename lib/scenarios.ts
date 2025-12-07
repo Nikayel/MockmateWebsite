@@ -1,7 +1,12 @@
 /**
  * Interview scenarios for MockMate
  * Shared between website and extension
+ *
+ * Now includes real-world scenarios that simulate actual
+ * Meta/Google AI-assisted interview formats.
  */
+
+import { realWorldBugFixScenarios, realWorldSystemDesignScenarios } from './scenarios-realworld';
 
 export type ScenarioType = 'dsa' | 'bugfix' | 'optimization' | 'security' | 'system-design';
 export type DifficultyLevel = 'easy' | 'medium' | 'hard';
@@ -16099,6 +16104,9 @@ The algorithm for myAtoi(string s) is as follows:
     },
     testCases: []
   },
+  // Include real-world scenarios from separate file
+  ...realWorldBugFixScenarios,
+  ...realWorldSystemDesignScenarios,
 ];
 
 export function filterScenarios(filters: {

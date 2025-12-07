@@ -1,12 +1,19 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import dynamic from "next/dynamic"
 import { MagneticButton } from "@/components/ui/magnetic-button"
-import { Play, ArrowRight, Sparkles } from "lucide-react"
+import { Play, ArrowRight, Sparkles, Building2, Zap, Brain } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
 import { GridBackground } from "@/components/GridBackground"
+
+// Lazy load Three.js particles for performance
+const SubtleParticles = dynamic(
+  () => import("@/components/SubtleParticles").then(mod => mod.SubtleParticles),
+  { ssr: false, loading: () => null }
+)
 
 export function HeroSection() {
   const [typedText, setTypedText] = useState("")
@@ -39,8 +46,16 @@ export function HeroSection() {
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-black">
-      {/* CSS Background - lightweight and reliable */}
+      {/* CSS Background - lightweight base */}
       <GridBackground />
+
+      {/* Subtle Three.js particles overlay */}
+      <SubtleParticles
+        className="absolute inset-0 z-[1] opacity-60"
+        particleCount={20}
+        primaryColor="#00d9ff"
+        secondaryColor="#00ff88"
+      />
 
       {/* Content */}
       <motion.div
