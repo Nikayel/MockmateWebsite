@@ -3,11 +3,17 @@ import { feedbackRateLimit } from "@/lib/rate-limit"
 import { generateFeedbackResponse } from "@/lib/ai-providers"
 import { trackFeedbackGenerationServer } from "@/lib/analytics-server"
 
-// Structured feedback schema for reliable extraction
+// Structured feedback schema - NEW GRADING CRITERIA
+// Aligned with real Meta/Google AI-assisted interview scoring
 interface FeedbackScores {
+  // New grading criteria
+  understanding: number       // 30% - Can you explain your approach?
+  problemSolving: number      // 25% - Debug & optimize
+  codeQuality: number         // 25% - Clean & efficient
+  communication: number       // 20% - Think out loud
+  // Legacy (kept for backward compatibility)
   correctness: number
   efficiency: number
-  codeQuality: number
   reasoningExplanation: number
   aiCollaboration: number
   overall: number
@@ -41,9 +47,14 @@ function extractScores(feedback: string, metrics: {
   }
 }): FeedbackScores {
   const scores: FeedbackScores = {
+    // New grading criteria
+    understanding: 70,
+    problemSolving: 70,
+    codeQuality: 70,
+    communication: 70,
+    // Legacy
     correctness: 70,
     efficiency: 70,
-    codeQuality: 70,
     reasoningExplanation: 70,
     aiCollaboration: 70,
     overall: 70,
@@ -51,9 +62,14 @@ function extractScores(feedback: string, metrics: {
 
   // Pattern: "Label: X/100" or "Label: X/10"
   const patterns = [
+    // NEW GRADING CRITERIA
+    { key: 'understanding', patterns: [/Understanding[:\s]+(\d+)\/100/i, /Understanding[:\s]+(\d+)\/10/i] },
+    { key: 'problemSolving', patterns: [/Problem[-\s]?Solving[:\s]+(\d+)\/100/i, /Problem[-\s]?Solving[:\s]+(\d+)\/10/i] },
+    { key: 'codeQuality', patterns: [/Code\s*Quality[:\s]+(\d+)\/100/i, /Code\s*Quality[:\s]+(\d+)\/10/i] },
+    { key: 'communication', patterns: [/Communication[:\s]+(\d+)\/100/i, /Communication[:\s]+(\d+)\/10/i] },
+    // LEGACY (for backward compatibility)
     { key: 'correctness', patterns: [/Correctness[:\s]+(\d+)\/100/i, /Correctness[:\s]+(\d+)\/10/i] },
     { key: 'efficiency', patterns: [/Efficiency[:\s]+(\d+)\/100/i, /Efficiency[:\s]+(\d+)\/10/i] },
-    { key: 'codeQuality', patterns: [/Code\s*Quality[:\s]+(\d+)\/100/i, /Code\s*Quality[:\s]+(\d+)\/10/i] },
     { key: 'reasoningExplanation', patterns: [/Reasoning\s*(?:&|and)?\s*Explanation[:\s]+(\d+)\/100/i, /Reasoning\s*(?:&|and)?\s*Explanation[:\s]+(\d+)\/10/i] },
     { key: 'aiCollaboration', patterns: [/AI\s*Collaboration[:\s]+(\d+)\/100/i, /AI\s*Collaboration[:\s]+(\d+)\/10/i] },
     { key: 'overall', patterns: [/Overall[:\s]+(\d+)\/100/i, /Overall[:\s]+(\d+)\/10/i] },
@@ -74,25 +90,41 @@ function extractScores(feedback: string, metrics: {
     }
   }
 
-  // Apply penalties based on actual metrics if scores weren't extracted properly
-  if (metrics.collaborationMessages === 0) {
-    // No collaboration = 0 for these categories
-    scores.reasoningExplanation = Math.min(scores.reasoningExplanation, 0)
-    scores.aiCollaboration = Math.min(scores.aiCollaboration, 0)
-  } else if (metrics.collaborationMessages <= 2) {
-    // Minimal collaboration = capped scores
-    scores.reasoningExplanation = Math.min(scores.reasoningExplanation, 30)
-    scores.aiCollaboration = Math.min(scores.aiCollaboration, 30)
+  // Derive new criteria from legacy if not parsed
+  const passRate = metrics.testsTotal > 0 ? (metrics.testsPassed / metrics.testsTotal) * 100 : 50
+
+  // Understanding = based on how they explained their approach
+  if (scores.understanding === 70) {
+    // Map from conversation and test performance
+    const baseUnderstanding = passRate
+    const communicationBonus = metrics.collaborationMessages > 0 ? Math.min(20, metrics.collaborationMessages * 5) : -20
+    scores.understanding = Math.min(100, Math.max(0, baseUnderstanding + communicationBonus))
   }
 
-  // Test-based correctness adjustment
+  // Problem-Solving = based on debugging and optimization
+  if (scores.problemSolving === 70) {
+    const effScore = metrics.efficiencyMetrics?.efficiencyScore || 50
+    scores.problemSolving = Math.round((passRate * 0.6) + (effScore * 0.4))
+  }
+
+  // Communication = based on how much they talked/messaged
+  if (scores.communication === 70) {
+    if (metrics.collaborationMessages === 0) {
+      scores.communication = 20 // Very low for no communication
+    } else if (metrics.collaborationMessages <= 2) {
+      scores.communication = 40
+    } else if (metrics.collaborationMessages <= 5) {
+      scores.communication = 60
+    } else {
+      scores.communication = Math.min(90, 60 + metrics.collaborationMessages * 3)
+    }
+  }
+
+  // Test-based correctness adjustment (legacy)
   if (metrics.testsTotal > 0) {
-    const passRate = (metrics.testsPassed / metrics.testsTotal) * 100
-    // If tests failed but score is high, adjust
     if (passRate < 50 && scores.correctness > 60) {
       scores.correctness = Math.min(scores.correctness, passRate + 20)
     }
-    // If all tests failed, cap correctness very low
     if (passRate === 0) {
       scores.correctness = Math.min(scores.correctness, 15)
     }
@@ -123,15 +155,17 @@ function extractScores(feedback: string, metrics: {
     }
   }
 
-  // ALWAYS recalculate overall from component scores to ensure accuracy
-  // This is critical because 0s in reasoning/collaboration MUST affect overall
-  const avgScore = Math.round(
-    (scores.correctness + scores.efficiency + scores.codeQuality +
-     scores.reasoningExplanation + scores.aiCollaboration) / 5
+  // Calculate overall using NEW WEIGHTED FORMULA
+  // Understanding (30%) + Problem-Solving (25%) + Code Quality (25%) + Communication (20%)
+  const newOverall = Math.round(
+    scores.understanding * 0.30 +
+    scores.problemSolving * 0.25 +
+    scores.codeQuality * 0.25 +
+    scores.communication * 0.20
   )
 
-  // Always use calculated average - don't trust AI's overall
-  scores.overall = avgScore
+  // Always use calculated weighted score - don't trust AI's overall
+  scores.overall = newOverall
 
   return scores
 }
@@ -211,53 +245,55 @@ export async function POST(request: NextRequest) {
     const testsPassed = testResults?.filter((t: any) => t.passed).length || 0
     const testsTotal = testResults?.length || 0
 
-    // Define system instruction for feedback generation (with structured output guidance)
-    const systemInstruction = `You are a senior interviewer delivering a focused technical debrief. Be direct, data-driven, and constructive.
+    // Define system instruction for feedback generation (NEW GRADING CRITERIA)
+    // Aligned with real Meta/Google AI-assisted interview scoring
+    const systemInstruction = `You are a senior interviewer at a top tech company delivering a focused technical debrief. Be direct, data-driven, and constructive.
 
 CRITICAL: Output ALL scores in EXACT format "Label: X/100" for reliable parsing.
 
-## SCORING FRAMEWORK (follow strictly)
+## NEW GRADING CRITERIA (used by Meta, Google, etc.)
 
-**Correctness (0-100):**
-- 100% tests pass = 85-100 (depending on edge cases handled)
-- 80-99% tests pass = 65-85
-- 50-79% tests pass = 40-65
-- Below 50% pass = 0-40
-- 0% pass = 0-15
+This scoring simulates real AI-assisted interviews. AI usage is OPTIONAL and not penalized.
 
-**Efficiency (0-100):**
-- Optimal time AND space complexity = 85-100
-- Optimal time OR space = 60-85
-- Both suboptimal = 30-60
-- Use provided efficiency metrics as reference
+**Understanding (30% weight, 0-100):**
+Can the candidate explain their approach?
+- Clear explanation of algorithm choice = 80-100
+- Basic explanation given = 50-80
+- Minimal explanation = 20-50
+- No explanation of approach = 0-20
 
-**Code Quality (0-100):**
-- Clean structure, good naming, proper formatting = 80-100
-- Acceptable but could improve = 60-80
-- Poor organization or naming = 40-60
-- Major quality issues = 0-40
+**Problem-Solving (25% weight, 0-100):**
+How well did they debug and optimize?
+- Optimal solution, good debugging = 80-100
+- Working solution, some optimization = 60-80
+- Solution works but inefficient = 40-60
+- Struggling with bugs/logic = 0-40
 
-**Reasoning & Explanation (0-100):**
-- 0 messages = 0/100 (critical failure: no communication)
-- 1-2 messages = 10-30/100
-- 3-5 messages = 40-60/100
-- 6+ quality messages with explanations = 70-100/100
+**Code Quality (25% weight, 0-100):**
+Is the code clean and efficient?
+- Clean, readable, efficient code = 80-100
+- Acceptable quality = 60-80
+- Needs improvement = 40-60
+- Poor quality = 0-40
 
-**AI Collaboration (0-100):**
-- Same scale as Reasoning based on message count
-- Quality matters: strategic questions > random asks
+**Communication (20% weight, 0-100):**
+Did they think out loud?
+- 0 messages = 20/100 (silent coding is not ideal but not a failure)
+- 1-2 messages = 40/100
+- 3-5 messages = 60/100
+- 6+ quality messages = 70-90/100
+- Excellent verbal explanation = 90-100/100
 
 ## OUTPUT FORMAT (use exactly)
 
 **TL;DR** – One sentence: what they did well + biggest gap.
 
 **Score Snapshot**
-- Correctness: X/100 – brief justification
-- Efficiency: X/100 – brief justification
+- Understanding: X/100 – brief justification
+- Problem-Solving: X/100 – brief justification
 - Code Quality: X/100 – brief justification
-- Reasoning & Explanation: X/100 – brief justification
-- AI Collaboration: X/100 – brief justification
-- Overall: X/100 – weighted average summary
+- Communication: X/100 – brief justification
+- Overall: X/100 – weighted average
 
 **What Worked** (max 3 bullets)
 - specific strength with evidence
@@ -270,12 +306,11 @@ CRITICAL: Output ALL scores in EXACT format "Label: X/100" for reliable parsing.
 2. Short-term practice
 3. Long-term skill development
 
-**AI & Communication Watchlist** – One paragraph on collaboration quality. If zero messages: "No evidence of thinking out loud—narrate your approach next time."
-
 RULES:
 - ~300 words max. Be concise.
 - Every point must reference actual data (tests, time, messages, complexity).
-- Zero collaboration = 0/100 for Reasoning AND AI Collaboration.
+- AI usage is OPTIONAL - don't penalize for not using AI.
+- Focus on understanding and explanation over AI usage frequency.
 - Never praise if tests fail. Address failures first.
 - Don't invent data. Say "No signal captured" if missing.
 `

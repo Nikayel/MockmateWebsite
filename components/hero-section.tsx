@@ -65,11 +65,14 @@ export function HeroSection() {
         animate="animate"
       >
         <div className="max-w-5xl mx-auto">
-          {/* Eyebrow */}
-          <motion.div variants={staggerItem} className="mb-6">
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-accent/30 bg-accent/5 text-accent text-sm font-medium backdrop-blur-sm">
-              <Sparkles className="w-4 h-4" />
-              AI-Powered Interview Training
+          {/* Eyebrow - AI-Assisted Interview Highlight */}
+          <motion.div variants={staggerItem} className="mb-6 flex flex-col sm:flex-row items-center gap-3">
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#00ff88]/40 bg-[#00ff88]/10 text-[#00ff88] text-sm font-medium backdrop-blur-sm">
+              <Zap className="w-4 h-4" />
+              Meta & Google Now Use AI-Assisted Interviews
+            </span>
+            <span className="text-xs text-gray-500">
+              Practice the new format before it's everywhere
             </span>
           </motion.div>
 

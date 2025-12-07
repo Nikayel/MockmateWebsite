@@ -1,0 +1,188 @@
+"use client"
+
+import { useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { Button } from "@/components/ui/button"
+import { ArrowRight, Briefcase, GraduationCap, Code2, Rocket } from "lucide-react"
+import { doc, updateDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+
+interface OnboardingModalProps {
+  isOpen: boolean
+  userId: string
+  onComplete: () => void
+}
+
+const roles = [
+  { id: "student", label: "Student", icon: GraduationCap, description: "Currently studying CS/Engineering" },
+  { id: "junior", label: "Junior Engineer", icon: Code2, description: "0-2 years experience" },
+  { id: "mid", label: "Mid-Level Engineer", icon: Briefcase, description: "2-5 years experience" },
+  { id: "senior", label: "Senior+ Engineer", icon: Rocket, description: "5+ years experience" },
+]
+
+const goals = [
+  { id: "faang", label: "FAANG/Big Tech" },
+  { id: "startup", label: "Startups" },
+  { id: "general", label: "General Practice" },
+  { id: "promotion", label: "Internal Promotion" },
+]
+
+export function OnboardingModal({ isOpen, userId, onComplete }: OnboardingModalProps) {
+  const [step, setStep] = useState(1)
+  const [selectedRole, setSelectedRole] = useState<string | null>(null)
+  const [selectedGoal, setSelectedGoal] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleComplete = async () => {
+    if (!selectedRole) return
+
+    setIsSubmitting(true)
+    try {
+      // Save to Firestore
+      const userRef = doc(db, "users", userId)
+      await updateDoc(userRef, {
+        role: selectedRole,
+        goal: selectedGoal || "general",
+        onboarding_completed: true,
+        onboarding_completed_at: new Date().toISOString(),
+      })
+      onComplete()
+    } catch (error) {
+      console.error("Failed to save onboarding data:", error)
+      // Still proceed - don't block the user
+      onComplete()
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          className="w-full max-w-lg mx-4 bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden"
+        >
+          {/* Header */}
+          <div className="p-6 pb-4 border-b border-gray-800">
+            <h2 className="text-xl font-heading font-bold text-white">
+              {step === 1 ? "Welcome to Skillon!" : "One more thing..."}
+            </h2>
+            <p className="text-sm text-gray-400 mt-1">
+              {step === 1
+                ? "Quick question to personalize your experience"
+                : "What's your interview goal?"}
+            </p>
+          </div>
+
+          {/* Content */}
+          <div className="p-6">
+            {step === 1 ? (
+              <>
+                <p className="text-sm text-gray-300 mb-4">What's your current role?</p>
+                <div className="grid grid-cols-1 gap-3">
+                  {roles.map((role) => {
+                    const Icon = role.icon
+                    const isSelected = selectedRole === role.id
+                    return (
+                      <button
+                        key={role.id}
+                        onClick={() => setSelectedRole(role.id)}
+                        className={`flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${
+                          isSelected
+                            ? "border-[#00d9ff] bg-[#00d9ff]/10"
+                            : "border-gray-700 hover:border-gray-600 bg-gray-800/50"
+                        }`}
+                      >
+                        <div className={`p-2 rounded-lg ${isSelected ? "bg-[#00d9ff]/20" : "bg-gray-800"}`}>
+                          <Icon className={`h-5 w-5 ${isSelected ? "text-[#00d9ff]" : "text-gray-400"}`} />
+                        </div>
+                        <div>
+                          <div className={`font-medium ${isSelected ? "text-white" : "text-gray-200"}`}>
+                            {role.label}
+                          </div>
+                          <div className="text-xs text-gray-500">{role.description}</div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-gray-300 mb-4">Where are you interviewing? (optional)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {goals.map((goal) => {
+                    const isSelected = selectedGoal === goal.id
+                    return (
+                      <button
+                        key={goal.id}
+                        onClick={() => setSelectedGoal(isSelected ? null : goal.id)}
+                        className={`p-4 rounded-xl border transition-all text-center ${
+                          isSelected
+                            ? "border-[#00d9ff] bg-[#00d9ff]/10 text-white"
+                            : "border-gray-700 hover:border-gray-600 bg-gray-800/50 text-gray-300"
+                        }`}
+                      >
+                        {goal.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="p-6 pt-4 border-t border-gray-800 flex justify-between items-center">
+            {step === 2 ? (
+              <button
+                onClick={() => setStep(1)}
+                className="text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Back
+              </button>
+            ) : (
+              <div />
+            )}
+
+            {step === 1 ? (
+              <Button
+                onClick={() => setStep(2)}
+                disabled={!selectedRole}
+                className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black"
+              >
+                Continue
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                onClick={handleComplete}
+                disabled={isSubmitting}
+                className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black"
+              >
+                {isSubmitting ? "Saving..." : "Start Practicing"}
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          {/* Progress indicator */}
+          <div className="px-6 pb-4 flex justify-center gap-2">
+            <div className={`h-1.5 w-8 rounded-full ${step >= 1 ? "bg-[#00d9ff]" : "bg-gray-700"}`} />
+            <div className={`h-1.5 w-8 rounded-full ${step >= 2 ? "bg-[#00d9ff]" : "bg-gray-700"}`} />
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  )
+}

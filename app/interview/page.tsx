@@ -1212,6 +1212,21 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         setWorkspaceContext(contextFiles)
         toast.success(`Loaded ${contextFiles.length} codebase file(s) for context`)
       }
+    } else if (selectedScenario.type === 'add-functionality') {
+      // For Add Functionality scenarios, load existing code to extend
+      initialCode = (selectedScenario as any).existingCode?.[selectedLanguage] || `// Add functionality to the existing codebase`
+
+      // Auto-load codebase files into workspace context
+      const codebaseFiles = (selectedScenario as any).codebaseFiles?.[selectedLanguage] || []
+      if (codebaseFiles.length > 0) {
+        const contextFiles = codebaseFiles.map((file: any) => ({
+          path: file.fileName,
+          content: file.content,
+          description: file.description,
+        }))
+        setWorkspaceContext(contextFiles)
+        toast.success(`Loaded ${contextFiles.length} codebase file(s) - review them to understand the existing code`)
+      }
     } else {
       // For DSA problems, load starter code
       initialCode = (selectedScenario as any).starterCode?.[selectedLanguage] || `function solution() {
@@ -1227,7 +1242,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setProtectedElements(protectedElementsData)
 
     // Initialize interviewer with welcome message (problem details are now in left panel)
-    const problemType = selectedScenario.type === 'bugfix' ? 'BUG FIX' : selectedScenario.type.toUpperCase()
+    const problemType = selectedScenario.type === 'bugfix' ? 'BUG FIX' :
+                       selectedScenario.type === 'add-functionality' ? 'ADD FUNCTIONALITY' :
+                       selectedScenario.type.toUpperCase()
     const initialMessage = `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${selectedScenario.title}**, a ${selectedScenario.difficulty} ${problemType} problem.
 
 Here's what I expect:
@@ -1507,6 +1524,16 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       setInput("")
       setLoading(true)
 
+      // Check if user wants to end the session
+      const conclusionSignals = [
+        "no thanks", "no thank", "no, thanks", "i'm done", "im done", "done",
+        "conclude", "end session", "that's all", "thats all", "nothing else",
+        "no questions", "i'm good", "im good", "all good", "let's wrap", "lets wrap"
+      ]
+      const isEndingSession = conclusionSignals.some(signal =>
+        input.toLowerCase().includes(signal)
+      )
+
       try {
         // Get user profile for context
         const userProfile = user ? await getUserProfile(user.id) : null
@@ -1514,11 +1541,19 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         // Extract name for personalization
         let userName = user?.user_metadata?.full_name || userProfile?.full_name || user?.email?.split("@")[0] || ""
 
+        // Add post-interview context if in that phase
+        let additionalContext = ""
+        if (showPostInterviewDiscussion && isInterviewer) {
+          additionalContext = isEndingSession
+            ? "\n\n[IMPORTANT: The candidate wants to end the session. Respond with a brief, graceful conclusion. Thank them, give a quick summary of their performance, and wish them luck. Do NOT ask more questions.]"
+            : "\n\n[POST-INTERVIEW DISCUSSION: Continue discussing their solution. If they indicate they're done or have no questions, wrap up gracefully.]"
+        }
+
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            message: input,
+            message: input + additionalContext,
             context: messages,
             role: isInterviewer ? "interviewer" : "partner",
             userContext: userProfile ? {
@@ -1532,6 +1567,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             scenarioTitle: selectedScenario?.title,
             scenarioType: selectedScenario?.type,
             isProactive: false,
+            isPostInterview: showPostInterviewDiscussion,
+            isEndingSession: isEndingSession,
           }),
         })
 
@@ -1736,12 +1773,18 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700">
                     <div className="w-2 h-2 rounded-full bg-[#00ff88]"></div>
                     <span className="text-white font-semibold">{scenarios.filter(s => s.type === 'bugfix').length}</span>
-                    <span className="text-gray-400">Bug Fix Scenarios</span>
+                    <span className="text-gray-400">Bug Fix</span>
+                  </div>
+                  <div className="flex items-center gap-2 px-4 py-2 bg-yellow-500/20 rounded-lg border border-yellow-500/30">
+                    <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                    <span className="text-white font-semibold">{scenarios.filter(s => s.type === 'add-functionality').length}</span>
+                    <span className="text-yellow-300">Add Functionality</span>
+                    <span className="text-[10px] text-yellow-500 bg-yellow-500/20 px-1.5 rounded">Flagship</span>
                   </div>
                   <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700">
                     <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                    <span className="text-white font-semibold">{scenarios.filter(s => s.type !== 'dsa' && s.type !== 'bugfix').length}</span>
-                    <span className="text-gray-400">Other</span>
+                    <span className="text-white font-semibold">{scenarios.filter(s => s.type === 'system-design').length}</span>
+                    <span className="text-gray-400">System Design</span>
                   </div>
                 </div>
               </div>
@@ -1773,9 +1816,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         <option value="">All Types</option>
                         <option value="dsa">DSA</option>
                         <option value="bugfix">Bug Fix</option>
+                        <option value="add-functionality">Add Functionality</option>
+                        <option value="system-design">System Design</option>
                         <option value="optimization">Optimization</option>
                         <option value="security">Security</option>
-                        <option value="system-design">System Design</option>
                       </select>
                     </div>
 
@@ -1829,9 +1873,14 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       <div className="flex items-center gap-2 mb-2">
                         <Badge className={`${scenario.type === "dsa" ? "bg-[#00d9ff] text-black" :
                           scenario.type === "bugfix" ? "bg-[#00ff88] text-black" :
-                            "bg-purple-500 text-white"
+                          scenario.type === "add-functionality" ? "bg-yellow-400 text-black" :
+                          scenario.type === "system-design" ? "bg-purple-500 text-white" :
+                            "bg-gray-500 text-white"
                           } text-xs font-semibold`}>
-                          {scenario.type === "dsa" ? "DSA" : scenario.type === "bugfix" ? "BUG FIX" : scenario.type.toUpperCase()}
+                          {scenario.type === "dsa" ? "DSA" :
+                           scenario.type === "bugfix" ? "BUG FIX" :
+                           scenario.type === "add-functionality" ? "ADD FEATURE" :
+                           scenario.type.toUpperCase()}
                         </Badge>
                         <Badge className={`${scenario.difficulty === "easy" ? "bg-green-600" :
                           scenario.difficulty === "medium" ? "bg-yellow-600" :
