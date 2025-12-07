@@ -7,6 +7,7 @@ import { HeroSection } from "@/components/hero-section"
 import { FeaturesSection } from "@/components/features-section"
 import { AIAssistedSection } from "@/components/ai-assisted-section"
 import { Footer } from "@/components/footer"
+import { OnboardingModal } from "@/components/OnboardingModal"
 import { useAuth } from "@/lib/auth-context"
 import { getUserProfile, checkUsageLimit } from "@/lib/firestore-helpers"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,6 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Terminal, ArrowRight, Crown, BarChart3 } from "lucide-react"
 import Link from "next/link"
+import type { Profile } from "@/lib/types"
 
 export default function HomePage() {
   const router = useRouter()
@@ -22,6 +24,8 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [usage, setUsage] = useState<{ used: number; limit: number; allowed: boolean; freeOpensRemaining: number } | null>(null)
   const [isPro, setIsPro] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [profile, setProfile] = useState<Profile | null>(null)
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -36,9 +40,15 @@ export default function HomePage() {
 
       try {
         // Get profile and usage
-        const profile = await getUserProfile(firebaseUser.uid)
-        setIsPro(profile?.subscription_tier === "pro")
-        
+        const userProfile = await getUserProfile(firebaseUser.uid)
+        setProfile(userProfile)
+        setIsPro(userProfile?.subscription_tier === "pro")
+
+        // Check if onboarding is needed
+        if (userProfile && !userProfile.onboarding_completed) {
+          setShowOnboarding(true)
+        }
+
         const usageData = await checkUsageLimit(firebaseUser.uid)
         setUsage(usageData)
       } catch (error) {
@@ -64,6 +74,12 @@ export default function HomePage() {
   if (!isLoading && user && firebaseUser) {
     return (
       <main className="min-h-screen bg-black">
+        {/* Onboarding modal for first-time users */}
+        <OnboardingModal
+          isOpen={showOnboarding}
+          userId={firebaseUser.uid}
+          onComplete={() => setShowOnboarding(false)}
+        />
         <Header />
         <div className="pt-24 pb-16">
           <div className="container mx-auto px-4 max-w-7xl">

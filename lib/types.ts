@@ -25,6 +25,11 @@ export interface Profile {
   subscription_current_period_end?: string // ISO date string when current period ends
   created_at: string
   updated_at: string
+  // Onboarding fields (minimal MVP)
+  role?: "student" | "junior" | "mid" | "senior"
+  goal?: "faang" | "startup" | "general" | "promotion"
+  onboarding_completed?: boolean
+  onboarding_completed_at?: string
 }
 
 export interface ProfileQuota {

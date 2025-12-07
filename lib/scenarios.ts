@@ -11,7 +11,7 @@ import { addFunctionalityScenarios, AddFunctionalityScenario } from './scenarios
 
 export type ScenarioType = 'dsa' | 'bugfix' | 'optimization' | 'security' | 'system-design' | 'add-functionality';
 export type DifficultyLevel = 'easy' | 'medium' | 'hard';
-export type Company = 'Google' | 'Meta' | 'Amazon' | 'Netflix' | 'Apple' | 'Microsoft' | 'Startup' | 'Generic' | 'Airbnb' | 'Shopify' | 'Walmart' | 'Stripe' | 'Slack';
+export type Company = 'Google' | 'Meta' | 'Amazon' | 'Netflix' | 'Apple' | 'Microsoft' | 'Startup' | 'Generic' | 'Airbnb' | 'Shopify' | 'Walmart' | 'Stripe' | 'Slack' | 'Notion' | 'Figma' | 'Discord';
 
 export interface BaseScenario {
   id: string;

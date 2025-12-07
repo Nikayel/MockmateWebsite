@@ -13,17 +13,25 @@ import { GradingCriteriaRadial } from "@/components/GradingCriteria"
 interface FeedbackSection {
   tldr: string
   scores: {
+    // New grading criteria aligned with real AI-assisted interviews
+    understanding: number       // 30% - Can you explain your approach?
+    problemSolving: number      // 25% - Debug & optimize
+    codeQuality: number         // 25% - Clean & efficient
+    communication: number       // 20% - Think out loud
+    // Legacy fields for backward compatibility
     correctness: number
     efficiency: number
-    codeQuality: number
     reasoning: number
     aiCollaboration: number
     overall: number
   }
   scoreJustifications: {
+    understanding?: string
+    problemSolving?: string
+    codeQuality?: string
+    communication?: string
     correctness?: string
     efficiency?: string
-    codeQuality?: string
     reasoning?: string
     aiCollaboration?: string
     overall?: string
@@ -58,9 +66,14 @@ function parseFeedback(feedback: string): FeedbackSection {
   const sections: FeedbackSection = {
     tldr: "",
     scores: {
+      // New grading criteria
+      understanding: 0,
+      problemSolving: 0,
+      codeQuality: 0,
+      communication: 0,
+      // Legacy (for backward compat)
       correctness: 0,
       efficiency: 0,
-      codeQuality: 0,
       reasoning: 0,
       aiCollaboration: 0,
       overall: 0,
@@ -110,58 +123,92 @@ function parseFeedback(feedback: string): FeedbackSection {
       return { score: parseScore(matchWithoutJustification, is100), justification: '' }
     }
     
-    // Try /100 first, then /10
-    const correctness100 = parseScoreWithJustification('Correctness', scoreText, true)
-    const correctness10 = correctness100.score === 0 ? parseScoreWithJustification('Correctness', scoreText, false) : correctness100
-    sections.scores.correctness = correctness10.score
-    if (correctness10.justification) sections.scoreJustifications.correctness = correctness10.justification
-    
-    const efficiency100 = parseScoreWithJustification('Efficiency', scoreText, true)
-    const efficiency10 = efficiency100.score === 0 ? parseScoreWithJustification('Efficiency', scoreText, false) : efficiency100
-    sections.scores.efficiency = efficiency10.score
-    if (efficiency10.justification) sections.scoreJustifications.efficiency = efficiency10.justification
-    
+    // NEW GRADING CRITERIA (aligned with real AI-assisted interviews)
+    // Understanding (30%) - Can you explain your approach?
+    const understanding100 = parseScoreWithJustification('Understanding', scoreText, true)
+    const understanding10 = understanding100.score === 0 ? parseScoreWithJustification('Understanding', scoreText, false) : understanding100
+    sections.scores.understanding = understanding10.score
+    if (understanding10.justification) sections.scoreJustifications.understanding = understanding10.justification
+
+    // Problem-Solving (25%) - Debug & optimize
+    const problemSolving100 = parseScoreWithJustification('Problem[-\\s]?Solving', scoreText, true)
+    const problemSolving10 = problemSolving100.score === 0 ? parseScoreWithJustification('Problem[-\\s]?Solving', scoreText, false) : problemSolving100
+    sections.scores.problemSolving = problemSolving10.score
+    if (problemSolving10.justification) sections.scoreJustifications.problemSolving = problemSolving10.justification
+
+    // Code Quality (25%) - Clean & efficient
     const codeQuality100 = parseScoreWithJustification('Code\\s+Quality', scoreText, true)
     const codeQuality10 = codeQuality100.score === 0 ? parseScoreWithJustification('Code\\s+Quality', scoreText, false) : codeQuality100
     sections.scores.codeQuality = codeQuality10.score
     if (codeQuality10.justification) sections.scoreJustifications.codeQuality = codeQuality10.justification
-    
-    // Handle "Reasoning & Explanation" or just "Reasoning"
+
+    // Communication (20%) - Think out loud
+    const communication100 = parseScoreWithJustification('Communication', scoreText, true)
+    const communication10 = communication100.score === 0 ? parseScoreWithJustification('Communication', scoreText, false) : communication100
+    sections.scores.communication = communication10.score
+    if (communication10.justification) sections.scoreJustifications.communication = communication10.justification
+
+    // LEGACY SCORES (for backward compatibility with old feedback)
+    const correctness100 = parseScoreWithJustification('Correctness', scoreText, true)
+    const correctness10 = correctness100.score === 0 ? parseScoreWithJustification('Correctness', scoreText, false) : correctness100
+    sections.scores.correctness = correctness10.score
+
+    const efficiency100 = parseScoreWithJustification('Efficiency', scoreText, true)
+    const efficiency10 = efficiency100.score === 0 ? parseScoreWithJustification('Efficiency', scoreText, false) : efficiency100
+    sections.scores.efficiency = efficiency10.score
+
+    // Handle "Reasoning & Explanation" as alias for Communication
     const reasoning100 = parseScoreWithJustification('Reasoning(?:\\s+&\\s+Explanation)?', scoreText, true)
     const reasoning10 = reasoning100.score === 0 ? parseScoreWithJustification('Reasoning(?:\\s+&\\s+Explanation)?', scoreText, false) : reasoning100
     sections.scores.reasoning = reasoning10.score
-    if (reasoning10.justification) sections.scoreJustifications.reasoning = reasoning10.justification
-    
+    // Map legacy Reasoning to Communication if Communication wasn't found
+    if (sections.scores.communication === 0 && sections.scores.reasoning > 0) {
+      sections.scores.communication = sections.scores.reasoning
+    }
+
     const aiCollaboration100 = parseScoreWithJustification('AI\\s+Collaboration', scoreText, true)
     const aiCollaboration10 = aiCollaboration100.score === 0 ? parseScoreWithJustification('AI\\s+Collaboration', scoreText, false) : aiCollaboration100
     sections.scores.aiCollaboration = aiCollaboration10.score
-    if (aiCollaboration10.justification) sections.scoreJustifications.aiCollaboration = aiCollaboration10.justification
-    
+
     const overall100 = parseScoreWithJustification('Overall', scoreText, true)
     const overall10 = overall100.score === 0 ? parseScoreWithJustification('Overall', scoreText, false) : overall100
     if (overall10.justification) sections.scoreJustifications.overall = overall10.justification
 
-    // Explicitly check for 0 scores in feedback text (in case AI mentions "0/100" explicitly)
-    const feedbackLower = feedback.toLowerCase()
-    if (feedbackLower.includes('reasoning') && feedbackLower.includes('0/100')) {
-      sections.scores.reasoning = 0
+    // Map legacy scores to new criteria if new ones weren't parsed
+    if (sections.scores.understanding === 0 && sections.scores.correctness > 0) {
+      // Understanding can be inferred from correctness + reasoning
+      sections.scores.understanding = Math.round((sections.scores.correctness + sections.scores.reasoning) / 2)
     }
-    if (feedbackLower.includes('ai collaboration') && feedbackLower.includes('0/100')) {
-      sections.scores.aiCollaboration = 0
+    if (sections.scores.problemSolving === 0 && sections.scores.efficiency > 0) {
+      // Problem-solving can be inferred from efficiency
+      sections.scores.problemSolving = sections.scores.efficiency
     }
 
-    // ALWAYS recalculate overall from component scores
-    // This ensures 0s in reasoning/collaboration properly affect the overall score
-    const calculatedOverall = Math.round(
-      (sections.scores.correctness + sections.scores.efficiency + sections.scores.codeQuality +
-       sections.scores.reasoning + sections.scores.aiCollaboration) / 5
-    )
-    sections.scores.overall = calculatedOverall
+    // Calculate overall using new weighted formula
+    // Understanding (30%) + Problem-Solving (25%) + Code Quality (25%) + Communication (20%)
+    const hasNewScores = sections.scores.understanding > 0 || sections.scores.problemSolving > 0 ||
+                         sections.scores.codeQuality > 0 || sections.scores.communication > 0
+
+    if (hasNewScores) {
+      sections.scores.overall = Math.round(
+        sections.scores.understanding * 0.30 +
+        sections.scores.problemSolving * 0.25 +
+        sections.scores.codeQuality * 0.25 +
+        sections.scores.communication * 0.20
+      )
+    } else {
+      // Fallback to legacy calculation
+      const calculatedOverall = Math.round(
+        (sections.scores.correctness + sections.scores.efficiency + sections.scores.codeQuality +
+         sections.scores.reasoning + sections.scores.aiCollaboration) / 5
+      )
+      sections.scores.overall = calculatedOverall
+    }
 
     // Debug: log if scores are still 0 after parsing
-    if (sections.scores.correctness === 0 && sections.scores.efficiency === 0 &&
-        sections.scores.codeQuality === 0 && sections.scores.reasoning === 0 &&
-        sections.scores.aiCollaboration === 0) {
+    if (sections.scores.understanding === 0 && sections.scores.problemSolving === 0 &&
+        sections.scores.codeQuality === 0 && sections.scores.communication === 0 &&
+        sections.scores.correctness === 0) {
       console.warn("Failed to parse scores from feedback. Score text:", scoreText.substring(0, 200))
     }
   }
@@ -241,62 +288,70 @@ export default function PracticeFeedback({
   // Check complexity accuracy (if efficiency score is high, complexity is accurate)
   const complexityAccurate = (efficiencyScore || 0) >= 70
 
-  // Fallback: If scores weren't parsed, use overall score as baseline and adjust based on feedback content
-  const hasParsedScores = sections.scores.correctness > 0 || sections.scores.efficiency > 0 || 
-                          sections.scores.codeQuality > 0 || sections.scores.reasoning > 0 || 
-                          sections.scores.aiCollaboration > 0
+  // Fallback: If scores weren't parsed, infer from feedback content and test results
+  const hasParsedNewScores = sections.scores.understanding > 0 || sections.scores.problemSolving > 0 ||
+                              sections.scores.codeQuality > 0 || sections.scores.communication > 0
+  const hasParsedLegacyScores = sections.scores.correctness > 0 || sections.scores.efficiency > 0 ||
+                                 sections.scores.reasoning > 0
 
-  if (!hasParsedScores && performanceScore > 0) {
+  if (!hasParsedNewScores && !hasParsedLegacyScores && performanceScore > 0) {
     // Use overall score as starting point - normalize to 0-100 scale
     const rawBaseScore = sections.scores.overall || performanceScore
     const baseScore = rawBaseScore <= 10 ? rawBaseScore * 10 : rawBaseScore
-    
-    // Infer individual scores based on test results and feedback content
+
+    // Infer scores based on test results and feedback content
     const testPassRate = testsTotal > 0 ? testsPassed / testsTotal : 1
-    sections.scores.correctness = Math.round(baseScore * testPassRate)
-    
-    // Check feedback for hints about reasoning and AI collaboration
     const feedbackLower = feedback.toLowerCase()
-    const hasReasoningIssues = feedbackLower.includes('walk through') || feedbackLower.includes('narrate') || 
-                               feedbackLower.includes('explain') || feedbackLower.includes('reasoning') ||
-                               feedbackLower.includes('proactive communication') || feedbackLower.includes('thought process')
-    const hasAiIssues = feedbackLower.includes('ai partner') || feedbackLower.includes('ai collaboration') ||
-                        feedbackLower.includes('engage with ai') || feedbackLower.includes('engage with the ai') ||
-                        feedbackLower.includes('use the ai partner')
-    
-    // Check for zero collaboration indicators - these should get 0, not 40
-    const noCollaboration = feedbackLower.includes('no collaboration') || 
-                           feedbackLower.includes('never messaged') || 
-                           feedbackLower.includes('no evidence') ||
-                           feedbackLower.includes('did not collaborate') ||
-                           feedbackLower.includes('zero collaboration') ||
-                           (feedbackLower.includes('reasoning') && feedbackLower.includes('0/100')) ||
-                           (feedbackLower.includes('ai collaboration') && feedbackLower.includes('0/100'))
-    
-    // If overall is high but there are improvement suggestions, adjust scores accordingly (0-100 scale)
-    if (baseScore >= 90) {
-      // High scores but with improvement suggestions means some areas need work
-      sections.scores.efficiency = hasReasoningIssues || hasAiIssues ? baseScore - 10 : baseScore
-      sections.scores.codeQuality = baseScore
-      // If no collaboration detected, give 0, not a reduced score
-      sections.scores.reasoning = noCollaboration ? 0 : (hasReasoningIssues ? Math.max(0, baseScore - 30) : baseScore)
-      sections.scores.aiCollaboration = noCollaboration ? 0 : (hasAiIssues ? Math.max(0, baseScore - 30) : baseScore)
+
+    // Check for communication/explanation issues
+    const hasCommunicationIssues = feedbackLower.includes('walk through') || feedbackLower.includes('narrate') ||
+                                    feedbackLower.includes('explain') || feedbackLower.includes('thought process') ||
+                                    feedbackLower.includes('verbalize') || feedbackLower.includes('proactive')
+
+    // Check for understanding issues
+    const hasUnderstandingIssues = feedbackLower.includes('understand') || feedbackLower.includes('clarify') ||
+                                    feedbackLower.includes('approach') || feedbackLower.includes('reasoning')
+
+    // Did user communicate during the session? Look for positive signals
+    const didCommunicate = feedbackLower.includes('explained') || feedbackLower.includes('discussed') ||
+                           feedbackLower.includes('asked') || feedbackLower.includes('clear explanation') ||
+                           feedbackLower.includes('walked through')
+
+    // NEW GRADING CRITERIA scores
+    // Understanding (30%) - Based on test pass rate and explanation quality
+    sections.scores.understanding = Math.round(baseScore * testPassRate * (hasUnderstandingIssues ? 0.7 : 1))
+
+    // Problem-Solving (25%) - Based on efficiency and debugging
+    sections.scores.problemSolving = Math.round(baseScore * (testPassRate > 0.8 ? 1 : 0.8))
+
+    // Code Quality (25%) - Based on test pass rate
+    sections.scores.codeQuality = Math.round(baseScore * testPassRate)
+
+    // Communication (20%) - Based on whether user communicated
+    if (didCommunicate) {
+      sections.scores.communication = Math.round(baseScore * (hasCommunicationIssues ? 0.7 : 1))
+    } else if (hasCommunicationIssues) {
+      // User didn't communicate much, and feedback mentions it
+      sections.scores.communication = Math.round(baseScore * 0.3)
     } else {
-      // Lower overall score - distribute more evenly
-      sections.scores.efficiency = baseScore
-      sections.scores.codeQuality = baseScore
-      // If no collaboration detected, give 0, not 40
-      sections.scores.reasoning = noCollaboration ? 0 : (hasReasoningIssues ? Math.max(0, baseScore - 20) : baseScore)
-      sections.scores.aiCollaboration = noCollaboration ? 0 : (hasAiIssues ? Math.max(0, baseScore - 20) : baseScore)
+      // Default to moderate score if no clear signals
+      sections.scores.communication = Math.round(baseScore * 0.6)
     }
-    
-    // Ensure scores don't exceed overall and are within valid range (0-100 scale)
-    const maxScore = Math.min(baseScore, 100)
-    sections.scores.correctness = Math.min(Math.max(sections.scores.correctness, 0), maxScore)
-    sections.scores.efficiency = Math.min(Math.max(sections.scores.efficiency, 0), maxScore)
+
+    // Ensure scores are within valid range
+    const maxScore = 100
+    sections.scores.understanding = Math.min(Math.max(sections.scores.understanding, 0), maxScore)
+    sections.scores.problemSolving = Math.min(Math.max(sections.scores.problemSolving, 0), maxScore)
     sections.scores.codeQuality = Math.min(Math.max(sections.scores.codeQuality, 0), maxScore)
-    sections.scores.reasoning = Math.min(Math.max(sections.scores.reasoning, 0), maxScore)
-    sections.scores.aiCollaboration = Math.min(Math.max(sections.scores.aiCollaboration, 0), maxScore)
+    sections.scores.communication = Math.min(Math.max(sections.scores.communication, 0), maxScore)
+
+    // Recalculate overall with new weights
+    sections.scores.overall = Math.round(
+      sections.scores.understanding * 0.30 +
+      sections.scores.problemSolving * 0.25 +
+      sections.scores.codeQuality * 0.25 +
+      sections.scores.communication * 0.20
+    )
   }
 
   // Convert scores from 0-10 to 0-100 if needed (for backward compatibility)
@@ -304,10 +359,16 @@ export default function PracticeFeedback({
     return score <= 10 ? score * 10 : score
   }
 
+  // New grading criteria scores (aligned with real AI-assisted interviews)
   const normalizedScores = {
+    // Primary criteria (what we display)
+    understanding: normalizeScore(sections.scores.understanding || 0),    // 30%
+    problemSolving: normalizeScore(sections.scores.problemSolving || 0),  // 25%
+    codeQuality: normalizeScore(sections.scores.codeQuality || 0),        // 25%
+    communication: normalizeScore(sections.scores.communication || 0),    // 20%
+    // Legacy (for backward compatibility)
     correctness: normalizeScore(sections.scores.correctness || 0),
     efficiency: normalizeScore(sections.scores.efficiency || 0),
-    codeQuality: normalizeScore(sections.scores.codeQuality || 0),
     reasoning: normalizeScore(sections.scores.reasoning || 0),
     aiCollaboration: normalizeScore(sections.scores.aiCollaboration || 0),
   }
@@ -650,63 +711,80 @@ export default function PracticeFeedback({
         </Card>
       </div>
 
-      {/* Detailed Performance Metrics */}
+      {/* Detailed Performance Metrics - New Grading Criteria */}
       <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-8">
         <CardHeader>
           <CardTitle className="text-white flex items-center space-x-2">
             <BarChart3 className="h-5 w-5 text-[#00d9ff]" />
             <span>Detailed Performance Metrics</span>
           </CardTitle>
+          <p className="text-xs text-gray-500 mt-1">Graded like real Meta/Google AI-assisted interviews</p>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Understanding - 30% weight */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-300">Correctness</span>
-                <span className="text-[#00d9ff] font-semibold">{normalizedScores.correctness}%</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-300">Understanding</span>
+                  <span className="text-[10px] text-gray-500 px-1.5 py-0.5 bg-gray-800 rounded">30%</span>
+                </div>
+                <span className="text-[#00d9ff] font-semibold">{normalizedScores.understanding}%</span>
               </div>
-              <Progress value={normalizedScores.correctness} className="h-2 bg-gray-800" />
+              <Progress value={normalizedScores.understanding} className="h-2 bg-gray-800" />
+              <p className="text-[10px] text-gray-500 mt-1">Can you explain your approach?</p>
             </div>
 
+            {/* Problem-Solving - 25% weight */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-300">Code Quality</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-300">Problem-Solving</span>
+                  <span className="text-[10px] text-gray-500 px-1.5 py-0.5 bg-gray-800 rounded">25%</span>
+                </div>
+                <span className="text-[#00d9ff] font-semibold">{normalizedScores.problemSolving}%</span>
+              </div>
+              <Progress value={normalizedScores.problemSolving} className="h-2 bg-gray-800" />
+              <p className="text-[10px] text-gray-500 mt-1">Debug & optimize effectively</p>
+            </div>
+
+            {/* Code Quality - 25% weight */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-300">Code Quality</span>
+                  <span className="text-[10px] text-gray-500 px-1.5 py-0.5 bg-gray-800 rounded">25%</span>
+                </div>
                 <span className="text-[#00d9ff] font-semibold">{normalizedScores.codeQuality}%</span>
               </div>
               <Progress value={normalizedScores.codeQuality} className="h-2 bg-gray-800" />
+              <p className="text-[10px] text-gray-500 mt-1">Clean, efficient, readable</p>
             </div>
 
+            {/* Communication - 20% weight */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-300">Communication</span>
-                <span className="text-[#00d9ff] font-semibold">{normalizedScores.reasoning}%</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-300">Communication</span>
+                  <span className="text-[10px] text-gray-500 px-1.5 py-0.5 bg-gray-800 rounded">20%</span>
+                </div>
+                <span className="text-[#00d9ff] font-semibold">{normalizedScores.communication}%</span>
               </div>
-              <Progress value={normalizedScores.reasoning} className="h-2 bg-gray-800" />
+              <Progress value={normalizedScores.communication} className="h-2 bg-gray-800" />
+              <p className="text-[10px] text-gray-500 mt-1">Think out loud, explain decisions</p>
             </div>
+          </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-300">Efficiency</span>
-                <span className="text-[#00d9ff] font-semibold">{normalizedScores.efficiency}%</span>
-              </div>
-              <Progress value={normalizedScores.efficiency} className="h-2 bg-gray-800" />
+          {/* Overall Score - Full Width */}
+          <div className="mt-8 pt-6 border-t border-gray-800">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-white font-medium">Overall Score</span>
+              <span className="text-[#00d9ff] font-bold text-xl">{overallScore}%</span>
             </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-300">AI Collaboration</span>
-                <span className="text-[#00d9ff] font-semibold">{normalizedScores.aiCollaboration}%</span>
-              </div>
-              <Progress value={normalizedScores.aiCollaboration} className="h-2 bg-gray-800" />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-300">Overall</span>
-                <span className="text-[#00d9ff] font-semibold">{overallScore}%</span>
-              </div>
-              <Progress value={overallScore} className="h-2 bg-gray-800" />
-            </div>
+            <Progress value={overallScore} className="h-3 bg-gray-800" />
+            <p className="text-[10px] text-gray-500 mt-2 text-center">
+              AI usage is optional and not penalized · What matters is understanding
+            </p>
           </div>
         </CardContent>
       </Card>
