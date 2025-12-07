@@ -3,256 +3,163 @@
 import { motion } from "framer-motion"
 import { ScrollReveal } from "@/lib/motion"
 import { MagneticButton } from "@/components/ui/magnetic-button"
-import {
-  Brain,
-  Building2,
-  TrendingUp,
-  Users,
-  Zap,
-  Target,
-  CheckCircle,
-  ArrowRight,
-  Sparkles,
-} from "lucide-react"
+import { ArrowRight, Zap } from "lucide-react"
 import Link from "next/link"
 
 /**
  * AIAssistedSection - Marketing content about AI-assisted interviews
  *
- * Key message: Companies are adopting AI-assisted interviews.
- * This is the future. You need to be prepared.
+ * Design: Unique horizontal visualization, NOT rectangular cards
+ * Keep it subtle and different from typical AI-generated designs
  */
 
-const companies = [
-  { name: "Meta", status: "AI pilot program", year: "2024" },
-  { name: "Google", status: "AI tools allowed", year: "2024" },
-  { name: "Amazon", status: "Evaluating AI usage", year: "2024" },
-  { name: "Microsoft", status: "Copilot integration", year: "2024" },
-]
+const criteria = [
+  { id: 'understanding', label: 'Understanding', percent: 30, color: '#00d9ff', hint: 'Explain your approach' },
+  { id: 'problem-solving', label: 'Problem-Solving', percent: 25, color: '#00ff88', hint: 'Debug & optimize' },
+  { id: 'code-quality', label: 'Code Quality', percent: 25, color: '#a78bfa', hint: 'Clean & efficient' },
+  { id: 'communication', label: 'Communication', percent: 20, color: '#fbbf24', hint: 'Think out loud' },
+];
 
-const gradingCriteria = [
-  {
-    icon: Brain,
-    title: "Understanding",
-    description: "Can you explain your code? Why did you choose this approach?",
-    weight: "30%",
-  },
-  {
-    icon: Target,
-    title: "Problem-Solving",
-    description: "How do you break down problems? How do you debug?",
-    weight: "25%",
-  },
-  {
-    icon: Zap,
-    title: "Code Quality",
-    description: "Does it work? Is it efficient? Is it readable?",
-    weight: "25%",
-  },
-  {
-    icon: Users,
-    title: "Communication",
-    description: "Do you share your thought process? Ask clarifying questions?",
-    weight: "20%",
-  },
-]
-
-const notGradedOn = [
-  "How often you use AI",
-  "Whether you type fast",
-  "Memorizing algorithms",
-  "Using AI for every question",
-]
+const companies = ['Meta', 'Google', 'Amazon', 'Microsoft'];
 
 export function AIAssistedSection() {
   return (
-    <section className="relative py-24 bg-black overflow-hidden">
-      {/* Gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-950/80 to-black" />
-
-      {/* Subtle accent glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#00d9ff]/[0.03] rounded-full blur-[150px]" />
+    <section className="relative py-32 bg-black overflow-hidden">
+      {/* Subtle gradient */}
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-gray-950/30 to-transparent" />
 
       <div className="container mx-auto px-4 relative z-10">
         {/* Header */}
-        <ScrollReveal className="text-center mb-16">
+        <ScrollReveal className="text-center mb-20">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#00ff88]/30 bg-[#00ff88]/5 text-[#00ff88] text-sm font-medium mb-6">
-              <TrendingUp className="w-4 h-4" />
-              The Future of Technical Interviews
-            </div>
-
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold text-white mb-6 leading-tight">
+            <p className="text-sm text-gray-500 uppercase tracking-widest mb-4">
+              The future is here
+            </p>
+            <h2 className="text-4xl md:text-5xl font-heading font-bold text-white mb-4">
               AI-Assisted Interviews
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#00d9ff] to-[#00ff88]">
-                Are Here
-              </span>
             </h2>
-
-            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              Top tech companies are rolling out AI-assisted coding interviews.
-              They want to see if you can{" "}
-              <span className="text-white font-medium">use AI as a tool</span>,
-              not a crutch.
+            <p className="text-lg text-gray-400 max-w-2xl mx-auto">
+              {companies.join(', ')} are rolling out AI-assisted coding interviews.
+              They want to see if you can use AI as a <span className="text-white">tool</span>, not a crutch.
             </p>
           </motion.div>
         </ScrollReveal>
 
-        {/* Company adoption */}
+        {/* Grading visualization - horizontal bar style */}
         <ScrollReveal>
           <motion.div
-            className="mb-20"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            className="max-w-3xl mx-auto mb-20"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
           >
-            <p className="text-center text-gray-500 text-sm uppercase tracking-widest mb-6">
-              Companies adopting AI-assisted interviews
+            <p className="text-center text-xs text-gray-600 uppercase tracking-widest mb-8">
+              What you're evaluated on
             </p>
-            <div className="flex flex-wrap justify-center gap-6">
-              {companies.map((company, idx) => (
-                <motion.div
-                  key={company.name}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: idx * 0.1 }}
-                  className="flex items-center gap-3 px-5 py-3 rounded-xl bg-gray-900/50 border border-gray-800 hover:border-gray-700 transition-colors"
-                >
-                  <Building2 className="h-5 w-5 text-[#00d9ff]" />
-                  <div>
-                    <div className="font-medium text-white">{company.name}</div>
-                    <div className="text-xs text-gray-500">{company.status}</div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        </ScrollReveal>
 
-        {/* What you're graded on */}
-        <div className="grid lg:grid-cols-2 gap-12 mb-20">
-          {/* Graded on */}
-          <ScrollReveal>
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-            >
-              <div className="flex items-center gap-2 mb-6">
-                <CheckCircle className="h-5 w-5 text-[#00ff88]" />
-                <h3 className="text-2xl font-bold text-white">What You're Graded On</h3>
-              </div>
-
-              <div className="space-y-4">
-                {gradingCriteria.map((criteria, idx) => (
+            {/* Horizontal stacked bar */}
+            <div className="relative">
+              {/* The bar */}
+              <div className="flex h-3 rounded-full overflow-hidden bg-gray-900">
+                {criteria.map((item, idx) => (
                   <motion.div
-                    key={criteria.title}
-                    initial={{ opacity: 0, y: 10 }}
-                    whileInView={{ opacity: 1, y: 0 }}
+                    key={item.id}
+                    initial={{ width: 0 }}
+                    whileInView={{ width: `${item.percent}%` }}
                     viewport={{ once: true }}
-                    transition={{ delay: idx * 0.1 }}
-                    className="flex gap-4 p-4 rounded-xl bg-gray-900/50 border border-gray-800 group hover:border-[#00d9ff]/30 transition-colors"
+                    transition={{ duration: 0.8, delay: idx * 0.1, ease: "easeOut" }}
+                    className="relative group cursor-pointer"
+                    style={{ backgroundColor: item.color }}
                   >
-                    <div
-                      className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-110"
-                      style={{ backgroundColor: "#00d9ff10" }}
-                    >
-                      <criteria.icon className="h-6 w-6 text-[#00d9ff]" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <h4 className="font-semibold text-white">{criteria.title}</h4>
-                        <span className="text-xs font-medium text-[#00ff88] bg-[#00ff88]/10 px-2 py-0.5 rounded">
-                          {criteria.weight}
-                        </span>
+                    {/* Hover tooltip */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                      <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 whitespace-nowrap text-center">
+                        <div className="text-xs font-medium" style={{ color: item.color }}>
+                          {item.label}
+                        </div>
+                        <div className="text-[10px] text-gray-500">{item.hint}</div>
                       </div>
-                      <p className="text-sm text-gray-400">{criteria.description}</p>
                     </div>
                   </motion.div>
                 ))}
               </div>
-            </motion.div>
-          </ScrollReveal>
 
-          {/* NOT graded on */}
-          <ScrollReveal>
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-            >
-              <div className="flex items-center gap-2 mb-6">
-                <Sparkles className="h-5 w-5 text-yellow-500" />
-                <h3 className="text-2xl font-bold text-white">What You're NOT Graded On</h3>
+              {/* Labels below */}
+              <div className="flex mt-4">
+                {criteria.map((item) => (
+                  <div
+                    key={item.id}
+                    className="text-center"
+                    style={{ width: `${item.percent}%` }}
+                  >
+                    <div className="text-xs font-medium text-gray-400">{item.label}</div>
+                    <div className="text-[10px] text-gray-600">{item.percent}%</div>
+                  </div>
+                ))}
               </div>
+            </div>
+          </motion.div>
+        </ScrollReveal>
 
-              <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 mb-6">
-                <ul className="space-y-3">
-                  {notGradedOn.map((item, idx) => (
-                    <motion.li
-                      key={item}
-                      initial={{ opacity: 0, x: 10 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ delay: idx * 0.1 }}
-                      className="flex items-center gap-3 text-gray-400"
-                    >
-                      <span className="w-2 h-2 rounded-full bg-red-500/50" />
-                      {item}
-                    </motion.li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="bg-gradient-to-r from-[#00d9ff]/10 to-[#00ff88]/10 border border-[#00d9ff]/20 rounded-xl p-6">
-                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
-                  <Brain className="h-4 w-4 text-[#00d9ff]" />
-                  The Real Test
-                </h4>
-                <p className="text-gray-400 text-sm leading-relaxed">
-                  Interviewers want to see if you can{" "}
-                  <span className="text-white">think critically</span>,{" "}
-                  <span className="text-white">understand code</span>, and{" "}
-                  <span className="text-white">explain your decisions</span>.
-                  AI is just a tool — like Stack Overflow or documentation.
-                  What matters is what you do with it.
-                </p>
-              </div>
-            </motion.div>
-          </ScrollReveal>
-        </div>
-
-        {/* CTA */}
+        {/* What's NOT evaluated - simple text list */}
         <ScrollReveal>
           <motion.div
-            className="text-center"
-            initial={{ opacity: 0, y: 20 }}
+            className="max-w-xl mx-auto text-center mb-16"
+            initial={{ opacity: 0, y: 10 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <p className="text-gray-400 mb-6 text-lg">
-              Practice like the real thing. Get evaluated on what actually matters.
+            <p className="text-xs text-gray-600 uppercase tracking-widest mb-4">
+              What doesn't matter
             </p>
-            <Link href="/interview">
-              <MagneticButton
-                size="lg"
-                variant="primary"
-                glowColor="accent"
-                className="group"
-              >
-                <Zap className="w-5 h-5" />
-                Start AI-Assisted Practice
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </MagneticButton>
-            </Link>
+            <p className="text-gray-500 text-sm leading-relaxed">
+              <span className="line-through text-gray-600">How often you use AI</span>
+              <span className="mx-2 text-gray-700">·</span>
+              <span className="line-through text-gray-600">Typing speed</span>
+              <span className="mx-2 text-gray-700">·</span>
+              <span className="line-through text-gray-600">Memorized algorithms</span>
+            </p>
           </motion.div>
         </ScrollReveal>
+
+        {/* Key message */}
+        <ScrollReveal>
+          <motion.div
+            className="max-w-lg mx-auto text-center mb-12"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+          >
+            <p className="text-gray-300 text-lg leading-relaxed">
+              Real interviewers want to see you{' '}
+              <span className="text-white font-medium">think</span>,{' '}
+              <span className="text-white font-medium">debug</span>, and{' '}
+              <span className="text-white font-medium">explain</span>.
+              <br />
+              <span className="text-gray-500 text-sm">AI is optional. Understanding isn't.</span>
+            </p>
+          </motion.div>
+        </ScrollReveal>
+
+        {/* CTA */}
+        <div className="text-center">
+          <Link href="/interview">
+            <MagneticButton
+              size="lg"
+              variant="primary"
+              glowColor="accent"
+              className="group"
+            >
+              <Zap className="w-5 h-5" />
+              Practice Like the Real Thing
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </MagneticButton>
+          </Link>
+        </div>
       </div>
     </section>
   )

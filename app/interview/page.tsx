@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { CodeViewerSidePanel } from "@/components/CodeViewerSidePanel"
 import PracticeFeedback from "@/components/PracticeFeedback"
+import { GradingCriteriaTooltip } from "@/components/GradingCriteria"
 import {
   Play,
   RotateCcw,
@@ -2125,12 +2126,16 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           <Code className="h-3 w-3 text-[#00d9ff]" />
                           <span>{selectedScenario?.title.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}.{selectedLanguage === "javascript" ? "js" : selectedLanguage === "typescript" ? "ts" : "py"}</span>
                         </div>
-                        {isInterviewStarted && (
-                          <div className="flex items-center space-x-1">
-                            <div className="w-1.5 h-1.5 bg-[#00d9ff] rounded-full animate-pulse"></div>
-                            <span className="text-[#00d9ff] text-xs">LIVE</span>
-                          </div>
-                        )}
+                        <div className="flex items-center space-x-3">
+                          {/* Grading criteria indicator */}
+                          <GradingCriteriaTooltip />
+                          {isInterviewStarted && (
+                            <div className="flex items-center space-x-1">
+                              <div className="w-1.5 h-1.5 bg-[#00d9ff] rounded-full animate-pulse"></div>
+                              <span className="text-[#00d9ff] text-xs">LIVE</span>
+                            </div>
+                          )}
+                        </div>
                       </CardTitle>
                     </CardHeader>
                     {/* Code Editor - Direct in Card, no CardContent wrapper */}

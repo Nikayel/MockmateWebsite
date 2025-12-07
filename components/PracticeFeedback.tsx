@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { CheckCircle, TrendingUp, Target, Zap, Code, MessageSquare, Activity, ChevronDown, ChevronUp, XCircle, FileText, RotateCcw, Play, Download, AlertCircle, Sparkles, Clock, BarChart3, Lightbulb, AlertTriangle } from "lucide-react"
 import { LearningRecommendations } from "@/components/LearningRecommendations"
 import { Progress } from "@/components/ui/progress"
+import { GradingCriteriaRadial } from "@/components/GradingCriteria"
 
 interface FeedbackSection {
   tldr: string
@@ -489,6 +490,17 @@ export default function PracticeFeedback({
             <div className="text-4xl font-bold text-[#00d9ff] mb-1">{letterGrade}</div>
             <div className="text-gray-400">Overall Grade</div>
           </div>
+        </div>
+      </div>
+
+      {/* How You Were Graded - Radial visualization */}
+      <div className="mb-8 p-6 bg-gray-900/30 rounded-2xl border border-gray-800/50">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-medium text-white mb-1">How You Were Evaluated</h2>
+            <p className="text-sm text-gray-500">Real interview criteria · AI usage is optional</p>
+          </div>
+          <GradingCriteriaRadial />
         </div>
       </div>
 
