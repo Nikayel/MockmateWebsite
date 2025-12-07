@@ -238,14 +238,66 @@ export async function initializeUserQuota(userId: string, subscriptionTier: "fre
 /**
  * Check if user has available sessions
  */
-export async function checkUsageLimit(userId: string): Promise<{ allowed: boolean; used: number; limit: number }> {
+export async function checkUsageLimit(userId: string): Promise<{ allowed: boolean; used: number; limit: number; freeOpensRemaining: number }> {
   const profile = await getUserProfile(userId)
   const quota = await initializeUserQuota(userId, profile?.subscription_tier || "free")
 
   return {
-    allowed: quota.sessions_used < quota.sessions_limit,
+    allowed: quota.sessions_used < quota.sessions_limit || (quota.free_opens_remaining || 0) > 0,
     used: quota.sessions_used,
     limit: quota.sessions_limit,
+    freeOpensRemaining: quota.free_opens_remaining || 0,
+  }
+}
+
+/**
+ * Check if starting a session will cost usage
+ * Returns: { costsUsage: boolean, freeOpensRemaining: number, reason: string }
+ *
+ * Usage model:
+ * - First session costs 1 usage, grants 10 free opens
+ * - After 10 opens, next session costs 1 usage, grants 10 more free opens
+ * - Pro users have higher limits but same free opens system
+ */
+export async function checkSessionCost(userId: string): Promise<{
+  costsUsage: boolean;
+  freeOpensRemaining: number;
+  allowed: boolean;
+  reason: string;
+}> {
+  const profile = await getUserProfile(userId)
+  const quota = await initializeUserQuota(userId, profile?.subscription_tier || "free")
+
+  const freeOpens = quota.free_opens_remaining || 0
+  const used = quota.sessions_used
+  const limit = quota.sessions_limit
+
+  // If user has free opens remaining, no cost
+  if (freeOpens > 0) {
+    return {
+      costsUsage: false,
+      freeOpensRemaining: freeOpens,
+      allowed: true,
+      reason: `${freeOpens} free opens remaining`,
+    }
+  }
+
+  // No free opens - check if user has usage left
+  if (used < limit) {
+    return {
+      costsUsage: true,
+      freeOpensRemaining: 0,
+      allowed: true,
+      reason: `Will use 1 session (${used + 1}/${limit}), then get 10 free opens`,
+    }
+  }
+
+  // No free opens and no usage left
+  return {
+    costsUsage: true,
+    freeOpensRemaining: 0,
+    allowed: false,
+    reason: `Session limit reached (${used}/${limit})`,
   }
 }
 
@@ -294,9 +346,17 @@ export async function updateInterviewSession(
 }
 
 /**
- * Increment session usage (with atomic transaction to prevent race conditions)
+ * Record session start and manage usage
+ *
+ * New model:
+ * - If user has free opens, decrement free_opens_remaining
+ * - If no free opens, increment sessions_used and grant 10 free opens
  */
-export async function incrementSessionUsage(userId: string): Promise<void> {
+export async function recordSessionStart(userId: string): Promise<{
+  success: boolean;
+  usedPaidSession: boolean;
+  freeOpensRemaining: number;
+}> {
   const profile = await getUserProfile(userId)
   const quota = await initializeUserQuota(userId, profile?.subscription_tier || "free")
 
@@ -308,32 +368,66 @@ export async function incrementSessionUsage(userId: string): Promise<void> {
 
   const quotaSnap = await getDocs(quotaQuery)
 
-  if (!quotaSnap.empty) {
-    const quotaRef = quotaSnap.docs[0].ref
+  if (quotaSnap.empty) {
+    throw new Error("Quota not found")
+  }
 
-    // Use Firestore transaction to prevent race conditions
-    await runTransaction(db, async (transaction) => {
-      const quotaDoc = await transaction.get(quotaRef)
+  const quotaRef = quotaSnap.docs[0].ref
+  let usedPaidSession = false
+  let newFreeOpens = 0
 
-      if (!quotaDoc.exists()) {
-        throw new Error("Quota document does not exist")
-      }
+  await runTransaction(db, async (transaction) => {
+    const quotaDoc = await transaction.get(quotaRef)
 
-      const currentUsage = quotaDoc.data().sessions_used || 0
-      const sessionLimit = quotaDoc.data().sessions_limit || 0
+    if (!quotaDoc.exists()) {
+      throw new Error("Quota document does not exist")
+    }
 
-      // Check if user has exceeded limit
+    const data = quotaDoc.data()
+    const currentUsage = data.sessions_used || 0
+    const sessionLimit = data.sessions_limit || 0
+    const freeOpens = data.free_opens_remaining || 0
+
+    // If user has free opens, use one
+    if (freeOpens > 0) {
+      newFreeOpens = freeOpens - 1
+      transaction.update(quotaRef, {
+        free_opens_remaining: newFreeOpens,
+        last_session_start: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      usedPaidSession = false
+    } else {
+      // No free opens - need to use a paid session
       if (currentUsage >= sessionLimit) {
         throw new Error("Session limit exceeded")
       }
 
-      // Atomically increment sessions_used
+      // Use 1 session, grant 10 free opens
+      newFreeOpens = 10
       transaction.update(quotaRef, {
         sessions_used: increment(1),
+        free_opens_remaining: newFreeOpens,
+        last_session_start: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-    })
+      usedPaidSession = true
+    }
+  })
+
+  return {
+    success: true,
+    usedPaidSession,
+    freeOpensRemaining: newFreeOpens,
   }
+}
+
+/**
+ * @deprecated Use recordSessionStart instead
+ * Kept for backward compatibility
+ */
+export async function incrementSessionUsage(userId: string): Promise<void> {
+  await recordSessionStart(userId)
 }
 
 /**

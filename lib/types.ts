@@ -36,6 +36,9 @@ export interface ProfileQuota {
   period_end: string
   created_at: string
   updated_at: string
+  // Free opens: after first use, get 10 free scenario opens before next usage is counted
+  free_opens_remaining?: number
+  last_session_start?: string // Track when last paid session started
 }
 
 export interface InterviewSession {

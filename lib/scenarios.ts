@@ -7,8 +7,9 @@
  */
 
 import { realWorldBugFixScenarios, realWorldSystemDesignScenarios } from './scenarios-realworld';
+import { addFunctionalityScenarios, AddFunctionalityScenario } from './scenarios-add-functionality';
 
-export type ScenarioType = 'dsa' | 'bugfix' | 'optimization' | 'security' | 'system-design';
+export type ScenarioType = 'dsa' | 'bugfix' | 'optimization' | 'security' | 'system-design' | 'add-functionality';
 export type DifficultyLevel = 'easy' | 'medium' | 'hard';
 export type Company = 'Google' | 'Meta' | 'Amazon' | 'Netflix' | 'Apple' | 'Microsoft' | 'Startup' | 'Generic' | 'Airbnb' | 'Shopify' | 'Walmart' | 'Stripe' | 'Slack';
 
@@ -95,7 +96,10 @@ export interface SystemDesignScenario extends BaseScenario {
   discussionPoints: string[];
 }
 
-export type Scenario = DSAScenario | BugFixScenario | SystemDesignScenario;
+export type Scenario = DSAScenario | BugFixScenario | SystemDesignScenario | AddFunctionalityScenario;
+
+// Re-export AddFunctionalityScenario for convenience
+export type { AddFunctionalityScenario } from './scenarios-add-functionality';
 
 export const scenarios: Scenario[] = [
   {
@@ -16107,6 +16111,8 @@ The algorithm for myAtoi(string s) is as follows:
   // Include real-world scenarios from separate file
   ...realWorldBugFixScenarios,
   ...realWorldSystemDesignScenarios,
+  // Add functionality scenarios - real-world feature implementation
+  ...addFunctionalityScenarios,
 ];
 
 export function filterScenarios(filters: {

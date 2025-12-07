@@ -20,7 +20,7 @@ export default function HomePage() {
   const router = useRouter()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
-  const [usage, setUsage] = useState<{ used: number; limit: number; allowed: boolean } | null>(null)
+  const [usage, setUsage] = useState<{ used: number; limit: number; allowed: boolean; freeOpensRemaining: number } | null>(null)
   const [isPro, setIsPro] = useState(false)
 
   useEffect(() => {
@@ -81,17 +81,26 @@ export default function HomePage() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-white text-sm font-medium flex items-center">
                     <BarChart3 className="h-4 w-4 mr-2" />
-                    Sessions This Month
+                    Practice Sessions
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-white mb-2">
                     {usage?.used || 0} / {usage?.limit || 2}
+                    <span className="text-sm font-normal text-gray-400 ml-2">used</span>
                   </div>
                   <Progress value={usage ? (usage.used / usage.limit) * 100 : 0} className="h-2 mb-2" />
-                  <p className="text-xs text-gray-400">
-                    {usage?.allowed ? `${usage.limit - (usage.used || 0)} sessions remaining` : "Limit reached"}
-                  </p>
+                  {(usage?.freeOpensRemaining || 0) > 0 ? (
+                    <p className="text-xs text-[#00ff88]">
+                      {usage?.freeOpensRemaining} free opens remaining
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-400">
+                      {usage?.allowed
+                        ? `Next session uses 1 credit, then 10 free opens`
+                        : "Limit reached - upgrade for more"}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 
