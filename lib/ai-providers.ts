@@ -10,9 +10,17 @@
  * - Use Deepseek for simple chat interactions (cheapest)
  * - Use Gemini for standard interviews (balanced)
  * - Use Claude for complex feedback generation (highest quality)
+ *
+ * Includes:
+ * - Response caching to reduce API costs
+ * - Usage tracking for billing and analytics
+ * - Rate limiting per user
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { generateCacheKey, getCachedResponse, setCachedResponse } from './ai-cache'
+import { trackUsageEvent, calculateCost, PROVIDER_COSTS } from './usage-tracking'
+import { checkRateLimit, recordRequestStart, recordRequestEnd, updateTokenCount, RateLimitTier } from './rate-limiter'
 
 // Provider types
 export type AIProvider = 'gemini' | 'deepseek' | 'claude'
@@ -251,6 +259,7 @@ async function callProvider(
 
 /**
  * Main function: Generate AI response with fallback
+ * Now includes caching, rate limiting, and usage tracking
  */
 export async function generateAIResponse(
   systemPrompt: string,
@@ -261,6 +270,14 @@ export async function generateAIResponse(
     preferredProvider?: AIProvider
     maxRetries?: number
     temperature?: number // Override default temperature (0.0-1.0)
+    // New options for tracking and caching
+    userId?: string
+    userTier?: RateLimitTier
+    sessionId?: string
+    scenarioId?: string
+    eventType?: 'chat_message' | 'feedback_generation' | 'hint_request'
+    skipCache?: boolean
+    skipRateLimit?: boolean
   } = {}
 ): Promise<AIResponse> {
   const {
@@ -268,9 +285,64 @@ export async function generateAIResponse(
     preferredProvider,
     maxRetries = MAX_RETRIES,
     temperature,
+    userId,
+    userTier = 'free',
+    sessionId,
+    scenarioId,
+    eventType = 'chat_message',
+    skipCache = false,
+    skipRateLimit = false,
   } = options
 
   const startTime = Date.now()
+
+  // 1. Check rate limit if userId provided
+  if (userId && !skipRateLimit) {
+    const rateLimitCheck = await checkRateLimit(userId, userTier)
+    if (!rateLimitCheck.allowed) {
+      throw new Error(rateLimitCheck.message || 'Rate limit exceeded')
+    }
+  }
+
+  // 2. Check cache if not skipped
+  if (!skipCache) {
+    const cacheKey = generateCacheKey({
+      type: eventType,
+      systemPrompt,
+      userMessage,
+      context: history.map(h => h.content).join('|'),
+      scenarioId,
+    })
+
+    const cached = await getCachedResponse(cacheKey)
+    if (cached.hit && cached.response) {
+      console.log(`[AI Provider] Cache hit (${cached.source})`)
+
+      // Track cached usage (no cost)
+      if (userId) {
+        trackUsageEvent({
+          userId,
+          eventType,
+          cached: true,
+          sessionId,
+          scenarioId,
+          latencyMs: Date.now() - startTime,
+        }).catch(() => {})
+      }
+
+      return {
+        text: cached.response,
+        provider: 'gemini', // Indicate it was from cache
+        latencyMs: Date.now() - startTime,
+        tokensUsed: 0,
+      }
+    }
+  }
+
+  // 3. Record request start for rate limiting
+  if (userId) {
+    recordRequestStart(userId, 500) // Estimate 500 tokens
+  }
 
   // Determine provider order
   let providerOrder: AIProvider[]
@@ -284,6 +356,7 @@ export async function generateAIResponse(
   providerOrder = providerOrder.filter(p => PROVIDERS[p].enabled)
 
   if (providerOrder.length === 0) {
+    if (userId) recordRequestEnd(userId)
     throw new Error('No AI providers are configured. Please set API keys.')
   }
 
@@ -301,10 +374,50 @@ export async function generateAIResponse(
         const latencyMs = Date.now() - startTime
         console.log(`[AI Provider] Success with ${provider} in ${latencyMs}ms`)
 
+        // Estimate tokens (rough estimate: 4 chars per token)
+        const inputTokens = Math.ceil((systemPrompt.length + userMessage.length + history.reduce((sum, h) => sum + h.content.length, 0)) / 4)
+        const outputTokens = Math.ceil(text.length / 4)
+        const totalTokens = inputTokens + outputTokens
+        const cost = calculateCost(inputTokens, outputTokens, provider)
+
+        // 4. Track usage
+        if (userId) {
+          updateTokenCount(userId, totalTokens)
+          recordRequestEnd(userId)
+
+          trackUsageEvent({
+            userId,
+            eventType,
+            provider,
+            model: PROVIDERS[provider].model,
+            inputTokens,
+            outputTokens,
+            totalTokens,
+            cost,
+            latencyMs,
+            cached: false,
+            sessionId,
+            scenarioId,
+          }).catch(() => {})
+        }
+
+        // 5. Cache the response
+        if (!skipCache) {
+          const cacheKey = generateCacheKey({
+            type: eventType,
+            systemPrompt,
+            userMessage,
+            context: history.map(h => h.content).join('|'),
+            scenarioId,
+          })
+          setCachedResponse(cacheKey, text, eventType).catch(() => {})
+        }
+
         return {
           text,
           provider,
           latencyMs,
+          tokensUsed: totalTokens,
         }
       } catch (error: any) {
         lastError = error
@@ -324,6 +437,7 @@ export async function generateAIResponse(
   }
 
   // All providers failed
+  if (userId) recordRequestEnd(userId)
   throw new Error(
     `All AI providers failed. Last error: ${lastError?.message || 'Unknown error'}`
   )
