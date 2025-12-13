@@ -346,6 +346,77 @@ export async function updateInterviewSession(
 }
 
 /**
+ * Save in-progress session state for recovery
+ * Called periodically during active interview
+ */
+export async function saveSessionState(
+  sessionId: string,
+  state: {
+    code: string;
+    selectedLanguage: string;
+    elapsedTime: number;
+    chatMessages?: Array<{ type: string; message: string }>;
+    interviewerMessages?: Array<{ type: string; message: string }>;
+    testResults?: Array<any>;
+  }
+): Promise<void> {
+  try {
+    const sessionRef = doc(db, "interview_sessions", sessionId)
+    await setDoc(sessionRef, {
+      session_state: {
+        code: state.code,
+        language: state.selectedLanguage,
+        elapsed_time: state.elapsedTime,
+        chat_messages: state.chatMessages?.slice(-20), // Keep last 20 messages
+        interviewer_messages: state.interviewerMessages?.slice(-20),
+        test_results: state.testResults?.slice(-10),
+        saved_at: new Date().toISOString(),
+      },
+      updated_at: new Date().toISOString(),
+    }, { merge: true })
+  } catch (error) {
+    console.error("Failed to save session state to Firestore:", error)
+    // Non-blocking - localStorage backup exists
+  }
+}
+
+/**
+ * Get session state for recovery
+ */
+export async function getSessionState(sessionId: string): Promise<{
+  code?: string;
+  language?: string;
+  elapsedTime?: number;
+  chatMessages?: Array<{ type: string; message: string }>;
+  interviewerMessages?: Array<{ type: string; message: string }>;
+  testResults?: Array<any>;
+  savedAt?: string;
+} | null> {
+  try {
+    const sessionRef = doc(db, "interview_sessions", sessionId)
+    const sessionSnap = await getDoc(sessionRef)
+
+    if (!sessionSnap.exists()) return null
+
+    const data = sessionSnap.data()
+    if (!data.session_state) return null
+
+    return {
+      code: data.session_state.code,
+      language: data.session_state.language,
+      elapsedTime: data.session_state.elapsed_time,
+      chatMessages: data.session_state.chat_messages,
+      interviewerMessages: data.session_state.interviewer_messages,
+      testResults: data.session_state.test_results,
+      savedAt: data.session_state.saved_at,
+    }
+  } catch (error) {
+    console.error("Failed to get session state:", error)
+    return null
+  }
+}
+
+/**
  * Record session start and manage usage
  *
  * New model:

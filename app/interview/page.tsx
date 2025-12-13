@@ -54,7 +54,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/lib/auth-context"
-import { checkUsageLimit, recordSessionStart, getUserProfile, createInterviewSession, updateInterviewSession, checkSessionCost } from "@/lib/firestore-helpers"
+import { checkUsageLimit, recordSessionStart, getUserProfile, createInterviewSession, updateInterviewSession, checkSessionCost, saveSessionState, getSessionState } from "@/lib/firestore-helpers"
 import { scenarios, filterScenarios, getScenarioById, type Scenario, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
 import { extractProtectedElements, validateCodeProtection, enforceCodeProtection } from "@/lib/code-protection"
 import { toast } from "sonner"
@@ -64,6 +64,18 @@ const Editor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
   loading: () => null
 })
+
+// Supported languages for code execution
+// JavaScript and Python are fully supported; others are coming soon
+const SUPPORTED_LANGUAGES = ["javascript", "typescript", "python"] as const
+const COMING_SOON_LANGUAGES = ["java", "cpp", "csharp", "go", "rust"] as const
+
+type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number]
+type ComingSoonLanguage = typeof COMING_SOON_LANGUAGES[number]
+
+const isLanguageSupported = (lang: string): lang is SupportedLanguage => {
+  return SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage)
+}
 
 interface ChatMessage {
   type: "user" | "ai"
@@ -646,11 +658,11 @@ Let's continue!`
     }
   }, [])
 
-  // Auto-save session data every 30 seconds
+  // Auto-save session data every 30 seconds (localStorage + Firestore)
   useEffect(() => {
     if (!isInterviewStarted || !selectedScenario || !firebaseUser) return
 
-    const autoSaveInterval = setInterval(() => {
+    const autoSaveInterval = setInterval(async () => {
       try {
         const sessionData = {
           scenarioId: selectedScenario.id,
@@ -664,11 +676,22 @@ Let's continue!`
           timestamp: Date.now(),
         }
 
-        // Save to localStorage with user-specific key
+        // Save to localStorage with user-specific key (immediate backup)
         const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
         localStorage.setItem(storageKey, JSON.stringify(sessionData))
 
-        // Show subtle indication that auto-save happened (optional)
+        // Also save to Firestore if we have a session ID (for cross-device recovery)
+        if (currentSessionId) {
+          await saveSessionState(currentSessionId, {
+            code,
+            selectedLanguage,
+            elapsedTime,
+            chatMessages,
+            interviewerMessages,
+            testResults,
+          })
+        }
+
         console.log("Session auto-saved at", new Date().toLocaleTimeString())
       } catch (error) {
         console.error("Auto-save failed:", error)
@@ -679,39 +702,84 @@ Let's continue!`
     return () => {
       clearInterval(autoSaveInterval)
     }
-  }, [isInterviewStarted, selectedScenario, firebaseUser, code, chatMessages, interviewerMessages, selectedLanguage, elapsedTime, testResults, workspaceContext])
+  }, [isInterviewStarted, selectedScenario, firebaseUser, code, chatMessages, interviewerMessages, selectedLanguage, elapsedTime, testResults, workspaceContext, currentSessionId])
 
-  // Restore auto-saved session on mount
+  // Restore auto-saved session on mount (check both localStorage and Firestore)
   useEffect(() => {
     if (!firebaseUser || !selectedScenario || isInterviewStarted) return
 
-    try {
-      const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
-      const savedData = localStorage.getItem(storageKey)
+    const restoreSession = async () => {
+      try {
+        // Check localStorage first (faster)
+        const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
+        const savedData = localStorage.getItem(storageKey)
+        let localData = null
+        let localTimestamp = 0
 
-      if (savedData) {
-        const sessionData = JSON.parse(savedData)
-        const timeSinceLastSave = Date.now() - sessionData.timestamp
-
-        // Only restore if saved within last 24 hours
-        if (timeSinceLastSave < 24 * 60 * 60 * 1000) {
-          setCode(sessionData.code || "")
-          setChatMessages(sessionData.chatMessages || [])
-          setInterviewerMessages(sessionData.interviewerMessages || [])
-          setSelectedLanguage(sessionData.selectedLanguage || "javascript")
-          setTestResults(sessionData.testResults || [])
-          setWorkspaceContext(sessionData.workspaceContext || [])
-
-          toast.info("Session restored from auto-save")
-        } else {
-          // Clean up old saves
-          localStorage.removeItem(storageKey)
+        if (savedData) {
+          const parsed = JSON.parse(savedData)
+          const timeSinceLastSave = Date.now() - parsed.timestamp
+          if (timeSinceLastSave < 24 * 60 * 60 * 1000) {
+            localData = parsed
+            localTimestamp = parsed.timestamp
+          } else {
+            localStorage.removeItem(storageKey)
+          }
         }
+
+        // Check Firestore if we have a session ID in URL
+        const sessionIdFromUrl = searchParams.get('session')
+        let firestoreData = null
+        let firestoreTimestamp = 0
+
+        if (sessionIdFromUrl) {
+          const firestoreState = await getSessionState(sessionIdFromUrl)
+          if (firestoreState?.savedAt) {
+            firestoreData = firestoreState
+            firestoreTimestamp = new Date(firestoreState.savedAt).getTime()
+            setCurrentSessionId(sessionIdFromUrl)
+          }
+        }
+
+        // Use the most recent save (prefer Firestore if same time for cross-device)
+        const useFirestore = firestoreData && (!localData || firestoreTimestamp >= localTimestamp)
+
+        if (useFirestore && firestoreData) {
+          setCode(firestoreData.code || "")
+          setChatMessages((firestoreData.chatMessages as ChatMessage[]) || [])
+          setInterviewerMessages((firestoreData.interviewerMessages as ChatMessage[]) || [])
+          setSelectedLanguage((firestoreData.language as typeof selectedLanguage) || "javascript")
+          setTestResults(firestoreData.testResults || [])
+          if (firestoreData.elapsedTime) {
+            setElapsedTime(firestoreData.elapsedTime)
+          }
+          toast.info("Session restored from cloud backup", {
+            description: "Your progress was saved. Continue where you left off!",
+          })
+        } else if (localData) {
+          setCode(localData.code || "")
+          setChatMessages(localData.chatMessages || [])
+          setInterviewerMessages(localData.interviewerMessages || [])
+          setSelectedLanguage(localData.selectedLanguage || "javascript")
+          setTestResults(localData.testResults || [])
+          setWorkspaceContext(localData.workspaceContext || [])
+          if (localData.elapsedTime) {
+            setElapsedTime(localData.elapsedTime)
+          }
+          toast.info("Session restored from auto-save", {
+            description: "Your local progress was recovered.",
+          })
+        }
+      } catch (error) {
+        console.error("Failed to restore auto-saved session:", error)
+        toast.error("Could not restore session", {
+          description: "Starting fresh. Previous progress may be lost.",
+        })
       }
-    } catch (error) {
-      console.error("Failed to restore auto-saved session:", error)
     }
-  }, [firebaseUser, selectedScenario])
+
+    restoreSession()
+  }, [firebaseUser, selectedScenario, searchParams])
 
   const triggerProactiveInterviewer = async () => {
     if (isLoadingInterviewer || showFeedback || showPostInterviewDiscussion) return
@@ -1030,6 +1098,9 @@ Ask ONE focused question based on these observations.`)
           }
         } catch (feedbackError) {
           console.error("Error generating feedback:", feedbackError)
+          toast.warning("Feedback generation delayed", {
+            description: "Using basic feedback. Full analysis may be available shortly.",
+          })
         }
       }
 
@@ -1204,7 +1275,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         setUsageLimit(updatedUsage)
       } catch (error) {
         console.error("Error creating session:", error)
-        toast.error("Failed to track session")
+        toast.error("Session tracking error", {
+          description: "Your progress will still be saved locally. You can continue the interview.",
+        })
       }
     }
 
@@ -1290,6 +1363,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         )
       } catch (error) {
         console.error("Error updating session:", error)
+        // Silent failure - session data is also saved locally
       }
     }
 
@@ -1601,6 +1675,13 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       } catch (error) {
         console.error("Chat error:", error)
         setMessages((prev) => [...prev, { type: "ai", message: "Sorry, I couldn't process that. Please try again." }])
+        toast.error("Failed to send message", {
+          description: "Network error. Please check your connection and try again.",
+          action: {
+            label: "Retry",
+            onClick: () => handleSendMessage(isInterviewer),
+          },
+        })
       } finally {
         setLoading(false)
       }
@@ -1728,7 +1809,13 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       }
     } catch (error) {
       console.error("Code execution error:", error)
-      toast.error("Failed to run tests")
+      toast.error("Failed to run tests", {
+        description: "There was a problem executing your code. Please try again.",
+        action: {
+          label: "Retry",
+          onClick: () => runCode(),
+        },
+      })
     } finally {
       setIsRunningTests(false)
     }
@@ -2002,17 +2089,26 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   {/* Language Selector */}
                   <select
                     value={selectedLanguage}
-                    onChange={(e) => setSelectedLanguage(e.target.value as typeof selectedLanguage)}
+                    onChange={(e) => {
+                      const newLang = e.target.value as typeof selectedLanguage
+                      setSelectedLanguage(newLang)
+                      if (!isLanguageSupported(newLang)) {
+                        toast.warning(`${newLang.toUpperCase()} execution coming soon`, {
+                          description: "You can write code, but tests won't run. Use JavaScript or Python for full support.",
+                          duration: 5000,
+                        })
+                      }
+                    }}
                     className="bg-gray-800 border border-gray-600 text-white rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#00d9ff]"
                   >
                     <option value="javascript">JavaScript</option>
                     <option value="typescript">TypeScript</option>
                     <option value="python">Python</option>
-                    <option value="java">Java</option>
-                    <option value="cpp">C++</option>
-                    <option value="csharp">C#</option>
-                    <option value="go">Go</option>
-                    <option value="rust">Rust</option>
+                    <option value="java">Java (Coming Soon)</option>
+                    <option value="cpp">C++ (Coming Soon)</option>
+                    <option value="csharp">C# (Coming Soon)</option>
+                    <option value="go">Go (Coming Soon)</option>
+                    <option value="rust">Rust (Coming Soon)</option>
                   </select>
                 </div>
                 <div className="flex items-center space-x-3">
@@ -2444,11 +2540,28 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
                       {/* Controls */}
                       <div className="flex items-center justify-end gap-2 flex-shrink-0">
+                        {!isLanguageSupported(selectedLanguage) && (
+                          <span className="text-[10px] text-yellow-400 mr-1">
+                            Use JS/Python to run tests
+                          </span>
+                        )}
                         <Button
-                          onClick={runCode}
+                          onClick={() => {
+                            if (!isLanguageSupported(selectedLanguage)) {
+                              toast.error(`${selectedLanguage.toUpperCase()} execution not supported yet`, {
+                                description: "Switch to JavaScript or Python to run tests.",
+                                action: {
+                                  label: "Use JavaScript",
+                                  onClick: () => setSelectedLanguage("javascript"),
+                                },
+                              })
+                              return
+                            }
+                            runCode()
+                          }}
                           disabled={showFeedback}
                           loading={isRunningTests}
-                          className="bg-green-600 hover:bg-green-700 text-white text-xs h-7"
+                          className={`${isLanguageSupported(selectedLanguage) ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 hover:bg-gray-500"} text-white text-xs h-7`}
                           aria-label={isRunningTests ? "Running tests" : "Run tests"}
                         >
                           {!isRunningTests && <PlayCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
@@ -2456,89 +2569,97 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         </Button>
                       </div>
 
-                      {/* AI Coding Partner - Minimal collapsed by default */}
-                      <div className="border-t border-gray-700 pt-2 flex-shrink-0">
-                        {!isAIPartnerExpanded ? (
-                          /* Collapsed state - just a thin bar */
-                          <div
-                            className="flex items-center justify-between px-2 py-1.5 bg-gray-800/50 rounded cursor-pointer hover:bg-gray-800 transition-colors"
-                            onClick={() => setIsAIPartnerExpanded(true)}
-                          >
-                            <div className="flex items-center gap-2">
-                              <Bot className="h-3 w-3 text-[#00d9ff]" />
-                              <span className="text-[10px] text-gray-400">AI Assistant</span>
-                              <span className="text-[10px] text-gray-600">· optional</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {chatMessages.length > 0 && (
-                                <span className="text-[10px] text-gray-500">{chatMessages.length} msg</span>
-                              )}
-                              <ChevronUp className="h-3 w-3 text-gray-500" />
-                            </div>
-                          </div>
-                        ) : (
-                          /* Expanded state - compact chat */
-                          <div className="bg-gray-800/30 rounded p-2">
-                            {/* Header with collapse */}
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-1.5">
+                      {/* AI Coding Partner - Only show for interview types that allow AI assistance
+                          Real interview rules:
+                          - DSA: NO AI (pure problem-solving like Google/Meta traditional interviews)
+                          - Bug Fix: YES (Meta E5+ allows AI tools for debugging)
+                          - Add Functionality: YES (realistic production environment)
+                          - System Design: YES (discussion-based, AI collaboration acceptable)
+                      */}
+                      {selectedScenario && selectedScenario.type !== 'dsa' && (
+                        <div className="border-t border-gray-700 pt-2 flex-shrink-0">
+                          {!isAIPartnerExpanded ? (
+                            /* Collapsed state - just a thin bar */
+                            <div
+                              className="flex items-center justify-between px-2 py-1.5 bg-gray-800/50 rounded cursor-pointer hover:bg-gray-800 transition-colors"
+                              onClick={() => setIsAIPartnerExpanded(true)}
+                            >
+                              <div className="flex items-center gap-2">
                                 <Bot className="h-3 w-3 text-[#00d9ff]" />
-                                <span className="text-[10px] text-gray-300">AI Assistant</span>
-                                <span className="text-[9px] text-gray-600 bg-gray-800 px-1 rounded">optional</span>
+                                <span className="text-[10px] text-gray-400">AI Assistant</span>
+                                <span className="text-[10px] text-gray-600">· optional</span>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setIsAIPartnerExpanded(false)}
-                                className="h-5 w-5 p-0 text-gray-500 hover:text-white"
-                              >
-                                <ChevronDown className="h-3 w-3" />
-                              </Button>
-                            </div>
-
-                            {/* Messages - max height 120px */}
-                            <div className="max-h-[120px] overflow-y-auto space-y-1 mb-2">
-                              {chatMessages.length === 0 ? (
-                                <p className="text-[10px] text-gray-500 text-center py-2">
-                                  Ask for hints, not solutions
-                                </p>
-                              ) : (
-                                chatMessages.slice(-4).map((msg, index) => (
-                                  <div key={index} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
-                                    <div className={`max-w-[85%] px-2 py-1 rounded text-[10px] ${msg.type === "user" ? "bg-blue-600/80 text-white" : "bg-gray-700 text-gray-200"}`}>
-                                      {msg.message.length > 100 ? msg.message.substring(0, 100) + "..." : msg.message}
-                                    </div>
-                                  </div>
-                                ))
-                              )}
-                              <div ref={chatEndRef} />
-                            </div>
-
-                            {/* Input - single line */}
-                            <div className="flex gap-1">
-                              <Input
-                                value={chatInput}
-                                onChange={(e) => setChatInput(e.target.value)}
-                                placeholder="Quick question..."
-                                className="flex-1 bg-gray-900 border-gray-700 text-white text-[10px] h-6 placeholder:text-gray-600"
-                                onKeyPress={(e) => e.key === "Enter" && !isLoadingChat && handleSendMessage(false)}
-                                disabled={isLoadingChat}
-                              />
-                              <Button
-                                onClick={() => handleSendMessage(false)}
-                                disabled={!chatInput.trim() || isLoadingChat}
-                                className="h-6 w-6 p-0 bg-[#00d9ff] hover:bg-[#00d9ff]/80"
-                              >
-                                {isLoadingChat ? (
-                                  <div className="h-2 w-2 border border-white/30 border-t-white rounded-full animate-spin" />
-                                ) : (
-                                  <Send className="h-2.5 w-2.5" />
+                              <div className="flex items-center gap-2">
+                                {chatMessages.length > 0 && (
+                                  <span className="text-[10px] text-gray-500">{chatMessages.length} msg</span>
                                 )}
-                              </Button>
+                                <ChevronUp className="h-3 w-3 text-gray-500" />
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
+                          ) : (
+                            /* Expanded state - compact chat */
+                            <div className="bg-gray-800/30 rounded p-2">
+                              {/* Header with collapse */}
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-1.5">
+                                  <Bot className="h-3 w-3 text-[#00d9ff]" />
+                                  <span className="text-[10px] text-gray-300">AI Assistant</span>
+                                  <span className="text-[9px] text-gray-600 bg-gray-800 px-1 rounded">optional</span>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setIsAIPartnerExpanded(false)}
+                                  className="h-5 w-5 p-0 text-gray-500 hover:text-white"
+                                >
+                                  <ChevronDown className="h-3 w-3" />
+                                </Button>
+                              </div>
+
+                              {/* Messages - max height 120px */}
+                              <div className="max-h-[120px] overflow-y-auto space-y-1 mb-2">
+                                {chatMessages.length === 0 ? (
+                                  <p className="text-[10px] text-gray-500 text-center py-2">
+                                    Ask for hints, not solutions
+                                  </p>
+                                ) : (
+                                  chatMessages.slice(-4).map((msg, index) => (
+                                    <div key={index} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
+                                      <div className={`max-w-[85%] px-2 py-1 rounded text-[10px] ${msg.type === "user" ? "bg-blue-600/80 text-white" : "bg-gray-700 text-gray-200"}`}>
+                                        {msg.message.length > 100 ? msg.message.substring(0, 100) + "..." : msg.message}
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                                <div ref={chatEndRef} />
+                              </div>
+
+                              {/* Input - single line */}
+                              <div className="flex gap-1">
+                                <Input
+                                  value={chatInput}
+                                  onChange={(e) => setChatInput(e.target.value)}
+                                  placeholder="Quick question..."
+                                  className="flex-1 bg-gray-900 border-gray-700 text-white text-[10px] h-6 placeholder:text-gray-600"
+                                  onKeyPress={(e) => e.key === "Enter" && !isLoadingChat && handleSendMessage(false)}
+                                  disabled={isLoadingChat}
+                                />
+                                <Button
+                                  onClick={() => handleSendMessage(false)}
+                                  disabled={!chatInput.trim() || isLoadingChat}
+                                  className="h-6 w-6 p-0 bg-[#00d9ff] hover:bg-[#00d9ff]/80"
+                                >
+                                  {isLoadingChat ? (
+                                    <div className="h-2 w-2 border border-white/30 border-t-white rounded-full animate-spin" />
+                                  ) : (
+                                    <Send className="h-2.5 w-2.5" />
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </Card>
 
