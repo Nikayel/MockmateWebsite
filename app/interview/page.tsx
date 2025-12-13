@@ -2456,89 +2456,97 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         </Button>
                       </div>
 
-                      {/* AI Coding Partner - Minimal collapsed by default */}
-                      <div className="border-t border-gray-700 pt-2 flex-shrink-0">
-                        {!isAIPartnerExpanded ? (
-                          /* Collapsed state - just a thin bar */
-                          <div
-                            className="flex items-center justify-between px-2 py-1.5 bg-gray-800/50 rounded cursor-pointer hover:bg-gray-800 transition-colors"
-                            onClick={() => setIsAIPartnerExpanded(true)}
-                          >
-                            <div className="flex items-center gap-2">
-                              <Bot className="h-3 w-3 text-[#00d9ff]" />
-                              <span className="text-[10px] text-gray-400">AI Assistant</span>
-                              <span className="text-[10px] text-gray-600">· optional</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {chatMessages.length > 0 && (
-                                <span className="text-[10px] text-gray-500">{chatMessages.length} msg</span>
-                              )}
-                              <ChevronUp className="h-3 w-3 text-gray-500" />
-                            </div>
-                          </div>
-                        ) : (
-                          /* Expanded state - compact chat */
-                          <div className="bg-gray-800/30 rounded p-2">
-                            {/* Header with collapse */}
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-1.5">
+                      {/* AI Coding Partner - Only show for interview types that allow AI assistance
+                          Real interview rules:
+                          - DSA: NO AI (pure problem-solving like Google/Meta traditional interviews)
+                          - Bug Fix: YES (Meta E5+ allows AI tools for debugging)
+                          - Add Functionality: YES (realistic production environment)
+                          - System Design: YES (discussion-based, AI collaboration acceptable)
+                      */}
+                      {selectedScenario && selectedScenario.type !== 'dsa' && (
+                        <div className="border-t border-gray-700 pt-2 flex-shrink-0">
+                          {!isAIPartnerExpanded ? (
+                            /* Collapsed state - just a thin bar */
+                            <div
+                              className="flex items-center justify-between px-2 py-1.5 bg-gray-800/50 rounded cursor-pointer hover:bg-gray-800 transition-colors"
+                              onClick={() => setIsAIPartnerExpanded(true)}
+                            >
+                              <div className="flex items-center gap-2">
                                 <Bot className="h-3 w-3 text-[#00d9ff]" />
-                                <span className="text-[10px] text-gray-300">AI Assistant</span>
-                                <span className="text-[9px] text-gray-600 bg-gray-800 px-1 rounded">optional</span>
+                                <span className="text-[10px] text-gray-400">AI Assistant</span>
+                                <span className="text-[10px] text-gray-600">· optional</span>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setIsAIPartnerExpanded(false)}
-                                className="h-5 w-5 p-0 text-gray-500 hover:text-white"
-                              >
-                                <ChevronDown className="h-3 w-3" />
-                              </Button>
-                            </div>
-
-                            {/* Messages - max height 120px */}
-                            <div className="max-h-[120px] overflow-y-auto space-y-1 mb-2">
-                              {chatMessages.length === 0 ? (
-                                <p className="text-[10px] text-gray-500 text-center py-2">
-                                  Ask for hints, not solutions
-                                </p>
-                              ) : (
-                                chatMessages.slice(-4).map((msg, index) => (
-                                  <div key={index} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
-                                    <div className={`max-w-[85%] px-2 py-1 rounded text-[10px] ${msg.type === "user" ? "bg-blue-600/80 text-white" : "bg-gray-700 text-gray-200"}`}>
-                                      {msg.message.length > 100 ? msg.message.substring(0, 100) + "..." : msg.message}
-                                    </div>
-                                  </div>
-                                ))
-                              )}
-                              <div ref={chatEndRef} />
-                            </div>
-
-                            {/* Input - single line */}
-                            <div className="flex gap-1">
-                              <Input
-                                value={chatInput}
-                                onChange={(e) => setChatInput(e.target.value)}
-                                placeholder="Quick question..."
-                                className="flex-1 bg-gray-900 border-gray-700 text-white text-[10px] h-6 placeholder:text-gray-600"
-                                onKeyPress={(e) => e.key === "Enter" && !isLoadingChat && handleSendMessage(false)}
-                                disabled={isLoadingChat}
-                              />
-                              <Button
-                                onClick={() => handleSendMessage(false)}
-                                disabled={!chatInput.trim() || isLoadingChat}
-                                className="h-6 w-6 p-0 bg-[#00d9ff] hover:bg-[#00d9ff]/80"
-                              >
-                                {isLoadingChat ? (
-                                  <div className="h-2 w-2 border border-white/30 border-t-white rounded-full animate-spin" />
-                                ) : (
-                                  <Send className="h-2.5 w-2.5" />
+                              <div className="flex items-center gap-2">
+                                {chatMessages.length > 0 && (
+                                  <span className="text-[10px] text-gray-500">{chatMessages.length} msg</span>
                                 )}
-                              </Button>
+                                <ChevronUp className="h-3 w-3 text-gray-500" />
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
+                          ) : (
+                            /* Expanded state - compact chat */
+                            <div className="bg-gray-800/30 rounded p-2">
+                              {/* Header with collapse */}
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-1.5">
+                                  <Bot className="h-3 w-3 text-[#00d9ff]" />
+                                  <span className="text-[10px] text-gray-300">AI Assistant</span>
+                                  <span className="text-[9px] text-gray-600 bg-gray-800 px-1 rounded">optional</span>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setIsAIPartnerExpanded(false)}
+                                  className="h-5 w-5 p-0 text-gray-500 hover:text-white"
+                                >
+                                  <ChevronDown className="h-3 w-3" />
+                                </Button>
+                              </div>
+
+                              {/* Messages - max height 120px */}
+                              <div className="max-h-[120px] overflow-y-auto space-y-1 mb-2">
+                                {chatMessages.length === 0 ? (
+                                  <p className="text-[10px] text-gray-500 text-center py-2">
+                                    Ask for hints, not solutions
+                                  </p>
+                                ) : (
+                                  chatMessages.slice(-4).map((msg, index) => (
+                                    <div key={index} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
+                                      <div className={`max-w-[85%] px-2 py-1 rounded text-[10px] ${msg.type === "user" ? "bg-blue-600/80 text-white" : "bg-gray-700 text-gray-200"}`}>
+                                        {msg.message.length > 100 ? msg.message.substring(0, 100) + "..." : msg.message}
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                                <div ref={chatEndRef} />
+                              </div>
+
+                              {/* Input - single line */}
+                              <div className="flex gap-1">
+                                <Input
+                                  value={chatInput}
+                                  onChange={(e) => setChatInput(e.target.value)}
+                                  placeholder="Quick question..."
+                                  className="flex-1 bg-gray-900 border-gray-700 text-white text-[10px] h-6 placeholder:text-gray-600"
+                                  onKeyPress={(e) => e.key === "Enter" && !isLoadingChat && handleSendMessage(false)}
+                                  disabled={isLoadingChat}
+                                />
+                                <Button
+                                  onClick={() => handleSendMessage(false)}
+                                  disabled={!chatInput.trim() || isLoadingChat}
+                                  className="h-6 w-6 p-0 bg-[#00d9ff] hover:bg-[#00d9ff]/80"
+                                >
+                                  {isLoadingChat ? (
+                                    <div className="h-2 w-2 border border-white/30 border-t-white rounded-full animate-spin" />
+                                  ) : (
+                                    <Send className="h-2.5 w-2.5" />
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </Card>
 
