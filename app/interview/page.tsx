@@ -54,7 +54,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/lib/auth-context"
-import { checkUsageLimit, recordSessionStart, getUserProfile, createInterviewSession, updateInterviewSession, checkSessionCost } from "@/lib/firestore-helpers"
+import { checkUsageLimit, recordSessionStart, getUserProfile, createInterviewSession, updateInterviewSession, checkSessionCost, saveSessionState, getSessionState } from "@/lib/firestore-helpers"
 import { scenarios, filterScenarios, getScenarioById, type Scenario, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
 import { extractProtectedElements, validateCodeProtection, enforceCodeProtection } from "@/lib/code-protection"
 import { toast } from "sonner"
@@ -64,6 +64,18 @@ const Editor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
   loading: () => null
 })
+
+// Supported languages for code execution
+// JavaScript and Python are fully supported; others are coming soon
+const SUPPORTED_LANGUAGES = ["javascript", "typescript", "python"] as const
+const COMING_SOON_LANGUAGES = ["java", "cpp", "csharp", "go", "rust"] as const
+
+type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number]
+type ComingSoonLanguage = typeof COMING_SOON_LANGUAGES[number]
+
+const isLanguageSupported = (lang: string): lang is SupportedLanguage => {
+  return SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage)
+}
 
 interface ChatMessage {
   type: "user" | "ai"
@@ -646,11 +658,11 @@ Let's continue!`
     }
   }, [])
 
-  // Auto-save session data every 30 seconds
+  // Auto-save session data every 30 seconds (localStorage + Firestore)
   useEffect(() => {
     if (!isInterviewStarted || !selectedScenario || !firebaseUser) return
 
-    const autoSaveInterval = setInterval(() => {
+    const autoSaveInterval = setInterval(async () => {
       try {
         const sessionData = {
           scenarioId: selectedScenario.id,
@@ -664,11 +676,22 @@ Let's continue!`
           timestamp: Date.now(),
         }
 
-        // Save to localStorage with user-specific key
+        // Save to localStorage with user-specific key (immediate backup)
         const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
         localStorage.setItem(storageKey, JSON.stringify(sessionData))
 
-        // Show subtle indication that auto-save happened (optional)
+        // Also save to Firestore if we have a session ID (for cross-device recovery)
+        if (currentSessionId) {
+          await saveSessionState(currentSessionId, {
+            code,
+            selectedLanguage,
+            elapsedTime,
+            chatMessages,
+            interviewerMessages,
+            testResults,
+          })
+        }
+
         console.log("Session auto-saved at", new Date().toLocaleTimeString())
       } catch (error) {
         console.error("Auto-save failed:", error)
@@ -679,39 +702,84 @@ Let's continue!`
     return () => {
       clearInterval(autoSaveInterval)
     }
-  }, [isInterviewStarted, selectedScenario, firebaseUser, code, chatMessages, interviewerMessages, selectedLanguage, elapsedTime, testResults, workspaceContext])
+  }, [isInterviewStarted, selectedScenario, firebaseUser, code, chatMessages, interviewerMessages, selectedLanguage, elapsedTime, testResults, workspaceContext, currentSessionId])
 
-  // Restore auto-saved session on mount
+  // Restore auto-saved session on mount (check both localStorage and Firestore)
   useEffect(() => {
     if (!firebaseUser || !selectedScenario || isInterviewStarted) return
 
-    try {
-      const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
-      const savedData = localStorage.getItem(storageKey)
+    const restoreSession = async () => {
+      try {
+        // Check localStorage first (faster)
+        const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
+        const savedData = localStorage.getItem(storageKey)
+        let localData = null
+        let localTimestamp = 0
 
-      if (savedData) {
-        const sessionData = JSON.parse(savedData)
-        const timeSinceLastSave = Date.now() - sessionData.timestamp
-
-        // Only restore if saved within last 24 hours
-        if (timeSinceLastSave < 24 * 60 * 60 * 1000) {
-          setCode(sessionData.code || "")
-          setChatMessages(sessionData.chatMessages || [])
-          setInterviewerMessages(sessionData.interviewerMessages || [])
-          setSelectedLanguage(sessionData.selectedLanguage || "javascript")
-          setTestResults(sessionData.testResults || [])
-          setWorkspaceContext(sessionData.workspaceContext || [])
-
-          toast.info("Session restored from auto-save")
-        } else {
-          // Clean up old saves
-          localStorage.removeItem(storageKey)
+        if (savedData) {
+          const parsed = JSON.parse(savedData)
+          const timeSinceLastSave = Date.now() - parsed.timestamp
+          if (timeSinceLastSave < 24 * 60 * 60 * 1000) {
+            localData = parsed
+            localTimestamp = parsed.timestamp
+          } else {
+            localStorage.removeItem(storageKey)
+          }
         }
+
+        // Check Firestore if we have a session ID in URL
+        const sessionIdFromUrl = searchParams.get('session')
+        let firestoreData = null
+        let firestoreTimestamp = 0
+
+        if (sessionIdFromUrl) {
+          const firestoreState = await getSessionState(sessionIdFromUrl)
+          if (firestoreState?.savedAt) {
+            firestoreData = firestoreState
+            firestoreTimestamp = new Date(firestoreState.savedAt).getTime()
+            setCurrentSessionId(sessionIdFromUrl)
+          }
+        }
+
+        // Use the most recent save (prefer Firestore if same time for cross-device)
+        const useFirestore = firestoreData && (!localData || firestoreTimestamp >= localTimestamp)
+
+        if (useFirestore && firestoreData) {
+          setCode(firestoreData.code || "")
+          setChatMessages((firestoreData.chatMessages as ChatMessage[]) || [])
+          setInterviewerMessages((firestoreData.interviewerMessages as ChatMessage[]) || [])
+          setSelectedLanguage((firestoreData.language as typeof selectedLanguage) || "javascript")
+          setTestResults(firestoreData.testResults || [])
+          if (firestoreData.elapsedTime) {
+            setElapsedTime(firestoreData.elapsedTime)
+          }
+          toast.info("Session restored from cloud backup", {
+            description: "Your progress was saved. Continue where you left off!",
+          })
+        } else if (localData) {
+          setCode(localData.code || "")
+          setChatMessages(localData.chatMessages || [])
+          setInterviewerMessages(localData.interviewerMessages || [])
+          setSelectedLanguage(localData.selectedLanguage || "javascript")
+          setTestResults(localData.testResults || [])
+          setWorkspaceContext(localData.workspaceContext || [])
+          if (localData.elapsedTime) {
+            setElapsedTime(localData.elapsedTime)
+          }
+          toast.info("Session restored from auto-save", {
+            description: "Your local progress was recovered.",
+          })
+        }
+      } catch (error) {
+        console.error("Failed to restore auto-saved session:", error)
+        toast.error("Could not restore session", {
+          description: "Starting fresh. Previous progress may be lost.",
+        })
       }
-    } catch (error) {
-      console.error("Failed to restore auto-saved session:", error)
     }
-  }, [firebaseUser, selectedScenario])
+
+    restoreSession()
+  }, [firebaseUser, selectedScenario, searchParams])
 
   const triggerProactiveInterviewer = async () => {
     if (isLoadingInterviewer || showFeedback || showPostInterviewDiscussion) return
@@ -1030,6 +1098,9 @@ Ask ONE focused question based on these observations.`)
           }
         } catch (feedbackError) {
           console.error("Error generating feedback:", feedbackError)
+          toast.warning("Feedback generation delayed", {
+            description: "Using basic feedback. Full analysis may be available shortly.",
+          })
         }
       }
 
@@ -1204,7 +1275,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         setUsageLimit(updatedUsage)
       } catch (error) {
         console.error("Error creating session:", error)
-        toast.error("Failed to track session")
+        toast.error("Session tracking error", {
+          description: "Your progress will still be saved locally. You can continue the interview.",
+        })
       }
     }
 
@@ -1290,6 +1363,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         )
       } catch (error) {
         console.error("Error updating session:", error)
+        // Silent failure - session data is also saved locally
       }
     }
 
@@ -1601,6 +1675,13 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       } catch (error) {
         console.error("Chat error:", error)
         setMessages((prev) => [...prev, { type: "ai", message: "Sorry, I couldn't process that. Please try again." }])
+        toast.error("Failed to send message", {
+          description: "Network error. Please check your connection and try again.",
+          action: {
+            label: "Retry",
+            onClick: () => handleSendMessage(isInterviewer),
+          },
+        })
       } finally {
         setLoading(false)
       }
@@ -1728,7 +1809,13 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       }
     } catch (error) {
       console.error("Code execution error:", error)
-      toast.error("Failed to run tests")
+      toast.error("Failed to run tests", {
+        description: "There was a problem executing your code. Please try again.",
+        action: {
+          label: "Retry",
+          onClick: () => runCode(),
+        },
+      })
     } finally {
       setIsRunningTests(false)
     }
@@ -2002,17 +2089,26 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   {/* Language Selector */}
                   <select
                     value={selectedLanguage}
-                    onChange={(e) => setSelectedLanguage(e.target.value as typeof selectedLanguage)}
+                    onChange={(e) => {
+                      const newLang = e.target.value as typeof selectedLanguage
+                      setSelectedLanguage(newLang)
+                      if (!isLanguageSupported(newLang)) {
+                        toast.warning(`${newLang.toUpperCase()} execution coming soon`, {
+                          description: "You can write code, but tests won't run. Use JavaScript or Python for full support.",
+                          duration: 5000,
+                        })
+                      }
+                    }}
                     className="bg-gray-800 border border-gray-600 text-white rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#00d9ff]"
                   >
                     <option value="javascript">JavaScript</option>
                     <option value="typescript">TypeScript</option>
                     <option value="python">Python</option>
-                    <option value="java">Java</option>
-                    <option value="cpp">C++</option>
-                    <option value="csharp">C#</option>
-                    <option value="go">Go</option>
-                    <option value="rust">Rust</option>
+                    <option value="java">Java (Coming Soon)</option>
+                    <option value="cpp">C++ (Coming Soon)</option>
+                    <option value="csharp">C# (Coming Soon)</option>
+                    <option value="go">Go (Coming Soon)</option>
+                    <option value="rust">Rust (Coming Soon)</option>
                   </select>
                 </div>
                 <div className="flex items-center space-x-3">
@@ -2444,11 +2540,28 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
                       {/* Controls */}
                       <div className="flex items-center justify-end gap-2 flex-shrink-0">
+                        {!isLanguageSupported(selectedLanguage) && (
+                          <span className="text-[10px] text-yellow-400 mr-1">
+                            Use JS/Python to run tests
+                          </span>
+                        )}
                         <Button
-                          onClick={runCode}
+                          onClick={() => {
+                            if (!isLanguageSupported(selectedLanguage)) {
+                              toast.error(`${selectedLanguage.toUpperCase()} execution not supported yet`, {
+                                description: "Switch to JavaScript or Python to run tests.",
+                                action: {
+                                  label: "Use JavaScript",
+                                  onClick: () => setSelectedLanguage("javascript"),
+                                },
+                              })
+                              return
+                            }
+                            runCode()
+                          }}
                           disabled={showFeedback}
                           loading={isRunningTests}
-                          className="bg-green-600 hover:bg-green-700 text-white text-xs h-7"
+                          className={`${isLanguageSupported(selectedLanguage) ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 hover:bg-gray-500"} text-white text-xs h-7`}
                           aria-label={isRunningTests ? "Running tests" : "Run tests"}
                         >
                           {!isRunningTests && <PlayCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
