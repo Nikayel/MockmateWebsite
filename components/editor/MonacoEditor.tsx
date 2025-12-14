@@ -137,7 +137,7 @@ function MonacoEditorComponent({
           lineHeight: 22,
           tabSize: 2,
           scrollBeyondLastLine: false,
-          automaticLayout: false, // Disabled - we use ResizeObserver for precise control
+          automaticLayout: true, // Enable automatic layout to handle resizing properly
           wordWrap: "off",
           lineNumbers: "on",
           lineNumbersMinChars: 3,
@@ -162,16 +162,19 @@ function MonacoEditorComponent({
           codeLens: false,
           links: false,
           colorDecorators: false,
-          selectionHighlight: false,
+          selectionHighlight: true, // Enable selection highlighting
           occurrencesHighlight: "off",
           renderWhitespace: "none",
           guides: { indentation: false },
           bracketPairColorization: { enabled: false },
           matchBrackets: "never",
           padding: { top: 8, bottom: 8 },
-          // Ensure cursor layer syncs with view lines
-          cursorBlinking: "blink",
+          // Cursor settings - ensure smooth blinking
+          cursorBlinking: "smooth",
           cursorStyle: "line",
+          cursorSmoothCaretAnimation: "on",
+          // Prevent sticky scroll issues
+          stickyScroll: { enabled: false },
         }}
         loading={
           <div className="flex items-center justify-center h-full bg-[#1e1e1e]">

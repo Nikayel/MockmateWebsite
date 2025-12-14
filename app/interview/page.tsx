@@ -2143,11 +2143,14 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 </div>
               </div>
 
-              {/* Main Interface - Three Column Layout */}
+              {/* Main Interface - Three Column Layout - Optimized for smaller screens */}
               {!showFeedback && !showPostInterviewDiscussion ? (
                 <div
-                  className={`grid grid-cols-1 gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${isCodeViewerOpen ? "xl:ml-[600px]" : ""
-                    } md:grid-cols-[240px_minmax(0,1fr)] lg:grid-cols-[260px_minmax(0,1fr)_260px] xl:grid-cols-[300px_minmax(0,1fr)_300px] 2xl:grid-cols-[340px_minmax(0,1fr)_340px]`}
+                  className={`grid grid-cols-1 gap-1.5 sm:gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${
+                    isCodeViewerOpen
+                      ? "lg:ml-[420px] xl:ml-[480px] 2xl:ml-[520px]"
+                      : ""
+                  } md:grid-cols-[200px_minmax(0,1fr)] lg:grid-cols-[220px_minmax(0,1fr)_220px] xl:grid-cols-[260px_minmax(0,1fr)_260px] 2xl:grid-cols-[300px_minmax(0,1fr)_300px]`}
                 >
                   {/* Left: Problem Description / File Upload */}
                   <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden order-1">
@@ -2439,7 +2442,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             // Layout
                             automaticLayout: true,
                             scrollBeyondLastLine: false,
-                            scrollbar: { vertical: 'hidden', horizontal: 'hidden', handleMouseWheel: true },
+                            scrollbar: { vertical: 'auto', horizontal: 'auto', handleMouseWheel: true, verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
                             overviewRulerLanes: 0,
                             overviewRulerBorder: false,
                             hideCursorInOverviewRuler: true,
@@ -2451,17 +2454,16 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             minimap: { enabled: false },
                             lineNumbers: 'on',
                             lineNumbersMinChars: 3,
-                            lineDecorationsWidth: 0,
+                            lineDecorationsWidth: 8,
                             glyphMargin: false,
                             folding: false,
                             foldingHighlight: false,
                             showFoldingControls: 'never',
                             renderLineHighlight: 'none',
                             renderWhitespace: 'none',
-                            renderIndentGuides: false,
                             renderLineHighlightOnlyWhenFocus: true,
 
-                            // Disable features
+                            // Disable features but keep selection working
                             contextmenu: false,
                             quickSuggestions: false,
                             suggestOnTriggerCharacters: false,
@@ -2473,8 +2475,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             links: false,
                             colorDecorators: false,
                             codeLens: false,
-                            occurrencesHighlight: false,
-                            selectionHighlight: false,
+                            occurrencesHighlight: 'off',
+                            selectionHighlight: true, // Enable selection highlighting
                             matchBrackets: 'never',
 
                             // Styling
@@ -2486,8 +2488,13 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             readOnly: !isInterviewStarted || showFeedback,
 
                             // Padding and layout
-                            padding: { top: 0, bottom: 0 },
+                            padding: { top: 8, bottom: 8 },
                             fixedOverflowWidgets: true,
+
+                            // Cursor settings - ensure smooth blinking
+                            cursorBlinking: 'smooth',
+                            cursorStyle: 'line',
+                            cursorSmoothCaretAnimation: 'on',
 
                             // Disable all widgets and popups
                             find: {

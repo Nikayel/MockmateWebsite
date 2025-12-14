@@ -392,13 +392,13 @@
 
 /* ===== MONACO EDITOR STYLES ===== */
 
-/* Main wrapper - critical for containment */
+/* Main wrapper - use layout containment only (not strict) to allow Monaco positioning */
 .monaco-wrapper {
   position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;
-  contain: strict;
+  contain: layout style;
   isolation: isolate;
 }
 
@@ -410,7 +410,7 @@
   overflow: hidden;
   border-radius: 6px;
   background: #1e1e1e;
-  contain: strict;
+  contain: layout style;
   isolation: isolate;
 }
 
@@ -486,12 +486,11 @@
   z-index: 9999 !important;
 }
 
-/* Force widgets to be contained */
+/* Force widgets to be contained - but allow cursor/selection layers to work */
 .monaco-wrapper .monaco-editor .overlayWidgets,
 .editor-wrapper .monaco-editor .overlayWidgets {
   position: absolute !important;
   overflow: hidden !important;
-  contain: strict !important;
 }
 
 /* Hide any stray decorations */
@@ -606,10 +605,10 @@
   position: absolute !important;
 }
 
-/* Fix Monaco loading container */
+/* Fix Monaco loading container - use layout containment only */
 .monaco-wrapper [data-keybinding-context],
 .editor-wrapper [data-keybinding-context] {
-  contain: strict !important;
+  contain: layout !important;
 }
 
 /* Editor wrapper must be positioned for absolute children */
@@ -680,22 +679,38 @@
   color: #c6c6c6 !important;
 }
 
-/* Cursor */
+/* Cursor - Allow Monaco's native blink animation to work */
 .monaco-wrapper .cursor,
-.editor-wrapper .cursor {
+.editor-wrapper .cursor,
+.monaco-wrapper .monaco-editor .cursor,
+.editor-wrapper .monaco-editor .cursor {
   background: #aeafad !important;
   border-color: #aeafad !important;
-  position: absolute !important;
   visibility: visible !important;
-  opacity: 1 !important;
   pointer-events: none !important;
-  transform: none !important;
+  /* DO NOT override opacity or transform - Monaco uses these for blinking */
 }
 
-/* Selection */
+/* Ensure cursor layer is visible and properly positioned */
+.monaco-wrapper .monaco-editor .cursors-layer,
+.editor-wrapper .monaco-editor .cursors-layer {
+  position: absolute !important;
+  z-index: 10 !important;
+}
+
+/* Selection - Ensure selection highlighting is visible */
 .monaco-wrapper .selected-text,
-.editor-wrapper .selected-text {
-  background: rgba(38, 79, 120, 0.5) !important;
+.editor-wrapper .selected-text,
+.monaco-wrapper .monaco-editor .selected-text,
+.editor-wrapper .monaco-editor .selected-text {
+  background: rgba(38, 79, 120, 0.6) !important;
+}
+
+/* Ensure view-overlays (contains selection and cursor) is visible */
+.monaco-wrapper .monaco-editor .view-overlays,
+.editor-wrapper .monaco-editor .view-overlays {
+  position: absolute !important;
+  z-index: 5 !important;
 }
 
 /* Scrollbar styling */
@@ -797,5 +812,54 @@
 
   .chat-panel {
     max-height: 300px;
+  }
+}
+
+/* Small laptop optimizations (1024px - 1366px) */
+@media (min-width: 1024px) and (max-width: 1366px) {
+  .monaco-wrapper,
+  .editor-wrapper {
+    min-height: 200px;
+  }
+
+  /* Reduce padding on interview cards */
+  .interview-card {
+    padding: 0.5rem;
+  }
+
+  /* Smaller fonts for panels */
+  .panel-content {
+    font-size: 0.75rem;
+  }
+}
+
+/* Code viewer overlay optimization */
+@media (max-width: 1023px) {
+  /* On mobile/tablet, code viewer is overlay only - no margin shift */
+  .code-viewer-open {
+    margin-left: 0 !important;
+  }
+}
+
+/* Monaco editor responsive font sizes */
+@media (max-width: 640px) {
+  .monaco-wrapper .monaco-editor,
+  .editor-wrapper .monaco-editor {
+    font-size: 12px !important;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .monaco-wrapper .monaco-editor,
+  .editor-wrapper .monaco-editor {
+    font-size: 13px !important;
+  }
+}
+
+/* Ensure editor takes full available height on smaller screens */
+@media (max-height: 800px) {
+  .monaco-wrapper,
+  .editor-wrapper {
+    min-height: 180px;
   }
 }
