@@ -391,78 +391,8 @@
 }
 
 /* ===== MONACO EDITOR STYLES ===== */
-/* MINIMAL CSS - Let Monaco handle its own internals */
-
-/* Outer wrapper - just sets dimensions and overflow */
-.monaco-wrapper,
-.editor-wrapper {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: #1e1e1e;
-  border-radius: 6px;
-}
-
-/* Reset Tailwind border/outline styles that leak into Monaco */
-.monaco-wrapper .monaco-editor,
-.monaco-wrapper .monaco-editor *,
-.editor-wrapper .monaco-editor,
-.editor-wrapper .monaco-editor * {
-  border-color: transparent !important;
-  outline-color: transparent !important;
-}
-
-/* Hide internal Monaco editor elements that should not be visible */
-/* These are internal input handlers - they need to exist but should be invisible */
-.monaco-wrapper .monaco-editor .native-edit-context,
-.editor-wrapper .monaco-editor .native-edit-context {
-  /* Make completely invisible but still functional for input */
-  opacity: 0 !important;
-  color: transparent !important;
-  background: transparent !important;
-  border: none !important;
-  outline: none !important;
-  box-shadow: none !important;
-  /* Remove any visual styling that might leak through */
-  text-shadow: none !important;
-  /* Monaco handles positioning, we just make it invisible */
-}
-
-.monaco-wrapper .monaco-editor .ime-text-area,
-.editor-wrapper .monaco-editor .ime-text-area {
-  /* IME textarea should be completely hidden - it's readonly and aria-hidden */
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-  position: absolute !important;
-  width: 0 !important;
-  height: 0 !important;
-  overflow: hidden !important;
-  border: none !important;
-  outline: none !important;
-  resize: none !important;
-  z-index: -9999 !important;
-}
-
-/* Hide widgets we disabled via options (backup) */
-.monaco-wrapper .minimap,
-.editor-wrapper .minimap {
-  display: none !important;
-}
-
-/* Scrollbar theming only */
-.monaco-wrapper .monaco-editor .scrollbar .slider,
-.editor-wrapper .monaco-editor .scrollbar .slider {
-  background: rgba(121, 121, 121, 0.4);
-  border-radius: 4px;
-}
-
-.monaco-wrapper .monaco-editor .scrollbar .slider:hover,
-.editor-wrapper .monaco-editor .scrollbar .slider:hover {
-  background: rgba(121, 121, 121, 0.7);
-}
+/* REMOVED ALL CUSTOM STYLING - Let Monaco handle everything internally */
+/* Any interference with Monaco's internal elements breaks cursor/selection */
 
 /* Responsive improvements */
 @media (max-width: 1024px) {

@@ -359,45 +359,8 @@ Let's continue!`
     }
   }, [interviewerMessages])
 
-  // Measure editor container height for Monaco Editor
-  useEffect(() => {
-    if (!editorContainerRef.current) return
-
-    const updateHeight = () => {
-      if (editorContainerRef.current) {
-        const height = editorContainerRef.current.clientHeight
-        if (height > 0) {
-          setEditorHeight(height)
-        }
-      }
-    }
-
-    let resizeObserver: ResizeObserver | null = null
-
-    // Use requestAnimationFrame to ensure DOM is laid out
-    const rafId = requestAnimationFrame(() => {
-      updateHeight()
-
-      // Use ResizeObserver to track size changes
-      if (editorContainerRef.current) {
-        resizeObserver = new ResizeObserver(() => {
-          requestAnimationFrame(updateHeight)
-        })
-        resizeObserver.observe(editorContainerRef.current)
-      }
-    })
-
-    // Also listen to window resize
-    window.addEventListener('resize', updateHeight)
-
-    return () => {
-      cancelAnimationFrame(rafId)
-      if (resizeObserver) {
-        resizeObserver.disconnect()
-      }
-      window.removeEventListener('resize', updateHeight)
-    }
-  }, [isInterviewStarted, showFeedback, testResults.length])
+  // Monaco Editor handles layout automatically with automaticLayout: true
+  // No manual height tracking needed
 
   // Update code when language changes during interview
   useEffect(() => {

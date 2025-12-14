@@ -52,7 +52,7 @@ const nextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com https://cdn.jsdelivr.net https://apis.google.com https://*.googleapis.com https://www.gstatic.com https://accounts.google.com",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data: https://fonts.gstatic.com",
               "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com https://*.firebase.googleapis.com https://*.google-analytics.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://oauth2.googleapis.com https://www.googleapis.com wss://*.firebaseio.com https://api.stripe.com https://cdn.jsdelivr.net",
