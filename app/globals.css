@@ -413,6 +413,39 @@
   outline-color: transparent !important;
 }
 
+/* Hide internal Monaco editor elements that should not be visible */
+/* These are internal input handlers - they need to exist but should be invisible */
+.monaco-wrapper .monaco-editor .native-edit-context,
+.editor-wrapper .monaco-editor .native-edit-context {
+  /* Make completely invisible but still functional for input */
+  opacity: 0 !important;
+  color: transparent !important;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  /* Remove any visual styling that might leak through */
+  text-shadow: none !important;
+  /* Monaco handles positioning, we just make it invisible */
+}
+
+.monaco-wrapper .monaco-editor .ime-text-area,
+.editor-wrapper .monaco-editor .ime-text-area {
+  /* IME textarea should be completely hidden - it's readonly and aria-hidden */
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  border: none !important;
+  outline: none !important;
+  resize: none !important;
+  z-index: -9999 !important;
+}
+
 /* Hide widgets we disabled via options (backup) */
 .monaco-wrapper .minimap,
 .editor-wrapper .minimap {
