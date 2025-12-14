@@ -44,9 +44,19 @@ export default function HomePage() {
         setProfile(userProfile)
         setIsPro(userProfile?.subscription_tier === "pro")
 
-        // Check if onboarding is needed
-        if (userProfile && !userProfile.onboarding_completed) {
-          setShowOnboarding(true)
+        // Check if onboarding is needed - only show if profile exists and onboarding is not completed
+        if (userProfile) {
+          if (!userProfile.onboarding_completed) {
+            console.log("Onboarding not completed, showing modal")
+            setShowOnboarding(true)
+          } else {
+            console.log("Onboarding already completed, skipping modal")
+            setShowOnboarding(false)
+          }
+        } else {
+          // Profile doesn't exist yet - don't show onboarding until profile is created
+          console.log("Profile doesn't exist yet, waiting for profile creation")
+          setShowOnboarding(false)
         }
 
         const usageData = await checkUsageLimit(firebaseUser.uid)
@@ -78,7 +88,18 @@ export default function HomePage() {
         <OnboardingModal
           isOpen={showOnboarding}
           userId={firebaseUser.uid}
-          onComplete={() => setShowOnboarding(false)}
+          onComplete={async () => {
+            setShowOnboarding(false)
+            // Reload profile to get updated onboarding status
+            try {
+              const updatedProfile = await getUserProfile(firebaseUser.uid)
+              if (updatedProfile) {
+                setProfile(updatedProfile)
+              }
+            } catch (error) {
+              console.error("Error reloading profile after onboarding:", error)
+            }
+          }}
         />
         <Header />
         <div className="pt-24 pb-16">

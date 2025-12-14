@@ -4,7 +4,7 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Briefcase, GraduationCap, Code2, Rocket } from "lucide-react"
-import { doc, updateDoc } from "firebase/firestore"
+import { doc, setDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 interface OnboardingModalProps {
@@ -38,18 +38,25 @@ export function OnboardingModal({ isOpen, userId, onComplete }: OnboardingModalP
 
     setIsSubmitting(true)
     try {
-      // Save to Firestore
-      const userRef = doc(db, "users", userId)
-      await updateDoc(userRef, {
+      // Save to profiles collection (not users) - use setDoc with merge to ensure it works
+      const profileRef = doc(db, "profiles", userId)
+      await setDoc(profileRef, {
         role: selectedRole,
         goal: selectedGoal || "general",
         onboarding_completed: true,
         onboarding_completed_at: new Date().toISOString(),
-      })
+        updated_at: new Date().toISOString(),
+      }, { merge: true })
+
+      console.log("✅ Onboarding data saved to profile:", { userId, role: selectedRole, goal: selectedGoal })
       onComplete()
-    } catch (error) {
-      console.error("Failed to save onboarding data:", error)
-      // Still proceed - don't block the user
+    } catch (error: any) {
+      console.error("❌ Failed to save onboarding data:", error)
+      console.error("Error code:", error?.code)
+      console.error("Error message:", error?.message)
+
+      // Still proceed - don't block the user even if save fails
+      // The profile might be created later and onboarding can be completed then
       onComplete()
     } finally {
       setIsSubmitting(false)
@@ -97,11 +104,10 @@ export function OnboardingModal({ isOpen, userId, onComplete }: OnboardingModalP
                       <button
                         key={role.id}
                         onClick={() => setSelectedRole(role.id)}
-                        className={`flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${
-                          isSelected
+                        className={`flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${isSelected
                             ? "border-[#00d9ff] bg-[#00d9ff]/10"
                             : "border-gray-700 hover:border-gray-600 bg-gray-800/50"
-                        }`}
+                          }`}
                       >
                         <div className={`p-2 rounded-lg ${isSelected ? "bg-[#00d9ff]/20" : "bg-gray-800"}`}>
                           <Icon className={`h-5 w-5 ${isSelected ? "text-[#00d9ff]" : "text-gray-400"}`} />
@@ -127,11 +133,10 @@ export function OnboardingModal({ isOpen, userId, onComplete }: OnboardingModalP
                       <button
                         key={goal.id}
                         onClick={() => setSelectedGoal(isSelected ? null : goal.id)}
-                        className={`p-4 rounded-xl border transition-all text-center ${
-                          isSelected
+                        className={`p-4 rounded-xl border transition-all text-center ${isSelected
                             ? "border-[#00d9ff] bg-[#00d9ff]/10 text-white"
                             : "border-gray-700 hover:border-gray-600 bg-gray-800/50 text-gray-300"
-                        }`}
+                          }`}
                       >
                         {goal.label}
                       </button>

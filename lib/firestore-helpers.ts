@@ -26,7 +26,7 @@ export async function createOrUpdateProfile(
   }
 
   const profileRef = doc(db, "profiles", userId)
-  
+
   // Check if profile exists first
   let profileSnap
   let existingProfile: Profile | null = null
@@ -44,8 +44,8 @@ export async function createOrUpdateProfile(
   // Only set subscription_tier to "free" for NEW profiles
   // For existing profiles, preserve their current subscription tier
   const isNewProfile = !existingProfile
-  const subscriptionTier = isNewProfile 
-    ? "free" 
+  const subscriptionTier = isNewProfile
+    ? "free"
     : (existingProfile.subscription_tier || "free")
 
   // Build profile data, filtering out undefined values for Firestore
@@ -86,6 +86,19 @@ export async function createOrUpdateProfile(
     if (existingProfile.subscription_platform !== undefined) {
       profileDataForFirestore.subscription_platform = existingProfile.subscription_platform
     }
+    // Preserve onboarding data if it exists
+    if (existingProfile.onboarding_completed !== undefined) {
+      profileDataForFirestore.onboarding_completed = existingProfile.onboarding_completed
+    }
+    if (existingProfile.onboarding_completed_at !== undefined) {
+      profileDataForFirestore.onboarding_completed_at = existingProfile.onboarding_completed_at
+    }
+    if (existingProfile.role !== undefined) {
+      profileDataForFirestore.role = existingProfile.role
+    }
+    if (existingProfile.goal !== undefined) {
+      profileDataForFirestore.goal = existingProfile.goal
+    }
   }
 
   // Build the Profile object for return (can have undefined optional fields)
@@ -116,7 +129,7 @@ export async function createOrUpdateProfile(
     console.error("Email:", email)
     console.error("Error code:", writeError.code)
     console.error("Error message:", writeError.message)
-    
+
     // Re-throw with more context
     throw new Error(
       `Failed to save profile: ${writeError.message || "Unknown error"} (Code: ${writeError.code || "unknown"})`
@@ -184,13 +197,13 @@ export async function initializeUserQuota(userId: string, subscriptionTier: "fre
         const quotaStart = new Date(quota.period_start)
         return quotaStart >= periodStart && quotaStart <= periodEnd
       })
-    
+
     if (currentPeriodQuota) {
       // Update quota limit if subscription tier changed
-      const sessionsLimit = subscriptionTier === "pro" 
-        ? PRICING_CONFIG.pro.sessionsPerMonth 
+      const sessionsLimit = subscriptionTier === "pro"
+        ? PRICING_CONFIG.pro.sessionsPerMonth
         : PRICING_CONFIG.free.sessionsPerMonth
-      
+
       // If limit changed, update it
       if (currentPeriodQuota.sessions_limit !== sessionsLimit) {
         const quotaRef = quotaSnap.docs.find(doc => {
@@ -198,7 +211,7 @@ export async function initializeUserQuota(userId: string, subscriptionTier: "fre
           const quotaStart = new Date(quota.period_start)
           return quotaStart >= periodStart && quotaStart <= periodEnd
         })?.ref
-        
+
         if (quotaRef) {
           await setDoc(quotaRef, {
             sessions_limit: sessionsLimit,
@@ -207,14 +220,14 @@ export async function initializeUserQuota(userId: string, subscriptionTier: "fre
           currentPeriodQuota.sessions_limit = sessionsLimit
         }
       }
-      
+
       return currentPeriodQuota
     }
   }
 
   // Create new quota
-  const sessionsLimit = subscriptionTier === "pro" 
-    ? PRICING_CONFIG.pro.sessionsPerMonth 
+  const sessionsLimit = subscriptionTier === "pro"
+    ? PRICING_CONFIG.pro.sessionsPerMonth
     : PRICING_CONFIG.free.sessionsPerMonth
 
   const quotaData: ProfileQuota = {
@@ -323,7 +336,7 @@ export async function createInterviewSession(
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
-  
+
   await setDoc(sessionRef, sessionData)
   return sessionRef.id
 }
