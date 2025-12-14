@@ -2144,13 +2144,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               </div>
 
               {/* Main Interface - Three Column Layout - Optimized for smaller screens */}
+              {/* Code viewer is now a pure overlay - no margin shift */}
               {!showFeedback && !showPostInterviewDiscussion ? (
                 <div
-                  className={`grid grid-cols-1 gap-1.5 sm:gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${
-                    isCodeViewerOpen
-                      ? "lg:ml-[420px] xl:ml-[480px] 2xl:ml-[520px]"
-                      : ""
-                  } md:grid-cols-[200px_minmax(0,1fr)] lg:grid-cols-[220px_minmax(0,1fr)_220px] xl:grid-cols-[260px_minmax(0,1fr)_260px] 2xl:grid-cols-[300px_minmax(0,1fr)_300px]`}
+                  className="grid grid-cols-1 gap-1.5 sm:gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 md:grid-cols-[200px_minmax(0,1fr)] lg:grid-cols-[220px_minmax(0,1fr)_220px] xl:grid-cols-[260px_minmax(0,1fr)_260px] 2xl:grid-cols-[300px_minmax(0,1fr)_300px]"
                 >
                   {/* Left: Problem Description / File Upload */}
                   <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden order-1">

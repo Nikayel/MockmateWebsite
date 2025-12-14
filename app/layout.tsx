@@ -23,6 +23,11 @@ export const metadata: Metadata = {
   description:
     "Master coding interviews with AI-powered realistic practice sessions. Get real-time feedback from an intelligent interviewer and land your dream tech job.",
   generator: "v0.app",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 }
 
 export default function RootLayout({
