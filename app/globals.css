@@ -391,410 +391,44 @@
 }
 
 /* ===== MONACO EDITOR STYLES ===== */
+/* MINIMAL CSS - Let Monaco handle its own internals */
 
-/* Main wrapper - use layout containment only (not strict) to allow Monaco positioning */
-.monaco-wrapper {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  contain: layout style;
-  isolation: isolate;
-}
-
-/* Editor container wrapper */
-.editor-wrapper {
-  position: relative;
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-  border-radius: 6px;
-  background: #1e1e1e;
-  contain: layout style;
-  isolation: isolate;
-}
-
-/* Force Monaco to respect container bounds */
-.monaco-wrapper .monaco-editor,
-.editor-wrapper .monaco-editor {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-}
-
-/* Overflow guard - prevents visual glitches */
-.monaco-wrapper .overflow-guard,
-.editor-wrapper .overflow-guard {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  overflow: hidden !important;
-}
-
-/* CRITICAL: Hide all Monaco widgets and overlays that cause visual glitches */
-.monaco-wrapper .monaco-editor .monaco-hover,
-.editor-wrapper .monaco-editor .monaco-hover,
-.monaco-wrapper .monaco-editor .suggest-widget,
-.editor-wrapper .monaco-editor .suggest-widget,
-.monaco-wrapper .monaco-editor .parameter-hints-widget,
-.editor-wrapper .monaco-editor .parameter-hints-widget,
-.monaco-wrapper .monaco-editor .find-widget,
-.editor-wrapper .monaco-editor .find-widget,
-.monaco-wrapper .monaco-editor .rename-box,
-.editor-wrapper .monaco-editor .rename-box,
-.monaco-wrapper .monaco-editor .monaco-editor-overlaymessage,
-.editor-wrapper .monaco-editor .monaco-editor-overlaymessage,
-.monaco-wrapper .monaco-editor .codelens-decoration,
-.editor-wrapper .monaco-editor .codelens-decoration,
-.monaco-wrapper .monaco-editor .accessibilityHelpWidget,
-.editor-wrapper .monaco-editor .accessibilityHelpWidget {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
-
-/* Hide minimap completely */
-.monaco-wrapper .minimap,
-.editor-wrapper .minimap,
-.monaco-wrapper .minimap-slider,
-.editor-wrapper .minimap-slider {
-  display: none !important;
-  width: 0 !important;
-  visibility: hidden !important;
-}
-
-/* Hide overview ruler (right-side scrollbar decorations) */
-.monaco-wrapper .decorationsOverviewRuler,
-.editor-wrapper .decorationsOverviewRuler,
-.monaco-wrapper .monaco-editor .overview-ruler,
-.editor-wrapper .monaco-editor .overview-ruler {
-  display: none !important;
-  width: 0 !important;
-}
-
-/* Fix context view widgets that may appear outside */
-.context-view,
-.monaco-menu-container,
-.shadow-root-host {
-  z-index: 9999 !important;
-}
-
-/* Force widgets to be contained - but allow cursor/selection layers to work */
-.monaco-wrapper .monaco-editor .overlayWidgets,
-.editor-wrapper .monaco-editor .overlayWidgets {
-  position: absolute !important;
-  overflow: hidden !important;
-}
-
-/* Hide any stray decorations */
-.monaco-wrapper .monaco-editor .view-overlays>div,
-.editor-wrapper .monaco-editor .view-overlays>div {
-  /* Let Monaco handle positioning of cursor and decorations */
-  /* REMOVED contain - it can interfere with cursor positioning */
-}
-
-/* Specifically target the current-line highlight that may overflow */
-.monaco-wrapper .monaco-editor .current-line,
-.editor-wrapper .monaco-editor .current-line {
-  display: none !important;
-}
-
-/* Hide sticky scroll (can cause rectangle glitches) */
-.monaco-wrapper .monaco-editor .sticky-widget,
-.editor-wrapper .monaco-editor .sticky-widget,
-.monaco-wrapper .monaco-editor .sticky-line-number,
-.editor-wrapper .monaco-editor .sticky-line-number,
-.monaco-wrapper .monaco-editor .stickyScroll,
-.editor-wrapper .monaco-editor .stickyScroll {
-  display: none !important;
-  height: 0 !important;
-}
-
-/* Hide zone widgets (like inline diffs) - use visibility to preserve layout */
-.monaco-wrapper .monaco-editor .zone-widget,
-.editor-wrapper .monaco-editor .zone-widget {
-  visibility: hidden !important;
-  height: 0 !important;
-  overflow: hidden !important;
-}
-
-/* Don't hide view-zones completely - it can break cursor positioning */
-/* Only hide if they contain actual content */
-.monaco-wrapper .monaco-editor .view-zones>div:not(:empty),
-.editor-wrapper .monaco-editor .view-zones>div:not(:empty) {
-  height: 0 !important;
-  overflow: hidden !important;
-}
-
-/* Content widgets are needed for cursor and selection - don't hide */
-/* Only hide specific problematic widgets */
-.monaco-wrapper .monaco-editor .monaco-editor-hover,
-.editor-wrapper .monaco-editor .monaco-editor-hover {
-  display: none !important;
-}
-
-/* Hide editor message and action widgets */
-.monaco-wrapper .monaco-editor .editor-actions,
-.editor-wrapper .monaco-editor .editor-actions,
-.monaco-wrapper .monaco-editor .message,
-.editor-wrapper .monaco-editor .message {
-  display: none !important;
-}
-
-/* Monaco overflow-guard - main internal container */
-.monaco-wrapper .monaco-editor .overflow-guard,
-.editor-wrapper .monaco-editor .overflow-guard {
-  position: absolute !important;
-  inset: 0 !important;
-  top: 0 !important;
-  left: 0 !important;
-}
-
-/* Editor container inside monaco-editor */
-.monaco-wrapper .monaco-editor .editor-container,
-.editor-wrapper .monaco-editor .editor-container {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-}
-
-/* Ensure lines content is properly positioned */
-/* REMOVED: top/padding/margin overrides that break cursor sync */
-.monaco-wrapper .monaco-editor .lines-content,
-.editor-wrapper .monaco-editor .lines-content {
-  position: relative !important;
-}
-
-/* Fix view-lines positioning - let Monaco handle the top offset */
-/* REMOVED: top/padding/margin overrides that break cursor positioning */
-.monaco-wrapper .monaco-editor .view-lines,
-.editor-wrapper .monaco-editor .view-lines {
-  position: relative;
-  /* Let Monaco calculate positioning */
-}
-
-/* Ensure view-overlays aligns with view-lines */
-/* Monaco positions view-overlays absolutely to align with view-lines */
-/* REMOVED contain - it interferes with cursor positioning calculations */
-.monaco-wrapper .monaco-editor .view-overlays,
-.editor-wrapper .monaco-editor .view-overlays {
-  /* Let Monaco handle all positioning - don't interfere */
-}
-
-/* Ensure editor scrollable area starts at top */
-.monaco-wrapper .monaco-editor .monaco-scrollable-element,
-.editor-wrapper .monaco-editor .monaco-scrollable-element {
-  top: 0 !important;
-  position: absolute !important;
-  inset: 0 !important;
-}
-
-/* Remove any top offset from the editor-scrollable */
-.monaco-wrapper .monaco-editor .editor-scrollable,
-.editor-wrapper .monaco-editor .editor-scrollable {
-  top: 0 !important;
-  position: absolute !important;
-}
-
-/* Fix Monaco loading container - use layout containment only */
-.monaco-wrapper [data-keybinding-context],
-.editor-wrapper [data-keybinding-context] {
-  contain: layout !important;
-}
-
-/* Editor wrapper must be positioned for absolute children */
+/* Outer wrapper - just sets dimensions and overflow */
 .monaco-wrapper,
 .editor-wrapper {
-  position: relative !important;
-  display: flex !important;
-  flex-direction: column !important;
-  overflow: hidden !important;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #1e1e1e;
+  border-radius: 6px;
 }
 
-/* The react-monaco-editor section wrapper */
-.monaco-wrapper>section,
-.editor-wrapper>section {
-  position: absolute !important;
-  inset: 0 !important;
-  overflow: hidden !important;
-  display: flex !important;
-  flex-direction: column !important;
+/* Reset Tailwind border/outline styles that leak into Monaco */
+.monaco-wrapper .monaco-editor,
+.monaco-wrapper .monaco-editor *,
+.editor-wrapper .monaco-editor,
+.editor-wrapper .monaco-editor * {
+  border-color: transparent !important;
+  outline-color: transparent !important;
 }
 
-/* The first div inside section (react wrapper div) */
-.monaco-wrapper>section>div,
-.editor-wrapper>section>div {
-  flex: 1 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  position: relative !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  min-height: 0 !important;
-}
-
-/* The monaco-editor div itself */
-.monaco-wrapper>section>div>.monaco-editor,
-.editor-wrapper>section>div>.monaco-editor {
-  flex: 1 !important;
-  height: 100% !important;
-}
-
-/* Hide any placeholder/loading artifacts that might remain */
-.monaco-wrapper>div:first-child:empty,
-.editor-wrapper>div:first-child:empty {
+/* Hide widgets we disabled via options (backup) */
+.monaco-wrapper .minimap,
+.editor-wrapper .minimap {
   display: none !important;
 }
 
-/* Editor background */
-.monaco-wrapper .monaco-editor-background,
-.editor-wrapper .monaco-editor-background {
-  background: #1e1e1e !important;
+/* Scrollbar theming only */
+.monaco-wrapper .monaco-editor .scrollbar .slider,
+.editor-wrapper .monaco-editor .scrollbar .slider {
+  background: rgba(121, 121, 121, 0.4);
+  border-radius: 4px;
 }
 
-/* Margin (line numbers area) */
-.monaco-wrapper .margin,
-.editor-wrapper .margin {
-  background: #1e1e1e !important;
-}
-
-/* Line numbers */
-.monaco-wrapper .line-numbers,
-.editor-wrapper .line-numbers {
-  color: #858585 !important;
-}
-
-/* Active line number */
-.monaco-wrapper .current-line~.line-numbers,
-.editor-wrapper .current-line~.line-numbers {
-  color: #c6c6c6 !important;
-}
-
-/* Cursor - Allow Monaco's native blink animation to work */
-.monaco-wrapper .cursor,
-.editor-wrapper .cursor,
-.monaco-wrapper .monaco-editor .cursor,
-.editor-wrapper .monaco-editor .cursor {
-  background: #aeafad !important;
-  border-color: #aeafad !important;
-  visibility: visible !important;
-  pointer-events: none !important;
-  /* DO NOT override opacity or transform - Monaco uses these for blinking */
-}
-
-/* Ensure cursor layer is visible and properly positioned */
-.monaco-wrapper .monaco-editor .cursors-layer,
-.editor-wrapper .monaco-editor .cursors-layer {
-  position: absolute !important;
-  z-index: 10 !important;
-}
-
-/* Selection - Ensure selection highlighting is visible */
-.monaco-wrapper .selected-text,
-.editor-wrapper .selected-text,
-.monaco-wrapper .monaco-editor .selected-text,
-.editor-wrapper .monaco-editor .selected-text {
-  background: rgba(38, 79, 120, 0.6) !important;
-}
-
-/* Ensure view-overlays (contains selection and cursor) is visible */
-.monaco-wrapper .monaco-editor .view-overlays,
-.editor-wrapper .monaco-editor .view-overlays {
-  position: absolute !important;
-  z-index: 5 !important;
-}
-
-/* Scrollbar styling */
-.monaco-wrapper .scrollbar,
-.editor-wrapper .scrollbar {
-  background: transparent !important;
-}
-
-.monaco-wrapper .slider,
-.editor-wrapper .slider {
-  background: rgba(121, 121, 121, 0.4) !important;
-  border-radius: 4px !important;
-}
-
-.monaco-wrapper .slider:hover,
-.editor-wrapper .slider:hover {
-  background: rgba(121, 121, 121, 0.7) !important;
-}
-
-/* Hide decorations that cause visual issues */
-/* REMOVED contain: strict - it breaks cursor positioning */
-/* The more specific .monaco-editor .view-overlays rule below handles positioning */
-
-/* CRITICAL: Reset Tailwind's global * styles for Monaco internal elements */
-/* The @layer base { * { @apply border-border outline-ring/50; } } leaks into Monaco */
-.monaco-wrapper *,
-.editor-wrapper *,
-.monaco-wrapper .monaco-editor *,
-.editor-wrapper .monaco-editor * {
-  border-color: transparent;
-  outline-color: transparent;
-}
-
-/* CRITICAL: Hide Monaco's internal input elements that can "leak" visually */
-/* These are invisible input handlers for IME/keyboard/accessibility */
-.monaco-wrapper .monaco-editor textarea.ime-text-area,
-.editor-wrapper .monaco-editor textarea.ime-text-area,
-.monaco-wrapper .monaco-editor .inputarea,
-.editor-wrapper .monaco-editor .inputarea,
-.monaco-wrapper .monaco-editor textarea,
-.editor-wrapper .monaco-editor textarea {
-  opacity: 0 !important;
-  background: transparent !important;
-  color: transparent !important;
-  caret-color: transparent !important;
-  border: none !important;
-  border-width: 0 !important;
-  border-style: none !important;
-  border-color: transparent !important;
-  outline: none !important;
-  outline-width: 0 !important;
-  box-shadow: none !important;
-  resize: none !important;
-  appearance: none !important;
-  -webkit-appearance: none !important;
-}
-
-/* Hide native edit context overlay */
-.monaco-wrapper .monaco-editor .native-edit-context,
-.editor-wrapper .monaco-editor .native-edit-context,
-.monaco-wrapper .monaco-editor [class*="native-edit"],
-.editor-wrapper .monaco-editor [class*="native-edit"] {
-  opacity: 0 !important;
-  background: transparent !important;
-  color: transparent !important;
-  border: none !important;
-  border-width: 0 !important;
-  outline: none !important;
-  pointer-events: none !important;
-}
-
-/* Fix for any absolute positioned children */
-.monaco-wrapper [class*="monaco-"],
-.editor-wrapper [class*="monaco-"] {
-  box-sizing: border-box;
-}
-
-/* Prevent text selection outside editor */
-.monaco-wrapper {
-  user-select: none;
-}
-
-.monaco-wrapper .view-lines {
-  user-select: text;
+.monaco-wrapper .monaco-editor .scrollbar .slider:hover,
+.editor-wrapper .monaco-editor .scrollbar .slider:hover {
+  background: rgba(121, 121, 121, 0.7);
 }
 
 /* Responsive improvements */
@@ -812,54 +446,5 @@
 
   .chat-panel {
     max-height: 300px;
-  }
-}
-
-/* Small laptop optimizations (1024px - 1366px) */
-@media (min-width: 1024px) and (max-width: 1366px) {
-  .monaco-wrapper,
-  .editor-wrapper {
-    min-height: 200px;
-  }
-
-  /* Reduce padding on interview cards */
-  .interview-card {
-    padding: 0.5rem;
-  }
-
-  /* Smaller fonts for panels */
-  .panel-content {
-    font-size: 0.75rem;
-  }
-}
-
-/* Code viewer overlay optimization */
-@media (max-width: 1023px) {
-  /* On mobile/tablet, code viewer is overlay only - no margin shift */
-  .code-viewer-open {
-    margin-left: 0 !important;
-  }
-}
-
-/* Monaco editor responsive font sizes */
-@media (max-width: 640px) {
-  .monaco-wrapper .monaco-editor,
-  .editor-wrapper .monaco-editor {
-    font-size: 12px !important;
-  }
-}
-
-@media (min-width: 641px) and (max-width: 1024px) {
-  .monaco-wrapper .monaco-editor,
-  .editor-wrapper .monaco-editor {
-    font-size: 13px !important;
-  }
-}
-
-/* Ensure editor takes full available height on smaller screens */
-@media (max-height: 800px) {
-  .monaco-wrapper,
-  .editor-wrapper {
-    min-height: 180px;
   }
 }
