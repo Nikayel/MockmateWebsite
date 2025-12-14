@@ -17,12 +17,14 @@ export async function getUserIdFromRequest(request: NextRequest): Promise<string
     const authHeader = request.headers.get("authorization")
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      console.warn("⚠️ No authorization header or invalid format")
       return null
     }
 
     const token = authHeader.substring(7) // Remove "Bearer " prefix
 
     if (!token) {
+      console.warn("⚠️ Empty token after Bearer prefix")
       return null
     }
 
@@ -37,12 +39,32 @@ export async function getUserIdFromRequest(request: NextRequest): Promise<string
 
       // Return user ID from verified token
       return decodedToken.uid
-    } catch (verificationError) {
-      console.error("Token verification failed:", verificationError)
+    } catch (verificationError: any) {
+      console.error("❌ Token verification failed:")
+      console.error("  Error code:", verificationError?.code)
+      console.error("  Error message:", verificationError?.message)
+
+      // Provide more specific error information
+      if (verificationError?.code === "auth/argument-error") {
+        console.error("  Issue: Invalid token format")
+      } else if (verificationError?.code === "auth/id-token-expired") {
+        console.error("  Issue: Token has expired")
+      } else if (verificationError?.code === "auth/id-token-revoked") {
+        console.error("  Issue: Token has been revoked")
+      } else if (verificationError?.code === "auth/invalid-id-token") {
+        console.error("  Issue: Token is invalid or malformed")
+      } else if (verificationError?.code === "auth/project-not-found") {
+        console.error("  Issue: Firebase project not found - check Admin SDK initialization")
+      }
+
       return null
     }
   } catch (error) {
-    console.error("Error verifying token:", error)
+    console.error("❌ Error verifying token:", error)
+    if (error instanceof Error) {
+      console.error("  Error name:", error.name)
+      console.error("  Error message:", error.message)
+    }
     return null
   }
 }
