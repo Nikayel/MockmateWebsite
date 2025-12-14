@@ -74,15 +74,15 @@ function CodeViewerSidePanelInner({
 
   return (
     <>
-      {/* Backdrop overlay for mobile/tablet - click to close */}
+      {/* Backdrop overlay - click to close (darker on mobile, subtle on desktop) */}
       <div
-        className="fixed inset-0 bg-black/50 z-[39] lg:hidden"
+        className="fixed inset-0 bg-black/60 lg:bg-black/30 z-[39] backdrop-blur-sm lg:backdrop-blur-none"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Side Panel - Responsive widths */}
-      <div className="fixed left-0 top-0 h-full w-[calc(100vw-60px)] sm:w-[320px] md:w-[380px] lg:w-[420px] xl:w-[480px] 2xl:w-[520px] max-w-[520px] z-[40] bg-gray-900 border-r border-gray-700 shadow-2xl flex flex-col transition-transform duration-300 ease-in-out">
+      {/* Side Panel - Responsive widths - Pure overlay, doesn't shift content */}
+      <div className="fixed left-0 top-0 h-full w-[calc(100vw-48px)] sm:w-[300px] md:w-[340px] lg:w-[380px] xl:w-[420px] 2xl:w-[460px] max-w-[460px] z-[40] bg-gray-900 border-r border-gray-700 shadow-2xl flex flex-col transition-transform duration-300 ease-in-out animate-in slide-in-from-left">
         {/* Header */}
         <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-700 bg-gray-800/50 flex-shrink-0">
           <div className="flex items-center gap-2 flex-1 min-w-0">
