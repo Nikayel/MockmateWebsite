@@ -105,20 +105,39 @@ export default function ProfilePage() {
           })
         }
 
-        // Fetch usage data from Firestore
+        // Fetch usage data - use checkUsageLimit for consistency with dashboard
         try {
-          const usageQuery = query(
-            collection(db, "profile_quota"),
-            where("user_id", "==", firebaseUser.uid)
-          )
-          const usageSnap = await getDocs(usageQuery)
+          const { checkUsageLimit } = await import("@/lib/firestore-helpers")
+          const usageData = await checkUsageLimit(firebaseUser.uid)
 
-          if (!usageSnap.empty) {
-            setUsage(usageSnap.docs[0].data() as ProfileQuota)
+          // Convert to ProfileQuota format for compatibility
+          const profileQuota: ProfileQuota = {
+            id: `quota_${firebaseUser.uid}`,
+            user_id: firebaseUser.uid,
+            sessions_used: usageData.used,
+            sessions_limit: usageData.limit,
+            free_opens_remaining: usageData.freeOpensRemaining || 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           }
+          setUsage(profileQuota)
         } catch (usageError) {
           console.error("Error fetching usage:", usageError)
-          // Usage data might not exist for new users, so don't show error
+          // Fallback to direct Firestore query if checkUsageLimit fails
+          try {
+            const usageQuery = query(
+              collection(db, "profile_quota"),
+              where("user_id", "==", firebaseUser.uid)
+            )
+            const usageSnap = await getDocs(usageQuery)
+
+            if (!usageSnap.empty) {
+              setUsage(usageSnap.docs[0].data() as ProfileQuota)
+            }
+          } catch (fallbackError) {
+            console.error("Error in fallback usage fetch:", fallbackError)
+            // Usage data might not exist for new users, so don't show error
+          }
         }
       } catch (error) {
         console.error("Error loading user data:", error)
