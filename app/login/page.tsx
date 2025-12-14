@@ -8,12 +8,12 @@ import { Badge } from "@/components/ui/badge"
 import { Github, Shield, FolderSyncIcon as Sync, BarChart3, Star, ArrowRight, Terminal, CheckCircle } from "lucide-react"
 import { signInWithGitHub, signInWithGoogle } from "@/lib/auth"
 import { createOrUpdateProfile } from "@/lib/firestore-helpers"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { toast } from "sonner"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 
-export default function LoginPage() {
+function LoginPageContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [authStatus, setAuthStatus] = useState<"idle" | "authenticating" | "creating-profile" | "complete">("idle")
   const [authProvider, setAuthProvider] = useState<"github" | "google" | null>(null)
@@ -24,11 +24,11 @@ export default function LoginPage() {
   // Check if user is already logged in and redirect them
   // Use useAuth hook instead of duplicate listener to avoid conflicts
   const { firebaseUser, initialized } = useAuth()
-  
+
   useEffect(() => {
     // Only redirect if auth is initialized and user exists
     if (!initialized || !firebaseUser) return
-    
+
     // User is already logged in, redirect them
     const savedRedirect = localStorage.getItem("auth_redirect")
     if (savedRedirect) {
@@ -115,7 +115,7 @@ export default function LoginPage() {
           }
         }
       }
-      
+
       handleProfileCreation()
     }
   }, [router, redirect, authStatus, firebaseUser])
@@ -125,7 +125,7 @@ export default function LoginPage() {
       setIsLoading(true)
       setAuthStatus("authenticating")
       setAuthProvider("github")
-      
+
       // Store redirect in localStorage for callback to use
       if (redirect) {
         localStorage.setItem("auth_redirect", redirect)
@@ -151,7 +151,7 @@ export default function LoginPage() {
       setIsLoading(true)
       setAuthStatus("authenticating")
       setAuthProvider("google")
-      
+
       // Store redirect in localStorage for callback to use
       if (redirect) {
         localStorage.setItem("auth_redirect", redirect)
@@ -175,7 +175,7 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen bg-black">
       <Header />
-      
+
       {/* Professional Loading Overlay */}
       {(authStatus === "authenticating" || authStatus === "creating-profile" || authStatus === "complete") && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -208,26 +208,23 @@ export default function LoginPage() {
                 {/* Progress Steps */}
                 <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
                   <div className={`flex items-center space-x-2 sm:space-x-3 ${authStatus !== "idle" ? "opacity-100" : "opacity-50"}`}>
-                    <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center ${
-                      authStatus === "authenticating" || authStatus === "creating-profile" || authStatus === "complete"
+                    <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center ${authStatus === "authenticating" || authStatus === "creating-profile" || authStatus === "complete"
                         ? "bg-[#00d9ff] text-white"
                         : "bg-gray-700 text-gray-400"
-                    }`}>
+                      }`}>
                       {authStatus !== "idle" && <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />}
                     </div>
                     <span className="text-xs sm:text-sm text-gray-300">Authentication</span>
                   </div>
 
-                  <div className={`flex items-center space-x-2 sm:space-x-3 ${
-                    authStatus === "creating-profile" || authStatus === "complete" ? "opacity-100" : "opacity-50"
-                  }`}>
-                    <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center ${
-                      authStatus === "creating-profile" || authStatus === "complete"
+                  <div className={`flex items-center space-x-2 sm:space-x-3 ${authStatus === "creating-profile" || authStatus === "complete" ? "opacity-100" : "opacity-50"
+                    }`}>
+                    <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center ${authStatus === "creating-profile" || authStatus === "complete"
                         ? "bg-[#00d9ff] text-white"
                         : authStatus === "authenticating"
-                        ? "bg-[#00d9ff]/20 border-2 border-[#00d9ff] animate-pulse"
-                        : "bg-gray-700 text-gray-400"
-                    }`}>
+                          ? "bg-[#00d9ff]/20 border-2 border-[#00d9ff] animate-pulse"
+                          : "bg-gray-700 text-gray-400"
+                      }`}>
                       {authStatus === "creating-profile" || authStatus === "complete" ? (
                         <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                       ) : authStatus === "authenticating" ? (
@@ -237,16 +234,14 @@ export default function LoginPage() {
                     <span className="text-xs sm:text-sm text-gray-300">Profile Setup</span>
                   </div>
 
-                  <div className={`flex items-center space-x-2 sm:space-x-3 ${
-                    authStatus === "complete" ? "opacity-100" : "opacity-50"
-                  }`}>
-                    <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center ${
-                      authStatus === "complete"
+                  <div className={`flex items-center space-x-2 sm:space-x-3 ${authStatus === "complete" ? "opacity-100" : "opacity-50"
+                    }`}>
+                    <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center ${authStatus === "complete"
                         ? "bg-[#00d9ff] text-white"
                         : authStatus === "creating-profile"
-                        ? "bg-[#00d9ff]/20 border-2 border-[#00d9ff] animate-pulse"
-                        : "bg-gray-700 text-gray-400"
-                    }`}>
+                          ? "bg-[#00d9ff]/20 border-2 border-[#00d9ff] animate-pulse"
+                          : "bg-gray-700 text-gray-400"
+                      }`}>
                       {authStatus === "complete" ? (
                         <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                       ) : authStatus === "creating-profile" ? (
@@ -256,15 +251,14 @@ export default function LoginPage() {
                     <span className="text-xs sm:text-sm text-gray-300">Ready to go!</span>
                   </div>
                 </div>
-                
+
                 {/* Loading Bar */}
                 <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
-                  <div 
-                    className={`h-full bg-gradient-to-r from-[#00d9ff] to-[#ff8c69] transition-all duration-500 ${
-                      authStatus === "authenticating" ? "w-1/3" :
-                      authStatus === "creating-profile" ? "w-2/3" :
-                      authStatus === "complete" ? "w-full" : "w-0"
-                    }`}
+                  <div
+                    className={`h-full bg-gradient-to-r from-[#00d9ff] to-[#ff8c69] transition-all duration-500 ${authStatus === "authenticating" ? "w-1/3" :
+                        authStatus === "creating-profile" ? "w-2/3" :
+                          authStatus === "complete" ? "w-full" : "w-0"
+                      }`}
                   ></div>
                 </div>
               </CardContent>
@@ -558,5 +552,17 @@ export default function LoginPage() {
 
       <Footer />
     </main>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen bg-black flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
+      </main>
+    }>
+      <LoginPageContent />
+    </Suspense>
   )
 }

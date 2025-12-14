@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { db } from "@/lib/firebase"
-import { collection, query, where, getDocs, orderBy, limit as firestoreLimit, Timestamp } from "firebase/firestore"
+import { adminDb } from "@/lib/firebase-admin"
+import {
+  getFirebaseAnalyticsOverview,
+  getFirebaseAnalyticsEvents,
+  getFirebaseAnalyticsAcquisition,
+  getFirebaseAnalyticsConversions,
+} from "@/lib/firebase-analytics-admin"
 
 /**
  * Admin Analytics API
@@ -11,6 +16,18 @@ import { collection, query, where, getDocs, orderBy, limit as firestoreLimit, Ti
 
 export async function GET(request: NextRequest) {
   try {
+    // Verify Admin SDK is initialized
+    if (!adminDb) {
+      console.error("Firebase Admin SDK not initialized")
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Firebase Admin SDK not initialized. Check server configuration."
+        },
+        { status: 500 }
+      )
+    }
+
     // TODO: Add admin authentication check
     // const isAdmin = await verifyAdminAccess(request)
     // if (!isAdmin) {
@@ -39,8 +56,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch all users
-    const profilesSnapshot = await getDocs(collection(db, "profiles"))
-    const totalUsers = profilesSnapshot.size
+    let profilesSnapshot
+    try {
+      profilesSnapshot = await adminDb.collection("profiles").get()
+    } catch (error) {
+      console.error("Error fetching profiles:", error)
+      profilesSnapshot = { size: 0, docs: [] } as any
+    }
+    const totalUsers = profilesSnapshot.size || 0
 
     // Count by subscription tier
     const tierCounts = {
@@ -49,23 +72,33 @@ export async function GET(request: NextRequest) {
       enterprise: 0,
     }
 
-    profilesSnapshot.forEach((doc) => {
-      const profile = doc.data()
-      const tier = profile.subscription_tier || "free"
-      tierCounts[tier as keyof typeof tierCounts]++
-    })
+    if (profilesSnapshot.docs) {
+      profilesSnapshot.docs.forEach((doc: any) => {
+        const profile = doc.data()
+        const tier = profile.subscription_tier || "free"
+        if (tier in tierCounts) {
+          tierCounts[tier as keyof typeof tierCounts]++
+        }
+      })
+    }
 
     // Fetch sessions (with time range filter if applicable)
-    let sessionsQuery = query(collection(db, "interview_sessions"))
-    if (startDate) {
-      sessionsQuery = query(
-        sessionsQuery,
-        where("started_at", ">=", startDate.toISOString())
-      )
+    let sessionsSnapshot
+    try {
+      if (startDate) {
+        sessionsSnapshot = await adminDb
+          .collection("interview_sessions")
+          .where("started_at", ">=", startDate.toISOString())
+          .get()
+      } else {
+        sessionsSnapshot = await adminDb.collection("interview_sessions").get()
+      }
+    } catch (error) {
+      console.error("Error fetching sessions:", error)
+      sessionsSnapshot = { size: 0, docs: [] } as any
     }
-    const sessionsSnapshot = await getDocs(sessionsQuery)
 
-    const totalSessions = sessionsSnapshot.size
+    const totalSessions = sessionsSnapshot.size || 0
     let completedSessions = 0
     let totalPerformanceScore = 0
     let sessionsWithScore = 0
@@ -73,57 +106,67 @@ export async function GET(request: NextRequest) {
     const sessionsByType: Record<string, number> = {}
     const sessionsByDifficulty: Record<string, number> = {}
 
-    sessionsSnapshot.forEach((doc) => {
-      const session = doc.data()
+    if (sessionsSnapshot.docs) {
+      sessionsSnapshot.docs.forEach((doc: any) => {
+        const session = doc.data()
 
-      if (session.completed_at) {
-        completedSessions++
-      }
+        if (session.completed_at) {
+          completedSessions++
+        }
 
-      if (session.performance_score !== undefined) {
-        totalPerformanceScore += session.performance_score
-        sessionsWithScore++
-      }
+        if (session.performance_score !== undefined) {
+          totalPerformanceScore += session.performance_score
+          sessionsWithScore++
+        }
 
-      // Count by type
-      const type = session.type || "unknown"
-      sessionsByType[type] = (sessionsByType[type] || 0) + 1
+        // Count by type
+        const type = session.type || "unknown"
+        sessionsByType[type] = (sessionsByType[type] || 0) + 1
 
-      // Count by difficulty
-      const difficulty = session.difficulty || "unknown"
-      sessionsByDifficulty[difficulty] = (sessionsByDifficulty[difficulty] || 0) + 1
-    })
+        // Count by difficulty
+        const difficulty = session.difficulty || "unknown"
+        sessionsByDifficulty[difficulty] = (sessionsByDifficulty[difficulty] || 0) + 1
+      })
+    }
 
     const avgPerformanceScore = sessionsWithScore > 0
       ? Math.round(totalPerformanceScore / sessionsWithScore)
       : 0
 
     // Fetch analytics events
-    let eventsQuery = query(collection(db, "analytics_events"))
-    if (startDate) {
-      eventsQuery = query(
-        eventsQuery,
-        where("timestamp", ">=", startDate.toISOString())
-      )
+    let eventsSnapshot
+    try {
+      if (startDate) {
+        eventsSnapshot = await adminDb
+          .collection("analytics_events")
+          .where("timestamp", ">=", startDate.toISOString())
+          .get()
+      } else {
+        eventsSnapshot = await adminDb.collection("analytics_events").get()
+      }
+    } catch (error) {
+      console.error("Error fetching analytics events:", error)
+      eventsSnapshot = { size: 0, docs: [] } as any
     }
-    const eventsSnapshot = await getDocs(eventsQuery)
 
     const eventCounts: Record<string, number> = {}
     let totalCodeExecutions = 0
     let passedCodeExecutions = 0
 
-    eventsSnapshot.forEach((doc) => {
-      const event = doc.data()
-      const eventName = event.event_name || "unknown"
-      eventCounts[eventName] = (eventCounts[eventName] || 0) + 1
+    if (eventsSnapshot.docs) {
+      eventsSnapshot.docs.forEach((doc: any) => {
+        const event = doc.data()
+        const eventName = event.event_name || "unknown"
+        eventCounts[eventName] = (eventCounts[eventName] || 0) + 1
 
-      if (eventName === "code_execution") {
-        totalCodeExecutions++
-        if (event.properties?.passed) {
-          passedCodeExecutions++
+        if (eventName === "code_execution") {
+          totalCodeExecutions++
+          if (event.properties?.passed) {
+            passedCodeExecutions++
+          }
         }
-      }
-    })
+      })
+    }
 
     const codeExecutionPassRate = totalCodeExecutions > 0
       ? Math.round((passedCodeExecutions / totalCodeExecutions) * 100)
@@ -132,21 +175,70 @@ export async function GET(request: NextRequest) {
     // Calculate revenue metrics (assuming $25 for Pro)
     const mrr = tierCounts.pro * 25 // Monthly Recurring Revenue
 
-    // Fetch recent errors (last 100)
-    const errorsQuery = query(
-      collection(db, "analytics_events"),
-      where("event_name", "==", "error"),
-      orderBy("timestamp", "desc"),
-      firestoreLimit(100)
+    // Fetch recent errors (last 100) - handle potential index error gracefully
+    let recentErrors: Array<{
+      timestamp: string
+      errorType?: string
+      errorMessage?: string
+      page?: string
+      userId?: string
+    }> = []
+
+    try {
+      const errorsSnapshot = await adminDb
+        .collection("analytics_events")
+        .where("event_name", "==", "error")
+        .orderBy("timestamp", "desc")
+        .limit(100)
+        .get()
+
+      recentErrors = errorsSnapshot.docs.map(doc => {
+        const data = doc.data()
+        return {
+          timestamp: data.timestamp,
+          errorType: data.properties?.errorType,
+          errorMessage: data.properties?.errorMessage,
+          page: data.properties?.page,
+          userId: data.properties?.userId,
+        }
+      })
+    } catch (error) {
+      console.error("Error fetching errors (may need composite index):", error)
+      // Try without orderBy as fallback
+      try {
+        const errorsSnapshot = await adminDb
+          .collection("analytics_events")
+          .where("event_name", "==", "error")
+          .limit(100)
+          .get()
+
+        recentErrors = errorsSnapshot.docs
+          .map(doc => {
+            const data = doc.data()
+            return {
+              timestamp: data.timestamp,
+              errorType: data.properties?.errorType,
+              errorMessage: data.properties?.errorMessage,
+              page: data.properties?.page,
+              userId: data.properties?.userId,
+            }
+          })
+          .sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""))
+          .slice(0, 100)
+      } catch (fallbackError) {
+        console.error("Error fetching errors (fallback):", fallbackError)
+      }
+    }
+
+    // Fetch Firebase Analytics data (if configured)
+    const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : timeRange === "90d" ? 90 : 365
+    const firebaseAnalytics = await getFirebaseAnalyticsOverview(days)
+    const firebaseEvents = await getFirebaseAnalyticsEvents(
+      ["sign_up", "login", "session_start", "session_complete", "purchase", "code_execution", "ai_interaction"],
+      days
     )
-    const errorsSnapshot = await getDocs(errorsQuery)
-    const recentErrors = errorsSnapshot.docs.map(doc => ({
-      timestamp: doc.data().timestamp,
-      errorType: doc.data().properties?.errorType,
-      errorMessage: doc.data().properties?.errorMessage,
-      page: doc.data().properties?.page,
-      userId: doc.data().properties?.userId,
-    }))
+    const firebaseAcquisition = await getFirebaseAnalyticsAcquisition(days)
+    const firebaseConversions = await getFirebaseAnalyticsConversions(days)
 
     return NextResponse.json({
       success: true,
@@ -169,7 +261,7 @@ export async function GET(request: NextRequest) {
           arr: mrr * 12, // Annual Recurring Revenue
         },
         analytics: {
-          totalEvents: eventsSnapshot.size,
+          totalEvents: eventsSnapshot.size || 0,
           byEventType: eventCounts,
           codeExecutions: {
             total: totalCodeExecutions,
@@ -178,15 +270,35 @@ export async function GET(request: NextRequest) {
           },
         },
         errors: {
-          total: errorsSnapshot.size,
+          total: recentErrors.length,
           recent: recentErrors,
         },
+        // Firebase Analytics data (if available)
+        firebaseAnalytics: firebaseAnalytics ? {
+          activeUsers: firebaseAnalytics.activeUsers,
+          newUsers: firebaseAnalytics.newUsers,
+          pageViews: firebaseAnalytics.pageViews,
+          sessions: firebaseAnalytics.sessions,
+          avgSessionDuration: firebaseAnalytics.avgSessionDuration,
+          bounceRate: firebaseAnalytics.bounceRate,
+          engagementRate: firebaseAnalytics.engagementRate,
+          eventsByType: firebaseAnalytics.eventsByType,
+          acquisition: firebaseAcquisition || [],
+          conversions: firebaseConversions || {},
+        } : null,
       },
     })
   } catch (error) {
     console.error("Admin analytics API error:", error)
+    const errorMessage = error instanceof Error ? error.message : "Failed to fetch analytics"
+    const errorStack = error instanceof Error ? error.stack : undefined
+    console.error("Error details:", { errorMessage, errorStack })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch analytics" },
+      {
+        success: false,
+        error: errorMessage,
+        details: process.env.NODE_ENV === "development" ? errorStack : undefined
+      },
       { status: 500 }
     )
   }
