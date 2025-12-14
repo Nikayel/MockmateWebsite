@@ -105,6 +105,15 @@ export async function POST(request: NextRequest) {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session
 
+    console.log(`📦 Processing checkout.session.completed event`)
+    console.log(`   Session ID: ${session.id}`)
+    console.log(`   Payment Status: ${session.payment_status}`)
+    console.log(`   Mode: ${session.mode}`)
+    console.log(`   Customer: ${session.customer}`)
+    console.log(`   Subscription: ${session.subscription}`)
+    console.log(`   Metadata:`, session.metadata)
+    console.log(`   Client Reference ID: ${session.client_reference_id}`)
+
     // Process if payment was successful OR no payment required (100% discount coupon)
     // When a 100% discount coupon is applied, payment_status is "no_payment_required" not "paid"
     const paymentSuccessful = session.payment_status === "paid" || session.payment_status === "no_payment_required"
@@ -114,7 +123,19 @@ export async function POST(request: NextRequest) {
       const userId = session.metadata?.userId || session.client_reference_id
 
       if (userId) {
+        console.log(`✅ Found userId: ${userId}`)
         try {
+          // First, check if profile exists
+          const profileRef = adminDb.collection("profiles").doc(userId)
+          const profileSnap = await profileRef.get()
+
+          if (!profileSnap.exists) {
+            console.error(`❌ Profile does not exist for userId: ${userId}`)
+            console.error(`   Cannot update subscription - profile must exist first`)
+            // Don't return error - webhook will be retried, and profile might be created later
+            // But log this prominently so it can be fixed
+          }
+
           // Fetch subscription details to get dates
           let subscriptionStartDate: string | undefined
           let currentPeriodEnd: string | undefined
@@ -130,39 +151,81 @@ export async function POST(request: NextRequest) {
               currentPeriodEnd = subscription.current_period_end
                 ? new Date(subscription.current_period_end * 1000).toISOString()
                 : undefined
+              console.log(`✅ Retrieved subscription details: ${subscription.id}, status: ${subscription.status}`)
             } catch (subError) {
-              console.error("Error fetching subscription details:", subError)
+              console.error("❌ Error fetching subscription details:", subError)
               // Continue without dates if fetch fails
             }
           }
 
           // Use Admin SDK to update profile (bypasses security rules)
-          const profileRef = adminDb.collection("profiles").doc(userId)
-          await profileRef.set({
+          // Use update() instead of set() to ensure we don't overwrite other fields
+          // But first check if document exists
+          const updateData: any = {
             subscription_tier: "pro",
             subscription_platform: session.metadata?.platform || "website",
             stripe_customer_id: session.customer as string,
             stripe_subscription_id: session.subscription as string,
             subscription_status: "active",
-            subscription_start_date: subscriptionStartDate,
-            subscription_current_period_end: currentPeriodEnd,
             updated_at: new Date().toISOString(),
-          }, { merge: true })
+          }
+
+          if (subscriptionStartDate) {
+            updateData.subscription_start_date = subscriptionStartDate
+          }
+          if (currentPeriodEnd) {
+            updateData.subscription_current_period_end = currentPeriodEnd
+          }
+
+          if (profileSnap.exists) {
+            // Document exists - use update to preserve other fields
+            await profileRef.update(updateData)
+            console.log(`✅ Updated existing profile for user ${userId}`)
+          } else {
+            // Document doesn't exist - use set with merge
+            // But we need at least email and id for a valid profile
+            const existingData = profileSnap.data() || {}
+            await profileRef.set({
+              id: userId,
+              email: existingData.email || session.customer_email || "",
+              ...updateData,
+              created_at: existingData.created_at || new Date().toISOString(),
+            }, { merge: true })
+            console.log(`⚠️ Profile did not exist - created with subscription data for user ${userId}`)
+            console.log(`   WARNING: Profile may be incomplete - email: ${existingData.email || session.customer_email || "MISSING"}`)
+          }
 
           // Update quota to reflect Pro subscription (35 sessions)
           await updateQuotaForSubscriptionTierAdmin(userId, "pro")
 
-          console.log(`✅ User ${userId} upgraded to Pro via Stripe`)
+          console.log(`✅ User ${userId} upgraded to Pro via Stripe webhook`)
           console.log(`   Payment Status: ${session.payment_status}`)
           console.log(`   Subscription ID: ${session.subscription}`)
           console.log(`   Customer ID: ${session.customer}`)
           console.log(`   Quota updated to Pro limit (35 sessions)`)
+
+          // Verify the update worked
+          const verifySnap = await profileRef.get()
+          if (verifySnap.exists) {
+            const verifyData = verifySnap.data()
+            console.log(`✅ Verification - Profile subscription_tier: ${verifyData?.subscription_tier}`)
+            if (verifyData?.subscription_tier !== "pro") {
+              console.error(`❌ CRITICAL: Profile update failed! subscription_tier is still: ${verifyData?.subscription_tier}`)
+            }
+          }
         } catch (error) {
           console.error("❌ Error updating user profile:", error)
+          if (error instanceof Error) {
+            console.error("   Error name:", error.name)
+            console.error("   Error message:", error.message)
+            console.error("   Error stack:", error.stack)
+          }
           return NextResponse.json({ error: "Failed to update profile" }, { status: 500 })
         }
       } else {
         console.warn(`⚠️ checkout.session.completed event missing userId. Session ID: ${session.id}`)
+        console.warn(`   Metadata:`, session.metadata)
+        console.warn(`   Client Reference ID: ${session.client_reference_id}`)
       }
     } else {
       console.log(`ℹ️ Skipping checkout.session.completed - payment_status: ${session.payment_status}, mode: ${session.mode}`)
@@ -187,8 +250,8 @@ export async function POST(request: NextRequest) {
         // Check subscription status
         const isActive = subscription.status === "active"
         const isCanceled = event.type === "customer.subscription.deleted" ||
-                          subscription.status === "canceled" ||
-                          subscription.status === "unpaid"
+          subscription.status === "canceled" ||
+          subscription.status === "unpaid"
 
         if (isCanceled) {
           // Downgrade to free tier
