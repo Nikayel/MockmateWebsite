@@ -180,6 +180,7 @@ export default function InterviewPage() {
   const editorContainerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<any>(null) // Monaco editor instance ref
   const [editorHeight, setEditorHeight] = useState(400)
+  const previousCodeRef = useRef<string>(code)
 
   // Monaco Editor cleanup on unmount - dispose all models to prevent memory leaks
   useEffect(() => {
@@ -703,6 +704,18 @@ Let's continue!`
       clearInterval(autoSaveInterval)
     }
   }, [isInterviewStarted, selectedScenario, firebaseUser, code, chatMessages, interviewerMessages, selectedLanguage, elapsedTime, testResults, workspaceContext, currentSessionId])
+
+  // #region agent log
+  // Track when code value changes externally (not from user typing)
+  useEffect(() => {
+    if (previousCodeRef.current !== code && editorRef.current) {
+      const cursorPos = editorRef.current.getPosition()
+      const selection = editorRef.current.getSelection()
+      fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:708', message: 'Code value changed externally', data: { oldLength: previousCodeRef.current.length, newLength: code.length, cursorPos, selection }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'E' }) }).catch(() => { });
+      previousCodeRef.current = code
+    }
+  }, [code])
+  // #endregion
 
   // Restore auto-saved session on mount (check both localStorage and Firestore)
   useEffect(() => {
@@ -2318,6 +2331,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           language={selectedLanguage}
                           value={code}
                           onMount={(editor, monaco) => {
+                            // #region agent log
+                            fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:2320', message: 'Editor onMount called', data: { hasEditor: !!editor, hasMonaco: !!monaco }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
+                            // #endregion
+
                             // Dispose old editor reference if exists
                             if (editorRef.current && editorRef.current !== editor) {
                               try {
@@ -2340,8 +2357,54 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                 }
                               }
                             })
+
+                            // #region agent log
+                            // Track cursor position changes
+                            const logCursorPosition = () => {
+                              try {
+                                const position = editor.getPosition()
+                                const selection = editor.getSelection()
+                                fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:2343', message: 'Cursor position update', data: { position, selection, hasFocus: editor.hasTextFocus() }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
+                              } catch (e) { }
+                            };
+                            // #endregion
+
+                            // #region agent log
+                            // Track click events on editor container
+                            const editorDom = editor.getContainerDomNode()
+                            const handleClick = (e: MouseEvent) => {
+                              const position = editor.getPosition()
+                              const selection = editor.getSelection()
+                              fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:2343', message: 'Editor click event', data: { clickX: e.clientX, clickY: e.clientY, position, selection, hasFocus: editor.hasTextFocus() }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
+                            };
+                            editorDom.addEventListener('click', handleClick);
+                            // #endregion
+
+                            // #region agent log
+                            // Track cursor position on selection change
+                            editor.onDidChangeCursorPosition((e) => {
+                              fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:2343', message: 'Cursor position changed', data: { position: e.position, reason: e.reason }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
+                            });
+                            // #endregion
+
+                            // #region agent log
+                            // Track focus changes
+                            editor.onDidFocusEditorText(() => {
+                              const position = editor.getPosition()
+                              fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:2343', message: 'Editor focused', data: { position }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });
+                            });
+                            editor.onDidBlurEditorText(() => {
+                              fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:2343', message: 'Editor blurred', data: {}, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });
+                            });
+                            // #endregion
                           }}
                           onChange={(value, event) => {
+                            // #region agent log
+                            const cursorPosBefore = editorRef.current?.getPosition()
+                            const selectionBefore = editorRef.current?.getSelection()
+                            fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:2344', message: 'onChange called - before update', data: { cursorPosBefore, selectionBefore, valueLength: value?.length, oldCodeLength: code.length, isFlush: event?.isFlush }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'E' }) }).catch(() => { });
+                            // #endregion
+
                             const newCode = value || ""
 
                             // Skip validation for programmatic changes (like language switches)
@@ -2362,6 +2425,14 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             }
 
                             setCode(newCode)
+
+                            // #region agent log
+                            setTimeout(() => {
+                              const cursorPosAfter = editorRef.current?.getPosition()
+                              const selectionAfter = editorRef.current?.getSelection()
+                              fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:2364', message: 'onChange called - after update', data: { cursorPosAfter, selectionAfter, newCodeLength: newCode.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'E' }) }).catch(() => { });
+                            }, 10);
+                            // #endregion
                           }}
                           theme="vs-dark"
                           options={{

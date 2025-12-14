@@ -17,19 +17,26 @@
   --secondary-foreground: oklch(0 0 0);
   --muted: oklch(0.96 0 0);
   --muted-foreground: oklch(0.45 0 0);
-  --accent: oklch(0.73 0.134 210.86); /* Electric Cyan #00d9ff */
+  --accent: oklch(0.73 0.134 210.86);
+  /* Electric Cyan #00d9ff */
   --accent-foreground: oklch(0 0 0);
-  --neural: oklch(0.87 0.184 157.04); /* Success Green #00ff88 */
+  --neural: oklch(0.87 0.184 157.04);
+  /* Success Green #00ff88 */
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(1 0 0);
   --border: oklch(0.9 0 0);
   --input: oklch(0.96 0 0);
   --ring: oklch(0.73 0.134 210.86);
-  --chart-1: oklch(0.73 0.134 210.86); /* Cyan */
-  --chart-2: oklch(0.87 0.184 157.04); /* Green */
-  --chart-3: oklch(0.82 0.162 85.87);  /* Yellow */
-  --chart-4: oklch(0.55 0.25 310);     /* Magenta */
-  --chart-5: oklch(0.45 0.15 270);     /* Purple */
+  --chart-1: oklch(0.73 0.134 210.86);
+  /* Cyan */
+  --chart-2: oklch(0.87 0.184 157.04);
+  /* Green */
+  --chart-3: oklch(0.82 0.162 85.87);
+  /* Yellow */
+  --chart-4: oklch(0.55 0.25 310);
+  /* Magenta */
+  --chart-5: oklch(0.45 0.15 270);
+  /* Purple */
   --radius: 0.625rem;
   --sidebar: oklch(0.98 0 0);
   --sidebar-foreground: oklch(0 0 0);
@@ -43,31 +50,44 @@
 
 .dark {
   /* Neural Minimalism Dark Theme - PRIMARY */
-  --background: oklch(0 0 0); /* Pure black #000000 */
-  --foreground: oklch(1 0 0); /* Pure white #ffffff */
-  --card: oklch(0.039 0 0); /* #0a0a0a */
+  --background: oklch(0 0 0);
+  /* Pure black #000000 */
+  --foreground: oklch(1 0 0);
+  /* Pure white #ffffff */
+  --card: oklch(0.039 0 0);
+  /* #0a0a0a */
   --card-foreground: oklch(1 0 0);
   --popover: oklch(0.039 0 0);
   --popover-foreground: oklch(1 0 0);
   --primary: oklch(1 0 0);
   --primary-foreground: oklch(0 0 0);
-  --secondary: oklch(0.102 0 0); /* #1a1a1a */
+  --secondary: oklch(0.102 0 0);
+  /* #1a1a1a */
   --secondary-foreground: oklch(1 0 0);
   --muted: oklch(0.102 0 0);
   --muted-foreground: oklch(0.45 0 0);
-  --accent: oklch(0.73 0.134 210.86); /* Electric Cyan #00d9ff */
+  --accent: oklch(0.73 0.134 210.86);
+  /* Electric Cyan #00d9ff */
   --accent-foreground: oklch(0 0 0);
-  --neural: oklch(0.87 0.184 157.04); /* Success Green #00ff88 */
-  --destructive: oklch(0.64 0.27 12.57); /* Error Red #ff3366 */
+  --neural: oklch(0.87 0.184 157.04);
+  /* Success Green #00ff88 */
+  --destructive: oklch(0.64 0.27 12.57);
+  /* Error Red #ff3366 */
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.165 0 0); /* #2a2a2a */
+  --border: oklch(0.165 0 0);
+  /* #2a2a2a */
   --input: oklch(0.102 0 0);
   --ring: oklch(0.73 0.134 210.86);
-  --chart-1: oklch(0.73 0.134 210.86); /* Cyan */
-  --chart-2: oklch(0.87 0.184 157.04); /* Green */
-  --chart-3: oklch(0.82 0.162 85.87);  /* Yellow */
-  --chart-4: oklch(0.55 0.25 310);     /* Magenta */
-  --chart-5: oklch(0.45 0.15 270);     /* Purple */
+  --chart-1: oklch(0.73 0.134 210.86);
+  /* Cyan */
+  --chart-2: oklch(0.87 0.184 157.04);
+  /* Green */
+  --chart-3: oklch(0.82 0.162 85.87);
+  /* Yellow */
+  --chart-4: oklch(0.55 0.25 310);
+  /* Magenta */
+  --chart-5: oklch(0.45 0.15 270);
+  /* Purple */
   --sidebar: oklch(0 0 0);
   --sidebar-foreground: oklch(1 0 0);
   --sidebar-primary: oklch(0.73 0.134 210.86);
@@ -126,8 +146,31 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Cursor pointer for all clickable elements */
+  button,
+  a,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  [onclick],
+  .cursor-pointer,
+  [class*="cursor-pointer"] {
+    cursor: pointer;
+  }
+
+  /* Disabled elements should show not-allowed */
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  input[type="button"]:disabled,
+  input[type="submit"]:disabled,
+  input[type="reset"]:disabled {
+    cursor: not-allowed;
   }
 }
 
@@ -135,12 +178,15 @@
 
 /* Neural Pulse - For nodes and connection points */
 @keyframes neural-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow:
       0 0 10px rgba(0, 217, 255, 0.3),
       0 0 20px rgba(0, 217, 255, 0.1);
     transform: scale(1);
   }
+
   50% {
     box-shadow:
       0 0 20px rgba(0, 217, 255, 0.6),
@@ -151,9 +197,12 @@
 
 /* Glow Pulse - Accent glow effect */
 @keyframes glow-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 20px rgba(0, 217, 255, 0.4);
   }
+
   50% {
     box-shadow: 0 0 40px rgba(0, 217, 255, 0.8), 0 0 60px rgba(0, 217, 255, 0.4);
   }
@@ -161,9 +210,12 @@
 
 /* Neural Glow - Success/green glow */
 @keyframes neural-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
   }
+
   50% {
     box-shadow: 0 0 40px rgba(0, 255, 136, 0.8), 0 0 60px rgba(0, 255, 136, 0.4);
   }
@@ -174,6 +226,7 @@
   0% {
     background-position: -200% center;
   }
+
   100% {
     background-position: 200% center;
   }
@@ -181,12 +234,16 @@
 
 /* Float - Gentle floating motion */
 @keyframes float {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0) translateX(0);
   }
+
   25% {
     transform: translateY(-10px) translateX(5px);
   }
+
   75% {
     transform: translateY(5px) translateX(-5px);
   }
@@ -197,6 +254,7 @@
   0% {
     transform: translateY(-100%);
   }
+
   100% {
     transform: translateY(100vh);
   }
@@ -207,6 +265,7 @@
   0% {
     stroke-dashoffset: 1000;
   }
+
   100% {
     stroke-dashoffset: 0;
   }
@@ -219,6 +278,7 @@
     transform: translateY(20px);
     filter: blur(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -228,7 +288,9 @@
 
 /* Magnetic - Button hover effect */
 @keyframes magnetic {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translate(0, 0);
   }
 }
@@ -248,12 +310,10 @@
 }
 
 .animate-shimmer {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(0, 217, 255, 0.1) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(0, 217, 255, 0.1) 50%,
+      transparent 100%);
   background-size: 200% 100%;
   animation: shimmer 3s linear infinite;
 }
@@ -297,6 +357,7 @@
 .interview-card {
   transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
 }
 
 .interview-card:hover {
@@ -314,6 +375,7 @@
 .scenario-card {
   transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
 }
 
 .scenario-card:hover {
@@ -433,9 +495,10 @@
 }
 
 /* Hide any stray decorations */
-.monaco-wrapper .monaco-editor .view-overlays > div,
-.editor-wrapper .monaco-editor .view-overlays > div {
-  contain: strict;
+.monaco-wrapper .monaco-editor .view-overlays>div,
+.editor-wrapper .monaco-editor .view-overlays>div {
+  /* Let Monaco handle positioning of cursor and decorations */
+  /* REMOVED contain - it can interfere with cursor positioning */
 }
 
 /* Specifically target the current-line highlight that may overflow */
@@ -465,8 +528,8 @@
 
 /* Don't hide view-zones completely - it can break cursor positioning */
 /* Only hide if they contain actual content */
-.monaco-wrapper .monaco-editor .view-zones > div:not(:empty),
-.editor-wrapper .monaco-editor .view-zones > div:not(:empty) {
+.monaco-wrapper .monaco-editor .view-zones>div:not(:empty),
+.editor-wrapper .monaco-editor .view-zones>div:not(:empty) {
   height: 0 !important;
   overflow: hidden !important;
 }
@@ -516,7 +579,16 @@
 /* REMOVED: top/padding/margin overrides that break cursor positioning */
 .monaco-wrapper .monaco-editor .view-lines,
 .editor-wrapper .monaco-editor .view-lines {
+  position: relative;
   /* Let Monaco calculate positioning */
+}
+
+/* Ensure view-overlays aligns with view-lines */
+/* Monaco positions view-overlays absolutely to align with view-lines */
+/* REMOVED contain - it interferes with cursor positioning calculations */
+.monaco-wrapper .monaco-editor .view-overlays,
+.editor-wrapper .monaco-editor .view-overlays {
+  /* Let Monaco handle all positioning - don't interfere */
 }
 
 /* Ensure editor scrollable area starts at top */
@@ -550,8 +622,8 @@
 }
 
 /* The react-monaco-editor section wrapper */
-.monaco-wrapper > section,
-.editor-wrapper > section {
+.monaco-wrapper>section,
+.editor-wrapper>section {
   position: absolute !important;
   inset: 0 !important;
   overflow: hidden !important;
@@ -560,8 +632,8 @@
 }
 
 /* The first div inside section (react wrapper div) */
-.monaco-wrapper > section > div,
-.editor-wrapper > section > div {
+.monaco-wrapper>section>div,
+.editor-wrapper>section>div {
   flex: 1 !important;
   display: flex !important;
   flex-direction: column !important;
@@ -572,15 +644,15 @@
 }
 
 /* The monaco-editor div itself */
-.monaco-wrapper > section > div > .monaco-editor,
-.editor-wrapper > section > div > .monaco-editor {
+.monaco-wrapper>section>div>.monaco-editor,
+.editor-wrapper>section>div>.monaco-editor {
   flex: 1 !important;
   height: 100% !important;
 }
 
 /* Hide any placeholder/loading artifacts that might remain */
-.monaco-wrapper > div:first-child:empty,
-.editor-wrapper > div:first-child:empty {
+.monaco-wrapper>div:first-child:empty,
+.editor-wrapper>div:first-child:empty {
   display: none !important;
 }
 
@@ -603,8 +675,8 @@
 }
 
 /* Active line number */
-.monaco-wrapper .current-line ~ .line-numbers,
-.editor-wrapper .current-line ~ .line-numbers {
+.monaco-wrapper .current-line~.line-numbers,
+.editor-wrapper .current-line~.line-numbers {
   color: #c6c6c6 !important;
 }
 
@@ -613,6 +685,11 @@
 .editor-wrapper .cursor {
   background: #aeafad !important;
   border-color: #aeafad !important;
+  position: absolute !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: none !important;
+  transform: none !important;
 }
 
 /* Selection */
@@ -639,10 +716,8 @@
 }
 
 /* Hide decorations that cause visual issues */
-.monaco-wrapper .view-overlays,
-.editor-wrapper .view-overlays {
-  contain: strict;
-}
+/* REMOVED contain: strict - it breaks cursor positioning */
+/* The more specific .monaco-editor .view-overlays rule below handles positioning */
 
 /* CRITICAL: Reset Tailwind's global * styles for Monaco internal elements */
 /* The @layer base { * { @apply border-border outline-ring/50; } } leaks into Monaco */
@@ -719,7 +794,7 @@
     flex-direction: column;
     gap: 1rem;
   }
-  
+
   .chat-panel {
     max-height: 300px;
   }
