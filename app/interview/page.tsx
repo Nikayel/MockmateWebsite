@@ -298,7 +298,7 @@ export default function InterviewPage() {
 
           // Initialize interviewer with welcome message
           const problemType = scenario.type === 'bugfix' ? 'BUG FIX' : scenario.type.toUpperCase()
-          const initialMessage = `Welcome back! You're continuing your practice on **${scenario.title}** - a ${scenario.difficulty} ${problemType} problem.
+          const initialMessage = `Welcome back! I'm Sable, your interviewer. You're continuing your practice on **${scenario.title}** - a ${scenario.difficulty} ${problemType} problem.
 
 You can continue where you left off. Feel free to:
 - Ask me clarifying questions about the requirements
@@ -1332,8 +1332,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
     // Initialize interviewer with welcome message (problem details are now in left panel)
     const problemType = selectedScenario.type === 'bugfix' ? 'BUG FIX' :
-                       selectedScenario.type === 'add-functionality' ? 'ADD FUNCTIONALITY' :
-                       selectedScenario.type.toUpperCase()
+      selectedScenario.type === 'add-functionality' ? 'ADD FUNCTIONALITY' :
+        selectedScenario.type.toUpperCase()
     const initialMessage = `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${selectedScenario.title}**, a ${selectedScenario.difficulty} ${problemType} problem.
 
 Here's what I expect:
@@ -1976,14 +1976,14 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       <div className="flex items-center gap-2 mb-2">
                         <Badge className={`${scenario.type === "dsa" ? "bg-[#00d9ff] text-black" :
                           scenario.type === "bugfix" ? "bg-[#00ff88] text-black" :
-                          scenario.type === "add-functionality" ? "bg-yellow-400 text-black" :
-                          scenario.type === "system-design" ? "bg-purple-500 text-white" :
-                            "bg-gray-500 text-white"
+                            scenario.type === "add-functionality" ? "bg-yellow-400 text-black" :
+                              scenario.type === "system-design" ? "bg-purple-500 text-white" :
+                                "bg-gray-500 text-white"
                           } text-xs font-semibold`}>
                           {scenario.type === "dsa" ? "DSA" :
-                           scenario.type === "bugfix" ? "BUG FIX" :
-                           scenario.type === "add-functionality" ? "ADD FEATURE" :
-                           scenario.type.toUpperCase()}
+                            scenario.type === "bugfix" ? "BUG FIX" :
+                              scenario.type === "add-functionality" ? "ADD FEATURE" :
+                                scenario.type.toUpperCase()}
                         </Badge>
                         <Badge className={`${scenario.difficulty === "easy" ? "bg-green-600" :
                           scenario.difficulty === "medium" ? "bg-yellow-600" :
@@ -2389,7 +2389,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             renderWhitespace: 'none',
                             renderIndentGuides: false,
                             renderLineHighlightOnlyWhenFocus: true,
-                            
+
                             // Disable features
                             contextmenu: false,
                             quickSuggestions: false,
@@ -2405,7 +2405,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             occurrencesHighlight: false,
                             selectionHighlight: false,
                             matchBrackets: 'never',
-                            
+
                             // Styling
                             fontSize: 13,
                             lineHeight: 21,
@@ -2413,11 +2413,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             tabSize: 2,
                             fontLigatures: false,
                             readOnly: !isInterviewStarted || showFeedback,
-                            
+
                             // Padding and layout
                             padding: { top: 0, bottom: 0 },
                             fixedOverflowWidgets: true,
-                            
+
                             // Disable all widgets and popups
                             find: {
                               addExtraSpaceOnTop: false,
@@ -2626,7 +2626,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                   chatMessages.slice(-4).map((msg, index) => (
                                     <div key={index} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
                                       <div className={`max-w-[85%] px-2 py-1 rounded text-[10px] ${msg.type === "user" ? "bg-blue-600/80 text-white" : "bg-gray-700 text-gray-200"}`}>
-                                        {msg.message.length > 100 ? msg.message.substring(0, 100) + "..." : msg.message}
+                                        <p className="break-words whitespace-pre-wrap">{msg.message}</p>
                                       </div>
                                     </div>
                                   ))
