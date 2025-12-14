@@ -63,6 +63,18 @@ interface AnalyticsMetrics {
       userId?: string
     }>
   }
+  firebaseAnalytics?: {
+    activeUsers: number
+    newUsers: number
+    pageViews: number
+    sessions: number
+    avgSessionDuration: number
+    bounceRate: number
+    engagementRate: number
+    eventsByType: Record<string, number>
+    acquisition: Array<{ source: string; users: number }>
+    conversions: Record<string, number>
+  } | null
 }
 
 interface AIUsageData {
@@ -109,12 +121,20 @@ export default function AdminDashboard() {
       try {
         // Fetch main analytics
         const response = await fetch(`/api/admin/analytics?timeRange=${timeRange}`)
+
+        if (!response.ok) {
+          console.error("Analytics API error:", response.status, response.statusText)
+          const errorData = await response.json().catch(() => ({}))
+          console.error("Error details:", errorData)
+          return
+        }
+
         const data = await response.json()
 
-        if (data.success) {
+        if (data.success && data.metrics) {
           setMetrics(data.metrics)
         } else {
-          console.error("Failed to load metrics:", data.error)
+          console.error("Failed to load metrics:", data.error || "Unknown error")
         }
 
         // Fetch AI usage data
@@ -334,8 +354,8 @@ export default function AdminDashboard() {
                           difficulty === "easy"
                             ? "bg-green-600/20 text-green-400 border-green-600/30"
                             : difficulty === "medium"
-                            ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
-                            : "bg-red-600/20 text-red-400 border-red-600/30"
+                              ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
+                              : "bg-red-600/20 text-red-400 border-red-600/30"
                         }
                       >
                         {difficulty.toUpperCase()}
@@ -403,6 +423,113 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
+          {/* Firebase Analytics */}
+          {metrics.firebaseAnalytics && (
+            <>
+              <Card className="bg-gray-900/50 border-gray-700 mb-8">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center">
+                    <BarChart3 className="h-5 w-5 mr-2 text-[#00d9ff]" />
+                    Firebase Analytics
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-gray-800/50 p-4 rounded-lg">
+                      <div className="text-2xl font-bold text-[#00d9ff] mb-1">
+                        {metrics.firebaseAnalytics.activeUsers.toLocaleString()}
+                      </div>
+                      <p className="text-xs text-gray-400">Active Users</p>
+                    </div>
+                    <div className="bg-gray-800/50 p-4 rounded-lg">
+                      <div className="text-2xl font-bold text-green-400 mb-1">
+                        {metrics.firebaseAnalytics.newUsers.toLocaleString()}
+                      </div>
+                      <p className="text-xs text-gray-400">New Users</p>
+                    </div>
+                    <div className="bg-gray-800/50 p-4 rounded-lg">
+                      <div className="text-2xl font-bold text-white mb-1">
+                        {metrics.firebaseAnalytics.pageViews.toLocaleString()}
+                      </div>
+                      <p className="text-xs text-gray-400">Page Views</p>
+                    </div>
+                    <div className="bg-gray-800/50 p-4 rounded-lg">
+                      <div className="text-2xl font-bold text-purple-400 mb-1">
+                        {metrics.firebaseAnalytics.sessions.toLocaleString()}
+                      </div>
+                      <p className="text-xs text-gray-400">Sessions</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="bg-gray-800/30 p-3 rounded">
+                      <span className="text-gray-400 text-sm">Avg Session Duration</span>
+                      <div className="text-lg font-semibold text-white mt-1">
+                        {Math.floor(metrics.firebaseAnalytics.avgSessionDuration / 60)}m {metrics.firebaseAnalytics.avgSessionDuration % 60}s
+                      </div>
+                    </div>
+                    <div className="bg-gray-800/30 p-3 rounded">
+                      <span className="text-gray-400 text-sm">Bounce Rate</span>
+                      <div className="text-lg font-semibold text-white mt-1">
+                        {metrics.firebaseAnalytics.bounceRate.toFixed(1)}%
+                      </div>
+                    </div>
+                    <div className="bg-gray-800/30 p-3 rounded">
+                      <span className="text-gray-400 text-sm">Engagement Rate</span>
+                      <div className="text-lg font-semibold text-[#00d9ff] mt-1">
+                        {metrics.firebaseAnalytics.engagementRate.toFixed(1)}%
+                      </div>
+                    </div>
+                  </div>
+
+                  {Object.keys(metrics.firebaseAnalytics.eventsByType).length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="text-sm font-medium text-gray-400 mb-3">Top Events</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {Object.entries(metrics.firebaseAnalytics.eventsByType)
+                          .slice(0, 8)
+                          .map(([eventName, count]) => (
+                            <div key={eventName} className="bg-gray-800/30 p-2 rounded">
+                              <div className="text-lg font-semibold text-white">{count.toLocaleString()}</div>
+                              <p className="text-xs text-gray-400 capitalize">{eventName.replace(/_/g, " ")}</p>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {metrics.firebaseAnalytics.acquisition && metrics.firebaseAnalytics.acquisition.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="text-sm font-medium text-gray-400 mb-3">User Acquisition</h4>
+                      <div className="space-y-2">
+                        {metrics.firebaseAnalytics.acquisition.slice(0, 5).map((item) => (
+                          <div key={item.source} className="flex items-center justify-between bg-gray-800/30 px-3 py-2 rounded">
+                            <span className="text-white text-sm capitalize">{item.source || "direct"}</span>
+                            <span className="text-[#00d9ff] font-semibold">{item.users.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {Object.keys(metrics.firebaseAnalytics.conversions).length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-400 mb-3">Conversions</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        {Object.entries(metrics.firebaseAnalytics.conversions).map(([eventName, count]) => (
+                          <div key={eventName} className="bg-gray-800/30 p-2 rounded">
+                            <div className="text-lg font-semibold text-green-400">{count.toLocaleString()}</div>
+                            <p className="text-xs text-gray-400 capitalize">{eventName.replace(/_/g, " ")}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+
           {/* AI Usage & Costs */}
           {aiUsage && (
             <Card className="bg-gray-900/50 border-gray-700 mb-8">
@@ -460,8 +587,8 @@ export default function AdminDashboard() {
                                 user.tier === "enterprise"
                                   ? "bg-purple-600/20 text-purple-400 border-purple-600/30"
                                   : user.tier === "pro"
-                                  ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
-                                  : "bg-gray-600/20 text-gray-400 border-gray-600/30"
+                                    ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
+                                    : "bg-gray-600/20 text-gray-400 border-gray-600/30"
                               }
                             >
                               {user.tier}
@@ -471,11 +598,10 @@ export default function AdminDashboard() {
                             <span className="text-[#00ff88] text-sm font-medium">${user.cost.toFixed(4)}</span>
                             <div className="w-20 h-2 bg-gray-700 rounded-full overflow-hidden">
                               <div
-                                className={`h-full rounded-full ${
-                                  user.budgetUsedPercent > 80 ? "bg-red-500" :
+                                className={`h-full rounded-full ${user.budgetUsedPercent > 80 ? "bg-red-500" :
                                   user.budgetUsedPercent > 50 ? "bg-yellow-500" :
-                                  "bg-[#00ff88]"
-                                }`}
+                                    "bg-[#00ff88]"
+                                  }`}
                                 style={{ width: `${Math.min(100, user.budgetUsedPercent)}%` }}
                               />
                             </div>
