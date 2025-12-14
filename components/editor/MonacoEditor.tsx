@@ -1,8 +1,7 @@
 "use client"
 
-import React, { useEffect, useRef, memo, useState } from "react"
-import Editor, { OnMount, OnChange } from "@monaco-editor/react"
-import type { editor } from "monaco-editor"
+import React, { memo } from "react"
+import Editor, { OnChange } from "@monaco-editor/react"
 
 export interface MonacoEditorProps {
   value: string
@@ -15,6 +14,7 @@ export interface MonacoEditorProps {
 }
 
 // Simple, clean Monaco editor component
+// Relies on Monaco's built-in automaticLayout - no manual intervention
 function MonacoEditorComponent({
   value,
   onChange,
@@ -24,96 +24,18 @@ function MonacoEditorComponent({
   theme = "vs-dark",
   className = "",
 }: MonacoEditorProps) {
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [isClient, setIsClient] = useState(false)
-
-  // Ensure we're on the client before rendering Monaco
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
-
-  // Handle editor mount
-  const handleMount: OnMount = (editor, monaco) => {
-    editorRef.current = editor
-
-    // Focus the editor after a brief delay to ensure DOM is ready
-    setTimeout(() => {
-      editor.focus()
-    }, 100)
-
-    // Force initial layout after mount with multiple frames to ensure stability
-    requestAnimationFrame(() => {
-      editor.layout()
-      // Second layout call to handle any delayed container sizing
-      requestAnimationFrame(() => {
-        editor.layout()
-      })
-    })
-  }
-
-  // Handle value changes
+  // Handle value changes - simple passthrough
   const handleChange: OnChange = (newValue) => {
     if (onChange && newValue !== undefined) {
       onChange(newValue)
     }
   }
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (editorRef.current) {
-        editorRef.current.dispose()
-        editorRef.current = null
-      }
-    }
-  }, [])
-
-  // Use ResizeObserver for precise container-based layout updates
-  // This is more reliable than window resize events and doesn't conflict with automaticLayout
-  useEffect(() => {
-    if (!containerRef.current || !isClient) return
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      // Debounce layout calls to prevent jitter
-      if (editorRef.current) {
-        requestAnimationFrame(() => {
-          editorRef.current?.layout()
-        })
-      }
-    })
-
-    resizeObserver.observe(containerRef.current)
-    return () => resizeObserver.disconnect()
-  }, [isClient])
-
   // Convert height to CSS string
   const cssHeight = typeof height === "number" ? `${height}px` : height
 
-  // Show loading state during SSR/hydration
-  if (!isClient) {
-    return (
-      <div
-        className={`monaco-wrapper ${className}`}
-        style={{
-          height: cssHeight,
-          width: "100%",
-          position: "relative",
-          overflow: "hidden",
-          background: "#1e1e1e",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div className="text-gray-400 text-sm">Loading editor...</div>
-      </div>
-    )
-  }
-
   return (
     <div
-      ref={containerRef}
       className={`monaco-wrapper ${className}`}
       style={{
         height: cssHeight,
@@ -129,7 +51,6 @@ function MonacoEditorComponent({
         value={value}
         theme={theme}
         onChange={handleChange}
-        onMount={handleMount}
         options={{
           readOnly,
           minimap: { enabled: false },
@@ -137,7 +58,7 @@ function MonacoEditorComponent({
           lineHeight: 22,
           tabSize: 2,
           scrollBeyondLastLine: false,
-          automaticLayout: true, // Enable automatic layout to handle resizing properly
+          automaticLayout: true,
           wordWrap: "off",
           lineNumbers: "on",
           lineNumbersMinChars: 3,
@@ -162,18 +83,15 @@ function MonacoEditorComponent({
           codeLens: false,
           links: false,
           colorDecorators: false,
-          selectionHighlight: true, // Enable selection highlighting
+          selectionHighlight: true,
           occurrencesHighlight: "off",
           renderWhitespace: "none",
           guides: { indentation: false },
           bracketPairColorization: { enabled: false },
           matchBrackets: "never",
           padding: { top: 8, bottom: 8 },
-          // Cursor settings - ensure smooth blinking
-          cursorBlinking: "smooth",
+          cursorBlinking: "blink",
           cursorStyle: "line",
-          cursorSmoothCaretAnimation: "on",
-          // Prevent sticky scroll issues
           stickyScroll: { enabled: false },
         }}
         loading={
