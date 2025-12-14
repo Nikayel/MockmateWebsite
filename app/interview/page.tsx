@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import dynamic from "next/dynamic"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
@@ -11,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { CodeViewerSidePanel } from "@/components/CodeViewerSidePanel"
+import { MonacoEditor } from "@/components/editor"
 import PracticeFeedback from "@/components/PracticeFeedback"
 import { GradingCriteriaTooltip } from "@/components/GradingCriteria"
 import {
@@ -58,12 +58,6 @@ import { checkUsageLimit, recordSessionStart, getUserProfile, createInterviewSes
 import { scenarios, filterScenarios, getScenarioById, type Scenario, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
 import { extractProtectedElements, validateCodeProtection, enforceCodeProtection } from "@/lib/code-protection"
 import { toast } from "sonner"
-
-// Dynamically import Monaco Editor (client-side only)
-const Editor = dynamic(() => import("@monaco-editor/react"), {
-  ssr: false,
-  loading: () => null
-})
 
 // Supported languages for code execution
 // JavaScript and Python are fully supported; others are coming soon
@@ -178,39 +172,7 @@ export default function InterviewPage() {
   const interviewerEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const editorContainerRef = useRef<HTMLDivElement>(null)
-  const editorRef = useRef<any>(null) // Monaco editor instance ref
-  const [editorHeight, setEditorHeight] = useState(400)
   const previousCodeRef = useRef<string>(code)
-
-  // Monaco Editor cleanup on unmount - dispose all models to prevent memory leaks
-  useEffect(() => {
-    return () => {
-      // Dispose editor instance
-      if (editorRef.current) {
-        try {
-          editorRef.current.dispose()
-        } catch (e) {
-          console.warn('Error disposing editor:', e)
-        }
-        editorRef.current = null
-      }
-      // Dispose all Monaco models
-      if (typeof window !== 'undefined' && (window as any).monaco?.editor) {
-        try {
-          const models = (window as any).monaco.editor.getModels()
-          models.forEach((model: any) => {
-            try {
-              model.dispose()
-            } catch (e) {
-              // Model may already be disposed
-            }
-          })
-        } catch (e) {
-          console.warn('Error disposing Monaco models:', e)
-        }
-      }
-    }
-  }, [])
 
   // Update URL when interview starts (for refresh persistence)
   useEffect(() => {
@@ -705,17 +667,12 @@ Let's continue!`
     }
   }, [isInterviewStarted, selectedScenario, firebaseUser, code, chatMessages, interviewerMessages, selectedLanguage, elapsedTime, testResults, workspaceContext, currentSessionId])
 
-  // #region agent log
-  // Track when code value changes externally (not from user typing)
+  // Track when code value changes
   useEffect(() => {
-    if (previousCodeRef.current !== code && editorRef.current) {
-      const cursorPos = editorRef.current.getPosition()
-      const selection = editorRef.current.getSelection()
-      fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:708', message: 'Code value changed externally', data: { oldLength: previousCodeRef.current.length, newLength: code.length, cursorPos, selection }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'E' }) }).catch(() => { });
+    if (previousCodeRef.current !== code) {
       previousCodeRef.current = code
     }
   }, [code])
-  // #endregion
 
   // Restore auto-saved session on mount (check both localStorage and Firestore)
   useEffect(() => {
@@ -1380,16 +1337,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       }
     }
 
-    // Monaco cleanup - dispose editor and all models to prevent memory leaks
-    if (editorRef.current) {
-      try {
-        editorRef.current.dispose()
-      } catch (e) {
-        console.warn('Error disposing editor on reset:', e)
-      }
-      editorRef.current = null
-    }
-
+    // Monaco cleanup - dispose all models to prevent memory leaks
     if (typeof window !== 'undefined' && (window as any).monaco?.editor) {
       try {
         const models = (window as any).monaco.editor.getModels()
@@ -1403,7 +1351,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           }
         })
       } catch (e) {
-        console.warn('Error disposing Monaco models on reset:', e)
+        // Silent failure
       }
     }
 
@@ -2322,184 +2270,25 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         </div>
                       </CardTitle>
                     </CardHeader>
-                    {/* Code Editor - Direct in Card, no CardContent wrapper */}
+                    {/* Code Editor - Using centralized MonacoEditor component */}
                     <div className="flex flex-col flex-1 min-h-0 gap-2 px-3 pb-3">
-                      <div ref={editorContainerRef} className="flex-1 min-h-0 rounded border border-gray-700 editor-wrapper">
-                        <Editor
-                          key={`editor-${selectedLanguage}-${selectedScenario?.id || 'none'}`}
-                          height={editorHeight}
+                      <div ref={editorContainerRef} className="flex-1 min-h-0 rounded border border-gray-700 overflow-hidden">
+                        <MonacoEditor
+                          height="100%"
                           language={selectedLanguage}
                           value={code}
-                          onMount={(editor, monaco) => {
-                            // #region agent log
-                            fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:2320', message: 'Editor onMount called', data: { hasEditor: !!editor, hasMonaco: !!monaco }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
-                            // #endregion
-
-                            // Dispose old editor reference if exists
-                            if (editorRef.current && editorRef.current !== editor) {
-                              try {
-                                editorRef.current.dispose()
-                              } catch (e) {
-                                // Editor may already be disposed
-                              }
-                            }
-                            editorRef.current = editor
-
-                            // Clean up any orphaned models (except the current one)
-                            const currentModel = editor.getModel()
-                            const allModels = monaco.editor.getModels()
-                            allModels.forEach((model: any) => {
-                              if (model !== currentModel && !model.isDisposed()) {
-                                try {
-                                  model.dispose()
-                                } catch (e) {
-                                  // Model may already be disposed
-                                }
-                              }
-                            })
-
-                            // #region agent log
-                            // Track cursor position changes
-                            const logCursorPosition = () => {
-                              try {
-                                const position = editor.getPosition()
-                                const selection = editor.getSelection()
-                                fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:2343', message: 'Cursor position update', data: { position, selection, hasFocus: editor.hasTextFocus() }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
-                              } catch (e) { }
-                            };
-                            // #endregion
-
-                            // #region agent log
-                            // Track click events on editor container
-                            const editorDom = editor.getContainerDomNode()
-                            const handleClick = (e: MouseEvent) => {
-                              const position = editor.getPosition()
-                              const selection = editor.getSelection()
-                              fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:2343', message: 'Editor click event', data: { clickX: e.clientX, clickY: e.clientY, position, selection, hasFocus: editor.hasTextFocus() }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
-                            };
-                            editorDom.addEventListener('click', handleClick);
-                            // #endregion
-
-                            // #region agent log
-                            // Track cursor position on selection change
-                            editor.onDidChangeCursorPosition((e) => {
-                              fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:2343', message: 'Cursor position changed', data: { position: e.position, reason: e.reason }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
-                            });
-                            // #endregion
-
-                            // #region agent log
-                            // Track focus changes
-                            editor.onDidFocusEditorText(() => {
-                              const position = editor.getPosition()
-                              fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:2343', message: 'Editor focused', data: { position }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });
-                            });
-                            editor.onDidBlurEditorText(() => {
-                              fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:2343', message: 'Editor blurred', data: {}, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });
-                            });
-                            // #endregion
-                          }}
-                          onChange={(value, event) => {
-                            // #region agent log
-                            const cursorPosBefore = editorRef.current?.getPosition()
-                            const selectionBefore = editorRef.current?.getSelection()
-                            fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:2344', message: 'onChange called - before update', data: { cursorPosBefore, selectionBefore, valueLength: value?.length, oldCodeLength: code.length, isFlush: event?.isFlush }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'E' }) }).catch(() => { });
-                            // #endregion
-
-                            const newCode = value || ""
-
-                            // Skip validation for programmatic changes (like language switches)
-                            if (event?.isFlush) {
-                              setCode(newCode)
-                              return
-                            }
-
+                          onChange={(newCode) => {
                             // Enforce code protection if enabled
                             if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
                               const validation = validateCodeProtection(newCode, protectedElements, selectedLanguage)
-
                               if (!validation.valid) {
-                                // Show error and prevent the change
                                 toast.error(`Cannot remove required code: ${validation.errors[0]}`)
-                                return // Don't update code
+                                return
                               }
                             }
-
                             setCode(newCode)
-
-                            // #region agent log
-                            setTimeout(() => {
-                              const cursorPosAfter = editorRef.current?.getPosition()
-                              const selectionAfter = editorRef.current?.getSelection()
-                              fetch('http://127.0.0.1:7242/ingest/fa7430c1-0c9b-4dc0-854b-1f5f18ce2789', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'interview/page.tsx:2364', message: 'onChange called - after update', data: { cursorPosAfter, selectionAfter, newCodeLength: newCode.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'E' }) }).catch(() => { });
-                            }, 10);
-                            // #endregion
                           }}
-                          theme="vs-dark"
-                          options={{
-                            // Layout
-                            automaticLayout: true,
-                            scrollBeyondLastLine: false,
-                            scrollbar: { vertical: 'auto', horizontal: 'auto', handleMouseWheel: true, verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
-                            overviewRulerLanes: 0,
-                            overviewRulerBorder: false,
-                            hideCursorInOverviewRuler: true,
-
-                            // Disable sticky scroll (causes space at top)
-                            stickyScroll: { enabled: false },
-
-                            // Minimize UI elements
-                            minimap: { enabled: false },
-                            lineNumbers: 'on',
-                            lineNumbersMinChars: 3,
-                            lineDecorationsWidth: 8,
-                            glyphMargin: false,
-                            folding: false,
-                            foldingHighlight: false,
-                            showFoldingControls: 'never',
-                            renderLineHighlight: 'none',
-                            renderWhitespace: 'none',
-                            renderLineHighlightOnlyWhenFocus: true,
-
-                            // Disable features but keep selection working
-                            contextmenu: false,
-                            quickSuggestions: false,
-                            suggestOnTriggerCharacters: false,
-                            acceptSuggestionOnEnter: 'off',
-                            tabCompletion: 'off',
-                            wordBasedSuggestions: 'off',
-                            parameterHints: { enabled: false },
-                            hover: { enabled: false },
-                            links: false,
-                            colorDecorators: false,
-                            codeLens: false,
-                            occurrencesHighlight: 'off',
-                            selectionHighlight: true, // Enable selection highlighting
-                            matchBrackets: 'never',
-
-                            // Styling
-                            fontSize: 13,
-                            lineHeight: 21,
-                            letterSpacing: 0.5,
-                            tabSize: 2,
-                            fontLigatures: false,
-                            readOnly: !isInterviewStarted || showFeedback,
-
-                            // Padding and layout
-                            padding: { top: 8, bottom: 8 },
-                            fixedOverflowWidgets: true,
-
-                            // Cursor settings - ensure smooth blinking
-                            cursorBlinking: 'smooth',
-                            cursorStyle: 'line',
-                            cursorSmoothCaretAnimation: 'on',
-
-                            // Disable all widgets and popups
-                            find: {
-                              addExtraSpaceOnTop: false,
-                              autoFindInSelection: 'never',
-                              seedSearchStringFromSelection: 'never',
-                            },
-                          }}
+                          readOnly={!isInterviewStarted || showFeedback}
                         />
                       </div>
 
@@ -2872,17 +2661,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     {showCodeInDiscussion && (
                       <CardContent>
                         <div className="border border-gray-700 rounded-lg overflow-hidden">
-                          <Editor
+                          <MonacoEditor
                             height="400px"
                             language={selectedLanguage}
                             value={code}
-                            theme="vs-dark"
-                            options={{
-                              readOnly: true,
-                              minimap: { enabled: false },
-                              fontSize: 14,
-                              scrollBeyondLastLine: false,
-                            }}
+                            readOnly
                           />
                         </div>
                         {testResults.length > 0 && (
