@@ -49,13 +49,13 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com https://cdn.jsdelivr.net https://apis.google.com https://www.gstatic.com",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com https://cdn.jsdelivr.net https://apis.google.com https://*.googleapis.com https://www.gstatic.com https://accounts.google.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data: https://fonts.gstatic.com",
-              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com https://*.firebase.googleapis.com https://*.google-analytics.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com wss://*.firebaseio.com https://api.stripe.com https://cdn.jsdelivr.net",
+              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com https://*.firebase.googleapis.com https://*.google-analytics.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://oauth2.googleapis.com https://www.googleapis.com wss://*.firebaseio.com https://api.stripe.com https://cdn.jsdelivr.net",
               "worker-src 'self' blob: https://cdn.jsdelivr.net",
-              "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://www.youtube.com https://accounts.google.com https://danuxx-42bf3.firebaseapp.com https://danuxx-42bf3.web.app",
+              "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://www.youtube.com https://accounts.google.com https://*.googleapis.com https://*.firebaseapp.com https://*.web.app",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",
@@ -73,7 +73,7 @@ const nextConfig = {
       ...config.watchOptions,
       ignored: ['**/extension/**', '**/node_modules/**'],
     }
-    
+
     // Exclude firebase-admin from client-side bundle (server-only package)
     if (!isServer) {
       config.resolve.fallback = {
@@ -84,7 +84,7 @@ const nextConfig = {
         child_process: false,
         crypto: false,
       }
-      
+
       // Externalize firebase-admin for client builds
       const originalExternals = config.externals
       config.externals = [
@@ -100,7 +100,7 @@ const nextConfig = {
         },
       ]
     }
-    
+
     return config
   },
 }

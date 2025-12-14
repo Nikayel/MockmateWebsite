@@ -18,30 +18,94 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || ""
 }
 
+// Validate Firebase configuration
+function validateFirebaseConfig() {
+  const requiredFields = [
+    'apiKey',
+    'authDomain',
+    'projectId',
+    'storageBucket',
+    'messagingSenderId',
+    'appId'
+  ] as const
+
+  const missingFields: string[] = []
+  
+  for (const field of requiredFields) {
+    if (!firebaseConfig[field]) {
+      missingFields.push(`NEXT_PUBLIC_FIREBASE_${field.toUpperCase().replace(/([A-Z])/g, '_$1')}`)
+    }
+  }
+
+  if (missingFields.length > 0) {
+    const errorMessage = `Missing required Firebase environment variables: ${missingFields.join(', ')}`
+    console.error('❌ Firebase Configuration Error:', errorMessage)
+    console.error('Please ensure all required environment variables are set in your .env.local file')
+    
+    // In development, throw error to prevent silent failures
+    if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+      throw new Error(errorMessage)
+    }
+  }
+}
+
+// Validate config before initialization
+validateFirebaseConfig()
+
 // Log Firebase config (without sensitive values)
 console.log('Initializing Firebase with config:', {
   projectId: firebaseConfig.projectId,
   authDomain: firebaseConfig.authDomain,
-  storageBucket: firebaseConfig.storageBucket
+  storageBucket: firebaseConfig.storageBucket,
+  hasApiKey: !!firebaseConfig.apiKey,
+  hasAppId: !!firebaseConfig.appId
 })
 
 // Initialize Firebase (only if not already initialized)
 let app: FirebaseApp
-if (getApps().length === 0) {
-  console.log('Initializing new Firebase app instance')
-  app = initializeApp(firebaseConfig)
-} else {
-  console.log('Using existing Firebase app instance')
-  app = getApps()[0]
+try {
+  if (getApps().length === 0) {
+    console.log('Initializing new Firebase app instance')
+    app = initializeApp(firebaseConfig)
+  } else {
+    console.log('Using existing Firebase app instance')
+    app = getApps()[0]
+  }
+} catch (error: any) {
+  console.error('❌ Firebase initialization error:', error)
+  console.error('Error code:', error.code)
+  console.error('Error message:', error.message)
+  
+  // Provide helpful error messages
+  if (error.code === 'app/invalid-app-credentials') {
+    throw new Error('Invalid Firebase configuration. Please check your environment variables.')
+  } else if (error.code === 'app/duplicate-app') {
+    console.warn('Firebase app already initialized, using existing instance')
+    app = getApps()[0]
+  } else {
+    throw error
+  }
 }
 
 // Initialize Firebase services
 console.log('Initializing Firebase Auth and Firestore')
-export const auth = getAuth(app)
-console.log('Firebase Auth initialized')
+let authInstance: Auth
+let dbInstance: Firestore
 
-export const db = getFirestore(app)
-console.log('Firestore initialized')
+try {
+  authInstance = getAuth(app)
+  console.log('Firebase Auth initialized')
+  
+  dbInstance = getFirestore(app)
+  console.log('Firestore initialized')
+} catch (error: any) {
+  console.error('❌ Firebase service initialization error:', error)
+  throw new Error(`Failed to initialize Firebase services: ${error.message}`)
+}
+
+// Export initialized services
+export const auth = authInstance
+export const db = dbInstance
 
 // Initialize Analytics only on client side
 export const analytics: Analytics | null =
