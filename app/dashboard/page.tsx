@@ -72,7 +72,6 @@ export default function DashboardPage() {
           // This fixes Pro users who were incorrectly reset
           if ((userProfile.stripe_subscription_id || userProfile.stripe_customer_id) &&
             userProfile.subscription_tier === "free") {
-            console.log("Auto-syncing subscription for user with Stripe IDs but free tier")
             try {
               const token = await firebaseUser.getIdToken()
               const syncResponse = await fetch("/api/sync-subscription", {
@@ -96,9 +95,8 @@ export default function DashboardPage() {
                   setUsage(updatedUsage)
                 }
               }
-            } catch (syncError) {
-              console.error("Auto-sync failed (non-critical):", syncError)
-              // Don't show error to user, just log it
+            } catch {
+              // Auto-sync failed (non-critical) - don't show error to user
             }
           }
         }
@@ -131,12 +129,10 @@ export default function DashboardPage() {
 
             setSessions(sessionsData.slice(0, 5))
           }
-        } catch (sessionError) {
-          console.error("Error fetching sessions:", sessionError)
-          // Don't show error to user, just log it
+        } catch {
+          // Error fetching sessions - don't show error to user
         }
-      } catch (error) {
-        console.error("Error loading dashboard:", error)
+      } catch {
         toast.error("Failed to load dashboard")
       } finally {
         setDataLoading(false)

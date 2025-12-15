@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { adminDb } from "@/lib/firebase-admin"
+import { adminDb, adminAuth } from "@/lib/firebase-admin"
 import {
   getFirebaseAnalyticsOverview,
   getFirebaseAnalyticsEvents,
@@ -7,18 +7,64 @@ import {
   getFirebaseAnalyticsConversions,
 } from "@/lib/firebase-analytics-admin"
 
+// Admin user IDs (should match admin/usage route)
+const ADMIN_USER_IDS = [
+  process.env.ADMIN_USER_ID,
+].filter((id): id is string => Boolean(id))
+
+/**
+ * Verify admin access using Firebase Auth token
+ */
+async function verifyAdminAccess(request: NextRequest): Promise<{ authorized: boolean; userId?: string }> {
+  try {
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return { authorized: false }
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+
+    // Verify the Firebase ID token
+    if (!adminAuth) {
+      return { authorized: false }
+    }
+
+    const decodedToken = await adminAuth.verifyIdToken(token)
+    const userId = decodedToken.uid
+
+    // Check if user is in admin list
+    if (ADMIN_USER_IDS.includes(userId)) {
+      return { authorized: true, userId }
+    }
+
+    // Check Firestore for admin role
+    if (adminDb) {
+      const userDoc = await adminDb.collection('profiles').doc(userId).get()
+      const userData = userDoc.data()
+
+      if (userData?.role === 'admin' || userData?.subscription_tier === 'enterprise') {
+        return { authorized: true, userId }
+      }
+    }
+
+    return { authorized: false }
+  } catch (error) {
+    // Token verification failed
+    return { authorized: false }
+  }
+}
+
 /**
  * Admin Analytics API
  * Returns aggregate metrics for admin dashboard
  *
- * IMPORTANT: In production, add authentication middleware to verify admin access
+ * Requires admin authentication via Firebase ID token
  */
 
 export async function GET(request: NextRequest) {
   try {
     // Verify Admin SDK is initialized
     if (!adminDb) {
-      console.error("Firebase Admin SDK not initialized")
       return NextResponse.json(
         {
           success: false,
@@ -28,11 +74,11 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // TODO: Add admin authentication check
-    // const isAdmin = await verifyAdminAccess(request)
-    // if (!isAdmin) {
-    //   return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
-    // }
+    // Verify admin access
+    const auth = await verifyAdminAccess(request)
+    if (!auth.authorized) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+    }
 
     const { searchParams } = new URL(request.url)
     const timeRange = searchParams.get("timeRange") || "7d" // 7d, 30d, 90d, all

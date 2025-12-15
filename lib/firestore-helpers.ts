@@ -20,10 +20,7 @@ export async function createOrUpdateProfile(
     throw new Error("User ID is required to create/update profile")
   }
 
-  if (!email || email.trim() === "") {
-    console.warn("Warning: Creating profile with empty email for user:", userId)
-    // Don't throw error, but log warning - some providers might not provide email immediately
-  }
+  // Note: Some providers might not provide email immediately - allow empty email
 
   const profileRef = doc(db, "profiles", userId)
 
@@ -35,8 +32,7 @@ export async function createOrUpdateProfile(
     if (profileSnap.exists()) {
       existingProfile = profileSnap.data() as Profile
     }
-  } catch (readError: any) {
-    console.error("Error reading existing profile:", readError)
+  } catch {
     // Continue anyway - we'll try to create it
     profileSnap = { exists: () => false, data: () => null } as any
   }
@@ -120,16 +116,8 @@ export async function createOrUpdateProfile(
 
   try {
     await setDoc(profileRef, profileDataForFirestore, { merge: true })
-    console.log("✅ Profile saved successfully to Firestore:", userId)
-    console.log(`   Subscription tier: ${subscriptionTier} (${isNewProfile ? 'new profile' : 'existing profile preserved'})`)
     return profileData
   } catch (writeError: any) {
-    console.error("❌ Error writing profile to Firestore:", writeError)
-    console.error("User ID:", userId)
-    console.error("Email:", email)
-    console.error("Error code:", writeError.code)
-    console.error("Error message:", writeError.message)
-
     // Re-throw with more context
     throw new Error(
       `Failed to save profile: ${writeError.message || "Unknown error"} (Code: ${writeError.code || "unknown"})`
@@ -163,8 +151,7 @@ export async function getUserProfile(userId: string, syncStripe: boolean = true)
         const syncedProfile = await syncSubscriptionFromStripe(userId)
         return syncedProfile || profile
       }
-    } catch (syncError) {
-      console.error("Error syncing subscription from Stripe:", syncError)
+    } catch {
       // Return existing profile if sync fails
       return profile
     }
@@ -387,8 +374,7 @@ export async function saveSessionState(
       },
       updated_at: new Date().toISOString(),
     }, { merge: true })
-  } catch (error) {
-    console.error("Failed to save session state to Firestore:", error)
+  } catch {
     // Non-blocking - localStorage backup exists
   }
 }
@@ -423,8 +409,7 @@ export async function getSessionState(sessionId: string): Promise<{
       testResults: data.session_state.test_results,
       savedAt: data.session_state.saved_at,
     }
-  } catch (error) {
-    console.error("Failed to get session state:", error)
+  } catch {
     return null
   }
 }

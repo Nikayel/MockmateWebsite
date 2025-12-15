@@ -318,9 +318,8 @@ export async function generateAIResponse(
 
     const cached = await getCachedResponse(cacheKey)
     if (cached.hit && cached.response) {
-      console.log(`[AI Provider] Cache hit (${cached.source})`)
 
-      // Track cached usage (no cost)
+      // Track cached usage (no cost) - fire-and-forget
       if (userId) {
         trackUsageEvent({
           userId,
@@ -329,7 +328,9 @@ export async function generateAIResponse(
           sessionId,
           scenarioId,
           latencyMs: Date.now() - startTime,
-        }).catch(() => {})
+        }).catch(() => {
+          // Usage tracking failure is non-critical - silent fail
+        })
       }
 
       return {
@@ -369,12 +370,10 @@ export async function generateAIResponse(
     // Retry loop for each provider
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        console.log(`[AI Provider] Trying ${provider} (attempt ${attempt + 1}/${maxRetries})`)
 
         const text = await callProvider(provider, systemPrompt, userMessage, history, temperature)
 
         const latencyMs = Date.now() - startTime
-        console.log(`[AI Provider] Success with ${provider} in ${latencyMs}ms`)
 
         // Estimate tokens (rough estimate: 4 chars per token)
         const inputTokens = Math.ceil((systemPrompt.length + userMessage.length + history.reduce((sum, h) => sum + h.content.length, 0)) / 4)
@@ -387,6 +386,7 @@ export async function generateAIResponse(
           updateTokenCount(userId, totalTokens)
           recordRequestEnd(userId)
 
+          // Fire-and-forget usage tracking - errors are non-critical
           trackUsageEvent({
             userId,
             eventType,
@@ -400,7 +400,9 @@ export async function generateAIResponse(
             cached: false,
             sessionId,
             scenarioId,
-          }).catch(() => {})
+          }).catch(() => {
+            // Usage tracking failure is non-critical - silent fail
+          })
         }
 
         // 5. Cache the response
@@ -412,7 +414,10 @@ export async function generateAIResponse(
             context: history.map(h => h.content).join('|'),
             scenarioId,
           })
-          setCachedResponse(cacheKey, text, eventType).catch(() => {})
+          // Fire-and-forget cache write - errors are non-critical
+          setCachedResponse(cacheKey, text, eventType).catch(() => {
+            // Cache write failure is non-critical - silent fail
+          })
         }
 
         return {
@@ -423,12 +428,10 @@ export async function generateAIResponse(
         }
       } catch (error: any) {
         lastError = error
-        console.error(`[AI Provider] ${provider} failed:`, error?.message || error)
 
         // Only retry if it's a retryable error
         if (isRetryableError(error) && attempt < maxRetries - 1) {
           const delay = RETRY_DELAYS[attempt] || RETRY_DELAYS[RETRY_DELAYS.length - 1]
-          console.log(`[AI Provider] Retrying ${provider} in ${delay}ms...`)
           await new Promise(resolve => setTimeout(resolve, delay))
         } else {
           // Move to next provider

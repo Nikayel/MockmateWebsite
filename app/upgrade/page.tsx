@@ -52,20 +52,8 @@ function UpgradePageContent() {
         const success = searchParams?.get("success")
         const canceled = searchParams?.get("canceled")
 
-        // DEBUG: Log all relevant state
-        console.log("=== Upgrade Page Debug ===")
-        console.log("URL params:", { success, canceled, sessionId: searchParams?.get("session_id") })
-        console.log("Auth state:", {
-          hasUser: !!user,
-          userId: user?.id,
-          hasFirebaseUser: !!firebaseUser,
-          authLoading,
-          initialized
-        })
-
         if (success === "true") {
           const sessionId = searchParams?.get("session_id")
-          console.log("Processing successful payment, sessionId:", sessionId)
           toast.success("Payment successful! Syncing your account...")
 
           // IMPORTANT: Save user info BEFORE any state changes
@@ -74,20 +62,15 @@ function UpgradePageContent() {
           const currentFirebaseUser = firebaseUser
 
           // Sync subscription with retries to handle webhook race condition
-          console.log("Checking sync conditions:", { sessionId, hasFirebaseUser: !!currentFirebaseUser, userId: currentUserId })
-
           if (sessionId && currentFirebaseUser && currentUserId) {
-            console.log("Starting sync process...")
             let syncSuccess = false
             let attempts = 0
             const maxAttempts = 5
 
             while (!syncSuccess && attempts < maxAttempts) {
               attempts++
-              console.log(`Sync attempt ${attempts} starting...`)
               try {
                 const token = await currentFirebaseUser.getIdToken(true) // Force refresh token
-                console.log("Got Firebase token, calling sync API...")
 
                 // Call sync API to check Stripe and update profile
                 const syncResponse = await fetch("/api/sync-subscription", {
@@ -101,7 +84,6 @@ function UpgradePageContent() {
 
                 if (syncResponse.ok) {
                   const syncData = await syncResponse.json()
-                  console.log(`Subscription sync attempt ${attempts}:`, syncData)
 
                   // Check if user is now Pro
                   if (syncData.profile?.subscription_tier === "pro") {
@@ -113,30 +95,19 @@ function UpgradePageContent() {
                     toast.success("You're now a Pro member!")
                   } else {
                     // Not yet synced, wait and retry
-                    console.log(`Sync attempt ${attempts}: Not yet Pro, waiting...`)
                     await new Promise(resolve => setTimeout(resolve, 1500))
                   }
                 } else {
-                  const errorText = await syncResponse.text()
-                  console.error(`Sync attempt ${attempts} failed:`, syncResponse.status, errorText)
                   await new Promise(resolve => setTimeout(resolve, 1000))
                 }
-              } catch (syncError) {
-                console.error(`Sync attempt ${attempts} error:`, syncError)
+              } catch {
                 await new Promise(resolve => setTimeout(resolve, 1000))
               }
             }
 
             if (!syncSuccess) {
-              console.warn("Could not confirm Pro status after retries - redirecting anyway")
               toast.info("Redirecting to your account. If Pro status isn't showing, please refresh the page.")
             }
-          } else {
-            console.error("Missing auth info for sync:", {
-              hasSessionId: !!sessionId,
-              hasFirebaseUser: !!currentFirebaseUser,
-              hasUserId: !!currentUserId
-            })
           }
 
           // Clean URL and redirect AFTER sync is complete
@@ -146,8 +117,8 @@ function UpgradePageContent() {
           // Clean URL params after showing toast
           router.replace("/upgrade")
         }
-      } catch (error) {
-        console.error("Error handling search params:", error)
+      } catch {
+        // Error handling search params
       }
     }
 
@@ -167,8 +138,8 @@ function UpgradePageContent() {
       try {
         const userProfile = await getUserProfile(firebaseUser.uid)
         setProfile(userProfile)
-      } catch (error) {
-        console.error("Error loading profile on upgrade page:", error)
+      } catch {
+        // Error loading profile
       } finally {
         setProfileLoading(false)
       }
@@ -217,10 +188,8 @@ function UpgradePageContent() {
           let promoUsageSnap
           try {
             promoUsageSnap = await getDoc(promoUsageRef)
-          } catch (readError: any) {
-            // If read fails due to permissions, it might be because document doesn't exist
-            // Continue to try creating it
-            console.log("Read check failed (document may not exist):", readError)
+          } catch {
+            // If read fails due to permissions, document may not exist - continue
           }
           
           if (promoUsageSnap?.exists()) {
@@ -251,10 +220,6 @@ function UpgradePageContent() {
             window.location.reload()
           }, 1500)
         } catch (updateError: any) {
-          console.error("Error updating profile:", updateError)
-          console.error("Error code:", updateError.code)
-          console.error("Error message:", updateError.message)
-          
           if (updateError.code === "permission-denied") {
             toast.error("Permission denied. Please:\n1. Update Firestore security rules in Firebase Console\n2. See FIRESTORE_RULES.md for instructions", {
               duration: 10000,
@@ -267,8 +232,7 @@ function UpgradePageContent() {
       } else {
         toast.error(data.error || "Invalid promo code")
       }
-    } catch (error) {
-      console.error("Promo code error:", error)
+    } catch {
       toast.error("Failed to apply promo code. Please try again.")
     } finally {
       setApplyingPromo(false)
@@ -314,7 +278,6 @@ function UpgradePageContent() {
         throw new Error(data.error || "Failed to create checkout session")
       }
     } catch (error) {
-      console.error("Upgrade error:", error)
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
       toast.error("Upgrade failed", {
         description: errorMessage,

@@ -28,38 +28,15 @@ export default function AuthCallback() {
           // Create/update profile in Firestore immediately
           // This MUST complete before redirecting to ensure profile is saved
           try {
-            console.log("Creating/updating profile for user:", firebaseUser.uid)
-            console.log("User email:", firebaseUser.email)
-            console.log("User displayName:", firebaseUser.displayName)
-            console.log("User photoURL:", firebaseUser.photoURL)
-            
             await createOrUpdateProfile(
               firebaseUser.uid,
               firebaseUser.email || "",
               firebaseUser.displayName,
               firebaseUser.photoURL
             )
-            
-            console.log("Profile created/updated successfully for:", firebaseUser.uid)
-          } catch (profileError: any) {
-            console.error("Failed to create/update profile:", profileError)
-            console.error("Error code:", profileError.code)
-            console.error("Error message:", profileError.message)
-            console.error("Error stack:", profileError.stack)
-            
-            // Log specific error types
-            if (profileError.code === "permission-denied") {
-              console.error("❌ Firestore permission denied!")
-              console.error("User UID:", firebaseUser.uid)
-              console.error("Make sure Firestore security rules allow writes for authenticated users")
-            } else if (profileError.code === "unavailable") {
-              console.error("❌ Firestore service unavailable - network issue")
-            } else if (profileError.code === "unauthenticated") {
-              console.error("❌ User is not authenticated")
-            }
-            
-            // Don't block the flow, but log the error prominently
-            // The user can still use the app, but profile won't be saved
+          } catch {
+            // Profile creation failed - don't block the flow
+            // User can still use the app, profile sync will retry on next auth
           }
           
           // Get ID token for VS Code deep link
@@ -81,8 +58,7 @@ export default function AuthCallback() {
         } else {
           setStatus("error")
         }
-      } catch (error) {
-        console.error("Auth callback error:", error)
+      } catch {
         setStatus("error")
       }
     }
