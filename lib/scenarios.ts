@@ -8,6 +8,7 @@
 
 import { realWorldBugFixScenarios, realWorldSystemDesignScenarios } from './scenarios-realworld';
 import { addFunctionalityScenarios, AddFunctionalityScenario } from './scenarios-add-functionality';
+import { DSAPattern, DSA_PATTERNS } from './types/dsa-patterns';
 
 export type ScenarioType = 'dsa' | 'bugfix' | 'optimization' | 'security' | 'system-design' | 'add-functionality';
 export type DifficultyLevel = 'easy' | 'medium' | 'hard';
@@ -26,6 +27,8 @@ export interface BaseScenario {
 
 export interface DSAScenario extends BaseScenario {
   type: 'dsa';
+  // NEW: Pattern category (like LeetCode/NeetCode)
+  pattern: DSAPattern;
   problemStatement: string;
   examples: {
     input: string;
@@ -106,6 +109,7 @@ export const scenarios: Scenario[] = [
     id: 'dsa-two-sum',
     title: 'Two Sum',
     type: 'dsa',
+    pattern: 'arrays-hashing', // NeetCode category
     difficulty: 'easy',
     companies: ['Google', 'Amazon', 'Meta', 'Microsoft', 'Apple'],
     description: 'Find two numbers in an array that add up to a target value',
