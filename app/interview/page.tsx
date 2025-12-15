@@ -445,44 +445,20 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
   // Monaco Editor handles layout automatically with automaticLayout: true
   // No manual height tracking needed
 
-  // Update code when language changes during interview
+  // Update code and workspace files when language changes during interview
   useEffect(() => {
     if (isInterviewStarted && selectedScenario && !showFeedback) {
       let newCode: string
+      let codebaseFiles: any[] = []
 
       // For bug fix scenarios, use buggyCode
       if (selectedScenario.type === 'bugfix') {
         newCode = (selectedScenario as any).buggyCode?.[selectedLanguage] || `// Bug fix code not available for ${selectedLanguage}`
-
-        // Also update workspace files when language changes
-        const codebaseFiles = (selectedScenario as any).codebaseFiles?.[selectedLanguage] || []
-        if (codebaseFiles.length > 0) {
-          const contextFiles = codebaseFiles.map((file: any) => ({
-            path: file.fileName,
-            content: file.content,
-          }))
-          setWorkspaceContext(contextFiles)
-          toast.success(`Loaded ${contextFiles.length} codebase file(s) for ${selectedLanguage}`)
-        } else {
-          setWorkspaceContext([])
-        }
+        codebaseFiles = (selectedScenario as any).codebaseFiles?.[selectedLanguage] || []
       } else if (selectedScenario.type === 'add-functionality') {
         // For Add Functionality scenarios, use existingCode
         newCode = (selectedScenario as any).existingCode?.[selectedLanguage] || `// Add functionality code not available for ${selectedLanguage}`
-
-        // Also update workspace files when language changes
-        const codebaseFiles = (selectedScenario as any).codebaseFiles?.[selectedLanguage] || []
-        if (codebaseFiles.length > 0) {
-          const contextFiles = codebaseFiles.map((file: any) => ({
-            path: file.fileName,
-            content: file.content,
-            description: file.description,
-          }))
-          setWorkspaceContext(contextFiles)
-          toast.success(`Loaded ${contextFiles.length} codebase file(s) for ${selectedLanguage}`)
-        } else {
-          setWorkspaceContext([])
-        }
+        codebaseFiles = (selectedScenario as any).codebaseFiles?.[selectedLanguage] || []
       } else {
         // For DSA scenarios, use starterCode
         newCode = (selectedScenario as any).starterCode?.[selectedLanguage] || `function solution() {
@@ -491,11 +467,29 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 }`
       }
 
-      // Only update if code is still the starter code or empty
+      // ALWAYS update workspace context files when language changes
+      // This ensures codebase files stay in sync with selected language
+      if (codebaseFiles.length > 0) {
+        const contextFiles = codebaseFiles.map((file: any) => ({
+          path: file.fileName,
+          content: file.content,
+          description: file.description,
+        }))
+        setWorkspaceContext(contextFiles)
+        toast.success(`Loaded ${contextFiles.length} codebase file(s) for ${selectedLanguage}`)
+      } else if (selectedScenario.type === 'bugfix' || selectedScenario.type === 'add-functionality') {
+        // Clear workspace context if no codebase files for this language
+        setWorkspaceContext([])
+        toast.warning(`No codebase files available for ${selectedLanguage}. Consider using JavaScript or Python.`)
+      }
+
+      // Only update main code if it's still the starter/default code
       const currentCodeTrimmed = code.trim()
       const isEmptyOrStarter = currentCodeTrimmed === "" ||
         currentCodeTrimmed.includes("Write your solution here") ||
         currentCodeTrimmed.includes("BUG:") ||
+        currentCodeTrimmed.includes("TODO:") ||
+        currentCodeTrimmed.includes("not available for") ||
         currentCodeTrimmed.length < 100
 
       if (isEmptyOrStarter) {
