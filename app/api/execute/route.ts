@@ -63,9 +63,15 @@ async function executeJavaScript(code: string, testCase: any, scenarioType: stri
               if (typeof testCache === 'function') return testCache;
               if (typeof testRateLimiter === 'function') return testRateLimiter;
               if (typeof testTextSearch === 'function') return testTextSearch;
+              if (typeof testAutocomplete === 'function') return testAutocomplete;
+              if (typeof testStateHistory === 'function') return testStateHistory;
+              if (typeof testEventAggregator === 'function') return testEventAggregator;
               if (typeof test_cache === 'function') return test_cache;
               if (typeof test_rate_limiter === 'function') return test_rate_limiter;
               if (typeof test_text_search === 'function') return test_text_search;
+              if (typeof test_autocomplete === 'function') return test_autocomplete;
+              if (typeof test_state_history === 'function') return test_state_history;
+              if (typeof test_event_aggregator === 'function') return test_event_aggregator;
 
               // Check common function names
               if (typeof solution === 'function') return solution;
