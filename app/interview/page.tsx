@@ -434,39 +434,23 @@ Let's continue!`
   const hasTriggeredInactivityRef = useRef<boolean>(false)
   const hasTriggeredSilenceRef = useRef<boolean>(false)
 
-  // Proactive interviewer - improved with context-aware timing (code change detection)
+  // Proactive interviewer - DISABLED (was too intrusive)
+  // The automatic pop-ups were awkward and interrupted user flow
   useEffect(() => {
     if (!isInterviewStarted || showFeedback || showPostInterviewDiscussion) return
 
     const codeHash = code.trim().replace(/\s+/g, " ")
-    const codeLength = code.trim().length
 
-    // Track code changes
+    // Track code changes (for metrics only, no proactive triggering)
     if (codeHash !== lastCodeHash) {
       lastCodeChangeRef.current = Date.now()
-      hasTriggeredInactivityRef.current = false // Reset inactivity trigger on new code
-    }
-
-    // More intelligent timing based on code activity
-    // Jump in after 15-30 seconds of inactivity, but only if meaningful code exists
-    if (codeHash !== lastCodeHash && codeLength > 50 && lastCodeHash.length > 0) {
-      if (proactiveTimer) {
-        clearTimeout(proactiveTimer)
-        setProactiveTimer(null)
-      }
-
-      // Variable timing: shorter for more complex code, longer for simpler
-      const baseDelay = 15000 // 15 seconds base
-      const complexityMultiplier = codeLength > 200 ? 0.8 : codeLength > 100 ? 1.0 : 1.2
-      const delay = Math.floor(baseDelay * complexityMultiplier)
-
-      const timer = setTimeout(() => {
-        triggerProactiveInterviewer()
-      }, delay)
-
-      setProactiveTimer(timer)
+      hasTriggeredInactivityRef.current = false
       setLastCodeHash(codeHash)
     }
+
+    // DISABLED: Automatic proactive messages were too intrusive
+    // Users found them awkward and distracting
+    // The interviewer will only respond when the user messages them
 
     return () => {
       if (proactiveTimer) {
@@ -475,101 +459,33 @@ Let's continue!`
     }
   }, [code, isInterviewStarted, showFeedback, showPostInterviewDiscussion, lastCodeHash])
 
-  // Proactive interviewer - INACTIVITY detection (user not typing for too long)
+  // Proactive interviewer - INACTIVITY detection - DISABLED
+  // Was too intrusive and interrupted user flow
   useEffect(() => {
-    if (!isInterviewStarted || showFeedback || showPostInterviewDiscussion) return
-
-    // Clear existing inactivity timer
-    if (inactivityTimerRef.current) {
-      clearTimeout(inactivityTimerRef.current)
-    }
-
-    // Set up inactivity check every 45 seconds
-    const INACTIVITY_THRESHOLD = 45000 // 45 seconds of no code changes
-    const CHECK_INTERVAL = 15000 // Check every 15 seconds
-
-    const checkInactivity = () => {
-      const timeSinceLastChange = Date.now() - lastCodeChangeRef.current
-      const codeLength = code.trim().length
-
-      // If user hasn't typed in 45+ seconds and hasn't been prompted yet
-      if (timeSinceLastChange > INACTIVITY_THRESHOLD && !hasTriggeredInactivityRef.current) {
-        hasTriggeredInactivityRef.current = true
-
-        // Different prompts based on code state
-        if (codeLength < 30) {
-          // User hasn't started coding yet
-          triggerProactiveInterviewerWithContext("inactivity_no_code")
-        } else if (codeLength < 100) {
-          // User started but seems stuck
-          triggerProactiveInterviewerWithContext("inactivity_stuck")
-        } else {
-          // User was coding but stopped
-          triggerProactiveInterviewerWithContext("inactivity_paused")
-        }
-      }
-    }
-
-    // Start checking after initial 30 seconds
-    const initialDelay = setTimeout(() => {
-      checkInactivity()
-      inactivityTimerRef.current = setInterval(checkInactivity, CHECK_INTERVAL) as unknown as NodeJS.Timeout
-    }, 30000)
-
+    // DISABLED: Automatic inactivity prompts were awkward
+    // Users prefer to work at their own pace without interruption
     return () => {
-      clearTimeout(initialDelay)
       if (inactivityTimerRef.current) {
         clearInterval(inactivityTimerRef.current)
       }
     }
   }, [isInterviewStarted, showFeedback, showPostInterviewDiscussion, code])
 
-  // Proactive interviewer - SILENCE detection (user not communicating)
+  // Proactive interviewer - SILENCE detection - DISABLED
+  // Was too intrusive and condescending
   useEffect(() => {
-    if (!isInterviewStarted || showFeedback || showPostInterviewDiscussion) return
+    // DISABLED: Silence detection prompts felt patronizing
+    // The scoring system handles communication separately
+    // Users can choose to communicate when they want to
 
-    // Update last interviewer message time when user sends a message
+    // Still track for metrics purposes
     const userMessages = interviewerMessages.filter(m => m.type === 'user')
     if (userMessages.length > 0) {
       lastInterviewerMessageRef.current = Date.now()
       hasTriggeredSilenceRef.current = false
     }
 
-    // Clear existing silence timer
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current)
-    }
-
-    // Set up silence check - if user hasn't talked to interviewer in 2 minutes
-    const SILENCE_THRESHOLD = 120000 // 2 minutes
-    const CHECK_INTERVAL = 30000 // Check every 30 seconds
-
-    const checkSilence = () => {
-      const timeSinceLastMessage = Date.now() - lastInterviewerMessageRef.current
-      const userMessageCount = interviewerMessages.filter(m => m.type === 'user').length
-
-      // If user hasn't communicated with interviewer in 2+ minutes
-      if (timeSinceLastMessage > SILENCE_THRESHOLD && !hasTriggeredSilenceRef.current && elapsedTime > 60) {
-        hasTriggeredSilenceRef.current = true
-
-        if (userMessageCount === 0) {
-          // User hasn't said anything at all
-          triggerProactiveInterviewerWithContext("silence_no_communication")
-        } else {
-          // User stopped communicating
-          triggerProactiveInterviewerWithContext("silence_stopped")
-        }
-      }
-    }
-
-    // Start checking after 60 seconds
-    const initialDelay = setTimeout(() => {
-      checkSilence()
-      silenceTimerRef.current = setInterval(checkSilence, CHECK_INTERVAL) as unknown as NodeJS.Timeout
-    }, 60000)
-
     return () => {
-      clearTimeout(initialDelay)
       if (silenceTimerRef.current) {
         clearInterval(silenceTimerRef.current)
       }

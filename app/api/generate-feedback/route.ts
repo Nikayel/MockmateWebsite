@@ -93,12 +93,17 @@ function extractScores(feedback: string, metrics: {
   // Derive new criteria from legacy if not parsed
   const passRate = metrics.testsTotal > 0 ? (metrics.testsPassed / metrics.testsTotal) * 100 : 50
 
-  // Understanding = based on how they explained their approach
+  // Understanding = primarily based on test results (did they understand the problem?)
+  // Communication is separate - don't double-penalize
   if (scores.understanding === 70) {
-    // Map from conversation and test performance
-    const baseUnderstanding = passRate
-    const communicationBonus = metrics.collaborationMessages > 0 ? Math.min(20, metrics.collaborationMessages * 5) : -20
-    scores.understanding = Math.min(100, Math.max(0, baseUnderstanding + communicationBonus))
+    // If tests pass, they understood the problem
+    if (passRate >= 80) {
+      scores.understanding = Math.min(95, passRate + 10)
+    } else if (passRate >= 50) {
+      scores.understanding = passRate + 5
+    } else {
+      scores.understanding = Math.max(20, passRate)
+    }
   }
 
   // Problem-Solving = based on debugging and optimization
@@ -108,15 +113,18 @@ function extractScores(feedback: string, metrics: {
   }
 
   // Communication = based on how much they talked/messaged
+  // BUT: Don't overly penalize - some good candidates work quietly then explain at end
   if (scores.communication === 70) {
     if (metrics.collaborationMessages === 0) {
-      scores.communication = 20 // Very low for no communication
+      // Even with 0 tracked messages, give benefit of doubt if tests passed
+      // They may have explained verbally or in code comments
+      scores.communication = passRate >= 80 ? 50 : 35
     } else if (metrics.collaborationMessages <= 2) {
-      scores.communication = 40
+      scores.communication = passRate >= 80 ? 60 : 45
     } else if (metrics.collaborationMessages <= 5) {
-      scores.communication = 60
+      scores.communication = 65
     } else {
-      scores.communication = Math.min(90, 60 + metrics.collaborationMessages * 3)
+      scores.communication = Math.min(85, 65 + metrics.collaborationMessages * 2)
     }
   }
 
@@ -157,6 +165,7 @@ function extractScores(feedback: string, metrics: {
 
   // Calculate overall using NEW WEIGHTED FORMULA
   // Understanding (30%) + Problem-Solving (25%) + Code Quality (25%) + Communication (20%)
+  // But ensure correct solutions get fair scores
   const newOverall = Math.round(
     scores.understanding * 0.30 +
     scores.problemSolving * 0.25 +
@@ -164,8 +173,15 @@ function extractScores(feedback: string, metrics: {
     scores.communication * 0.20
   )
 
-  // Always use calculated weighted score - don't trust AI's overall
-  scores.overall = newOverall
+  // Floor: If all tests pass, minimum score should be 65 (C range)
+  // A correct solution should never be a D or F
+  if (passRate >= 90) {
+    scores.overall = Math.max(70, newOverall) // At least B- for near-perfect tests
+  } else if (passRate >= 80) {
+    scores.overall = Math.max(65, newOverall) // At least C+ for 80%+ tests
+  } else {
+    scores.overall = newOverall
+  }
 
   return scores
 }
