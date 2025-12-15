@@ -663,8 +663,19 @@ export default function PracticeFeedback({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Quick Summary - always show */}
+            <div className="bg-[#00d9ff]/5 border border-[#00d9ff]/10 rounded-lg p-4">
+              <p className="text-gray-300 text-sm">
+                {sections.tldr || (testsPassed === testsTotal && testsTotal > 0
+                  ? "Your solution passed all tests. Focus on explaining your approach more during the interview."
+                  : testsPassed > 0
+                  ? `Your solution passed ${testsPassed}/${testsTotal} tests. Review the failing cases and edge conditions.`
+                  : "Focus on getting a working solution first, then optimize.")}
+              </p>
+            </div>
+
             {/* Strengths */}
-            {sections.whatWorked.length > 0 && (
+            {sections.whatWorked.length > 0 ? (
               <div className="bg-[#00d9ff]/10 border border-[#00d9ff]/20 rounded-lg p-4">
                 <div className="flex items-center space-x-2 mb-2">
                   <TrendingUp className="h-4 w-4 text-[#00d9ff]" />
@@ -676,10 +687,21 @@ export default function PracticeFeedback({
                   ))}
                 </ul>
               </div>
+            ) : testsPassed > 0 && (
+              <div className="bg-[#00d9ff]/10 border border-[#00d9ff]/20 rounded-lg p-4">
+                <div className="flex items-center space-x-2 mb-2">
+                  <TrendingUp className="h-4 w-4 text-[#00d9ff]" />
+                  <span className="text-[#00d9ff] font-semibold">Strengths</span>
+                </div>
+                <ul className="text-gray-300 text-sm space-y-1">
+                  <li>• Passed {testsPassed}/{testsTotal} test cases</li>
+                  {testsPassed === testsTotal && <li>• Solution handles all given test cases correctly</li>}
+                </ul>
+              </div>
             )}
 
             {/* Areas for Improvement */}
-            {sections.fixNext.length > 0 && (
+            {sections.fixNext.length > 0 ? (
               <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-4">
                 <div className="flex items-center space-x-2 mb-2">
                   <Target className="h-4 w-4 text-gray-400" />
@@ -689,6 +711,17 @@ export default function PracticeFeedback({
                   {sections.fixNext.map((item, index) => (
                     <li key={index}>• {item}</li>
                   ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-4">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Target className="h-4 w-4 text-gray-400" />
+                  <span className="text-gray-400 font-semibold">Areas for Improvement</span>
+                </div>
+                <ul className="text-gray-300 text-sm space-y-1">
+                  <li>• Practice explaining your thought process out loud</li>
+                  <li>• Discuss time/space complexity before coding</li>
                 </ul>
               </div>
             )}
