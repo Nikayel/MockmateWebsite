@@ -15804,49 +15804,7 @@ The algorithm for myAtoi(string s) is as follows:
     testCases: []
   },
 
-  {
-    id: 'dsa-kth-largest-element',
-    title: 'Kth Largest Element in Array',
-    type: 'dsa',
-    difficulty: 'medium',
-    companies: ["Amazon", "Google", "Meta", "Microsoft"],
-    description: 'Find the kth largest element in an unsorted array.',
-    tags: ["heap", "quickselect", "sorting"],
-    estimatedTime: 20,
-    problemStatement: `Given an integer array nums and an integer k, return the kth largest element in the array. Note that it is the kth largest element in sorted order, not the kth distinct element.`,
-    examples: [
-    {
-      input: 'nums = [3,2,1,5,6,4], k = 2',
-      output: '5'
-    },
-    {
-      input: 'nums = [3,2,3,1,2,4,5,5,6], k = 4',
-      output: '4'
-    }
-  ],
-    constraints: [
-    '1 <= k <= nums.length <= 10^5',
-    '-10^4 <= nums[i] <= 10^4'
-  ],
-    hints: [
-    'Use min heap of size k',
-    'Or use quickselect algorithm for O(n) average',
-    'Heap approach: O(n log k), Quickselect: O(n) average'
-  ],
-    starterCode: {
-      javascript: `function kth_largest_element() {
-  // Your code here
-}`,
-      python: `def kth_largest_element():
-    # Your code here
-    pass`
-    },
-    optimalComplexity: {
-      time: 'O(n log k) heap, O(n) quickselect',
-      space: 'O(k)'
-    },
-    testCases: []
-  },
+  // NOTE: removed duplicate 'dsa-kth-largest-element' variant to avoid ID collisions
 
   {
     id: 'dsa-merge-k-sorted-lists',

@@ -724,7 +724,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           context: interviewerMessages,
           role: "interviewer",
           userContext: userProfile ? {
-            email: user.email,
+            email: user?.email,
             subscription_tier: userProfile.subscription_tier,
             sessions_used: usageLimit?.used || 0,
           } : undefined,
@@ -882,7 +882,7 @@ Interviews are conversations, not just coding exercises.`
       observations.push("Candidate is using hash-based data structures - ASK if they understand the space tradeoff")
     }
 
-    if (code.match(/recursion|function.*\(.*\)\s*{[\s\S]*\1\(/)) {
+    if (code.match(/recursion|function.*\(.*\)\s*{[\s\S]*function\s*\(/)) {
       observations.push("Candidate is using recursion - ASK about base cases and stack limits")
     }
 
@@ -1065,7 +1065,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           context: interviewerMessages,
           role: "interviewer",
           userContext: userProfile ? {
-            email: user.email,
+            email: user?.email,
             subscription_tier: userProfile.subscription_tier,
             sessions_used: usageLimit?.used || 0,
           } : undefined,
@@ -1562,7 +1562,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             context: messages,
             role: isInterviewer ? "interviewer" : "partner",
             userContext: userProfile ? {
-              email: user.email,
+              email: user?.email,
               full_name: userName,
               subscription_tier: userProfile.subscription_tier,
               sessions_used: usageLimit?.used || 0,
@@ -1616,8 +1616,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     const complexityLevel = controlStructures <= 3 ? "Low" : controlStructures <= 7 ? "Medium" : "High"
 
     // Estimate time complexity based on nested loops
-    const nestedLoopCount = (code.match(/for.*{[^}]*for/gs) || []).length +
-      (code.match(/while.*{[^}]*while/gs) || []).length
+    const nestedLoopCount = (code.match(/for.*{[^}]*for/g) || []).length +
+      (code.match(/while.*{[^}]*while/g) || []).length
     let estimatedTimeComplexity = "O(n)"
     if (nestedLoopCount >= 2) {
       estimatedTimeComplexity = "O(n³)"
@@ -1925,14 +1925,14 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       <div className="border-t border-gray-700 pt-3 mt-3">
                         <h3 className="text-white font-semibold mb-2">Workspace Files</h3>
                         {/* Show warning for add-functionality when language has no files */}
-                        {selectedScenario.type === 'add-functionality' && workspaceContext.length === 0 && (
+                        {selectedScenario && selectedScenario.type === 'add-functionality' && workspaceContext.length === 0 && (
                           <div className="mb-2 bg-yellow-500/10 border border-yellow-500/30 rounded p-2">
                             <p className="text-xs text-yellow-300">
                               ⚠️ This scenario is optimized for <strong>JavaScript/TypeScript</strong>. Switch language for codebase files.
                             </p>
                           </div>
                         )}
-                        {(selectedScenario.type === 'bugfix' || selectedScenario.type === 'add-functionality') && workspaceContext.length > 0 ? (
+                        {selectedScenario && (selectedScenario.type === 'bugfix' || selectedScenario.type === 'add-functionality') && workspaceContext.length > 0 ? (
                           <div className="mb-2">
                             <p className="text-xs text-green-400 mb-2">
                               ✓ {workspaceContext.length} codebase file(s) loaded automatically
