@@ -54,12 +54,20 @@ async function executeJavaScript(code: string, testCase: any, scenarioType: stri
         // Strategy 2: Code might be a function declaration, try wrapping differently
         try {
           // Try as an IIFE that returns a function
-          // For bugfix scenarios, try to find any function that matches common patterns
+          // For bugfix and add-functionality scenarios, look for test functions and main functions
           const wrapped = runInNewContext(`
             (function() {
               ${trimmedCode}
               // Try to find and return the function
-              // Check common function names first
+              // Check for test functions first (add-functionality scenarios)
+              if (typeof testCache === 'function') return testCache;
+              if (typeof testRateLimiter === 'function') return testRateLimiter;
+              if (typeof testTextSearch === 'function') return testTextSearch;
+              if (typeof test_cache === 'function') return test_cache;
+              if (typeof test_rate_limiter === 'function') return test_rate_limiter;
+              if (typeof test_text_search === 'function') return test_text_search;
+
+              // Check common function names
               if (typeof solution === 'function') return solution;
               if (typeof twoSum === 'function') return twoSum;
               if (typeof main === 'function') return main;
@@ -77,6 +85,7 @@ async function executeJavaScript(code: string, testCase: any, scenarioType: stri
               // Also check for specific bugfix function names
               if (typeof processAdjacentPairs === 'function') return processAdjacentPairs;
               if (typeof getUserEmailFormatted === 'function') return getUserEmailFormatted;
+              if (typeof PaymentProcessor === 'function') return PaymentProcessor;
 
               // Return the first non-utility function found
               if (functionNames.length > 0) {
@@ -385,9 +394,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No test cases defined for this scenario" }, { status: 400 })
     }
 
-    // For bugfix scenarios, prepend codebase files to provide supporting functions
+    // For bugfix AND add-functionality scenarios, prepend codebase files to provide supporting functions
     let fullCode = code
-    if (scenario.type === 'bugfix') {
+    if (scenario.type === 'bugfix' || scenario.type === 'add-functionality') {
       const scenarioWithCodebase = scenario as any
       const codebaseFiles = scenarioWithCodebase.codebaseFiles?.[language] || []
 
@@ -406,6 +415,14 @@ export async function POST(request: NextRequest) {
               // Remove import statements
               fileContent = fileContent.replace(/import\s+.*?from\s+['"][^'"]*['"]\s*;?/g, '')
               fileContent = fileContent.replace(/import\s+['"][^'"]*['"]\s*;?/g, '')
+            }
+
+            // For Python, remove import statements from local modules
+            if (language === 'python') {
+              // Remove relative imports
+              fileContent = fileContent.replace(/from\s+\.\w*\s+import\s+[^\n]+/g, '')
+              // Remove local module imports but keep standard library
+              fileContent = fileContent.replace(/from\s+(?!typing|collections|functools|itertools|math|re|json|datetime|os|sys)\w+\s+import\s+[^\n]+/g, '')
             }
 
             // Add a comment header for context

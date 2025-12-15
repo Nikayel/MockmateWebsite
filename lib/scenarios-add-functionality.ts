@@ -2249,6 +2249,778 @@ export const db = mongoose.connection;`,
       'Proper indexes are added for query performance',
     ],
   },
+
+  // =============================================================================
+  // SIMPLER TESTABLE ADD-FUNCTIONALITY SCENARIOS
+  // These are pure functions that can be tested with the current execution engine
+  // =============================================================================
+
+  {
+    id: 'add-feature-cache-system',
+    title: 'Add TTL Expiration to Cache',
+    type: 'add-functionality',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Google', 'Meta', 'Microsoft'],
+    description: 'Add time-to-live (TTL) expiration feature to an existing cache system',
+    tags: ['cache', 'data-structures', 'time-based'],
+    estimatedTime: 30,
+    problemStatement: `You're working on a caching system. The existing cache supports get/set operations but doesn't support TTL expiration.
+
+**Your task:**
+1. Read the existing cache implementation
+2. Add TTL support: entries should expire after a specified duration
+3. Modify the get method to check expiration
+4. Ensure expired entries don't count toward cache size
+5. All existing tests must still pass
+
+**Context:** This cache is used by multiple microservices. TTL is critical for avoiding stale data.`,
+    featureRequirements: [
+      'set(key, value, ttlMs) - store with optional TTL in milliseconds',
+      'get(key) - returns null if expired or not found',
+      'has(key) - returns false if expired',
+      'delete(key) - removes entry',
+      'size() - returns count of non-expired entries',
+      'cleanup() - removes all expired entries',
+    ],
+    existingCode: {
+      javascript: `// cache.js - Simple cache implementation
+// TODO: Add TTL (time-to-live) expiration support
+
+class Cache {
+  constructor(maxSize = 100) {
+    this.maxSize = maxSize;
+    this.store = new Map();
+  }
+
+  /**
+   * Store a value in the cache
+   * @param {string} key - The cache key
+   * @param {any} value - The value to store
+   * @param {number} ttlMs - Time to live in milliseconds (optional)
+   */
+  set(key, value, ttlMs = null) {
+    // TODO: Implement TTL support
+    // Store the value along with expiration time if ttlMs is provided
+    if (this.store.size >= this.maxSize) {
+      // Remove oldest entry
+      const firstKey = this.store.keys().next().value;
+      this.store.delete(firstKey);
+    }
+    this.store.set(key, value);
+  }
+
+  /**
+   * Get a value from the cache
+   * @param {string} key - The cache key
+   * @returns {any} The cached value or null if not found/expired
+   */
+  get(key) {
+    // TODO: Check if entry is expired before returning
+    return this.store.get(key) || null;
+  }
+
+  /**
+   * Check if key exists and is not expired
+   * @param {string} key - The cache key
+   * @returns {boolean}
+   */
+  has(key) {
+    // TODO: Return false if expired
+    return this.store.has(key);
+  }
+
+  /**
+   * Delete a key from the cache
+   * @param {string} key - The cache key
+   * @returns {boolean} True if key was deleted
+   */
+  delete(key) {
+    return this.store.delete(key);
+  }
+
+  /**
+   * Get count of non-expired entries
+   * @returns {number}
+   */
+  size() {
+    // TODO: Only count non-expired entries
+    return this.store.size;
+  }
+
+  /**
+   * Remove all expired entries
+   * @returns {number} Number of entries removed
+   */
+  cleanup() {
+    // TODO: Implement cleanup of expired entries
+    return 0;
+  }
+}
+
+// Test helper function - DO NOT MODIFY
+function testCache(operations) {
+  const cache = new Cache(10);
+  const results = [];
+
+  for (const op of operations) {
+    switch (op.type) {
+      case 'set':
+        cache.set(op.key, op.value, op.ttl);
+        results.push({ type: 'set', key: op.key });
+        break;
+      case 'get':
+        results.push({ type: 'get', key: op.key, value: cache.get(op.key) });
+        break;
+      case 'has':
+        results.push({ type: 'has', key: op.key, exists: cache.has(op.key) });
+        break;
+      case 'size':
+        results.push({ type: 'size', count: cache.size() });
+        break;
+      case 'wait':
+        // Simulate time passing (in test mode, we manipulate time)
+        if (typeof op.ms === 'number') {
+          // Advance mock time
+          global.__mockTime = (global.__mockTime || Date.now()) + op.ms;
+        }
+        break;
+      case 'cleanup':
+        results.push({ type: 'cleanup', removed: cache.cleanup() });
+        break;
+    }
+  }
+
+  return results;
+}`,
+      python: `# cache.py - Simple cache implementation
+# TODO: Add TTL (time-to-live) expiration support
+
+import time
+
+class Cache:
+    def __init__(self, max_size=100):
+        self.max_size = max_size
+        self.store = {}
+
+    def set(self, key, value, ttl_ms=None):
+        """
+        Store a value in the cache
+        Args:
+            key: The cache key
+            value: The value to store
+            ttl_ms: Time to live in milliseconds (optional)
+        """
+        # TODO: Implement TTL support
+        # Store the value along with expiration time if ttl_ms is provided
+        if len(self.store) >= self.max_size:
+            # Remove first entry (oldest)
+            first_key = next(iter(self.store))
+            del self.store[first_key]
+        self.store[key] = value
+
+    def get(self, key):
+        """
+        Get a value from the cache
+        Returns: The cached value or None if not found/expired
+        """
+        # TODO: Check if entry is expired before returning
+        return self.store.get(key)
+
+    def has(self, key):
+        """Check if key exists and is not expired"""
+        # TODO: Return False if expired
+        return key in self.store
+
+    def delete(self, key):
+        """Delete a key from the cache"""
+        if key in self.store:
+            del self.store[key]
+            return True
+        return False
+
+    def size(self):
+        """Get count of non-expired entries"""
+        # TODO: Only count non-expired entries
+        return len(self.store)
+
+    def cleanup(self):
+        """Remove all expired entries"""
+        # TODO: Implement cleanup of expired entries
+        return 0
+
+
+# Test helper function - DO NOT MODIFY
+def test_cache(operations):
+    cache = Cache(10)
+    results = []
+
+    for op in operations:
+        if op['type'] == 'set':
+            cache.set(op['key'], op['value'], op.get('ttl'))
+            results.append({'type': 'set', 'key': op['key']})
+        elif op['type'] == 'get':
+            results.append({'type': 'get', 'key': op['key'], 'value': cache.get(op['key'])})
+        elif op['type'] == 'has':
+            results.append({'type': 'has', 'key': op['key'], 'exists': cache.has(op['key'])})
+        elif op['type'] == 'size':
+            results.append({'type': 'size', 'count': cache.size()})
+        elif op['type'] == 'cleanup':
+            results.append({'type': 'cleanup', 'removed': cache.cleanup()})
+
+    return results`,
+    },
+    codebaseFiles: {
+      javascript: [
+        {
+          fileName: 'utils/time.js',
+          content: `// Time utilities for cache
+// Use these for time-based operations
+
+function getCurrentTime() {
+  // In tests, this may return mock time
+  return global.__mockTime || Date.now();
+}
+
+function isExpired(expiresAt) {
+  if (!expiresAt) return false;
+  return getCurrentTime() >= expiresAt;
+}
+
+module.exports = { getCurrentTime, isExpired };`,
+          description: 'Time utilities - use getCurrentTime() instead of Date.now() for testability',
+        },
+      ],
+      python: [
+        {
+          fileName: 'utils/time_utils.py',
+          content: `# Time utilities for cache
+# Use these for time-based operations
+
+_mock_time = None
+
+def get_current_time():
+    """Returns current time in milliseconds"""
+    global _mock_time
+    if _mock_time is not None:
+        return _mock_time
+    return int(time.time() * 1000)
+
+def is_expired(expires_at):
+    """Check if a timestamp has expired"""
+    if expires_at is None:
+        return False
+    return get_current_time() >= expires_at`,
+          description: 'Time utilities - use get_current_time() for testability',
+        },
+      ],
+    },
+    hints: [
+      'Store expiration timestamp along with value (e.g., { value, expiresAt })',
+      'Calculate expiresAt as getCurrentTime() + ttlMs when setting',
+      'In get(), check if entry exists AND is not expired',
+      'Use the isExpired() utility from time.js',
+      'For cleanup(), iterate through entries and delete expired ones',
+    ],
+    testCases: [
+      {
+        input: { operations: [
+          { type: 'set', key: 'a', value: 1 },
+          { type: 'get', key: 'a' }
+        ]},
+        expected: [
+          { type: 'set', key: 'a' },
+          { type: 'get', key: 'a', value: 1 }
+        ],
+        description: 'Basic set and get without TTL',
+      },
+      {
+        input: { operations: [
+          { type: 'set', key: 'b', value: 2 },
+          { type: 'has', key: 'b' },
+          { type: 'has', key: 'c' }
+        ]},
+        expected: [
+          { type: 'set', key: 'b' },
+          { type: 'has', key: 'b', exists: true },
+          { type: 'has', key: 'c', exists: false }
+        ],
+        description: 'has() returns correct boolean',
+      },
+      {
+        input: { operations: [
+          { type: 'set', key: 'x', value: 10 },
+          { type: 'set', key: 'y', value: 20 },
+          { type: 'size' }
+        ]},
+        expected: [
+          { type: 'set', key: 'x' },
+          { type: 'set', key: 'y' },
+          { type: 'size', count: 2 }
+        ],
+        description: 'size() returns correct count',
+      },
+    ],
+    acceptanceCriteria: [
+      'All existing functionality still works',
+      'TTL expiration works correctly',
+      'Expired entries are not returned by get()',
+      'size() only counts non-expired entries',
+      'cleanup() removes expired entries',
+    ],
+  },
+
+  {
+    id: 'add-feature-rate-limiter',
+    title: 'Add Sliding Window Rate Limiter',
+    type: 'add-functionality',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Google', 'Stripe', 'Cloudflare'],
+    description: 'Implement a sliding window rate limiter for API requests',
+    tags: ['rate-limiting', 'algorithms', 'api'],
+    estimatedTime: 30,
+    problemStatement: `You're building an API rate limiter. The existing implementation uses a fixed window, which allows request bursts at window boundaries.
+
+**Your task:**
+1. Implement a sliding window rate limiter
+2. The limiter should allow N requests per window (e.g., 100 requests per minute)
+3. Use sliding window algorithm to avoid burst issues
+4. Return remaining quota and reset time with each check
+
+**Context:** This rate limiter protects backend services from abuse. Accurate limiting is critical.`,
+    featureRequirements: [
+      'isAllowed(clientId) - check if request is allowed',
+      'Sliding window algorithm (not fixed window)',
+      'Return { allowed, remaining, resetTime } from check',
+      'Support configurable limits per client',
+      'Efficient cleanup of old entries',
+    ],
+    existingCode: {
+      javascript: `// rate-limiter.js - Implement sliding window rate limiter
+
+class RateLimiter {
+  /**
+   * @param {number} maxRequests - Maximum requests per window
+   * @param {number} windowMs - Window size in milliseconds
+   */
+  constructor(maxRequests = 100, windowMs = 60000) {
+    this.maxRequests = maxRequests;
+    this.windowMs = windowMs;
+    this.clients = new Map(); // clientId -> request timestamps
+  }
+
+  /**
+   * Check if a request is allowed for the given client
+   * @param {string} clientId - Unique client identifier
+   * @returns {{ allowed: boolean, remaining: number, resetTime: number }}
+   */
+  isAllowed(clientId) {
+    // TODO: Implement sliding window rate limiting
+    // 1. Get current timestamp
+    // 2. Clean up old timestamps outside the window
+    // 3. Check if client has exceeded limit
+    // 4. If allowed, record the new request
+    // 5. Return { allowed, remaining, resetTime }
+
+    return {
+      allowed: true,
+      remaining: this.maxRequests,
+      resetTime: Date.now() + this.windowMs
+    };
+  }
+
+  /**
+   * Get current usage for a client
+   * @param {string} clientId
+   * @returns {{ used: number, remaining: number }}
+   */
+  getUsage(clientId) {
+    // TODO: Return current usage stats
+    return {
+      used: 0,
+      remaining: this.maxRequests
+    };
+  }
+
+  /**
+   * Reset limits for a client
+   * @param {string} clientId
+   */
+  reset(clientId) {
+    this.clients.delete(clientId);
+  }
+
+  /**
+   * Clean up old entries to prevent memory leaks
+   * @returns {number} Number of entries cleaned up
+   */
+  cleanup() {
+    // TODO: Remove timestamps older than windowMs for all clients
+    return 0;
+  }
+}
+
+// Test function - DO NOT MODIFY
+function testRateLimiter(config, requests) {
+  const limiter = new RateLimiter(config.maxRequests, config.windowMs);
+  const results = [];
+
+  for (const req of requests) {
+    if (req.type === 'check') {
+      const result = limiter.isAllowed(req.clientId);
+      results.push({
+        clientId: req.clientId,
+        ...result
+      });
+    } else if (req.type === 'usage') {
+      results.push({
+        clientId: req.clientId,
+        ...limiter.getUsage(req.clientId)
+      });
+    } else if (req.type === 'reset') {
+      limiter.reset(req.clientId);
+      results.push({ clientId: req.clientId, reset: true });
+    }
+  }
+
+  return results;
+}`,
+      python: `# rate_limiter.py - Implement sliding window rate limiter
+
+import time
+
+class RateLimiter:
+    def __init__(self, max_requests=100, window_ms=60000):
+        """
+        Args:
+            max_requests: Maximum requests per window
+            window_ms: Window size in milliseconds
+        """
+        self.max_requests = max_requests
+        self.window_ms = window_ms
+        self.clients = {}  # clientId -> list of request timestamps
+
+    def is_allowed(self, client_id):
+        """
+        Check if a request is allowed for the given client
+        Returns: { 'allowed': bool, 'remaining': int, 'reset_time': int }
+        """
+        # TODO: Implement sliding window rate limiting
+        # 1. Get current timestamp
+        # 2. Clean up old timestamps outside the window
+        # 3. Check if client has exceeded limit
+        # 4. If allowed, record the new request
+        # 5. Return { allowed, remaining, reset_time }
+
+        return {
+            'allowed': True,
+            'remaining': self.max_requests,
+            'reset_time': int(time.time() * 1000) + self.window_ms
+        }
+
+    def get_usage(self, client_id):
+        """Get current usage for a client"""
+        # TODO: Return current usage stats
+        return {
+            'used': 0,
+            'remaining': self.max_requests
+        }
+
+    def reset(self, client_id):
+        """Reset limits for a client"""
+        if client_id in self.clients:
+            del self.clients[client_id]
+
+    def cleanup(self):
+        """Clean up old entries to prevent memory leaks"""
+        # TODO: Remove timestamps older than window_ms for all clients
+        return 0
+
+
+# Test function - DO NOT MODIFY
+def test_rate_limiter(config, requests):
+    limiter = RateLimiter(config['max_requests'], config['window_ms'])
+    results = []
+
+    for req in requests:
+        if req['type'] == 'check':
+            result = limiter.is_allowed(req['client_id'])
+            results.append({
+                'client_id': req['client_id'],
+                **result
+            })
+        elif req['type'] == 'usage':
+            result = limiter.get_usage(req['client_id'])
+            results.append({
+                'client_id': req['client_id'],
+                **result
+            })
+        elif req['type'] == 'reset':
+            limiter.reset(req['client_id'])
+            results.append({'client_id': req['client_id'], 'reset': True})
+
+    return results`,
+    },
+    codebaseFiles: {
+      javascript: [],
+      python: [],
+    },
+    hints: [
+      'Store request timestamps in an array for each client',
+      'Filter out timestamps older than (now - windowMs)',
+      'Compare array length against maxRequests',
+      'Add current timestamp if request is allowed',
+      'resetTime is the oldest timestamp + windowMs',
+    ],
+    testCases: [
+      {
+        input: {
+          config: { maxRequests: 3, windowMs: 60000 },
+          requests: [
+            { type: 'check', clientId: 'user1' },
+            { type: 'check', clientId: 'user1' },
+            { type: 'check', clientId: 'user1' }
+          ]
+        },
+        expected: [
+          { clientId: 'user1', allowed: true, remaining: 2 },
+          { clientId: 'user1', allowed: true, remaining: 1 },
+          { clientId: 'user1', allowed: true, remaining: 0 }
+        ],
+        description: 'Allows requests up to limit',
+        orderMatters: false,
+      },
+      {
+        input: {
+          config: { maxRequests: 2, windowMs: 60000 },
+          requests: [
+            { type: 'check', clientId: 'user1' },
+            { type: 'check', clientId: 'user1' },
+            { type: 'check', clientId: 'user1' }
+          ]
+        },
+        expected: [
+          { clientId: 'user1', allowed: true },
+          { clientId: 'user1', allowed: true },
+          { clientId: 'user1', allowed: false }
+        ],
+        description: 'Blocks requests over limit',
+        orderMatters: false,
+      },
+    ],
+    acceptanceCriteria: [
+      'Sliding window algorithm implemented correctly',
+      'Returns accurate remaining count',
+      'Blocks requests when limit exceeded',
+      'Different clients have independent limits',
+      'cleanup() removes old entries',
+    ],
+  },
+
+  {
+    id: 'add-feature-text-search',
+    title: 'Add Fuzzy Search to Text Matcher',
+    type: 'add-functionality',
+    difficulty: 'medium',
+    companies: ['Google', 'Algolia', 'Elasticsearch', 'Meta'],
+    description: 'Add fuzzy matching capability to a text search system',
+    tags: ['search', 'algorithms', 'string-matching'],
+    estimatedTime: 35,
+    problemStatement: `You're working on a search system. The existing implementation only supports exact substring matching. Users want fuzzy search that tolerates typos.
+
+**Your task:**
+1. Implement fuzzy string matching using edit distance (Levenshtein)
+2. Add a threshold parameter for match tolerance
+3. Rank results by relevance (exact matches first, then by edit distance)
+4. Keep existing exact match functionality working
+
+**Context:** This powers the search-as-you-type feature. Performance matters for large datasets.`,
+    featureRequirements: [
+      'Implement Levenshtein distance calculation',
+      'search(query, maxDistance) - returns fuzzy matches',
+      'Results sorted by relevance (lower distance = higher rank)',
+      'Exact matches should have distance of 0',
+      'Support configurable max edit distance threshold',
+    ],
+    existingCode: {
+      javascript: `// text-search.js - Add fuzzy matching
+
+class TextSearch {
+  constructor() {
+    this.items = [];
+  }
+
+  /**
+   * Add items to the search index
+   * @param {string[]} items - Array of strings to index
+   */
+  addItems(items) {
+    this.items = [...this.items, ...items];
+  }
+
+  /**
+   * Calculate Levenshtein (edit) distance between two strings
+   * @param {string} a - First string
+   * @param {string} b - Second string
+   * @returns {number} Edit distance
+   */
+  editDistance(a, b) {
+    // TODO: Implement Levenshtein distance algorithm
+    // This should return the minimum number of single-character edits
+    // (insertions, deletions, substitutions) to transform a into b
+    return 0;
+  }
+
+  /**
+   * Search for items matching the query
+   * @param {string} query - Search query
+   * @param {number} maxDistance - Maximum edit distance (0 = exact match only)
+   * @returns {{ item: string, distance: number }[]} Sorted by distance
+   */
+  search(query, maxDistance = 2) {
+    // TODO: Implement fuzzy search
+    // 1. Calculate edit distance for each item
+    // 2. Filter items within maxDistance
+    // 3. Sort by distance (ascending)
+    // 4. Return array of { item, distance }
+
+    return [];
+  }
+
+  /**
+   * Find exact matches (existing functionality - DO NOT MODIFY)
+   * @param {string} query
+   * @returns {string[]}
+   */
+  exactMatch(query) {
+    return this.items.filter(item =>
+      item.toLowerCase().includes(query.toLowerCase())
+    );
+  }
+}
+
+// Test function - DO NOT MODIFY
+function testTextSearch(items, queries) {
+  const search = new TextSearch();
+  search.addItems(items);
+
+  return queries.map(q => ({
+    query: q.query,
+    maxDistance: q.maxDistance,
+    results: search.search(q.query, q.maxDistance)
+  }));
+}`,
+      python: `# text_search.py - Add fuzzy matching
+
+class TextSearch:
+    def __init__(self):
+        self.items = []
+
+    def add_items(self, items):
+        """Add items to the search index"""
+        self.items.extend(items)
+
+    def edit_distance(self, a, b):
+        """
+        Calculate Levenshtein (edit) distance between two strings
+        Returns: Edit distance (minimum single-character edits)
+        """
+        # TODO: Implement Levenshtein distance algorithm
+        # This should return the minimum number of single-character edits
+        # (insertions, deletions, substitutions) to transform a into b
+        return 0
+
+    def search(self, query, max_distance=2):
+        """
+        Search for items matching the query
+        Args:
+            query: Search query
+            max_distance: Maximum edit distance (0 = exact match only)
+        Returns: List of { 'item': str, 'distance': int } sorted by distance
+        """
+        # TODO: Implement fuzzy search
+        # 1. Calculate edit distance for each item
+        # 2. Filter items within max_distance
+        # 3. Sort by distance (ascending)
+        # 4. Return list of { item, distance }
+
+        return []
+
+    def exact_match(self, query):
+        """Find exact matches (existing functionality - DO NOT MODIFY)"""
+        query_lower = query.lower()
+        return [item for item in self.items if query_lower in item.lower()]
+
+
+# Test function - DO NOT MODIFY
+def test_text_search(items, queries):
+    search = TextSearch()
+    search.add_items(items)
+
+    return [
+        {
+            'query': q['query'],
+            'max_distance': q['max_distance'],
+            'results': search.search(q['query'], q['max_distance'])
+        }
+        for q in queries
+    ]`,
+    },
+    codebaseFiles: {
+      javascript: [],
+      python: [],
+    },
+    hints: [
+      'Use dynamic programming for edit distance: dp[i][j] = min edits to transform a[0:i] to b[0:j]',
+      'Base cases: dp[i][0] = i, dp[0][j] = j',
+      'Transition: if a[i-1] == b[j-1], dp[i][j] = dp[i-1][j-1], else min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]) + 1',
+      'For search(), compare query against each item name (case-insensitive)',
+      'Filter results where distance <= maxDistance, then sort',
+    ],
+    testCases: [
+      {
+        input: {
+          items: ['apple', 'banana', 'grape'],
+          queries: [{ query: 'apple', maxDistance: 0 }]
+        },
+        expected: [
+          { query: 'apple', maxDistance: 0, results: [{ item: 'apple', distance: 0 }] }
+        ],
+        description: 'Exact match has distance 0',
+      },
+      {
+        input: {
+          items: ['apple', 'apply', 'maple'],
+          queries: [{ query: 'aple', maxDistance: 1 }]
+        },
+        expected: [
+          { query: 'aple', maxDistance: 1, results: [{ item: 'apple', distance: 1 }] }
+        ],
+        description: 'Finds items within edit distance 1',
+      },
+      {
+        input: {
+          items: ['cat', 'bat', 'rat', 'car'],
+          queries: [{ query: 'cat', maxDistance: 1 }]
+        },
+        expected: [
+          { query: 'cat', maxDistance: 1, results: [
+            { item: 'cat', distance: 0 },
+            { item: 'bat', distance: 1 },
+            { item: 'rat', distance: 1 },
+            { item: 'car', distance: 1 }
+          ]}
+        ],
+        description: 'Returns multiple matches sorted by distance',
+      },
+    ],
+    acceptanceCriteria: [
+      'Edit distance calculation is correct',
+      'Fuzzy search returns relevant results',
+      'Results sorted by distance (ascending)',
+      'Exact matches have distance of 0',
+      'maxDistance parameter works correctly',
+    ],
+  },
 ];
 
 export default addFunctionalityScenarios;
