@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { chatRateLimit } from "@/lib/rate-limit"
 import { generateAIResponse, validateResponseRelevance, type TaskComplexity } from "@/lib/ai-providers"
 import { trackAIChatServer } from "@/lib/analytics-server"
+import { getCompanyStyle, getPatternMetadata, type DSAPattern } from "@/lib/types/dsa-patterns"
 
 interface UserContext {
   email?: string
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
-    const { message, context, role, userContext, workspaceContext, currentCode, isProactive, scenarioTitle, scenarioType, elapsedTime, sessionId, userId } = await request.json()
+    const { message, context, role, userContext, workspaceContext, currentCode, isProactive, scenarioTitle, scenarioType, scenarioPattern, scenarioCompany, elapsedTime, sessionId, userId } = await request.json()
 
     // For proactive messages (interviewer jumping in), message might be empty
     if (!message && !isProactive) {
@@ -160,38 +161,60 @@ IMPORTANT: When referencing the candidate, use their first name or last name onl
       ? `\n\nCURRENT PROBLEM: ${scenarioTitle}${scenarioType ? ` (${scenarioType.toUpperCase()})` : ''}\n`
       : ''
 
-    const systemPrompts = {
-      interviewer: `You are Sable, a professional technical interviewer. Be direct and concise.
+    // Get company-specific interview style
+    const companyStyle = getCompanyStyle(scenarioCompany || 'Generic')
 
+    // Get pattern-specific metadata for DSA problems
+    const patternMeta = scenarioPattern ? getPatternMetadata(scenarioPattern as DSAPattern) : null
+
+    // Build company-specific context
+    const companyContext = `
+COMPANY: ${companyStyle.company}
+INTERVIEW STYLE: ${companyStyle.style}
+YOU ARE: A ${companyStyle.company} interviewer conducting a technical interview.
+${companyStyle.company !== 'Generic' ? `Mention you're interviewing for ${companyStyle.company} in your first response.` : ''}
+
+FOCUS AREAS: ${companyStyle.focusAreas.join(', ')}
+EVALUATION EMPHASIS: ${companyStyle.evaluationEmphasis.join(', ')}
+PERSONALITY: ${companyStyle.interviewerPersonality}
+`
+
+    // Build pattern-specific context for DSA problems
+    const patternContext = patternMeta ? `
+PROBLEM PATTERN: ${patternMeta.name}
+KEY TECHNIQUES: ${patternMeta.keyTechniques.join(', ')}
+EXPECTED COMPLEXITY: Time ${patternMeta.timeComplexityHints[0]}, Space ${patternMeta.spaceComplexityHints[0]}
+PATTERN-SPECIFIC FOLLOW-UPS TO ASK:
+${patternMeta.interviewerFollowUps.slice(0, 3).map(q => `- ${q}`).join('\n')}
+` : ''
+
+    const systemPrompts = {
+      interviewer: `You are a professional technical interviewer at ${companyStyle.company}. Be direct and concise.
+
+${companyContext}
 ${userContextString}${problemContext}
+${patternContext}
 
 CORE RULES:
 - Keep responses SHORT (2-4 sentences max)
 - Ask ONE question at a time
-- Don't repeat yourself or the candidate's words back to them
+- Adapt your style to ${companyStyle.company}'s interview culture
 - No generic praise until tests pass
 - Sound natural, not robotic
+
+COMPANY-SPECIFIC FOLLOW-UPS:
+${companyStyle.commonFollowUps.slice(0, 3).map(q => `- ${q}`).join('\n')}
 
 WHAT TO DO:
 - When they share code: Ask about complexity OR edge cases (pick one)
 - When they explain: Acknowledge briefly, then probe deeper with ONE follow-up
 - When stuck: Give a small hint, not a lecture
-- When tests pass: "Nice. What's the time complexity?" (brief acknowledgment)
+- When tests pass: Brief acknowledgment, then ask a follow-up question
 
 WHAT NOT TO DO:
 - Don't give long speeches or multiple questions at once
 - Don't say "Great question!" or "That's a good point!" repeatedly
 - Don't summarize what they just said back to them
-- Don't ask them to "walk me through" more than once per session
-
-EXAMPLE GOOD RESPONSES:
-- "What's the time complexity here?"
-- "What happens if the input is empty?"
-- "I see an issue on line 5. Take another look."
-- "That works. Can you optimize the space usage?"
-
-EXAMPLE BAD RESPONSES (TOO LONG):
-- "That's a really interesting approach! I can see you're thinking about using a hash map, which is great. Can you walk me through your thought process and explain why you chose this data structure? Also, what's the time complexity?"
 
 ${scenarioTitle ? `Problem: ${scenarioTitle}` : ''}
 
