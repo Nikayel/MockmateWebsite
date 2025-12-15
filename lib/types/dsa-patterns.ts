@@ -39,6 +39,7 @@ export const DSA_PATTERNS = {
   // Heap / Priority Queue
   HEAP: 'heap',
   PRIORITY_QUEUE: 'priority-queue',
+  HEAP_PRIORITY_QUEUE: 'heap-priority-queue',
 
   // Backtracking
   BACKTRACKING: 'backtracking',
@@ -67,6 +68,7 @@ export const DSA_PATTERNS = {
   // Math & Geometry
   MATH: 'math',
   GEOMETRY: 'geometry',
+  MATH_GEOMETRY: 'math-geometry',
 
   // Bit Manipulation
   BIT_MANIPULATION: 'bit-manipulation',

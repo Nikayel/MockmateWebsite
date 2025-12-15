@@ -87,7 +87,7 @@ const PATTERN_GROUPS = [
   },
   {
     name: "Heap / Priority Queue",
-    patterns: ["heap", "priority-queue"] as DSAPattern[],
+    patterns: ["heap", "priority-queue", "heap-priority-queue"] as DSAPattern[],
     icon: BarChart3,
     color: "from-amber-500/60 to-yellow-500/60",
     bgColor: "bg-slate-900/60",
@@ -135,7 +135,7 @@ const PATTERN_GROUPS = [
   },
   {
     name: "Math & Geometry",
-    patterns: ["math", "geometry"] as DSAPattern[],
+    patterns: ["math", "geometry", "math-geometry"] as DSAPattern[],
     icon: Calculator,
     color: "from-pink-500/60 to-rose-500/60",
     bgColor: "bg-slate-900/60",
