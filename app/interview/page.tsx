@@ -274,6 +274,14 @@ export default function InterviewPage() {
           setShowScenarioBrowser(false)
           setStartTime(Date.now())
 
+          // Check if there's saved session state to determine if this is a true resume
+          const savedState = await getSessionState(sessionId)
+          const hasExistingProgress = savedState && (
+            savedState.interviewerMessages && savedState.interviewerMessages.length > 1 ||
+            savedState.chatMessages && savedState.chatMessages.length > 1 ||
+            savedState.elapsedTime && savedState.elapsedTime > 60
+          )
+
           // Initialize code based on scenario type
           let initialCode: string
           if (scenario.type === 'bugfix') {
@@ -292,11 +300,26 @@ export default function InterviewPage() {
 
 }`
           }
-          setCode(initialCode)
 
-          // Initialize interviewer with welcome message
-          const problemType = scenario.type === 'bugfix' ? 'BUG FIX' : scenario.type.toUpperCase()
-          const initialMessage = `Welcome back! I'm Sable, your interviewer. You're continuing your practice on **${scenario.title}** - a ${scenario.difficulty} ${problemType} problem.
+          // If there's saved code, use it; otherwise use starter code
+          if (hasExistingProgress && savedState?.code) {
+            setCode(savedState.code)
+            if (savedState.language) {
+              setSelectedLanguage(savedState.language as any)
+            }
+          } else {
+            setCode(initialCode)
+          }
+
+          // Initialize interviewer with appropriate message based on progress
+          const problemType = scenario.type === 'bugfix' ? 'BUG FIX' :
+            scenario.type === 'add-functionality' ? 'ADD FUNCTIONALITY' :
+              scenario.type.toUpperCase()
+
+          let initialMessage: string
+          if (hasExistingProgress) {
+            // True resume - user has made progress
+            initialMessage = `Welcome back! I'm Sable, your interviewer. You're continuing your practice on **${scenario.title}** - a ${scenario.difficulty} ${problemType} problem.
 
 You can continue where you left off. Feel free to:
 - Ask me clarifying questions about the requirements
@@ -305,13 +328,38 @@ You can continue where you left off. Feel free to:
 
 Let's continue!`
 
-          setInterviewerMessages([{ type: "ai", message: initialMessage }])
-          setChatMessages([{
-            type: "ai",
-            message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
-          }])
+            // Restore previous messages if available
+            if (savedState?.interviewerMessages && savedState.interviewerMessages.length > 0) {
+              setInterviewerMessages(savedState.interviewerMessages as Array<{ type: "ai" | "user"; message: string }>)
+            } else {
+              setInterviewerMessages([{ type: "ai", message: initialMessage }])
+            }
+            if (savedState?.chatMessages && savedState.chatMessages.length > 0) {
+              setChatMessages(savedState.chatMessages as Array<{ type: "ai" | "user"; message: string }>)
+            } else {
+              setChatMessages([{
+                type: "ai",
+                message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
+              }])
+            }
+            toast.success("Session resumed")
+          } else {
+            // Fresh start - no previous progress
+            initialMessage = `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${scenario.title}**, a ${scenario.difficulty} ${problemType} problem.
 
-          toast.success("Session resumed")
+Here's what I expect:
+- Walk me through your plan before you code; if you skip that, I'll call it out.
+- Narrate while you build so I can understand your reasoning.
+- Use the AI partner intentionally. If you're just copying suggestions, I'll flag it.
+
+Take a breath, study the prompt on the left, and tell me how you plan to attack this.`
+
+            setInterviewerMessages([{ type: "ai", message: initialMessage }])
+            setChatMessages([{
+              type: "ai",
+              message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
+            }])
+          }
         } else {
           toast.error("Scenario not found")
         }

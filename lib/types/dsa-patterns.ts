@@ -796,7 +796,7 @@ export const COMPANY_INTERVIEW_STYLES: Record<string, CompanyInterviewStyle> = {
   },
 
   'Generic': {
-    company: 'Tech Company',
+    company: '', // Empty - don't mention any specific company
     style: 'Standard technical interview',
     focusAreas: ['Problem-solving', 'Code quality', 'Communication'],
     interviewFormat: 'Standard 45-60 min coding interview',

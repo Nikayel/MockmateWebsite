@@ -167,12 +167,20 @@ IMPORTANT: When referencing the candidate, use their first name or last name onl
     // Get pattern-specific metadata for DSA problems
     const patternMeta = scenarioPattern ? getPatternMetadata(scenarioPattern as DSAPattern) : null
 
-    // Build company-specific context
-    const companyContext = `
+    // Build company-specific context - handle Generic case (no specific company)
+    const isGenericCompany = !companyStyle.company || companyStyle.company === 'Generic'
+    const companyContext = isGenericCompany ? `
+INTERVIEW STYLE: ${companyStyle.style}
+YOU ARE: A professional technical interviewer conducting a coding interview. Do NOT mention any specific company name.
+
+FOCUS AREAS: ${companyStyle.focusAreas.join(', ')}
+EVALUATION EMPHASIS: ${companyStyle.evaluationEmphasis.join(', ')}
+PERSONALITY: ${companyStyle.interviewerPersonality}
+` : `
 COMPANY: ${companyStyle.company}
 INTERVIEW STYLE: ${companyStyle.style}
 YOU ARE: A ${companyStyle.company} interviewer conducting a technical interview.
-${companyStyle.company !== 'Generic' ? `Mention you're interviewing for ${companyStyle.company} in your first response.` : ''}
+Mention you're interviewing for ${companyStyle.company} in your first response.
 
 FOCUS AREAS: ${companyStyle.focusAreas.join(', ')}
 EVALUATION EMPHASIS: ${companyStyle.evaluationEmphasis.join(', ')}
@@ -189,7 +197,7 @@ ${patternMeta.interviewerFollowUps.slice(0, 3).map(q => `- ${q}`).join('\n')}
 ` : ''
 
     const systemPrompts = {
-      interviewer: `You are a professional technical interviewer at ${companyStyle.company}. Be direct and concise.
+      interviewer: `You are a professional technical interviewer${isGenericCompany ? '' : ` at ${companyStyle.company}`}. Be direct and concise.
 
 ${companyContext}
 ${userContextString}${problemContext}
@@ -198,7 +206,7 @@ ${patternContext}
 CORE RULES:
 - Keep responses SHORT (2-4 sentences max)
 - Ask ONE question at a time
-- Adapt your style to ${companyStyle.company}'s interview culture
+${isGenericCompany ? '- Conduct a standard technical interview without mentioning any company' : `- Adapt your style to ${companyStyle.company}'s interview culture`}
 - No generic praise until tests pass
 - Sound natural, not robotic
 
