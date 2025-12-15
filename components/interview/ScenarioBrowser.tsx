@@ -70,8 +70,16 @@ export function ScenarioBrowser({ onStartInterview, usageLimit, completedProblem
         return "bg-[#00d9ff] text-black"
       case "bugfix":
         return "bg-[#00ff88] text-black"
-      default:
+      case "add-functionality":
+        return "bg-amber-500 text-black"
+      case "system-design":
         return "bg-purple-500 text-white"
+      case "optimization":
+        return "bg-blue-500 text-white"
+      case "security":
+        return "bg-red-500 text-white"
+      default:
+        return "bg-gray-500 text-white"
     }
   }
 
@@ -113,27 +121,34 @@ export function ScenarioBrowser({ onStartInterview, usageLimit, completedProblem
             </div>
 
             {/* Stats */}
-            <div className="flex flex-wrap justify-center gap-4 text-sm">
-              <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700">
+            <div className="flex flex-wrap justify-center gap-3 text-sm">
+              <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/50 rounded-lg border border-gray-700">
                 <div className="w-2 h-2 rounded-full bg-[#00d9ff]"></div>
                 <span className="text-white font-semibold">
                   {scenarios.filter((s) => s.type === "dsa").length}
                 </span>
-                <span className="text-gray-400">DSA Questions</span>
+                <span className="text-gray-400">DSA</span>
               </div>
-              <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700">
+              <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/50 rounded-lg border border-gray-700">
                 <div className="w-2 h-2 rounded-full bg-[#00ff88]"></div>
                 <span className="text-white font-semibold">
                   {scenarios.filter((s) => s.type === "bugfix").length}
                 </span>
-                <span className="text-gray-400">Bug Fix Scenarios</span>
+                <span className="text-gray-400">Bug Fix</span>
               </div>
-              <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700">
+              <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/50 rounded-lg border border-gray-700">
+                <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                <span className="text-white font-semibold">
+                  {scenarios.filter((s) => s.type === "add-functionality").length}
+                </span>
+                <span className="text-gray-400">Add Feature</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/50 rounded-lg border border-gray-700">
                 <div className="w-2 h-2 rounded-full bg-purple-500"></div>
                 <span className="text-white font-semibold">
-                  {scenarios.filter((s) => s.type !== "dsa" && s.type !== "bugfix").length}
+                  {scenarios.filter((s) => s.type === "system-design").length}
                 </span>
-                <span className="text-gray-400">Other</span>
+                <span className="text-gray-400">System Design</span>
               </div>
             </div>
           </div>
@@ -177,11 +192,12 @@ export function ScenarioBrowser({ onStartInterview, usageLimit, completedProblem
                     className="w-full bg-gray-800 border border-gray-600 text-white rounded-md px-3 py-2"
                   >
                     <option value="">All Types</option>
-                    <option value="dsa">DSA</option>
+                    <option value="dsa">DSA Problems</option>
                     <option value="bugfix">Bug Fix</option>
+                    <option value="add-functionality">Add Functionality</option>
+                    <option value="system-design">System Design</option>
                     <option value="optimization">Optimization</option>
                     <option value="security">Security</option>
-                    <option value="system-design">System Design</option>
                   </select>
                 </div>
 
@@ -247,14 +263,18 @@ export function ScenarioBrowser({ onStartInterview, usageLimit, completedProblem
                         ? "DSA"
                         : scenario.type === "bugfix"
                         ? "BUG FIX"
-                        : scenario.type.toUpperCase()}
+                        : scenario.type === "add-functionality"
+                        ? "ADD FEATURE"
+                        : scenario.type === "system-design"
+                        ? "SYSTEM DESIGN"
+                        : scenario.type.toUpperCase().replace("-", " ")}
                     </Badge>
                     <Badge className={`${getDifficultyColor(scenario.difficulty)} text-xs`}>
                       {scenario.difficulty.toUpperCase()}
                     </Badge>
                   </div>
                   <CardTitle className="text-white mb-2">{scenario.title}</CardTitle>
-                  <p className="text-gray-400 text-sm">{scenario.description}</p>
+                  <p className="text-gray-400 text-sm line-clamp-2">{scenario.description}</p>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2 mb-4">
