@@ -66,7 +66,7 @@ export async function DELETE(request: NextRequest) {
       { name: "interview_sessions", field: "user_id" },
       { name: "profile_quota", field: "user_id" },
       { name: "session_vectors", field: "userId" },
-      { name: "user_profiles", field: "userId" },
+      { name: "performance_profiles", field: "userId" },
       { name: "promo_code_usage", field: "userId" },
       { name: "analytics", field: "userId" },
     ]

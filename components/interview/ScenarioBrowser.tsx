@@ -21,11 +21,12 @@ import { PatternBrowser } from "./PatternBrowser"
 interface ScenarioBrowserProps {
   onStartInterview: (scenario: Scenario) => void
   usageLimit: UsageLimit | null
+  completedProblems: string[]
 }
 
 type ViewMode = 'list' | 'patterns'
 
-export function ScenarioBrowser({ onStartInterview, usageLimit }: ScenarioBrowserProps) {
+export function ScenarioBrowser({ onStartInterview, usageLimit, completedProblems }: ScenarioBrowserProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('patterns')
   const {
     selectedScenario,
@@ -83,7 +84,7 @@ export function ScenarioBrowser({ onStartInterview, usageLimit }: ScenarioBrowse
             <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-4">
               Select Interview Scenario
             </h1>
-            <p className="text-xl text-gray-300 mb-6">Choose a problem to practice</p>
+            <p className="text-xl text-gray-300 mb-6">Practice questions organized by patterns or as a full list.</p>
 
             {/* View Mode Toggle */}
             <div className="flex justify-center gap-2 mb-6">
@@ -96,7 +97,7 @@ export function ScenarioBrowser({ onStartInterview, usageLimit }: ScenarioBrowse
                 }
               >
                 <LayoutGrid className="h-4 w-4 mr-2" />
-                Patterns (NeetCode Style)
+                Patterns
               </Button>
               <Button
                 variant={viewMode === 'list' ? 'default' : 'outline'}
@@ -139,7 +140,10 @@ export function ScenarioBrowser({ onStartInterview, usageLimit }: ScenarioBrowse
 
           {/* Pattern View */}
           {viewMode === 'patterns' && (
-            <PatternBrowser onStartInterview={onStartInterview} completedProblems={[]} />
+            <PatternBrowser
+              onStartInterview={onStartInterview}
+              completedProblems={completedProblems}
+            />
           )}
 
           {/* List View */}

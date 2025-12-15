@@ -19,143 +19,143 @@ interface PatternBrowserProps {
   completedProblems?: string[] // IDs of completed problems
 }
 
-// Pattern category groupings (like NeetCode roadmap)
+// Pattern category groupings for DSA roadmap
 const PATTERN_GROUPS = [
   {
     name: "Arrays & Hashing",
     patterns: ["arrays-hashing"] as DSAPattern[],
     icon: Hash,
-    color: "from-cyan-500 to-blue-500",
-    bgColor: "bg-cyan-500/10",
-    borderColor: "border-cyan-500/30",
+    color: "from-cyan-500/60 to-blue-500/60",
+    bgColor: "bg-slate-900/60",
+    borderColor: "border-slate-700/70",
   },
   {
     name: "Two Pointers",
     patterns: ["two-pointers"] as DSAPattern[],
     icon: GitBranch,
-    color: "from-green-500 to-emerald-500",
-    bgColor: "bg-green-500/10",
-    borderColor: "border-green-500/30",
+    color: "from-emerald-500/60 to-green-500/60",
+    bgColor: "bg-slate-900/60",
+    borderColor: "border-slate-700/70",
   },
   {
     name: "Sliding Window",
     patterns: ["sliding-window"] as DSAPattern[],
     icon: Layers,
-    color: "from-yellow-500 to-orange-500",
-    bgColor: "bg-yellow-500/10",
-    borderColor: "border-yellow-500/30",
+    color: "from-amber-500/60 to-orange-500/60",
+    bgColor: "bg-slate-900/60",
+    borderColor: "border-slate-700/70",
   },
   {
     name: "Stack",
     patterns: ["stack", "monotonic-stack"] as DSAPattern[],
     icon: List,
-    color: "from-purple-500 to-pink-500",
-    bgColor: "bg-purple-500/10",
-    borderColor: "border-purple-500/30",
+    color: "from-purple-500/60 to-pink-500/60",
+    bgColor: "bg-slate-900/60",
+    borderColor: "border-slate-700/70",
   },
   {
     name: "Binary Search",
     patterns: ["binary-search"] as DSAPattern[],
     icon: Binary,
-    color: "from-red-500 to-rose-500",
-    bgColor: "bg-red-500/10",
-    borderColor: "border-red-500/30",
+    color: "from-rose-500/60 to-red-500/60",
+    bgColor: "bg-slate-900/60",
+    borderColor: "border-slate-700/70",
   },
   {
     name: "Linked List",
     patterns: ["linked-list"] as DSAPattern[],
     icon: Repeat,
-    color: "from-indigo-500 to-violet-500",
-    bgColor: "bg-indigo-500/10",
-    borderColor: "border-indigo-500/30",
+    color: "from-indigo-500/60 to-violet-500/60",
+    bgColor: "bg-slate-900/60",
+    borderColor: "border-slate-700/70",
   },
   {
     name: "Trees",
     patterns: ["trees", "binary-tree", "binary-search-tree"] as DSAPattern[],
     icon: TreeDeciduous,
-    color: "from-emerald-500 to-teal-500",
-    bgColor: "bg-emerald-500/10",
-    borderColor: "border-emerald-500/30",
+    color: "from-emerald-500/60 to-teal-500/60",
+    bgColor: "bg-slate-900/60",
+    borderColor: "border-slate-700/70",
   },
   {
     name: "Tries",
     patterns: ["trie"] as DSAPattern[],
     icon: Network,
-    color: "from-sky-500 to-cyan-500",
-    bgColor: "bg-sky-500/10",
-    borderColor: "border-sky-500/30",
+    color: "from-sky-500/60 to-cyan-500/60",
+    bgColor: "bg-slate-900/60",
+    borderColor: "border-slate-700/70",
   },
   {
     name: "Heap / Priority Queue",
     patterns: ["heap", "priority-queue"] as DSAPattern[],
     icon: BarChart3,
-    color: "from-amber-500 to-yellow-500",
-    bgColor: "bg-amber-500/10",
-    borderColor: "border-amber-500/30",
+    color: "from-amber-500/60 to-yellow-500/60",
+    bgColor: "bg-slate-900/60",
+    borderColor: "border-slate-700/70",
   },
   {
     name: "Backtracking",
     patterns: ["backtracking"] as DSAPattern[],
     icon: Repeat,
-    color: "from-fuchsia-500 to-purple-500",
-    bgColor: "bg-fuchsia-500/10",
-    borderColor: "border-fuchsia-500/30",
+    color: "from-fuchsia-500/60 to-purple-500/60",
+    bgColor: "bg-slate-900/60",
+    borderColor: "border-slate-700/70",
   },
   {
     name: "Graphs",
     patterns: ["graphs", "bfs", "dfs", "topological-sort", "union-find", "dijkstra"] as DSAPattern[],
     icon: Network,
-    color: "from-blue-500 to-indigo-500",
-    bgColor: "bg-blue-500/10",
-    borderColor: "border-blue-500/30",
+    color: "from-blue-500/60 to-indigo-500/60",
+    bgColor: "bg-slate-900/60",
+    borderColor: "border-slate-700/70",
   },
   {
     name: "Dynamic Programming",
     patterns: ["dp-1d", "dp-2d", "dp-knapsack", "dp-lcs", "dp-tree"] as DSAPattern[],
     icon: Cpu,
-    color: "from-orange-500 to-red-500",
-    bgColor: "bg-orange-500/10",
-    borderColor: "border-orange-500/30",
+    color: "from-orange-500/60 to-red-500/60",
+    bgColor: "bg-slate-900/60",
+    borderColor: "border-slate-700/70",
   },
   {
     name: "Greedy",
     patterns: ["greedy"] as DSAPattern[],
     icon: Zap,
-    color: "from-lime-500 to-green-500",
-    bgColor: "bg-lime-500/10",
-    borderColor: "border-lime-500/30",
+    color: "from-lime-500/60 to-green-500/60",
+    bgColor: "bg-slate-900/60",
+    borderColor: "border-slate-700/70",
   },
   {
     name: "Intervals",
     patterns: ["intervals"] as DSAPattern[],
     icon: Box,
-    color: "from-teal-500 to-cyan-500",
-    bgColor: "bg-teal-500/10",
-    borderColor: "border-teal-500/30",
+    color: "from-teal-500/60 to-cyan-500/60",
+    bgColor: "bg-slate-900/60",
+    borderColor: "border-slate-700/70",
   },
   {
     name: "Math & Geometry",
     patterns: ["math", "geometry"] as DSAPattern[],
     icon: Calculator,
-    color: "from-pink-500 to-rose-500",
-    bgColor: "bg-pink-500/10",
-    borderColor: "border-pink-500/30",
+    color: "from-pink-500/60 to-rose-500/60",
+    bgColor: "bg-slate-900/60",
+    borderColor: "border-slate-700/70",
   },
   {
     name: "Bit Manipulation",
     patterns: ["bit-manipulation"] as DSAPattern[],
     icon: Binary,
-    color: "from-slate-500 to-gray-500",
-    bgColor: "bg-slate-500/10",
-    borderColor: "border-slate-500/30",
+    color: "from-slate-500/60 to-gray-500/60",
+    bgColor: "bg-slate-900/60",
+    borderColor: "border-slate-700/70",
   },
   {
     name: "Matrix",
     patterns: ["matrix"] as DSAPattern[],
     icon: Grid3X3,
-    color: "from-violet-500 to-purple-500",
-    bgColor: "bg-violet-500/10",
-    borderColor: "border-violet-500/30",
+    color: "from-violet-500/60 to-purple-500/60",
+    bgColor: "bg-slate-900/60",
+    borderColor: "border-slate-700/70",
   },
 ]
 
@@ -228,10 +228,10 @@ function inferPattern(scenario: Scenario): DSAPattern | null {
 
 const getDifficultyColor = (difficulty: DifficultyLevel) => {
   switch (difficulty) {
-    case "easy": return "text-green-400 bg-green-400/10 border-green-400/30"
-    case "medium": return "text-yellow-400 bg-yellow-400/10 border-yellow-400/30"
-    case "hard": return "text-red-400 bg-red-400/10 border-red-400/30"
-    default: return "text-gray-400 bg-gray-400/10 border-gray-400/30"
+    case "easy": return "text-emerald-300 bg-emerald-500/10 border-emerald-500/20"
+    case "medium": return "text-amber-300 bg-amber-500/10 border-amber-500/20"
+    case "hard": return "text-rose-300 bg-rose-500/10 border-rose-500/20"
+    default: return "text-gray-300 bg-gray-500/10 border-gray-500/20"
   }
 }
 
@@ -268,22 +268,22 @@ export function PatternBrowser({ onStartInterview, completedProblems = [] }: Pat
       {/* Header Stats */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-white mb-2">DSA Patterns</h2>
-          <p className="text-gray-400">Master algorithms by pattern, like NeetCode roadmap</p>
+          <h2 className="text-2xl font-bold text-white mb-2">Practice by Pattern</h2>
+          <p className="text-gray-400">Group related problems into patterns to build deep intuition.</p>
         </div>
         <div className="text-right">
-          <div className="text-3xl font-bold text-[#00d9ff]">{totalCompleted}/{totalProblems}</div>
-          <div className="text-gray-400 text-sm">Problems Solved</div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Progress</div>
+          <div className="text-lg font-semibold text-gray-100">{totalCompleted}/{totalProblems} solved</div>
         </div>
       </div>
 
       {/* Overall Progress */}
       <div className="mb-8">
-        <div className="flex justify-between text-sm mb-2">
-          <span className="text-gray-400">Overall Progress</span>
-          <span className="text-[#00d9ff]">{Math.round((totalCompleted / totalProblems) * 100)}%</span>
+        <div className="flex justify-between text-xs mb-2 text-gray-400">
+          <span>Overall progress</span>
+          <span>{Math.round((totalCompleted / totalProblems) * 100)}%</span>
         </div>
-        <Progress value={(totalCompleted / totalProblems) * 100} className="h-2 bg-gray-800" />
+        <Progress value={(totalCompleted / totalProblems) * 100} className="h-1.5 bg-gray-900/80" />
       </div>
 
       {/* Pattern Grid */}
@@ -295,7 +295,7 @@ export function PatternBrowser({ onStartInterview, completedProblems = [] }: Pat
           return (
             <Card
               key={group.name}
-              className={`${group.bgColor} ${group.borderColor} border-2 transition-all duration-300 cursor-pointer hover:scale-[1.02] ${
+              className={`${group.bgColor} ${group.borderColor} border transition-all duration-300 cursor-pointer hover:border-gray-500/80 ${
                 isExpanded ? 'col-span-full' : ''
               }`}
               onClick={() => setExpandedPattern(isExpanded ? null : group.name)}

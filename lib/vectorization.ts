@@ -392,7 +392,7 @@ export async function findSimilarSessions(
  */
 export async function getUserPerformanceProfile(userId: string): Promise<UserPerformanceProfile | null> {
   try {
-    const docRef = doc(db, 'user_profiles', userId)
+    const docRef = doc(db, 'performance_profiles', userId)
     const docSnap = await getDoc(docRef)
 
     if (docSnap.exists()) {
@@ -503,13 +503,13 @@ export async function updateUserPerformanceProfile(
     }
 
     // Store in Firestore
-    const docRef = doc(db, 'user_profiles', userId)
+    const docRef = doc(db, 'performance_profiles', userId)
     await updateDoc(docRef, {
       ...updatedProfile,
       lastUpdated: updatedProfile.lastUpdated.toISOString(),
     }).catch(async () => {
       // If doc doesn't exist, create it
-      await addDoc(collection(db, 'user_profiles'), {
+      await addDoc(collection(db, 'performance_profiles'), {
         ...updatedProfile,
         lastUpdated: updatedProfile.lastUpdated.toISOString(),
       })
