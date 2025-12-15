@@ -16162,6 +16162,1377 @@ The algorithm for myAtoi(string s) is as follows:
     },
     testCases: []
   },
+
+  // =============================================================================
+  // ADDITIONAL STACK PROBLEMS (8 more to reach 10 total)
+  // =============================================================================
+  {
+    id: 'dsa-daily-temperatures',
+    title: 'Daily Temperatures',
+    type: 'dsa',
+    pattern: 'stack',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Google', 'Meta', 'Microsoft'],
+    description: 'Find days until warmer temperature using monotonic stack',
+    tags: ['stack', 'monotonic-stack', 'array'],
+    estimatedTime: 25,
+    problemStatement: `Given an array of integers temperatures represents the daily temperatures, return an array answer such that answer[i] is the number of days you have to wait after the ith day to get a warmer temperature. If there is no future day for which this is possible, keep answer[i] == 0 instead.`,
+    examples: [
+      {
+        input: 'temperatures = [73,74,75,71,69,72,76,73]',
+        output: '[1,1,4,2,1,1,0,0]',
+        explanation: 'For day 0 (73°), the next warmer is day 1 (74°), so answer[0] = 1.',
+      },
+      {
+        input: 'temperatures = [30,40,50,60]',
+        output: '[1,1,1,0]',
+      },
+      {
+        input: 'temperatures = [30,60,90]',
+        output: '[1,1,0]',
+      },
+    ],
+    constraints: [
+      '1 <= temperatures.length <= 10^5',
+      '30 <= temperatures[i] <= 100',
+    ],
+    hints: [
+      'Use a monotonic decreasing stack to track indices',
+      'When you find a warmer temperature, pop from stack and calculate days',
+      'Stack stores indices, not temperatures',
+    ],
+    starterCode: {
+      javascript: `function dailyTemperatures(temperatures) {
+  // Write your solution here
+
+}`,
+      typescript: `function dailyTemperatures(temperatures: number[]): number[] {
+  // Write your solution here
+
+}`,
+      python: `def daily_temperatures(temperatures):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public int[] dailyTemperatures(int[] temperatures) {
+        // Write your solution here
+        return new int[0];
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(n)',
+    },
+    testCases: [
+      { input: { temperatures: [73,74,75,71,69,72,76,73] }, expected: [1,1,4,2,1,1,0,0], description: 'Standard case' },
+      { input: { temperatures: [30,40,50,60] }, expected: [1,1,1,0], description: 'Increasing temperatures' },
+      { input: { temperatures: [30,60,90] }, expected: [1,1,0], description: 'Simple increasing' },
+    ],
+  },
+  {
+    id: 'dsa-largest-rectangle-histogram',
+    title: 'Largest Rectangle in Histogram',
+    type: 'dsa',
+    pattern: 'stack',
+    difficulty: 'hard',
+    companies: ['Amazon', 'Google', 'Meta', 'Microsoft', 'Apple'],
+    description: 'Find the largest rectangular area in a histogram',
+    tags: ['stack', 'monotonic-stack', 'array'],
+    estimatedTime: 35,
+    problemStatement: `Given an array of integers heights representing the histogram's bar height where the width of each bar is 1, return the area of the largest rectangle in the histogram.`,
+    examples: [
+      {
+        input: 'heights = [2,1,5,6,2,3]',
+        output: '10',
+        explanation: 'The largest rectangle has area = 10 (bars at index 2 and 3 with height 5).',
+      },
+      {
+        input: 'heights = [2,4]',
+        output: '4',
+      },
+    ],
+    constraints: [
+      '1 <= heights.length <= 10^5',
+      '0 <= heights[i] <= 10^4',
+    ],
+    hints: [
+      'Use a monotonic increasing stack',
+      'When you encounter a smaller bar, calculate areas for bars that can\'t extend further',
+      'Track the width using indices on the stack',
+    ],
+    starterCode: {
+      javascript: `function largestRectangleArea(heights) {
+  // Write your solution here
+
+}`,
+      typescript: `function largestRectangleArea(heights: number[]): number {
+  // Write your solution here
+
+}`,
+      python: `def largest_rectangle_area(heights):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public int largestRectangleArea(int[] heights) {
+        // Write your solution here
+        return 0;
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(n)',
+    },
+    testCases: [
+      { input: { heights: [2,1,5,6,2,3] }, expected: 10, description: 'Standard histogram' },
+      { input: { heights: [2,4] }, expected: 4, description: 'Two bars' },
+      { input: { heights: [1] }, expected: 1, description: 'Single bar' },
+    ],
+  },
+  {
+    id: 'dsa-evaluate-reverse-polish',
+    title: 'Evaluate Reverse Polish Notation',
+    type: 'dsa',
+    pattern: 'stack',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Google', 'Microsoft', 'LinkedIn'],
+    description: 'Evaluate arithmetic expression in Reverse Polish Notation',
+    tags: ['stack', 'math', 'array'],
+    estimatedTime: 20,
+    problemStatement: `You are given an array of strings tokens that represents an arithmetic expression in a Reverse Polish Notation.
+
+Evaluate the expression. Return an integer that represents the value of the expression.
+
+Note that:
+- The valid operators are '+', '-', '*', and '/'.
+- Each operand may be an integer or another expression.
+- The division between two integers always truncates toward zero.
+- There will not be any division by zero.
+- The input represents a valid arithmetic expression in reverse polish notation.`,
+    examples: [
+      {
+        input: 'tokens = ["2","1","+","3","*"]',
+        output: '9',
+        explanation: '((2 + 1) * 3) = 9',
+      },
+      {
+        input: 'tokens = ["4","13","5","/","+"]',
+        output: '6',
+        explanation: '(4 + (13 / 5)) = 6',
+      },
+      {
+        input: 'tokens = ["10","6","9","3","+","-11","*","/","*","17","+","5","+"]',
+        output: '22',
+      },
+    ],
+    constraints: [
+      '1 <= tokens.length <= 10^4',
+      'tokens[i] is either an operator or an integer in range [-200, 200]',
+    ],
+    hints: [
+      'Use a stack to store operands',
+      'When you see an operator, pop two operands, apply operation, push result',
+      'Be careful with integer division truncation toward zero',
+    ],
+    starterCode: {
+      javascript: `function evalRPN(tokens) {
+  // Write your solution here
+
+}`,
+      typescript: `function evalRPN(tokens: string[]): number {
+  // Write your solution here
+
+}`,
+      python: `def eval_rpn(tokens):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public int evalRPN(String[] tokens) {
+        // Write your solution here
+        return 0;
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(n)',
+    },
+    testCases: [
+      { input: { tokens: ["2","1","+","3","*"] }, expected: 9, description: 'Basic expression' },
+      { input: { tokens: ["4","13","5","/","+"] }, expected: 6, description: 'Division expression' },
+    ],
+  },
+  {
+    id: 'dsa-decode-string',
+    title: 'Decode String',
+    type: 'dsa',
+    pattern: 'stack',
+    difficulty: 'medium',
+    companies: ['Google', 'Amazon', 'Apple', 'Microsoft'],
+    description: 'Decode an encoded string with nested patterns',
+    tags: ['stack', 'string', 'recursion'],
+    estimatedTime: 25,
+    problemStatement: `Given an encoded string, return its decoded string.
+
+The encoding rule is: k[encoded_string], where the encoded_string inside the square brackets is being repeated exactly k times. Note that k is guaranteed to be a positive integer.
+
+You may assume that the input string is always valid; there are no extra white spaces, square brackets are well-formed, etc. Furthermore, you may assume that the original data does not contain any digits and that digits are only for those repeat numbers, k.`,
+    examples: [
+      {
+        input: 's = "3[a]2[bc]"',
+        output: '"aaabcbc"',
+      },
+      {
+        input: 's = "3[a2[c]]"',
+        output: '"accaccacc"',
+        explanation: 'Inner 2[c] = "cc", then 3[acc] = "accaccacc"',
+      },
+      {
+        input: 's = "2[abc]3[cd]ef"',
+        output: '"abcabccdcdcdef"',
+      },
+    ],
+    constraints: [
+      '1 <= s.length <= 30',
+      's consists of lowercase English letters, digits, and square brackets',
+      's is guaranteed to be a valid input',
+      'All the integers in s are in the range [1, 300]',
+    ],
+    hints: [
+      'Use two stacks: one for counts, one for strings',
+      'When you see "[", push current string and count to stacks',
+      'When you see "]", pop and repeat the current string',
+    ],
+    starterCode: {
+      javascript: `function decodeString(s) {
+  // Write your solution here
+
+}`,
+      typescript: `function decodeString(s: string): string {
+  // Write your solution here
+
+}`,
+      python: `def decode_string(s):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public String decodeString(String s) {
+        // Write your solution here
+        return "";
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n * maxK)',
+      space: 'O(n)',
+    },
+    testCases: [
+      { input: { s: "3[a]2[bc]" }, expected: "aaabcbc", description: 'Simple pattern' },
+      { input: { s: "3[a2[c]]" }, expected: "accaccacc", description: 'Nested pattern' },
+      { input: { s: "2[abc]3[cd]ef" }, expected: "abcabccdcdcdef", description: 'Multiple patterns with suffix' },
+    ],
+  },
+  {
+    id: 'dsa-asteroid-collision',
+    title: 'Asteroid Collision',
+    type: 'dsa',
+    pattern: 'stack',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Google', 'Meta'],
+    description: 'Simulate asteroid collisions using a stack',
+    tags: ['stack', 'array', 'simulation'],
+    estimatedTime: 25,
+    problemStatement: `We are given an array asteroids of integers representing asteroids in a row.
+
+For each asteroid, the absolute value represents its size, and the sign represents its direction (positive meaning right, negative meaning left). Each asteroid moves at the same speed.
+
+Find out the state of the asteroids after all collisions. If two asteroids meet, the smaller one will explode. If both are the same size, both will explode. Two asteroids moving in the same direction will never meet.`,
+    examples: [
+      {
+        input: 'asteroids = [5,10,-5]',
+        output: '[5,10]',
+        explanation: 'The 10 and -5 collide resulting in 10. The 5 and 10 never collide.',
+      },
+      {
+        input: 'asteroids = [8,-8]',
+        output: '[]',
+        explanation: 'The 8 and -8 collide exploding each other.',
+      },
+      {
+        input: 'asteroids = [10,2,-5]',
+        output: '[10]',
+        explanation: 'The 2 and -5 collide resulting in -5. The 10 and -5 collide resulting in 10.',
+      },
+    ],
+    constraints: [
+      '2 <= asteroids.length <= 10^4',
+      '-1000 <= asteroids[i] <= 1000',
+      'asteroids[i] != 0',
+    ],
+    hints: [
+      'Use a stack to track surviving asteroids',
+      'Only collision: positive moving right meets negative moving left',
+      'Handle the collision loop until no more collisions possible',
+    ],
+    starterCode: {
+      javascript: `function asteroidCollision(asteroids) {
+  // Write your solution here
+
+}`,
+      typescript: `function asteroidCollision(asteroids: number[]): number[] {
+  // Write your solution here
+
+}`,
+      python: `def asteroid_collision(asteroids):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public int[] asteroidCollision(int[] asteroids) {
+        // Write your solution here
+        return new int[0];
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(n)',
+    },
+    testCases: [
+      { input: { asteroids: [5,10,-5] }, expected: [5,10], description: 'Larger asteroid survives' },
+      { input: { asteroids: [8,-8] }, expected: [], description: 'Equal size explosion' },
+      { input: { asteroids: [10,2,-5] }, expected: [10], description: 'Chain collision' },
+    ],
+  },
+  {
+    id: 'dsa-simplify-path',
+    title: 'Simplify Path',
+    type: 'dsa',
+    pattern: 'stack',
+    difficulty: 'medium',
+    companies: ['Meta', 'Amazon', 'Microsoft'],
+    description: 'Simplify Unix-style file path using a stack',
+    tags: ['stack', 'string'],
+    estimatedTime: 20,
+    problemStatement: `Given a string path, which is an absolute path (starting with a slash '/') to a file or directory in a Unix-style file system, convert it to the simplified canonical path.
+
+In a Unix-style file system, a period '.' refers to the current directory, a double period '..' refers to the directory up a level, and any multiple consecutive slashes are treated as a single slash '/'. The canonical path should:
+- Start with a single slash '/'
+- Not end with a trailing '/'
+- Only contain the directories on the path from the root directory to the target file or directory`,
+    examples: [
+      {
+        input: 'path = "/home/"',
+        output: '"/home"',
+        explanation: 'Remove trailing slash.',
+      },
+      {
+        input: 'path = "/../"',
+        output: '"/"',
+        explanation: 'Going up from root stays at root.',
+      },
+      {
+        input: 'path = "/home//foo/"',
+        output: '"/home/foo"',
+        explanation: 'Multiple slashes are replaced by single slash.',
+      },
+    ],
+    constraints: [
+      '1 <= path.length <= 3000',
+      'path consists of English letters, digits, period, slash, or underscore',
+      'path is a valid absolute Unix path',
+    ],
+    hints: [
+      'Split by "/" and use a stack for directories',
+      'Skip empty strings and "."',
+      'Pop from stack for ".." if not empty',
+    ],
+    starterCode: {
+      javascript: `function simplifyPath(path) {
+  // Write your solution here
+
+}`,
+      typescript: `function simplifyPath(path: string): string {
+  // Write your solution here
+
+}`,
+      python: `def simplify_path(path):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public String simplifyPath(String path) {
+        // Write your solution here
+        return "";
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(n)',
+    },
+    testCases: [
+      { input: { path: "/home/" }, expected: "/home", description: 'Remove trailing slash' },
+      { input: { path: "/../" }, expected: "/", description: 'Stay at root' },
+      { input: { path: "/home//foo/" }, expected: "/home/foo", description: 'Multiple slashes' },
+    ],
+  },
+  {
+    id: 'dsa-basic-calculator',
+    title: 'Basic Calculator',
+    type: 'dsa',
+    pattern: 'stack',
+    difficulty: 'hard',
+    companies: ['Amazon', 'Google', 'Meta', 'Microsoft'],
+    description: 'Implement a basic calculator with parentheses',
+    tags: ['stack', 'math', 'string'],
+    estimatedTime: 35,
+    problemStatement: `Given a string s representing a valid expression, implement a basic calculator to evaluate it, and return the result of the evaluation.
+
+Note: You are not allowed to use any built-in function which evaluates strings as mathematical expressions.
+
+The expression string may contain:
+- '+' and '-' operators
+- '(' and ')' parentheses
+- ' ' spaces
+- Non-negative integers`,
+    examples: [
+      {
+        input: 's = "1 + 1"',
+        output: '2',
+      },
+      {
+        input: 's = " 2-1 + 2 "',
+        output: '3',
+      },
+      {
+        input: 's = "(1+(4+5+2)-3)+(6+8)"',
+        output: '23',
+      },
+    ],
+    constraints: [
+      '1 <= s.length <= 3 * 10^5',
+      's consists of digits, "+", "-", "(", ")", and " "',
+      's represents a valid expression',
+    ],
+    hints: [
+      'Use a stack to handle parentheses and signs',
+      'Track current sign (+1 or -1) and apply when seeing numbers',
+      'Push result and sign when entering parenthesis, pop when leaving',
+    ],
+    starterCode: {
+      javascript: `function calculate(s) {
+  // Write your solution here
+
+}`,
+      typescript: `function calculate(s: string): number {
+  // Write your solution here
+
+}`,
+      python: `def calculate(s):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public int calculate(String s) {
+        // Write your solution here
+        return 0;
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(n)',
+    },
+    testCases: [
+      { input: { s: "1 + 1" }, expected: 2, description: 'Simple addition' },
+      { input: { s: " 2-1 + 2 " }, expected: 3, description: 'Subtraction and addition' },
+      { input: { s: "(1+(4+5+2)-3)+(6+8)" }, expected: 23, description: 'Nested parentheses' },
+    ],
+  },
+  {
+    id: 'dsa-remove-duplicates-string',
+    title: 'Remove All Adjacent Duplicates In String II',
+    type: 'dsa',
+    pattern: 'stack',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Google', 'Bloomberg'],
+    description: 'Remove k adjacent duplicate letters using a stack',
+    tags: ['stack', 'string'],
+    estimatedTime: 25,
+    problemStatement: `You are given a string s and an integer k, a k duplicate removal consists of choosing k adjacent and equal letters from s and removing them, causing the left and the right side of the deleted substring to concatenate together.
+
+We repeatedly make k duplicate removals on s until we no longer can.
+
+Return the final string after all such duplicate removals have been made. It is guaranteed that the answer is unique.`,
+    examples: [
+      {
+        input: 's = "abcd", k = 2',
+        output: '"abcd"',
+        explanation: 'No adjacent duplicates.',
+      },
+      {
+        input: 's = "deeedbbcccbdaa", k = 3',
+        output: '"aa"',
+        explanation: '"eee" -> "ddbcccbdaa" -> "ddbbbdaa" -> "dddaa" -> "aa"',
+      },
+      {
+        input: 's = "pbbcggttciiippooaais", k = 2',
+        output: '"ps"',
+      },
+    ],
+    constraints: [
+      '1 <= s.length <= 10^5',
+      '2 <= k <= 10^4',
+      's only contains lowercase English letters',
+    ],
+    hints: [
+      'Use a stack that stores [character, count] pairs',
+      'When count reaches k, pop from stack',
+      'Build result from stack at the end',
+    ],
+    starterCode: {
+      javascript: `function removeDuplicates(s, k) {
+  // Write your solution here
+
+}`,
+      typescript: `function removeDuplicates(s: string, k: number): string {
+  // Write your solution here
+
+}`,
+      python: `def remove_duplicates(s, k):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public String removeDuplicates(String s, int k) {
+        // Write your solution here
+        return "";
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(n)',
+    },
+    testCases: [
+      { input: { s: "abcd", k: 2 }, expected: "abcd", description: 'No duplicates' },
+      { input: { s: "deeedbbcccbdaa", k: 3 }, expected: "aa", description: 'Multiple removals' },
+    ],
+  },
+
+  // =============================================================================
+  // ADDITIONAL BST PROBLEMS (6 more to reach 10 total)
+  // =============================================================================
+  {
+    id: 'dsa-delete-node-bst',
+    title: 'Delete Node in a BST',
+    type: 'dsa',
+    pattern: 'binary-search-tree',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Google', 'Microsoft'],
+    description: 'Delete a node from a binary search tree',
+    tags: ['tree', 'bst', 'recursion'],
+    estimatedTime: 25,
+    problemStatement: `Given a root node reference of a BST and a key, delete the node with the given key in the BST. Return the root node reference (possibly updated) of the BST.
+
+Basically, the deletion can be divided into two stages:
+1. Search for a node to remove.
+2. If the node is found, delete the node.`,
+    examples: [
+      {
+        input: 'root = [5,3,6,2,4,null,7], key = 3',
+        output: '[5,4,6,2,null,null,7]',
+        explanation: 'One valid answer is [5,4,6,2,null,null,7].',
+      },
+      {
+        input: 'root = [5,3,6,2,4,null,7], key = 0',
+        output: '[5,3,6,2,4,null,7]',
+        explanation: 'The tree does not contain a node with value = 0.',
+      },
+    ],
+    constraints: [
+      'The number of nodes in the tree is in range [0, 10^4]',
+      '-10^5 <= Node.val <= 10^5',
+      'Each node has a unique value',
+      'root is a valid binary search tree',
+    ],
+    hints: [
+      'Handle three cases: leaf node, one child, two children',
+      'For two children, find inorder successor (smallest in right subtree)',
+      'Replace value with successor, then delete successor',
+    ],
+    starterCode: {
+      javascript: `function deleteNode(root, key) {
+  // Write your solution here
+
+}`,
+      typescript: `function deleteNode(root: TreeNode | null, key: number): TreeNode | null {
+  // Write your solution here
+
+}`,
+      python: `def delete_node(root, key):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public TreeNode deleteNode(TreeNode root, int key) {
+        // Write your solution here
+        return null;
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(h)',
+      space: 'O(h)',
+    },
+    testCases: [
+      { input: { root: [5,3,6,2,4,null,7], key: 3 }, expected: [5,4,6,2,null,null,7], description: 'Delete node with two children' },
+      { input: { root: [5,3,6,2,4,null,7], key: 0 }, expected: [5,3,6,2,4,null,7], description: 'Key not found' },
+    ],
+  },
+  {
+    id: 'dsa-convert-sorted-array-bst',
+    title: 'Convert Sorted Array to Binary Search Tree',
+    type: 'dsa',
+    pattern: 'binary-search-tree',
+    difficulty: 'easy',
+    companies: ['Amazon', 'Google', 'Microsoft', 'Apple'],
+    description: 'Convert sorted array to height-balanced BST',
+    tags: ['tree', 'bst', 'divide-and-conquer', 'array'],
+    estimatedTime: 20,
+    problemStatement: `Given an integer array nums where the elements are sorted in ascending order, convert it to a height-balanced binary search tree.
+
+A height-balanced binary tree is a binary tree in which the depth of the two subtrees of every node never differs by more than one.`,
+    examples: [
+      {
+        input: 'nums = [-10,-3,0,5,9]',
+        output: '[0,-3,9,-10,null,5]',
+        explanation: 'One valid BST is [0,-3,9,-10,null,5].',
+      },
+      {
+        input: 'nums = [1,3]',
+        output: '[3,1] or [1,null,3]',
+        explanation: 'Either tree is valid.',
+      },
+    ],
+    constraints: [
+      '1 <= nums.length <= 10^4',
+      '-10^4 <= nums[i] <= 10^4',
+      'nums is sorted in strictly increasing order',
+    ],
+    hints: [
+      'Choose middle element as root for balance',
+      'Recursively build left subtree from left half',
+      'Recursively build right subtree from right half',
+    ],
+    starterCode: {
+      javascript: `function sortedArrayToBST(nums) {
+  // Write your solution here
+
+}`,
+      typescript: `function sortedArrayToBST(nums: number[]): TreeNode | null {
+  // Write your solution here
+
+}`,
+      python: `def sorted_array_to_bst(nums):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public TreeNode sortedArrayToBST(int[] nums) {
+        // Write your solution here
+        return null;
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(log n)',
+    },
+    testCases: [
+      { input: { nums: [-10,-3,0,5,9] }, expected: "valid BST", description: 'Build balanced BST' },
+      { input: { nums: [1,3] }, expected: "valid BST", description: 'Two elements' },
+    ],
+  },
+  {
+    id: 'dsa-two-sum-bst',
+    title: 'Two Sum IV - Input is a BST',
+    type: 'dsa',
+    pattern: 'binary-search-tree',
+    difficulty: 'easy',
+    companies: ['Amazon', 'Meta', 'Google'],
+    description: 'Find if two nodes in BST sum to target value',
+    tags: ['tree', 'bst', 'two-pointers', 'hash-table'],
+    estimatedTime: 20,
+    problemStatement: `Given the root of a binary search tree and an integer k, return true if there exist two elements in the BST such that their sum is equal to k, or false otherwise.`,
+    examples: [
+      {
+        input: 'root = [5,3,6,2,4,null,7], k = 9',
+        output: 'true',
+        explanation: '2 + 7 = 9 or 3 + 6 = 9',
+      },
+      {
+        input: 'root = [5,3,6,2,4,null,7], k = 28',
+        output: 'false',
+      },
+    ],
+    constraints: [
+      'The number of nodes in the tree is in range [1, 10^4]',
+      '-10^4 <= Node.val <= 10^4',
+      'root is guaranteed to be a valid binary search tree',
+      '-10^5 <= k <= 10^5',
+    ],
+    hints: [
+      'Use inorder traversal to get sorted array, then use two pointers',
+      'Alternative: use a hash set during traversal',
+      'For each node, check if (k - node.val) exists in the tree',
+    ],
+    starterCode: {
+      javascript: `function findTarget(root, k) {
+  // Write your solution here
+
+}`,
+      typescript: `function findTarget(root: TreeNode | null, k: number): boolean {
+  // Write your solution here
+
+}`,
+      python: `def find_target(root, k):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public boolean findTarget(TreeNode root, int k) {
+        // Write your solution here
+        return false;
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(n)',
+    },
+    testCases: [
+      { input: { root: [5,3,6,2,4,null,7], k: 9 }, expected: true, description: 'Target exists' },
+      { input: { root: [5,3,6,2,4,null,7], k: 28 }, expected: false, description: 'Target does not exist' },
+    ],
+  },
+  {
+    id: 'dsa-bst-iterator',
+    title: 'Binary Search Tree Iterator',
+    type: 'dsa',
+    pattern: 'binary-search-tree',
+    difficulty: 'medium',
+    companies: ['Meta', 'Amazon', 'Microsoft', 'Google'],
+    description: 'Implement an iterator over a BST',
+    tags: ['tree', 'bst', 'design', 'stack'],
+    estimatedTime: 25,
+    problemStatement: `Implement the BSTIterator class that represents an iterator over the in-order traversal of a binary search tree (BST):
+
+- BSTIterator(TreeNode root) Initializes an object with the root of the BST.
+- boolean hasNext() Returns true if there exists a number in the traversal to the right of the pointer.
+- int next() Moves the pointer to the right, then returns the number at the pointer.
+
+Notice that by initializing the pointer to a non-existent smallest number, the first call to next() will return the smallest element in the BST.
+
+You may assume that next() calls will always be valid.`,
+    examples: [
+      {
+        input: 'BSTIterator([7, 3, 15, null, null, 9, 20]); next(); next(); hasNext(); next(); hasNext(); next(); hasNext(); next(); hasNext();',
+        output: '3, 7, true, 9, true, 15, true, 20, false',
+      },
+    ],
+    constraints: [
+      'The number of nodes in the tree is in range [1, 10^5]',
+      '0 <= Node.val <= 10^6',
+      'At most 10^5 calls will be made to hasNext and next',
+    ],
+    hints: [
+      'Use a stack to simulate inorder traversal',
+      'Push all left children initially',
+      'When calling next(), pop from stack and push right child\'s left descendants',
+    ],
+    starterCode: {
+      javascript: `class BSTIterator {
+  constructor(root) {
+    // Initialize iterator
+  }
+
+  next() {
+    // Return next smallest element
+  }
+
+  hasNext() {
+    // Return true if more elements exist
+  }
+}`,
+      typescript: `class BSTIterator {
+  constructor(root: TreeNode | null) {
+    // Initialize iterator
+  }
+
+  next(): number {
+    // Return next smallest element
+  }
+
+  hasNext(): boolean {
+    // Return true if more elements exist
+  }
+}`,
+      python: `class BSTIterator:
+    def __init__(self, root):
+        # Initialize iterator
+        pass
+
+    def next(self) -> int:
+        # Return next smallest element
+        pass
+
+    def has_next(self) -> bool:
+        # Return true if more elements exist
+        pass`,
+      java: `class BSTIterator {
+    public BSTIterator(TreeNode root) {
+        // Initialize iterator
+    }
+
+    public int next() {
+        // Return next smallest element
+        return 0;
+    }
+
+    public boolean hasNext() {
+        // Return true if more elements exist
+        return false;
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(1) average for next()',
+      space: 'O(h)',
+    },
+    testCases: [],
+  },
+  {
+    id: 'dsa-range-sum-bst',
+    title: 'Range Sum of BST',
+    type: 'dsa',
+    pattern: 'binary-search-tree',
+    difficulty: 'easy',
+    companies: ['Meta', 'Amazon', 'Google'],
+    description: 'Calculate sum of values within a range in BST',
+    tags: ['tree', 'bst', 'dfs'],
+    estimatedTime: 15,
+    problemStatement: `Given the root node of a binary search tree and two integers low and high, return the sum of values of all nodes with a value in the inclusive range [low, high].`,
+    examples: [
+      {
+        input: 'root = [10,5,15,3,7,null,18], low = 7, high = 15',
+        output: '32',
+        explanation: 'Nodes 7, 10, and 15 are in range [7, 15]. 7 + 10 + 15 = 32.',
+      },
+      {
+        input: 'root = [10,5,15,3,7,13,18,1,null,6], low = 6, high = 10',
+        output: '23',
+        explanation: 'Nodes 6, 7, and 10 are in range [6, 10]. 6 + 7 + 10 = 23.',
+      },
+    ],
+    constraints: [
+      'The number of nodes in the tree is in range [1, 2 * 10^4]',
+      '1 <= Node.val <= 10^5',
+      '1 <= low <= high <= 10^5',
+      'All Node.val are unique',
+    ],
+    hints: [
+      'Use BST property to prune search space',
+      'If node value < low, only search right subtree',
+      'If node value > high, only search left subtree',
+    ],
+    starterCode: {
+      javascript: `function rangeSumBST(root, low, high) {
+  // Write your solution here
+
+}`,
+      typescript: `function rangeSumBST(root: TreeNode | null, low: number, high: number): number {
+  // Write your solution here
+
+}`,
+      python: `def range_sum_bst(root, low, high):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public int rangeSumBST(TreeNode root, int low, int high) {
+        // Write your solution here
+        return 0;
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(h)',
+    },
+    testCases: [
+      { input: { root: [10,5,15,3,7,null,18], low: 7, high: 15 }, expected: 32, description: 'Standard range' },
+      { input: { root: [10,5,15,3,7,13,18,1,null,6], low: 6, high: 10 }, expected: 23, description: 'Another range' },
+    ],
+  },
+  {
+    id: 'dsa-serialize-deserialize-bst',
+    title: 'Serialize and Deserialize BST',
+    type: 'dsa',
+    pattern: 'binary-search-tree',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Google', 'Meta', 'Microsoft'],
+    description: 'Design algorithm to serialize and deserialize a BST',
+    tags: ['tree', 'bst', 'design', 'string'],
+    estimatedTime: 30,
+    problemStatement: `Serialization is converting a data structure or object into a sequence of bits so that it can be stored in a file or memory buffer, or transmitted across a network connection link to be reconstructed later in the same or another computer environment.
+
+Design an algorithm to serialize and deserialize a binary search tree. There is no restriction on how your serialization/deserialization algorithm should work. You need to ensure that a binary search tree can be serialized to a string, and this string can be deserialized to the original tree structure.
+
+The encoded string should be as compact as possible.`,
+    examples: [
+      {
+        input: 'root = [2,1,3]',
+        output: '[2,1,3]',
+      },
+      {
+        input: 'root = []',
+        output: '[]',
+      },
+    ],
+    constraints: [
+      'The number of nodes in the tree is in range [0, 10^4]',
+      '0 <= Node.val <= 10^4',
+      'The input tree is guaranteed to be a binary search tree',
+    ],
+    hints: [
+      'Preorder traversal uniquely defines a BST (no need for null markers)',
+      'Use BST property during deserialization',
+      'Pass bounds (min, max) to validate placement during rebuild',
+    ],
+    starterCode: {
+      javascript: `class Codec {
+  serialize(root) {
+    // Serialize BST to string
+  }
+
+  deserialize(data) {
+    // Deserialize string to BST
+  }
+}`,
+      typescript: `class Codec {
+  serialize(root: TreeNode | null): string {
+    // Serialize BST to string
+  }
+
+  deserialize(data: string): TreeNode | null {
+    // Deserialize string to BST
+  }
+}`,
+      python: `class Codec:
+    def serialize(self, root):
+        # Serialize BST to string
+        pass
+
+    def deserialize(self, data):
+        # Deserialize string to BST
+        pass`,
+      java: `public class Codec {
+    public String serialize(TreeNode root) {
+        // Serialize BST to string
+        return "";
+    }
+
+    public TreeNode deserialize(String data) {
+        // Deserialize string to BST
+        return null;
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(n)',
+    },
+    testCases: [],
+  },
+
+  // =============================================================================
+  // ADDITIONAL TWO POINTERS PROBLEMS (6 more to reach 10 total)
+  // =============================================================================
+  {
+    id: 'dsa-remove-duplicates-sorted-array',
+    title: 'Remove Duplicates from Sorted Array',
+    type: 'dsa',
+    pattern: 'two-pointers',
+    difficulty: 'easy',
+    companies: ['Amazon', 'Google', 'Meta', 'Microsoft'],
+    description: 'Remove duplicates in-place from sorted array',
+    tags: ['array', 'two-pointers'],
+    estimatedTime: 15,
+    problemStatement: `Given an integer array nums sorted in non-decreasing order, remove the duplicates in-place such that each unique element appears only once. The relative order of the elements should be kept the same. Then return the number of unique elements in nums.
+
+Consider the number of unique elements of nums to be k. To get accepted, you need to:
+- Change the array nums such that the first k elements contain the unique elements in the order they were present originally.
+- Return k.`,
+    examples: [
+      {
+        input: 'nums = [1,1,2]',
+        output: '2, nums = [1,2,_]',
+        explanation: 'Function returns k = 2, with first two elements being 1 and 2.',
+      },
+      {
+        input: 'nums = [0,0,1,1,1,2,2,3,3,4]',
+        output: '5, nums = [0,1,2,3,4,_,_,_,_,_]',
+        explanation: 'Function returns k = 5.',
+      },
+    ],
+    constraints: [
+      '1 <= nums.length <= 3 * 10^4',
+      '-100 <= nums[i] <= 100',
+      'nums is sorted in non-decreasing order',
+    ],
+    hints: [
+      'Use two pointers: slow for unique position, fast to scan',
+      'When fast finds new element, copy to slow position',
+      'Return slow + 1 as the count of unique elements',
+    ],
+    starterCode: {
+      javascript: `function removeDuplicates(nums) {
+  // Write your solution here
+
+}`,
+      typescript: `function removeDuplicates(nums: number[]): number {
+  // Write your solution here
+
+}`,
+      python: `def remove_duplicates(nums):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public int removeDuplicates(int[] nums) {
+        // Write your solution here
+        return 0;
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(1)',
+    },
+    testCases: [
+      { input: { nums: [1,1,2] }, expected: 2, description: 'Simple case' },
+      { input: { nums: [0,0,1,1,1,2,2,3,3,4] }, expected: 5, description: 'Multiple duplicates' },
+    ],
+  },
+  {
+    id: 'dsa-move-zeroes',
+    title: 'Move Zeroes',
+    type: 'dsa',
+    pattern: 'two-pointers',
+    difficulty: 'easy',
+    companies: ['Meta', 'Amazon', 'Apple', 'Microsoft'],
+    description: 'Move all zeroes to end while maintaining order',
+    tags: ['array', 'two-pointers'],
+    estimatedTime: 15,
+    problemStatement: `Given an integer array nums, move all 0's to the end of it while maintaining the relative order of the non-zero elements.
+
+Note that you must do this in-place without making a copy of the array.`,
+    examples: [
+      {
+        input: 'nums = [0,1,0,3,12]',
+        output: '[1,3,12,0,0]',
+      },
+      {
+        input: 'nums = [0]',
+        output: '[0]',
+      },
+    ],
+    constraints: [
+      '1 <= nums.length <= 10^4',
+      '-2^31 <= nums[i] <= 2^31 - 1',
+    ],
+    hints: [
+      'Use two pointers: one for next non-zero position, one to scan',
+      'Swap non-zero elements to the front',
+      'All zeroes naturally end up at the end',
+    ],
+    starterCode: {
+      javascript: `function moveZeroes(nums) {
+  // Write your solution here
+
+}`,
+      typescript: `function moveZeroes(nums: number[]): void {
+  // Write your solution here
+
+}`,
+      python: `def move_zeroes(nums):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public void moveZeroes(int[] nums) {
+        // Write your solution here
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(1)',
+    },
+    testCases: [
+      { input: { nums: [0,1,0,3,12] }, expected: [1,3,12,0,0], description: 'Standard case' },
+      { input: { nums: [0] }, expected: [0], description: 'Single zero' },
+    ],
+  },
+  {
+    id: 'dsa-valid-palindrome',
+    title: 'Valid Palindrome',
+    type: 'dsa',
+    pattern: 'two-pointers',
+    difficulty: 'easy',
+    companies: ['Meta', 'Amazon', 'Microsoft', 'Apple'],
+    description: 'Check if string is palindrome ignoring non-alphanumeric',
+    tags: ['string', 'two-pointers'],
+    estimatedTime: 15,
+    problemStatement: `A phrase is a palindrome if, after converting all uppercase letters into lowercase letters and removing all non-alphanumeric characters, it reads the same forward and backward. Alphanumeric characters include letters and numbers.
+
+Given a string s, return true if it is a palindrome, or false otherwise.`,
+    examples: [
+      {
+        input: 's = "A man, a plan, a canal: Panama"',
+        output: 'true',
+        explanation: '"amanaplanacanalpanama" is a palindrome.',
+      },
+      {
+        input: 's = "race a car"',
+        output: 'false',
+        explanation: '"raceacar" is not a palindrome.',
+      },
+      {
+        input: 's = " "',
+        output: 'true',
+        explanation: 'After removing non-alphanumeric characters, it\'s empty, which is a palindrome.',
+      },
+    ],
+    constraints: [
+      '1 <= s.length <= 2 * 10^5',
+      's consists only of printable ASCII characters',
+    ],
+    hints: [
+      'Use two pointers from start and end',
+      'Skip non-alphanumeric characters',
+      'Compare lowercase versions of characters',
+    ],
+    starterCode: {
+      javascript: `function isPalindrome(s) {
+  // Write your solution here
+
+}`,
+      typescript: `function isPalindrome(s: string): boolean {
+  // Write your solution here
+
+}`,
+      python: `def is_palindrome(s):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public boolean isPalindrome(String s) {
+        // Write your solution here
+        return false;
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(1)',
+    },
+    testCases: [
+      { input: { s: "A man, a plan, a canal: Panama" }, expected: true, description: 'Classic palindrome' },
+      { input: { s: "race a car" }, expected: false, description: 'Not a palindrome' },
+      { input: { s: " " }, expected: true, description: 'Empty after cleanup' },
+    ],
+  },
+  {
+    id: 'dsa-sort-colors',
+    title: 'Sort Colors',
+    type: 'dsa',
+    pattern: 'two-pointers',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Microsoft', 'Meta', 'Apple'],
+    description: 'Sort array with only 0, 1, 2 in one pass (Dutch National Flag)',
+    tags: ['array', 'two-pointers', 'sorting'],
+    estimatedTime: 20,
+    problemStatement: `Given an array nums with n objects colored red, white, or blue, sort them in-place so that objects of the same color are adjacent, with the colors in the order red, white, and blue.
+
+We will use the integers 0, 1, and 2 to represent the color red, white, and blue, respectively.
+
+You must solve this problem without using the library's sort function.
+
+Follow up: Could you come up with a one-pass algorithm using only constant extra space?`,
+    examples: [
+      {
+        input: 'nums = [2,0,2,1,1,0]',
+        output: '[0,0,1,1,2,2]',
+      },
+      {
+        input: 'nums = [2,0,1]',
+        output: '[0,1,2]',
+      },
+    ],
+    constraints: [
+      'n == nums.length',
+      '1 <= n <= 300',
+      'nums[i] is either 0, 1, or 2',
+    ],
+    hints: [
+      'Use three pointers: low, mid, high',
+      'All 0s should be before low, all 2s after high',
+      'Dutch National Flag algorithm by Dijkstra',
+    ],
+    starterCode: {
+      javascript: `function sortColors(nums) {
+  // Write your solution here
+
+}`,
+      typescript: `function sortColors(nums: number[]): void {
+  // Write your solution here
+
+}`,
+      python: `def sort_colors(nums):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public void sortColors(int[] nums) {
+        // Write your solution here
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(1)',
+    },
+    testCases: [
+      { input: { nums: [2,0,2,1,1,0] }, expected: [0,0,1,1,2,2], description: 'Standard case' },
+      { input: { nums: [2,0,1] }, expected: [0,1,2], description: 'Three elements' },
+    ],
+  },
+  {
+    id: 'dsa-reverse-string',
+    title: 'Reverse String',
+    type: 'dsa',
+    pattern: 'two-pointers',
+    difficulty: 'easy',
+    companies: ['Amazon', 'Microsoft', 'Apple'],
+    description: 'Reverse a string array in-place',
+    tags: ['string', 'two-pointers', 'array'],
+    estimatedTime: 10,
+    problemStatement: `Write a function that reverses a string. The input string is given as an array of characters s.
+
+You must do this by modifying the input array in-place with O(1) extra memory.`,
+    examples: [
+      {
+        input: 's = ["h","e","l","l","o"]',
+        output: '["o","l","l","e","h"]',
+      },
+      {
+        input: 's = ["H","a","n","n","a","h"]',
+        output: '["h","a","n","n","a","H"]',
+      },
+    ],
+    constraints: [
+      '1 <= s.length <= 10^5',
+      's[i] is a printable ascii character',
+    ],
+    hints: [
+      'Use two pointers at start and end',
+      'Swap and move pointers toward center',
+      'Stop when pointers meet or cross',
+    ],
+    starterCode: {
+      javascript: `function reverseString(s) {
+  // Write your solution here
+
+}`,
+      typescript: `function reverseString(s: string[]): void {
+  // Write your solution here
+
+}`,
+      python: `def reverse_string(s):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public void reverseString(char[] s) {
+        // Write your solution here
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(1)',
+    },
+    testCases: [
+      { input: { s: ["h","e","l","l","o"] }, expected: ["o","l","l","e","h"], description: 'Standard case' },
+      { input: { s: ["H","a","n","n","a","h"] }, expected: ["h","a","n","n","a","H"], description: 'Palindrome input' },
+    ],
+  },
+  {
+    id: 'dsa-partition-labels',
+    title: 'Partition Labels',
+    type: 'dsa',
+    pattern: 'two-pointers',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Google', 'Meta'],
+    description: 'Partition string into parts where each letter appears in one part only',
+    tags: ['string', 'two-pointers', 'greedy', 'hash-table'],
+    estimatedTime: 25,
+    problemStatement: `You are given a string s. We want to partition the string into as many parts as possible so that each letter appears in at most one part.
+
+Note that the partition is done so that after concatenating all the parts in order, the resultant string should be s.
+
+Return a list of integers representing the size of these parts.`,
+    examples: [
+      {
+        input: 's = "ababcbacadefegdehijhklij"',
+        output: '[9,7,8]',
+        explanation: 'The partition is "ababcbaca", "defegde", "hijhklij". Each letter appears in at most one part.',
+      },
+      {
+        input: 's = "eccbbbbdec"',
+        output: '[10]',
+        explanation: 'All letters are interconnected, so single partition.',
+      },
+    ],
+    constraints: [
+      '1 <= s.length <= 500',
+      's consists of lowercase English letters',
+    ],
+    hints: [
+      'First, find the last occurrence of each character',
+      'Track the end of current partition as max of last occurrences',
+      'When current index equals partition end, we have a complete partition',
+    ],
+    starterCode: {
+      javascript: `function partitionLabels(s) {
+  // Write your solution here
+
+}`,
+      typescript: `function partitionLabels(s: string): number[] {
+  // Write your solution here
+
+}`,
+      python: `def partition_labels(s):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public List<Integer> partitionLabels(String s) {
+        // Write your solution here
+        return new ArrayList<>();
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: 'O(n)',
+      space: 'O(1)',
+    },
+    testCases: [
+      { input: { s: "ababcbacadefegdehijhklij" }, expected: [9,7,8], description: 'Three partitions' },
+      { input: { s: "eccbbbbdec" }, expected: [10], description: 'Single partition' },
+    ],
+  },
+
   // Include real-world scenarios from separate file
   ...realWorldBugFixScenarios,
   ...realWorldSystemDesignScenarios,
