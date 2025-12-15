@@ -1,8 +1,8 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
-import { Search, Play } from "lucide-react"
+import { Search, Play, LayoutGrid, List, Sparkles } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,13 +16,17 @@ import {
   type DifficultyLevel,
   type Company,
 } from "@/lib/scenarios"
+import { PatternBrowser } from "./PatternBrowser"
 
 interface ScenarioBrowserProps {
   onStartInterview: (scenario: Scenario) => void
   usageLimit: UsageLimit | null
 }
 
+type ViewMode = 'list' | 'patterns'
+
 export function ScenarioBrowser({ onStartInterview, usageLimit }: ScenarioBrowserProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>('patterns')
   const {
     selectedScenario,
     setSelectedScenario,
@@ -80,6 +84,34 @@ export function ScenarioBrowser({ onStartInterview, usageLimit }: ScenarioBrowse
               Select Interview Scenario
             </h1>
             <p className="text-xl text-gray-300 mb-6">Choose a problem to practice</p>
+
+            {/* View Mode Toggle */}
+            <div className="flex justify-center gap-2 mb-6">
+              <Button
+                variant={viewMode === 'patterns' ? 'default' : 'outline'}
+                onClick={() => setViewMode('patterns')}
+                className={viewMode === 'patterns'
+                  ? 'bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80'
+                  : 'border-gray-600 text-gray-300 hover:bg-gray-800'
+                }
+              >
+                <LayoutGrid className="h-4 w-4 mr-2" />
+                Patterns (NeetCode Style)
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+                onClick={() => setViewMode('list')}
+                className={viewMode === 'list'
+                  ? 'bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80'
+                  : 'border-gray-600 text-gray-300 hover:bg-gray-800'
+                }
+              >
+                <List className="h-4 w-4 mr-2" />
+                All Problems
+              </Button>
+            </div>
+
+            {/* Stats */}
             <div className="flex flex-wrap justify-center gap-4 text-sm">
               <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700">
                 <div className="w-2 h-2 rounded-full bg-[#00d9ff]"></div>
@@ -104,6 +136,15 @@ export function ScenarioBrowser({ onStartInterview, usageLimit }: ScenarioBrowse
               </div>
             </div>
           </div>
+
+          {/* Pattern View */}
+          {viewMode === 'patterns' && (
+            <PatternBrowser onStartInterview={onStartInterview} completedProblems={[]} />
+          )}
+
+          {/* List View */}
+          {viewMode === 'list' && (
+            <>
 
           {/* Filters */}
           <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-6">
@@ -279,6 +320,8 @@ export function ScenarioBrowser({ onStartInterview, usageLimit }: ScenarioBrowse
               </Card>
             ))}
           </div>
+          </>
+          )}
         </div>
       </div>
     </section>
