@@ -9,7 +9,11 @@ import Stripe from "stripe"
 import { adminDb } from "@/lib/firebase-admin"
 import { PRICING_CONFIG } from "@/lib/config"
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error("STRIPE_SECRET_KEY environment variable is required")
+}
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2024-11-20.acacia", // Use latest Stripe API version
 })
 

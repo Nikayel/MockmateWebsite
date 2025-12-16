@@ -9,11 +9,19 @@ import Stripe from "stripe"
 import { adminDb } from "@/lib/firebase-admin"
 import { PRICING_CONFIG } from "@/lib/config"
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error("STRIPE_SECRET_KEY environment variable is required")
+}
+
+if (!process.env.STRIPE_WEBHOOK_SECRET) {
+  throw new Error("STRIPE_WEBHOOK_SECRET environment variable is required")
+}
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2024-11-20.acacia",
 })
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || ""
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
 
 /**
  * Update user quota for subscription tier using Admin SDK

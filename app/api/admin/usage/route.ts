@@ -2,49 +2,57 @@
  * Admin Usage API
  *
  * Endpoints for viewing and managing user usage data.
- * Requires admin authentication.
+ * Requires admin authentication via Firebase ID token.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
+import { adminDb, adminAuth } from '@/lib/firebase-admin'
 import { getAdminUsageStats, getUserUsageSummary, BUDGET_CAPS } from '@/lib/usage-tracking'
 import { getCacheStats } from '@/lib/ai-cache'
 
-// Admin user IDs (you can also use Firestore roles)
+// Admin user IDs - requires proper env configuration
 const ADMIN_USER_IDS = [
-  process.env.ADMIN_USER_ID || '',
-  // Add more admin IDs as needed
-].filter(Boolean)
+  process.env.ADMIN_USER_ID,
+].filter((id): id is string => Boolean(id))
 
 /**
- * Verify admin access
+ * Verify admin access using Firebase Auth token verification
  */
 async function verifyAdmin(request: NextRequest): Promise<{ authorized: boolean; userId?: string }> {
   try {
-    // Get user ID from authorization header or cookie
     const authHeader = request.headers.get('authorization')
-    const userId = authHeader?.replace('Bearer ', '')
-
-    if (!userId) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return { authorized: false }
     }
 
-    // Check if user is admin
+    const token = authHeader.replace('Bearer ', '')
+
+    // Verify the Firebase ID token properly
+    if (!adminAuth) {
+      return { authorized: false }
+    }
+
+    const decodedToken = await adminAuth.verifyIdToken(token)
+    const userId = decodedToken.uid
+
+    // Check if user is in admin list
     if (ADMIN_USER_IDS.includes(userId)) {
       return { authorized: true, userId }
     }
 
     // Check Firestore for admin role
-    const userDoc = await adminDb.collection('users').doc(userId).get()
-    const userData = userDoc.data()
+    if (adminDb) {
+      const userDoc = await adminDb.collection('profiles').doc(userId).get()
+      const userData = userDoc.data()
 
-    if (userData?.role === 'admin' || userData?.subscription_tier === 'enterprise') {
-      return { authorized: true, userId }
+      if (userData?.role === 'admin' || userData?.subscription_tier === 'enterprise') {
+        return { authorized: true, userId }
+      }
     }
 
     return { authorized: false }
   } catch (error) {
-    console.error('[Admin API] Auth error:', error)
+    // Token verification failed - don't expose error details
     return { authorized: false }
   }
 }
@@ -59,14 +67,10 @@ async function verifyAdmin(request: NextRequest): Promise<{ authorized: boolean;
  * - userId: string (required if view=user)
  */
 export async function GET(request: NextRequest) {
-  // For development, allow access without auth
-  const isDev = process.env.NODE_ENV === 'development'
-
-  if (!isDev) {
-    const auth = await verifyAdmin(request)
-    if (!auth.authorized) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  // Always require authentication - no dev bypass
+  const auth = await verifyAdmin(request)
+  if (!auth.authorized) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const { searchParams } = new URL(request.url)
@@ -169,13 +173,10 @@ export async function GET(request: NextRequest) {
  * - budget: number (for set_budget)
  */
 export async function POST(request: NextRequest) {
-  const isDev = process.env.NODE_ENV === 'development'
-
-  if (!isDev) {
-    const auth = await verifyAdmin(request)
-    if (!auth.authorized) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  // Always require authentication - no dev bypass
+  const auth = await verifyAdmin(request)
+  if (!auth.authorized) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
