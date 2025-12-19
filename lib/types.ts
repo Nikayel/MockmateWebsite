@@ -19,6 +19,7 @@ export interface Profile {
   subscription_tier: "free" | "pro" | "enterprise"
   subscription_platform?: "website" | "vscode"
   subscription_status?: string
+  subscription_type?: "monthly" | "yearly" // Type of subscription: monthly (recurring) or yearly (one-time)
   stripe_customer_id?: string
   stripe_subscription_id?: string
   subscription_start_date?: string // ISO date string when subscription started
