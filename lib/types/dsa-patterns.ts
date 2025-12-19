@@ -849,3 +849,203 @@ ${patternMeta.interviewerFollowUps.slice(0, 2).map(q => `- ${q}`).join('\n')}
 ${companyStyle.commonFollowUps.slice(0, 2).map(q => `- ${q}`).join('\n')}
 `.trim();
 }
+
+// =============================================================================
+// PATTERN PREREQUISITES (Learning Roadmap)
+// =============================================================================
+
+export interface PatternNode {
+  id: string;
+  name: string;
+  patterns: DSAPattern[];
+  prerequisites: string[]; // IDs of prerequisite pattern groups
+  tier: number; // 1 = Foundation, 2 = Core, 3 = Advanced, 4 = Expert
+  description: string;
+}
+
+export const PATTERN_ROADMAP: PatternNode[] = [
+  // Tier 1 - Foundation (No prerequisites)
+  {
+    id: 'arrays-hashing',
+    name: 'Arrays & Hashing',
+    patterns: ['arrays-hashing'],
+    prerequisites: [],
+    tier: 1,
+    description: 'Start here! Hash maps, frequency counting, and array manipulation are the foundation of most algorithms.',
+  },
+
+  // Tier 2 - Core Patterns (Build on Arrays)
+  {
+    id: 'two-pointers',
+    name: 'Two Pointers',
+    patterns: ['two-pointers'],
+    prerequisites: ['arrays-hashing'],
+    tier: 2,
+    description: 'Learn to traverse arrays efficiently with two pointers moving in different directions.',
+  },
+  {
+    id: 'stack',
+    name: 'Stack',
+    patterns: ['stack', 'monotonic-stack'],
+    prerequisites: ['arrays-hashing'],
+    tier: 2,
+    description: 'LIFO data structure essential for parsing, matching, and tracking previous elements.',
+  },
+  {
+    id: 'binary-search',
+    name: 'Binary Search',
+    patterns: ['binary-search'],
+    prerequisites: ['arrays-hashing'],
+    tier: 2,
+    description: 'Divide and conquer on sorted data. Essential for O(log n) solutions.',
+  },
+  {
+    id: 'sliding-window',
+    name: 'Sliding Window',
+    patterns: ['sliding-window'],
+    prerequisites: ['two-pointers'],
+    tier: 2,
+    description: 'Optimize subarray problems using a window that expands and contracts.',
+  },
+  {
+    id: 'linked-list',
+    name: 'Linked List',
+    patterns: ['linked-list'],
+    prerequisites: ['two-pointers'],
+    tier: 2,
+    description: 'Pointer manipulation, fast/slow pointers, and in-place reversal techniques.',
+  },
+
+  // Tier 3 - Advanced Data Structures
+  {
+    id: 'trees',
+    name: 'Trees',
+    patterns: ['trees', 'binary-tree', 'binary-search-tree'],
+    prerequisites: ['stack', 'linked-list'],
+    tier: 3,
+    description: 'Tree traversal (DFS/BFS), BST properties, and recursive problem solving.',
+  },
+  {
+    id: 'heap',
+    name: 'Heap / Priority Queue',
+    patterns: ['heap', 'priority-queue', 'heap-priority-queue'],
+    prerequisites: ['arrays-hashing', 'binary-search'],
+    tier: 3,
+    description: 'Efficiently find min/max elements. Essential for top-K problems and scheduling.',
+  },
+  {
+    id: 'trie',
+    name: 'Tries',
+    patterns: ['trie'],
+    prerequisites: ['trees'],
+    tier: 3,
+    description: 'Prefix trees for efficient string operations and autocomplete features.',
+  },
+  {
+    id: 'backtracking',
+    name: 'Backtracking',
+    patterns: ['backtracking'],
+    prerequisites: ['trees'],
+    tier: 3,
+    description: 'Exhaustive search with pruning for permutations, combinations, and constraint satisfaction.',
+  },
+
+  // Tier 3 - Graphs
+  {
+    id: 'graphs',
+    name: 'Graphs',
+    patterns: ['graphs', 'bfs', 'dfs', 'topological-sort', 'union-find', 'dijkstra'],
+    prerequisites: ['trees', 'heap'],
+    tier: 3,
+    description: 'Graph traversal, shortest paths, cycle detection, and connected components.',
+  },
+
+  // Tier 4 - Advanced Techniques
+  {
+    id: 'dp-1d',
+    name: 'DP (1D)',
+    patterns: ['dp-1d'],
+    prerequisites: ['backtracking'],
+    tier: 4,
+    description: 'Optimize recursive solutions by storing subproblem results. Start with 1D state.',
+  },
+  {
+    id: 'dp-2d',
+    name: 'DP (2D)',
+    patterns: ['dp-2d', 'dp-knapsack', 'dp-lcs'],
+    prerequisites: ['dp-1d'],
+    tier: 4,
+    description: 'Two-dimensional state for grid problems, subsequences, and knapsack variants.',
+  },
+  {
+    id: 'dp-tree',
+    name: 'Tree DP',
+    patterns: ['dp-tree'],
+    prerequisites: ['dp-1d', 'trees'],
+    tier: 4,
+    description: 'Dynamic programming on tree structures using post-order traversal.',
+  },
+  {
+    id: 'greedy',
+    name: 'Greedy',
+    patterns: ['greedy'],
+    prerequisites: ['dp-1d'],
+    tier: 4,
+    description: 'Local optimal choices that lead to global optimum. Know when DP is overkill.',
+  },
+  {
+    id: 'intervals',
+    name: 'Intervals',
+    patterns: ['intervals'],
+    prerequisites: ['greedy', 'heap'],
+    tier: 4,
+    description: 'Merging, inserting, and scheduling interval problems.',
+  },
+
+  // Tier 4 - Specialized Topics
+  {
+    id: 'bit-manipulation',
+    name: 'Bit Manipulation',
+    patterns: ['bit-manipulation'],
+    prerequisites: ['arrays-hashing'],
+    tier: 4,
+    description: 'XOR tricks, bit masks, and low-level optimizations.',
+  },
+  {
+    id: 'math-geometry',
+    name: 'Math & Geometry',
+    patterns: ['math', 'geometry', 'math-geometry'],
+    prerequisites: ['arrays-hashing'],
+    tier: 4,
+    description: 'Number theory, GCD/LCM, and geometric calculations.',
+  },
+  {
+    id: 'matrix',
+    name: 'Matrix',
+    patterns: ['matrix'],
+    prerequisites: ['dp-2d'],
+    tier: 4,
+    description: 'Matrix traversal, rotation, and layer-by-layer processing.',
+  },
+];
+
+export function getPatternNode(nodeId: string): PatternNode | undefined {
+  return PATTERN_ROADMAP.find(node => node.id === nodeId);
+}
+
+export function getPatternPrerequisites(nodeId: string): PatternNode[] {
+  const node = getPatternNode(nodeId);
+  if (!node) return [];
+  return node.prerequisites.map(id => getPatternNode(id)).filter((n): n is PatternNode => n !== undefined);
+}
+
+export function isPatternUnlocked(nodeId: string, completedPatterns: string[]): boolean {
+  const node = getPatternNode(nodeId);
+  if (!node) return false;
+  if (node.prerequisites.length === 0) return true;
+  return node.prerequisites.every(prereq => completedPatterns.includes(prereq));
+}
+
+export function getPatternsByTier(tier: number): PatternNode[] {
+  return PATTERN_ROADMAP.filter(node => node.tier === tier);
+}

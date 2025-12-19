@@ -8,6 +8,7 @@
 // Core interview components
 export { ScenarioBrowser } from "./ScenarioBrowser"
 export { PatternBrowser } from "./PatternBrowser"
+export { DSARoadmap } from "./DSARoadmap"
 export { ProblemPanel } from "./ProblemPanel"
 export { InterviewerChat, AIChatPartner } from "./InterviewerChat"
 export { InterviewEditor } from "./InterviewEditor"

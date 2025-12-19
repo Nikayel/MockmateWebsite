@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { Search, Play, LayoutGrid, List, Sparkles } from "lucide-react"
+import { Search, Play, LayoutGrid, List, Target, Bug, Wrench, Cpu, Shield, Zap } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -17,6 +17,7 @@ import {
   type Company,
 } from "@/lib/scenarios"
 import { PatternBrowser } from "./PatternBrowser"
+import { DSARoadmap } from "./DSARoadmap"
 
 interface ScenarioBrowserProps {
   onStartInterview: (scenario: Scenario) => void
@@ -24,10 +25,19 @@ interface ScenarioBrowserProps {
   completedProblems: string[]
 }
 
-type ViewMode = 'list' | 'patterns'
+type ViewMode = 'roadmap' | 'patterns' | 'list'
+
+// Exercise type quick filters
+const EXERCISE_TYPES = [
+  { id: 'dsa', label: 'DSA', icon: Cpu, color: 'bg-[#00d9ff]', textColor: 'text-black' },
+  { id: 'bugfix', label: 'Bug Fix', icon: Bug, color: 'bg-[#00ff88]', textColor: 'text-black' },
+  { id: 'add-functionality', label: 'Add Feature', icon: Wrench, color: 'bg-amber-500', textColor: 'text-black' },
+  { id: 'optimization', label: 'Optimization', icon: Zap, color: 'bg-blue-500', textColor: 'text-white' },
+  { id: 'security', label: 'Security', icon: Shield, color: 'bg-red-500', textColor: 'text-white' },
+] as const
 
 export function ScenarioBrowser({ onStartInterview, usageLimit, completedProblems }: ScenarioBrowserProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('patterns')
+  const [viewMode, setViewMode] = useState<ViewMode>('roadmap')
   const {
     selectedScenario,
     setSelectedScenario,
@@ -97,6 +107,17 @@ export function ScenarioBrowser({ onStartInterview, usageLimit, completedProblem
             {/* View Mode Toggle */}
             <div className="flex justify-center gap-2 mb-6">
               <Button
+                variant={viewMode === 'roadmap' ? 'default' : 'outline'}
+                onClick={() => setViewMode('roadmap')}
+                className={viewMode === 'roadmap'
+                  ? 'bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80'
+                  : 'border-gray-600 text-gray-300 hover:bg-gray-800'
+                }
+              >
+                <Target className="h-4 w-4 mr-2" />
+                Roadmap
+              </Button>
+              <Button
                 variant={viewMode === 'patterns' ? 'default' : 'outline'}
                 onClick={() => setViewMode('patterns')}
                 className={viewMode === 'patterns'
@@ -153,6 +174,14 @@ export function ScenarioBrowser({ onStartInterview, usageLimit, completedProblem
             </div>
           </div>
 
+          {/* Roadmap View */}
+          {viewMode === 'roadmap' && (
+            <DSARoadmap
+              onStartInterview={onStartInterview}
+              completedProblems={completedProblems}
+            />
+          )}
+
           {/* Pattern View */}
           {viewMode === 'patterns' && (
             <PatternBrowser
@@ -165,12 +194,57 @@ export function ScenarioBrowser({ onStartInterview, usageLimit, completedProblem
           {viewMode === 'list' && (
             <>
 
+          {/* Quick Type Filters */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            <span className="text-gray-400 text-sm self-center mr-2">Quick Filters:</span>
+            {EXERCISE_TYPES.map((type) => {
+              const Icon = type.icon
+              const isActive = filterType.includes(type.id as ScenarioType)
+              const count = scenarios.filter(s => s.type === type.id).length
+              return (
+                <Button
+                  key={type.id}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (isActive) {
+                      setFilterType(filterType.filter(t => t !== type.id))
+                    } else {
+                      setFilterType([...filterType, type.id as ScenarioType])
+                    }
+                  }}
+                  className={`${
+                    isActive
+                      ? `${type.color} ${type.textColor} border-transparent`
+                      : 'border-gray-600 text-gray-300 hover:bg-gray-800'
+                  }`}
+                >
+                  <Icon className="h-3 w-3 mr-1.5" />
+                  {type.label}
+                  <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs bg-black/20">
+                    {count}
+                  </Badge>
+                </Button>
+              )
+            })}
+            {filterType.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setFilterType([])}
+                className="text-gray-400 hover:text-white"
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+
           {/* Filters */}
           <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-6">
             <CardContent className="p-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Search */}
-                <div className="md:col-span-2 lg:col-span-2">
+                <div className="md:col-span-2 lg:col-span-1">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
@@ -182,7 +256,7 @@ export function ScenarioBrowser({ onStartInterview, usageLimit, completedProblem
                   </div>
                 </div>
 
-                {/* Type Filter */}
+                {/* Type Filter - keep for multi-select dropdown */}
                 <div>
                   <select
                     value={filterType.join(",")}
