@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { feedbackRateLimit } from "@/lib/rate-limit"
-import { generateFeedbackResponse } from "@/lib/ai-providers"
+import { generateFeedbackResponse, generateAIResponse } from "@/lib/ai-providers"
 import { trackFeedbackGenerationServer } from "@/lib/analytics-server"
 
 // Structured feedback schema - NEW GRADING CRITERIA
@@ -30,315 +30,370 @@ interface StructuredFeedback {
 }
 
 /**
- * Analyze conversation content quality for communication scoring
- * Returns a quality score based on what was actually discussed
+ * AI-validated conversation analysis results
+ * This is what the AI returns after semantic analysis
  */
-function analyzeConversationQuality(transcript: Array<{ role: string; content: string }> | undefined): {
-  quality: number
-  discussedComplexity: boolean
-  discussedApproach: boolean
-  discussedAlternatives: boolean
-  discussedEdgeCases: boolean
+interface ConversationValidation {
+  // Coherence checks - is this real communication or gibberish?
+  isCoherent: boolean              // Are responses actual sentences?
+  responsesRelevant: boolean       // Do responses relate to questions asked?
+
+  // Approach explanation quality
+  approachExplained: boolean       // Did they explain their approach?
+  approachQuality: 'none' | 'poor' | 'basic' | 'good' | 'excellent'
+
+  // Complexity analysis - validated against actual code
+  complexityDiscussed: boolean     // Did they mention complexity?
+  complexityAccurate: boolean      // Was their stated complexity CORRECT?
+  statedComplexity: string | null  // What they claimed (e.g., "O(n)")
+
+  // Question-answer quality
+  questionsAsked: number           // How many questions interviewer asked
+  questionsAnswered: number        // How many were substantively answered
+
+  // Technical discussion depth
+  edgeCasesConsidered: boolean
+  alternativesDiscussed: boolean
+
+  // Overall communication quality (0-100)
+  communicationScore: number
+}
+
+/**
+ * STEP 1: Basic algorithmic pre-screening (fast, no AI)
+ * Detects obvious signals and filters out empty/minimal conversations
+ */
+function preScreenConversation(transcript: Array<{ role: string; content: string }> | undefined): {
+  hasContent: boolean
+  candidateMessageCount: number
+  avgMessageLength: number
+  hasKeywords: {
+    complexity: boolean
+    approach: boolean
+    alternatives: boolean
+    edgeCases: boolean
+  }
+  suspiciousPatterns: {
+    tooShort: boolean
+    possibleGibberish: boolean
+    keywordStuffing: boolean
+  }
 } {
   if (!transcript || transcript.length === 0) {
-    return { quality: 30, discussedComplexity: false, discussedApproach: false, discussedAlternatives: false, discussedEdgeCases: false }
+    return {
+      hasContent: false,
+      candidateMessageCount: 0,
+      avgMessageLength: 0,
+      hasKeywords: { complexity: false, approach: false, alternatives: false, edgeCases: false },
+      suspiciousPatterns: { tooShort: true, possibleGibberish: false, keywordStuffing: false }
+    }
   }
 
-  // Get only candidate messages
-  const candidateMessages = transcript.filter(m => m.role === 'candidate').map(m => m.content.toLowerCase())
-  const allContent = candidateMessages.join(' ')
+  const candidateMessages = transcript.filter(m => m.role === 'candidate')
+  const candidateContent = candidateMessages.map(m => m.content)
+  const allContent = candidateContent.join(' ').toLowerCase()
 
-  // Check for quality indicators
-  const discussedComplexity = /\b(time complexity|space complexity|big o|o\(n\)|o\(1\)|o\(n\^2\)|o\(log|linear|constant|quadratic)\b/i.test(allContent)
-  const discussedApproach = /\b(approach|strategy|algorithm|method|idea|plan|thinking|would|could|let me|my approach|i('m| am|'ll| will)|first|then|next)\b/i.test(allContent)
-  const discussedAlternatives = /\b(alternative|another way|different approach|could also|other option|instead of|trade-?off|brute force|optimiz)\b/i.test(allContent)
-  const discussedEdgeCases = /\b(edge case|corner case|empty|null|negative|zero|duplicate|boundary|special case|what if|overflow)\b/i.test(allContent)
+  // Calculate message stats
+  const totalLength = candidateContent.reduce((sum, m) => sum + m.length, 0)
+  const avgLength = totalLength / Math.max(1, candidateMessages.length)
 
-  // Calculate quality score based on content analysis
-  let quality = 35 // Base score for any communication
+  // Keyword detection (basic signals)
+  const hasKeywords = {
+    complexity: /\b(time complexity|space complexity|big o|o\(n\)|o\(1\)|o\(n\^2\)|o\(log|linear|constant|quadratic)\b/i.test(allContent),
+    approach: /\b(approach|strategy|algorithm|method|idea|plan|first|then|next|iterate|loop|hash|set|map|array)\b/i.test(allContent),
+    alternatives: /\b(alternative|another way|different approach|could also|other option|instead of|trade-?off|brute force|optimiz)\b/i.test(allContent),
+    edgeCases: /\b(edge case|corner case|empty|null|negative|zero|duplicate|boundary|special case|what if|overflow)\b/i.test(allContent)
+  }
 
-  // Reward substantive content
-  if (candidateMessages.length > 0) quality += 10
-  if (candidateMessages.length >= 3) quality += 10
-  if (discussedApproach) quality += 15
-  if (discussedComplexity) quality += 15
-  if (discussedAlternatives) quality += 10
-  if (discussedEdgeCases) quality += 10
+  // Suspicious pattern detection
+  const wordCount = allContent.split(/\s+/).filter(w => w.length > 0).length
+  const uniqueWords = new Set(allContent.split(/\s+/).filter(w => w.length > 2))
+  const uniqueRatio = uniqueWords.size / Math.max(1, wordCount)
 
-  // Reward longer, more detailed responses
-  const avgLength = candidateMessages.reduce((sum, m) => sum + m.length, 0) / Math.max(1, candidateMessages.length)
-  if (avgLength > 100) quality += 5
-  if (avgLength > 200) quality += 5
+  // Gibberish detection: very low unique word ratio suggests repetition/nonsense
+  const possibleGibberish = wordCount > 20 && uniqueRatio < 0.3
+
+  // Keyword stuffing: high keyword density without substance
+  const keywordCount = Object.values(hasKeywords).filter(Boolean).length
+  const keywordStuffing = keywordCount >= 3 && avgLength < 50 && wordCount < 30
 
   return {
-    quality: Math.min(95, quality),
-    discussedComplexity,
-    discussedApproach,
-    discussedAlternatives,
-    discussedEdgeCases
+    hasContent: candidateMessages.length > 0 && totalLength > 10,
+    candidateMessageCount: candidateMessages.length,
+    avgMessageLength: avgLength,
+    hasKeywords,
+    suspiciousPatterns: {
+      tooShort: avgLength < 20,
+      possibleGibberish,
+      keywordStuffing
+    }
   }
 }
 
 /**
- * Calculate understanding score algorithmically
+ * STEP 2: AI validation of conversation quality
+ * Only called if pre-screening passes basic checks
+ * Returns structured validation that algorithm uses for scoring
  */
-function calculateUnderstandingScore(
-  passRate: number,
-  conversationAnalysis: ReturnType<typeof analyzeConversationQuality>
-): number {
-  let score = 0
+async function validateConversationWithAI(
+  transcript: Array<{ role: string; content: string }>,
+  code: string,
+  actualComplexity: { time: string; space: string } | null
+): Promise<ConversationValidation> {
+  // Prepare conversation for AI (truncate to save tokens)
+  const recentMessages = transcript.slice(-15) // Last 15 messages max
+  const conversationText = recentMessages.map(m =>
+    `[${m.role.toUpperCase()}]: ${m.content.slice(0, 300)}${m.content.length > 300 ? '...' : ''}`
+  ).join('\n')
 
-  // Base understanding on test pass rate
-  if (passRate >= 80) {
-    score = Math.min(90, passRate + 5)
-  } else if (passRate >= 50) {
-    score = passRate + 5
-  } else {
-    score = Math.max(20, passRate)
+  // Count interviewer questions
+  const interviewerQuestions = transcript.filter(m =>
+    m.role === 'interviewer' && m.content.includes('?')
+  ).length
+
+  const validationPrompt = `Analyze this coding interview conversation and return ONLY valid JSON.
+
+CONVERSATION:
+${conversationText}
+
+CANDIDATE'S CODE (for complexity verification):
+\`\`\`
+${code.slice(0, 1000)}
+\`\`\`
+
+ACTUAL CODE COMPLEXITY: Time=${actualComplexity?.time || 'unknown'}, Space=${actualComplexity?.space || 'unknown'}
+
+Analyze and return this exact JSON structure (no markdown, no explanation):
+{
+  "isCoherent": true/false,
+  "responsesRelevant": true/false,
+  "approachExplained": true/false,
+  "approachQuality": "none|poor|basic|good|excellent",
+  "complexityDiscussed": true/false,
+  "complexityAccurate": true/false,
+  "statedComplexity": "O(n)" or null,
+  "questionsAsked": ${interviewerQuestions},
+  "questionsAnswered": number,
+  "edgeCasesConsidered": true/false,
+  "alternativesDiscussed": true/false,
+  "communicationScore": 0-100
+}
+
+VALIDATION RULES:
+- isCoherent: false if responses are gibberish, random words, or nonsensical
+- responsesRelevant: false if candidate responses don't relate to questions asked
+- complexityAccurate: ONLY true if stated complexity matches actual code complexity
+- communicationScore: 0-30 if incoherent, 30-50 if minimal, 50-70 if basic, 70-85 if good, 85-100 if excellent
+
+Return ONLY the JSON object, nothing else.`
+
+  try {
+    const response = await generateAIResponse(
+      'You are a technical interview evaluator. Return only valid JSON, no markdown.',
+      validationPrompt,
+      [],
+      { complexity: 'simple', temperature: 0.1 } // Low temp for consistent JSON
+    )
+
+    // Parse AI response
+    const jsonMatch = response.text.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0])
+      return {
+        isCoherent: Boolean(parsed.isCoherent),
+        responsesRelevant: Boolean(parsed.responsesRelevant),
+        approachExplained: Boolean(parsed.approachExplained),
+        approachQuality: parsed.approachQuality || 'none',
+        complexityDiscussed: Boolean(parsed.complexityDiscussed),
+        complexityAccurate: Boolean(parsed.complexityAccurate),
+        statedComplexity: parsed.statedComplexity || null,
+        questionsAsked: Number(parsed.questionsAsked) || interviewerQuestions,
+        questionsAnswered: Number(parsed.questionsAnswered) || 0,
+        edgeCasesConsidered: Boolean(parsed.edgeCasesConsidered),
+        alternativesDiscussed: Boolean(parsed.alternativesDiscussed),
+        communicationScore: Math.min(100, Math.max(0, Number(parsed.communicationScore) || 50))
+      }
+    }
+  } catch (error) {
+    console.error('AI validation parsing error:', error)
   }
 
-  // Bonus for explaining approach and complexity
-  if (conversationAnalysis.discussedApproach) score = Math.min(95, score + 5)
-  if (conversationAnalysis.discussedComplexity) score = Math.min(98, score + 5)
-
-  return Math.round(score)
+  // Fallback if AI validation fails
+  return getDefaultValidation()
 }
 
 /**
- * Calculate problem-solving score algorithmically
+ * Default validation when AI call fails or is skipped
  */
-function calculateProblemSolvingScore(
+function getDefaultValidation(): ConversationValidation {
+  return {
+    isCoherent: true, // Assume coherent if we can't validate
+    responsesRelevant: true,
+    approachExplained: false,
+    approachQuality: 'none',
+    complexityDiscussed: false,
+    complexityAccurate: false,
+    statedComplexity: null,
+    questionsAsked: 0,
+    questionsAnswered: 0,
+    edgeCasesConsidered: false,
+    alternativesDiscussed: false,
+    communicationScore: 40
+  }
+}
+
+/**
+ * STEP 3: Calculate final scores using both algorithmic signals and AI validation
+ */
+function calculateValidatedScores(
   passRate: number,
   efficiencyMetrics: { efficiencyScore?: number } | undefined,
-  conversationAnalysis: ReturnType<typeof analyzeConversationQuality>
-): number {
+  preScreen: ReturnType<typeof preScreenConversation>,
+  aiValidation: ConversationValidation
+): {
+  understanding: number
+  problemSolving: number
+  codeQuality: number
+  communication: number
+  overall: number
+} {
+  // === UNDERSTANDING SCORE (30%) ===
+  // Primary: test pass rate (proves they understood the problem)
+  // Secondary: approach explanation quality
+  let understanding = 0
+  if (passRate >= 80) {
+    understanding = Math.min(85, passRate)
+  } else if (passRate >= 50) {
+    understanding = passRate + 5
+  } else {
+    understanding = Math.max(20, passRate)
+  }
+
+  // Bonus for explaining approach (only if AI validated as real explanation)
+  if (aiValidation.approachExplained && aiValidation.isCoherent) {
+    const approachBonus = {
+      'excellent': 12,
+      'good': 8,
+      'basic': 4,
+      'poor': 2,
+      'none': 0
+    }[aiValidation.approachQuality] || 0
+    understanding = Math.min(98, understanding + approachBonus)
+  }
+
+  // Bonus for ACCURATE complexity discussion (not just mentioning it)
+  if (aiValidation.complexityDiscussed && aiValidation.complexityAccurate) {
+    understanding = Math.min(98, understanding + 5)
+  } else if (aiValidation.complexityDiscussed && !aiValidation.complexityAccurate) {
+    // Penalty for wrong complexity claim
+    understanding = Math.max(20, understanding - 5)
+  }
+
+  // === PROBLEM-SOLVING SCORE (25%) ===
+  // Primary: test pass rate + code efficiency
+  // Secondary: edge cases and alternatives discussed
   const effScore = efficiencyMetrics?.efficiencyScore || 50
-  let score = Math.round((passRate * 0.6) + (effScore * 0.4))
+  let problemSolving = Math.round((passRate * 0.6) + (effScore * 0.4))
 
-  // Bonus for discussing alternatives and edge cases
-  if (conversationAnalysis.discussedAlternatives) score = Math.min(95, score + 5)
-  if (conversationAnalysis.discussedEdgeCases) score = Math.min(95, score + 5)
+  // Bonus only if AI validated these as real discussions (not keyword stuffing)
+  if (aiValidation.alternativesDiscussed && aiValidation.isCoherent) {
+    problemSolving = Math.min(95, problemSolving + 5)
+  }
+  if (aiValidation.edgeCasesConsidered && aiValidation.isCoherent) {
+    problemSolving = Math.min(95, problemSolving + 5)
+  }
 
-  return score
-}
-
-/**
- * Calculate code quality score algorithmically
- */
-function calculateCodeQualityScore(
-  passRate: number,
-  efficiencyMetrics: { efficiencyScore?: number } | undefined
-): number {
-  const effScore = efficiencyMetrics?.efficiencyScore || 50
-
-  // Code quality = 50% test pass rate + 30% efficiency + 20% base
-  let score = Math.round(
+  // === CODE QUALITY SCORE (25%) ===
+  // Purely algorithmic - based on test results and efficiency
+  // This CAN'T be gamed through conversation
+  const codeQuality = Math.min(100, Math.round(
     passRate * 0.50 +
     effScore * 0.30 +
-    50 * 0.20 // Base readability assumption
+    50 * 0.20
+  ))
+
+  // === COMMUNICATION SCORE (20%) ===
+  // This is where AI validation matters most
+  let communication = 30 // Base
+
+  // If AI detected incoherence or gibberish, cap severely
+  if (!aiValidation.isCoherent) {
+    communication = Math.min(25, aiValidation.communicationScore)
+  }
+  // If responses weren't relevant to questions, penalize
+  else if (!aiValidation.responsesRelevant) {
+    communication = Math.min(40, aiValidation.communicationScore)
+  }
+  // If pre-screening detected suspicious patterns (keyword stuffing), cap
+  else if (preScreen.suspiciousPatterns.keywordStuffing) {
+    communication = Math.min(35, aiValidation.communicationScore)
+  }
+  // Otherwise use AI's communication score
+  else {
+    communication = aiValidation.communicationScore
+
+    // Small bonus if they answered most interviewer questions
+    if (aiValidation.questionsAsked > 0) {
+      const answerRate = aiValidation.questionsAnswered / aiValidation.questionsAsked
+      if (answerRate >= 0.8) {
+        communication = Math.min(95, communication + 5)
+      }
+    }
+  }
+
+  // Floor for candidates who at least had a real conversation
+  if (preScreen.hasContent && preScreen.candidateMessageCount >= 2 && aiValidation.isCoherent) {
+    communication = Math.max(40, communication)
+  }
+
+  // === OVERALL SCORE ===
+  const overall = Math.round(
+    understanding * 0.30 +
+    problemSolving * 0.25 +
+    codeQuality * 0.25 +
+    communication * 0.20
   )
 
-  return Math.min(100, score)
+  return {
+    understanding: Math.round(understanding),
+    problemSolving: Math.round(problemSolving),
+    codeQuality: Math.round(codeQuality),
+    communication: Math.round(communication),
+    overall
+  }
 }
 
 /**
- * Extract scores from feedback text using multiple patterns
- * Falls back to algorithmic scores if AI parsing fails
+ * Apply score floors for correct solutions
+ * A perfect, optimal solution should never get a failing grade
  */
-function extractScores(feedback: string, metrics: {
-  testsPassed: number
-  testsTotal: number
-  timeSpent: number
-  collaborationMessages: number
-  conversationTranscript?: Array<{ role: string; content: string }>
-  efficiencyMetrics?: {
-    efficiencyScore?: number
-    estimatedTimeComplexity?: string
-    optimalTimeComplexity?: string
-    estimatedSpaceComplexity?: string
-    optimalSpaceComplexity?: string
-  }
-}): FeedbackScores {
-  const scores: FeedbackScores = {
-    // New grading criteria
-    understanding: 70,
-    problemSolving: 70,
-    codeQuality: 70,
-    communication: 70,
-    // Legacy
-    correctness: 70,
-    efficiency: 70,
-    reasoningExplanation: 70,
-    aiCollaboration: 70,
-    overall: 70,
-  }
+function applyScoreFloors(
+  scores: ReturnType<typeof calculateValidatedScores>,
+  passRate: number,
+  efficiencyScore: number | undefined,
+  aiValidation: ConversationValidation
+): ReturnType<typeof calculateValidatedScores> {
+  const isOptimal = (efficiencyScore || 0) >= 80
+  const hasGoodComm = aiValidation.communicationScore >= 60 && aiValidation.isCoherent
 
-  // Pattern: "Label: X/100" or "Label: X/10"
-  const patterns = [
-    // NEW GRADING CRITERIA
-    { key: 'understanding', patterns: [/Understanding[:\s]+(\d+)\/100/i, /Understanding[:\s]+(\d+)\/10/i] },
-    { key: 'problemSolving', patterns: [/Problem[-\s]?Solving[:\s]+(\d+)\/100/i, /Problem[-\s]?Solving[:\s]+(\d+)\/10/i] },
-    { key: 'codeQuality', patterns: [/Code\s*Quality[:\s]+(\d+)\/100/i, /Code\s*Quality[:\s]+(\d+)\/10/i] },
-    { key: 'communication', patterns: [/Communication[:\s]+(\d+)\/100/i, /Communication[:\s]+(\d+)\/10/i] },
-    // LEGACY (for backward compatibility)
-    { key: 'correctness', patterns: [/Correctness[:\s]+(\d+)\/100/i, /Correctness[:\s]+(\d+)\/10/i] },
-    { key: 'efficiency', patterns: [/Efficiency[:\s]+(\d+)\/100/i, /Efficiency[:\s]+(\d+)\/10/i] },
-    { key: 'reasoningExplanation', patterns: [/Reasoning\s*(?:&|and)?\s*Explanation[:\s]+(\d+)\/100/i, /Reasoning\s*(?:&|and)?\s*Explanation[:\s]+(\d+)\/10/i] },
-    { key: 'aiCollaboration', patterns: [/AI\s*Collaboration[:\s]+(\d+)\/100/i, /AI\s*Collaboration[:\s]+(\d+)\/10/i] },
-    { key: 'overall', patterns: [/Overall[:\s]+(\d+)\/100/i, /Overall[:\s]+(\d+)\/10/i] },
-  ]
+  let overall = scores.overall
 
-  for (const { key, patterns: patternList } of patterns) {
-    for (const pattern of patternList) {
-      const match = feedback.match(pattern)
-      if (match) {
-        let value = parseInt(match[1], 10)
-        // Convert /10 scale to /100
-        if (pattern.toString().includes('/10')) {
-          value = value * 10
-        }
-        scores[key as keyof FeedbackScores] = Math.min(100, Math.max(0, value))
-        break
-      }
-    }
-  }
-
-  // Derive new criteria from legacy if not parsed
-  const passRate = metrics.testsTotal > 0 ? (metrics.testsPassed / metrics.testsTotal) * 100 : 50
-
-  // Analyze conversation for understanding signals
-  const conversationAnalysis = analyzeConversationQuality(metrics.conversationTranscript)
-
-  // Understanding = based on test results AND explanation of approach
-  // A correct solution shows understanding; explaining approach confirms it
-  if (scores.understanding === 70) {
-    // Base understanding on test pass rate
-    if (passRate >= 80) {
-      scores.understanding = Math.min(90, passRate + 5)
-    } else if (passRate >= 50) {
-      scores.understanding = passRate + 5
-    } else {
-      scores.understanding = Math.max(20, passRate)
-    }
-
-    // Bonus for explaining approach and complexity (shows deeper understanding)
-    if (conversationAnalysis.discussedApproach) {
-      scores.understanding = Math.min(95, scores.understanding + 5)
-    }
-    if (conversationAnalysis.discussedComplexity) {
-      scores.understanding = Math.min(98, scores.understanding + 5)
-    }
-  }
-
-  // Problem-Solving = based on debugging, optimization, and approach
-  if (scores.problemSolving === 70) {
-    const effScore = metrics.efficiencyMetrics?.efficiencyScore || 50
-    scores.problemSolving = Math.round((passRate * 0.6) + (effScore * 0.4))
-
-    // Bonus for discussing alternatives and edge cases (shows problem-solving thinking)
-    if (conversationAnalysis.discussedAlternatives) {
-      scores.problemSolving = Math.min(95, scores.problemSolving + 5)
-    }
-    if (conversationAnalysis.discussedEdgeCases) {
-      scores.problemSolving = Math.min(95, scores.problemSolving + 5)
-    }
-  }
-
-  // Communication = based on CONTENT QUALITY, not just message count
-  // Uses the conversationAnalysis computed above
-  if (scores.communication === 70) {
-    // Use content-based quality score as the primary communication metric
-    if (conversationAnalysis.quality > 50) {
-      // Good communication detected based on content
-      scores.communication = conversationAnalysis.quality
-
-      // Bonus for discussing specific technical topics together
-      if (conversationAnalysis.discussedComplexity && conversationAnalysis.discussedApproach) {
-        scores.communication = Math.min(95, scores.communication + 5)
-      }
-    } else if (metrics.collaborationMessages > 0) {
-      // Some messages sent but content analysis didn't find key indicators
-      // Still give credit for attempting communication
-      scores.communication = Math.max(45, conversationAnalysis.quality)
-    } else {
-      // No conversation transcript - use pass rate as proxy
-      // A passing solution with good efficiency suggests some understanding
-      if (passRate >= 80) {
-        scores.communication = 50 // Benefit of doubt for correct solution
-      } else {
-        scores.communication = 35
-      }
-    }
-  }
-
-  // Test-based correctness adjustment (legacy)
-  if (metrics.testsTotal > 0) {
-    if (passRate < 50 && scores.correctness > 60) {
-      scores.correctness = Math.min(scores.correctness, passRate + 20)
-    }
-    if (passRate === 0) {
-      scores.correctness = Math.min(scores.correctness, 15)
-    }
-  }
-
-  // Efficiency-based adjustments using actual code analysis
-  if (metrics.efficiencyMetrics) {
-    const eff = metrics.efficiencyMetrics
-    const timeOptimal = eff.estimatedTimeComplexity === eff.optimalTimeComplexity
-    const spaceOptimal = eff.estimatedSpaceComplexity === eff.optimalSpaceComplexity
-
-    // Cap efficiency based on actual complexity analysis
-    if (!timeOptimal && !spaceOptimal) {
-      // Both suboptimal - cap at 50
-      scores.efficiency = Math.min(scores.efficiency, 50)
-    } else if (!timeOptimal) {
-      // Time suboptimal - cap at 70
-      scores.efficiency = Math.min(scores.efficiency, 70)
-    } else if (!spaceOptimal) {
-      // Space suboptimal - cap at 80
-      scores.efficiency = Math.min(scores.efficiency, 80)
-    }
-
-    // Use actual efficiency score as a floor/ceiling reference
-    if (eff.efficiencyScore !== undefined) {
-      // Don't let AI score be more than 15 points higher than calculated
-      scores.efficiency = Math.min(scores.efficiency, eff.efficiencyScore + 15)
-    }
-  }
-
-  // Calculate overall using NEW WEIGHTED FORMULA
-  // Understanding (30%) + Problem-Solving (25%) + Code Quality (25%) + Communication (20%)
-  // But ensure correct solutions get fair scores
-  const newOverall = Math.round(
-    scores.understanding * 0.30 +
-    scores.problemSolving * 0.25 +
-    scores.codeQuality * 0.25 +
-    scores.communication * 0.20
-  )
-
-  // Floor: Correct solutions with good communication deserve good scores
-  // A correct, optimal solution should NEVER get an F grade
-  const isOptimalSolution = metrics.efficiencyMetrics?.efficiencyScore !== undefined &&
-    metrics.efficiencyMetrics.efficiencyScore >= 80
-  const hasGoodCommunication = conversationAnalysis.quality >= 60 ||
-    (conversationAnalysis.discussedComplexity && conversationAnalysis.discussedApproach)
-
-  if (passRate >= 100 && isOptimalSolution && hasGoodCommunication) {
-    // Perfect tests + optimal solution + good communication = A range minimum
-    scores.overall = Math.max(85, newOverall)
-  } else if (passRate >= 100 && isOptimalSolution) {
-    // Perfect tests + optimal solution = B+ minimum
-    scores.overall = Math.max(78, newOverall)
+  if (passRate >= 100 && isOptimal && hasGoodComm) {
+    overall = Math.max(85, overall) // A range
+  } else if (passRate >= 100 && isOptimal) {
+    overall = Math.max(78, overall) // B+ range
+  } else if (passRate >= 100) {
+    overall = Math.max(72, overall) // B range
   } else if (passRate >= 90) {
-    scores.overall = Math.max(70, newOverall) // At least B- for near-perfect tests
+    overall = Math.max(68, overall) // B- range
   } else if (passRate >= 80) {
-    scores.overall = Math.max(65, newOverall) // At least C+ for 80%+ tests
-  } else {
-    scores.overall = newOverall
+    overall = Math.max(62, overall) // C+ range
   }
 
-  return scores
+  return { ...scores, overall }
 }
+
+
 
 /**
  * Parse structured sections from feedback
@@ -472,47 +527,64 @@ CODE EFFICIENCY ANALYSIS:
 - No efficiency data available
 `
 
-    // ALGORITHMIC ANALYSIS: Analyze conversation BEFORE AI call to save tokens
-    // This makes scoring deterministic and reduces AI token usage
-    const conversationAnalysis = analyzeConversationQuality(conversationTranscript)
+    // HYBRID VALIDATION FLOW:
+    // Step 1: Fast algorithmic pre-screening
+    // Step 2: AI semantic validation (only if pre-screening passes)
+    // Step 3: Calculate scores using both signals
+    // Step 4: Apply score floors for correct solutions
+
     const passRate = testsTotal > 0 ? (testsPassed / testsTotal) * 100 : 0
 
-    // Pre-calculate scores algorithmically (AI will only generate narrative)
-    const algorithmicScores = {
-      understanding: calculateUnderstandingScore(passRate, conversationAnalysis),
-      problemSolving: calculateProblemSolvingScore(passRate, efficiencyMetrics, conversationAnalysis),
-      codeQuality: calculateCodeQualityScore(passRate, efficiencyMetrics),
-      communication: conversationAnalysis.quality,
-      overall: 0 // Will be calculated after
-    }
-    algorithmicScores.overall = Math.round(
-      algorithmicScores.understanding * 0.30 +
-      algorithmicScores.problemSolving * 0.25 +
-      algorithmicScores.codeQuality * 0.25 +
-      algorithmicScores.communication * 0.20
+    // Step 1: Pre-screen conversation (fast, no AI)
+    const preScreen = preScreenConversation(conversationTranscript)
+
+    // Step 2: AI validation (only if there's real content to validate)
+    // Skip AI call if: no content, gibberish detected, or keyword stuffing
+    const shouldValidateWithAI = preScreen.hasContent &&
+      !preScreen.suspiciousPatterns.possibleGibberish &&
+      !preScreen.suspiciousPatterns.keywordStuffing &&
+      preScreen.candidateMessageCount >= 1
+
+    const aiValidation = shouldValidateWithAI
+      ? await validateConversationWithAI(
+          conversationTranscript,
+          code,
+          efficiencyMetrics ? {
+            time: efficiencyMetrics.estimatedTimeComplexity || 'unknown',
+            space: efficiencyMetrics.estimatedSpaceComplexity || 'unknown'
+          } : null
+        )
+      : getDefaultValidation()
+
+    // Step 3: Calculate validated scores using both algorithmic + AI signals
+    const validatedScores = calculateValidatedScores(
+      passRate,
+      efficiencyMetrics,
+      preScreen,
+      aiValidation
     )
 
-    // Apply score floors for correct solutions
-    const isOptimalSolution = efficiencyMetrics?.efficiencyScore !== undefined && efficiencyMetrics.efficiencyScore >= 80
-    if (passRate >= 100 && isOptimalSolution && conversationAnalysis.quality >= 60) {
-      algorithmicScores.overall = Math.max(85, algorithmicScores.overall)
-    } else if (passRate >= 100 && isOptimalSolution) {
-      algorithmicScores.overall = Math.max(78, algorithmicScores.overall)
-    } else if (passRate >= 90) {
-      algorithmicScores.overall = Math.max(70, algorithmicScores.overall)
-    } else if (passRate >= 80) {
-      algorithmicScores.overall = Math.max(65, algorithmicScores.overall)
-    }
+    // Step 4: Apply score floors for correct solutions
+    const algorithmicScores = applyScoreFloors(
+      validatedScores,
+      passRate,
+      efficiencyMetrics?.efficiencyScore,
+      aiValidation
+    )
 
-    // Send SUMMARY to AI instead of full transcript (saves ~500-1000 tokens)
+    // Send validated summary to AI for narrative generation
     const conversationSummary = `
-COMMUNICATION ANALYSIS (algorithmically detected):
-- Discussed time/space complexity: ${conversationAnalysis.discussedComplexity ? 'YES' : 'NO'}
-- Explained approach/algorithm: ${conversationAnalysis.discussedApproach ? 'YES' : 'NO'}
-- Considered alternatives: ${conversationAnalysis.discussedAlternatives ? 'YES' : 'NO'}
-- Mentioned edge cases: ${conversationAnalysis.discussedEdgeCases ? 'YES' : 'NO'}
-- Communication quality score: ${conversationAnalysis.quality}/100
-- Total candidate messages: ${conversationTranscript?.filter((m: { role: string }) => m.role === 'candidate').length || 0}
+COMMUNICATION ANALYSIS (hybrid validated):
+- Coherent responses: ${aiValidation.isCoherent ? 'YES' : 'NO - possible gibberish detected'}
+- Responses relevant to questions: ${aiValidation.responsesRelevant ? 'YES' : 'NO'}
+- Approach explained: ${aiValidation.approachExplained ? `YES (${aiValidation.approachQuality})` : 'NO'}
+- Complexity discussed: ${aiValidation.complexityDiscussed ? 'YES' : 'NO'}
+- Complexity accurate: ${aiValidation.complexityAccurate ? 'YES' : 'NO - stated: ' + (aiValidation.statedComplexity || 'none')}
+- Edge cases considered: ${aiValidation.edgeCasesConsidered ? 'YES' : 'NO'}
+- Alternatives discussed: ${aiValidation.alternativesDiscussed ? 'YES' : 'NO'}
+- Questions answered: ${aiValidation.questionsAnswered}/${aiValidation.questionsAsked}
+- Communication score: ${aiValidation.communicationScore}/100
+- Total candidate messages: ${preScreen.candidateMessageCount}
 
 PRE-CALCULATED SCORES (use these as your scores):
 - Understanding: ${algorithmicScores.understanding}/100
