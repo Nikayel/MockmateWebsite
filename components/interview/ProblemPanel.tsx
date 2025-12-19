@@ -1,7 +1,7 @@
 "use client"
 
-import { useRef, useMemo } from "react"
-import { Target, Lightbulb, Code, Zap, Clock, HardDrive, BookOpen, ChevronDown, ChevronUp } from "lucide-react"
+import { useRef, useMemo, useState, useEffect } from "react"
+import { Target, Lightbulb, Code, Zap, Clock, HardDrive, BookOpen, ChevronDown, ChevronUp, AlertCircle } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -9,7 +9,6 @@ import { useInterviewStore, type WorkspaceFile } from "@/lib/stores"
 import type { Scenario, DSAScenario } from "@/lib/scenarios"
 import { PATTERN_METADATA, type DSAPattern } from "@/lib/types/dsa-patterns"
 import { toast } from "sonner"
-import { useState } from "react"
 
 interface ProblemPanelProps {
   scenario: Scenario
@@ -82,7 +81,8 @@ function inferPattern(scenario: Scenario): DSAPattern | null {
 
 export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [showAnalysis, setShowAnalysis] = useState(false)
+  // Default to showing analysis for DSA problems
+  const [showAnalysis, setShowAnalysis] = useState(scenario.type === 'dsa')
   const {
     isInterviewStarted,
     elapsedTime,
@@ -92,6 +92,11 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
   } = useInterviewStore()
 
   const hints = (scenario as any).hints || []
+
+  // Reset analysis visibility when scenario changes
+  useEffect(() => {
+    setShowAnalysis(scenario.type === 'dsa')
+  }, [scenario.id])
 
   // Get pattern metadata for DSA problems
   const patternMetadata = useMemo(() => {
@@ -193,6 +198,9 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
               <span className="flex items-center gap-1.5 text-xs">
                 <BookOpen className="h-3 w-3 text-[#00d9ff]" />
                 Pattern Analysis
+                <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/50 text-[10px] px-1.5">
+                  {patternMetadata.name}
+                </Badge>
               </span>
               {showAnalysis ? (
                 <ChevronUp className="h-4 w-4 text-gray-400" />
@@ -203,13 +211,8 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
 
             {showAnalysis && (
               <div className="space-y-3 animate-in slide-in-from-top-2 duration-200">
-                {/* Pattern Name */}
+                {/* Pattern Description */}
                 <div className="bg-[#00d9ff]/10 border border-[#00d9ff]/30 rounded-lg p-2">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/50 text-xs">
-                      {patternMetadata.name}
-                    </Badge>
-                  </div>
                   <p className="text-gray-300 text-xs leading-relaxed">
                     {patternMetadata.description}
                   </p>
@@ -219,14 +222,14 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
                 <div>
                   <h4 className="text-gray-400 text-xs font-medium mb-1.5 flex items-center gap-1">
                     <Zap className="h-3 w-3 text-yellow-400" />
-                    Key Techniques
+                    Key Techniques to Consider
                   </h4>
                   <div className="flex flex-wrap gap-1">
                     {patternMetadata.keyTechniques.map((tech, i) => (
                       <Badge
                         key={i}
                         variant="outline"
-                        className="text-xs bg-gray-800/50 text-gray-300 border-gray-700"
+                        className="text-xs bg-yellow-500/10 text-yellow-300 border-yellow-500/30"
                       >
                         {tech}
                       </Badge>
@@ -236,39 +239,56 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
 
                 {/* Expected Complexity */}
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-gray-800/30 rounded p-2">
+                  <div className="bg-green-500/10 border border-green-500/20 rounded p-2">
                     <h4 className="text-gray-400 text-xs font-medium mb-1 flex items-center gap-1">
                       <Clock className="h-3 w-3 text-green-400" />
                       Time Complexity
                     </h4>
                     <div className="space-y-0.5">
-                      {patternMetadata.timeComplexityHints.slice(0, 2).map((hint, i) => (
+                      {patternMetadata.timeComplexityHints.map((hint, i) => (
                         <p key={i} className="text-xs text-green-300">{hint}</p>
                       ))}
                     </div>
                   </div>
-                  <div className="bg-gray-800/30 rounded p-2">
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded p-2">
                     <h4 className="text-gray-400 text-xs font-medium mb-1 flex items-center gap-1">
                       <HardDrive className="h-3 w-3 text-blue-400" />
                       Space Complexity
                     </h4>
                     <div className="space-y-0.5">
-                      {patternMetadata.spaceComplexityHints.slice(0, 2).map((hint, i) => (
+                      {patternMetadata.spaceComplexityHints.map((hint, i) => (
                         <p key={i} className="text-xs text-blue-300">{hint}</p>
                       ))}
                     </div>
                   </div>
                 </div>
 
+                {/* Common Questions for this Pattern */}
+                {patternMetadata.commonQuestions && patternMetadata.commonQuestions.length > 0 && (
+                  <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-2">
+                    <h4 className="text-purple-300 text-xs font-medium mb-1.5">
+                      Similar Problems to Practice
+                    </h4>
+                    <div className="flex flex-wrap gap-1">
+                      {patternMetadata.commonQuestions.slice(0, 4).map((q, i) => (
+                        <span key={i} className="text-xs text-gray-300 bg-gray-800/50 px-1.5 py-0.5 rounded">
+                          {q}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* What to Expect from Interviewer */}
                 <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-2">
-                  <h4 className="text-orange-300 text-xs font-medium mb-1.5">
-                    Common Interviewer Questions
+                  <h4 className="text-orange-300 text-xs font-medium mb-1.5 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Expect These Follow-up Questions
                   </h4>
                   <ul className="space-y-1">
-                    {patternMetadata.interviewerFollowUps.slice(0, 3).map((q, i) => (
+                    {patternMetadata.interviewerFollowUps.map((q, i) => (
                       <li key={i} className="text-xs text-gray-300 flex items-start gap-1.5">
-                        <span className="text-orange-400 flex-shrink-0">•</span>
+                        <span className="text-orange-400 flex-shrink-0">{i + 1}.</span>
                         {q}
                       </li>
                     ))}
