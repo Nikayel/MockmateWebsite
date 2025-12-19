@@ -58,6 +58,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/lib/auth-context"
 import { checkUsageLimit, recordSessionStart, getUserProfile, createInterviewSession, updateInterviewSession, checkSessionCost, saveSessionState, getSessionState } from "@/lib/firestore-helpers"
+import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { scenarios, filterScenarios, getScenarioById, type Scenario, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
 import { extractProtectedElements, validateCodeProtection, enforceCodeProtection } from "@/lib/code-protection"
 import { toast } from "sonner"
@@ -93,6 +94,7 @@ export default function InterviewPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
+  const { markQuestionCompleted, activeRoadmap } = useRoadmapStore()
   const [isLoading, setIsLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
   const [showScenarioBrowser, setShowScenarioBrowser] = useState(true)
@@ -168,6 +170,9 @@ export default function InterviewPage() {
   // Code protection state
   const [protectedElements, setProtectedElements] = useState<ReturnType<typeof extractProtectedElements> | null>(null)
   const [starterCode, setStarterCode] = useState<string>("")
+
+  // Roadmap tracking
+  const isFromRoadmap = searchParams?.get("roadmap") === "true"
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const interviewerEndRef = useRef<HTMLDivElement>(null)
@@ -1089,6 +1094,12 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             scoreToSave,
             comprehensiveFeedback
           )
+
+          // Mark question complete in roadmap if user came from roadmap
+          if (isFromRoadmap && selectedScenario && activeRoadmap) {
+            markQuestionCompleted(selectedScenario.id)
+            toast.success("Progress saved to your roadmap!")
+          }
 
           // Vectorize session for RAG features (async, non-blocking)
           fetch("/api/vectorize-session", {
@@ -2567,6 +2578,17 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     onRetry={resetInterview}
                     onNewProblem={resetInterview}
                   />
+                  {isFromRoadmap && activeRoadmap && (
+                    <div className="mt-6 flex justify-center">
+                      <Button
+                        onClick={() => router.push("/roadmap")}
+                        className="bg-primary hover:bg-primary/90 text-white"
+                      >
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        Back to Roadmap
+                      </Button>
+                    </div>
+                  )}
                 </>
               )}
             </div>
