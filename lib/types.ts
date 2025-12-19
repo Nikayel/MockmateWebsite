@@ -31,6 +31,10 @@ export interface Profile {
   goal?: "faang" | "startup" | "general" | "promotion"
   onboarding_completed?: boolean
   onboarding_completed_at?: string
+  // Product tour fields
+  tour_completed?: boolean
+  tour_skipped?: boolean
+  tour_completed_at?: string
 }
 
 export interface ProfileQuota {
