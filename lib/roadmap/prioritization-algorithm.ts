@@ -299,6 +299,7 @@ export function buildDailySchedule(
       questions: todaysQuestions.map(q => ({
         scenarioId: q.scenarioId,
         title: q.title,
+        pattern: q.pattern,
         difficulty: q.difficulty,
         estimatedMinutes: q.estimatedMinutes,
         status: 'pending' as const,

@@ -158,19 +158,19 @@ export const useRoadmapStore = create<RoadmapState>()(
           ),
         }))
 
-        const completedCount = updatedPlans
-          .flatMap((p) => p.questions)
-          .filter((q) => q.status === 'completed').length
+        const allQuestions = updatedPlans.flatMap((p) => p.questions)
+        const completedCount = allQuestions.filter((q) => q.status === 'completed').length
 
-        // Update pattern coverage
+        // Update pattern coverage - count per pattern
         const patternCoverage = state.activeRoadmap.patternCoverage.map((pc) => {
-          const patternCompleted = updatedPlans
-            .flatMap((p) => p.questions)
-            .filter((q) => q.status === 'completed').length
+          const patternQuestions = allQuestions.filter((q) => q.pattern === pc.pattern)
+          const patternCompleted = patternQuestions.filter((q) => q.status === 'completed').length
+          const total = patternQuestions.length || pc.total
           return {
             ...pc,
+            total,
             completed: patternCompleted,
-            percentage: Math.round((patternCompleted / pc.total) * 100),
+            percentage: total > 0 ? Math.round((patternCompleted / total) * 100) : 0,
           }
         })
 

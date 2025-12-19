@@ -36,12 +36,14 @@ export default function RoadmapPage() {
     return planDate.getTime() === today.getTime()
   }) ?? 0
 
-  // Set selected day to today on mount
+  // Set selected day to today on initial mount only
   useEffect(() => {
-    if (roadmap && todayIndex >= 0 && selectedDayIndex !== todayIndex) {
+    if (roadmap && todayIndex >= 0) {
+      // Only auto-select today on first load, not on every change
       selectDay(todayIndex)
     }
-  }, [roadmap, todayIndex, selectedDayIndex, selectDay])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roadmap?.id]) // Only run when roadmap changes, not on every selectedDayIndex change
 
   const handleStartQuestion = (scenarioId: string) => {
     // Navigate to interview with this scenario

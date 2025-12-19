@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Play, Check, SkipForward, Clock, Zap, Star } from 'lucide-react'
+import { Play, Check, SkipForward, Clock, Zap, Star, Calendar, Coffee } from 'lucide-react'
 import { DailyPlan } from '@/lib/data/company-questions/types'
 import { cn } from '@/lib/utils'
 
@@ -20,18 +20,67 @@ export function TodaysFocus({
 }: TodaysFocusProps) {
   const completedCount = plan.questions.filter((q) => q.status === 'completed').length
   const totalCount = plan.questions.length
-  const allComplete = completedCount === totalCount
+  const allComplete = totalCount > 0 && completedCount === totalCount
+
+  // Determine if this is today, past, or future
+  const planDate = new Date(plan.date)
+  planDate.setHours(0, 0, 0, 0)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const isToday = planDate.getTime() === today.getTime()
+  const isPast = planDate < today
+  const isFuture = planDate > today
+
+  // Format date for display
+  const dateLabel = isToday
+    ? "Today's Focus"
+    : planDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+
+  // Handle rest/review days (no questions)
+  if (totalCount === 0) {
+    return (
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-500/10 to-transparent p-6 text-center">
+          <Coffee className="h-12 w-12 mx-auto text-blue-500 mb-3" />
+          <h2 className="text-lg font-bold">{dateLabel}</h2>
+          <p className="text-muted-foreground mt-1">{plan.theme}</p>
+          {plan.notes && (
+            <p className="text-sm text-muted-foreground mt-4 max-w-md mx-auto">{plan.notes}</p>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary/10 to-transparent p-4 border-b border-border">
+      <div className={cn(
+        "p-4 border-b border-border",
+        isToday && "bg-gradient-to-r from-primary/10 to-transparent",
+        isPast && "bg-gradient-to-r from-muted/50 to-transparent",
+        isFuture && "bg-gradient-to-r from-blue-500/5 to-transparent"
+      )}>
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold flex items-center gap-2">
-              <Zap className="h-5 w-5 text-primary" />
-              Today's Focus
-            </h2>
+            <div className="flex items-center gap-2">
+              {isToday ? (
+                <Zap className="h-5 w-5 text-primary" />
+              ) : (
+                <Calendar className="h-5 w-5 text-muted-foreground" />
+              )}
+              <h2 className="text-lg font-bold">{dateLabel}</h2>
+              {isPast && !allComplete && (
+                <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded">
+                  Catch up
+                </span>
+              )}
+              {isFuture && (
+                <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded">
+                  Upcoming
+                </span>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground mt-0.5">{plan.theme}</p>
           </div>
           <div className="text-right">
@@ -46,8 +95,11 @@ export function TodaysFocus({
         <div className="mt-3 h-1.5 bg-muted rounded-full overflow-hidden">
           <motion.div
             initial={{ width: 0 }}
-            animate={{ width: `${(completedCount / totalCount) * 100}%` }}
-            className="h-full bg-primary rounded-full"
+            animate={{ width: `${(completedCount / Math.max(totalCount, 1)) * 100}%` }}
+            className={cn(
+              "h-full rounded-full",
+              allComplete ? "bg-green-500" : "bg-primary"
+            )}
           />
         </div>
       </div>
