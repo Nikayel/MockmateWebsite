@@ -2056,11 +2056,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     </CardHeader>
                     {/* Code Editor - Using centralized MonacoEditor component */}
                     <div className="flex flex-col flex-1 min-h-0 gap-2 px-3 pb-3">
-                      <div ref={editorContainerRef} className="flex-1 min-h-0 rounded border border-gray-700 overflow-hidden">
+                      <div ref={editorContainerRef} className="flex-1 min-h-0 rounded border border-gray-700 overflow-hidden relative">
                         <MonacoEditor
                           height="100%"
                           language={selectedLanguage}
-                          value={code}
+                          value={code || (selectedScenario ? ((selectedScenario as any).starterCode?.[selectedLanguage] || (selectedScenario as any).buggyCode?.[selectedLanguage] || (selectedScenario as any).existingCode?.[selectedLanguage] || '') : '')}
                           onChange={(newCode) => {
                             // Enforce code protection if enabled
                             if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
@@ -2074,6 +2074,30 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           }}
                           readOnly={!isInterviewStarted || showFeedback}
                         />
+                        {/* Start Interview Overlay - shown when scenario selected but not started */}
+                        {selectedScenario && !isInterviewStarted && !showScenarioBrowser && (
+                          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-10">
+                            <div className="text-center p-6 max-w-md">
+                              <div className="w-16 h-16 bg-[#00d9ff]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <PlayCircle className="h-8 w-8 text-[#00d9ff]" />
+                              </div>
+                              <h3 className="text-xl font-bold text-white mb-2">Ready to Start?</h3>
+                              <p className="text-gray-400 text-sm mb-4">
+                                Review the problem on the left, then start your interview when ready. The timer will begin once you start.
+                              </p>
+                              <Button
+                                onClick={startInterview}
+                                className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black font-semibold px-8 py-3 text-base"
+                              >
+                                <PlayCircle className="mr-2 h-5 w-5" />
+                                Start Interview
+                              </Button>
+                              <p className="text-gray-500 text-xs mt-3">
+                                Estimated time: {selectedScenario.estimatedTime || 30} minutes
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Terminal/Console Output - Enhanced */}

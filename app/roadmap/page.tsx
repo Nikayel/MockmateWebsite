@@ -11,6 +11,7 @@ import {
   TodaysFocus,
   PatternCoverage,
   WeeklyCalendar,
+  CompanyInterviewGuide,
 } from '@/components/roadmap'
 import { useRoadmapStore, useActiveRoadmap } from '@/lib/stores/roadmap-store'
 import { getCompanyById } from '@/lib/data/company-questions'
@@ -111,10 +112,10 @@ export default function RoadmapPage() {
           </motion.div>
         )}
 
-        {/* Main content grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main content grid - Responsive layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Left column - Today's focus */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 md:space-y-6 order-2 lg:order-1">
             {selectedPlan && (
               <TodaysFocus
                 plan={selectedPlan}
@@ -130,32 +131,39 @@ export default function RoadmapPage() {
               selectedDayIndex={selectedDayIndex}
               onSelectDay={selectDay}
             />
+
+            {/* Company Interview Guide - Full width on mobile, in left column on desktop */}
+            {companyData && (
+              <div className="block lg:hidden">
+                <CompanyInterviewGuide company={companyData} />
+              </div>
+            )}
           </div>
 
-          {/* Right column - Pattern coverage */}
-          <div className="space-y-6">
+          {/* Right column - Pattern coverage & Interview Guide */}
+          <div className="space-y-4 md:space-y-6 order-1 lg:order-2">
             <PatternCoverage
               roadmap={roadmap}
               companyTopPatterns={topPatterns}
             />
 
-            {/* Quick stats */}
-            <div className="bg-card border border-border rounded-xl p-6">
-              <h3 className="font-semibold mb-4 flex items-center gap-2">
-                <Target className="h-5 w-5 text-primary" />
+            {/* Milestones - Collapsible on mobile */}
+            <div className="bg-card border border-border rounded-xl p-4 md:p-6">
+              <h3 className="font-semibold mb-3 md:mb-4 flex items-center gap-2 text-sm md:text-base">
+                <Target className="h-4 w-4 md:h-5 md:w-5 text-primary" />
                 Milestones
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-2 md:space-y-3">
                 {roadmap.milestones.slice(0, 3).map((milestone) => (
                   <div
                     key={milestone.id}
-                    className={`p-3 rounded-lg border ${
+                    className={`p-2 md:p-3 rounded-lg border ${
                       milestone.isCompleted
-                        ? 'bg-green-50 border-green-200'
+                        ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800/30'
                         : 'bg-muted/50 border-border'
                     }`}
                   >
-                    <p className="font-medium text-sm">{milestone.name}</p>
+                    <p className="font-medium text-xs md:text-sm">{milestone.name}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {new Date(milestone.targetDate).toLocaleDateString('en-US', {
                         month: 'short',
@@ -166,6 +174,13 @@ export default function RoadmapPage() {
                 ))}
               </div>
             </div>
+
+            {/* Company Interview Guide - Only on desktop sidebar */}
+            {companyData && (
+              <div className="hidden lg:block">
+                <CompanyInterviewGuide company={companyData} />
+              </div>
+            )}
           </div>
         </div>
       </main>
