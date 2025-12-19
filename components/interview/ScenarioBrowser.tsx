@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { Search, Play, LayoutGrid, List, Target, Bug, Wrench, Cpu, Shield, Zap } from "lucide-react"
+import { Search, Play, LayoutGrid, List, Target, Bug, Wrench, Cpu, Shield, Zap, Check } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -27,13 +27,58 @@ interface ScenarioBrowserProps {
 
 type ViewMode = 'roadmap' | 'patterns' | 'list'
 
-// Exercise type quick filters
+// Exercise type quick filters with descriptions
 const EXERCISE_TYPES = [
-  { id: 'dsa', label: 'DSA', icon: Cpu, color: 'bg-[#00d9ff]', textColor: 'text-black' },
-  { id: 'bugfix', label: 'Bug Fix', icon: Bug, color: 'bg-[#00ff88]', textColor: 'text-black' },
-  { id: 'add-functionality', label: 'Add Feature', icon: Wrench, color: 'bg-amber-500', textColor: 'text-black' },
-  { id: 'optimization', label: 'Optimization', icon: Zap, color: 'bg-blue-500', textColor: 'text-white' },
-  { id: 'security', label: 'Security', icon: Shield, color: 'bg-red-500', textColor: 'text-white' },
+  {
+    id: 'dsa',
+    label: 'DSA',
+    description: 'Algorithm & data structure problems',
+    icon: Cpu,
+    color: 'bg-[#00d9ff]',
+    textColor: 'text-black',
+    borderColor: 'border-[#00d9ff]',
+    hoverColor: 'hover:bg-[#00d9ff]/20'
+  },
+  {
+    id: 'bugfix',
+    label: 'Bug Fix',
+    description: 'Find and fix bugs in existing code',
+    icon: Bug,
+    color: 'bg-[#00ff88]',
+    textColor: 'text-black',
+    borderColor: 'border-[#00ff88]',
+    hoverColor: 'hover:bg-[#00ff88]/20'
+  },
+  {
+    id: 'add-functionality',
+    label: 'Add Feature',
+    description: 'Implement new features in codebases',
+    icon: Wrench,
+    color: 'bg-amber-500',
+    textColor: 'text-black',
+    borderColor: 'border-amber-500',
+    hoverColor: 'hover:bg-amber-500/20'
+  },
+  {
+    id: 'optimization',
+    label: 'Optimization',
+    description: 'Improve performance of existing code',
+    icon: Zap,
+    color: 'bg-blue-500',
+    textColor: 'text-white',
+    borderColor: 'border-blue-500',
+    hoverColor: 'hover:bg-blue-500/20'
+  },
+  {
+    id: 'security',
+    label: 'Security',
+    description: 'Find and fix security vulnerabilities',
+    icon: Shield,
+    color: 'bg-red-500',
+    textColor: 'text-white',
+    borderColor: 'border-red-500',
+    hoverColor: 'hover:bg-red-500/20'
+  },
 ] as const
 
 export function ScenarioBrowser({ onStartInterview, usageLimit, completedProblems }: ScenarioBrowserProps) {
@@ -194,48 +239,88 @@ export function ScenarioBrowser({ onStartInterview, usageLimit, completedProblem
           {viewMode === 'list' && (
             <>
 
-          {/* Quick Type Filters */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            <span className="text-gray-400 text-sm self-center mr-2">Quick Filters:</span>
-            {EXERCISE_TYPES.map((type) => {
-              const Icon = type.icon
-              const isActive = filterType.includes(type.id as ScenarioType)
-              const count = scenarios.filter(s => s.type === type.id).length
-              return (
-                <Button
-                  key={type.id}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    if (isActive) {
-                      setFilterType(filterType.filter(t => t !== type.id))
-                    } else {
-                      setFilterType([...filterType, type.id as ScenarioType])
-                    }
-                  }}
-                  className={`${
-                    isActive
-                      ? `${type.color} ${type.textColor} border-transparent`
-                      : 'border-gray-600 text-gray-300 hover:bg-gray-800'
-                  }`}
-                >
-                  <Icon className="h-3 w-3 mr-1.5" />
-                  {type.label}
-                  <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs bg-black/20">
-                    {count}
-                  </Badge>
-                </Button>
-              )
-            })}
+          {/* Exercise Type Cards - Visual Filter */}
+          <div className="mb-6">
+            <h3 className="text-sm font-medium text-gray-400 mb-3">Filter by Exercise Type</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              {EXERCISE_TYPES.map((type) => {
+                const Icon = type.icon
+                const isActive = filterType.includes(type.id as ScenarioType)
+                const count = scenarios.filter(s => s.type === type.id).length
+                return (
+                  <button
+                    key={type.id}
+                    onClick={() => {
+                      if (isActive) {
+                        setFilterType(filterType.filter(t => t !== type.id))
+                      } else {
+                        setFilterType([...filterType, type.id as ScenarioType])
+                      }
+                    }}
+                    className={`
+                      relative p-4 rounded-xl border-2 transition-all duration-200
+                      ${isActive
+                        ? `${type.color} ${type.textColor} border-transparent shadow-lg`
+                        : `bg-gray-900/50 border-gray-700 ${type.hoverColor} hover:${type.borderColor}`
+                      }
+                    `}
+                  >
+                    {/* Active indicator */}
+                    {isActive && (
+                      <div className="absolute top-2 right-2">
+                        <Check className="h-4 w-4" />
+                      </div>
+                    )}
+
+                    <div className="flex flex-col items-center text-center">
+                      <div className={`p-2 rounded-lg mb-2 ${isActive ? 'bg-black/20' : 'bg-gray-800'}`}>
+                        <Icon className={`h-5 w-5 ${isActive ? '' : type.textColor === 'text-black' ? 'text-gray-300' : type.textColor.replace('text-', 'text-')}`}
+                          style={{ color: isActive ? 'currentColor' : type.color.replace('bg-', '').replace('[', '').replace(']', '') }}
+                        />
+                      </div>
+                      <span className={`font-semibold text-sm ${isActive ? '' : 'text-white'}`}>
+                        {type.label}
+                      </span>
+                      <span className={`text-xs mt-1 ${isActive ? 'opacity-80' : 'text-gray-400'}`}>
+                        {count} problems
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Active filters summary */}
             {filterType.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setFilterType([])}
-                className="text-gray-400 hover:text-white"
-              >
-                Clear
-              </Button>
+              <div className="flex items-center gap-2 mt-3 p-2 bg-gray-800/50 rounded-lg">
+                <span className="text-xs text-gray-400">Showing:</span>
+                <div className="flex flex-wrap gap-1">
+                  {filterType.map(t => {
+                    const type = EXERCISE_TYPES.find(et => et.id === t)
+                    if (!type) return null
+                    const Icon = type.icon
+                    return (
+                      <Badge
+                        key={t}
+                        className={`${type.color} ${type.textColor} text-xs cursor-pointer hover:opacity-80`}
+                        onClick={() => setFilterType(filterType.filter(ft => ft !== t))}
+                      >
+                        <Icon className="h-3 w-3 mr-1" />
+                        {type.label}
+                        <span className="ml-1 opacity-70">×</span>
+                      </Badge>
+                    )
+                  })}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFilterType([])}
+                  className="text-gray-400 hover:text-white text-xs h-6 ml-auto"
+                >
+                  Clear all
+                </Button>
+              </div>
             )}
           </div>
 

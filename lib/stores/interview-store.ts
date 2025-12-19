@@ -264,7 +264,18 @@ export const useInterviewStore = create<InterviewState & InterviewActions>()(
       ...initialState,
 
       // Scenario Actions
-      setSelectedScenario: (scenario) => set({ selectedScenario: scenario }),
+      setSelectedScenario: (scenario) => set({
+        selectedScenario: scenario,
+        // Clear test results when switching scenarios to prevent stale data
+        testResults: [],
+        testSummary: { total: 0, passed: 0, failed: 0, passRate: 0 },
+        efficiencyMetrics: null,
+        // Clear hints when switching
+        revealedHints: 0,
+        // Clear chat messages for new scenario
+        interviewerMessages: [],
+        chatMessages: [],
+      }),
       setShowScenarioBrowser: (show) => set({ showScenarioBrowser: show }),
 
       // Filter Actions
