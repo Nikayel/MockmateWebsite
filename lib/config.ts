@@ -30,6 +30,17 @@ export const PRICING_CONFIG = {
       priceDisplay: "$25",
       period: "/month",
       description: "For serious interview preparation",
+      monthly: {
+        price: 25,
+        priceDisplay: "$25",
+        period: "/month",
+      },
+      yearly: {
+        price: 225,
+        priceDisplay: "$225",
+        period: "/year",
+        oneTime: true,
+      },
     },
     vscode: {
       name: "Pro",
