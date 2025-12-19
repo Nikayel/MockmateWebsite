@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Work_Sans, Open_Sans } from "next/font/google"
 import { Toaster } from "sonner"
 import { AuthProvider } from "@/lib/auth-context"
+import { ErrorBoundaryProvider } from "@/components/providers/error-boundary-provider"
 import { CookieConsent } from "@/components/CookieConsent"
 import "./globals.css"
 
@@ -45,11 +46,13 @@ html {
         `}</style>
       </head>
       <body className={`${workSans.variable} ${openSans.variable} antialiased`}>
-        <AuthProvider>
-          {children}
-          <Toaster position="top-right" richColors />
-          <CookieConsent />
-        </AuthProvider>
+        <ErrorBoundaryProvider>
+          <AuthProvider>
+            {children}
+            <Toaster position="top-right" richColors />
+            <CookieConsent />
+          </AuthProvider>
+        </ErrorBoundaryProvider>
       </body>
     </html>
   )
