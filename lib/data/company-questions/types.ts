@@ -92,8 +92,8 @@ export interface UserRoadmapAssessment {
   interviewDate: Date
   daysRemaining: number
 
-  // User's current level
-  experienceLevel: 'beginner' | 'intermediate' | 'advanced'
+  // User's current level (including intern for internship candidates)
+  experienceLevel: 'intern' | 'beginner' | 'intermediate' | 'advanced'
   problemsSolvedEstimate: number
 
   // Pattern familiarity (from self-assessment)

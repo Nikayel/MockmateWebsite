@@ -30,15 +30,24 @@ const CONFIG = {
     prerequisites: 0.05,       // Are prerequisites met?
   },
 
-  // Time estimates by difficulty (minutes)
+  // Time estimates by difficulty (minutes) - adjusted by experience level
   timeEstimates: {
     easy: 25,
     medium: 40,
     hard: 60,
   },
 
+  // Time multipliers for different experience levels (interns need more time)
+  timeMultipliers: {
+    intern: 1.5,      // Interns typically need 50% more time
+    beginner: 1.3,    // Beginners need 30% more time
+    intermediate: 1.0,
+    advanced: 0.8,    // Advanced users are faster
+  },
+
   // Minimum questions per pattern for adequate coverage
   minQuestionsPerPattern: {
+    intern: 6,        // Interns should practice more fundamentals
     beginner: 5,
     intermediate: 3,
     advanced: 2,
@@ -53,10 +62,23 @@ const CONFIG = {
 
   // Days to leave for review before interview
   reviewBufferDays: 3,
+
+  // Intern-specific patterns to prioritize (commonly asked in internship interviews)
+  internPriorityPatterns: [
+    'arrays-hashing',
+    'two-pointers',
+    'sliding-window',
+    'binary-search',
+    'stack',
+    'trees',
+    'dp-1d',
+    'string',
+  ] as const,
 }
 
 /**
  * Calculate priority score for a single question
+ * Supports intern, beginner, intermediate, and advanced experience levels
  */
 export function calculatePriorityScore(
   scenario: DSAScenario,
@@ -65,6 +87,8 @@ export function calculatePriorityScore(
 ): { score: number; reasons: string[] } {
   let score = 0
   const reasons: string[] = []
+  const isIntern = assessment.experienceLevel === 'intern'
+  const isBeginnerOrIntern = isIntern || assessment.experienceLevel === 'beginner'
 
   // 1. Company frequency score (35%)
   const patternData = companyData.topPatterns.find(p => p.pattern === scenario.pattern)
@@ -73,6 +97,14 @@ export function calculatePriorityScore(
     score += freqScore * CONFIG.weights.companyFrequency * 100
     if (patternData.frequency >= 80) {
       reasons.push(`Top pattern at ${companyData.name} (${patternData.frequency}% frequency)`)
+    }
+  }
+
+  // 1b. Intern-specific pattern bonus
+  if (isIntern && CONFIG.internPriorityPatterns.includes(scenario.pattern as any)) {
+    score += 15 // Bonus for fundamental patterns commonly asked in intern interviews
+    if (!patternData || patternData.frequency < 80) {
+      reasons.push('Core pattern for internship interviews')
     }
   }
 
@@ -98,15 +130,27 @@ export function calculatePriorityScore(
     }
   }
 
-  // 4. Time efficiency score (15%)
+  // 4. Time efficiency score (15%) - adjusted for experience level
   const daysRemaining = assessment.daysRemaining
-  if (daysRemaining < 7) {
+
+  // For interns: prioritize easy and medium, avoid hard problems
+  if (isIntern) {
+    if (scenario.difficulty === 'easy') {
+      score += CONFIG.weights.timeEfficiency * 80
+      reasons.push('Great for building fundamentals')
+    } else if (scenario.difficulty === 'medium') {
+      score += CONFIG.weights.timeEfficiency * 60
+    } else if (scenario.difficulty === 'hard') {
+      score -= CONFIG.weights.timeEfficiency * 80 // Strongly penalize hard for interns
+      reasons.push('Consider after mastering basics')
+    }
+  } else if (daysRemaining < 7) {
     // Very limited time - prioritize medium difficulty
     if (scenario.difficulty === 'medium') {
       score += CONFIG.weights.timeEfficiency * 100
       reasons.push('Best ROI for limited time')
     } else if (scenario.difficulty === 'hard') {
-      score -= CONFIG.weights.timeEfficiency * 50 // Penalize hard problems
+      score -= CONFIG.weights.timeEfficiency * 50
     }
   } else if (daysRemaining < 14) {
     // Limited time - slight preference for medium
@@ -114,15 +158,14 @@ export function calculatePriorityScore(
       score += CONFIG.weights.timeEfficiency * 50
     }
   } else if (daysRemaining >= 30) {
-    // Plenty of time - include hard problems
-    if (scenario.difficulty === 'hard' && assessment.experienceLevel !== 'beginner') {
+    // Plenty of time - include hard problems (but not for beginners)
+    if (scenario.difficulty === 'hard' && !isBeginnerOrIntern) {
       score += CONFIG.weights.timeEfficiency * 30
       reasons.push('Time available for challenging problems')
     }
   }
 
   // 5. Prerequisite check (5%)
-  // PATTERN_ROADMAP is a flat array of PatternNode, find the one containing this pattern
   const scenarioPatternNode = PATTERN_ROADMAP.find(node =>
     node.patterns.includes(scenario.pattern as DSAPattern)
   )
@@ -140,7 +183,12 @@ export function calculatePriorityScore(
       score += CONFIG.weights.prerequisites * 100
     } else {
       score -= CONFIG.weights.prerequisites * 50
-      reasons.push('Consider learning prerequisites first')
+      // More helpful message for interns
+      if (isIntern) {
+        reasons.push('Learn prerequisite patterns first for better understanding')
+      } else {
+        reasons.push('Consider learning prerequisites first')
+      }
     }
   }
 
@@ -554,14 +602,24 @@ function formatPatternName(pattern: DSAPattern): string {
 
 /**
  * Get study recommendations based on current progress
+ * Provides tailored advice for interns, beginners, and experienced candidates
  */
 export function getStudyRecommendations(roadmap: PersonalizedRoadmap): string[] {
   const recommendations: string[] = []
+  const isIntern = roadmap.assessment.experienceLevel === 'intern'
+  const isBeginnerOrIntern = isIntern || roadmap.assessment.experienceLevel === 'beginner'
+  const daysLeft = roadmap.assessment.daysRemaining
 
+  // Progress-based recommendations
   if (!roadmap.isOnTrack) {
     if (roadmap.daysAhead < -3) {
-      recommendations.push('You\'re significantly behind schedule. Consider increasing daily study time.')
-      recommendations.push('Focus on must-know questions if time is very limited.')
+      if (isIntern) {
+        recommendations.push('Focus on easy and medium problems to build confidence quickly.')
+        recommendations.push('Prioritize core patterns: arrays, two pointers, and basic trees.')
+      } else {
+        recommendations.push('You\'re significantly behind schedule. Consider increasing daily study time.')
+        recommendations.push('Focus on must-know questions if time is very limited.')
+      }
     } else {
       recommendations.push('You\'re slightly behind. Try to complete one extra question today.')
     }
@@ -573,17 +631,50 @@ export function getStudyRecommendations(roadmap: PersonalizedRoadmap): string[] 
     .map(p => p.pattern)
 
   if (weakPatterns.length > 0) {
-    recommendations.push(`Focus on improving: ${weakPatterns.slice(0, 2).map(p => formatPatternName(p)).join(', ')}`)
+    if (isIntern) {
+      // Filter to show only intern-friendly patterns first
+      const internFriendlyWeak = weakPatterns.filter(p =>
+        CONFIG.internPriorityPatterns.includes(p as any)
+      )
+      if (internFriendlyWeak.length > 0) {
+        recommendations.push(`Start with fundamentals: ${internFriendlyWeak.slice(0, 2).map(p => formatPatternName(p)).join(', ')}`)
+      } else {
+        recommendations.push(`Focus on improving: ${weakPatterns.slice(0, 2).map(p => formatPatternName(p)).join(', ')}`)
+      }
+    } else {
+      recommendations.push(`Focus on improving: ${weakPatterns.slice(0, 2).map(p => formatPatternName(p)).join(', ')}`)
+    }
   }
 
-  // Time-based recommendations
-  const daysLeft = roadmap.assessment.daysRemaining
+  // Time-based recommendations with intern/experience-level considerations
   if (daysLeft <= 3) {
-    recommendations.push('Final days! Focus on review and rest.')
-    recommendations.push('Re-attempt any questions you struggled with.')
+    if (isIntern) {
+      recommendations.push('Review completed problems and get plenty of rest!')
+      recommendations.push('Practice explaining your thought process out loud.')
+    } else {
+      recommendations.push('Final days! Focus on review and rest.')
+      recommendations.push('Re-attempt any questions you struggled with.')
+    }
   } else if (daysLeft <= 7) {
-    recommendations.push('One week left - prioritize must-know questions.')
-    recommendations.push('Skip very hard problems if not comfortable.')
+    if (isIntern) {
+      recommendations.push('Focus on problems you can solve confidently.')
+      recommendations.push('Practice clear communication - interviewers value this for interns!')
+    } else {
+      recommendations.push('One week left - prioritize must-know questions.')
+      recommendations.push('Skip very hard problems if not comfortable.')
+    }
+  } else if (isIntern && daysLeft > 14) {
+    // Early stage advice for interns
+    const masteredPatterns = roadmap.patternCoverage.filter(p => p.percentage >= 80).length
+    if (masteredPatterns < 3) {
+      recommendations.push('Master 2-3 core patterns deeply before moving on.')
+      recommendations.push('Internship interviews test fundamentals - quality over quantity!')
+    }
+  }
+
+  // Experience-specific tips
+  if (isBeginnerOrIntern && recommendations.length < 2) {
+    recommendations.push('Don\'t rush! Understanding the approach matters more than speed.')
   }
 
   return recommendations
