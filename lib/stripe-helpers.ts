@@ -239,8 +239,42 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
     } else {
       console.log(`No subscription found for user ${userId}`)
 
-      // No subscription found - if user was Pro, downgrade them
-      if (profile.subscription_tier === "pro") {
+      // Check if user has a yearly plan (one-time payment) that may have expired
+      if (profile.subscription_tier === "pro" && profile.subscription_type === "yearly") {
+        const periodEnd = profile.subscription_current_period_end
+        if (periodEnd) {
+          const periodEndDate = new Date(periodEnd)
+          const now = new Date()
+          
+          if (now > periodEndDate) {
+            // Yearly plan has expired - downgrade to free
+            await profileRef.set({
+              subscription_tier: "free",
+              subscription_status: "expired",
+              updated_at: new Date().toISOString(),
+            }, { merge: true })
+
+            await updateQuotaForSubscriptionTierAdmin(userId, "free")
+
+            console.log(`Synced user ${userId} to Free - yearly plan expired on ${periodEndDate.toISOString()}`)
+          } else {
+            // Yearly plan is still active
+            console.log(`User ${userId} has active yearly plan until ${periodEndDate.toISOString()}`)
+          }
+        } else {
+          // No period end date - treat as expired
+          await profileRef.set({
+            subscription_tier: "free",
+            subscription_status: "expired",
+            updated_at: new Date().toISOString(),
+          }, { merge: true })
+
+          await updateQuotaForSubscriptionTierAdmin(userId, "free")
+
+          console.log(`Synced user ${userId} to Free - yearly plan missing period end date`)
+        }
+      } else if (profile.subscription_tier === "pro") {
+        // Pro user with no subscription and not yearly - downgrade
         await profileRef.set({
           subscription_tier: "free",
           subscription_status: "none",
