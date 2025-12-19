@@ -126,6 +126,7 @@ export async function POST(request: NextRequest) {
     // When a 100% discount coupon is applied, payment_status is "no_payment_required" not "paid"
     const paymentSuccessful = session.payment_status === "paid" || session.payment_status === "no_payment_required"
 
+    // Handle subscription mode (monthly plans)
     if (paymentSuccessful && session.mode === "subscription") {
       // Upgrade user to Pro
       const userId = session.metadata?.userId || session.client_reference_id
@@ -235,7 +236,69 @@ export async function POST(request: NextRequest) {
         console.warn(`   Metadata:`, session.metadata)
         console.warn(`   Client Reference ID: ${session.client_reference_id}`)
       }
-    } else {
+    }
+
+    // Handle payment mode (yearly one-time plans)
+    if (paymentSuccessful && session.mode === "payment") {
+      const userId = session.metadata?.userId || session.client_reference_id
+      const planType = session.metadata?.planType
+
+      if (userId && planType === "yearly") {
+        console.log(`✅ Processing yearly one-time payment for user ${userId}`)
+        try {
+          const profileRef = adminDb.collection("profiles").doc(userId)
+          const profileSnap = await profileRef.get()
+
+          if (!profileSnap.exists) {
+            console.error(`❌ Profile does not exist for userId: ${userId}`)
+            return NextResponse.json({ error: "Profile not found" }, { status: 404 })
+          }
+
+          // Calculate subscription end date (1 year from now)
+          const now = new Date()
+          const oneYearFromNow = new Date(now)
+          oneYearFromNow.setFullYear(now.getFullYear() + 1)
+
+          // Update profile with Pro access for 1 year
+          const updateData: any = {
+            subscription_tier: "pro",
+            subscription_platform: session.metadata?.platform || "website",
+            subscription_status: "active",
+            subscription_start_date: now.toISOString(),
+            subscription_current_period_end: oneYearFromNow.toISOString(),
+            subscription_type: "yearly",
+            updated_at: new Date().toISOString(),
+          }
+
+          if (session.customer) {
+            updateData.stripe_customer_id = session.customer as string
+          }
+
+          await profileRef.update(updateData)
+          console.log(`✅ Updated profile for yearly plan - Pro access until ${oneYearFromNow.toISOString()}`)
+
+          // Update quota to Pro limit
+          await updateQuotaForSubscriptionTierAdmin(userId, "pro")
+
+          console.log(`✅ User ${userId} upgraded to Pro (yearly) via Stripe webhook`)
+          console.log(`   Payment Status: ${session.payment_status}`)
+          console.log(`   Customer ID: ${session.customer}`)
+          console.log(`   Quota updated to Pro limit (35 sessions)`)
+        } catch (error) {
+          console.error("❌ Error updating user profile for yearly plan:", error)
+          if (error instanceof Error) {
+            console.error("   Error name:", error.name)
+            console.error("   Error message:", error.message)
+            console.error("   Error stack:", error.stack)
+          }
+          return NextResponse.json({ error: "Failed to update profile" }, { status: 500 })
+        }
+      } else {
+        console.log(`ℹ️ Skipping payment mode - planType: ${planType}, userId: ${userId}`)
+      }
+    }
+
+    if (!paymentSuccessful || (session.mode !== "subscription" && session.mode !== "payment")) {
       console.log(`ℹ️ Skipping checkout.session.completed - payment_status: ${session.payment_status}, mode: ${session.mode}`)
     }
   }
