@@ -3,14 +3,15 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Briefcase, GraduationCap, Code2, Rocket } from "lucide-react"
+import { ArrowRight, Briefcase, GraduationCap, Code2, Rocket, Sparkles } from "lucide-react"
 import { doc, setDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 interface OnboardingModalProps {
   isOpen: boolean
   userId: string
-  onComplete: () => void
+  userName?: string
+  onComplete: (showTour: boolean) => void
 }
 
 const roles = [
@@ -27,13 +28,13 @@ const goals = [
   { id: "promotion", label: "Internal Promotion" },
 ]
 
-export function OnboardingModal({ isOpen, userId, onComplete }: OnboardingModalProps) {
+export function OnboardingModal({ isOpen, userId, userName, onComplete }: OnboardingModalProps) {
   const [step, setStep] = useState(1)
   const [selectedRole, setSelectedRole] = useState<string | null>(null)
   const [selectedGoal, setSelectedGoal] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleComplete = async () => {
+  const handleComplete = async (takeTour: boolean) => {
     if (!selectedRole) return
 
     setIsSubmitting(true)
@@ -48,16 +49,16 @@ export function OnboardingModal({ isOpen, userId, onComplete }: OnboardingModalP
         updated_at: new Date().toISOString(),
       }, { merge: true })
 
-      console.log("✅ Onboarding data saved to profile:", { userId, role: selectedRole, goal: selectedGoal })
-      onComplete()
+      console.log("Onboarding data saved to profile:", { userId, role: selectedRole, goal: selectedGoal })
+      onComplete(takeTour)
     } catch (error: any) {
-      console.error("❌ Failed to save onboarding data:", error)
+      console.error("Failed to save onboarding data:", error)
       console.error("Error code:", error?.code)
       console.error("Error message:", error?.message)
 
       // Still proceed - don't block the user even if save fails
       // The profile might be created later and onboarding can be completed then
-      onComplete()
+      onComplete(takeTour)
     } finally {
       setIsSubmitting(false)
     }
@@ -82,7 +83,7 @@ export function OnboardingModal({ isOpen, userId, onComplete }: OnboardingModalP
           {/* Header */}
           <div className="p-6 pb-4 border-b border-gray-800">
             <h2 className="text-xl font-heading font-bold text-white">
-              {step === 1 ? "Welcome to Skillon!" : "One more thing..."}
+              {step === 1 ? (userName ? `Welcome, ${userName}!` : "Welcome to Skillon!") : "One more thing..."}
             </h2>
             <p className="text-sm text-gray-400 mt-1">
               {step === 1
@@ -143,6 +144,21 @@ export function OnboardingModal({ isOpen, userId, onComplete }: OnboardingModalP
                     )
                   })}
                 </div>
+
+                {/* Tour option */}
+                <div className="mt-6 p-4 bg-gradient-to-r from-[#00d9ff]/10 to-[#00ff88]/10 border border-[#00d9ff]/30 rounded-xl">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-[#00d9ff]/20 rounded-lg">
+                      <Sparkles className="h-5 w-5 text-[#00d9ff]" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-white font-medium mb-1">Quick Tour Available</h4>
+                      <p className="text-sm text-gray-400">
+                        Take a 30-second tour to learn how to make the most of your practice sessions.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </>
             )}
           </div>
@@ -170,14 +186,24 @@ export function OnboardingModal({ isOpen, userId, onComplete }: OnboardingModalP
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             ) : (
-              <Button
-                onClick={handleComplete}
-                disabled={isSubmitting}
-                className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black"
-              >
-                {isSubmitting ? "Saving..." : "Start Practicing"}
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => handleComplete(false)}
+                  disabled={isSubmitting}
+                  variant="outline"
+                  className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                >
+                  {isSubmitting ? "Saving..." : "Skip Tour"}
+                </Button>
+                <Button
+                  onClick={() => handleComplete(true)}
+                  disabled={isSubmitting}
+                  className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black"
+                >
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  {isSubmitting ? "Saving..." : "Take Quick Tour"}
+                </Button>
+              </div>
             )}
           </div>
 

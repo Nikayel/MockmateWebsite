@@ -8,6 +8,7 @@ import { FeaturesSection } from "@/components/features-section"
 import { AIAssistedSection } from "@/components/ai-assisted-section"
 import { Footer } from "@/components/footer"
 import { OnboardingModal } from "@/components/OnboardingModal"
+import { ProductTour } from "@/components/ProductTour"
 import { useAuth } from "@/lib/auth-context"
 import { getUserProfile, checkUsageLimit } from "@/lib/firestore-helpers"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -25,6 +26,7 @@ export default function HomePage() {
   const [usage, setUsage] = useState<{ used: number; limit: number; allowed: boolean; freeOpensRemaining: number } | null>(null)
   const [isPro, setIsPro] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [showTour, setShowTour] = useState(false)
   const [profile, setProfile] = useState<Profile | null>(null)
 
   useEffect(() => {
@@ -49,14 +51,17 @@ export default function HomePage() {
           if (!userProfile.onboarding_completed) {
             console.log("Onboarding not completed, showing modal")
             setShowOnboarding(true)
+            setShowTour(false)
           } else {
             console.log("Onboarding already completed, skipping modal")
             setShowOnboarding(false)
+            setShowTour(false)
           }
         } else {
           // Profile doesn't exist yet - don't show onboarding until profile is created
           console.log("Profile doesn't exist yet, waiting for profile creation")
           setShowOnboarding(false)
+          setShowTour(false)
         }
 
         const usageData = await checkUsageLimit(firebaseUser.uid)
@@ -82,14 +87,21 @@ export default function HomePage() {
 
   // If signed in, show dashboard view
   if (!isLoading && user && firebaseUser) {
+    const userName = user.user_metadata?.full_name?.split(' ')[0] || firebaseUser.displayName?.split(' ')[0]
+
     return (
       <main className="min-h-screen bg-black">
         {/* Onboarding modal for first-time users */}
         <OnboardingModal
           isOpen={showOnboarding}
           userId={firebaseUser.uid}
-          onComplete={async () => {
+          userName={userName}
+          onComplete={async (takeTour: boolean) => {
             setShowOnboarding(false)
+            // Show tour if user chose to take it
+            if (takeTour) {
+              setShowTour(true)
+            }
             // Reload profile to get updated onboarding status
             try {
               const updatedProfile = await getUserProfile(firebaseUser.uid)
@@ -101,6 +113,22 @@ export default function HomePage() {
             }
           }}
         />
+
+        {/* Product tour for new users */}
+        <ProductTour
+          isOpen={showTour}
+          userId={firebaseUser.uid}
+          userName={userName}
+          onComplete={() => {
+            setShowTour(false)
+            // Navigate to interview page after tour
+            router.push('/interview')
+          }}
+          onSkip={() => {
+            setShowTour(false)
+          }}
+        />
+
         <Header />
         <div className="pt-24 pb-16">
           <div className="container mx-auto px-4 max-w-7xl">
