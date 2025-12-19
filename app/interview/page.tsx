@@ -1209,6 +1209,16 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setShowScenarioBrowser(false)
     setStartTime(Date.now())
 
+    // Clear previous session's test results and metrics (fixes terminal persistence bug)
+    setTestResults([])
+    setTestSummary({ total: 0, passed: 0, failed: 0, passRate: 0 })
+    setEfficiencyMetrics(null)
+    setElapsedTime(0)
+    setRevealedHints(0)
+    setWorkspaceContext([])
+    setComprehensiveFeedback("")
+    setPerformanceScore(null)
+
     // Initialize code based on scenario type
     let initialCode: string
     if (selectedScenario.type === 'bugfix') {
