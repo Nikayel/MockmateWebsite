@@ -131,6 +131,7 @@ export interface DailyPlan {
   questions: {
     scenarioId: string
     title: string
+    pattern: DSAPattern
     difficulty: 'easy' | 'medium' | 'hard'
     estimatedMinutes: number
     status: 'pending' | 'in_progress' | 'completed' | 'skipped'

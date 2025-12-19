@@ -94,7 +94,7 @@ export default function InterviewPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
-  const { markQuestionCompleted, activeRoadmap } = useRoadmapStore()
+  const { markQuestionCompleted, addActualTime, activeRoadmap } = useRoadmapStore()
   const [isLoading, setIsLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
   const [showScenarioBrowser, setShowScenarioBrowser] = useState(true)
@@ -265,10 +265,12 @@ export default function InterviewPage() {
       const usage = await checkUsageLimit(firebaseUser.uid)
       setUsageLimit(usage)
 
-      // Check if we're reopening a session
+      // Check if we're reopening a session or starting from roadmap
       const sessionId = searchParams?.get("session")
       const scenarioId = searchParams?.get("scenario")
+      const fromRoadmap = searchParams?.get("roadmap") === "true"
 
+      // Case 1: Reopening an existing session
       if (sessionId && scenarioId) {
         // Load the scenario and reopen the session
         const scenario = getScenarioById(scenarioId)
@@ -368,6 +370,18 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           }
         } else {
           toast.error("Scenario not found")
+        }
+      }
+      // Case 2: Starting fresh from roadmap (scenario only, no session)
+      else if (scenarioId && !sessionId && fromRoadmap) {
+        const scenario = getScenarioById(scenarioId)
+        if (scenario) {
+          // Just select the scenario - don't auto-start, let user click Start Interview
+          setSelectedScenario(scenario)
+          setShowScenarioBrowser(false) // Hide browser to show the problem view
+        } else {
+          toast.error("Scenario not found")
+          setShowScenarioBrowser(true)
         }
       }
 
@@ -1097,7 +1111,12 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
           // Mark question complete in roadmap if user came from roadmap
           if (isFromRoadmap && selectedScenario && activeRoadmap) {
-            markQuestionCompleted(selectedScenario.id)
+            markQuestionCompleted(selectedScenario.id, calculatedPerformanceScore)
+            // Add elapsed time (convert seconds to minutes)
+            const minutesSpent = Math.round(elapsedTime / 60)
+            if (minutesSpent > 0) {
+              addActualTime(minutesSpent)
+            }
             toast.success("Progress saved to your roadmap!")
           }
 

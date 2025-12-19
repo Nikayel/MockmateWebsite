@@ -20,7 +20,7 @@ export const stripeData: CompanyQuestionData = {
   topPatterns: [
     { pattern: 'arrays-hashing', frequency: 90, priority: 10, typicalDifficulty: 'medium' },
     { pattern: 'string', frequency: 85, priority: 9, typicalDifficulty: 'medium' },
-    { pattern: 'string', frequency: 80, priority: 9, typicalDifficulty: 'hard' },
+    { pattern: 'string-matching', frequency: 80, priority: 9, typicalDifficulty: 'hard' },
     { pattern: 'bfs', frequency: 65, priority: 7, typicalDifficulty: 'medium' },
     { pattern: 'trees', frequency: 60, priority: 7, typicalDifficulty: 'medium' },
     { pattern: 'dp-1d', frequency: 55, priority: 6, typicalDifficulty: 'hard' },

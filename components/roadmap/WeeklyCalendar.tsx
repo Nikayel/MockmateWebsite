@@ -1,7 +1,8 @@
 'use client'
 
-import { motion } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Check, Circle } from 'lucide-react'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ChevronLeft, ChevronRight, Check, Circle, CalendarDays } from 'lucide-react'
 import { DailyPlan } from '@/lib/data/company-questions/types'
 import { cn } from '@/lib/utils'
 
@@ -16,8 +17,16 @@ export function WeeklyCalendar({
   selectedDayIndex,
   onSelectDay,
 }: WeeklyCalendarProps) {
+  const [hoveredDay, setHoveredDay] = useState<number | null>(null)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+
+  // Find today's index
+  const todayIndex = dailyPlans.findIndex((plan) => {
+    const planDate = new Date(plan.date)
+    planDate.setHours(0, 0, 0, 0)
+    return planDate.getTime() === today.getTime()
+  })
 
   // Get current week view (show 7 days centered around today or selected day)
   const weekStart = Math.max(0, selectedDayIndex - 3)
@@ -26,6 +35,7 @@ export function WeeklyCalendar({
 
   const canScrollLeft = weekStart > 0
   const canScrollRight = weekEnd < dailyPlans.length
+  const showJumpToToday = todayIndex >= 0 && Math.abs(todayIndex - selectedDayIndex) > 3
 
   const scrollLeft = () => {
     if (canScrollLeft) {
@@ -39,37 +49,77 @@ export function WeeklyCalendar({
     }
   }
 
+  const jumpToToday = () => {
+    if (todayIndex >= 0) {
+      onSelectDay(todayIndex)
+    }
+  }
+
   return (
     <div className="bg-card border border-border rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold">Weekly Schedule</h3>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={scrollLeft}
-            disabled={!canScrollLeft}
-            className={cn(
-              'p-1.5 rounded-lg transition-colors',
-              canScrollLeft
-                ? 'hover:bg-muted text-foreground'
-                : 'text-muted-foreground/50 cursor-not-allowed'
-            )}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button
-            onClick={scrollRight}
-            disabled={!canScrollRight}
-            className={cn(
-              'p-1.5 rounded-lg transition-colors',
-              canScrollRight
-                ? 'hover:bg-muted text-foreground'
-                : 'text-muted-foreground/50 cursor-not-allowed'
-            )}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+        <h3 className="font-semibold flex items-center gap-2">
+          <CalendarDays className="h-5 w-5 text-primary" />
+          Weekly Schedule
+        </h3>
+        <div className="flex items-center gap-2">
+          {showJumpToToday && (
+            <button
+              onClick={jumpToToday}
+              className="px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 rounded-lg transition-colors"
+            >
+              Jump to Today
+            </button>
+          )}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={scrollLeft}
+              disabled={!canScrollLeft}
+              aria-label="Previous week"
+              className={cn(
+                'p-1.5 rounded-lg transition-colors',
+                canScrollLeft
+                  ? 'hover:bg-muted text-foreground'
+                  : 'text-muted-foreground/50 cursor-not-allowed'
+              )}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              onClick={scrollRight}
+              disabled={!canScrollRight}
+              aria-label="Next week"
+              className={cn(
+                'p-1.5 rounded-lg transition-colors',
+                canScrollRight
+                  ? 'hover:bg-muted text-foreground'
+                  : 'text-muted-foreground/50 cursor-not-allowed'
+              )}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Hover tooltip */}
+      <AnimatePresence>
+        {hoveredDay !== null && dailyPlans[hoveredDay] && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            className="mb-3 p-2 bg-muted rounded-lg text-sm text-center"
+          >
+            <span className="font-medium">{dailyPlans[hoveredDay].theme}</span>
+            {dailyPlans[hoveredDay].questions.length > 0 && (
+              <span className="text-muted-foreground ml-2">
+                ({dailyPlans[hoveredDay].questions.length} questions)
+              </span>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="grid grid-cols-7 gap-2">
         {visibleDays.map((plan, index) => {
@@ -98,6 +148,8 @@ export function WeeklyCalendar({
               totalCount={totalCount}
               allComplete={allComplete}
               onClick={() => onSelectDay(actualIndex)}
+              onHover={() => setHoveredDay(actualIndex)}
+              onLeave={() => setHoveredDay(null)}
             />
           )
         })}
@@ -131,6 +183,8 @@ function DayCell({
   totalCount,
   allComplete,
   onClick,
+  onHover,
+  onLeave,
 }: {
   plan: DailyPlan
   isToday: boolean
@@ -140,6 +194,8 @@ function DayCell({
   totalCount: number
   allComplete: boolean
   onClick: () => void
+  onHover: () => void
+  onLeave: () => void
 }) {
   const date = new Date(plan.date)
   const dayName = date.toLocaleDateString('en-US', { weekday: 'short' })
@@ -150,13 +206,16 @@ function DayCell({
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
       onClick={onClick}
+      onMouseEnter={onHover}
+      onMouseLeave={onLeave}
+      aria-label={`${dayName} ${dayNum}: ${plan.theme}. ${completedCount} of ${totalCount} completed.`}
       className={cn(
-        'relative p-2 rounded-lg text-center transition-all',
-        isSelected && 'ring-2 ring-primary ring-offset-2',
-        allComplete && 'bg-green-100',
-        isToday && !allComplete && 'bg-primary/10',
-        isPast && !allComplete && 'bg-yellow-50',
-        !isToday && !isPast && !allComplete && 'bg-muted/50 hover:bg-muted'
+        'relative p-2 rounded-lg text-center transition-all cursor-pointer',
+        isSelected && 'ring-2 ring-primary ring-offset-2 bg-primary/5',
+        allComplete && !isSelected && 'bg-green-100',
+        isToday && !allComplete && !isSelected && 'bg-primary/10',
+        isPast && !allComplete && !isSelected && 'bg-yellow-50',
+        !isToday && !isPast && !allComplete && !isSelected && 'bg-muted/50 hover:bg-muted'
       )}
     >
       {/* Day name */}
