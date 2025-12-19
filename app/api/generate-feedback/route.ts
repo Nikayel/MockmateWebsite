@@ -30,6 +30,56 @@ interface StructuredFeedback {
 }
 
 /**
+ * Analyze conversation content quality for communication scoring
+ * Returns a quality score based on what was actually discussed
+ */
+function analyzeConversationQuality(transcript: Array<{ role: string; content: string }> | undefined): {
+  quality: number
+  discussedComplexity: boolean
+  discussedApproach: boolean
+  discussedAlternatives: boolean
+  discussedEdgeCases: boolean
+} {
+  if (!transcript || transcript.length === 0) {
+    return { quality: 30, discussedComplexity: false, discussedApproach: false, discussedAlternatives: false, discussedEdgeCases: false }
+  }
+
+  // Get only candidate messages
+  const candidateMessages = transcript.filter(m => m.role === 'candidate').map(m => m.content.toLowerCase())
+  const allContent = candidateMessages.join(' ')
+
+  // Check for quality indicators
+  const discussedComplexity = /\b(time complexity|space complexity|big o|o\(n\)|o\(1\)|o\(n\^2\)|o\(log|linear|constant|quadratic)\b/i.test(allContent)
+  const discussedApproach = /\b(approach|strategy|algorithm|method|idea|plan|thinking|would|could|let me|my approach|i('m| am|'ll| will)|first|then|next)\b/i.test(allContent)
+  const discussedAlternatives = /\b(alternative|another way|different approach|could also|other option|instead of|trade-?off|brute force|optimiz)\b/i.test(allContent)
+  const discussedEdgeCases = /\b(edge case|corner case|empty|null|negative|zero|duplicate|boundary|special case|what if|overflow)\b/i.test(allContent)
+
+  // Calculate quality score based on content analysis
+  let quality = 35 // Base score for any communication
+
+  // Reward substantive content
+  if (candidateMessages.length > 0) quality += 10
+  if (candidateMessages.length >= 3) quality += 10
+  if (discussedApproach) quality += 15
+  if (discussedComplexity) quality += 15
+  if (discussedAlternatives) quality += 10
+  if (discussedEdgeCases) quality += 10
+
+  // Reward longer, more detailed responses
+  const avgLength = candidateMessages.reduce((sum, m) => sum + m.length, 0) / Math.max(1, candidateMessages.length)
+  if (avgLength > 100) quality += 5
+  if (avgLength > 200) quality += 5
+
+  return {
+    quality: Math.min(95, quality),
+    discussedComplexity,
+    discussedApproach,
+    discussedAlternatives,
+    discussedEdgeCases
+  }
+}
+
+/**
  * Extract scores from feedback text using multiple patterns
  * Falls back to intelligent defaults based on context
  */
@@ -38,6 +88,7 @@ function extractScores(feedback: string, metrics: {
   testsTotal: number
   timeSpent: number
   collaborationMessages: number
+  conversationTranscript?: Array<{ role: string; content: string }>
   efficiencyMetrics?: {
     efficiencyScore?: number
     estimatedTimeComplexity?: string
@@ -93,38 +144,68 @@ function extractScores(feedback: string, metrics: {
   // Derive new criteria from legacy if not parsed
   const passRate = metrics.testsTotal > 0 ? (metrics.testsPassed / metrics.testsTotal) * 100 : 50
 
-  // Understanding = primarily based on test results (did they understand the problem?)
-  // Communication is separate - don't double-penalize
+  // Analyze conversation for understanding signals
+  const conversationAnalysis = analyzeConversationQuality(metrics.conversationTranscript)
+
+  // Understanding = based on test results AND explanation of approach
+  // A correct solution shows understanding; explaining approach confirms it
   if (scores.understanding === 70) {
-    // If tests pass, they understood the problem
+    // Base understanding on test pass rate
     if (passRate >= 80) {
-      scores.understanding = Math.min(95, passRate + 10)
+      scores.understanding = Math.min(90, passRate + 5)
     } else if (passRate >= 50) {
       scores.understanding = passRate + 5
     } else {
       scores.understanding = Math.max(20, passRate)
     }
+
+    // Bonus for explaining approach and complexity (shows deeper understanding)
+    if (conversationAnalysis.discussedApproach) {
+      scores.understanding = Math.min(95, scores.understanding + 5)
+    }
+    if (conversationAnalysis.discussedComplexity) {
+      scores.understanding = Math.min(98, scores.understanding + 5)
+    }
   }
 
-  // Problem-Solving = based on debugging and optimization
+  // Problem-Solving = based on debugging, optimization, and approach
   if (scores.problemSolving === 70) {
     const effScore = metrics.efficiencyMetrics?.efficiencyScore || 50
     scores.problemSolving = Math.round((passRate * 0.6) + (effScore * 0.4))
+
+    // Bonus for discussing alternatives and edge cases (shows problem-solving thinking)
+    if (conversationAnalysis.discussedAlternatives) {
+      scores.problemSolving = Math.min(95, scores.problemSolving + 5)
+    }
+    if (conversationAnalysis.discussedEdgeCases) {
+      scores.problemSolving = Math.min(95, scores.problemSolving + 5)
+    }
   }
 
-  // Communication = based on how much they talked/messaged
-  // BUT: Don't overly penalize - some good candidates work quietly then explain at end
+  // Communication = based on CONTENT QUALITY, not just message count
+  // Uses the conversationAnalysis computed above
   if (scores.communication === 70) {
-    if (metrics.collaborationMessages === 0) {
-      // Even with 0 tracked messages, give benefit of doubt if tests passed
-      // They may have explained verbally or in code comments
-      scores.communication = passRate >= 80 ? 50 : 35
-    } else if (metrics.collaborationMessages <= 2) {
-      scores.communication = passRate >= 80 ? 60 : 45
-    } else if (metrics.collaborationMessages <= 5) {
-      scores.communication = 65
+    // Use content-based quality score as the primary communication metric
+    if (conversationAnalysis.quality > 50) {
+      // Good communication detected based on content
+      scores.communication = conversationAnalysis.quality
+
+      // Bonus for discussing specific technical topics together
+      if (conversationAnalysis.discussedComplexity && conversationAnalysis.discussedApproach) {
+        scores.communication = Math.min(95, scores.communication + 5)
+      }
+    } else if (metrics.collaborationMessages > 0) {
+      // Some messages sent but content analysis didn't find key indicators
+      // Still give credit for attempting communication
+      scores.communication = Math.max(45, conversationAnalysis.quality)
     } else {
-      scores.communication = Math.min(85, 65 + metrics.collaborationMessages * 2)
+      // No conversation transcript - use pass rate as proxy
+      // A passing solution with good efficiency suggests some understanding
+      if (passRate >= 80) {
+        scores.communication = 50 // Benefit of doubt for correct solution
+      } else {
+        scores.communication = 35
+      }
     }
   }
 
@@ -173,9 +254,20 @@ function extractScores(feedback: string, metrics: {
     scores.communication * 0.20
   )
 
-  // Floor: If all tests pass, minimum score should be 65 (C range)
-  // A correct solution should never be a D or F
-  if (passRate >= 90) {
+  // Floor: Correct solutions with good communication deserve good scores
+  // A correct, optimal solution should NEVER get an F grade
+  const isOptimalSolution = metrics.efficiencyMetrics?.efficiencyScore !== undefined &&
+    metrics.efficiencyMetrics.efficiencyScore >= 80
+  const hasGoodCommunication = conversationAnalysis.quality >= 60 ||
+    (conversationAnalysis.discussedComplexity && conversationAnalysis.discussedApproach)
+
+  if (passRate >= 100 && isOptimalSolution && hasGoodCommunication) {
+    // Perfect tests + optimal solution + good communication = A range minimum
+    scores.overall = Math.max(85, newOverall)
+  } else if (passRate >= 100 && isOptimalSolution) {
+    // Perfect tests + optimal solution = B+ minimum
+    scores.overall = Math.max(78, newOverall)
+  } else if (passRate >= 90) {
     scores.overall = Math.max(70, newOverall) // At least B- for near-perfect tests
   } else if (passRate >= 80) {
     scores.overall = Math.max(65, newOverall) // At least C+ for 80%+ tests
@@ -247,7 +339,7 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
-    const { code, scenarioTitle, scenarioType, testResults, language, timeSpent, aiCollaborationMetrics, interactionMetrics, efficiencyMetrics, sessionId, userId } = await request.json()
+    const { code, scenarioTitle, scenarioType, testResults, language, timeSpent, aiCollaborationMetrics, interactionMetrics, efficiencyMetrics, conversationTranscript, sessionId, userId } = await request.json()
 
     if (!code || !scenarioTitle) {
       return NextResponse.json({ error: "Code and scenario title are required" }, { status: 400 })
@@ -293,12 +385,13 @@ Is the code clean and efficient?
 - Poor quality = 0-40
 
 **Communication (20% weight, 0-100):**
-Did they think out loud?
-- 0 messages = 20/100 (silent coding is not ideal but not a failure)
-- 1-2 messages = 40/100
-- 3-5 messages = 60/100
-- 6+ quality messages = 70-90/100
-- Excellent verbal explanation = 90-100/100
+Did they think out loud? SCORE BASED ON CONTENT QUALITY, NOT MESSAGE COUNT!
+- Discussed time/space complexity + approach explanation = 80-100
+- Explained their approach clearly = 70-85
+- Answered interviewer questions substantively = 60-80
+- Basic communication without depth = 40-60
+- Silent coding with no explanation = 20-40
+IMPORTANT: Read the conversation transcript! If they explained complexity or alternatives, score 70+
 
 ## OUTPUT FORMAT (use exactly)
 
@@ -386,6 +479,24 @@ CODE EFFICIENCY ANALYSIS:
 - No efficiency data available
 `
 
+    // Format conversation transcript for content analysis
+    // This allows evaluation of WHAT was said, not just how many messages
+    const conversationInfo = conversationTranscript && conversationTranscript.length > 0 ? `
+CONVERSATION TRANSCRIPT (CRITICAL for Communication scoring):
+${conversationTranscript.slice(-20).map((m: { role: string; content: string }) =>
+  `[${m.role.toUpperCase()}]: ${m.content.slice(0, 500)}${m.content.length > 500 ? '...' : ''}`
+).join('\n')}
+
+IMPORTANT: Score Communication based on the CONTENT above, not just message count. Look for:
+- Did they explain their approach/algorithm choice?
+- Did they discuss time/space complexity?
+- Did they consider edge cases or alternatives?
+- Did they answer the interviewer's questions substantively?
+` : `
+CONVERSATION TRANSCRIPT:
+- No conversation recorded (candidate may have coded silently)
+`
+
     const prompt = `Provide a concise, brutally honest interview debrief using the exact structure from the system instruction.
 
 PROBLEM: ${scenarioTitle}${scenarioType ? ` (${scenarioType})` : ''}
@@ -395,8 +506,7 @@ ${testResultsSummary}
 ${aiCollaborationInfo}
 ${interactionInfo}
 ${efficiencyInfo}
-
-TOTAL COLLABORATION MESSAGES FROM USER: ${collaborationMessages}
+${conversationInfo}
 
 SOLUTION CODE (for reference only):
 \`\`\`${language || 'javascript'}
@@ -410,10 +520,14 @@ ${testResults.filter((t: any) => !t.passed).slice(0, 5).map((t: any) =>
     ).join('\n\n')}
 ` : ''}
 
-Remember:
+CRITICAL SCORING INSTRUCTIONS:
 - Output ALL scores in exact "Label: X/100" format
-- Be explicit when tests pass but collaboration/explanation was missing
-- Score collaboration proportionally: 0 messages = 0/100, 1-2 messages = 10-30/100, 3-5 messages = 40-60/100, 6+ quality messages = 70-100/100
+- COMMUNICATION SCORING: Base score on CONTENT QUALITY from the conversation transcript above, NOT message count!
+  * If candidate explained their approach, discussed complexity, or talked through alternatives = 70-90/100
+  * If candidate answered questions substantively = 60-80/100
+  * If candidate communicated but briefly = 40-60/100
+  * If no meaningful communication recorded = 20-40/100
+- A correct, optimal solution with good communication should score 80+ overall
 - Only include insights that materially change the candidate's next interview`
 
     // Use AI provider abstraction with complex task type for quality
@@ -426,11 +540,13 @@ Remember:
     const feedback = aiResponse.text
 
     // Extract scores using robust parsing with efficiency validation
+    // Now includes conversation transcript for content-based communication scoring
     const scores = extractScores(feedback, {
       testsPassed,
       testsTotal,
       timeSpent: timeSpent || 0,
       collaborationMessages,
+      conversationTranscript,
       efficiencyMetrics: efficiencyMetrics ? {
         efficiencyScore: efficiencyMetrics.efficiencyScore,
         estimatedTimeComplexity: efficiencyMetrics.estimatedTimeComplexity,

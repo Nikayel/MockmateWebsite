@@ -77,6 +77,7 @@ const isLanguageSupported = (lang: string): lang is SupportedLanguage => {
 interface ChatMessage {
   type: "user" | "ai"
   message: string
+  timestamp?: number
 }
 
 interface TestResult {
@@ -961,30 +962,9 @@ Ask ONE focused question based on these observations.`)
         skillsDemonstrated: selectedScenario?.tags || [],
       }
 
-      const noInterviewerWalkthrough = interactionMetrics.interviewerQuestionsAnswered === 0
-      const noAiPartnerCollab = aiCollaborationMetrics.partnerMessagesSent === 0
-      const rushedSession = elapsedTime < 90
-
-      const applyCollaborationPenalty = (score: number) => {
-        let adjustedScore = score
-        // If no collaboration at all, cap at 45-50/100 (very strict penalty)
-        if (noInterviewerWalkthrough && noAiPartnerCollab) {
-          adjustedScore = Math.min(adjustedScore, 50)
-          // If they also rushed, make it even lower
-          if (rushedSession) {
-            adjustedScore = Math.min(adjustedScore, 45)
-          }
-        }
-        // If missing one form of collaboration, cap at 60/100
-        else if (noInterviewerWalkthrough || noAiPartnerCollab) {
-          adjustedScore = Math.min(adjustedScore, 60)
-        }
-        // Rushed session penalty (if they have some collaboration)
-        if (rushedSession && !(noInterviewerWalkthrough && noAiPartnerCollab)) {
-          adjustedScore = Math.min(adjustedScore, 65)
-        }
-        return Math.max(0, adjustedScore)
-      }
+      // Note: We no longer apply harsh penalties based on message counts alone
+      // The AI feedback system now evaluates actual conversation content quality
+      // This prevents unfair penalties when users communicate well but message counts are low
 
       // Generate comprehensive feedback first
       let comprehensiveFeedback = `Completed ${selectedScenario?.title} with ${summary.passed}/${summary.total} tests passing`
@@ -996,6 +976,21 @@ Ask ONE focused question based on these observations.`)
 
       if (currentSessionId && user && code.trim()) {
         try {
+          // Prepare conversation transcript for content-based evaluation
+          // This allows the AI to evaluate WHAT was said, not just message counts
+          const conversationTranscript = [
+            ...interviewerMessages.map(m => ({
+              role: m.type === 'user' ? 'candidate' : 'interviewer',
+              content: m.message,
+              timestamp: m.timestamp
+            })),
+            ...chatMessages.map(m => ({
+              role: m.type === 'user' ? 'candidate' : 'ai_partner',
+              content: m.message,
+              timestamp: m.timestamp
+            }))
+          ].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+
           const feedbackResponse = await fetch("/api/generate-feedback", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1010,6 +1005,8 @@ Ask ONE focused question based on these observations.`)
               interactionMetrics,
               // Pass efficiency metrics for accurate feedback
               efficiencyMetrics: efficiencyData,
+              // NEW: Pass actual conversation content for quality-based evaluation
+              conversationTranscript,
               sessionId: currentSessionId,
               userId: user.id,
             }),
@@ -1028,7 +1025,6 @@ Ask ONE focused question based on these observations.`)
         }
       }
 
-      calculatedPerformanceScore = applyCollaborationPenalty(calculatedPerformanceScore)
       setComprehensiveFeedback(comprehensiveFeedback)
       setPerformanceScore(calculatedPerformanceScore)
 
