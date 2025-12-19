@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronRight, ChevronLeft, Zap, Book, Target, Clock } from 'lucide-react'
+import { ChevronRight, ChevronLeft, Zap, Book, Target, Clock, GraduationCap } from 'lucide-react'
 import { DSAPattern, PATTERN_METADATA } from '@/lib/types/dsa-patterns'
 import { cn } from '@/lib/utils'
 
@@ -12,7 +12,7 @@ interface SkillAssessmentProps {
 }
 
 export interface AssessmentResult {
-  experienceLevel: 'beginner' | 'intermediate' | 'advanced'
+  experienceLevel: 'intern' | 'beginner' | 'intermediate' | 'advanced'
   problemsSolved: number
   hoursPerDay: number
   patternFamiliarity: { pattern: DSAPattern; level: 'unknown' | 'seen' | 'practiced' | 'confident' }[]
@@ -33,7 +33,7 @@ const CORE_PATTERNS: DSAPattern[] = [
 
 export function SkillAssessment({ onComplete, onBack }: SkillAssessmentProps) {
   const [step, setStep] = useState<Step>('experience')
-  const [experienceLevel, setExperienceLevel] = useState<'beginner' | 'intermediate' | 'advanced' | null>(null)
+  const [experienceLevel, setExperienceLevel] = useState<'intern' | 'beginner' | 'intermediate' | 'advanced' | null>(null)
   const [problemsSolved, setProblemsSolved] = useState<number>(0)
   const [hoursPerDay, setHoursPerDay] = useState<number>(2)
   const [patternFamiliarity, setPatternFamiliarity] = useState<
@@ -169,10 +169,18 @@ function ExperienceStep({
   selected,
   onSelect,
 }: {
-  selected: 'beginner' | 'intermediate' | 'advanced' | null
-  onSelect: (level: 'beginner' | 'intermediate' | 'advanced') => void
+  selected: 'intern' | 'beginner' | 'intermediate' | 'advanced' | null
+  onSelect: (level: 'intern' | 'beginner' | 'intermediate' | 'advanced') => void
 }) {
   const options = [
+    {
+      level: 'intern' as const,
+      icon: GraduationCap,
+      title: 'Intern / Student',
+      description: 'Preparing for internship interviews',
+      detail: 'Focus on core patterns and fundamentals',
+      badge: 'Tailored for internships',
+    },
     {
       level: 'beginner' as const,
       icon: Book,
@@ -199,13 +207,13 @@ function ExperienceStep({
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-foreground">What's Your Experience Level?</h2>
-        <p className="mt-2 text-muted-foreground">
+        <h2 className="text-xl font-bold text-foreground">What's Your Experience Level?</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
           This helps us calibrate problem difficulty and pacing
         </p>
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid gap-3">
         {options.map((option) => {
           const Icon = option.icon
           const isSelected = selected === option.level
@@ -215,25 +223,32 @@ function ExperienceStep({
               key={option.level}
               onClick={() => onSelect(option.level)}
               className={cn(
-                'p-4 rounded-xl border-2 text-left transition-all hover:shadow-md',
+                'p-3 rounded-xl border-2 text-left transition-all hover:shadow-md',
                 isSelected
                   ? 'border-primary bg-primary/5'
                   : 'border-border hover:border-primary/50'
               )}
             >
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-3">
                 <div
                   className={cn(
-                    'p-2 rounded-lg',
+                    'p-1.5 rounded-lg shrink-0',
                     isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted'
                   )}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-4 w-4" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold">{option.title}</h3>
-                  <p className="text-sm text-muted-foreground">{option.description}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{option.detail}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-sm">{option.title}</h3>
+                    {'badge' in option && option.badge && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-medium bg-primary/10 text-primary rounded-full">
+                        {option.badge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{option.description}</p>
+                  <p className="text-[10px] text-muted-foreground/70 mt-0.5">{option.detail}</p>
                 </div>
               </div>
             </button>
