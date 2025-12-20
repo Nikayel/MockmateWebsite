@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
-import { Plus, BookOpen, Target, Sparkles, Trophy, AlertTriangle, Clock, RefreshCw, PartyPopper, Calendar, ArrowRight } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Plus, BookOpen, Target, Sparkles, Trophy, AlertTriangle, Clock, RefreshCw, PartyPopper, Calendar, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react'
 import Link from 'next/link'
 
 import { Header } from '@/components/header'
@@ -29,6 +29,7 @@ export default function RoadmapPage() {
     markQuestionSkipped,
     setActiveRoadmap,
   } = useRoadmapStore()
+  const [isInternBannerExpanded, setIsInternBannerExpanded] = useState(false)
 
   // Get today's plan
   const today = new Date()
@@ -95,78 +96,111 @@ export default function RoadmapPage() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="container mx-auto px-4 py-6 pt-24 space-y-6">
-        {/* Intern-specific banner */}
-        {isIntern && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 border border-blue-500/20 rounded-xl p-4"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center shrink-0">
-                <Sparkles className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="font-semibold text-foreground">Internship Interview Track</p>
-                <p className="text-sm text-muted-foreground">
-                  Your plan focuses on foundational patterns and easier problems. Master the basics first!
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Near expiration warning */}
-        {daysRemaining <= 3 && daysRemaining >= 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4"
-          >
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0" />
-              <div>
-                <p className="font-semibold text-foreground">
-                  {daysRemaining === 0 ? 'Interview Day!' : `Only ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left!`}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {daysRemaining === 0
-                    ? 'Focus on reviewing what you know. You\'ve got this!'
-                    : 'Focus on your weakest patterns and must-know questions.'}
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-        {/* Roadmap header with progress */}
-        <RoadmapHeader roadmap={roadmap} />
-
-        {/* Recommendations alert */}
-        {recommendations.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-primary/5 border border-primary/20 rounded-lg p-4"
-          >
-            <div className="flex items-start gap-3">
-              <Sparkles className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-foreground">Study Tips</p>
-                <ul className="mt-1 text-sm text-muted-foreground space-y-1">
-                  {recommendations.slice(0, 2).map((rec, i) => (
-                    <li key={i}>• {rec}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Main content grid - Responsive layout */}
+      <main className="container mx-auto px-4 py-6 pt-24 space-y-4 md:space-y-6">
+        {/* Top section: Header info on left, Pattern Coverage & Milestones on right */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-          {/* Left column - Today's focus */}
-          <div className="lg:col-span-2 space-y-4 md:space-y-6 order-2 lg:order-1">
+          {/* Left column - Header sections and Today's Focus */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* Intern-specific banner - Collapsible */}
+            {isIntern && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 border border-blue-500/20 rounded-lg overflow-hidden max-w-2xl"
+              >
+                <button
+                  onClick={() => setIsInternBannerExpanded(!isInternBannerExpanded)}
+                  className="w-full flex items-center justify-between p-2 hover:bg-blue-500/5 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center shrink-0">
+                      <Sparkles className="h-3 w-3 text-white" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-semibold text-xs text-foreground">Internship Interview Track</p>
+                      {!isInternBannerExpanded && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Your plan focuses on foundational patterns and easier problems
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {isInternBannerExpanded ? (
+                    <ChevronUp className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  )}
+                </button>
+                <AnimatePresence>
+                  {isInternBannerExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden border-t border-blue-500/20"
+                    >
+                      <div className="p-2 pt-1.5">
+                        <p className="text-xs text-muted-foreground">
+                          Your plan focuses on foundational patterns and easier problems. Master the basics first!
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )}
+
+            {/* Near expiration warning */}
+            {daysRemaining <= 3 && daysRemaining >= 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4"
+              >
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0" />
+                  <div>
+                    <p className="font-semibold text-foreground">
+                      {daysRemaining === 0 ? 'Interview Day!' : `Only ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left!`}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {daysRemaining === 0
+                        ? 'Focus on reviewing what you know. You\'ve got this!'
+                        : 'Focus on your weakest patterns and must-know questions.'}
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Roadmap header with progress */}
+            <div className="max-w-2xl">
+              <RoadmapHeader roadmap={roadmap} />
+            </div>
+
+            {/* Recommendations alert */}
+            {recommendations.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-primary/5 border border-primary/20 rounded-lg p-2 max-w-2xl"
+              >
+                <div className="flex items-start gap-2">
+                  <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-xs text-foreground">Study Tips</p>
+                    <ul className="mt-1 text-xs text-muted-foreground space-y-0.5">
+                      {recommendations.slice(0, 2).map((rec, i) => (
+                        <li key={i}>• {rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Today's Focus - Moved up */}
             {selectedPlan && (
               <TodaysFocus
                 plan={selectedPlan}
@@ -175,30 +209,16 @@ export default function RoadmapPage() {
                 onMarkComplete={handleMarkComplete}
               />
             )}
-
-            {/* Weekly calendar */}
-            <WeeklyCalendar
-              dailyPlans={roadmap.dailyPlans}
-              selectedDayIndex={selectedDayIndex}
-              onSelectDay={selectDay}
-            />
-
-            {/* Company Interview Guide - Full width on mobile, in left column on desktop */}
-            {companyData && (
-              <div className="block lg:hidden">
-                <CompanyInterviewGuide company={companyData} isIntern={isIntern} />
-              </div>
-            )}
           </div>
 
-          {/* Right column - Pattern coverage & Interview Guide */}
-          <div className="space-y-4 md:space-y-6 order-1 lg:order-2">
+          {/* Right column - Pattern coverage & Milestones */}
+          <div className="space-y-4 md:space-y-6">
             <PatternCoverage
               roadmap={roadmap}
               companyTopPatterns={topPatterns}
             />
 
-            {/* Milestones - Collapsible on mobile */}
+            {/* Milestones */}
             <div className="bg-card border border-border rounded-xl p-4 md:p-6">
               <h3 className="font-semibold mb-3 md:mb-4 flex items-center gap-2 text-sm md:text-base">
                 <Target className="h-4 w-4 md:h-5 md:w-5 text-primary" />
@@ -234,6 +254,20 @@ export default function RoadmapPage() {
             )}
           </div>
         </div>
+
+        {/* Weekly calendar */}
+        <WeeklyCalendar
+          dailyPlans={roadmap.dailyPlans}
+          selectedDayIndex={selectedDayIndex}
+          onSelectDay={selectDay}
+        />
+
+        {/* Company Interview Guide - Full width on mobile */}
+        {companyData && (
+          <div className="block lg:hidden">
+            <CompanyInterviewGuide company={companyData} isIntern={isIntern} />
+          </div>
+        )}
       </main>
     </div>
   )
