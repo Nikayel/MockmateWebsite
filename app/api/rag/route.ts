@@ -184,12 +184,11 @@ function generateContextualHints(
     if (textLower.includes('optimal') || textLower.includes('efficient')) {
       hints.push({
         level: 3,
-        hint: `For ${problemType} problems like this, the optimal solution often uses ${
-          textLower.includes('sum') ? 'a hash map for O(1) lookups' :
-          textLower.includes('sort') ? 'sorting first, then two pointers' :
-          textLower.includes('path') ? 'dynamic programming or BFS' :
-          'a combination of the right data structure and algorithm'
-        }.`,
+        hint: `For ${problemType} problems like this, the optimal solution often uses ${textLower.includes('sum') ? 'a hash map for O(1) lookups' :
+            textLower.includes('sort') ? 'sorting first, then two pointers' :
+              textLower.includes('path') ? 'dynamic programming or BFS' :
+                'a combination of the right data structure and algorithm'
+          }.`,
       })
     }
   }
@@ -428,8 +427,8 @@ async function handleGetLearningPath(params: {
     message: profile.recentTrend === 'improving'
       ? "Great progress! Keep up the momentum."
       : profile.recentTrend === 'declining'
-      ? "Let's get back on track with some fundamentals."
-      : "Steady progress. Time to push to the next level!",
+        ? "Let's get back on track with some fundamentals."
+        : "Steady progress. Time to push to the next level!",
   })
 }
 
