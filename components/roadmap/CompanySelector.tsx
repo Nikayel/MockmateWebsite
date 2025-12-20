@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Search, Building2, ChevronRight, Star, Clock, Users } from 'lucide-react'
+import Image from 'next/image'
 import { ALL_COMPANIES, COMPANY_TIERS } from '@/lib/data/company-questions'
 import { CompanyId, CompanyQuestionData } from '@/lib/data/company-questions/types'
 import { cn } from '@/lib/utils'
@@ -147,8 +148,19 @@ function CompanyCard({
         </motion.div>
       )}
 
-      {/* Company name */}
-      <h3 className="font-semibold text-lg text-foreground">{company.name}</h3>
+      {/* Company header with logo */}
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-10 h-10 bg-white rounded-lg border border-border flex items-center justify-center overflow-hidden shrink-0">
+          <Image
+            src={company.logo}
+            alt={`${company.name} logo`}
+            width={32}
+            height={32}
+            className="w-8 h-8 object-contain"
+          />
+        </div>
+        <h3 className="font-semibold text-lg text-foreground">{company.name}</h3>
+      </div>
 
       {/* Stats row */}
       <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
