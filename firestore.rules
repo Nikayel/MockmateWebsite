@@ -169,6 +169,70 @@ service cloud.firestore {
     }
 
     // ============================================================================
+    // RAG COLLECTIONS - TEXT EMBEDDINGS
+    // ============================================================================
+
+    match /text_embeddings/{embeddingId} {
+      // Problems and hints: Read-only for all authenticated users
+      // Solutions: Only readable by the owning user
+      allow read: if isAuthenticated() && (
+        // Public: problems and hints
+        resource.data.type == 'problem' || 
+        resource.data.type == 'hint' ||
+        // Private: user's own solutions
+        (resource.data.type == 'solution' && 
+         resource.data.metadata.userId == request.auth.uid)
+      );
+
+      // Only backend (Admin SDK) can write embeddings
+      // Clients cannot create/update/delete embeddings directly
+      allow write: if false;
+    }
+
+    // ============================================================================
+    // RAG COLLECTIONS - SESSION VECTORS
+    // ============================================================================
+
+    match /session_vectors/{vectorId} {
+      // Users can read their own session vectors
+      allow read: if isAuthenticated() 
+                  && documentExists()
+                  && resource.data.userId == request.auth.uid;
+
+      // Only backend (Admin SDK) can write session vectors
+      // Clients cannot create/update/delete vectors directly
+      allow write: if false;
+    }
+
+    // ============================================================================
+    // RAG COLLECTIONS - PERFORMANCE PROFILES
+    // ============================================================================
+
+    match /performance_profiles/{userId} {
+      // Users can read their own performance profile
+      allow read: if isOwner(userId);
+
+      // Only backend (Admin SDK) can write performance profiles
+      // Clients cannot create/update/delete profiles directly
+      allow write: if false;
+    }
+
+    // ============================================================================
+    // RAG COLLECTIONS - RAG TRACES (Audit Logging)
+    // ============================================================================
+
+    match /rag_traces/{traceId} {
+      // Users can read their own RAG traces (for debugging)
+      allow read: if isAuthenticated() 
+                  && documentExists()
+                  && resource.data.userId == request.auth.uid;
+
+      // Only backend (Admin SDK) can write traces
+      // Clients cannot create/update/delete traces directly
+      allow write: if false;
+    }
+
+    // ============================================================================
     // DEFAULT DENY ALL
     // ============================================================================
 

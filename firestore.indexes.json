@@ -32,6 +32,48 @@
         { "fieldPath": "userId", "order": "ASCENDING" },
         { "fieldPath": "month", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "text_embeddings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "metadata.timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "text_embeddings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "metadata.userId", "order": "ASCENDING" },
+        { "fieldPath": "metadata.timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "text_embeddings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "metadata.problemId", "order": "ASCENDING" },
+        { "fieldPath": "metadata.timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "session_vectors",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "session_vectors",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "metadata.type", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
