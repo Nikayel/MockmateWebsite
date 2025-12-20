@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { CheckCircle, TrendingUp, Target, Zap, Code, MessageSquare, Activity, ChevronDown, ChevronUp, XCircle, FileText, RotateCcw, Play, Download, AlertCircle, Sparkles, Clock, BarChart3, Lightbulb, AlertTriangle } from "lucide-react"
 import { LearningRecommendations } from "@/components/LearningRecommendations"
+import { NextProblemRecommendations } from "@/components/NextProblemRecommendations"
 import { Progress } from "@/components/ui/progress"
 import { GradingCriteriaRadial } from "@/components/GradingCriteria"
 
@@ -841,6 +842,16 @@ export default function PracticeFeedback({
             />
           </CardContent>
         </Card>
+      )}
+
+      {/* RAG-Powered Next Problem Recommendations */}
+      {userId && problemTitle && (
+        <NextProblemRecommendations
+          userId={userId}
+          currentProblemText={problemTitle ? `${problemTitle}: ${feedback.substring(0, 200)}` : feedback.substring(0, 200)}
+          currentProblemId={problemTitle}
+          onSelectProblem={() => onNewProblem?.()}
+        />
       )}
 
       {/* Actions */}
