@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import dynamic from "next/dynamic"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
@@ -10,10 +11,33 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { CodeViewerSidePanel } from "@/components/CodeViewerSidePanel"
-import { MonacoEditor } from "@/components/editor"
-import PracticeFeedback from "@/components/PracticeFeedback"
 import { GradingCriteriaTooltip } from "@/components/GradingCriteria"
 import { ScenarioBrowser } from "@/components/interview"
+
+// Dynamically import heavy components to reduce initial bundle size
+const MonacoEditor = dynamic(
+  () => import("@/components/editor").then(mod => mod.MonacoEditor),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-full bg-[#1e1e1e]">
+        <div className="text-gray-400 text-sm">Loading editor...</div>
+      </div>
+    )
+  }
+)
+
+const PracticeFeedback = dynamic(
+  () => import("@/components/PracticeFeedback"),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-gray-400 text-sm">Loading feedback...</div>
+      </div>
+    )
+  }
+)
 import { db } from "@/lib/firebase"
 import { collection, getDocs, query, where } from "firebase/firestore"
 import {
