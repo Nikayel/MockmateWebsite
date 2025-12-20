@@ -11,8 +11,8 @@
  * Future: Can migrate to Pinecone/Weaviate for scale
  */
 
-import { db } from "./firebase"
-import { collection, addDoc, getDocs, query, where, orderBy, limit, doc, updateDoc, getDoc } from "firebase/firestore"
+import { adminDb } from "./firebase-admin"
+import { Timestamp } from "firebase-admin/firestore"
 
 // Vector dimensions
 const METRICS_VECTOR_DIM = 25
@@ -321,10 +321,12 @@ export function cosineSimilarity(a: number[], b: number[]): number {
  */
 export async function storeSessionVector(sessionVector: SessionVector): Promise<string> {
   try {
-    const docRef = await addDoc(collection(db, 'session_vectors'), {
+    const docRef = await adminDb.collection('session_vectors').add({
       ...sessionVector,
-      timestamp: sessionVector.timestamp.toISOString(),
-      createdAt: new Date().toISOString(),
+      userId: sessionVector.userId, // Keep camelCase for code consistency
+      user_id: sessionVector.userId, // Also store with underscore for Firestore rules compatibility
+      timestamp: Timestamp.fromDate(sessionVector.timestamp),
+      createdAt: Timestamp.now(),
     })
     return docRef.id
   } catch (error) {
@@ -348,14 +350,12 @@ export async function findSimilarSessions(
 ): Promise<Array<SessionVector & { similarity: number }>> {
   try {
     // Fetch user's session vectors
-    let q = query(
-      collection(db, 'session_vectors'),
-      where('userId', '==', userId),
-      orderBy('timestamp', 'desc'),
-      limit(100) // Get last 100 sessions for comparison
-    )
+    let q = adminDb.collection('session_vectors')
+      .where('userId', '==', userId)
+      .orderBy('timestamp', 'desc')
+      .limit(100) // Get last 100 sessions for comparison
 
-    const snapshot = await getDocs(q)
+    const snapshot = await q.get()
     const sessions: SessionVector[] = []
 
     snapshot.forEach(doc => {
@@ -364,10 +364,15 @@ export async function findSimilarSessions(
       if (options.sameType && data.metadata?.type !== options.sameType) return
       if (options.sameDifficulty && data.metadata?.difficulty !== options.sameDifficulty) return
 
+      // Convert Firestore Timestamp to Date
+      const timestamp = data.timestamp instanceof Timestamp 
+        ? data.timestamp.toDate() 
+        : data.timestamp?.toDate?.() || new Date(data.timestamp)
+
       sessions.push({
         ...data,
         sessionId: doc.id,
-        timestamp: new Date(data.timestamp),
+        timestamp,
       } as SessionVector)
     })
 
@@ -392,14 +397,21 @@ export async function findSimilarSessions(
  */
 export async function getUserPerformanceProfile(userId: string): Promise<UserPerformanceProfile | null> {
   try {
-    const docRef = doc(db, 'performance_profiles', userId)
-    const docSnap = await getDoc(docRef)
+    const docRef = adminDb.collection('performance_profiles').doc(userId)
+    const docSnap = await docRef.get()
 
-    if (docSnap.exists()) {
+    if (docSnap.exists) {
       const data = docSnap.data()
+      if (!data) return null
+
+      // Convert Firestore Timestamp to Date
+      const lastUpdated = data.lastUpdated instanceof Timestamp
+        ? data.lastUpdated.toDate()
+        : data.lastUpdated?.toDate?.() || new Date(data.lastUpdated)
+
       return {
         ...data,
-        lastUpdated: new Date(data.lastUpdated),
+        lastUpdated,
       } as UserPerformanceProfile
     }
 
@@ -503,17 +515,11 @@ export async function updateUserPerformanceProfile(
     }
 
     // Store in Firestore
-    const docRef = doc(db, 'performance_profiles', userId)
-    await updateDoc(docRef, {
+    const docRef = adminDb.collection('performance_profiles').doc(userId)
+    await docRef.set({
       ...updatedProfile,
-      lastUpdated: updatedProfile.lastUpdated.toISOString(),
-    }).catch(async () => {
-      // If doc doesn't exist, create it
-      await addDoc(collection(db, 'performance_profiles'), {
-        ...updatedProfile,
-        lastUpdated: updatedProfile.lastUpdated.toISOString(),
-      })
-    })
+      lastUpdated: Timestamp.fromDate(updatedProfile.lastUpdated),
+    }, { merge: true })
   } catch (error) {
     console.error('Error updating user profile:', error)
   }
@@ -633,13 +639,11 @@ export async function getAggregateAnalytics(
         break
     }
 
-    const q = query(
-      collection(db, 'session_vectors'),
-      where('timestamp', '>=', startDate.toISOString()),
-      orderBy('timestamp', 'desc')
-    )
+    const q = adminDb.collection('session_vectors')
+      .where('timestamp', '>=', Timestamp.fromDate(startDate))
+      .orderBy('timestamp', 'desc')
 
-    const snapshot = await getDocs(q)
+    const snapshot = await q.get()
 
     let totalScore = 0
     const scenarioCounts: Record<string, { title: string; count: number }> = {}

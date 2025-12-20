@@ -10,8 +10,8 @@
  * Future: Can be upgraded to use OpenAI embeddings, sentence-transformers, etc.
  */
 
-import { db } from "./firebase"
-import { collection, addDoc, getDocs, query, where, orderBy, limit, doc, getDoc, setDoc } from "firebase/firestore"
+import { adminDb } from "./firebase-admin"
+import { Timestamp } from "firebase-admin/firestore"
 import { cosineSimilarity } from "./vectorization"
 
 // Embedding dimensions
@@ -42,6 +42,7 @@ export interface TextEmbedding {
   metadata: {
     problemId?: string
     userId?: string
+    user_id?: string // For Firestore rules compatibility
     difficulty?: string
     tags?: string[]
     timestamp: string
@@ -207,13 +208,17 @@ function hashString(str: string): number {
  */
 export async function storeTextEmbedding(embedding: TextEmbedding): Promise<string> {
   try {
-    const docRef = await addDoc(collection(db, 'text_embeddings'), {
+    const timestamp = embedding.metadata.timestamp
+      ? Timestamp.fromDate(new Date(embedding.metadata.timestamp))
+      : Timestamp.now()
+
+    const docRef = await adminDb.collection('text_embeddings').add({
       ...embedding,
       metadata: {
         ...embedding.metadata,
-        timestamp: embedding.metadata.timestamp || new Date().toISOString(),
+        timestamp: timestamp.toDate().toISOString(), // Keep as ISO string in metadata for compatibility
       },
-      createdAt: new Date().toISOString(),
+      createdAt: Timestamp.now(),
     })
     return docRef.id
   } catch (error) {
@@ -239,13 +244,11 @@ export async function findSimilarTexts(
     const { type, limit: maxResults = 5, minSimilarity = 0.3, excludeIds = [], userId } = options
 
     // Build query
-    let q = query(
-      collection(db, 'text_embeddings'),
-      orderBy('metadata.timestamp', 'desc'),
-      limit(200) // Fetch more to filter client-side
-    )
+    let q = adminDb.collection('text_embeddings')
+      .orderBy('metadata.timestamp', 'desc')
+      .limit(200) // Fetch more to filter client-side
 
-    const snapshot = await getDocs(q)
+    const snapshot = await q.get()
     const results: SimilarResult[] = []
 
     snapshot.forEach(doc => {
@@ -254,7 +257,7 @@ export async function findSimilarTexts(
       // Apply filters
       if (type && data.type !== type) return
       if (excludeIds.includes(doc.id)) return
-      if (userId && data.metadata?.userId !== userId) return
+      if (userId && data.metadata?.userId !== userId && data.metadata?.user_id !== userId) return
 
       // Calculate similarity
       const similarity = cosineSimilarity(queryVector, data.vector)
@@ -297,7 +300,7 @@ export async function getSimilarProblems(
     type: 'problem',
     limit: options.limit || 5,
     excludeIds: options.excludeProblemId ? [options.excludeProblemId] : [],
-    minSimilarity: 0.4,
+    minSimilarity: 0.3, // Lowered from 0.4 to find more similar problems
   })
 }
 
@@ -396,7 +399,8 @@ export async function embedAndStoreSolution(
     vector,
     metadata: {
       problemId,
-      userId,
+      userId, // Keep camelCase for code consistency
+      user_id: userId, // Also store with underscore for Firestore rules compatibility
       tags: [metadata.language, metadata.passed ? 'passed' : 'failed'],
       timestamp: new Date().toISOString(),
     },
@@ -435,6 +439,39 @@ export async function embedAndStoreHint(
 }
 
 /**
+ * Check if user has solved a problem by problemId (direct lookup, more reliable)
+ */
+export async function hasUserSolvedProblem(
+  userId: string,
+  problemId: string
+): Promise<boolean> {
+  try {
+    const snapshot = await adminDb.collection('text_embeddings')
+      .where('type', '==', 'solution')
+      .where('metadata.problemId', '==', problemId)
+      .where('metadata.userId', '==', userId)
+      .limit(1)
+      .get()
+
+    // Also check with user_id field for compatibility
+    if (snapshot.empty) {
+      const snapshotAlt = await adminDb.collection('text_embeddings')
+        .where('type', '==', 'solution')
+        .where('metadata.problemId', '==', problemId)
+        .where('metadata.user_id', '==', userId)
+        .limit(1)
+        .get()
+      return !snapshotAlt.empty
+    }
+
+    return !snapshot.empty
+  } catch (error) {
+    console.error('Error checking if user solved problem:', error)
+    return false
+  }
+}
+
+/**
  * Get recommended next problems based on what user just solved
  */
 export async function getRecommendedNextProblems(
@@ -442,8 +479,9 @@ export async function getRecommendedNextProblems(
   currentProblemText: string,
   currentProblemId?: string
 ): Promise<SimilarResult[]> {
+  // Lower similarity threshold to find more problems
   const similarProblems = await getSimilarProblems(currentProblemText, {
-    limit: 10,
+    limit: 15, // Get more candidates
     excludeProblemId: currentProblemId,
   })
 
@@ -453,17 +491,10 @@ export async function getRecommendedNextProblems(
     const problemId = problem.metadata?.problemId
     if (!problemId) continue
 
-    const userSolutions = await findSimilarTexts(
-      generateTextEmbedding(problem.text),
-      {
-        type: 'solution',
-        userId,
-        limit: 1,
-        minSimilarity: 0.3,
-      }
-    )
+    // Use direct problemId lookup instead of similarity search
+    const hasSolved = await hasUserSolvedProblem(userId, problemId)
 
-    if (userSolutions.length === 0) {
+    if (!hasSolved) {
       unsolvedProblems.push(problem)
     }
   }

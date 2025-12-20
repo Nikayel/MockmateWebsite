@@ -17,7 +17,7 @@ import { ScenarioBrowser } from "@/components/interview"
 // Dynamically import heavy components to reduce initial bundle size
 const MonacoEditor = dynamic(
   () => import("@/components/editor").then(mod => mod.MonacoEditor),
-  { 
+  {
     ssr: false,
     loading: () => (
       <div className="flex items-center justify-center h-full bg-[#1e1e1e]">
@@ -29,7 +29,7 @@ const MonacoEditor = dynamic(
 
 const PracticeFeedback = dynamic(
   () => import("@/components/PracticeFeedback"),
-  { 
+  {
     ssr: false,
     loading: () => (
       <div className="flex items-center justify-center p-8">
@@ -1130,7 +1130,15 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           await updateInterviewSession(
             currentSessionId,
             scoreToSave,
-            comprehensiveFeedback
+            comprehensiveFeedback,
+            {
+              code,
+              language: selectedLanguage,
+              testResults,
+              timeComplexity: efficiencyData?.estimatedTimeComplexity,
+              spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
+              efficiencyScore: efficiencyData?.efficiencyScore,
+            }
           )
 
           // Mark question complete in roadmap if user came from roadmap
@@ -1142,6 +1150,26 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
               addActualTime(minutesSpent)
             }
             toast.success("Progress saved to your roadmap!")
+          }
+
+          // Store solution for RAG (async, non-blocking)
+          if (selectedScenario?.id && code.trim()) {
+            fetch("/api/rag", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "store-solution",
+                userId: user.id,
+                problemId: selectedScenario.id,
+                problemTitle: selectedScenario.title,
+                solutionCode: code,
+                language: selectedLanguage,
+                passed: summary.passed === summary.total,
+                score: calculatedPerformanceScore,
+              }),
+            }).catch((err) => {
+              console.error("Solution storage error (non-blocking):", err)
+            })
           }
 
           // Vectorize session for RAG features (async, non-blocking)
@@ -1343,7 +1371,15 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         await updateInterviewSession(
           currentSessionId,
           scoreToSave,
-          comprehensiveFeedback || `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
+          comprehensiveFeedback || `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`,
+          {
+            code,
+            language: selectedLanguage,
+            testResults,
+            timeComplexity: efficiencyMetrics?.estimatedTimeComplexity,
+            spaceComplexity: efficiencyMetrics?.estimatedSpaceComplexity,
+            efficiencyScore: efficiencyMetrics?.efficiencyScore,
+          }
         )
       } catch (error) {
         console.error("Error updating session:", error)
