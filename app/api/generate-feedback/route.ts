@@ -244,11 +244,10 @@ function getDefaultValidation(): ConversationValidation {
 }
 
 /**
- * STEP 3: Calculate final scores using both algorithmic signals and AI validation
+ * SYSTEM DESIGN SCORING - focused on architecture and discussion quality
+ * No test pass rate since system design is discussion-based
  */
-function calculateValidatedScores(
-  passRate: number,
-  efficiencyMetrics: { efficiencyScore?: number } | undefined,
+function calculateSystemDesignScores(
   preScreen: ReturnType<typeof preScreenConversation>,
   aiValidation: ConversationValidation
 ): {
@@ -258,6 +257,189 @@ function calculateValidatedScores(
   communication: number
   overall: number
 } {
+  // System design evaluation criteria (based on industry standards):
+  // - Requirements Gathering: Did they ask clarifying questions?
+  // - Architecture: Did they propose clear components?
+  // - Scalability: Did they discuss scaling concerns?
+  // - Trade-offs: Did they explain pros/cons of choices?
+  // - Communication: Did they communicate clearly?
+
+  // UNDERSTANDING = Requirements gathering + approach explanation
+  let understanding = 40 // Base score for system design
+  if (aiValidation.approachExplained && aiValidation.isCoherent) {
+    const approachBonus = {
+      'excellent': 40,
+      'good': 30,
+      'basic': 15,
+      'poor': 5,
+      'none': 0
+    }[aiValidation.approachQuality] || 0
+    understanding = Math.min(95, understanding + approachBonus)
+  }
+
+  // PROBLEM-SOLVING = Architecture quality + alternatives discussed
+  let problemSolving = 40 // Base score
+  if (aiValidation.alternativesDiscussed && aiValidation.isCoherent) {
+    problemSolving = Math.min(90, problemSolving + 25)
+  }
+  if (aiValidation.edgeCasesConsidered && aiValidation.isCoherent) {
+    problemSolving = Math.min(95, problemSolving + 20)
+  }
+
+  // CODE QUALITY = For system design, this becomes "Design Quality"
+  // Based on discussion depth and coherence
+  let codeQuality = 50 // Base score (no actual code for system design)
+  if (aiValidation.isCoherent && preScreen.hasContent) {
+    // Reward depth of discussion
+    const messageCount = preScreen.candidateMessageCount || 0
+    if (messageCount >= 10) codeQuality = Math.min(90, codeQuality + 30)
+    else if (messageCount >= 5) codeQuality = Math.min(80, codeQuality + 20)
+    else if (messageCount >= 2) codeQuality = Math.min(70, codeQuality + 10)
+  }
+
+  // COMMUNICATION = Most important for system design interviews
+  let communication = 30 // Base
+  if (!aiValidation.isCoherent) {
+    communication = Math.min(25, aiValidation.communicationScore)
+  } else if (!aiValidation.responsesRelevant) {
+    communication = Math.min(40, aiValidation.communicationScore)
+  } else {
+    communication = aiValidation.communicationScore
+    // Bonus for answering interviewer questions
+    if (aiValidation.questionsAsked > 0) {
+      const answerRate = aiValidation.questionsAnswered / aiValidation.questionsAsked
+      if (answerRate >= 0.8) communication = Math.min(95, communication + 10)
+      else if (answerRate >= 0.5) communication = Math.min(90, communication + 5)
+    }
+  }
+
+  // System design weighting: Communication is most important
+  const overall = Math.round(
+    understanding * 0.20 +      // Requirements & understanding
+    problemSolving * 0.30 +     // Architecture & scalability
+    codeQuality * 0.20 +        // Design depth
+    communication * 0.30        // Critical for system design
+  )
+
+  return {
+    understanding: Math.round(understanding),
+    problemSolving: Math.round(problemSolving),
+    codeQuality: Math.round(codeQuality),
+    communication: Math.round(communication),
+    overall
+  }
+}
+
+/**
+ * BUG FIX SCORING - emphasize debugging process and root cause analysis
+ */
+function calculateBugFixScores(
+  passRate: number,
+  preScreen: ReturnType<typeof preScreenConversation>,
+  aiValidation: ConversationValidation
+): {
+  understanding: number
+  problemSolving: number
+  codeQuality: number
+  communication: number
+  overall: number
+} {
+  // Bug fix evaluation criteria:
+  // - Did they find the bug? (test pass rate is key indicator)
+  // - Did they explain the root cause?
+  // - Did they fix it cleanly?
+  // - Did they consider edge cases?
+
+  // UNDERSTANDING = Bug identification + root cause explanation
+  let understanding = 20
+  if (passRate >= 80) {
+    understanding = Math.min(85, passRate) // Found and fixed the bug
+  } else if (passRate >= 50) {
+    understanding = passRate + 10 // Partial fix
+  } else {
+    understanding = Math.max(20, passRate + 15) // Base for attempting
+  }
+
+  // Bonus for explaining the bug
+  if (aiValidation.approachExplained && aiValidation.isCoherent) {
+    const approachBonus = {
+      'excellent': 15,
+      'good': 10,
+      'basic': 5,
+      'poor': 2,
+      'none': 0
+    }[aiValidation.approachQuality] || 0
+    understanding = Math.min(98, understanding + approachBonus)
+  }
+
+  // PROBLEM-SOLVING = Debugging approach + fix quality
+  let problemSolving = Math.round(passRate * 0.7 + 15) // Base on fix success
+  if (aiValidation.edgeCasesConsidered && aiValidation.isCoherent) {
+    problemSolving = Math.min(95, problemSolving + 10)
+  }
+  if (aiValidation.alternativesDiscussed && aiValidation.isCoherent) {
+    problemSolving = Math.min(95, problemSolving + 5)
+  }
+
+  // CODE QUALITY = Clean fix, not hacky workaround
+  const codeQuality = Math.min(100, Math.round(passRate * 0.8 + 20))
+
+  // COMMUNICATION = Explaining the debugging process
+  let communication = 30
+  if (!aiValidation.isCoherent) {
+    communication = Math.min(25, aiValidation.communicationScore)
+  } else {
+    communication = aiValidation.communicationScore
+    if (aiValidation.questionsAsked > 0) {
+      const answerRate = aiValidation.questionsAnswered / aiValidation.questionsAsked
+      if (answerRate >= 0.7) communication = Math.min(95, communication + 5)
+    }
+  }
+
+  // Bug fix weighting: Understanding the bug is most important
+  const overall = Math.round(
+    understanding * 0.35 +      // Finding + explaining the bug
+    problemSolving * 0.25 +     // Debugging approach
+    codeQuality * 0.20 +        // Clean fix
+    communication * 0.20        // Explaining process
+  )
+
+  return {
+    understanding: Math.round(understanding),
+    problemSolving: Math.round(problemSolving),
+    codeQuality: Math.round(codeQuality),
+    communication: Math.round(communication),
+    overall
+  }
+}
+
+/**
+ * STEP 3: Calculate final scores using both algorithmic signals and AI validation
+ */
+function calculateValidatedScores(
+  passRate: number,
+  efficiencyMetrics: { efficiencyScore?: number } | undefined,
+  preScreen: ReturnType<typeof preScreenConversation>,
+  aiValidation: ConversationValidation,
+  scenarioType?: string
+): {
+  understanding: number
+  problemSolving: number
+  codeQuality: number
+  communication: number
+  overall: number
+} {
+  // SYSTEM DESIGN SCORING - conversation-based, no test pass rate
+  if (scenarioType === 'system-design') {
+    return calculateSystemDesignScores(preScreen, aiValidation)
+  }
+
+  // BUG FIX SCORING - emphasize debugging process
+  if (scenarioType === 'bugfix') {
+    return calculateBugFixScores(passRate, preScreen, aiValidation)
+  }
+
+  // DSA SCORING (default) - test pass rate + code quality
   // === UNDERSTANDING SCORE (30%) ===
   // Primary: test pass rate (proves they understood the problem)
   // Secondary: approach explanation quality
@@ -564,11 +746,13 @@ CODE EFFICIENCY ANALYSIS:
       : getDefaultValidation()
 
     // Step 3: Calculate validated scores using both algorithmic + AI signals
+    // Different scoring models for different scenario types
     const validatedScores = calculateValidatedScores(
       passRate,
       efficiencyMetrics,
       preScreen,
-      aiValidation
+      aiValidation,
+      scenarioType // Pass scenario type for specialized scoring
     )
 
     // Step 4: Apply score floors for correct solutions
