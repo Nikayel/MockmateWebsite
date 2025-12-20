@@ -1,25 +1,43 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { CheckCircle, TrendingUp, Target, Zap, Code, MessageSquare, Activity, ChevronDown, ChevronUp, XCircle, FileText, RotateCcw, Play, Download, AlertCircle, Sparkles, Clock, BarChart3, Lightbulb, AlertTriangle } from "lucide-react"
+import {
+  CheckCircle,
+  TrendingUp,
+  Target,
+  Code,
+  MessageSquare,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  RotateCcw,
+  Play,
+  Download,
+  Sparkles,
+  Clock,
+  BarChart3,
+  Lightbulb,
+  AlertTriangle,
+  Award,
+  Zap,
+  BookOpen
+} from "lucide-react"
 import { LearningRecommendations } from "@/components/LearningRecommendations"
 import { NextProblemRecommendations } from "@/components/NextProblemRecommendations"
 import { Progress } from "@/components/ui/progress"
-import { GradingCriteriaRadial } from "@/components/GradingCriteria"
+import { cn } from "@/lib/utils"
 
 interface FeedbackSection {
   tldr: string
   scores: {
-    // New grading criteria aligned with real AI-assisted interviews
-    understanding: number       // 30% - Can you explain your approach?
-    problemSolving: number      // 25% - Debug & optimize
-    codeQuality: number         // 25% - Clean & efficient
-    communication: number       // 20% - Think out loud
-    // Legacy fields for backward compatibility
+    understanding: number
+    problemSolving: number
+    codeQuality: number
+    communication: number
     correctness: number
     efficiency: number
     reasoning: number
@@ -67,12 +85,10 @@ function parseFeedback(feedback: string): FeedbackSection {
   const sections: FeedbackSection = {
     tldr: "",
     scores: {
-      // New grading criteria
       understanding: 0,
       problemSolving: 0,
       codeQuality: 0,
       communication: 0,
-      // Legacy (for backward compat)
       correctness: 0,
       efficiency: 0,
       reasoning: 0,
@@ -86,31 +102,14 @@ function parseFeedback(feedback: string): FeedbackSection {
     aiWatchlist: "",
   }
 
-  // Extract TL;DR
   const tldrMatch = feedback.match(/\*\*TL;DR\*\*[:\s]*([\s\S]+?)(?=\n\*\*|$)/)
   if (tldrMatch) sections.tldr = tldrMatch[1].trim()
 
-  // Extract scores - improved regex to handle various formats
   const scoreSection = feedback.match(/\*\*Score Snapshot\*\*[:\s]*([\s\S]+?)(?=\n\*\*|$)/i)
   if (scoreSection) {
     const scoreText = scoreSection[1]
-    
-    // More flexible regex patterns that handle:
-    // - "Correctness: 10/10" or "Correctness: 10/10 – justification"
-    // - Bullet points: "- Correctness: 10/10"
-    // - Variations in spacing and dashes
-    
-    // Parse scores - handle both /10 and /100 formats, and extract justifications
-    const parseScore = (match: RegExpMatchArray | null, is100: boolean) => {
-      if (!match) return 0
-      const score = parseInt(match[1], 10)
-      // If format is /10, convert to /100; if /100, use as-is
-      return is100 ? score : score * 10
-    }
-    
-    // Extract score and justification (format: "Label: X/100 – justification" or "- Label: X/100 – justification")
+
     const parseScoreWithJustification = (label: string, scoreText: string, is100: boolean = true) => {
-      // Try with justification first (handles "Label: X/100 – justification" or "- Label: X/100 – justification")
       const regexWithJustification = new RegExp(`[-•]?\\s*${label}[:\s–-]*(\\d+)\\s*\\/\\s*${is100 ? '100' : '10'}[–-\\s]+(.+?)(?=\\n|$)`, 'i')
       const matchWithJustification = scoreText.match(regexWithJustification)
       if (matchWithJustification && matchWithJustification[2]?.trim()) {
@@ -118,75 +117,72 @@ function parseFeedback(feedback: string): FeedbackSection {
         const justification = matchWithJustification[2].trim()
         return { score: is100 ? score : score * 10, justification }
       }
-      // Fallback: try without justification
       const regexWithoutJustification = new RegExp(`[-•]?\\s*${label}[:\s–-]*(\\d+)\\s*\\/\\s*${is100 ? '100' : '10'}`, 'i')
       const matchWithoutJustification = scoreText.match(regexWithoutJustification)
-      return { score: parseScore(matchWithoutJustification, is100), justification: '' }
+      if (matchWithoutJustification) {
+        return { score: is100 ? parseInt(matchWithoutJustification[1], 10) : parseInt(matchWithoutJustification[1], 10) * 10, justification: '' }
+      }
+      return { score: 0, justification: '' }
     }
-    
-    // NEW GRADING CRITERIA (aligned with real AI-assisted interviews)
-    // Understanding (30%) - Can you explain your approach?
-    const understanding100 = parseScoreWithJustification('Understanding', scoreText, true)
-    const understanding10 = understanding100.score === 0 ? parseScoreWithJustification('Understanding', scoreText, false) : understanding100
-    sections.scores.understanding = understanding10.score
-    if (understanding10.justification) sections.scoreJustifications.understanding = understanding10.justification
 
-    // Problem-Solving (25%) - Debug & optimize
-    const problemSolving100 = parseScoreWithJustification('Problem[-\\s]?Solving', scoreText, true)
-    const problemSolving10 = problemSolving100.score === 0 ? parseScoreWithJustification('Problem[-\\s]?Solving', scoreText, false) : problemSolving100
-    sections.scores.problemSolving = problemSolving10.score
-    if (problemSolving10.justification) sections.scoreJustifications.problemSolving = problemSolving10.justification
+    const understanding = parseScoreWithJustification('Understanding', scoreText, true)
+    if (understanding.score === 0) {
+      const alt = parseScoreWithJustification('Understanding', scoreText, false)
+      sections.scores.understanding = alt.score
+      if (alt.justification) sections.scoreJustifications.understanding = alt.justification
+    } else {
+      sections.scores.understanding = understanding.score
+      if (understanding.justification) sections.scoreJustifications.understanding = understanding.justification
+    }
 
-    // Code Quality (25%) - Clean & efficient
-    const codeQuality100 = parseScoreWithJustification('Code\\s+Quality', scoreText, true)
-    const codeQuality10 = codeQuality100.score === 0 ? parseScoreWithJustification('Code\\s+Quality', scoreText, false) : codeQuality100
-    sections.scores.codeQuality = codeQuality10.score
-    if (codeQuality10.justification) sections.scoreJustifications.codeQuality = codeQuality10.justification
+    const problemSolving = parseScoreWithJustification('Problem[-\\s]?Solving', scoreText, true)
+    if (problemSolving.score === 0) {
+      const alt = parseScoreWithJustification('Problem[-\\s]?Solving', scoreText, false)
+      sections.scores.problemSolving = alt.score
+    } else {
+      sections.scores.problemSolving = problemSolving.score
+    }
 
-    // Communication (20%) - Think out loud
-    const communication100 = parseScoreWithJustification('Communication', scoreText, true)
-    const communication10 = communication100.score === 0 ? parseScoreWithJustification('Communication', scoreText, false) : communication100
-    sections.scores.communication = communication10.score
-    if (communication10.justification) sections.scoreJustifications.communication = communication10.justification
+    const codeQuality = parseScoreWithJustification('Code\\s+Quality', scoreText, true)
+    if (codeQuality.score === 0) {
+      const alt = parseScoreWithJustification('Code\\s+Quality', scoreText, false)
+      sections.scores.codeQuality = alt.score
+    } else {
+      sections.scores.codeQuality = codeQuality.score
+    }
 
-    // LEGACY SCORES (for backward compatibility with old feedback)
-    const correctness100 = parseScoreWithJustification('Correctness', scoreText, true)
-    const correctness10 = correctness100.score === 0 ? parseScoreWithJustification('Correctness', scoreText, false) : correctness100
-    sections.scores.correctness = correctness10.score
+    const communication = parseScoreWithJustification('Communication', scoreText, true)
+    if (communication.score === 0) {
+      const alt = parseScoreWithJustification('Communication', scoreText, false)
+      sections.scores.communication = alt.score
+    } else {
+      sections.scores.communication = communication.score
+    }
 
-    const efficiency100 = parseScoreWithJustification('Efficiency', scoreText, true)
-    const efficiency10 = efficiency100.score === 0 ? parseScoreWithJustification('Efficiency', scoreText, false) : efficiency100
-    sections.scores.efficiency = efficiency10.score
+    // Legacy scores
+    const correctness = parseScoreWithJustification('Correctness', scoreText, true)
+    sections.scores.correctness = correctness.score === 0 ? parseScoreWithJustification('Correctness', scoreText, false).score : correctness.score
 
-    // Handle "Reasoning & Explanation" as alias for Communication
-    const reasoning100 = parseScoreWithJustification('Reasoning(?:\\s+&\\s+Explanation)?', scoreText, true)
-    const reasoning10 = reasoning100.score === 0 ? parseScoreWithJustification('Reasoning(?:\\s+&\\s+Explanation)?', scoreText, false) : reasoning100
-    sections.scores.reasoning = reasoning10.score
-    // Map legacy Reasoning to Communication if Communication wasn't found
+    const efficiency = parseScoreWithJustification('Efficiency', scoreText, true)
+    sections.scores.efficiency = efficiency.score === 0 ? parseScoreWithJustification('Efficiency', scoreText, false).score : efficiency.score
+
+    const reasoning = parseScoreWithJustification('Reasoning(?:\\s+&\\s+Explanation)?', scoreText, true)
+    sections.scores.reasoning = reasoning.score === 0 ? parseScoreWithJustification('Reasoning(?:\\s+&\\s+Explanation)?', scoreText, false).score : reasoning.score
+
     if (sections.scores.communication === 0 && sections.scores.reasoning > 0) {
       sections.scores.communication = sections.scores.reasoning
     }
 
-    const aiCollaboration100 = parseScoreWithJustification('AI\\s+Collaboration', scoreText, true)
-    const aiCollaboration10 = aiCollaboration100.score === 0 ? parseScoreWithJustification('AI\\s+Collaboration', scoreText, false) : aiCollaboration100
-    sections.scores.aiCollaboration = aiCollaboration10.score
+    const aiCollaboration = parseScoreWithJustification('AI\\s+Collaboration', scoreText, true)
+    sections.scores.aiCollaboration = aiCollaboration.score === 0 ? parseScoreWithJustification('AI\\s+Collaboration', scoreText, false).score : aiCollaboration.score
 
-    const overall100 = parseScoreWithJustification('Overall', scoreText, true)
-    const overall10 = overall100.score === 0 ? parseScoreWithJustification('Overall', scoreText, false) : overall100
-    if (overall10.justification) sections.scoreJustifications.overall = overall10.justification
-
-    // Map legacy scores to new criteria if new ones weren't parsed
     if (sections.scores.understanding === 0 && sections.scores.correctness > 0) {
-      // Understanding can be inferred from correctness + reasoning
       sections.scores.understanding = Math.round((sections.scores.correctness + sections.scores.reasoning) / 2)
     }
     if (sections.scores.problemSolving === 0 && sections.scores.efficiency > 0) {
-      // Problem-solving can be inferred from efficiency
       sections.scores.problemSolving = sections.scores.efficiency
     }
 
-    // Calculate overall using new weighted formula
-    // Understanding (30%) + Problem-Solving (25%) + Code Quality (25%) + Communication (20%)
     const hasNewScores = sections.scores.understanding > 0 || sections.scores.problemSolving > 0 ||
                          sections.scores.codeQuality > 0 || sections.scores.communication > 0
 
@@ -198,50 +194,28 @@ function parseFeedback(feedback: string): FeedbackSection {
         sections.scores.communication * 0.20
       )
     } else {
-      // Fallback to legacy calculation
-      const calculatedOverall = Math.round(
+      sections.scores.overall = Math.round(
         (sections.scores.correctness + sections.scores.efficiency + sections.scores.codeQuality +
          sections.scores.reasoning + sections.scores.aiCollaboration) / 5
       )
-      sections.scores.overall = calculatedOverall
-    }
-
-    // Debug: log if scores are still 0 after parsing
-    if (sections.scores.understanding === 0 && sections.scores.problemSolving === 0 &&
-        sections.scores.codeQuality === 0 && sections.scores.communication === 0 &&
-        sections.scores.correctness === 0) {
-      console.warn("Failed to parse scores from feedback. Score text:", scoreText.substring(0, 200))
     }
   }
 
-  // Extract What Worked
   const whatWorkedMatch = feedback.match(/\*\*What Worked\*\*[:\s]*([\s\S]+?)(?=\n\*\*|$)/)
   if (whatWorkedMatch) {
-    sections.whatWorked = whatWorkedMatch[1]
-      .split(/\n[-•]/)
-      .map(s => s.trim())
-      .filter(s => s && s.length > 0)
+    sections.whatWorked = whatWorkedMatch[1].split(/\n[-•]/).map(s => s.trim()).filter(s => s && s.length > 0)
   }
 
-  // Extract Fix Next
   const fixNextMatch = feedback.match(/\*\*Fix Next\*\*[:\s]*([\s\S]+?)(?=\n\*\*|$)/)
   if (fixNextMatch) {
-    sections.fixNext = fixNextMatch[1]
-      .split(/\n[-•]/)
-      .map(s => s.trim())
-      .filter(s => s && s.length > 0)
+    sections.fixNext = fixNextMatch[1].split(/\n[-•]/).map(s => s.trim()).filter(s => s && s.length > 0)
   }
 
-  // Extract Action Plan
   const actionPlanMatch = feedback.match(/\*\*Action Plan\*\*[:\s]*([\s\S]+?)(?=\n\*\*|$)/)
   if (actionPlanMatch) {
-    sections.actionPlan = actionPlanMatch[1]
-      .split(/\n\d+\./)
-      .map(s => s.trim())
-      .filter(s => s && s.length > 0)
+    sections.actionPlan = actionPlanMatch[1].split(/\n\d+\./).map(s => s.trim()).filter(s => s && s.length > 0)
   }
 
-  // Extract AI Watchlist
   const aiWatchlistMatch = feedback.match(/\*\*AI & Communication Watchlist\*\*[:\s]*([\s\S]+?)(?=\n\*\*|$)/)
   if (aiWatchlistMatch) sections.aiWatchlist = aiWatchlistMatch[1].trim()
 
@@ -267,86 +241,36 @@ export default function PracticeFeedback({
   onNewProblem,
   onExport,
 }: PracticeFeedbackProps) {
+  const [showCode, setShowCode] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
+  const [showRecommendations, setShowRecommendations] = useState(false)
+
   const sections = parseFeedback(feedback)
 
-  // Parse feedback for edge cases and alternative solutions
   const feedbackLower = feedback.toLowerCase()
-  const hasEdgeCases = feedbackLower.includes('edge case') || feedbackLower.includes('edge cases') || 
-                       feedbackLower.includes('corner case') || feedbackLower.includes('boundary')
-  const hasAlternatives = feedbackLower.includes('alternative') || feedbackLower.includes('alternate solution') ||
-                          feedbackLower.includes('another approach') || feedbackLower.includes('different method')
-
-  // Format time
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    if (minutes > 0) {
-      return `${minutes} minute${minutes !== 1 ? 's' : ''}`
-    }
-    return `${secs} second${secs !== 1 ? 's' : ''}`
-  }
-
-  // Check complexity accuracy (if efficiency score is high, complexity is accurate)
+  const hasEdgeCases = feedbackLower.includes('edge case') || feedbackLower.includes('corner case')
+  const hasAlternatives = feedbackLower.includes('alternative') || feedbackLower.includes('another approach')
   const complexityAccurate = (efficiencyScore || 0) >= 70
 
-  // Fallback: If scores weren't parsed, infer from feedback content and test results
-  const hasParsedNewScores = sections.scores.understanding > 0 || sections.scores.problemSolving > 0 ||
-                              sections.scores.codeQuality > 0 || sections.scores.communication > 0
-  const hasParsedLegacyScores = sections.scores.correctness > 0 || sections.scores.efficiency > 0 ||
-                                 sections.scores.reasoning > 0
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60)
+    return minutes > 0 ? `${minutes}m` : `${seconds}s`
+  }
 
-  if (!hasParsedNewScores && !hasParsedLegacyScores && performanceScore > 0) {
-    // Use overall score as starting point - normalize to 0-100 scale
-    const rawBaseScore = sections.scores.overall || performanceScore
-    const baseScore = rawBaseScore <= 10 ? rawBaseScore * 10 : rawBaseScore
+  // Fallback score inference
+  const hasParsedScores = sections.scores.understanding > 0 || sections.scores.problemSolving > 0 ||
+                          sections.scores.codeQuality > 0 || sections.scores.communication > 0
 
-    // Infer scores based on test results and feedback content
+  if (!hasParsedScores && performanceScore > 0) {
+    const baseScore = performanceScore <= 10 ? performanceScore * 10 : performanceScore
     const testPassRate = testsTotal > 0 ? testsPassed / testsTotal : 1
-    const feedbackLower = feedback.toLowerCase()
+    const hasCommunicationIssues = feedbackLower.includes('explain') || feedbackLower.includes('thought process')
 
-    // Check for communication/explanation issues
-    const hasCommunicationIssues = feedbackLower.includes('walk through') || feedbackLower.includes('narrate') ||
-                                    feedbackLower.includes('explain') || feedbackLower.includes('thought process') ||
-                                    feedbackLower.includes('verbalize') || feedbackLower.includes('proactive')
-
-    // Check for understanding issues
-    const hasUnderstandingIssues = feedbackLower.includes('understand') || feedbackLower.includes('clarify') ||
-                                    feedbackLower.includes('approach') || feedbackLower.includes('reasoning')
-
-    // Did user communicate during the session? Look for positive signals
-    const didCommunicate = feedbackLower.includes('explained') || feedbackLower.includes('discussed') ||
-                           feedbackLower.includes('asked') || feedbackLower.includes('clear explanation') ||
-                           feedbackLower.includes('walked through')
-
-    // NEW GRADING CRITERIA scores
-    // Understanding (30%) - Based on test pass rate and explanation quality
-    sections.scores.understanding = Math.round(baseScore * testPassRate * (hasUnderstandingIssues ? 0.7 : 1))
-
-    // Problem-Solving (25%) - Based on efficiency and debugging
+    sections.scores.understanding = Math.round(baseScore * testPassRate * 0.9)
     sections.scores.problemSolving = Math.round(baseScore * (testPassRate > 0.8 ? 1 : 0.8))
-
-    // Code Quality (25%) - Based on test pass rate
     sections.scores.codeQuality = Math.round(baseScore * testPassRate)
+    sections.scores.communication = Math.round(baseScore * (hasCommunicationIssues ? 0.5 : 0.7))
 
-    // Communication (20%) - Based on whether user communicated
-    if (didCommunicate) {
-      sections.scores.communication = Math.round(baseScore * (hasCommunicationIssues ? 0.7 : 1))
-    } else if (hasCommunicationIssues) {
-      // User didn't communicate much, and feedback mentions it
-      sections.scores.communication = Math.round(baseScore * 0.3)
-    } else {
-      // Default to moderate score if no clear signals
-      sections.scores.communication = Math.round(baseScore * 0.6)
-    }
-
-    // Ensure scores are within valid range
-    const maxScore = 100
-    sections.scores.understanding = Math.min(Math.max(sections.scores.understanding, 0), maxScore)
-    sections.scores.problemSolving = Math.min(Math.max(sections.scores.problemSolving, 0), maxScore)
-    sections.scores.codeQuality = Math.min(Math.max(sections.scores.codeQuality, 0), maxScore)
-    sections.scores.communication = Math.min(Math.max(sections.scores.communication, 0), maxScore)
-
-    // Recalculate overall with new weights
     sections.scores.overall = Math.round(
       sections.scores.understanding * 0.30 +
       sections.scores.problemSolving * 0.25 +
@@ -355,536 +279,333 @@ export default function PracticeFeedback({
     )
   }
 
-  // Convert scores from 0-10 to 0-100 if needed (for backward compatibility)
-  const normalizeScore = (score: number) => {
-    return score <= 10 ? score * 10 : score
+  const normalizeScore = (score: number) => score <= 10 ? score * 10 : score
+
+  const scores = {
+    understanding: normalizeScore(sections.scores.understanding || 0),
+    problemSolving: normalizeScore(sections.scores.problemSolving || 0),
+    codeQuality: normalizeScore(sections.scores.codeQuality || 0),
+    communication: normalizeScore(sections.scores.communication || 0),
   }
 
-  // New grading criteria scores (aligned with real AI-assisted interviews)
-  const normalizedScores = {
-    // Primary criteria (what we display)
-    understanding: normalizeScore(sections.scores.understanding || 0),    // 30%
-    problemSolving: normalizeScore(sections.scores.problemSolving || 0),  // 25%
-    codeQuality: normalizeScore(sections.scores.codeQuality || 0),        // 25%
-    communication: normalizeScore(sections.scores.communication || 0),    // 20%
-    // Legacy (for backward compatibility)
-    correctness: normalizeScore(sections.scores.correctness || 0),
-    efficiency: normalizeScore(sections.scores.efficiency || 0),
-    reasoning: normalizeScore(sections.scores.reasoning || 0),
-    aiCollaboration: normalizeScore(sections.scores.aiCollaboration || 0),
-  }
+  const overallScore = sections.scores.overall > 0 ? normalizeScore(sections.scores.overall) : normalizeScore(performanceScore)
 
-  const normalizedPerformanceScore = normalizeScore(performanceScore)
-
-  // Use consistent platform colors - accent cyan for all score indicators
-  // Opacity/intensity varies based on score level for visual hierarchy
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return "#00d9ff" // cyan accent - excellent
-    if (score >= 60) return "#00d9ff" // cyan accent - good
-    return "#94a3b8" // slate gray - needs improvement
-  }
-
-  const getScoreBgColor = (score: number) => {
-    if (score >= 80) return "bg-[#00d9ff]"
-    if (score >= 60) return "bg-[#00d9ff]/70"
-    return "bg-gray-500"
-  }
-
-  // Calculate letter grade from score
   const getLetterGrade = (score: number) => {
-    if (score >= 95) return "A+"
-    if (score >= 90) return "A"
-    if (score >= 85) return "A-"
-    if (score >= 80) return "B+"
-    if (score >= 75) return "B"
-    if (score >= 70) return "B-"
-    if (score >= 65) return "C+"
-    if (score >= 60) return "C"
-    if (score >= 55) return "C-"
-    if (score >= 50) return "D"
-    return "F"
+    if (score >= 95) return { grade: "A+", color: "text-emerald-400" }
+    if (score >= 90) return { grade: "A", color: "text-emerald-400" }
+    if (score >= 85) return { grade: "A-", color: "text-emerald-400" }
+    if (score >= 80) return { grade: "B+", color: "text-[#00d9ff]" }
+    if (score >= 75) return { grade: "B", color: "text-[#00d9ff]" }
+    if (score >= 70) return { grade: "B-", color: "text-[#00d9ff]" }
+    if (score >= 65) return { grade: "C+", color: "text-yellow-400" }
+    if (score >= 60) return { grade: "C", color: "text-yellow-400" }
+    if (score >= 55) return { grade: "C-", color: "text-yellow-400" }
+    if (score >= 50) return { grade: "D", color: "text-orange-400" }
+    return { grade: "F", color: "text-red-400" }
   }
 
-  const overallScore = sections.scores.overall > 0 ? normalizeScore(sections.scores.overall) : normalizedPerformanceScore
-  const letterGrade = getLetterGrade(overallScore)
+  const { grade, color } = getLetterGrade(overallScore)
 
   const generatePDF = async () => {
     const { default: jsPDF } = await import("jspdf")
     const doc = new jsPDF()
-    const pageWidth = doc.internal.pageSize.getWidth()
     const margin = 20
-    let yPosition = 20
+    let y = 20
 
-    // Title
-    doc.setFontSize(24)
+    doc.setFontSize(20)
     doc.setFont("helvetica", "bold")
-    doc.text("Skillon - Interview Feedback Report", margin, yPosition)
-    yPosition += 15
+    doc.text("Skillon - Interview Feedback", margin, y)
+    y += 12
 
-    // Date
     doc.setFontSize(10)
     doc.setFont("helvetica", "normal")
-    doc.text(`Generated: ${new Date().toLocaleString()}`, margin, yPosition)
-    yPosition += 15
+    doc.text(`${problemTitle || "Interview Session"} | ${new Date().toLocaleDateString()}`, margin, y)
+    y += 15
 
-    // Overall Score - Large and Prominent
-    doc.setFontSize(18)
-    doc.setFont("helvetica", "bold")
-    doc.text("Overall Score", margin, yPosition)
-    yPosition += 10
-    doc.setFontSize(32)
-    const overallScore = sections.scores.overall > 0 ? normalizeScore(sections.scores.overall) : normalizedPerformanceScore
-    doc.text(`${overallScore}/100`, margin, yPosition)
-    yPosition += 15
-
-    // Category Scores
     doc.setFontSize(16)
     doc.setFont("helvetica", "bold")
-    doc.text("Category Breakdown", margin, yPosition)
-    yPosition += 10
+    doc.text(`Grade: ${grade} (${overallScore}/100)`, margin, y)
+    y += 12
 
-    const categories = [
-      { name: "Correctness", score: normalizedScores.correctness },
-      { name: "Efficiency", score: normalizedScores.efficiency },
-      { name: "Code Quality", score: normalizedScores.codeQuality },
-      { name: "Reasoning & Explanation", score: normalizedScores.reasoning },
-      { name: "AI Collaboration", score: normalizedScores.aiCollaboration },
+    doc.setFontSize(11)
+    doc.setFont("helvetica", "normal")
+    const criteria = [
+      { name: "Understanding", score: scores.understanding, weight: "30%" },
+      { name: "Problem-Solving", score: scores.problemSolving, weight: "25%" },
+      { name: "Code Quality", score: scores.codeQuality, weight: "25%" },
+      { name: "Communication", score: scores.communication, weight: "20%" },
     ]
-
-    doc.setFontSize(11)
-    doc.setFont("helvetica", "normal")
-    categories.forEach(cat => {
-      doc.text(`${cat.name}: ${cat.score}/100`, margin + 5, yPosition)
-      yPosition += 7
+    criteria.forEach(c => {
+      doc.text(`${c.name} (${c.weight}): ${c.score}%`, margin + 5, y)
+      y += 6
     })
-    yPosition += 8
+    y += 8
 
-    // Performance Metrics
-    doc.setFontSize(16)
-    doc.setFont("helvetica", "bold")
-    doc.text("Performance Metrics", margin, yPosition)
-    yPosition += 10
-    doc.setFontSize(11)
-    doc.setFont("helvetica", "normal")
-    doc.text(`Time Taken: ${formatTime(elapsedTime)}`, margin + 5, yPosition)
-    yPosition += 7
-    doc.text(`Complexity Accuracy: ${complexityAccurate ? 'Yes' : 'No'}`, margin + 5, yPosition)
-    yPosition += 7
-    doc.text(`Edge Cases Discussed: ${hasEdgeCases ? 'Yes' : 'No'}`, margin + 5, yPosition)
-    yPosition += 7
-    doc.text(`Alternative Solutions: ${hasAlternatives ? 'Yes' : 'No'}`, margin + 5, yPosition)
-    yPosition += 12
-
-    // What to Improve Section
     if (sections.fixNext.length > 0) {
-      doc.setFontSize(16)
+      doc.setFontSize(14)
       doc.setFont("helvetica", "bold")
-      doc.text("What to Improve", margin, yPosition)
-      yPosition += 10
+      doc.text("Areas to Improve", margin, y)
+      y += 8
       doc.setFontSize(10)
       doc.setFont("helvetica", "normal")
-
-      sections.fixNext.forEach((item, index) => {
-        if (yPosition > 270) {
-          doc.addPage()
-          yPosition = 20
-        }
-        const lines = doc.splitTextToSize(`${index + 1}. ${item}`, pageWidth - 2 * margin - 10)
-        doc.text(lines, margin + 5, yPosition)
-        yPosition += lines.length * 5 + 3
-      })
-      yPosition += 8
-    }
-
-    // Action Plan
-    if (sections.actionPlan.length > 0) {
-      if (yPosition > 250) {
-        doc.addPage()
-        yPosition = 20
-      }
-      doc.setFontSize(16)
-      doc.setFont("helvetica", "bold")
-      doc.text("Action Plan", margin, yPosition)
-      yPosition += 10
-      doc.setFontSize(10)
-      doc.setFont("helvetica", "normal")
-
-      sections.actionPlan.forEach((item, index) => {
-        if (yPosition > 270) {
-          doc.addPage()
-          yPosition = 20
-        }
-        const lines = doc.splitTextToSize(`${index + 1}. ${item}`, pageWidth - 2 * margin - 10)
-        doc.text(lines, margin + 5, yPosition)
-        yPosition += lines.length * 5 + 3
+      sections.fixNext.slice(0, 3).forEach((item, i) => {
+        const lines = doc.splitTextToSize(`${i + 1}. ${item}`, 170)
+        doc.text(lines, margin + 5, y)
+        y += lines.length * 5 + 2
       })
     }
 
-    // Save PDF
     doc.save(`skillon-feedback-${Date.now()}.pdf`)
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto">
-      {/* Screen reader announcement */}
+    <div className="w-full max-w-4xl mx-auto space-y-4">
+      {/* Screen reader */}
       <div role="status" aria-live="polite" className="sr-only">
-        Interview feedback loaded. Overall grade: {letterGrade}. Score: {overallScore} out of 100.
+        Interview feedback loaded. Grade: {grade}. Score: {overallScore}/100.
       </div>
 
-      {/* Header Section */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <div className="flex items-center space-x-4 mb-2">
-              <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30">
-                {difficulty || "Medium"}
-              </Badge>
-              <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30">Completed</Badge>
+      {/* Hero Section - Grade + Quick Actions */}
+      <div className="bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 rounded-2xl border border-gray-800 overflow-hidden">
+        <div className="p-6">
+          {/* Header row */}
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30 text-xs">
+                  {difficulty || "Medium"}
+                </Badge>
+                <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
+                  Completed
+                </Badge>
+              </div>
+              <h1 className="text-xl font-bold text-white truncate">
+                {problemTitle || problemType || "Interview Session"}
+              </h1>
             </div>
-            <h1 className="text-3xl font-heading font-bold text-white">
-              {problemTitle || problemType || "Interview Session"}
-            </h1>
-            <p className="text-gray-300 mt-2">
-              {sections.tldr || `${problemType || "Technical"} problem - ${difficulty || "Medium"} difficulty`}
-            </p>
+
+            {/* Grade circle */}
+            <div className="flex flex-col items-center">
+              <div className={cn(
+                "w-16 h-16 rounded-full flex items-center justify-center border-4",
+                overallScore >= 80 ? "border-emerald-500/50 bg-emerald-500/10" :
+                overallScore >= 60 ? "border-[#00d9ff]/50 bg-[#00d9ff]/10" :
+                "border-yellow-500/50 bg-yellow-500/10"
+              )}>
+                <span className={cn("text-2xl font-bold", color)}>{grade}</span>
+              </div>
+              <span className="text-xs text-gray-500 mt-1">{overallScore}%</span>
+            </div>
           </div>
-          <div className="text-right">
-            <div className="text-4xl font-bold text-[#00d9ff] mb-1">{letterGrade}</div>
-            <div className="text-gray-400">Overall Grade</div>
+
+          {/* TL;DR */}
+          <p className="text-gray-400 text-sm leading-relaxed mb-4">
+            {sections.tldr || `Completed ${testsPassed}/${testsTotal} tests in ${formatTime(elapsedTime)}.`}
+          </p>
+
+          {/* Quick stats row */}
+          <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
+            <span className="flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5" />
+              {formatTime(elapsedTime)}
+            </span>
+            <span className="flex items-center gap-1.5">
+              {complexityAccurate ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
+              Complexity
+            </span>
+            <span className="flex items-center gap-1.5">
+              {hasEdgeCases ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
+              Edge Cases
+            </span>
+            <span className="flex items-center gap-1.5">
+              {hasAlternatives ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
+              Alternatives
+            </span>
           </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex border-t border-gray-800">
+          <button
+            onClick={onRetry}
+            className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800/50 transition-colors border-r border-gray-800"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Retry
+          </button>
+          <button
+            onClick={onNewProblem}
+            className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-[#00d9ff] hover:bg-[#00d9ff]/10 transition-colors border-r border-gray-800"
+          >
+            <Play className="h-4 w-4" />
+            New Problem
+          </button>
+          <button
+            onClick={onExport || generatePDF}
+            className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800/50 transition-colors"
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </button>
         </div>
       </div>
 
-      {/* How You Were Graded - Radial visualization */}
-      <div className="mb-8 p-6 bg-gray-900/30 rounded-2xl border border-gray-800/50">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-medium text-white mb-1">How You Were Evaluated</h2>
-            <p className="text-sm text-gray-500">Real interview criteria · AI usage is optional</p>
-          </div>
-          <GradingCriteriaRadial />
-        </div>
-      </div>
-
-      {/* Performance Overview Card */}
-      <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-8">
-        <CardHeader>
-          <CardTitle className="text-white text-2xl">Performance Overview</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
-              <div>
-                <div className="text-gray-400 text-sm">Time Taken</div>
-                <div className="text-white text-xl font-semibold">{formatTime(elapsedTime)}</div>
-              </div>
-              <Clock className="h-8 w-8 text-[#00d9ff]" />
-            </div>
-
-            <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
-              <div>
-                <div className="text-gray-400 text-sm">Complexity Accuracy</div>
-                <div className="text-white text-xl font-semibold">{complexityAccurate ? "Good" : "Needs Work"}</div>
-              </div>
-              {complexityAccurate ? (
-                <CheckCircle className="h-8 w-8 text-[#00d9ff]" />
-              ) : (
-                <AlertTriangle className="h-8 w-8 text-gray-400" />
-              )}
-            </div>
-
-            <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
-              <div>
-                <div className="text-gray-400 text-sm">Edge Cases Discussed</div>
-                <div className="text-white text-xl font-semibold">{hasEdgeCases ? "Yes" : "No"}</div>
-              </div>
-              {hasEdgeCases ? (
-                <CheckCircle className="h-8 w-8 text-[#00d9ff]" />
-              ) : (
-                <AlertTriangle className="h-8 w-8 text-gray-400" />
-              )}
-            </div>
-
-            <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
-              <div>
-                <div className="text-gray-400 text-sm">Alternative Solutions</div>
-                <div className="text-white text-xl font-semibold">{hasAlternatives ? "Discussed" : "Not Discussed"}</div>
-              </div>
-              {hasAlternatives ? (
-                <CheckCircle className="h-8 w-8 text-[#00d9ff]" />
-              ) : (
-                <AlertTriangle className="h-8 w-8 text-gray-400" />
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Two Column Layout: Code + AI Feedback */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        {/* Code Solution */}
-        {code && (
-          <Card className="bg-gray-900/50 border-gray-700 glass-effect">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center space-x-2">
-                <Code className="h-5 w-5 text-[#00d9ff]" />
-                <span>Your Solution</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-black rounded-lg p-4 max-h-[300px] overflow-auto">
-                <pre className="text-sm text-white font-mono leading-relaxed">
-                  <code>{code}</code>
-                </pre>
-              </div>
-              <div className="mt-4 space-y-2">
-                {sections.whatWorked.slice(0, 3).map((item, index) => (
-                  <div key={index} className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-[#00d9ff]" />
-                    <span className="text-[#00d9ff] text-sm">{item}</span>
-                  </div>
-                ))}
-                {sections.fixNext.slice(0, 1).map((item, index) => (
-                  <div key={index} className="flex items-center space-x-2">
-                    <AlertTriangle className="h-4 w-4 text-gray-400" />
-                    <span className="text-gray-400 text-sm">{item.split('.')[0]}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* AI Feedback */}
-        <Card className="bg-gray-900/50 border-gray-700 glass-effect">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center space-x-2">
-              <MessageSquare className="h-5 w-5 text-[#00d9ff]" />
-              <span>AI Feedback</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Quick Summary - always show */}
-            <div className="bg-[#00d9ff]/5 border border-[#00d9ff]/10 rounded-lg p-4">
-              <p className="text-gray-300 text-sm">
-                {sections.tldr || (testsPassed === testsTotal && testsTotal > 0
-                  ? "Your solution passed all tests. Focus on explaining your approach more during the interview."
-                  : testsPassed > 0
-                  ? `Your solution passed ${testsPassed}/${testsTotal} tests. Review the failing cases and edge conditions.`
-                  : "Focus on getting a working solution first, then optimize.")}
-              </p>
-            </div>
-
-            {/* Strengths */}
-            {sections.whatWorked.length > 0 ? (
-              <div className="bg-[#00d9ff]/10 border border-[#00d9ff]/20 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-2">
-                  <TrendingUp className="h-4 w-4 text-[#00d9ff]" />
-                  <span className="text-[#00d9ff] font-semibold">Strengths</span>
-                </div>
-                <ul className="text-gray-300 text-sm space-y-1">
-                  {sections.whatWorked.map((item, index) => (
-                    <li key={index}>• {item}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : testsPassed > 0 && (
-              <div className="bg-[#00d9ff]/10 border border-[#00d9ff]/20 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-2">
-                  <TrendingUp className="h-4 w-4 text-[#00d9ff]" />
-                  <span className="text-[#00d9ff] font-semibold">Strengths</span>
-                </div>
-                <ul className="text-gray-300 text-sm space-y-1">
-                  <li>• Passed {testsPassed}/{testsTotal} test cases</li>
-                  {testsPassed === testsTotal && <li>• Solution handles all given test cases correctly</li>}
-                </ul>
-              </div>
-            )}
-
-            {/* Areas for Improvement */}
-            {sections.fixNext.length > 0 ? (
-              <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-2">
-                  <Target className="h-4 w-4 text-gray-400" />
-                  <span className="text-gray-400 font-semibold">Areas for Improvement</span>
-                </div>
-                <ul className="text-gray-300 text-sm space-y-1">
-                  {sections.fixNext.map((item, index) => (
-                    <li key={index}>• {item}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-2">
-                  <Target className="h-4 w-4 text-gray-400" />
-                  <span className="text-gray-400 font-semibold">Areas for Improvement</span>
-                </div>
-                <ul className="text-gray-300 text-sm space-y-1">
-                  <li>• Practice explaining your thought process out loud</li>
-                  <li>• Discuss time/space complexity before coding</li>
-                </ul>
-              </div>
-            )}
-
-            {/* Next Steps */}
-            {sections.actionPlan.length > 0 && (
-              <div className="bg-[#00d9ff]/5 border border-[#00d9ff]/10 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-2">
-                  <Lightbulb className="h-4 w-4 text-[#00d9ff]" />
-                  <span className="text-[#00d9ff] font-semibold">Next Steps</span>
-                </div>
-                <ol className="text-gray-300 text-sm space-y-1 list-decimal list-inside">
-                  {sections.actionPlan.map((item, index) => (
-                    <li key={index}>{item}</li>
-                  ))}
-                </ol>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Detailed Performance Metrics - New Grading Criteria */}
-      <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-8">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center space-x-2">
-            <BarChart3 className="h-5 w-5 text-[#00d9ff]" />
-            <span>Detailed Performance Metrics</span>
-          </CardTitle>
-          <p className="text-xs text-gray-500 mt-1">Graded like real Meta/Google AI-assisted interviews</p>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Understanding - 30% weight */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-300">Understanding</span>
-                  <span className="text-[10px] text-gray-500 px-1.5 py-0.5 bg-gray-800 rounded">30%</span>
-                </div>
-                <span className="text-[#00d9ff] font-semibold">{normalizedScores.understanding}%</span>
-              </div>
-              <Progress value={normalizedScores.understanding} className="h-2 bg-gray-800" />
-              <p className="text-[10px] text-gray-500 mt-1">Can you explain your approach?</p>
-            </div>
-
-            {/* Problem-Solving - 25% weight */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-300">Problem-Solving</span>
-                  <span className="text-[10px] text-gray-500 px-1.5 py-0.5 bg-gray-800 rounded">25%</span>
-                </div>
-                <span className="text-[#00d9ff] font-semibold">{normalizedScores.problemSolving}%</span>
-              </div>
-              <Progress value={normalizedScores.problemSolving} className="h-2 bg-gray-800" />
-              <p className="text-[10px] text-gray-500 mt-1">Debug & optimize effectively</p>
-            </div>
-
-            {/* Code Quality - 25% weight */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-300">Code Quality</span>
-                  <span className="text-[10px] text-gray-500 px-1.5 py-0.5 bg-gray-800 rounded">25%</span>
-                </div>
-                <span className="text-[#00d9ff] font-semibold">{normalizedScores.codeQuality}%</span>
-              </div>
-              <Progress value={normalizedScores.codeQuality} className="h-2 bg-gray-800" />
-              <p className="text-[10px] text-gray-500 mt-1">Clean, efficient, readable</p>
-            </div>
-
-            {/* Communication - 20% weight */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-300">Communication</span>
-                  <span className="text-[10px] text-gray-500 px-1.5 py-0.5 bg-gray-800 rounded">20%</span>
-                </div>
-                <span className="text-[#00d9ff] font-semibold">{normalizedScores.communication}%</span>
-              </div>
-              <Progress value={normalizedScores.communication} className="h-2 bg-gray-800" />
-              <p className="text-[10px] text-gray-500 mt-1">Think out loud, explain decisions</p>
-            </div>
-          </div>
-
-          {/* Overall Score - Full Width */}
-          <div className="mt-8 pt-6 border-t border-gray-800">
+      {/* Scores Grid - Compact 2x2 */}
+      <div className="grid grid-cols-2 gap-3">
+        {[
+          { name: "Understanding", score: scores.understanding, weight: "30%", icon: Lightbulb, color: "#00d9ff" },
+          { name: "Problem-Solving", score: scores.problemSolving, weight: "25%", icon: Zap, color: "#00ff88" },
+          { name: "Code Quality", score: scores.codeQuality, weight: "25%", icon: Code, color: "#a78bfa" },
+          { name: "Communication", score: scores.communication, weight: "20%", icon: MessageSquare, color: "#fbbf24" },
+        ].map((item) => (
+          <div key={item.name} className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-white font-medium">Overall Score</span>
-              <span className="text-[#00d9ff] font-bold text-xl">{overallScore}%</span>
+              <div className="flex items-center gap-2">
+                <item.icon className="h-4 w-4" style={{ color: item.color }} />
+                <span className="text-sm text-gray-300">{item.name}</span>
+              </div>
+              <span className="text-xs text-gray-600">{item.weight}</span>
             </div>
-            <Progress value={overallScore} className="h-3 bg-gray-800" />
-            <p className="text-[10px] text-gray-500 mt-2 text-center">
-              AI usage is optional and not penalized · What matters is understanding
-            </p>
+            <div className="flex items-end justify-between">
+              <span className="text-2xl font-bold text-white">{item.score}%</span>
+              <div className="flex-1 ml-3">
+                <Progress value={item.score} className="h-1.5 bg-gray-800" />
+              </div>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        ))}
+      </div>
 
-      {/* Learning Recommendations */}
+      {/* Feedback Sections - Two columns on desktop */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* What Worked */}
+        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="h-4 w-4 text-emerald-400" />
+            <span className="text-sm font-medium text-emerald-400">What Worked</span>
+          </div>
+          <ul className="space-y-2">
+            {(sections.whatWorked.length > 0 ? sections.whatWorked : [`Passed ${testsPassed}/${testsTotal} tests`]).slice(0, 3).map((item, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
+                <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                <span className="line-clamp-2">{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Areas to Improve */}
+        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Target className="h-4 w-4 text-yellow-400" />
+            <span className="text-sm font-medium text-yellow-400">To Improve</span>
+          </div>
+          <ul className="space-y-2">
+            {(sections.fixNext.length > 0 ? sections.fixNext : ["Practice explaining your thought process", "Discuss complexity before coding"]).slice(0, 3).map((item, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
+                <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
+                <span className="line-clamp-2">{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      {/* Collapsible: Code Solution */}
+      {code && (
+        <Collapsible open={showCode} onOpenChange={setShowCode}>
+          <CollapsibleTrigger asChild>
+            <button className="w-full flex items-center justify-between p-4 bg-gray-900/50 border border-gray-800 rounded-xl hover:bg-gray-800/50 transition-colors">
+              <div className="flex items-center gap-2">
+                <Code className="h-4 w-4 text-[#00d9ff]" />
+                <span className="text-sm font-medium text-white">Your Solution</span>
+              </div>
+              {showCode ? <ChevronUp className="h-4 w-4 text-gray-500" /> : <ChevronDown className="h-4 w-4 text-gray-500" />}
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="mt-2 bg-black/50 border border-gray-800 rounded-xl p-4 max-h-[300px] overflow-auto">
+              <pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap">
+                <code>{code}</code>
+              </pre>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
+      {/* Collapsible: Action Plan */}
+      {sections.actionPlan.length > 0 && (
+        <Collapsible open={showDetails} onOpenChange={setShowDetails}>
+          <CollapsibleTrigger asChild>
+            <button className="w-full flex items-center justify-between p-4 bg-gray-900/50 border border-gray-800 rounded-xl hover:bg-gray-800/50 transition-colors">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-[#00d9ff]" />
+                <span className="text-sm font-medium text-white">Action Plan</span>
+                <span className="text-xs text-gray-600">({sections.actionPlan.length} steps)</span>
+              </div>
+              {showDetails ? <ChevronUp className="h-4 w-4 text-gray-500" /> : <ChevronDown className="h-4 w-4 text-gray-500" />}
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="mt-2 bg-gray-900/30 border border-gray-800 rounded-xl p-4">
+              <ol className="space-y-3">
+                {sections.actionPlan.map((item, i) => (
+                  <li key={i} className="flex items-start gap-3 text-sm text-gray-300">
+                    <span className="w-6 h-6 bg-[#00d9ff]/20 text-[#00d9ff] rounded-full flex items-center justify-center text-xs font-bold shrink-0">
+                      {i + 1}
+                    </span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
+      {/* Collapsible: Learning Recommendations */}
       {userId && (
-        <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-8">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center space-x-2">
-              <Sparkles className="h-5 w-5 text-[#00d9ff]" />
-              <span>Personalized Learning Path</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <LearningRecommendations
-              userId={userId}
-              currentProblemType={problemType}
-              currentDifficulty={difficulty}
-              performanceScore={overallScore}
-              onSelectProblem={(type, diff) => onNewProblem?.()}
-            />
-          </CardContent>
-        </Card>
+        <Collapsible open={showRecommendations} onOpenChange={setShowRecommendations}>
+          <CollapsibleTrigger asChild>
+            <button className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-[#00d9ff]/10 to-transparent border border-[#00d9ff]/20 rounded-xl hover:bg-[#00d9ff]/5 transition-colors">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-[#00d9ff]" />
+                <span className="text-sm font-medium text-white">Learning Recommendations</span>
+              </div>
+              {showRecommendations ? <ChevronUp className="h-4 w-4 text-gray-500" /> : <ChevronDown className="h-4 w-4 text-gray-500" />}
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="mt-2 space-y-4">
+              <Card className="bg-gray-900/30 border-gray-800">
+                <CardContent className="p-4">
+                  <LearningRecommendations
+                    userId={userId}
+                    currentProblemType={problemType}
+                    currentDifficulty={difficulty}
+                    performanceScore={overallScore}
+                    onSelectProblem={() => onNewProblem?.()}
+                  />
+                </CardContent>
+              </Card>
+
+              {problemTitle && (
+                <NextProblemRecommendations
+                  userId={userId}
+                  currentProblemText={`${problemTitle}: ${feedback.substring(0, 200)}`}
+                  currentProblemId={problemTitle}
+                  onSelectProblem={() => onNewProblem?.()}
+                />
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       )}
 
-      {/* RAG-Powered Next Problem Recommendations */}
-      {userId && problemTitle && (
-        <NextProblemRecommendations
-          userId={userId}
-          currentProblemText={problemTitle ? `${problemTitle}: ${feedback.substring(0, 200)}` : feedback.substring(0, 200)}
-          currentProblemId={problemTitle}
-          onSelectProblem={() => onNewProblem?.()}
-        />
-      )}
-
-      {/* Actions */}
-      <Card className="bg-gray-900/50 border-gray-700 glass-effect">
-        <CardHeader>
-          <CardTitle className="text-white">Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button
-              onClick={onExport || generatePDF}
-              className="bg-gray-700 hover:bg-gray-600 text-white flex-1"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Export Report (PDF)
-            </Button>
-            <Button
-              onClick={onRetry}
-              className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black flex-1"
-            >
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Retry Session
-            </Button>
-            <Button
-              onClick={onNewProblem}
-              className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black flex-1"
-            >
-              <Play className="mr-2 h-4 w-4" />
-              New Problem
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Footer note */}
+      <p className="text-center text-xs text-gray-600">
+        Graded like real Meta/Google interviews · AI usage optional
+      </p>
     </div>
   )
 }
