@@ -96,22 +96,31 @@ async function sendToExternalService(
     // Sentry integration (if configured)
     if (process.env.SENTRY_DSN && level === 'error') {
       // Dynamic import to avoid bundling if not used
-      const Sentry = await import('@sentry/nextjs').catch(() => null)
-      if (Sentry) {
-        if (context?.error instanceof Error) {
-          Sentry.captureException(context.error, {
-            extra: context,
-            tags: {
-              endpoint: context.endpoint as string,
-              userId: context.userId as string,
-            },
-          })
-        } else {
-          Sentry.captureMessage(message, {
-            level: 'error',
-            extra: context,
-          })
+      // Webpack ignore comment prevents build-time resolution errors
+      try {
+        // @ts-expect-error - Optional dependency, may not be installed
+        const Sentry = await import(
+          /* webpackIgnore: true */
+          '@sentry/nextjs'
+        ).catch(() => null)
+        if (Sentry) {
+          if (context?.error instanceof Error) {
+            Sentry.captureException(context.error, {
+              extra: context,
+              tags: {
+                endpoint: context.endpoint as string,
+                userId: context.userId as string,
+              },
+            })
+          } else {
+            Sentry.captureMessage(message, {
+              level: 'error',
+              extra: context,
+            })
+          }
         }
+      } catch {
+        // Sentry not installed, silently skip
       }
     }
 
