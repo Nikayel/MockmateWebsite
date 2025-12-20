@@ -62,94 +62,103 @@ export default function AccountPage() {
       }
 
       try {
+        // Parallelize all data fetching for faster page load
+        const [userProfile, usageSnap, sessionsSnap] = await Promise.all([
+          getUserProfile(firebaseUser.uid).catch(err => {
+            console.error("Error fetching profile:", err)
+            setError("Failed to load profile data")
+            toast.error("Failed to load profile data", {
+              description: "Some features may not be available",
+            })
+            return null
+          }),
+          // Fetch usage data from Firestore
+          (async () => {
+            try {
+              const usageQuery = query(
+                collection(db, "profile_quota"),
+                where("user_id", "==", firebaseUser.uid)
+              )
+              return await getDocs(usageQuery)
+            } catch (usageError) {
+              console.error("Error fetching usage:", usageError)
+              // Usage data might not exist for new users, so don't show error
+              return null
+            }
+          })(),
+          // Fetch recent sessions (limit to 5 most recent)
+          (async () => {
+            try {
+              const sessionsQuery = query(
+                collection(db, "interview_sessions"),
+                where("user_id", "==", firebaseUser.uid)
+              )
+              return await getDocs(sessionsQuery)
+            } catch (sessionError) {
+              console.error("Error fetching sessions:", sessionError)
+              return null
+            }
+          })()
+        ])
 
-        // Fetch profile data from Firestore (use helper to ensure consistency)
-        try {
-          const userProfile = await getUserProfile(firebaseUser.uid)
-          if (userProfile) {
-            setProfile(userProfile)
+        // Set profile data
+        if (userProfile) {
+          setProfile(userProfile)
 
-            // If user has Stripe IDs, sync subscription to get latest details
-            // This ensures subscription dates, status, etc. are up to date
-            if (userProfile.stripe_customer_id || userProfile.stripe_subscription_id) {
-              try {
-                const idToken = await firebaseUser.getIdToken()
-                const syncResponse = await fetch("/api/sync-subscription", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${idToken}`
-                  },
-                  body: JSON.stringify({ userId: firebaseUser.uid }),
-                })
-
+          // If user has Stripe IDs, sync subscription to get latest details (non-blocking)
+          // This ensures subscription dates, status, etc. are up to date
+          if (userProfile.stripe_customer_id || userProfile.stripe_subscription_id) {
+            // Run sync in background, don't block page load
+            firebaseUser.getIdToken().then(idToken => {
+              fetch("/api/sync-subscription", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${idToken}`
+                },
+                body: JSON.stringify({ userId: firebaseUser.uid }),
+              }).then(syncResponse => {
                 if (syncResponse.ok) {
-                  const syncData = await syncResponse.json()
-                  if (syncData.success && syncData.profile) {
-                    // Reload profile after sync
-                    const updatedProfile = await getUserProfile(firebaseUser.uid)
+                  return syncResponse.json()
+                }
+              }).then(syncData => {
+                if (syncData?.success && syncData.profile) {
+                  // Reload profile after sync
+                  getUserProfile(firebaseUser.uid).then(updatedProfile => {
                     if (updatedProfile) {
                       setProfile(updatedProfile)
                     }
-                  }
+                  })
                 }
-              } catch (syncError) {
+              }).catch(syncError => {
                 // Don't show error for sync failures - profile data is still valid
                 console.log("Subscription sync failed (non-critical):", syncError)
-              }
-            }
-          }
-        } catch (profileError) {
-          console.error("Error fetching profile:", profileError)
-          setError("Failed to load profile data")
-          toast.error("Failed to load profile data", {
-            description: "Some features may not be available",
-          })
-        }
-
-        // Fetch usage data from Firestore
-        try {
-          const usageQuery = query(
-            collection(db, "profile_quota"),
-            where("user_id", "==", firebaseUser.uid)
-          )
-          const usageSnap = await getDocs(usageQuery)
-
-          if (!usageSnap.empty) {
-            setUsage(usageSnap.docs[0].data() as ProfileQuota)
-          }
-        } catch (usageError) {
-          console.error("Error fetching usage:", usageError)
-          // Usage data might not exist for new users, so don't show error
-        }
-
-        // Fetch recent sessions (limit to 5 most recent)
-        try {
-          const sessionsQuery = query(
-            collection(db, "interview_sessions"),
-            where("user_id", "==", firebaseUser.uid)
-          )
-          const sessionsSnap = await getDocs(sessionsQuery)
-
-          if (!sessionsSnap.empty) {
-            // Sort in memory to avoid composite index requirement
-            const sessionsData = sessionsSnap.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data()
-            } as InterviewSession))
-
-            // Sort by started_at descending and take first 5
-            sessionsData.sort((a, b) => {
-              const dateA = new Date(a.started_at).getTime()
-              const dateB = new Date(b.started_at).getTime()
-              return dateB - dateA
+              })
             })
-
-            setSessions(sessionsData.slice(0, 5))
           }
-        } catch (sessionError) {
-          console.error("Error fetching sessions:", sessionError)
-          // Don't show error to user, just log it
+        }
+
+        // Set usage data
+        if (usageSnap && !usageSnap.empty) {
+          setUsage(usageSnap.docs[0].data() as ProfileQuota)
+        }
+
+        // Set sessions data
+        if (sessionsSnap && !sessionsSnap.empty) {
+          // Sort in memory to avoid composite index requirement
+          const sessionsData = sessionsSnap.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          } as InterviewSession))
+
+          // Sort by started_at descending and take first 5
+          sessionsData.sort((a, b) => {
+            const dateA = new Date(a.started_at).getTime()
+            const dateB = new Date(b.started_at).getTime()
+            return dateB - dateA
+          })
+
+          setSessions(sessionsData.slice(0, 5))
         }
       } catch (error) {
         console.error("Error loading user data:", error)

@@ -62,75 +62,76 @@ export default function DashboardPage() {
       }
 
       try {
-
-        // Load profile (refresh to get latest subscription status)
-        const userProfile = await getUserProfile(firebaseUser.uid)
-        if (userProfile) {
-          setProfile(userProfile)
-
-          // Auto-sync subscription if user has Stripe IDs but tier is "free"
-          // This fixes Pro users who were incorrectly reset
-          if ((userProfile.stripe_subscription_id || userProfile.stripe_customer_id) &&
-            userProfile.subscription_tier === "free") {
+        // Parallelize initial data loading for faster page load
+        const [userProfile, usageData, sessionsSnap] = await Promise.all([
+          getUserProfile(firebaseUser.uid),
+          checkUsageLimit(firebaseUser.uid),
+          // Load recent sessions in parallel
+          (async () => {
             try {
-              const token = await firebaseUser.getIdToken()
-              const syncResponse = await fetch("/api/sync-subscription", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({ userId: firebaseUser.uid }),
-              })
-
-              if (syncResponse.ok) {
-                const syncData = await syncResponse.json()
-                if (syncData.success && syncData.profile.subscription_tier === "pro") {
-                  // Reload profile and usage after sync
-                  const updatedProfile = await getUserProfile(firebaseUser.uid)
-                  if (updatedProfile) {
-                    setProfile(updatedProfile)
-                  }
-                  const updatedUsage = await checkUsageLimit(firebaseUser.uid)
-                  setUsage(updatedUsage)
-                }
-              }
+              const sessionsQuery = query(
+                collection(db, "interview_sessions"),
+                where("user_id", "==", firebaseUser.uid)
+              )
+              return await getDocs(sessionsQuery)
             } catch {
-              // Auto-sync failed (non-critical) - don't show error to user
+              return null
             }
-          }
-        }
+          })()
+        ])
 
-        // Load usage (this will use the correct subscription tier)
-        const usageData = await checkUsageLimit(firebaseUser.uid)
+        setProfile(userProfile)
         setUsage(usageData)
 
-        // Load recent sessions (limit to 5 most recent)
-        try {
-          const sessionsQuery = query(
-            collection(db, "interview_sessions"),
-            where("user_id", "==", firebaseUser.uid)
-          )
-          const sessionsSnap = await getDocs(sessionsQuery)
+        // Process sessions if loaded
+        if (sessionsSnap && !sessionsSnap.empty) {
+          const sessionsData = sessionsSnap.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          } as InterviewSession))
 
-          if (!sessionsSnap.empty) {
-            // Sort in memory to avoid composite index requirement
-            const sessionsData = sessionsSnap.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data()
-            } as InterviewSession))
+          // Sort by started_at descending and take first 5
+          sessionsData.sort((a, b) => {
+            const dateA = new Date(a.started_at).getTime()
+            const dateB = new Date(b.started_at).getTime()
+            return dateB - dateA
+          })
 
-            // Sort by started_at descending and take first 5
-            sessionsData.sort((a, b) => {
-              const dateA = new Date(a.started_at).getTime()
-              const dateB = new Date(b.started_at).getTime()
-              return dateB - dateA
+          setSessions(sessionsData.slice(0, 5))
+        }
+
+        // Auto-sync subscription if user has Stripe IDs but tier is "free"
+        // This fixes Pro users who were incorrectly reset (non-blocking)
+        if (userProfile && (userProfile.stripe_subscription_id || userProfile.stripe_customer_id) &&
+            userProfile.subscription_tier === "free") {
+          // Run sync in background, don't block page load
+          firebaseUser.getIdToken().then(token => {
+            fetch("/api/sync-subscription", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+              },
+              body: JSON.stringify({ userId: firebaseUser.uid }),
+            }).then(syncResponse => {
+              if (syncResponse.ok) {
+                return syncResponse.json()
+              }
+            }).then(syncData => {
+              if (syncData?.success && syncData.profile.subscription_tier === "pro") {
+                // Reload profile and usage after sync
+                Promise.all([
+                  getUserProfile(firebaseUser.uid),
+                  checkUsageLimit(firebaseUser.uid)
+                ]).then(([updatedProfile, updatedUsage]) => {
+                  if (updatedProfile) setProfile(updatedProfile)
+                  setUsage(updatedUsage)
+                })
+              }
+            }).catch(() => {
+              // Auto-sync failed (non-critical) - don't show error to user
             })
-
-            setSessions(sessionsData.slice(0, 5))
-          }
-        } catch {
-          // Error fetching sessions - don't show error to user
+          })
         }
       } catch {
         toast.error("Failed to load dashboard")
