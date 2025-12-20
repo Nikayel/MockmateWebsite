@@ -433,3 +433,40 @@ export async function embedAndStoreHint(
 
   return storeTextEmbedding(embedding)
 }
+
+/**
+ * Get recommended next problems based on what user just solved
+ */
+export async function getRecommendedNextProblems(
+  userId: string,
+  currentProblemText: string,
+  currentProblemId?: string
+): Promise<SimilarResult[]> {
+  const similarProblems = await getSimilarProblems(currentProblemText, {
+    limit: 10,
+    excludeProblemId: currentProblemId,
+  })
+
+  const unsolvedProblems: SimilarResult[] = []
+
+  for (const problem of similarProblems) {
+    const problemId = problem.metadata?.problemId
+    if (!problemId) continue
+
+    const userSolutions = await findSimilarTexts(
+      generateTextEmbedding(problem.text),
+      {
+        type: 'solution',
+        userId,
+        limit: 1,
+        minSimilarity: 0.3,
+      }
+    )
+
+    if (userSolutions.length === 0) {
+      unsolvedProblems.push(problem)
+    }
+  }
+
+  return unsolvedProblems.slice(0, 3)
+}
