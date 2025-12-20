@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getScenarioById } from "@/lib/scenarios"
 import { runInNewContext } from "vm"
 import { executeRateLimit } from "@/lib/rate-limit"
+import { enforceQuota } from "@/lib/quota-enforcement"
 import { spawn } from "child_process"
 import { trackCodeExecutionServer } from "@/lib/analytics-server"
 
@@ -371,6 +372,12 @@ export async function POST(request: NextRequest) {
   const rateLimitResponse = await executeRateLimit(request)
   if (rateLimitResponse) {
     return rateLimitResponse
+  }
+
+  // Enforce quota limits (session & budget)
+  const quotaResult = await enforceQuota(request)
+  if (!quotaResult.allowed && quotaResult.response) {
+    return quotaResult.response
   }
 
   const startTime = Date.now()
