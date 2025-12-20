@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, Loader2 } from 'lucide-react'
+import { ChevronLeft, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 
+import { Header } from '@/components/header'
 import { CompanySelector, InterviewDatePicker, SkillAssessment, AssessmentResult } from '@/components/roadmap'
 import { useRoadmapStore } from '@/lib/stores/roadmap-store'
 import { getCompanyById } from '@/lib/data/company-questions'
@@ -109,25 +110,15 @@ export default function NewRoadmapPage() {
 
   const companyData = selectedCompany ? getCompanyById(selectedCompany) : null
 
+  // Check for rate limit error
+  const isRateLimited = error?.toLowerCase().includes('rate') || error?.toLowerCase().includes('limit') || error?.toLowerCase().includes('too many')
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link
-            href="/roadmap"
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Back
-          </Link>
-          <h1 className="font-semibold">Create Study Roadmap</h1>
-          <div className="w-16" /> {/* Spacer for centering */}
-        </div>
-      </header>
+      <Header />
 
       {/* Progress steps */}
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-6 pt-24">
         <div className="flex items-center justify-center gap-2 mb-8">
           <StepIndicator label="Company" active={step === 'company'} completed={!!selectedCompany} />
           <StepConnector completed={!!selectedCompany} />
@@ -140,9 +131,38 @@ export default function NewRoadmapPage() {
 
         {/* Error message */}
         {error && (
-          <div className="max-w-2xl mx-auto mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {error}
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`max-w-2xl mx-auto mb-6 p-4 rounded-lg border ${
+              isRateLimited
+                ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800/30'
+                : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800/30'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <AlertCircle className={`h-5 w-5 shrink-0 mt-0.5 ${isRateLimited ? 'text-yellow-600' : 'text-red-600'}`} />
+              <div className="flex-1">
+                <p className={`font-medium ${isRateLimited ? 'text-yellow-800 dark:text-yellow-200' : 'text-red-800 dark:text-red-200'}`}>
+                  {isRateLimited ? 'Too Many Requests' : 'Error'}
+                </p>
+                <p className={`text-sm mt-1 ${isRateLimited ? 'text-yellow-700 dark:text-yellow-300' : 'text-red-700 dark:text-red-300'}`}>
+                  {isRateLimited
+                    ? 'You\'ve made too many requests. Please wait a moment and try again.'
+                    : error}
+                </p>
+                {isRateLimited && (
+                  <button
+                    onClick={() => setError(null)}
+                    className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Dismiss & Try Again
+                  </button>
+                )}
+              </div>
+            </div>
+          </motion.div>
         )}
 
         {/* Step content */}
