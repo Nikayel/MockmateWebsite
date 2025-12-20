@@ -23,11 +23,12 @@ service cloud.firestore {
 
     /**
      * Check if the user is creating their own document
+     * Note: This is a generic helper - specific collections may use different field names
      */
     function isCreatingOwnDocument(userId) {
       return isAuthenticated()
         && request.auth.uid == userId
-        && request.resource.data.userId == userId;
+        && (request.resource.data.userId == userId || request.resource.data.user_id == userId || request.resource.data.id == userId);
     }
 
     /**
@@ -53,15 +54,16 @@ service cloud.firestore {
       allow read: if isOwner(userId);
 
       // Users can create their own profile
+      // Document ID must match user ID, and id field must match document ID
       allow create: if isAuthenticated()
                     && request.auth.uid == userId
-                    && request.resource.data.userId == userId
-                    && hasRequiredFields(['userId', 'email', 'createdAt']);
+                    && request.resource.data.id == userId
+                    && hasRequiredFields(['id', 'email', 'createdAt']);
 
-      // Users can update their own profile (but not change userId)
+      // Users can update their own profile (but not change id)
       allow update: if isOwner(userId)
-                    && request.resource.data.userId == userId
-                    && resource.data.userId == userId;
+                    && request.resource.data.id == userId
+                    && resource.data.id == userId;
 
       // Users can delete their own profile
       allow delete: if isOwner(userId);
@@ -71,35 +73,34 @@ service cloud.firestore {
     // INTERVIEW SESSIONS
     // ============================================================================
 
-    match /sessions/{sessionId} {
+    match /interview_sessions/{sessionId} {
       // Users can read their own sessions
       allow read: if isAuthenticated()
                   && documentExists()
-                  && resource.data.userId == request.auth.uid;
+                  && resource.data.user_id == request.auth.uid;
 
       // Users can create their own sessions
       allow create: if isAuthenticated()
-                    && request.resource.data.userId == request.auth.uid
-                    && hasRequiredFields(['userId', 'scenarioTitle', 'startTime']);
+                    && request.resource.data.user_id == request.auth.uid;
 
       // Users can update their own sessions
       allow update: if isAuthenticated()
                     && documentExists()
-                    && resource.data.userId == request.auth.uid
-                    && request.resource.data.userId == request.auth.uid;
+                    && resource.data.user_id == request.auth.uid
+                    && request.resource.data.user_id == request.auth.uid;
 
       // Users can delete their own sessions
       allow delete: if isAuthenticated()
                     && documentExists()
-                    && resource.data.userId == request.auth.uid;
+                    && resource.data.user_id == request.auth.uid;
 
       // Performance optimization: Create index for common queries
       // Run in Firebase Console:
       // firebase firestore:indexes --project=your-project-id
       //
       // Composite indexes needed:
-      // 1. Collection: sessions, Fields: userId ASC, startTime DESC
-      // 2. Collection: sessions, Fields: userId ASC, status ASC, startTime DESC
+      // 1. Collection: interview_sessions, Fields: user_id ASC, started_at DESC
+      // 2. Collection: interview_sessions, Fields: user_id ASC, status ASC, started_at DESC
     }
 
     // ============================================================================
@@ -110,17 +111,41 @@ service cloud.firestore {
       // Users can read their own promo code usage
       allow read: if isAuthenticated()
                   && documentExists()
-                  && resource.data.userId == request.auth.uid;
+                  && resource.data.user_id == request.auth.uid;
 
       // Users can create promo code usage records
       // Document ID must be in format: {userId}_{code}
       allow create: if isAuthenticated()
-                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.user_id == request.auth.uid
                     && docId.matches(request.auth.uid + '_.*')
-                    && hasRequiredFields(['userId', 'code', 'usedAt']);
+                    && hasRequiredFields(['user_id', 'code', 'usedAt']);
 
       // Promo code usage records are immutable (no updates or deletes)
       allow update: if false;
+      allow delete: if false;
+    }
+
+    // ============================================================================
+    // PROFILE QUOTA (Usage tracking)
+    // ============================================================================
+
+    match /profile_quota/{quotaId} {
+      // Users can read their own quota data
+      allow read: if isAuthenticated()
+                  && documentExists()
+                  && resource.data.user_id == request.auth.uid;
+
+      // Users can create their own quota records
+      allow create: if isAuthenticated()
+                    && request.resource.data.user_id == request.auth.uid;
+
+      // Users can update their own quota records
+      allow update: if isAuthenticated()
+                    && documentExists()
+                    && resource.data.user_id == request.auth.uid
+                    && request.resource.data.user_id == request.auth.uid;
+
+      // Users cannot delete quota records (immutable history)
       allow delete: if false;
     }
 
@@ -147,7 +172,7 @@ service cloud.firestore {
 
       // Users can write their own analytics events
       allow create: if isAuthenticated()
-                    && request.resource.data.userId == request.auth.uid;
+                    && request.resource.data.user_id == request.auth.uid;
 
       // No updates or deletes
       allow update: if false;
@@ -181,7 +206,7 @@ service cloud.firestore {
         resource.data.type == 'hint' ||
         // Private: user's own solutions
         (resource.data.type == 'solution' && 
-         resource.data.metadata.userId == request.auth.uid)
+         resource.data.metadata.user_id == request.auth.uid)
       );
 
       // Only backend (Admin SDK) can write embeddings
@@ -197,7 +222,7 @@ service cloud.firestore {
       // Users can read their own session vectors
       allow read: if isAuthenticated() 
                   && documentExists()
-                  && resource.data.userId == request.auth.uid;
+                  && resource.data.user_id == request.auth.uid;
 
       // Only backend (Admin SDK) can write session vectors
       // Clients cannot create/update/delete vectors directly
@@ -225,7 +250,7 @@ service cloud.firestore {
       // Users can read their own RAG traces (for debugging)
       allow read: if isAuthenticated() 
                   && documentExists()
-                  && resource.data.userId == request.auth.uid;
+                  && resource.data.user_id == request.auth.uid;
 
       // Only backend (Admin SDK) can write traces
       // Clients cannot create/update/delete traces directly
@@ -291,17 +316,21 @@ service cloud.firestore {
 //
 // These composite indexes are recommended for optimal performance:
 //
-// Collection: sessions
-// - Fields: userId (Ascending), startTime (Descending)
+// Collection: interview_sessions
+// - Fields: user_id (Ascending), started_at (Descending)
 // - Query: Get user's recent sessions
 //
-// Collection: sessions
-// - Fields: userId (Ascending), status (Ascending), startTime (Descending)
+// Collection: interview_sessions
+// - Fields: user_id (Ascending), status (Ascending), started_at (Descending)
 // - Query: Get user's active/completed sessions
 //
 // Collection: promo_code_usage
-// - Fields: userId (Ascending), usedAt (Descending)
+// - Fields: user_id (Ascending), usedAt (Descending)
 // - Query: Get user's promo code history
+//
+// Collection: profile_quota
+// - Fields: user_id (Ascending), period_start (Descending)
+// - Query: Get user's quota history
 //
 // To create indexes, run:
 // firebase firestore:indexes --project=your-project-id
