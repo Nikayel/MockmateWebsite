@@ -2,30 +2,68 @@
  * PROPRIETARY CODE - NOT OPEN SOURCE
  * This file contains promotion code debugging utilities and is not part of the MIT license.
  * All rights reserved.
+ *
+ * ADMIN ONLY - Protected endpoint for debugging promo codes
  */
 
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
+import { getUserIdFromRequest } from "@/lib/auth-server"
+import { adminDb } from "@/lib/firebase-admin"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-11-20.acacia",
 })
 
-// Debug endpoint to check promotion codes
+// Admin user IDs - add your admin user IDs here
+const ADMIN_USER_IDS = process.env.ADMIN_USER_IDS?.split(",") || []
+
+async function isAdmin(userId: string): Promise<boolean> {
+  // Check hardcoded list first
+  if (ADMIN_USER_IDS.includes(userId)) return true
+
+  // Check Firestore for admin role
+  try {
+    const profileRef = adminDb.collection("profiles").doc(userId)
+    const profileSnap = await profileRef.get()
+    if (profileSnap.exists) {
+      const profile = profileSnap.data()
+      return profile?.role === "admin" || profile?.is_admin === true
+    }
+  } catch {
+    // Ignore errors
+  }
+
+  return false
+}
+
+// Debug endpoint to check promotion codes - ADMIN ONLY
 // Access at: /api/debug-promo-code?code=FREE25 or ?id=promo_xxxxx
 export async function GET(request: NextRequest) {
   try {
+    // Require authentication
+    const userId = await getUserIdFromRequest(request)
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+
+    // Require admin role
+    const admin = await isAdmin(userId)
+    if (!admin) {
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+    }
+
     const searchParams = request.nextUrl.searchParams
     const code = searchParams.get("code")
     const promoId = searchParams.get("id")
 
     const mode = process.env.STRIPE_SECRET_KEY?.startsWith("sk_live") ? "LIVE" : "TEST"
-    
+
     // List all promotion codes
     const allPromoCodes = await stripe.promotionCodes.list({ limit: 100 })
-    
+
     let specificCode: Stripe.PromotionCode[] = []
-    
+
     // Look up by ID if provided
     if (promoId) {
       try {
@@ -35,7 +73,7 @@ export async function GET(request: NextRequest) {
         console.error("Error retrieving promotion code by ID:", err)
       }
     }
-    
+
     // Or look up by code string
     if (code) {
       const found = await stripe.promotionCodes.list({
@@ -47,7 +85,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       mode,
-      searchingFor: code.toUpperCase(),
+      searchingFor: code?.toUpperCase() || promoId || "all",
       totalPromoCodes: allPromoCodes.data.length,
       allPromoCodes: allPromoCodes.data.map(pc => ({
         code: pc.code,
@@ -82,7 +120,7 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     return NextResponse.json(
-      { 
+      {
         error: error instanceof Error ? error.message : "Failed to check promotion codes",
         details: error instanceof Error ? error.stack : undefined,
       },
@@ -90,4 +128,3 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-

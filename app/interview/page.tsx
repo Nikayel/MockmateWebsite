@@ -13,6 +13,24 @@ import { Input } from "@/components/ui/input"
 import { CodeViewerSidePanel } from "@/components/CodeViewerSidePanel"
 import { GradingCriteriaTooltip } from "@/components/GradingCriteria"
 import { ScenarioBrowser } from "@/components/interview"
+import { ErrorBoundary } from "@/components/error-boundary"
+
+// Inline error fallback for components that fail to load
+function ComponentErrorFallback({ componentName }: { componentName: string }) {
+  return (
+    <div className="flex items-center justify-center h-full bg-gray-900/50 p-4">
+      <div className="text-center">
+        <div className="text-red-400 text-sm mb-2">Failed to load {componentName}</div>
+        <button
+          onClick={() => window.location.reload()}
+          className="text-xs text-[#00d9ff] hover:underline"
+        >
+          Reload page
+        </button>
+      </div>
+    </div>
+  )
+}
 
 // Dynamically import heavy components to reduce initial bundle size
 const MonacoEditor = dynamic(
@@ -2081,23 +2099,25 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     {/* Code Editor - Using centralized MonacoEditor component */}
                     <div className="flex flex-col flex-1 min-h-0 gap-2 px-3 pb-3">
                       <div ref={editorContainerRef} className="flex-1 min-h-0 rounded border border-gray-700 overflow-hidden relative">
-                        <MonacoEditor
-                          height="100%"
-                          language={selectedLanguage}
-                          value={code || (selectedScenario ? ((selectedScenario as any).starterCode?.[selectedLanguage] || (selectedScenario as any).buggyCode?.[selectedLanguage] || (selectedScenario as any).existingCode?.[selectedLanguage] || '') : '')}
-                          onChange={(newCode) => {
-                            // Enforce code protection if enabled
-                            if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
-                              const validation = validateCodeProtection(newCode, protectedElements, selectedLanguage)
-                              if (!validation.valid) {
-                                toast.error(`Cannot remove required code: ${validation.errors[0]}`)
-                                return
+                        <ErrorBoundary>
+                          <MonacoEditor
+                            height="100%"
+                            language={selectedLanguage}
+                            value={code || (selectedScenario ? ((selectedScenario as any).starterCode?.[selectedLanguage] || (selectedScenario as any).buggyCode?.[selectedLanguage] || (selectedScenario as any).existingCode?.[selectedLanguage] || '') : '')}
+                            onChange={(newCode) => {
+                              // Enforce code protection if enabled
+                              if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
+                                const validation = validateCodeProtection(newCode, protectedElements, selectedLanguage)
+                                if (!validation.valid) {
+                                  toast.error(`Cannot remove required code: ${validation.errors[0]}`)
+                                  return
+                                }
                               }
-                            }
-                            setCode(newCode)
-                          }}
-                          readOnly={!isInterviewStarted || showFeedback}
-                        />
+                              setCode(newCode)
+                            }}
+                            readOnly={!isInterviewStarted || showFeedback}
+                          />
+                        </ErrorBoundary>
                         {/* Start Interview Overlay - shown when scenario selected but not started */}
                         {selectedScenario && !isInterviewStarted && !showScenarioBrowser && (
                           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-10">
@@ -2627,24 +2647,26 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 </div>
               ) : (
                 <>
-                  <PracticeFeedback
-                    feedback={comprehensiveFeedback || ""}
-                    performanceScore={performanceScore || 0}
-                    testsPassed={testSummary.passed}
-                    testsTotal={testSummary.total}
-                    timeComplexity={efficiencyMetrics?.estimatedTimeComplexity}
-                    spaceComplexity={efficiencyMetrics?.estimatedSpaceComplexity}
-                    efficiencyScore={efficiencyMetrics?.efficiencyScore}
-                    elapsedTime={elapsedTime}
-                    userId={user?.id}
-                    problemType={selectedScenario?.type}
-                    difficulty={selectedScenario?.difficulty}
-                    problemTitle={selectedScenario?.title}
-                    code={code}
-                    language={selectedLanguage}
-                    onRetry={resetInterview}
-                    onNewProblem={resetInterview}
-                  />
+                  <ErrorBoundary>
+                    <PracticeFeedback
+                      feedback={comprehensiveFeedback || ""}
+                      performanceScore={performanceScore || 0}
+                      testsPassed={testSummary.passed}
+                      testsTotal={testSummary.total}
+                      timeComplexity={efficiencyMetrics?.estimatedTimeComplexity}
+                      spaceComplexity={efficiencyMetrics?.estimatedSpaceComplexity}
+                      efficiencyScore={efficiencyMetrics?.efficiencyScore}
+                      elapsedTime={elapsedTime}
+                      userId={user?.id}
+                      problemType={selectedScenario?.type}
+                      difficulty={selectedScenario?.difficulty}
+                      problemTitle={selectedScenario?.title}
+                      code={code}
+                      language={selectedLanguage}
+                      onRetry={resetInterview}
+                      onNewProblem={resetInterview}
+                    />
+                  </ErrorBoundary>
                   {isFromRoadmap && activeRoadmap && (
                     <div className="mt-6 flex justify-center">
                       <Button

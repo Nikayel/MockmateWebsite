@@ -128,8 +128,10 @@ export default function DashboardPage() {
                   setUsage(updatedUsage)
                 })
               }
-            }).catch(() => {
-              // Auto-sync failed (non-critical) - don't show error to user
+            }).catch((error) => {
+              // Auto-sync failed - show toast so user knows to try manual refresh
+              console.error("Subscription sync failed:", error)
+              toast.error("Could not sync subscription status. Please refresh the page.")
             })
           })
         }

@@ -365,13 +365,16 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
                 accept=".js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.h,.json,.md,.txt,text/*"
                 onChange={handleFileUpload}
                 className="hidden"
+                aria-label="Upload workspace files"
+                id="workspace-file-upload"
               />
               <Button
                 onClick={() => fileInputRef.current?.click()}
                 variant="outline"
                 className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent text-xs h-7"
+                aria-label="Upload code files to workspace"
               >
-                <Code className="mr-1 h-3 w-3" />
+                <Code className="mr-1 h-3 w-3" aria-hidden="true" />
                 Upload Files
               </Button>
               {workspaceContext.length > 0 && (

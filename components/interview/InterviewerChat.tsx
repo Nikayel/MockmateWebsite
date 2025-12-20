@@ -65,7 +65,13 @@ export function InterviewerChat({
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col flex-1 min-h-0 overflow-hidden p-3">
-        <div className="flex-1 overflow-y-auto space-y-2 mb-2 min-h-0 pr-2">
+        <div
+          className="flex-1 overflow-y-auto space-y-2 mb-2 min-h-0 pr-2"
+          role="log"
+          aria-label="Interview chat messages"
+          aria-live="polite"
+          aria-relevant="additions"
+        >
           {interviewerMessages.length === 0 ? (
             <div className="text-center py-8 text-gray-400">
               <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
