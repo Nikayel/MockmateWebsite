@@ -17,6 +17,8 @@ import {
   Lightbulb,
   BookOpen,
   Building2,
+  GraduationCap,
+  Star,
 } from 'lucide-react'
 import { CompanyQuestionData } from '@/lib/data/company-questions/types'
 import { cn } from '@/lib/utils'
@@ -24,9 +26,51 @@ import { cn } from '@/lib/utils'
 interface CompanyInterviewGuideProps {
   company: CompanyQuestionData
   defaultExpanded?: boolean
+  isIntern?: boolean
 }
 
-export function CompanyInterviewGuide({ company, defaultExpanded = false }: CompanyInterviewGuideProps) {
+// Intern-specific interview tips by company
+const internTips: Record<string, string[]> = {
+  google: [
+    'Focus on fundamentals - interns are evaluated on learning potential, not expert-level solutions',
+    'Practice explaining your thought process clearly - communication matters more for interns',
+    'Don\'t worry about system design - focus on coding and problem-solving skills',
+    'Google hosts tend to be very helpful and will guide you through the problem',
+  ],
+  meta: [
+    'Meta intern interviews are more focused on coding fundamentals',
+    'Expect 2 coding rounds instead of the full-time 3-4 rounds',
+    'Practice medium-difficulty problems from their most common patterns',
+    'Behavioral questions will focus on teamwork and learning experiences',
+  ],
+  amazon: [
+    'Leadership Principles matter even for interns - prepare 2-3 stories',
+    'Focus on customer obsession and learn & be curious principles',
+    'Expect bar raiser round to assess cultural fit and growth potential',
+    'Practice explaining trade-offs in your solutions',
+  ],
+  microsoft: [
+    'Microsoft is known for being intern-friendly with supportive interviewers',
+    'Focus on clean code and good coding practices',
+    'Practice debugging and testing scenarios',
+    'Show enthusiasm for the specific team/product you\'re applying to',
+  ],
+  apple: [
+    'Apple values creativity and thinking differently',
+    'Expect more open-ended problems with multiple solutions',
+    'Team fit is crucial - research the specific team culture',
+    'Be prepared to discuss your past projects in detail',
+  ],
+}
+
+const defaultInternTips = [
+  'Focus on fundamentals over advanced topics',
+  'Practice explaining your thought process out loud',
+  'Show enthusiasm and willingness to learn',
+  'Prepare questions about mentorship and learning opportunities',
+]
+
+export function CompanyInterviewGuide({ company, defaultExpanded = false, isIntern = false }: CompanyInterviewGuideProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     overview: false,
@@ -34,6 +78,7 @@ export function CompanyInterviewGuide({ company, defaultExpanded = false }: Comp
     style: false,
     tips: false,
     compensation: false,
+    internTips: isIntern, // Auto-expand intern tips if user is an intern
   })
 
   const toggleSection = (section: string) => {
@@ -47,6 +92,7 @@ export function CompanyInterviewGuide({ company, defaultExpanded = false }: Comp
       style: true,
       tips: true,
       compensation: true,
+      internTips: true,
     })
   }
 
@@ -57,8 +103,12 @@ export function CompanyInterviewGuide({ company, defaultExpanded = false }: Comp
       style: false,
       tips: false,
       compensation: false,
+      internTips: false,
     })
   }
+
+  // Get intern-specific tips for this company
+  const companyInternTips = internTips[company.id] || defaultInternTips
 
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
@@ -304,6 +354,62 @@ export function CompanyInterviewGuide({ company, defaultExpanded = false }: Comp
             <p className="text-[9px] text-muted-foreground mt-1.5">
               * TC = Base + Stock + Bonus (levels.fyi)
             </p>
+          </CollapsibleSection>
+        )}
+
+        {/* Intern-Specific Tips - Only shown for intern users */}
+        {isIntern && (
+          <CollapsibleSection
+            title="Intern Interview Tips"
+            icon={GraduationCap}
+            expanded={expandedSections.internTips}
+            onToggle={() => toggleSection('internTips')}
+            badge="For You"
+          >
+            <div className="space-y-2">
+              {/* Intern-specific badge */}
+              <div className="flex items-center gap-2 p-2 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg mb-3">
+                <Star className="h-4 w-4 text-blue-500" />
+                <p className="text-[11px] font-medium text-foreground">
+                  Tailored tips for {company.name} internship interviews
+                </p>
+              </div>
+
+              {/* Tips list */}
+              <div className="space-y-1.5">
+                {companyInternTips.map((tip, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-1.5 p-2 bg-blue-50 dark:bg-blue-900/10 border border-blue-200/50 dark:border-blue-800/30 rounded-md"
+                  >
+                    <CheckCircle className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-foreground leading-snug">{tip}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Intern interview structure */}
+              <div className="mt-3 p-2 bg-muted/50 rounded-md">
+                <h4 className="text-[10px] font-medium text-muted-foreground mb-1.5 flex items-center gap-1">
+                  <Users className="h-3 w-3" />
+                  Typical Intern Interview Structure
+                </h4>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <span className="w-4 h-4 bg-primary/10 rounded-full flex items-center justify-center text-[8px] font-bold text-primary">1</span>
+                    <span className="text-muted-foreground">Recruiter Screen (15-30 min)</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <span className="w-4 h-4 bg-primary/10 rounded-full flex items-center justify-center text-[8px] font-bold text-primary">2</span>
+                    <span className="text-muted-foreground">Coding Interview(s) (45-60 min each)</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <span className="w-4 h-4 bg-primary/10 rounded-full flex items-center justify-center text-[8px] font-bold text-primary">3</span>
+                    <span className="text-muted-foreground">Behavioral/Team Fit (30-45 min)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </CollapsibleSection>
         )}
       </div>

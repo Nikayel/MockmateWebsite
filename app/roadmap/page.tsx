@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Plus, BookOpen, Target, Sparkles } from 'lucide-react'
+import { Plus, BookOpen, Target, Sparkles, Trophy, AlertTriangle, Clock, RefreshCw, PartyPopper, Calendar, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
+import { Header } from '@/components/header'
 import {
   RoadmapHeader,
   TodaysFocus,
@@ -16,6 +17,7 @@ import {
 import { useRoadmapStore, useActiveRoadmap } from '@/lib/stores/roadmap-store'
 import { getCompanyById } from '@/lib/data/company-questions'
 import { getStudyRecommendations } from '@/lib/roadmap/prioritization-algorithm'
+import { cn } from '@/lib/utils'
 
 export default function RoadmapPage() {
   const router = useRouter()
@@ -25,6 +27,7 @@ export default function RoadmapPage() {
     selectDay,
     markQuestionCompleted,
     markQuestionSkipped,
+    setActiveRoadmap,
   } = useRoadmapStore()
 
   // Get today's plan
@@ -64,6 +67,25 @@ export default function RoadmapPage() {
     return <EmptyState />
   }
 
+  // Check for edge cases
+  const interviewDate = new Date(roadmap.interviewDate)
+  const now = new Date()
+  const daysRemaining = Math.ceil((interviewDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  const isExpired = daysRemaining < 0
+  const isCompleted = roadmap.questionsCompleted === roadmap.totalQuestions && roadmap.totalQuestions > 0
+  const isIntern = roadmap.assessment?.experienceLevel === 'intern'
+  const progress = Math.round((roadmap.questionsCompleted / roadmap.totalQuestions) * 100)
+
+  // Roadmap is expired - show expired state
+  if (isExpired) {
+    return <ExpiredState roadmap={roadmap} onCreateNew={() => router.push('/roadmap/new')} onArchive={() => setActiveRoadmap(null)} />
+  }
+
+  // Roadmap is completed - show completion celebration
+  if (isCompleted) {
+    return <CompletedState roadmap={roadmap} onCreateNew={() => router.push('/roadmap/new')} onReviewAgain={() => {}} />
+  }
+
   const companyData = getCompanyById(roadmap.targetCompany)
   const selectedPlan = roadmap.dailyPlans[selectedDayIndex]
   const recommendations = getStudyRecommendations(roadmap)
@@ -71,23 +93,52 @@ export default function RoadmapPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="font-bold text-xl">
-            MockMate
-          </Link>
-          <Link
-            href="/roadmap/new"
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            New Roadmap
-          </Link>
-        </div>
-      </header>
+      <Header />
 
-      <main className="container mx-auto px-4 py-6 space-y-6">
+      <main className="container mx-auto px-4 py-6 pt-24 space-y-6">
+        {/* Intern-specific banner */}
+        {isIntern && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 border border-blue-500/20 rounded-xl p-4"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center shrink-0">
+                <Sparkles className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="font-semibold text-foreground">Internship Interview Track</p>
+                <p className="text-sm text-muted-foreground">
+                  Your plan focuses on foundational patterns and easier problems. Master the basics first!
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Near expiration warning */}
+        {daysRemaining <= 3 && daysRemaining >= 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4"
+          >
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0" />
+              <div>
+                <p className="font-semibold text-foreground">
+                  {daysRemaining === 0 ? 'Interview Day!' : `Only ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left!`}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {daysRemaining === 0
+                    ? 'Focus on reviewing what you know. You\'ve got this!'
+                    : 'Focus on your weakest patterns and must-know questions.'}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
         {/* Roadmap header with progress */}
         <RoadmapHeader roadmap={roadmap} />
 
@@ -135,7 +186,7 @@ export default function RoadmapPage() {
             {/* Company Interview Guide - Full width on mobile, in left column on desktop */}
             {companyData && (
               <div className="block lg:hidden">
-                <CompanyInterviewGuide company={companyData} />
+                <CompanyInterviewGuide company={companyData} isIntern={isIntern} />
               </div>
             )}
           </div>
@@ -178,7 +229,7 @@ export default function RoadmapPage() {
             {/* Company Interview Guide - Only on desktop sidebar */}
             {companyData && (
               <div className="hidden lg:block">
-                <CompanyInterviewGuide company={companyData} />
+                <CompanyInterviewGuide company={companyData} isIntern={isIntern} />
               </div>
             )}
           </div>
@@ -190,39 +241,242 @@ export default function RoadmapPage() {
 
 function EmptyState() {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
-      <div className="text-center max-w-md mx-auto px-4">
-        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-          <BookOpen className="h-10 w-10 text-primary" />
-        </div>
-        <h1 className="text-2xl font-bold text-foreground mb-2">
-          Create Your Interview Roadmap
-        </h1>
-        <p className="text-muted-foreground mb-8">
-          Get a personalized study plan based on your target company, interview date, and current skill level.
-        </p>
-        <Link
-          href="/roadmap/new"
-          className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="h-5 w-5" />
-          Create Roadmap
-        </Link>
+    <div className="min-h-screen bg-background">
+      <Header />
+      <div className="flex items-center justify-center min-h-[calc(100vh-80px)] pt-24">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <BookOpen className="h-10 w-10 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">
+            Create Your Interview Roadmap
+          </h1>
+          <p className="text-muted-foreground mb-8">
+            Get a personalized study plan based on your target company, interview date, and current skill level.
+          </p>
+          <Link
+            href="/roadmap/new"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="h-5 w-5" />
+            Create Roadmap
+          </Link>
 
-        <div className="mt-12 grid grid-cols-3 gap-4 text-center">
-          <div>
-            <p className="text-2xl font-bold text-foreground">20+</p>
-            <p className="text-xs text-muted-foreground">Companies</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-foreground">168</p>
-            <p className="text-xs text-muted-foreground">Questions</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-foreground">31</p>
-            <p className="text-xs text-muted-foreground">Patterns</p>
+          <div className="mt-12 grid grid-cols-3 gap-4 text-center">
+            <div>
+              <p className="text-2xl font-bold text-foreground">20+</p>
+              <p className="text-xs text-muted-foreground">Companies</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-foreground">168</p>
+              <p className="text-xs text-muted-foreground">Questions</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-foreground">31</p>
+              <p className="text-xs text-muted-foreground">Patterns</p>
+            </div>
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Expired roadmap state - interview date has passed
+function ExpiredState({
+  roadmap,
+  onCreateNew,
+  onArchive,
+}: {
+  roadmap: any
+  onCreateNew: () => void
+  onArchive: () => void
+}) {
+  const progress = Math.round((roadmap.questionsCompleted / roadmap.totalQuestions) * 100)
+  const interviewDate = new Date(roadmap.interviewDate)
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      <div className="flex items-center justify-center min-h-[calc(100vh-80px)] pt-24">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center max-w-lg mx-auto px-4"
+        >
+          <div className="w-20 h-20 bg-yellow-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Clock className="h-10 w-10 text-yellow-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">
+            Roadmap Expired
+          </h1>
+          <p className="text-muted-foreground mb-6">
+            Your interview date for <span className="font-medium text-foreground">{roadmap.companyName}</span> was on{' '}
+            <span className="font-medium text-foreground">
+              {interviewDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            </span>
+          </p>
+
+          {/* Progress summary */}
+          <div className="bg-card border border-border rounded-xl p-6 mb-6">
+            <h3 className="font-semibold mb-4 text-foreground">Your Progress Summary</h3>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-2xl font-bold text-foreground">{progress}%</p>
+                <p className="text-xs text-muted-foreground">Completed</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{roadmap.questionsCompleted}</p>
+                <p className="text-xs text-muted-foreground">Questions</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{Math.round(roadmap.actualHoursSpent)}h</p>
+                <p className="text-xs text-muted-foreground">Studied</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={onCreateNew}
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+            >
+              <RefreshCw className="h-5 w-5" />
+              Create New Roadmap
+            </button>
+            <button
+              onClick={onArchive}
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 border border-border text-foreground rounded-lg font-medium hover:bg-muted transition-colors"
+            >
+              Archive & Clear
+            </button>
+          </div>
+
+          <p className="text-xs text-muted-foreground mt-6">
+            How did your interview go? Create a new roadmap for your next target!
+          </p>
+        </motion.div>
+      </div>
+    </div>
+  )
+}
+
+// Completed roadmap state - all questions done
+function CompletedState({
+  roadmap,
+  onCreateNew,
+  onReviewAgain,
+}: {
+  roadmap: any
+  onCreateNew: () => void
+  onReviewAgain: () => void
+}) {
+  const interviewDate = new Date(roadmap.interviewDate)
+  const now = new Date()
+  const daysUntil = Math.ceil((interviewDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      <div className="flex items-center justify-center min-h-[calc(100vh-80px)] pt-24">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center max-w-lg mx-auto px-4"
+        >
+          {/* Celebration animation */}
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 200, delay: 0.2 }}
+            className="w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/25"
+          >
+            <PartyPopper className="h-12 w-12 text-white" />
+          </motion.div>
+
+          <motion.h1
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="text-3xl font-bold text-foreground mb-2"
+          >
+            Congratulations!
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="text-muted-foreground mb-6"
+          >
+            You've completed your entire {roadmap.companyName} interview prep roadmap!
+          </motion.p>
+
+          {/* Stats */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl p-6 mb-6"
+          >
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-2xl font-bold text-green-600">{roadmap.totalQuestions}</p>
+                <p className="text-xs text-muted-foreground">Questions Solved</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-green-600">{Math.round(roadmap.actualHoursSpent)}h</p>
+                <p className="text-xs text-muted-foreground">Total Practice</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-green-600">{roadmap.patternCoverage?.length || 0}</p>
+                <p className="text-xs text-muted-foreground">Patterns Mastered</p>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Interview countdown */}
+          {daysUntil > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+              className="bg-card border border-border rounded-xl p-4 mb-6"
+            >
+              <div className="flex items-center justify-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                <span className="text-sm">
+                  <span className="font-semibold text-foreground">{daysUntil} days</span>
+                  <span className="text-muted-foreground"> until your interview</span>
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Use this time to review weak areas and practice mock interviews!
+              </p>
+            </motion.div>
+          )}
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7 }}
+            className="flex flex-col sm:flex-row gap-3 justify-center"
+          >
+            <Link
+              href="/interview"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+            >
+              <Trophy className="h-5 w-5" />
+              Practice Mock Interview
+            </Link>
+            <button
+              onClick={onCreateNew}
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 border border-border text-foreground rounded-lg font-medium hover:bg-muted transition-colors"
+            >
+              <ArrowRight className="h-5 w-5" />
+              New Roadmap
+            </button>
+          </motion.div>
+        </motion.div>
       </div>
     </div>
   )
