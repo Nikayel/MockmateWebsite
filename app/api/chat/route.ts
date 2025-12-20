@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { chatRateLimit } from "@/lib/rate-limit"
+import { enforceQuota } from "@/lib/quota-enforcement"
 import { generateAIResponse, validateResponseRelevance, type TaskComplexity } from "@/lib/ai-providers"
 import { trackAIChatServer } from "@/lib/analytics-server"
 import { getCompanyStyle, getPatternMetadata, type DSAPattern } from "@/lib/types/dsa-patterns"
+import { logger } from "@/lib/logger"
 
 interface UserContext {
   email?: string
@@ -94,6 +96,12 @@ export async function POST(request: NextRequest) {
   const rateLimitResponse = await chatRateLimit(request)
   if (rateLimitResponse) {
     return rateLimitResponse
+  }
+
+  // Enforce quota limits (session & budget)
+  const quotaResult = await enforceQuota(request)
+  if (!quotaResult.allowed && quotaResult.response) {
+    return quotaResult.response
   }
 
   const startTime = Date.now()
