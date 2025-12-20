@@ -2,15 +2,23 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import dynamic from "next/dynamic"
 import { Header } from "@/components/header"
 import { HeroSection } from "@/components/hero-section"
 import { FeaturesSection } from "@/components/features-section"
 import { AIAssistedSection } from "@/components/ai-assisted-section"
 import { Footer } from "@/components/footer"
-import { OnboardingModal } from "@/components/OnboardingModal"
-import { ProductTour } from "@/components/ProductTour"
 import { useAuth } from "@/lib/auth-context"
 import { getUserProfile, checkUsageLimit } from "@/lib/firestore-helpers"
+
+// Dynamically import heavy components to reduce initial bundle size
+const OnboardingModal = dynamic(() => import("@/components/OnboardingModal"), {
+  ssr: false
+})
+
+const ProductTour = dynamic(() => import("@/components/ProductTour"), {
+  ssr: false
+})
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -41,9 +49,14 @@ export default function HomePage() {
       }
 
       try {
-        // Get profile and usage
-        const userProfile = await getUserProfile(firebaseUser.uid)
+        // Parallelize Firebase queries for faster loading
+        const [userProfile, usageData] = await Promise.all([
+          getUserProfile(firebaseUser.uid),
+          checkUsageLimit(firebaseUser.uid)
+        ])
+        
         setProfile(userProfile)
+        setUsage(usageData)
         setIsPro(userProfile?.subscription_tier === "pro")
 
         // Check if onboarding is needed - only show if profile exists and onboarding is not completed
@@ -63,9 +76,6 @@ export default function HomePage() {
           setShowOnboarding(false)
           setShowTour(false)
         }
-
-        const usageData = await checkUsageLimit(firebaseUser.uid)
-        setUsage(usageData)
       } catch (error) {
         console.error("Error loading user data:", error)
       } finally {
