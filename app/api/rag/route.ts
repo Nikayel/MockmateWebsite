@@ -5,6 +5,7 @@ import {
   getRelevantHints,
   getSimilarSolutions,
   embedAndStoreSolution,
+  getRecommendedNextProblems,
 } from "@/lib/embeddings"
 import {
   getRecommendedScenarios,
@@ -46,6 +47,9 @@ export async function POST(request: NextRequest) {
 
       case 'get-learning-path':
         return handleGetLearningPath(params)
+
+      case 'get-next-problems':
+        return handleGetNextProblems(params)
 
       default:
         return NextResponse.json(
@@ -426,5 +430,40 @@ async function handleGetLearningPath(params: {
       : profile.recentTrend === 'declining'
       ? "Let's get back on track with some fundamentals."
       : "Steady progress. Time to push to the next level!",
+  })
+}
+
+async function handleGetNextProblems(params: {
+  userId: string
+  currentProblemText: string
+  currentProblemId?: string
+}) {
+  const { userId, currentProblemText, currentProblemId } = params
+
+  if (!userId || !currentProblemText) {
+    return NextResponse.json(
+      { error: "userId and currentProblemText are required" },
+      { status: 400 }
+    )
+  }
+
+  const recommendations = await getRecommendedNextProblems(
+    userId,
+    currentProblemText,
+    currentProblemId
+  )
+
+  return NextResponse.json({
+    recommendations: recommendations.map(problem => ({
+      problemId: problem.metadata?.problemId,
+      title: problem.metadata?.title || 'Unknown Problem',
+      text: problem.text.substring(0, 200) + '...',
+      similarity: Math.round(problem.similarity * 100),
+      difficulty: problem.metadata?.difficulty || 'medium',
+      type: problem.metadata?.type || 'dsa',
+    })),
+    message: recommendations.length > 0
+      ? `Found ${recommendations.length} similar problems you haven't solved yet!`
+      : "No similar unsolved problems found. Try something new!",
   })
 }
