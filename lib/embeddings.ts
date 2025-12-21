@@ -17,7 +17,7 @@ import { cosineSimilarity } from "./vectorization"
 // Embedding dimensions
 const TEXT_EMBEDDING_DIM = 256
 
-// Domain-specific vocabulary for coding problems
+// Domain-specific vocabulary for coding problems and system design
 const CODING_VOCABULARY = {
   // Data structures
   dataStructures: ['array', 'list', 'linked list', 'stack', 'queue', 'tree', 'binary tree', 'graph', 'hash', 'map', 'set', 'heap', 'trie', 'matrix'],
@@ -29,6 +29,8 @@ const CODING_VOCABULARY = {
   problemTypes: ['string', 'number', 'integer', 'sum', 'product', 'maximum', 'minimum', 'palindrome', 'substring', 'subarray', 'permutation', 'combination'],
   // Operations
   operations: ['insert', 'delete', 'update', 'find', 'traverse', 'reverse', 'merge', 'split', 'rotate', 'swap'],
+  // System design concepts
+  systemDesign: ['system design', 'architecture', 'scalability', 'distributed system', 'microservices', 'load balancer', 'database', 'cache', 'message queue', 'api', 'endpoint', 'latency', 'throughput', 'availability', 'consistency', 'replication', 'sharding', 'partitioning', 'cdn', 'websocket', 'pub sub', 'event driven', 'monolith', 'service', 'component', 'data model', 'schema', 'index', 'query', 'storage', 'reliability', 'fault tolerance', 'monitoring', 'observability', 'security', 'authentication', 'authorization', 'rate limiting', 'circuit breaker', 'retry', 'backoff', 'idempotency'],
 }
 
 // Flatten vocabulary for quick lookup
@@ -164,6 +166,16 @@ export function generateTextEmbedding(text: string): number[] {
     hasMin: text.toLowerCase().includes('minimum') || text.toLowerCase().includes('smallest'),
     hasPath: text.toLowerCase().includes('path') || text.toLowerCase().includes('route'),
     hasMatrix: text.toLowerCase().includes('matrix') || text.toLowerCase().includes('grid'),
+    // System design features
+    isSystemDesign: tokens.some(t => t.includes('system') || t.includes('design') || t.includes('architecture') || t.includes('scalability')),
+    hasScalability: tokens.some(t => t.includes('scale') || t.includes('scalability') || t.includes('throughput') || t.includes('load')),
+    hasDistributed: tokens.some(t => t.includes('distributed') || t.includes('microservice') || t.includes('service')),
+    hasDatabase: tokens.some(t => t.includes('database') || t.includes('db') || t.includes('sql') || t.includes('nosql') || t.includes('storage')),
+    hasCache: tokens.some(t => t.includes('cache') || t.includes('redis') || t.includes('memcached')),
+    hasQueue: tokens.some(t => t.includes('queue') || t.includes('kafka') || t.includes('rabbitmq') || t.includes('message')),
+    hasAPI: tokens.some(t => t.includes('api') || t.includes('endpoint') || t.includes('rest') || t.includes('graphql')),
+    hasLatency: tokens.some(t => t.includes('latency') || t.includes('response time') || t.includes('performance')),
+    hasAvailability: tokens.some(t => t.includes('availability') || t.includes('uptime') || t.includes('reliability') || t.includes('fault')),
   }
 
   const semanticValues = Object.values(semanticFeatures)
@@ -238,10 +250,11 @@ export async function findSimilarTexts(
     minSimilarity?: number
     excludeIds?: string[]
     userId?: string
+    problemType?: string // Filter by problem type (e.g., 'system-design', 'dsa', 'bugfix')
   } = {}
 ): Promise<SimilarResult[]> {
   try {
-    const { type, limit: maxResults = 5, minSimilarity = 0.3, excludeIds = [], userId } = options
+    const { type, limit: maxResults = 5, minSimilarity = 0.3, excludeIds = [], userId, problemType } = options
 
     // Build query
     let q = adminDb.collection('text_embeddings')
@@ -258,6 +271,12 @@ export async function findSimilarTexts(
       if (type && data.type !== type) return
       if (excludeIds.includes(doc.id)) return
       if (userId && data.metadata?.userId !== userId && data.metadata?.user_id !== userId) return
+
+      // Filter by problem type if specified (check tags array)
+      if (problemType) {
+        const tags = data.metadata?.tags || []
+        if (!tags.includes(problemType)) return
+      }
 
       // Calculate similarity
       const similarity = cosineSimilarity(queryVector, data.vector)
@@ -333,6 +352,7 @@ export async function getSimilarSolutions(
   userId: string,
   options: {
     limit?: number
+    problemType?: string // Filter by problem type
   } = {}
 ): Promise<SimilarResult[]> {
   const queryVector = generateTextEmbedding(problemText)
@@ -342,6 +362,7 @@ export async function getSimilarSolutions(
     limit: options.limit || 5,
     userId,
     minSimilarity: 0.4,
+    problemType: options.problemType, // Pass through problem type filter
   })
 }
 
@@ -387,11 +408,30 @@ export async function embedAndStoreSolution(
     language: string
     passed: boolean
     score: number
+    problemType?: string // 'dsa' | 'bugfix' | 'system-design' | etc.
   }
 ): Promise<string> {
-  // Include both the code and some context about the problem
-  const textToEmbed = `Solution for ${metadata.problemTitle} in ${metadata.language}:\n${solutionCode}`
+  // For system design, solutionCode is actually design notes
+  const isSystemDesign = metadata.problemType === 'system-design'
+  const solutionType = isSystemDesign ? 'design notes' : 'code'
+
+  // Include both the code/notes and some context about the problem
+  const textToEmbed = isSystemDesign
+    ? `System Design Solution for ${metadata.problemTitle}:\n${solutionCode}`
+    : `Solution for ${metadata.problemTitle} in ${metadata.language}:\n${solutionCode}`
   const vector = generateTextEmbedding(textToEmbed)
+
+  // Build tags with problem type
+  const tags = [metadata.language || 'notes']
+  if (metadata.passed !== undefined) {
+    tags.push(metadata.passed ? 'passed' : 'failed')
+  }
+  if (metadata.problemType) {
+    tags.push(metadata.problemType)
+  }
+  if (isSystemDesign) {
+    tags.push('system-design', 'architecture')
+  }
 
   const embedding: TextEmbedding = {
     text: solutionCode,
@@ -401,7 +441,7 @@ export async function embedAndStoreSolution(
       problemId,
       userId, // Keep camelCase for code consistency
       user_id: userId, // Also store with underscore for Firestore rules compatibility
-      tags: [metadata.language, metadata.passed ? 'passed' : 'failed'],
+      tags,
       timestamp: new Date().toISOString(),
     },
   }

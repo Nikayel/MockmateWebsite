@@ -1213,7 +1213,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           }
 
           // Store solution for RAG (async, non-blocking)
-          if (selectedScenario?.id && code.trim()) {
+          // For system design, store design notes even if empty (chat-only submission)
+          const isSystemDesign = selectedScenario?.type === 'system-design'
+          const shouldStore = selectedScenario?.id && (code.trim() || isSystemDesign)
+          
+          if (shouldStore) {
             fetch("/api/rag", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -1222,10 +1226,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                 userId: user.id,
                 problemId: selectedScenario.id,
                 problemTitle: selectedScenario.title,
-                solutionCode: code,
+                solutionCode: code || (isSystemDesign ? '// Design discussion completed via chat' : ''),
                 language: selectedLanguage,
-                passed: summary.passed === summary.total,
+                passed: isSystemDesign ? true : summary.passed === summary.total, // System design has no tests
                 score: calculatedPerformanceScore,
+                problemType: selectedScenario.type, // Pass problem type for proper tagging
               }),
             }).catch((err) => {
               console.error("Solution storage error (non-blocking):", err)
@@ -1466,23 +1471,52 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
   const resetInterview = async () => {
     // Update session if it exists and was completed
-    if (currentSessionId && (showFeedback || showPostInterviewDiscussion) && testSummary.total > 0) {
+    const isSystemDesign = selectedScenario?.type === 'system-design'
+    const hasTests = testSummary.total > 0
+    const shouldUpdate = currentSessionId && (showFeedback || showPostInterviewDiscussion) && (hasTests || isSystemDesign)
+    
+    if (shouldUpdate) {
       try {
         // Use performance score if available (already 0-100), otherwise use pass rate
-        const scoreToSave = performanceScore !== null ? performanceScore : testSummary.passRate
+        const scoreToSave = performanceScore !== null ? performanceScore : (hasTests ? testSummary.passRate : 0)
+        const feedbackText = isSystemDesign
+          ? comprehensiveFeedback || `Completed system design interview: ${selectedScenario?.title}`
+          : comprehensiveFeedback || `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
+        
         await updateInterviewSession(
           currentSessionId,
           scoreToSave,
-          comprehensiveFeedback || `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`,
+          feedbackText,
           {
-            code,
-            language: selectedLanguage,
-            testResults,
+            code: code || (isSystemDesign ? '// Design notes' : ''),
+            language: isSystemDesign ? 'notes' : selectedLanguage,
+            testResults: hasTests ? testResults : undefined,
             timeComplexity: efficiencyMetrics?.estimatedTimeComplexity,
             spaceComplexity: efficiencyMetrics?.estimatedSpaceComplexity,
             efficiencyScore: efficiencyMetrics?.efficiencyScore,
           }
         )
+        
+        // Store system design notes if not already stored
+        if (isSystemDesign && selectedScenario?.id && user) {
+          fetch("/api/rag", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "store-solution",
+              userId: user.id,
+              problemId: selectedScenario.id,
+              problemTitle: selectedScenario.title,
+              solutionCode: code.trim() || '// Design discussion completed via chat',
+              language: 'notes',
+              passed: true,
+              score: scoreToSave,
+              problemType: 'system-design',
+            }),
+          }).catch((err) => {
+            console.error("System design solution storage error (non-blocking):", err)
+          })
+        }
       } catch (error) {
         console.error("Error updating session:", error)
         // Silent failure - session data is also saved locally
@@ -1779,6 +1813,29 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
         if (data.reply) {
           setMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+          
+          // For system design interviews, store design notes when session ends
+          const isSystemDesign = selectedScenario?.type === 'system-design'
+          if (isSystemDesign && isEndingSession && selectedScenario?.id && user) {
+            // Store design notes (even if empty - chat-only submission)
+            fetch("/api/rag", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "store-solution",
+                userId: user.id,
+                problemId: selectedScenario.id,
+                problemTitle: selectedScenario.title,
+                solutionCode: code.trim() || '// Design discussion completed via chat',
+                language: 'notes',
+                passed: true, // System design has no tests
+                score: 0, // Will be calculated by feedback system
+                problemType: 'system-design',
+              }),
+            }).catch((err) => {
+              console.error("System design solution storage error (non-blocking):", err)
+            })
+          }
         } else {
           setMessages((prev) => [
             ...prev,
@@ -1872,6 +1929,204 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       optimalTimeComplexity,
       optimalSpaceComplexity,
       efficiencyScore: Math.max(0, efficiencyScore),
+    }
+  }
+
+  const submitSystemDesign = async () => {
+    if (!selectedScenario || selectedScenario.type !== 'system-design') return
+
+    setIsRunningTests(true) // Reuse this state for loading indicator
+
+    try {
+      // Generate feedback for system design based on conversation and design notes
+      await triggerSystemDesignFeedback()
+      
+      // Show success feedback
+      playSound('success')
+      toast.success("Design submitted!", {
+        description: "Your design notes have been saved. Review your feedback below.",
+      })
+    } catch (error) {
+      console.error("System design submission error:", error)
+      toast.error("Failed to submit design", {
+        description: "There was a problem submitting your design. Please try again.",
+        action: {
+          label: "Retry",
+          onClick: () => submitSystemDesign(),
+        },
+      })
+    } finally {
+      setIsRunningTests(false)
+    }
+  }
+
+  const triggerSystemDesignFeedback = async () => {
+    setIsGeneratingDiscussion(true)
+
+    try {
+      if (!selectedScenario || selectedScenario.type !== 'system-design') {
+        return
+      }
+
+      const partnerMessagesSent = chatMessages.filter((msg) => msg.type === "user").length
+      const partnerMessagesReceived = chatMessages.filter((msg) => msg.type === "ai").length
+      const interviewerUserMessages = interviewerMessages.filter((msg) => msg.type === "user")
+      const interviewerQuestionsAnswered = interviewerUserMessages.length
+      const interviewerClarificationsRequested = interviewerUserMessages.filter((msg) =>
+        msg.message.includes("?")
+      ).length
+      const interviewerFeedbackAcknowledged = interviewerUserMessages.filter((msg) =>
+        /thanks|got it|understand|cool|okay|ok/i.test(msg.message)
+      ).length
+      const proactiveInteractions =
+        interviewerQuestionsAnswered > 0 || partnerMessagesSent > 0 ? 1 : 0
+
+      const aiCollaborationMetrics = {
+        partnerMessagesSent,
+        partnerMessagesReceived,
+        partnerHintsRequested: revealedHints,
+      }
+
+      const interactionMetrics = {
+        interviewerQuestionsAnswered,
+        interviewerClarificationsRequested,
+        interviewerFeedbackAcknowledged,
+        proactiveInteractions,
+        problemDifficulty: selectedScenario?.difficulty,
+        problemType: selectedScenario?.type,
+        skillsDemonstrated: selectedScenario?.tags || [],
+      }
+
+      // For system design, generate feedback based on conversation and design notes
+      // Create a mock summary for system design (no tests, but we need the structure)
+      const mockSummary = {
+        passed: 0,
+        total: 0,
+        passRate: 0, // Will be calculated by feedback system based on conversation
+      }
+
+      // Generate comprehensive feedback
+      let comprehensiveFeedback = `Completed system design interview: ${selectedScenario?.title}`
+      let calculatedPerformanceScore = 0
+
+      // Generate feedback using the feedback API
+      const feedbackResponse = await fetch("/api/generate-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scenarioId: selectedScenario.id,
+          scenarioType: selectedScenario.type,
+          conversationHistory: [
+            ...interviewerMessages.map(m => ({
+              role: m.type === "user" ? "candidate" : "interviewer",
+              content: m.message,
+            })),
+          ],
+          code: code || '// Design notes completed via discussion',
+          language: 'notes',
+          testResults: [], // No tests for system design
+          efficiencyMetrics: null,
+          aiCollaborationMetrics,
+          interactionMetrics,
+        }),
+      })
+
+      if (feedbackResponse.ok) {
+        const feedbackData = await feedbackResponse.json()
+        comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
+        calculatedPerformanceScore = feedbackData.scores?.overall || 0
+      }
+
+      setComprehensiveFeedback(comprehensiveFeedback)
+      setPerformanceScore(calculatedPerformanceScore)
+
+      // Update session with completion data
+      if (currentSessionId && user) {
+        try {
+          await updateInterviewSession(
+            currentSessionId,
+            calculatedPerformanceScore,
+            comprehensiveFeedback,
+            {
+              code: code || '// Design notes',
+              language: 'notes',
+              testResults: [],
+            }
+          )
+
+          // Mark question complete in roadmap if user came from roadmap
+          const isFromRoadmap = searchParams.get('from') === 'roadmap'
+          if (isFromRoadmap && selectedScenario && activeRoadmap) {
+            markQuestionCompleted(selectedScenario.id, calculatedPerformanceScore)
+            const minutesSpent = Math.round(elapsedTime / 60)
+            if (minutesSpent > 0) {
+              addActualTime(minutesSpent)
+            }
+            toast.success("Progress saved to your roadmap!")
+          }
+
+          // Store solution for RAG (async, non-blocking)
+          if (selectedScenario?.id) {
+            fetch("/api/rag", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "store-solution",
+                userId: user.id,
+                problemId: selectedScenario.id,
+                problemTitle: selectedScenario.title,
+                solutionCode: code.trim() || '// Design discussion completed',
+                language: 'notes',
+                passed: true,
+                score: calculatedPerformanceScore,
+                problemType: 'system-design',
+              }),
+            }).catch((err) => {
+              console.error("Solution storage error (non-blocking):", err)
+            })
+          }
+        } catch (error) {
+          console.error("Error updating session:", error)
+        }
+      }
+
+      // Start post-interview discussion phase
+      setShowPostInterviewDiscussion(true)
+
+      // Trigger interviewer to provide final feedback
+      const finalMessage = `The candidate has submitted their design. Please provide a brief summary of their performance, highlighting strengths and areas for improvement. Keep it concise (2-3 sentences).`
+      
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: finalMessage,
+          context: interviewerMessages,
+          role: "interviewer",
+          userContext: user ? {
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "",
+          } : undefined,
+          currentCode: code,
+          scenarioTitle: selectedScenario?.title,
+          scenarioType: selectedScenario?.type,
+          isProactive: false,
+          isPostInterview: true,
+          isEndingSession: false,
+        }),
+      })
+
+      const data = await response.json()
+      if (data.reply) {
+        setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+      }
+    } catch (error) {
+      console.error("Error generating system design feedback:", error)
+      toast.error("Failed to generate feedback", {
+        description: "There was a problem generating your feedback. Please try again.",
+      })
+    } finally {
+      setIsGeneratingDiscussion(false)
     }
   }
 
@@ -2378,8 +2633,28 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         </div>
                       )}
 
-                      {/* Controls - Hide for system design since there's no runnable code */}
-                      {selectedScenario?.type !== 'system-design' && (
+                      {/* Controls */}
+                      {selectedScenario?.type === 'system-design' ? (
+                        /* Submit Design button for system design */
+                        <div className="flex flex-col gap-2 flex-shrink-0">
+                          <div className="text-[10px] text-gray-400 text-right">
+                            Document your design decisions above, then submit when ready
+                          </div>
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              onClick={submitSystemDesign}
+                              disabled={showFeedback || showPostInterviewDiscussion}
+                              loading={isRunningTests}
+                              className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black font-semibold text-xs h-7"
+                              aria-label={isRunningTests ? "Submitting design..." : "Submit Design"}
+                            >
+                              {!isRunningTests && <CheckCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
+                              {isRunningTests ? "Submitting..." : "Submit Design"}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Run Tests button for coding problems */
                         <div className="flex items-center justify-end gap-2 flex-shrink-0">
                           {!isLanguageSupported(selectedLanguage) && (
                             <span className="text-[10px] text-yellow-400 mr-1">
