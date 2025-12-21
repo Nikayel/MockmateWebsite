@@ -2009,25 +2009,38 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       let comprehensiveFeedback = `Completed system design interview: ${selectedScenario?.title}`
       let calculatedPerformanceScore = 0
 
+      // Prepare conversation transcript for content-based evaluation
+      // This allows the AI to evaluate WHAT was said, not just message counts
+      const conversationTranscript = [
+        ...interviewerMessages.map(m => ({
+          role: m.type === 'user' ? 'candidate' : 'interviewer',
+          content: m.message,
+          timestamp: m.timestamp
+        })),
+        ...chatMessages.map(m => ({
+          role: m.type === 'user' ? 'candidate' : 'ai_partner',
+          content: m.message,
+          timestamp: m.timestamp
+        }))
+      ].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+
       // Generate feedback using the feedback API
       const feedbackResponse = await fetch("/api/generate-feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          scenarioId: selectedScenario.id,
-          scenarioType: selectedScenario.type,
-          conversationHistory: [
-            ...interviewerMessages.map(m => ({
-              role: m.type === "user" ? "candidate" : "interviewer",
-              content: m.message,
-            })),
-          ],
           code: code || '// Design notes completed via discussion',
-          language: 'notes',
+          scenarioTitle: selectedScenario.title,
+          scenarioType: selectedScenario.type,
           testResults: [], // No tests for system design
-          efficiencyMetrics: null,
+          language: 'notes',
+          timeSpent: elapsedTime,
           aiCollaborationMetrics,
           interactionMetrics,
+          efficiencyMetrics: null, // No code efficiency for system design
+          conversationTranscript, // Pass actual conversation for AI analysis
+          sessionId: currentSessionId,
+          userId: user?.id,
         }),
       })
 

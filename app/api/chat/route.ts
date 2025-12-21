@@ -474,10 +474,21 @@ Ask ONE brief question:`
       provider: aiResponse.provider, // Include provider for debugging
       latencyMs: aiResponse.latencyMs,
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Chat API error:", error)
+    console.error("Error details:", {
+      message: error?.message,
+      status: error?.status,
+      stack: error?.stack,
+    })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to process chat message" },
+      { 
+        error: error instanceof Error ? error.message : error?.message || "Failed to process chat message",
+        details: process.env.NODE_ENV === 'development' ? {
+          status: error?.status,
+          originalError: error?.originalError?.message || error?.originalError,
+        } : undefined,
+      },
       { status: 500 },
     )
   }
