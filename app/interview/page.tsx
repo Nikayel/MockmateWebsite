@@ -344,6 +344,48 @@ export default function InterviewPage() {
               }))
               setWorkspaceContext(contextFiles)
             }
+          } else if (scenario.type === 'system-design') {
+            // For system design, provide a design notes template
+            initialCode = `// DESIGN NOTES: ${scenario.title}
+// Use this space to document your design decisions
+
+/* ============================================
+   1. REQUIREMENTS CLARIFICATION
+   ============================================ */
+// Functional:
+// -
+//
+// Non-Functional:
+// - Scale:
+// - Latency:
+// - Availability:
+
+/* ============================================
+   2. HIGH-LEVEL ARCHITECTURE
+   ============================================ */
+// Key Components:
+// 1.
+// 2.
+// 3.
+
+/* ============================================
+   3. DATA MODEL
+   ============================================ */
+// Tables/Collections:
+//
+
+/* ============================================
+   4. API DESIGN
+   ============================================ */
+// Endpoints:
+// POST /api/...
+// GET /api/...
+
+/* ============================================
+   5. SCALING & TRADE-OFFS
+   ============================================ */
+// -
+`
           } else {
             initialCode = (scenario as any).starterCode?.[selectedLanguage] || `function solution() {
   // Write your solution here
@@ -1318,6 +1360,48 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         setWorkspaceContext(contextFiles)
         toast.success(`Loaded ${contextFiles.length} codebase file(s) - review them to understand the existing code`)
       }
+    } else if (selectedScenario.type === 'system-design') {
+      // For system design, provide a design notes template
+      initialCode = `// DESIGN NOTES: ${selectedScenario.title}
+// Use this space to document your design decisions
+
+/* ============================================
+   1. REQUIREMENTS CLARIFICATION
+   ============================================ */
+// Functional:
+// -
+//
+// Non-Functional:
+// - Scale:
+// - Latency:
+// - Availability:
+
+/* ============================================
+   2. HIGH-LEVEL ARCHITECTURE
+   ============================================ */
+// Key Components:
+// 1.
+// 2.
+// 3.
+
+/* ============================================
+   3. DATA MODEL
+   ============================================ */
+// Tables/Collections:
+//
+
+/* ============================================
+   4. API DESIGN
+   ============================================ */
+// Endpoints:
+// POST /api/...
+// GET /api/...
+
+/* ============================================
+   5. SCALING & TRADE-OFFS
+   ============================================ */
+// -
+`
     } else {
       // For DSA problems, load starter code
       initialCode = (selectedScenario as any).starterCode?.[selectedLanguage] || `function solution() {
@@ -2082,7 +2166,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       <CardTitle className="text-white flex items-center justify-between text-xs">
                         <div className="flex items-center space-x-1">
                           <Code className="h-3 w-3 text-[#00d9ff]" />
-                          <span>{selectedScenario?.title.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}.{selectedLanguage === "javascript" ? "js" : selectedLanguage === "typescript" ? "ts" : "py"}</span>
+                          {selectedScenario?.type === 'system-design' ? (
+                            <span>Design Notes</span>
+                          ) : (
+                            <span>{selectedScenario?.title.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}.{selectedLanguage === "javascript" ? "js" : selectedLanguage === "typescript" ? "ts" : "py"}</span>
+                          )}
                         </div>
                         <div className="flex items-center space-x-3">
                           {/* Grading criteria indicator */}
@@ -2144,8 +2232,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         )}
                       </div>
 
-                      {/* Terminal/Console Output - Enhanced */}
-                      {testResults.length > 0 && (
+                      {/* Terminal/Console Output - Enhanced (hidden for system design) */}
+                      {testResults.length > 0 && selectedScenario?.type !== 'system-design' && (
                         <div className="flex-shrink-0 bg-black border border-gray-700 rounded flex flex-col max-h-48 min-h-[120px]">
                           {/* Terminal Header */}
                           <div className="flex items-center justify-between px-3 py-1.5 bg-gray-800 border-b border-gray-700 flex-shrink-0">
@@ -2254,36 +2342,38 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         </div>
                       )}
 
-                      {/* Controls */}
-                      <div className="flex items-center justify-end gap-2 flex-shrink-0">
-                        {!isLanguageSupported(selectedLanguage) && (
-                          <span className="text-[10px] text-yellow-400 mr-1">
-                            Use JS/Python to run tests
-                          </span>
-                        )}
-                        <Button
-                          onClick={() => {
-                            if (!isLanguageSupported(selectedLanguage)) {
-                              toast.error(`${selectedLanguage.toUpperCase()} execution not supported yet`, {
-                                description: "Switch to JavaScript or Python to run tests.",
-                                action: {
-                                  label: "Use JavaScript",
-                                  onClick: () => setSelectedLanguage("javascript"),
-                                },
-                              })
-                              return
-                            }
-                            runCode()
-                          }}
-                          disabled={showFeedback}
-                          loading={isRunningTests}
-                          className={`${isLanguageSupported(selectedLanguage) ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 hover:bg-gray-500"} text-white text-xs h-7`}
-                          aria-label={isRunningTests ? "Running tests" : "Run tests"}
-                        >
-                          {!isRunningTests && <PlayCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
-                          {isRunningTests ? "Running..." : "Run Tests"}
-                        </Button>
-                      </div>
+                      {/* Controls - Hide for system design since there's no runnable code */}
+                      {selectedScenario?.type !== 'system-design' && (
+                        <div className="flex items-center justify-end gap-2 flex-shrink-0">
+                          {!isLanguageSupported(selectedLanguage) && (
+                            <span className="text-[10px] text-yellow-400 mr-1">
+                              Use JS/Python to run tests
+                            </span>
+                          )}
+                          <Button
+                            onClick={() => {
+                              if (!isLanguageSupported(selectedLanguage)) {
+                                toast.error(`${selectedLanguage.toUpperCase()} execution not supported yet`, {
+                                  description: "Switch to JavaScript or Python to run tests.",
+                                  action: {
+                                    label: "Use JavaScript",
+                                    onClick: () => setSelectedLanguage("javascript"),
+                                  },
+                                })
+                                return
+                              }
+                              runCode()
+                            }}
+                            disabled={showFeedback}
+                            loading={isRunningTests}
+                            className={`${isLanguageSupported(selectedLanguage) ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 hover:bg-gray-500"} text-white text-xs h-7`}
+                            aria-label={isRunningTests ? "Running tests" : "Run tests"}
+                          >
+                            {!isRunningTests && <PlayCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
+                            {isRunningTests ? "Running..." : "Run Tests"}
+                          </Button>
+                        </div>
+                      )}
 
                       {/* AI Coding Partner - Only show for interview types that allow AI assistance
                           Real interview rules:
