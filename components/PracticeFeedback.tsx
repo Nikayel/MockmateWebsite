@@ -645,18 +645,18 @@ export default function PracticeFeedback({
                 <span className="text-sm font-medium text-emerald-400">What Worked</span>
               </div>
               <ul className="space-y-2">
-                {(sections.whatWorked.length > 0 ? sections.whatWorked : (
-                  problemType === 'system-design'
-                    ? ["Engaged in system design discussion", "Proposed architecture components"]
-                    : problemType === 'bugfix'
-                      ? [`Fixed ${testsPassed}/${testsTotal} issues`, "Identified bug location"]
-                      : [`Passed ${testsPassed}/${testsTotal} tests`]
-                )).slice(0, 3).map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
-                    <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-                    <span className="line-clamp-2">{item}</span>
+                {sections.whatWorked.length > 0 ? (
+                  sections.whatWorked.slice(0, 3).map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
+                      <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                      <span className="line-clamp-2">{item}</span>
+                    </li>
+                  ))
+                ) : (
+                  <li className="text-sm text-gray-500 italic">
+                    No strengths identified - review feedback above for details
                   </li>
-                ))}
+                )}
               </ul>
             </div>
 
@@ -667,18 +667,18 @@ export default function PracticeFeedback({
                 <span className="text-sm font-medium text-yellow-400">To Improve</span>
               </div>
               <ul className="space-y-2">
-                {(sections.fixNext.length > 0 ? sections.fixNext : (
-                  problemType === 'system-design'
-                    ? ["Clarify requirements before designing", "Discuss scalability trade-offs", "Consider failure scenarios"]
-                    : problemType === 'bugfix'
-                      ? ["Explain root cause before fixing", "Consider edge cases that caused the bug"]
-                      : ["Practice explaining your thought process", "Discuss complexity before coding"]
-                )).slice(0, 3).map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
-                    <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
-                    <span className="line-clamp-2">{item}</span>
+                {sections.fixNext.length > 0 ? (
+                  sections.fixNext.slice(0, 3).map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
+                      <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
+                      <span className="line-clamp-2">{item}</span>
+                    </li>
+                  ))
+                ) : (
+                  <li className="text-sm text-gray-500 italic">
+                    Review feedback above for specific areas to improve
                   </li>
-                ))}
+                )}
               </ul>
             </div>
           </div>

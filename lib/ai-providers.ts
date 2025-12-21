@@ -94,17 +94,30 @@ const RETRY_DELAYS = [1000, 2000, 4000] // Exponential backoff
 
 /**
  * Check if an error is retryable
+ * Quota errors should NOT be retried - they should immediately fallback to next provider
  */
 function isRetryableError(error: any): boolean {
   const status = error?.status || error?.response?.status
-  const message = error?.message || ''
+  const message = (error?.message || '').toLowerCase()
+  const errorString = JSON.stringify(error || {}).toLowerCase()
+
+  // Quota errors should NOT be retried - fallback immediately
+  if (
+    message.includes('quota exceeded') ||
+    message.includes('quota') ||
+    errorString.includes('quota exceeded') ||
+    errorString.includes('quota') ||
+    message.includes('limit: 20') // Gemini free tier limit
+  ) {
+    return false
+  }
 
   return (
     status === 503 ||
     status === 429 ||
     status === 500 ||
     message.includes('503') ||
-    message.includes('Service Unavailable') ||
+    message.includes('service unavailable') ||
     message.includes('overloaded') ||
     message.includes('rate limit') ||
     message.includes('timeout')
@@ -120,28 +133,63 @@ async function callGemini(
   history: Array<{ role: 'user' | 'model'; content: string }>,
   config: ProviderConfig
 ): Promise<string> {
-  const genAI = new GoogleGenerativeAI(config.apiKey || '')
-  const model = genAI.getGenerativeModel({
-    model: config.model,
-    systemInstruction: systemPrompt,
-  })
+  try {
+    const genAI = new GoogleGenerativeAI(config.apiKey || '')
+    const model = genAI.getGenerativeModel({
+      model: config.model,
+      systemInstruction: systemPrompt,
+    })
 
-  const geminiHistory = history.map(msg => ({
-    role: msg.role as 'user' | 'model',
-    parts: [{ text: msg.content }],
-  }))
+    const geminiHistory = history.map(msg => ({
+      role: msg.role as 'user' | 'model',
+      parts: [{ text: msg.content }],
+    }))
 
-  const chat = model.startChat({
-    history: geminiHistory,
-    generationConfig: {
-      maxOutputTokens: config.maxTokens,
-      temperature: config.temperature,
-    },
-  })
+    const chat = model.startChat({
+      history: geminiHistory,
+      generationConfig: {
+        maxOutputTokens: config.maxTokens,
+        temperature: config.temperature,
+      },
+    })
 
-  const result = await chat.sendMessage(userMessage)
-  const response = await result.response
-  return response.text()
+    const result = await chat.sendMessage(userMessage)
+    const response = await result.response
+    return response.text()
+  } catch (error: any) {
+    // Extract error message from Gemini SDK error structure
+    const errorMessage = error?.message || error?.toString() || 'Unknown error'
+    const errorDetails = error?.cause || error
+    const errorString = JSON.stringify(errorDetails || {}).toLowerCase()
+
+    // Check if it's a quota error (comprehensive detection)
+    const isQuotaError =
+      errorMessage.toLowerCase().includes('quota exceeded') ||
+      errorMessage.toLowerCase().includes('quota') ||
+      errorMessage.toLowerCase().includes('limit: 20') ||
+      errorMessage.toLowerCase().includes('free_tier_requests') ||
+      errorString.includes('quota') ||
+      errorString.includes('limit: 20') ||
+      errorString.includes('free_tier_requests') ||
+      errorString.includes('quotafailure')
+
+    if (isQuotaError) {
+      console.log(`[Gemini] Quota error detected: ${errorMessage.substring(0, 200)}`)
+      throw {
+        status: 429,
+        message: errorMessage,
+        quotaExceeded: true,
+        originalError: error,
+      }
+    }
+
+    // Re-throw with consistent structure
+    throw {
+      status: error?.status || error?.response?.status || 500,
+      message: errorMessage,
+      originalError: error,
+    }
+  }
 }
 
 /**
@@ -153,36 +201,81 @@ async function callDeepseek(
   history: Array<{ role: 'user' | 'model'; content: string }>,
   config: ProviderConfig
 ): Promise<string> {
-  const messages = [
-    { role: 'system', content: systemPrompt },
-    ...history.map(msg => ({
-      role: msg.role === 'model' ? 'assistant' : 'user',
-      content: msg.content,
-    })),
-    { role: 'user', content: userMessage },
-  ]
+  try {
+    if (!config.apiKey) {
+      throw new Error('DeepSeek API key is not configured')
+    }
 
-  const response = await fetch(`${config.baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: config.model,
-      messages,
-      max_tokens: config.maxTokens,
-      temperature: config.temperature,
-    }),
-  })
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...history.map(msg => ({
+        role: msg.role === 'model' ? 'assistant' : 'user',
+        content: msg.content,
+      })),
+      { role: 'user', content: userMessage },
+    ]
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}))
-    throw { status: response.status, message: error.error?.message || response.statusText }
+    console.log(`[DeepSeek] Calling API with model: ${config.model}, messages: ${messages.length}`)
+
+    const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages,
+        max_tokens: config.maxTokens,
+        temperature: config.temperature,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      let errorData: any = {}
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { error: { message: errorText } }
+      }
+
+      const errorMessage = errorData.error?.message || errorData.message || response.statusText
+      console.error(`[DeepSeek] API error (${response.status}):`, errorMessage)
+      console.error(`[DeepSeek] Full error response:`, errorText)
+
+      throw {
+        status: response.status,
+        message: `DeepSeek API error: ${errorMessage}`,
+        originalError: errorData,
+      }
+    }
+
+    const data = await response.json()
+    const content = data.choices[0]?.message?.content || ''
+
+    if (!content) {
+      console.error(`[DeepSeek] Empty response:`, JSON.stringify(data, null, 2))
+      throw {
+        status: 500,
+        message: 'DeepSeek returned empty response',
+        originalResponse: data,
+      }
+    }
+
+    console.log(`[DeepSeek] Success: ${content.length} characters`)
+    return content
+  } catch (error: any) {
+    // Re-throw with better context
+    if (error.status) {
+      throw error
+    }
+    throw {
+      status: 500,
+      message: `DeepSeek API call failed: ${error?.message || 'Unknown error'}`,
+      originalError: error,
+    }
   }
-
-  const data = await response.json()
-  return data.choices[0]?.message?.content || ''
 }
 
 /**
@@ -356,20 +449,46 @@ export async function generateAIResponse(
   }
 
   // Filter to only enabled providers
-  providerOrder = providerOrder.filter(p => PROVIDERS[p].enabled)
+  const enabledProviders = providerOrder.filter(p => PROVIDERS[p].enabled)
+  const disabledProviders = providerOrder.filter(p => !PROVIDERS[p].enabled)
+
+  // Log provider status for debugging
+  console.log(`[AI Provider] Provider status check:`)
+  providerOrder.forEach(p => {
+    const config = PROVIDERS[p]
+    const hasKey = !!config.apiKey
+    const enabled = config.enabled
+    const status = enabled ? '✅ enabled' : `❌ disabled (${hasKey ? 'key exists but disabled' : 'no API key'})`
+    console.log(`  ${p}: ${status}`)
+  })
+
+  if (disabledProviders.length > 0) {
+    console.log(`[AI Provider] ⚠️ Disabled providers will be skipped: ${disabledProviders.join(', ')}`)
+  }
+  console.log(`[AI Provider] Will try providers in order: ${enabledProviders.join(' → ')}`)
+
+  providerOrder = enabledProviders
 
   if (providerOrder.length === 0) {
     if (userId) recordRequestEnd(userId)
-    throw new Error('No AI providers are configured. Please set API keys.')
+    const missingKeys = disabledProviders.map(p => {
+      const keyName = p === 'gemini' ? 'GEMINI_API_KEY' : p === 'deepseek' ? 'DEEPSEEK_API_KEY' : 'ANTHROPIC_API_KEY'
+      return `${keyName} (for ${p})`
+    }).join(', ')
+    throw new Error(`No AI providers are configured. Please set at least one API key: ${missingKeys}`)
   }
 
   let lastError: any = null
 
   // Try each provider in order
   for (const provider of providerOrder) {
+    console.log(`[AI Provider] 🔄 Attempting provider: ${provider} (${PROVIDERS[provider].model})`)
     // Retry loop for each provider
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
+        if (attempt > 0) {
+          console.log(`[AI Provider] Retry attempt ${attempt + 1}/${maxRetries} for ${provider}`)
+        }
 
         const text = await callProvider(provider, systemPrompt, userMessage, history, temperature)
 
@@ -420,6 +539,7 @@ export async function generateAIResponse(
           })
         }
 
+        console.log(`[AI Provider] ✅ Successfully used ${provider} (${latencyMs}ms, ${totalTokens} tokens)`)
         return {
           text,
           provider,
@@ -428,6 +548,50 @@ export async function generateAIResponse(
         }
       } catch (error: any) {
         lastError = error
+
+        // Log error details for debugging
+        const errorMessage = error?.message || error?.toString() || 'Unknown error'
+        const errorStatus = error?.status || 'unknown'
+        console.log(`[AI Provider] ❌ ${provider} failed (attempt ${attempt + 1}/${maxRetries}):`, {
+          status: errorStatus,
+          message: errorMessage.substring(0, 300),
+          quotaExceeded: error?.quotaExceeded,
+        })
+
+        // Check if it's a quota error - immediately fallback to next provider
+        const errorString = JSON.stringify(error || {}).toLowerCase()
+        const errorCause = JSON.stringify(error?.cause || {}).toLowerCase()
+        const errorOriginal = JSON.stringify(error?.originalError || {}).toLowerCase()
+
+        // Comprehensive quota error detection
+        const isQuotaError =
+          error?.quotaExceeded ||
+          errorMessage.toLowerCase().includes('quota exceeded') ||
+          errorMessage.toLowerCase().includes('quota') ||
+          errorMessage.toLowerCase().includes('limit: 20') || // Gemini free tier limit
+          errorMessage.toLowerCase().includes('free_tier_requests') ||
+          errorMessage.toLowerCase().includes('quota failure') ||
+          errorString.includes('quota') ||
+          errorString.includes('limit: 20') ||
+          errorString.includes('free_tier_requests') ||
+          errorString.includes('quotafailure') ||
+          errorCause.includes('quota') ||
+          errorCause.includes('limit: 20') ||
+          errorOriginal.includes('quota') ||
+          errorOriginal.includes('limit: 20')
+
+        if (isQuotaError) {
+          // Quota errors should immediately fallback - don't retry
+          console.log(`[AI Provider] ⚠️ QUOTA EXCEEDED for ${provider} - immediately falling back`)
+          console.log(`[AI Provider] Error message:`, errorMessage.substring(0, 300))
+          const remainingProviders = providerOrder.slice(providerOrder.indexOf(provider) + 1)
+          if (remainingProviders.length > 0) {
+            console.log(`[AI Provider] ✅ Falling back to: ${remainingProviders.join(' → ')}`)
+          } else {
+            console.log(`[AI Provider] ❌ No more providers available for fallback`)
+          }
+          break
+        }
 
         // Only retry if it's a retryable error
         if (isRetryableError(error) && attempt < maxRetries - 1) {
@@ -443,9 +607,33 @@ export async function generateAIResponse(
 
   // All providers failed
   if (userId) recordRequestEnd(userId)
-  throw new Error(
-    `All AI providers failed. Last error: ${lastError?.message || 'Unknown error'}`
-  )
+
+  // Build helpful error message
+  const isQuotaError = lastError?.quotaExceeded ||
+    (lastError?.message || '').toLowerCase().includes('quota')
+
+  let errorMessage = `All AI providers failed.`
+
+  if (isQuotaError && disabledProviders.length > 0) {
+    const missingProviders = disabledProviders.map(p => {
+      const keyName = p === 'gemini' ? 'GEMINI_API_KEY' :
+        p === 'deepseek' ? 'DEEPSEEK_API_KEY' :
+          'ANTHROPIC_API_KEY'
+      return `${keyName} (for ${p})`
+    }).join(', ')
+
+    errorMessage = `Primary provider quota exceeded and no fallback providers available.\n\n` +
+      `To enable fallback providers, add these environment variables to your .env.local file:\n` +
+      `${missingProviders}\n\n` +
+      `Last error: ${lastError?.message?.substring(0, 200) || 'Unknown error'}`
+  } else if (isQuotaError) {
+    errorMessage = `All AI providers exceeded their quota limits. Please wait before retrying.\n\n` +
+      `Last error: ${lastError?.message?.substring(0, 200) || 'Unknown error'}`
+  } else {
+    errorMessage = `All AI providers failed. Last error: ${lastError?.message?.substring(0, 300) || 'Unknown error'}`
+  }
+
+  throw new Error(errorMessage)
 }
 
 /**
@@ -494,6 +682,19 @@ export function getProviderStatus(): Record<AIProvider, { enabled: boolean; mode
     deepseek: { enabled: PROVIDERS.deepseek.enabled, model: PROVIDERS.deepseek.model },
     claude: { enabled: PROVIDERS.claude.enabled, model: PROVIDERS.claude.model },
   }
+}
+
+// Log provider status on module load (server-side only)
+if (typeof window === 'undefined') {
+  const status = getProviderStatus()
+  console.log('[AI Providers] Configuration status:')
+  Object.entries(status).forEach(([provider, config]) => {
+    const statusIcon = config.enabled ? '✅' : '❌'
+    const apiKeySet = provider === 'gemini' ? !!process.env.GEMINI_API_KEY :
+      provider === 'deepseek' ? !!process.env.DEEPSEEK_API_KEY :
+        !!process.env.ANTHROPIC_API_KEY
+    console.log(`  ${statusIcon} ${provider}: ${config.enabled ? 'enabled' : 'disabled'} (${config.model})${config.enabled ? '' : ` - API key ${apiKeySet ? 'exists but provider disabled' : 'missing'}`}`)
+  })
 }
 
 /**

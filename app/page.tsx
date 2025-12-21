@@ -12,11 +12,11 @@ import { useAuth } from "@/lib/auth-context"
 import { getUserProfile, checkUsageLimit } from "@/lib/firestore-helpers"
 
 // Dynamically import heavy components to reduce initial bundle size
-const OnboardingModal = dynamic(() => import("@/components/OnboardingModal"), {
+const OnboardingModal = dynamic(() => import("@/components/OnboardingModal").then(mod => mod.OnboardingModal), {
   ssr: false
 })
 
-const ProductTour = dynamic(() => import("@/components/ProductTour"), {
+const ProductTour = dynamic(() => import("@/components/ProductTour").then(mod => mod.ProductTour), {
   ssr: false
 })
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
