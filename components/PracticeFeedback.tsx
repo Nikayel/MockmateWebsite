@@ -420,8 +420,21 @@ export default function PracticeFeedback({
                 <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30 text-xs">
                   {difficulty || "Medium"}
                 </Badge>
-                <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
-                  Completed
+                <Badge className={cn(
+                  "text-xs",
+                  overallScore >= 60
+                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                    : overallScore >= 40
+                      ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
+                      : "bg-red-500/20 text-red-400 border-red-500/30"
+                )}>
+                  {overallScore >= 60
+                    ? "Completed"
+                    : overallScore >= 40
+                      ? "Needs Work"
+                      : overallScore >= 20
+                        ? "Incomplete"
+                        : "Not Attempted"}
                 </Badge>
               </div>
               <h1 className="text-xl font-bold text-white truncate">
@@ -443,11 +456,15 @@ export default function PracticeFeedback({
             </div>
           </div>
 
-          {/* TL;DR - scenario-specific fallback */}
+          {/* TL;DR - scenario-specific fallback with low score handling */}
           <p className="text-gray-400 text-sm leading-relaxed mb-4">
             {sections.tldr || (
               problemType === 'system-design'
-                ? `Completed system design discussion in ${formatTime(elapsedTime)}.`
+                ? (overallScore < 25
+                    ? `Submitted without meaningful engagement. No design discussion or documentation provided.`
+                    : overallScore < 40
+                      ? `Minimal engagement in system design discussion. More participation required.`
+                      : `Completed system design discussion in ${formatTime(elapsedTime)}.`)
                 : problemType === 'bugfix'
                   ? `Completed bug fix in ${formatTime(elapsedTime)}. Fixed ${testsPassed}/${testsTotal} issues.`
                   : `Completed ${testsPassed}/${testsTotal} tests in ${formatTime(elapsedTime)}.`
@@ -638,7 +655,7 @@ export default function PracticeFeedback({
 
           {/* Feedback Sections - Two columns on desktop */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* What Worked - scenario-specific fallbacks */}
+            {/* What Worked - scenario-specific fallbacks with low score handling */}
             <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <TrendingUp className="h-4 w-4 text-emerald-400" />
@@ -652,6 +669,10 @@ export default function PracticeFeedback({
                       <span className="line-clamp-2">{item}</span>
                     </li>
                   ))
+                ) : overallScore < 25 && problemType === 'system-design' ? (
+                  <li className="text-sm text-gray-500 italic">
+                    The candidate opened the design problem but did not engage with the interview.
+                  </li>
                 ) : (
                   <li className="text-sm text-gray-500 italic">
                     No strengths identified - review feedback above for details
@@ -660,7 +681,7 @@ export default function PracticeFeedback({
               </ul>
             </div>
 
-            {/* Areas to Improve - scenario-specific fallbacks */}
+            {/* Areas to Improve - scenario-specific fallbacks with low score handling */}
             <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Target className="h-4 w-4 text-yellow-400" />
@@ -674,6 +695,21 @@ export default function PracticeFeedback({
                       <span className="line-clamp-2">{item}</span>
                     </li>
                   ))
+                ) : overallScore < 25 && problemType === 'system-design' ? (
+                  <>
+                    <li className="flex items-start gap-2 text-sm text-gray-300">
+                      <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                      <span className="line-clamp-2">ENGAGE with the interviewer - system design is a conversation, not a silent exercise</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm text-gray-300">
+                      <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
+                      <span className="line-clamp-2">Document your design decisions in the notes panel</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm text-gray-300">
+                      <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
+                      <span className="line-clamp-2">Practice explaining your thought process out loud</span>
+                    </li>
+                  </>
                 ) : (
                   <li className="text-sm text-gray-500 italic">
                     Review feedback above for specific areas to improve
