@@ -659,10 +659,90 @@ export async function POST(request: NextRequest) {
     const testsPassed = testResults?.filter((t: any) => t.passed).length || 0
     const testsTotal = testResults?.length || 0
 
-    // Simplified system instruction - AI generates narrative only, scores are algorithmic
-    const systemInstruction = `You are a senior interviewer delivering a focused technical debrief. Be direct and constructive.
-
+    // Scenario-specific system instruction - AI generates narrative only, scores are algorithmic
+    const getSystemInstruction = () => {
+      const baseRules = `
 IMPORTANT: Scores are PRE-CALCULATED. Just reference them in your feedback. Focus on actionable narrative.
+
+RULES:
+- ~200 words max. Be concise.
+- Focus on actionable improvements.
+- Reference the conversation and discussion quality.
+`
+
+      if (scenarioType === 'system-design') {
+        return `You are a senior system design interviewer at a FAANG company delivering focused feedback. Be direct and constructive.
+
+${baseRules}
+
+## OUTPUT FORMAT FOR SYSTEM DESIGN
+
+**TL;DR** – One sentence: what they did well in the design discussion + biggest gap.
+
+**Score Snapshot** (use the PRE-CALCULATED SCORES provided)
+- Requirements: X/100 – Did they clarify functional & non-functional requirements?
+- Architecture: X/100 – Did they propose clear components and data flow?
+- Scalability: X/100 – Did they address scaling, caching, trade-offs?
+- Communication: X/100 – Did they explain decisions clearly?
+- Overall: X/100
+
+**What Worked** (max 3 bullets)
+- specific design strength with evidence from discussion
+
+**Fix Next** (max 3 bullets, prioritized)
+- specific improvement for system design interviews
+
+**Action Plan** (3 numbered steps)
+1. Immediate action for next system design practice
+2. Short-term: concepts to study
+3. Long-term: projects to build
+
+SYSTEM DESIGN FOCUS:
+- Evaluate requirements gathering, not code
+- Focus on architecture decisions and trade-offs
+- Value clear communication and collaboration
+- Consider: Did they ask clarifying questions? Discuss alternatives? Handle scale?
+`
+      }
+
+      if (scenarioType === 'bugfix') {
+        return `You are a senior debugging expert delivering focused feedback on bug fix performance. Be direct and constructive.
+
+${baseRules}
+
+## OUTPUT FORMAT FOR BUG FIX
+
+**TL;DR** – One sentence: bug identification success + biggest gap.
+
+**Score Snapshot** (use the PRE-CALCULATED SCORES provided)
+- Bug Found: X/100 – Did they correctly identify the bug?
+- Root Cause: X/100 – Did they explain why the bug occurred?
+- Fix Quality: X/100 – Was the fix clean and correct?
+- Communication: X/100 – Did they explain their debugging process?
+- Overall: X/100
+
+**What Worked** (max 3 bullets)
+- specific debugging strength with evidence
+
+**Fix Next** (max 3 bullets, prioritized)
+- specific improvement for debugging skills
+
+**Action Plan** (3 numbered steps)
+1. Immediate debugging technique to practice
+2. Short-term: debugging patterns to learn
+3. Long-term: codebase understanding to build
+
+BUG FIX FOCUS:
+- Evaluate the debugging process, not just the fix
+- Value root cause analysis
+- Consider: Did they explain their hypothesis? Test incrementally?
+`
+      }
+
+      // Default DSA instruction
+      return `You are a senior interviewer delivering a focused technical debrief. Be direct and constructive.
+
+${baseRules}
 
 ## OUTPUT FORMAT
 
@@ -686,12 +766,13 @@ IMPORTANT: Scores are PRE-CALCULATED. Just reference them in your feedback. Focu
 2. Short-term practice
 3. Long-term skill development
 
-RULES:
-- ~200 words max. Be concise.
+DSA FOCUS:
 - Reference actual data (tests passed, complexity, time).
 - Never praise if tests fail. Address failures first.
-- Focus on actionable improvements.
 `
+    }
+
+    const systemInstruction = getSystemInstruction()
 
     const testResultsSummary = testResults && Array.isArray(testResults)
       ? `\n\nTEST RESULTS:\n- Total tests: ${testsTotal}\n- Passed: ${testsPassed}\n- Failed: ${testsTotal - testsPassed}\n`
@@ -778,21 +859,73 @@ COMMUNICATION ANALYSIS (hybrid validated):
 - Total candidate messages: ${preScreen.candidateMessageCount}
 
 PRE-CALCULATED SCORES (use these as your scores):
-- Understanding: ${algorithmicScores.understanding}/100
+${scenarioType === 'system-design' ? `- Requirements: ${algorithmicScores.understanding}/100
+- Architecture: ${algorithmicScores.problemSolving}/100
+- Scalability: ${algorithmicScores.codeQuality}/100
+- Communication: ${algorithmicScores.communication}/100` : scenarioType === 'bugfix' ? `- Bug Found: ${algorithmicScores.understanding}/100
+- Root Cause: ${algorithmicScores.problemSolving}/100
+- Fix Quality: ${algorithmicScores.codeQuality}/100
+- Communication: ${algorithmicScores.communication}/100` : `- Understanding: ${algorithmicScores.understanding}/100
 - Problem-Solving: ${algorithmicScores.problemSolving}/100
 - Code Quality: ${algorithmicScores.codeQuality}/100
-- Communication: ${algorithmicScores.communication}/100
+- Communication: ${algorithmicScores.communication}/100`}
 - Overall: ${algorithmicScores.overall}/100
 `
 
-    const prompt = `Generate interview feedback narrative using the pre-calculated scores below.
-
-PROBLEM: ${scenarioTitle}${scenarioType ? ` (${scenarioType})` : ''}
-LANGUAGE: ${language || 'JavaScript'}
+    // Build scenario-specific prompt
+    const buildPrompt = () => {
+      const baseInfo = `PROBLEM: ${scenarioTitle}${scenarioType ? ` (${scenarioType.toUpperCase()})` : ''}
 ${timeInfo}
+${conversationSummary}`
+
+      if (scenarioType === 'system-design') {
+        // System design: focus on discussion, not code
+        return `Generate system design interview feedback using the pre-calculated scores below.
+
+${baseInfo}
+
+DESIGN NOTES (if any):
+\`\`\`
+${code.length > 1500 ? code.slice(0, 1500) + '\n// ... [truncated]' : code}
+\`\`\`
+
+IMPORTANT:
+- This is a SYSTEM DESIGN interview - evaluate architecture discussion, NOT code execution
+- Use the PRE-CALCULATED SCORES above exactly
+- Focus on: requirements gathering, architecture decisions, scalability trade-offs, communication
+- Do NOT mention test pass rates or code efficiency - these don't apply to system design`
+      }
+
+      if (scenarioType === 'bugfix') {
+        // Bug fix: focus on debugging process
+        return `Generate bug fix interview feedback using the pre-calculated scores below.
+
+${baseInfo}
+${testResultsSummary}
+
+CANDIDATE'S FIX:
+\`\`\`${language || 'javascript'}
+${code.length > 2000 ? code.slice(0, 2000) + '\n// ... [truncated]' : code}
+\`\`\`
+${testResults && testResults.filter((t: any) => !t.passed).length > 0 ? `
+REMAINING ISSUES (first 3):
+${testResults.filter((t: any) => !t.passed).slice(0, 3).map((t: any) =>
+      `- ${t.description}: expected ${JSON.stringify(t.expected)}, got ${JSON.stringify(t.actual)}`
+    ).join('\n')}
+` : ''}
+
+IMPORTANT:
+- Evaluate the DEBUGGING PROCESS, not just whether the fix works
+- Use the PRE-CALCULATED SCORES above exactly
+- Focus on: bug identification, root cause analysis, fix quality, communication`
+      }
+
+      // Default DSA prompt
+      return `Generate interview feedback narrative using the pre-calculated scores below.
+
+${baseInfo}
 ${testResultsSummary}
 ${efficiencyInfo}
-${conversationSummary}
 
 SOLUTION CODE:
 \`\`\`${language || 'javascript'}
@@ -806,6 +939,9 @@ ${testResults.filter((t: any) => !t.passed).slice(0, 3).map((t: any) =>
 ` : ''}
 
 IMPORTANT: Use the PRE-CALCULATED SCORES above exactly. Focus on generating helpful narrative feedback, not recalculating scores.`
+    }
+
+    const prompt = buildPrompt()
 
     // Use AI provider abstraction for narrative feedback only
     const aiResponse = await generateFeedbackResponse(

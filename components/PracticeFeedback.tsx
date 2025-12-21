@@ -24,7 +24,12 @@ import {
   AlertTriangle,
   Award,
   Zap,
-  BookOpen
+  BookOpen,
+  Layers,
+  Scale,
+  Search,
+  Bug,
+  Wrench
 } from "lucide-react"
 import { LearningRecommendations } from "@/components/LearningRecommendations"
 import { NextProblemRecommendations } from "@/components/NextProblemRecommendations"
@@ -250,12 +255,20 @@ export default function PracticeFeedback({
   const feedbackLower = feedback.toLowerCase()
   
   // Check if edge cases were DISCUSSED with interviewer (not just solved correctly)
-  // Look for "Edge cases considered: YES" in the conversation summary or feedback
   const edgeCasesDiscussed = /edge cases considered:\s*yes/i.test(feedback) || 
     /discussed.*edge case/i.test(feedback) ||
-    /mentioned.*edge case/i.test(feedback)
-  const hasAlternatives = feedbackLower.includes('alternative') || feedbackLower.includes('another approach')
+    /mentioned.*edge case/i.test(feedback) ||
+    feedbackLower.includes('edge case') || feedbackLower.includes('corner case')
+  const hasAlternatives = feedbackLower.includes('alternative') || feedbackLower.includes('another approach') || feedbackLower.includes('trade-off') || feedbackLower.includes('tradeoff')
   const complexityAccurate = (efficiencyScore || 0) >= 70
+
+  // System design specific indicators
+  const hasRequirements = feedbackLower.includes('requirement') || feedbackLower.includes('clarif') || feedbackLower.includes('scope')
+  const hasScalability = feedbackLower.includes('scal') || feedbackLower.includes('performance') || feedbackLower.includes('load') || feedbackLower.includes('capacity')
+
+  // Bug fix specific indicators
+  const hasBugIdentified = feedbackLower.includes('bug') || feedbackLower.includes('issue') || feedbackLower.includes('problem') || feedbackLower.includes('error')
+  const hasRootCause = feedbackLower.includes('root cause') || feedbackLower.includes('because') || feedbackLower.includes('reason') || feedbackLower.includes('why')
 
   // Extract one-liner feedback for complexity, edge cases, and alternatives
   const extractFeedbackExplanation = (keyword: string, context: string): string => {
@@ -430,53 +443,99 @@ export default function PracticeFeedback({
             </div>
           </div>
 
-          {/* TL;DR */}
+          {/* TL;DR - scenario-specific fallback */}
           <p className="text-gray-400 text-sm leading-relaxed mb-4">
-            {sections.tldr || `Completed ${testsPassed}/${testsTotal} tests in ${formatTime(elapsedTime)}.`}
+            {sections.tldr || (
+              problemType === 'system-design'
+                ? `Completed system design discussion in ${formatTime(elapsedTime)}.`
+                : problemType === 'bugfix'
+                  ? `Completed bug fix in ${formatTime(elapsedTime)}. Fixed ${testsPassed}/${testsTotal} issues.`
+                  : `Completed ${testsPassed}/${testsTotal} tests in ${formatTime(elapsedTime)}.`
+            )}
           </p>
 
-          {/* Quick stats row */}
+          {/* Quick stats row - scenario-specific */}
           <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
             <span className="flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5" />
               {formatTime(elapsedTime)}
             </span>
-            <span className="flex items-center gap-1.5 group relative" title={complexityExplanation}>
-              {complexityAccurate ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
-              <span>Complexity</span>
-              {complexityExplanation && complexityExplanation.length < 60 && (
-                <span className="text-gray-600 ml-1 hidden sm:inline">• {complexityExplanation}</span>
-              )}
-              {complexityExplanation && complexityExplanation.length >= 60 && (
-                <span className="absolute left-0 top-full mt-1 w-64 p-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                  {complexityExplanation}
+            {problemType === 'system-design' ? (
+              // System design quick stats
+              <>
+                <span className="flex items-center gap-1.5 group relative" title="Requirements gathering and clarification">
+                  {hasRequirements ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
+                  Requirements
                 </span>
-              )}
-            </span>
-            <span className="flex items-center gap-1.5 group relative" title={edgeCasesExplanation}>
-              {edgeCasesDiscussed ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
-              <span>Edge Cases</span>
-              {edgeCasesExplanation && edgeCasesExplanation.length < 60 && (
-                <span className="text-gray-600 ml-1 hidden sm:inline">• {edgeCasesExplanation}</span>
-              )}
-              {edgeCasesExplanation && edgeCasesExplanation.length >= 60 && (
-                <span className="absolute left-0 top-full mt-1 w-64 p-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                  {edgeCasesExplanation}
+                <span className="flex items-center gap-1.5 group relative" title="Scalability and performance considerations">
+                  {hasScalability ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
+                  Scalability
                 </span>
-              )}
-            </span>
-            <span className="flex items-center gap-1.5 group relative" title={alternativesExplanation}>
-              {hasAlternatives ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
-              <span>Alternatives</span>
-              {alternativesExplanation && alternativesExplanation.length < 60 && (
-                <span className="text-gray-600 ml-1 hidden sm:inline">• {alternativesExplanation}</span>
-              )}
-              {alternativesExplanation && alternativesExplanation.length >= 60 && (
-                <span className="absolute left-0 top-full mt-1 w-64 p-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                  {alternativesExplanation}
+                <span className="flex items-center gap-1.5 group relative" title={alternativesExplanation || "Trade-offs and alternative approaches"}>
+                  {hasAlternatives ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
+                  Trade-offs
+                  {alternativesExplanation && alternativesExplanation.length < 60 && (
+                    <span className="text-gray-600 ml-1 hidden sm:inline">• {alternativesExplanation}</span>
+                  )}
                 </span>
-              )}
-            </span>
+              </>
+            ) : problemType === 'bugfix' ? (
+              // Bug fix quick stats
+              <>
+                <span className="flex items-center gap-1.5 group relative" title="Bug identification">
+                  {hasBugIdentified ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
+                  Bug Found
+                </span>
+                <span className="flex items-center gap-1.5 group relative" title="Root cause analysis">
+                  {hasRootCause ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
+                  Root Cause
+                </span>
+                <span className="flex items-center gap-1.5 group relative" title="Fix applied successfully">
+                  {testsPassed === testsTotal && testsTotal > 0 ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
+                  Fix Applied
+                </span>
+              </>
+            ) : (
+              // DSA quick stats (default) with explanations
+              <>
+                <span className="flex items-center gap-1.5 group relative" title={complexityExplanation}>
+                  {complexityAccurate ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
+                  <span>Complexity</span>
+                  {complexityExplanation && complexityExplanation.length < 60 && (
+                    <span className="text-gray-600 ml-1 hidden sm:inline">• {complexityExplanation}</span>
+                  )}
+                  {complexityExplanation && complexityExplanation.length >= 60 && (
+                    <span className="absolute left-0 top-full mt-1 w-64 p-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                      {complexityExplanation}
+                    </span>
+                  )}
+                </span>
+                <span className="flex items-center gap-1.5 group relative" title={edgeCasesExplanation}>
+                  {edgeCasesDiscussed ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
+                  <span>Edge Cases</span>
+                  {edgeCasesExplanation && edgeCasesExplanation.length < 60 && (
+                    <span className="text-gray-600 ml-1 hidden sm:inline">• {edgeCasesExplanation}</span>
+                  )}
+                  {edgeCasesExplanation && edgeCasesExplanation.length >= 60 && (
+                    <span className="absolute left-0 top-full mt-1 w-64 p-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                      {edgeCasesExplanation}
+                    </span>
+                  )}
+                </span>
+                <span className="flex items-center gap-1.5 group relative" title={alternativesExplanation}>
+                  {hasAlternatives ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
+                  <span>Alternatives</span>
+                  {alternativesExplanation && alternativesExplanation.length < 60 && (
+                    <span className="text-gray-600 ml-1 hidden sm:inline">• {alternativesExplanation}</span>
+                  )}
+                  {alternativesExplanation && alternativesExplanation.length >= 60 && (
+                    <span className="absolute left-0 top-full mt-1 w-64 p-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                      {alternativesExplanation}
+                    </span>
+                  )}
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -510,14 +569,20 @@ export default function PracticeFeedback({
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {/* Left Column - Main Content */}
         <div className="lg:col-span-3 space-y-4">
-          {/* Collapsible: Code Solution - Moved Higher */}
+          {/* Collapsible: Code/Design Solution - Moved Higher */}
           {code && (
             <Collapsible open={showCode} onOpenChange={setShowCode}>
               <CollapsibleTrigger asChild>
                 <button className="w-full flex items-center justify-between p-4 bg-gray-900/50 border border-gray-800 rounded-xl hover:bg-gray-800/50 transition-colors">
                   <div className="flex items-center gap-2">
-                    <Code className="h-4 w-4 text-[#00d9ff]" />
-                    <span className="text-sm font-medium text-white">Your Solution</span>
+                    {problemType === 'system-design' ? (
+                      <Layers className="h-4 w-4 text-[#00d9ff]" />
+                    ) : (
+                      <Code className="h-4 w-4 text-[#00d9ff]" />
+                    )}
+                    <span className="text-sm font-medium text-white">
+                      {problemType === 'system-design' ? 'Your Design Notes' : 'Your Solution'}
+                    </span>
                   </div>
                   {showCode ? <ChevronUp className="h-4 w-4 text-gray-500" /> : <ChevronDown className="h-4 w-4 text-gray-500" />}
                 </button>
@@ -573,14 +638,20 @@ export default function PracticeFeedback({
 
           {/* Feedback Sections - Two columns on desktop */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* What Worked */}
+            {/* What Worked - scenario-specific fallbacks */}
             <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <TrendingUp className="h-4 w-4 text-emerald-400" />
                 <span className="text-sm font-medium text-emerald-400">What Worked</span>
               </div>
               <ul className="space-y-2">
-                {(sections.whatWorked.length > 0 ? sections.whatWorked : [`Passed ${testsPassed}/${testsTotal} tests`]).slice(0, 3).map((item, i) => (
+                {(sections.whatWorked.length > 0 ? sections.whatWorked : (
+                  problemType === 'system-design'
+                    ? ["Engaged in system design discussion", "Proposed architecture components"]
+                    : problemType === 'bugfix'
+                      ? [`Fixed ${testsPassed}/${testsTotal} issues`, "Identified bug location"]
+                      : [`Passed ${testsPassed}/${testsTotal} tests`]
+                )).slice(0, 3).map((item, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
                     <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
                     <span className="line-clamp-2">{item}</span>
@@ -589,14 +660,20 @@ export default function PracticeFeedback({
               </ul>
             </div>
 
-            {/* Areas to Improve */}
+            {/* Areas to Improve - scenario-specific fallbacks */}
             <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Target className="h-4 w-4 text-yellow-400" />
                 <span className="text-sm font-medium text-yellow-400">To Improve</span>
               </div>
               <ul className="space-y-2">
-                {(sections.fixNext.length > 0 ? sections.fixNext : ["Practice explaining your thought process", "Discuss complexity before coding"]).slice(0, 3).map((item, i) => (
+                {(sections.fixNext.length > 0 ? sections.fixNext : (
+                  problemType === 'system-design'
+                    ? ["Clarify requirements before designing", "Discuss scalability trade-offs", "Consider failure scenarios"]
+                    : problemType === 'bugfix'
+                      ? ["Explain root cause before fixing", "Consider edge cases that caused the bug"]
+                      : ["Practice explaining your thought process", "Discuss complexity before coding"]
+                )).slice(0, 3).map((item, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
                     <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
                     <span className="line-clamp-2">{item}</span>
@@ -607,14 +684,27 @@ export default function PracticeFeedback({
           </div>
         </div>
 
-        {/* Right Column - Compact Scores Sidebar */}
+        {/* Right Column - Compact Scores Sidebar - scenario-specific */}
         <div className="lg:col-span-1 space-y-3">
-          {[
+          {(problemType === 'system-design' ? [
+            // System Design: Requirements, Architecture, Scalability, Communication
+            { name: "Requirements", score: scores.understanding, weight: "20%", icon: Search, color: "#00d9ff" },
+            { name: "Architecture", score: scores.problemSolving, weight: "30%", icon: Layers, color: "#00ff88" },
+            { name: "Scalability", score: scores.codeQuality, weight: "20%", icon: Scale, color: "#a78bfa" },
+            { name: "Communication", score: scores.communication, weight: "30%", icon: MessageSquare, color: "#fbbf24" },
+          ] : problemType === 'bugfix' ? [
+            // Bug Fix: Bug Identification, Root Cause, Fix Quality, Communication
+            { name: "Bug Found", score: scores.understanding, weight: "35%", icon: Bug, color: "#00d9ff" },
+            { name: "Root Cause", score: scores.problemSolving, weight: "25%", icon: Search, color: "#00ff88" },
+            { name: "Fix Quality", score: scores.codeQuality, weight: "20%", icon: Wrench, color: "#a78bfa" },
+            { name: "Communication", score: scores.communication, weight: "20%", icon: MessageSquare, color: "#fbbf24" },
+          ] : [
+            // DSA (default): Understanding, Problem-Solving, Code Quality, Communication
             { name: "Understanding", score: scores.understanding, weight: "30%", icon: Lightbulb, color: "#00d9ff" },
             { name: "Problem-Solving", score: scores.problemSolving, weight: "25%", icon: Zap, color: "#00ff88" },
             { name: "Code Quality", score: scores.codeQuality, weight: "25%", icon: Code, color: "#a78bfa" },
             { name: "Communication", score: scores.communication, weight: "20%", icon: MessageSquare, color: "#fbbf24" },
-          ].map((item) => (
+          ]).map((item) => (
             <div key={item.name} className="bg-gray-900/50 border border-gray-800 rounded-xl p-3">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1.5">
@@ -633,7 +723,6 @@ export default function PracticeFeedback({
           ))}
         </div>
       </div>
-
       {/* Collapsible: Action Plan */}
       {sections.actionPlan.length > 0 && (
         <Collapsible open={showDetails} onOpenChange={setShowDetails}>
@@ -665,9 +754,13 @@ export default function PracticeFeedback({
       )}
 
 
-      {/* Footer note */}
+      {/* Footer note - scenario-specific */}
       <p className="text-center text-xs text-gray-600">
-        Graded like real Meta/Google interviews · AI usage optional
+        {problemType === 'system-design'
+          ? "Evaluated like real FAANG system design interviews · Discussion-based"
+          : problemType === 'bugfix'
+            ? "Graded on debugging process & fix quality · AI collaboration allowed"
+            : "Graded like real Meta/Google interviews · AI usage optional"}
       </p>
     </div>
   )
