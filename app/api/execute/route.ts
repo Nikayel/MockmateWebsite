@@ -393,6 +393,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Scenario ID is required" }, { status: 400 })
     }
 
+    // Validate language parameter
+    const validLanguages = ['javascript', 'typescript', 'python']
+    if (!validLanguages.includes(language)) {
+      return NextResponse.json({
+        error: `Unsupported language: ${language}. Supported languages are: ${validLanguages.join(', ')}`
+      }, { status: 400 })
+    }
+
     // Get scenario from scenarios.ts
     const scenario = getScenarioById(scenarioId)
 

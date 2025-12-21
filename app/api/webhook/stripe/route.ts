@@ -303,6 +303,124 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Handle failed payments - notify users and update subscription status
+  if (event.type === "invoice.payment_failed") {
+    const invoice = event.data.object as Stripe.Invoice
+
+    console.log(`💸 Payment failed for invoice: ${invoice.id}`)
+
+    try {
+      // Find user by customer ID
+      const customerId = invoice.customer as string
+      if (customerId) {
+        const profilesQuery = await adminDb.collection("profiles")
+          .where("stripe_customer_id", "==", customerId)
+          .get()
+
+        if (!profilesQuery.empty) {
+          const profileDoc = profilesQuery.docs[0]
+          const userId = profileDoc.id
+          const profileRef = adminDb.collection("profiles").doc(userId)
+
+          // Update subscription status to indicate payment issue
+          await profileRef.set({
+            subscription_status: "past_due",
+            payment_failed_at: new Date().toISOString(),
+            payment_failure_reason: invoice.last_finalization_error?.message || "Payment declined",
+            updated_at: new Date().toISOString(),
+          }, { merge: true })
+
+          console.log(`⚠️ User ${userId} subscription marked as past_due due to payment failure`)
+
+          // Note: In production, you should also send an email notification here
+          // using a service like SendGrid, Resend, or AWS SES
+        }
+      }
+    } catch (error) {
+      console.error("Error handling payment failure:", error)
+    }
+  }
+
+  // Handle charge failures (declined cards, etc.)
+  if (event.type === "charge.failed") {
+    const charge = event.data.object as Stripe.Charge
+
+    console.log(`❌ Charge failed: ${charge.id}, reason: ${charge.failure_message}`)
+
+    try {
+      const customerId = charge.customer as string
+      if (customerId) {
+        const profilesQuery = await adminDb.collection("profiles")
+          .where("stripe_customer_id", "==", customerId)
+          .get()
+
+        if (!profilesQuery.empty) {
+          const profileDoc = profilesQuery.docs[0]
+          const userId = profileDoc.id
+          const profileRef = adminDb.collection("profiles").doc(userId)
+
+          await profileRef.set({
+            last_charge_failure: {
+              charge_id: charge.id,
+              failure_code: charge.failure_code,
+              failure_message: charge.failure_message,
+              occurred_at: new Date().toISOString(),
+            },
+            updated_at: new Date().toISOString(),
+          }, { merge: true })
+
+          console.log(`⚠️ Recorded charge failure for user ${userId}: ${charge.failure_message}`)
+        }
+      }
+    } catch (error) {
+      console.error("Error handling charge failure:", error)
+    }
+  }
+
+  // Handle successful payment after past_due (subscription recovered)
+  if (event.type === "invoice.paid") {
+    const invoice = event.data.object as Stripe.Invoice
+
+    // Only handle if this was a recovery from past_due
+    if (invoice.billing_reason === "subscription_cycle" || invoice.billing_reason === "subscription_update") {
+      try {
+        const customerId = invoice.customer as string
+        if (customerId) {
+          const profilesQuery = await adminDb.collection("profiles")
+            .where("stripe_customer_id", "==", customerId)
+            .get()
+
+          if (!profilesQuery.empty) {
+            const profileDoc = profilesQuery.docs[0]
+            const profile = profileDoc.data()
+
+            // Only update if subscription was past_due
+            if (profile?.subscription_status === "past_due") {
+              const userId = profileDoc.id
+              const profileRef = adminDb.collection("profiles").doc(userId)
+
+              await profileRef.set({
+                subscription_status: "active",
+                subscription_tier: "pro", // Restore Pro access
+                payment_failed_at: null, // Clear failure timestamp
+                payment_failure_reason: null, // Clear failure reason
+                payment_recovered_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              }, { merge: true })
+
+              // Restore Pro quota
+              await updateQuotaForSubscriptionTierAdmin(userId, "pro")
+
+              console.log(`✅ User ${userId} subscription recovered - payment successful`)
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error handling payment recovery:", error)
+      }
+    }
+  }
+
   // Handle subscription updates/cancellations
   if (event.type === "customer.subscription.deleted" || event.type === "customer.subscription.updated") {
     const subscription = event.data.object as Stripe.Subscription

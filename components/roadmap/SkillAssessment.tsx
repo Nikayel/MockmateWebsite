@@ -295,15 +295,22 @@ function ProblemsSolvedStep({
       </div>
 
       <div className="text-center">
+        <label htmlFor="problems-solved-range" className="sr-only">
+          Number of problems solved
+        </label>
         <input
+          id="problems-solved-range"
           type="range"
           min={0}
           max={500}
           value={value}
           onChange={(e) => onChange(parseInt(e.target.value))}
           className="w-full max-w-md"
+          aria-valuemin={0}
+          aria-valuemax={500}
+          aria-valuenow={value}
         />
-        <p className="mt-2 text-lg font-semibold">{value} problems</p>
+        <p className="mt-2 text-lg font-semibold" aria-live="polite">{value} problems</p>
       </div>
     </div>
   )

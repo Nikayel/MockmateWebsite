@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { adminDb } from "@/lib/firebase-admin"
 import { PRICING_CONFIG } from "@/lib/config"
+import { getUserIdFromRequest } from "@/lib/auth-server"
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY environment variable is required")
@@ -19,11 +20,16 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, platform, planType } = await request.json()
-
-    if (!userId) {
-      return NextResponse.json({ error: "User ID is required" }, { status: 400 })
+    // Verify authentication - userId must come from verified token
+    const authenticatedUserId = await getUserIdFromRequest(request)
+    if (!authenticatedUserId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
+
+    const { platform, planType } = await request.json()
+
+    // Use the authenticated userId, not from request body
+    const userId = authenticatedUserId
 
     if (!planType || (planType !== 'monthly' && planType !== 'yearly')) {
       return NextResponse.json({ error: "Plan type must be 'monthly' or 'yearly'" }, { status: 400 })

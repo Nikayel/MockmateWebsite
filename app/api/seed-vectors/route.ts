@@ -6,10 +6,33 @@ import {
   embedAndStoreHint,
   type TextEmbedding,
 } from "@/lib/embeddings"
+import { getUserIdFromRequest } from "@/lib/auth-server"
+import { adminDb } from "@/lib/firebase-admin"
+
+// Admin user IDs - add your admin user IDs here
+const ADMIN_USER_IDS = process.env.ADMIN_USER_IDS?.split(",") || []
+
+async function isAdmin(userId: string): Promise<boolean> {
+  if (ADMIN_USER_IDS.includes(userId)) return true
+
+  try {
+    const profileRef = adminDb.collection("profiles").doc(userId)
+    const profileSnap = await profileRef.get()
+    if (profileSnap.exists) {
+      const profile = profileSnap.data()
+      return profile?.role === "admin" || profile?.is_admin === true
+    }
+  } catch {
+    // Ignore errors
+  }
+
+  return false
+}
 
 /**
  * API endpoint to seed the vector DB with problem embeddings
  * This should be run once to initialize the RAG system
+ * ADMIN ONLY - requires authentication and admin role
  *
  * POST /api/seed-vectors
  * Query params:
@@ -18,6 +41,17 @@ import {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication
+    const userId = await getUserIdFromRequest(request)
+    if (!userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+
+    // Require admin role
+    const admin = await isAdmin(userId)
+    if (!admin) {
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+    }
     const { searchParams } = new URL(request.url)
     const limit = parseInt(searchParams.get("limit") || "0") || scenarios.length
     const force = searchParams.get("force") === "true"

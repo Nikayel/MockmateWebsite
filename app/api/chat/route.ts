@@ -204,12 +204,115 @@ PATTERN-SPECIFIC FOLLOW-UPS TO ASK:
 ${patternMeta.interviewerFollowUps.slice(0, 3).map(q => `- ${q}`).join('\n')}
 ` : ''
 
+    // Build system design specific context with phase-based guidance
+    const isSystemDesign = scenarioType === 'system-design'
+    const elapsedMinutes = elapsedTime ? Math.floor(elapsedTime / 60) : 0
+
+    // System design interviews should follow 4 phases (~45 min total)
+    const getSystemDesignPhase = (minutes: number) => {
+      if (minutes < 10) return 'requirements' // Phase 1: Requirements gathering
+      if (minutes < 20) return 'high-level' // Phase 2: High-level design
+      if (minutes < 35) return 'deep-dive' // Phase 3: Deep dive
+      return 'wrap-up' // Phase 4: Bottlenecks & wrap-up
+    }
+
+    const systemDesignPhase = isSystemDesign ? getSystemDesignPhase(elapsedMinutes) : null
+
+    const systemDesignContext = isSystemDesign ? `
+INTERVIEW TYPE: System Design (Architecture Discussion - NOT a coding interview)
+
+CURRENT PHASE: ${systemDesignPhase?.toUpperCase()} (${elapsedMinutes} min elapsed)
+
+PHASE GUIDANCE:
+${systemDesignPhase === 'requirements' ? `
+REQUIREMENTS PHASE (0-10 min):
+- Ask clarifying questions about scope and scale
+- Help candidate define functional requirements (what the system must do)
+- Help candidate define non-functional requirements (latency, availability, scale)
+- Ask: "How many users?" "What's the expected traffic?" "What's more important: consistency or availability?"
+- DON'T jump into architecture yet - requirements first!
+` : ''}
+${systemDesignPhase === 'high-level' ? `
+HIGH-LEVEL DESIGN PHASE (10-20 min):
+- Guide candidate to draw the major components
+- Ask about API design: "What endpoints do we need?"
+- Ask about data model: "What entities do we need to store?"
+- Ask about communication: "How will components communicate?"
+- Encourage thinking out loud about architectural choices
+` : ''}
+${systemDesignPhase === 'deep-dive' ? `
+DEEP DIVE PHASE (20-35 min):
+- Pick 1-2 components to explore deeply
+- Ask about scaling: "What happens at 10x traffic?"
+- Ask about failure modes: "What if this component fails?"
+- Discuss trade-offs: "Why did you choose X over Y?"
+- Probe on specific algorithms or data structures for key components
+` : ''}
+${systemDesignPhase === 'wrap-up' ? `
+WRAP-UP PHASE (35-45 min):
+- Ask about single points of failure
+- Discuss monitoring and observability
+- Ask about security considerations
+- Summarize the design and discuss improvements
+- Ask: "What would you do differently with more time?"
+` : ''}
+
+SYSTEM DESIGN EVALUATION CRITERIA:
+- Requirements Gathering: Did they ask good clarifying questions?
+- Architecture: Did they propose a clear, logical system design?
+- Scalability: Did they address how to handle increased load?
+- Trade-offs: Did they discuss pros/cons of their choices?
+- Communication: Did they explain their thinking clearly?
+
+SYSTEM DESIGN SPECIFIC RULES:
+- This is a DISCUSSION, not a coding exercise
+- There is NO "correct answer" - evaluate reasoning and trade-offs
+- Ask open-ended questions to understand their thinking
+- Guide them through phases naturally based on elapsed time
+- Focus on WHY they make decisions, not just WHAT they propose
+- Encourage them to think about scale (millions of users, TB of data)
+- Ask about failure scenarios and edge cases
+` : ''
+
+    // Build bug fix specific context
+    const isBugFix = scenarioType === 'bugfix'
+    const bugFixContext = isBugFix ? `
+INTERVIEW TYPE: Bug Fix / Debugging Interview
+
+THIS IS A DEBUGGING EXERCISE - Focus on:
+1. Understanding the bug: Ask them to explain what the bug is
+2. Debugging approach: How are they finding the issue?
+3. Root cause analysis: Do they understand WHY it happens?
+4. Fix quality: Is the fix correct and complete?
+5. Prevention: How to prevent similar bugs in the future?
+
+DEBUGGING INTERVIEW BEST PRACTICES:
+- Ask them to read through the code and explain what it does
+- Ask: "What do you think is causing this behavior?"
+- Ask: "How would you debug this in production?"
+- If they struggle: Give hints about WHERE to look, not WHAT the bug is
+- Ask about edge cases: "What if the input is empty? Null? Very large?"
+- After the fix: "How would you write a test to catch this?"
+
+EVALUATION CRITERIA FOR BUG FIX:
+- Bug Identification: Did they find the actual bug?
+- Debugging Process: Was their approach systematic or random?
+- Root Cause: Do they understand why the bug occurred?
+- Fix Quality: Is the fix correct, complete, and clean?
+- Testing Mindset: Did they consider edge cases and testing?
+
+DO NOT:
+- Give away the bug location or fix too quickly
+- Accept a fix without understanding the root cause
+- Let them blindly try things without reasoning
+` : ''
+
     const systemPrompts = {
       interviewer: `You are a professional technical interviewer${isGenericCompany ? '' : ` at ${companyStyle.company}`}. Be direct and concise.
 
 ${companyContext}
 ${userContextString}${problemContext}
-${patternContext}
+${isSystemDesign ? systemDesignContext : isBugFix ? bugFixContext : patternContext}
 
 CORE RULES:
 - Keep responses SHORT (2-4 sentences max)

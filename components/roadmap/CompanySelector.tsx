@@ -35,14 +35,23 @@ export function CompanySelector({ onSelect, selectedCompany }: CompanySelectorPr
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <label htmlFor="company-search" className="sr-only">
+          Search companies
+        </label>
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
         <input
+          id="company-search"
           type="text"
           placeholder="Search companies..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          maxLength={50}
           className="w-full pl-10 pr-4 py-3 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+          aria-describedby="company-search-help"
         />
+        <span id="company-search-help" className="sr-only">
+          Type to filter the list of companies below
+        </span>
       </div>
 
       {/* Tier filters */}

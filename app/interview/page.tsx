@@ -13,6 +13,24 @@ import { Input } from "@/components/ui/input"
 import { CodeViewerSidePanel } from "@/components/CodeViewerSidePanel"
 import { GradingCriteriaTooltip } from "@/components/GradingCriteria"
 import { ScenarioBrowser } from "@/components/interview"
+import { ErrorBoundary } from "@/components/error-boundary"
+
+// Inline error fallback for components that fail to load
+function ComponentErrorFallback({ componentName }: { componentName: string }) {
+  return (
+    <div className="flex items-center justify-center h-full bg-gray-900/50 p-4">
+      <div className="text-center">
+        <div className="text-red-400 text-sm mb-2">Failed to load {componentName}</div>
+        <button
+          onClick={() => window.location.reload()}
+          className="text-xs text-[#00d9ff] hover:underline"
+        >
+          Reload page
+        </button>
+      </div>
+    </div>
+  )
+}
 
 // Dynamically import heavy components to reduce initial bundle size
 const MonacoEditor = dynamic(
@@ -326,6 +344,48 @@ export default function InterviewPage() {
               }))
               setWorkspaceContext(contextFiles)
             }
+          } else if (scenario.type === 'system-design') {
+            // For system design, provide a design notes template
+            initialCode = `// DESIGN NOTES: ${scenario.title}
+// Use this space to document your design decisions
+
+/* ============================================
+   1. REQUIREMENTS CLARIFICATION
+   ============================================ */
+// Functional:
+// -
+//
+// Non-Functional:
+// - Scale:
+// - Latency:
+// - Availability:
+
+/* ============================================
+   2. HIGH-LEVEL ARCHITECTURE
+   ============================================ */
+// Key Components:
+// 1.
+// 2.
+// 3.
+
+/* ============================================
+   3. DATA MODEL
+   ============================================ */
+// Tables/Collections:
+//
+
+/* ============================================
+   4. API DESIGN
+   ============================================ */
+// Endpoints:
+// POST /api/...
+// GET /api/...
+
+/* ============================================
+   5. SCALING & TRADE-OFFS
+   ============================================ */
+// -
+`
           } else {
             initialCode = (scenario as any).starterCode?.[selectedLanguage] || `function solution() {
   // Write your solution here
@@ -1328,6 +1388,48 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         setWorkspaceContext(contextFiles)
         toast.success(`Loaded ${contextFiles.length} codebase file(s) - review them to understand the existing code`)
       }
+    } else if (selectedScenario.type === 'system-design') {
+      // For system design, provide a design notes template
+      initialCode = `// DESIGN NOTES: ${selectedScenario.title}
+// Use this space to document your design decisions
+
+/* ============================================
+   1. REQUIREMENTS CLARIFICATION
+   ============================================ */
+// Functional:
+// -
+//
+// Non-Functional:
+// - Scale:
+// - Latency:
+// - Availability:
+
+/* ============================================
+   2. HIGH-LEVEL ARCHITECTURE
+   ============================================ */
+// Key Components:
+// 1.
+// 2.
+// 3.
+
+/* ============================================
+   3. DATA MODEL
+   ============================================ */
+// Tables/Collections:
+//
+
+/* ============================================
+   4. API DESIGN
+   ============================================ */
+// Endpoints:
+// POST /api/...
+// GET /api/...
+
+/* ============================================
+   5. SCALING & TRADE-OFFS
+   ============================================ */
+// -
+`
     } else {
       // For DSA problems, load starter code
       initialCode = (selectedScenario as any).starterCode?.[selectedLanguage] || `function solution() {
@@ -2100,7 +2202,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       <CardTitle className="text-white flex items-center justify-between text-xs">
                         <div className="flex items-center space-x-1">
                           <Code className="h-3 w-3 text-[#00d9ff]" />
-                          <span>{selectedScenario?.title.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}.{selectedLanguage === "javascript" ? "js" : selectedLanguage === "typescript" ? "ts" : "py"}</span>
+                          {selectedScenario?.type === 'system-design' ? (
+                            <span>Design Notes</span>
+                          ) : (
+                            <span>{selectedScenario?.title.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}.{selectedLanguage === "javascript" ? "js" : selectedLanguage === "typescript" ? "ts" : "py"}</span>
+                          )}
                         </div>
                         <div className="flex items-center space-x-3">
                           {/* Grading criteria indicator */}
@@ -2117,23 +2223,25 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     {/* Code Editor - Using centralized MonacoEditor component */}
                     <div className="flex flex-col flex-1 min-h-0 gap-2 px-3 pb-3">
                       <div ref={editorContainerRef} className="flex-1 min-h-0 rounded border border-gray-700 overflow-hidden relative">
-                        <MonacoEditor
-                          height="100%"
-                          language={selectedLanguage}
-                          value={code || (selectedScenario ? ((selectedScenario as any).starterCode?.[selectedLanguage] || (selectedScenario as any).buggyCode?.[selectedLanguage] || (selectedScenario as any).existingCode?.[selectedLanguage] || '') : '')}
-                          onChange={(newCode) => {
-                            // Enforce code protection if enabled
-                            if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
-                              const validation = validateCodeProtection(newCode, protectedElements, selectedLanguage)
-                              if (!validation.valid) {
-                                toast.error(`Cannot remove required code: ${validation.errors[0]}`)
-                                return
+                        <ErrorBoundary>
+                          <MonacoEditor
+                            height="100%"
+                            language={selectedLanguage}
+                            value={code || (selectedScenario ? ((selectedScenario as any).starterCode?.[selectedLanguage] || (selectedScenario as any).buggyCode?.[selectedLanguage] || (selectedScenario as any).existingCode?.[selectedLanguage] || '') : '')}
+                            onChange={(newCode) => {
+                              // Enforce code protection if enabled
+                              if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
+                                const validation = validateCodeProtection(newCode, protectedElements, selectedLanguage)
+                                if (!validation.valid) {
+                                  toast.error(`Cannot remove required code: ${validation.errors[0]}`)
+                                  return
+                                }
                               }
-                            }
-                            setCode(newCode)
-                          }}
-                          readOnly={!isInterviewStarted || showFeedback}
-                        />
+                              setCode(newCode)
+                            }}
+                            readOnly={!isInterviewStarted || showFeedback}
+                          />
+                        </ErrorBoundary>
                         {/* Start Interview Overlay - shown when scenario selected but not started */}
                         {selectedScenario && !isInterviewStarted && !showScenarioBrowser && (
                           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-10">
@@ -2160,8 +2268,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         )}
                       </div>
 
-                      {/* Terminal/Console Output - Enhanced */}
-                      {testResults.length > 0 && (
+                      {/* Terminal/Console Output - Enhanced (hidden for system design) */}
+                      {testResults.length > 0 && selectedScenario?.type !== 'system-design' && (
                         <div className="flex-shrink-0 bg-black border border-gray-700 rounded flex flex-col max-h-48 min-h-[120px]">
                           {/* Terminal Header */}
                           <div className="flex items-center justify-between px-3 py-1.5 bg-gray-800 border-b border-gray-700 flex-shrink-0">
@@ -2270,36 +2378,38 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         </div>
                       )}
 
-                      {/* Controls */}
-                      <div className="flex items-center justify-end gap-2 flex-shrink-0">
-                        {!isLanguageSupported(selectedLanguage) && (
-                          <span className="text-[10px] text-yellow-400 mr-1">
-                            Use JS/Python to run tests
-                          </span>
-                        )}
-                        <Button
-                          onClick={() => {
-                            if (!isLanguageSupported(selectedLanguage)) {
-                              toast.error(`${selectedLanguage.toUpperCase()} execution not supported yet`, {
-                                description: "Switch to JavaScript or Python to run tests.",
-                                action: {
-                                  label: "Use JavaScript",
-                                  onClick: () => setSelectedLanguage("javascript"),
-                                },
-                              })
-                              return
-                            }
-                            runCode()
-                          }}
-                          disabled={showFeedback}
-                          loading={isRunningTests}
-                          className={`${isLanguageSupported(selectedLanguage) ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 hover:bg-gray-500"} text-white text-xs h-7`}
-                          aria-label={isRunningTests ? "Running tests" : "Run tests"}
-                        >
-                          {!isRunningTests && <PlayCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
-                          {isRunningTests ? "Running..." : "Run Tests"}
-                        </Button>
-                      </div>
+                      {/* Controls - Hide for system design since there's no runnable code */}
+                      {selectedScenario?.type !== 'system-design' && (
+                        <div className="flex items-center justify-end gap-2 flex-shrink-0">
+                          {!isLanguageSupported(selectedLanguage) && (
+                            <span className="text-[10px] text-yellow-400 mr-1">
+                              Use JS/Python to run tests
+                            </span>
+                          )}
+                          <Button
+                            onClick={() => {
+                              if (!isLanguageSupported(selectedLanguage)) {
+                                toast.error(`${selectedLanguage.toUpperCase()} execution not supported yet`, {
+                                  description: "Switch to JavaScript or Python to run tests.",
+                                  action: {
+                                    label: "Use JavaScript",
+                                    onClick: () => setSelectedLanguage("javascript"),
+                                  },
+                                })
+                                return
+                              }
+                              runCode()
+                            }}
+                            disabled={showFeedback}
+                            loading={isRunningTests}
+                            className={`${isLanguageSupported(selectedLanguage) ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 hover:bg-gray-500"} text-white text-xs h-7`}
+                            aria-label={isRunningTests ? "Running tests" : "Run tests"}
+                          >
+                            {!isRunningTests && <PlayCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
+                            {isRunningTests ? "Running..." : "Run Tests"}
+                          </Button>
+                        </div>
+                      )}
 
                       {/* AI Coding Partner - Only show for interview types that allow AI assistance
                           Real interview rules:
@@ -2663,24 +2773,26 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 </div>
               ) : (
                 <>
-                  <PracticeFeedback
-                    feedback={comprehensiveFeedback || ""}
-                    performanceScore={performanceScore || 0}
-                    testsPassed={testSummary.passed}
-                    testsTotal={testSummary.total}
-                    timeComplexity={efficiencyMetrics?.estimatedTimeComplexity}
-                    spaceComplexity={efficiencyMetrics?.estimatedSpaceComplexity}
-                    efficiencyScore={efficiencyMetrics?.efficiencyScore}
-                    elapsedTime={elapsedTime}
-                    userId={user?.id}
-                    problemType={selectedScenario?.type}
-                    difficulty={selectedScenario?.difficulty}
-                    problemTitle={selectedScenario?.title}
-                    code={code}
-                    language={selectedLanguage}
-                    onRetry={resetInterview}
-                    onNewProblem={resetInterview}
-                  />
+                  <ErrorBoundary>
+                    <PracticeFeedback
+                      feedback={comprehensiveFeedback || ""}
+                      performanceScore={performanceScore || 0}
+                      testsPassed={testSummary.passed}
+                      testsTotal={testSummary.total}
+                      timeComplexity={efficiencyMetrics?.estimatedTimeComplexity}
+                      spaceComplexity={efficiencyMetrics?.estimatedSpaceComplexity}
+                      efficiencyScore={efficiencyMetrics?.efficiencyScore}
+                      elapsedTime={elapsedTime}
+                      userId={user?.id}
+                      problemType={selectedScenario?.type}
+                      difficulty={selectedScenario?.difficulty}
+                      problemTitle={selectedScenario?.title}
+                      code={code}
+                      language={selectedLanguage}
+                      onRetry={resetInterview}
+                      onNewProblem={resetInterview}
+                    />
+                  </ErrorBoundary>
                   {isFromRoadmap && activeRoadmap && (
                     <div className="mt-6 flex justify-center">
                       <Button
