@@ -62,6 +62,22 @@ export interface InterviewSession {
   scenario_id?: string // scenario ID for reopening sessions
   performance_score?: number
   feedback?: string
+  // Additional completion data
+  final_code?: string
+  language?: string
+  test_results?: Array<any>
+  tests_passed?: number
+  tests_total?: number
+  time_complexity?: string
+  space_complexity?: string
+  efficiency_score?: number
+  // Session state (for recovery)
+  session_state?: {
+    code?: string
+    language?: string
+    elapsed_time?: number
+    test_results?: Array<any>
+  }
 }
 
 export interface ErrorState {

@@ -42,7 +42,7 @@ export async function createOrUpdateProfile(
   const isNewProfile = !existingProfile
   const subscriptionTier = isNewProfile
     ? "free"
-    : (existingProfile.subscription_tier || "free")
+    : (existingProfile?.subscription_tier || "free")
 
   // Build profile data, filtering out undefined values for Firestore
   // Firestore doesn't allow undefined values, so we only include defined fields
@@ -334,15 +334,39 @@ export async function createInterviewSession(
 export async function updateInterviewSession(
   sessionId: string,
   performanceScore?: number,
-  feedback?: string
+  feedback?: string,
+  additionalData?: {
+    code?: string
+    language?: string
+    testResults?: Array<any>
+    timeComplexity?: string
+    spaceComplexity?: string
+    efficiencyScore?: number
+  }
 ): Promise<void> {
   const sessionRef = doc(db, "interview_sessions", sessionId)
-  await setDoc(sessionRef, {
+  const updateData: any = {
     completed_at: new Date().toISOString(),
     performance_score: performanceScore,
     feedback: feedback,
     updated_at: new Date().toISOString(),
-  }, { merge: true })
+  }
+
+  // Save additional completion data
+  if (additionalData) {
+    if (additionalData.code) updateData.final_code = additionalData.code
+    if (additionalData.language) updateData.language = additionalData.language
+    if (additionalData.testResults) {
+      updateData.test_results = additionalData.testResults
+      updateData.tests_passed = additionalData.testResults.filter((t: any) => t.passed).length
+      updateData.tests_total = additionalData.testResults.length
+    }
+    if (additionalData.timeComplexity) updateData.time_complexity = additionalData.timeComplexity
+    if (additionalData.spaceComplexity) updateData.space_complexity = additionalData.spaceComplexity
+    if (additionalData.efficiencyScore) updateData.efficiency_score = additionalData.efficiencyScore
+  }
+
+  await setDoc(sessionRef, updateData, { merge: true })
 }
 
 /**

@@ -189,7 +189,7 @@ function parseFeedback(feedback: string): FeedbackSection {
     }
 
     const hasNewScores = sections.scores.understanding > 0 || sections.scores.problemSolving > 0 ||
-                         sections.scores.codeQuality > 0 || sections.scores.communication > 0
+      sections.scores.codeQuality > 0 || sections.scores.communication > 0
 
     if (hasNewScores) {
       sections.scores.overall = Math.round(
@@ -201,7 +201,7 @@ function parseFeedback(feedback: string): FeedbackSection {
     } else {
       sections.scores.overall = Math.round(
         (sections.scores.correctness + sections.scores.efficiency + sections.scores.codeQuality +
-         sections.scores.reasoning + sections.scores.aiCollaboration) / 5
+          sections.scores.reasoning + sections.scores.aiCollaboration) / 5
       )
     }
   }
@@ -253,7 +253,12 @@ export default function PracticeFeedback({
   const sections = parseFeedback(feedback)
 
   const feedbackLower = feedback.toLowerCase()
-  const hasEdgeCases = feedbackLower.includes('edge case') || feedbackLower.includes('corner case')
+  
+  // Check if edge cases were DISCUSSED with interviewer (not just solved correctly)
+  const edgeCasesDiscussed = /edge cases considered:\s*yes/i.test(feedback) || 
+    /discussed.*edge case/i.test(feedback) ||
+    /mentioned.*edge case/i.test(feedback) ||
+    feedbackLower.includes('edge case') || feedbackLower.includes('corner case')
   const hasAlternatives = feedbackLower.includes('alternative') || feedbackLower.includes('another approach') || feedbackLower.includes('trade-off') || feedbackLower.includes('tradeoff')
   const complexityAccurate = (efficiencyScore || 0) >= 70
 
@@ -265,6 +270,30 @@ export default function PracticeFeedback({
   const hasBugIdentified = feedbackLower.includes('bug') || feedbackLower.includes('issue') || feedbackLower.includes('problem') || feedbackLower.includes('error')
   const hasRootCause = feedbackLower.includes('root cause') || feedbackLower.includes('because') || feedbackLower.includes('reason') || feedbackLower.includes('why')
 
+  // Extract one-liner feedback for complexity, edge cases, and alternatives
+  const extractFeedbackExplanation = (keyword: string, context: string): string => {
+    const regex = new RegExp(`(${keyword}[^.]*?\\.)`, 'i')
+    const match = context.match(regex)
+    if (match) {
+      // Clean up the match - remove the keyword itself and trim
+      let explanation = match[1].replace(new RegExp(keyword, 'i'), '').trim()
+      // Remove leading punctuation
+      explanation = explanation.replace(/^[:\-–—\s]+/, '').trim()
+      // Limit to one sentence
+      const sentences = explanation.split(/[.!?]+/)
+      return sentences[0]?.trim() || ''
+    }
+    return ''
+  }
+
+  // Try to extract explanations from feedback
+  const complexityExplanation = extractFeedbackExplanation('complexity|time complexity|space complexity', feedback) ||
+    (complexityAccurate ? 'Optimal complexity achieved' : 'Could improve complexity analysis')
+  const edgeCasesExplanation = extractFeedbackExplanation('edge case|corner case', feedback) ||
+    (edgeCasesDiscussed ? 'Edge cases discussed with interviewer' : 'Did not discuss edge cases with interviewer')
+  const alternativesExplanation = extractFeedbackExplanation('alternative|another approach|different approach', feedback) ||
+    (hasAlternatives ? 'Alternative approaches discussed' : 'Consider discussing alternatives')
+
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60)
     return minutes > 0 ? `${minutes}m` : `${seconds}s`
@@ -272,7 +301,7 @@ export default function PracticeFeedback({
 
   // Fallback score inference
   const hasParsedScores = sections.scores.understanding > 0 || sections.scores.problemSolving > 0 ||
-                          sections.scores.codeQuality > 0 || sections.scores.communication > 0
+    sections.scores.codeQuality > 0 || sections.scores.communication > 0
 
   if (!hasParsedScores && performanceScore > 0) {
     const baseScore = performanceScore <= 10 ? performanceScore * 10 : performanceScore
@@ -301,7 +330,10 @@ export default function PracticeFeedback({
     communication: normalizeScore(sections.scores.communication || 0),
   }
 
-  const overallScore = sections.scores.overall > 0 ? normalizeScore(sections.scores.overall) : normalizeScore(performanceScore)
+  // Use performanceScore as primary source if available, otherwise use parsed overall score
+  // This ensures consistency between what's saved and what's displayed
+  const overallScore = performanceScore > 0 ? normalizeScore(performanceScore) : 
+    (sections.scores.overall > 0 ? normalizeScore(sections.scores.overall) : 0)
 
   const getLetterGrade = (score: number) => {
     if (score >= 95) return { grade: "A+", color: "text-emerald-400" }
@@ -402,8 +434,8 @@ export default function PracticeFeedback({
               <div className={cn(
                 "w-16 h-16 rounded-full flex items-center justify-center border-4",
                 overallScore >= 80 ? "border-emerald-500/50 bg-emerald-500/10" :
-                overallScore >= 60 ? "border-[#00d9ff]/50 bg-[#00d9ff]/10" :
-                "border-yellow-500/50 bg-yellow-500/10"
+                  overallScore >= 60 ? "border-[#00d9ff]/50 bg-[#00d9ff]/10" :
+                    "border-yellow-500/50 bg-yellow-500/10"
               )}>
                 <span className={cn("text-2xl font-bold", color)}>{grade}</span>
               </div>
@@ -431,49 +463,76 @@ export default function PracticeFeedback({
             {problemType === 'system-design' ? (
               // System design quick stats
               <>
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 group relative" title="Requirements gathering and clarification">
                   {hasRequirements ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
                   Requirements
                 </span>
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 group relative" title="Scalability and performance considerations">
                   {hasScalability ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
                   Scalability
                 </span>
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 group relative" title={alternativesExplanation || "Trade-offs and alternative approaches"}>
                   {hasAlternatives ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
                   Trade-offs
+                  {alternativesExplanation && alternativesExplanation.length < 60 && (
+                    <span className="text-gray-600 ml-1 hidden sm:inline">• {alternativesExplanation}</span>
+                  )}
                 </span>
               </>
             ) : problemType === 'bugfix' ? (
               // Bug fix quick stats
               <>
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 group relative" title="Bug identification">
                   {hasBugIdentified ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
                   Bug Found
                 </span>
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 group relative" title="Root cause analysis">
                   {hasRootCause ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
                   Root Cause
                 </span>
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 group relative" title="Fix applied successfully">
                   {testsPassed === testsTotal && testsTotal > 0 ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
                   Fix Applied
                 </span>
               </>
             ) : (
-              // DSA quick stats (default)
+              // DSA quick stats (default) with explanations
               <>
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 group relative" title={complexityExplanation}>
                   {complexityAccurate ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
-                  Complexity
+                  <span>Complexity</span>
+                  {complexityExplanation && complexityExplanation.length < 60 && (
+                    <span className="text-gray-600 ml-1 hidden sm:inline">• {complexityExplanation}</span>
+                  )}
+                  {complexityExplanation && complexityExplanation.length >= 60 && (
+                    <span className="absolute left-0 top-full mt-1 w-64 p-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                      {complexityExplanation}
+                    </span>
+                  )}
                 </span>
-                <span className="flex items-center gap-1.5">
-                  {hasEdgeCases ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
-                  Edge Cases
+                <span className="flex items-center gap-1.5 group relative" title={edgeCasesExplanation}>
+                  {edgeCasesDiscussed ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
+                  <span>Edge Cases</span>
+                  {edgeCasesExplanation && edgeCasesExplanation.length < 60 && (
+                    <span className="text-gray-600 ml-1 hidden sm:inline">• {edgeCasesExplanation}</span>
+                  )}
+                  {edgeCasesExplanation && edgeCasesExplanation.length >= 60 && (
+                    <span className="absolute left-0 top-full mt-1 w-64 p-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                      {edgeCasesExplanation}
+                    </span>
+                  )}
                 </span>
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 group relative" title={alternativesExplanation}>
                   {hasAlternatives ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
-                  Alternatives
+                  <span>Alternatives</span>
+                  {alternativesExplanation && alternativesExplanation.length < 60 && (
+                    <span className="text-gray-600 ml-1 hidden sm:inline">• {alternativesExplanation}</span>
+                  )}
+                  {alternativesExplanation && alternativesExplanation.length >= 60 && (
+                    <span className="absolute left-0 top-full mt-1 w-64 p-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                      {alternativesExplanation}
+                    </span>
+                  )}
                 </span>
               </>
             )}
@@ -506,120 +565,164 @@ export default function PracticeFeedback({
         </div>
       </div>
 
-      {/* Scores Grid - Compact 2x2, scenario-specific dimensions */}
-      <div className="grid grid-cols-2 gap-3">
-        {(problemType === 'system-design' ? [
-          // System Design: Requirements, Architecture, Scalability, Communication
-          { name: "Requirements", score: scores.understanding, weight: "20%", icon: Search, color: "#00d9ff", tooltip: "Clarifying functional & non-functional requirements" },
-          { name: "Architecture", score: scores.problemSolving, weight: "30%", icon: Layers, color: "#00ff88", tooltip: "High-level design & component decisions" },
-          { name: "Scalability", score: scores.codeQuality, weight: "20%", icon: Scale, color: "#a78bfa", tooltip: "Scaling strategies & trade-offs" },
-          { name: "Communication", score: scores.communication, weight: "30%", icon: MessageSquare, color: "#fbbf24", tooltip: "Explaining decisions & collaboration" },
-        ] : problemType === 'bugfix' ? [
-          // Bug Fix: Bug Identification, Root Cause, Fix Quality, Communication
-          { name: "Bug Found", score: scores.understanding, weight: "35%", icon: Bug, color: "#00d9ff", tooltip: "Identifying the bug correctly" },
-          { name: "Root Cause", score: scores.problemSolving, weight: "25%", icon: Search, color: "#00ff88", tooltip: "Understanding why the bug occurred" },
-          { name: "Fix Quality", score: scores.codeQuality, weight: "20%", icon: Wrench, color: "#a78bfa", tooltip: "Clean, correct fix without side effects" },
-          { name: "Communication", score: scores.communication, weight: "20%", icon: MessageSquare, color: "#fbbf24", tooltip: "Explaining debugging process" },
-        ] : [
-          // DSA (default): Understanding, Problem-Solving, Code Quality, Communication
-          { name: "Understanding", score: scores.understanding, weight: "30%", icon: Lightbulb, color: "#00d9ff", tooltip: "Explaining approach & complexity" },
-          { name: "Problem-Solving", score: scores.problemSolving, weight: "25%", icon: Zap, color: "#00ff88", tooltip: "Algorithm choice & optimization" },
-          { name: "Code Quality", score: scores.codeQuality, weight: "25%", icon: Code, color: "#a78bfa", tooltip: "Clean, efficient, readable code" },
-          { name: "Communication", score: scores.communication, weight: "20%", icon: MessageSquare, color: "#fbbf24", tooltip: "Thinking out loud" },
-        ]).map((item) => (
-          <div key={item.name} className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <item.icon className="h-4 w-4" style={{ color: item.color }} />
-                <span className="text-sm text-gray-300">{item.name}</span>
-              </div>
-              <span className="text-xs text-gray-600">{item.weight}</span>
-            </div>
-            <div className="flex items-end justify-between">
-              <span className="text-2xl font-bold text-white">{item.score}%</span>
-              <div className="flex-1 ml-3">
-                <Progress value={item.score} className="h-1.5 bg-gray-800" />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Main Content Grid - Scores on side, Code and Recommendations higher */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {/* Left Column - Main Content */}
+        <div className="lg:col-span-3 space-y-4">
+          {/* Collapsible: Code/Design Solution - Moved Higher */}
+          {code && (
+            <Collapsible open={showCode} onOpenChange={setShowCode}>
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between p-4 bg-gray-900/50 border border-gray-800 rounded-xl hover:bg-gray-800/50 transition-colors">
+                  <div className="flex items-center gap-2">
+                    {problemType === 'system-design' ? (
+                      <Layers className="h-4 w-4 text-[#00d9ff]" />
+                    ) : (
+                      <Code className="h-4 w-4 text-[#00d9ff]" />
+                    )}
+                    <span className="text-sm font-medium text-white">
+                      {problemType === 'system-design' ? 'Your Design Notes' : 'Your Solution'}
+                    </span>
+                  </div>
+                  {showCode ? <ChevronUp className="h-4 w-4 text-gray-500" /> : <ChevronDown className="h-4 w-4 text-gray-500" />}
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="mt-2 bg-black/50 border border-gray-800 rounded-xl p-4 max-h-[300px] overflow-auto">
+                  <pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap">
+                    <code>{code}</code>
+                  </pre>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
-      {/* Feedback Sections - Two columns on desktop */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {/* What Worked - scenario-specific fallbacks */}
-        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <TrendingUp className="h-4 w-4 text-emerald-400" />
-            <span className="text-sm font-medium text-emerald-400">What Worked</span>
+          {/* Collapsible: Learning Recommendations - Moved Higher */}
+          {userId && (
+            <Collapsible open={showRecommendations} onOpenChange={setShowRecommendations}>
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-[#00d9ff]/10 to-transparent border border-[#00d9ff]/20 rounded-xl hover:bg-[#00d9ff]/5 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-[#00d9ff]" />
+                    <span className="text-sm font-medium text-white">Learning Recommendations</span>
+                  </div>
+                  {showRecommendations ? <ChevronUp className="h-4 w-4 text-gray-500" /> : <ChevronDown className="h-4 w-4 text-gray-500" />}
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="mt-2 space-y-4">
+                  <Card className="bg-gray-900/30 border-gray-800">
+                    <CardContent className="p-4">
+                      <LearningRecommendations
+                        userId={userId}
+                        currentProblemType={problemType}
+                        currentDifficulty={difficulty}
+                        performanceScore={overallScore}
+                        onSelectProblem={() => onNewProblem?.()}
+                      />
+                    </CardContent>
+                  </Card>
+
+                  {problemTitle && (
+                    <NextProblemRecommendations
+                      userId={userId}
+                      currentProblemText={`${problemTitle}: ${feedback.substring(0, 200)}`}
+                      currentProblemId={problemTitle}
+                      onSelectProblem={() => onNewProblem?.()}
+                    />
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* Feedback Sections - Two columns on desktop */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* What Worked - scenario-specific fallbacks */}
+            <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="h-4 w-4 text-emerald-400" />
+                <span className="text-sm font-medium text-emerald-400">What Worked</span>
+              </div>
+              <ul className="space-y-2">
+                {(sections.whatWorked.length > 0 ? sections.whatWorked : (
+                  problemType === 'system-design'
+                    ? ["Engaged in system design discussion", "Proposed architecture components"]
+                    : problemType === 'bugfix'
+                      ? [`Fixed ${testsPassed}/${testsTotal} issues`, "Identified bug location"]
+                      : [`Passed ${testsPassed}/${testsTotal} tests`]
+                )).slice(0, 3).map((item, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span className="line-clamp-2">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Areas to Improve - scenario-specific fallbacks */}
+            <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Target className="h-4 w-4 text-yellow-400" />
+                <span className="text-sm font-medium text-yellow-400">To Improve</span>
+              </div>
+              <ul className="space-y-2">
+                {(sections.fixNext.length > 0 ? sections.fixNext : (
+                  problemType === 'system-design'
+                    ? ["Clarify requirements before designing", "Discuss scalability trade-offs", "Consider failure scenarios"]
+                    : problemType === 'bugfix'
+                      ? ["Explain root cause before fixing", "Consider edge cases that caused the bug"]
+                      : ["Practice explaining your thought process", "Discuss complexity before coding"]
+                )).slice(0, 3).map((item, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
+                    <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
+                    <span className="line-clamp-2">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-          <ul className="space-y-2">
-            {(sections.whatWorked.length > 0 ? sections.whatWorked : (
-              problemType === 'system-design'
-                ? ["Engaged in system design discussion", "Proposed architecture components"]
-                : problemType === 'bugfix'
-                  ? [`Fixed ${testsPassed}/${testsTotal} issues`, "Identified bug location"]
-                  : [`Passed ${testsPassed}/${testsTotal} tests`]
-            )).slice(0, 3).map((item, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
-                <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-                <span className="line-clamp-2">{item}</span>
-              </li>
-            ))}
-          </ul>
         </div>
 
-        {/* Areas to Improve - scenario-specific fallbacks */}
-        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Target className="h-4 w-4 text-yellow-400" />
-            <span className="text-sm font-medium text-yellow-400">To Improve</span>
-          </div>
-          <ul className="space-y-2">
-            {(sections.fixNext.length > 0 ? sections.fixNext : (
-              problemType === 'system-design'
-                ? ["Clarify requirements before designing", "Discuss scalability trade-offs", "Consider failure scenarios"]
-                : problemType === 'bugfix'
-                  ? ["Explain root cause before fixing", "Consider edge cases that caused the bug"]
-                  : ["Practice explaining your thought process", "Discuss complexity before coding"]
-            )).slice(0, 3).map((item, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
-                <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
-                <span className="line-clamp-2">{item}</span>
-              </li>
-            ))}
-          </ul>
+        {/* Right Column - Compact Scores Sidebar - scenario-specific */}
+        <div className="lg:col-span-1 space-y-3">
+          {(problemType === 'system-design' ? [
+            // System Design: Requirements, Architecture, Scalability, Communication
+            { name: "Requirements", score: scores.understanding, weight: "20%", icon: Search, color: "#00d9ff" },
+            { name: "Architecture", score: scores.problemSolving, weight: "30%", icon: Layers, color: "#00ff88" },
+            { name: "Scalability", score: scores.codeQuality, weight: "20%", icon: Scale, color: "#a78bfa" },
+            { name: "Communication", score: scores.communication, weight: "30%", icon: MessageSquare, color: "#fbbf24" },
+          ] : problemType === 'bugfix' ? [
+            // Bug Fix: Bug Identification, Root Cause, Fix Quality, Communication
+            { name: "Bug Found", score: scores.understanding, weight: "35%", icon: Bug, color: "#00d9ff" },
+            { name: "Root Cause", score: scores.problemSolving, weight: "25%", icon: Search, color: "#00ff88" },
+            { name: "Fix Quality", score: scores.codeQuality, weight: "20%", icon: Wrench, color: "#a78bfa" },
+            { name: "Communication", score: scores.communication, weight: "20%", icon: MessageSquare, color: "#fbbf24" },
+          ] : [
+            // DSA (default): Understanding, Problem-Solving, Code Quality, Communication
+            { name: "Understanding", score: scores.understanding, weight: "30%", icon: Lightbulb, color: "#00d9ff" },
+            { name: "Problem-Solving", score: scores.problemSolving, weight: "25%", icon: Zap, color: "#00ff88" },
+            { name: "Code Quality", score: scores.codeQuality, weight: "25%", icon: Code, color: "#a78bfa" },
+            { name: "Communication", score: scores.communication, weight: "20%", icon: MessageSquare, color: "#fbbf24" },
+          ]).map((item) => (
+            <div key={item.name} className="bg-gray-900/50 border border-gray-800 rounded-xl p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <item.icon className="h-3.5 w-3.5" style={{ color: item.color }} />
+                  <span className="text-xs text-gray-300">{item.name}</span>
+                </div>
+                <span className="text-xs text-gray-600">{item.weight}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xl font-bold text-white">{item.score}%</span>
+                <div className="flex-1 ml-2">
+                  <Progress value={item.score} className="h-1 bg-gray-800" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
-
-      {/* Collapsible: Code/Design Solution */}
-      {code && (
-        <Collapsible open={showCode} onOpenChange={setShowCode}>
-          <CollapsibleTrigger asChild>
-            <button className="w-full flex items-center justify-between p-4 bg-gray-900/50 border border-gray-800 rounded-xl hover:bg-gray-800/50 transition-colors">
-              <div className="flex items-center gap-2">
-                {problemType === 'system-design' ? (
-                  <Layers className="h-4 w-4 text-[#00d9ff]" />
-                ) : (
-                  <Code className="h-4 w-4 text-[#00d9ff]" />
-                )}
-                <span className="text-sm font-medium text-white">
-                  {problemType === 'system-design' ? 'Your Design Notes' : 'Your Solution'}
-                </span>
-              </div>
-              {showCode ? <ChevronUp className="h-4 w-4 text-gray-500" /> : <ChevronDown className="h-4 w-4 text-gray-500" />}
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="mt-2 bg-black/50 border border-gray-800 rounded-xl p-4 max-h-[300px] overflow-auto">
-              <pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap">
-                <code>{code}</code>
-              </pre>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-      )}
-
       {/* Collapsible: Action Plan */}
       {sections.actionPlan.length > 0 && (
         <Collapsible open={showDetails} onOpenChange={setShowDetails}>
@@ -650,44 +753,6 @@ export default function PracticeFeedback({
         </Collapsible>
       )}
 
-      {/* Collapsible: Learning Recommendations */}
-      {userId && (
-        <Collapsible open={showRecommendations} onOpenChange={setShowRecommendations}>
-          <CollapsibleTrigger asChild>
-            <button className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-[#00d9ff]/10 to-transparent border border-[#00d9ff]/20 rounded-xl hover:bg-[#00d9ff]/5 transition-colors">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-[#00d9ff]" />
-                <span className="text-sm font-medium text-white">Learning Recommendations</span>
-              </div>
-              {showRecommendations ? <ChevronUp className="h-4 w-4 text-gray-500" /> : <ChevronDown className="h-4 w-4 text-gray-500" />}
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="mt-2 space-y-4">
-              <Card className="bg-gray-900/30 border-gray-800">
-                <CardContent className="p-4">
-                  <LearningRecommendations
-                    userId={userId}
-                    currentProblemType={problemType}
-                    currentDifficulty={difficulty}
-                    performanceScore={overallScore}
-                    onSelectProblem={() => onNewProblem?.()}
-                  />
-                </CardContent>
-              </Card>
-
-              {problemTitle && (
-                <NextProblemRecommendations
-                  userId={userId}
-                  currentProblemText={`${problemTitle}: ${feedback.substring(0, 200)}`}
-                  currentProblemId={problemTitle}
-                  onSelectProblem={() => onNewProblem?.()}
-                />
-              )}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-      )}
 
       {/* Footer note - scenario-specific */}
       <p className="text-center text-xs text-gray-600">

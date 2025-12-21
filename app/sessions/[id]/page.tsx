@@ -184,12 +184,18 @@ export default function SessionDetailPage() {
             <PracticeFeedback
               feedback={session.feedback}
               performanceScore={session.performance_score || 0}
-              testsPassed={0}
-              testsTotal={0}
+              testsPassed={session.tests_passed ?? (session.test_results?.filter((t: any) => t.passed).length || 0)}
+              testsTotal={session.tests_total ?? (session.test_results?.length || 0)}
               timeComplexity={session.time_complexity}
               spaceComplexity={session.space_complexity}
               efficiencyScore={session.efficiency_score}
               elapsedTime={Math.round((new Date(session.completed_at).getTime() - new Date(session.started_at).getTime()) / 1000)}
+              userId={firebaseUser?.uid}
+              problemType={session.type}
+              difficulty={session.difficulty}
+              problemTitle={session.topic}
+              code={session.final_code || session.session_state?.code}
+              language={session.language || session.session_state?.language || "javascript"}
               onRetry={() => router.push(`/interview?scenario=${session.scenario_id}`)}
               onNewProblem={() => router.push('/interview')}
             />

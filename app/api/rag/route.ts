@@ -119,6 +119,43 @@ function generateContextualHints(
   const textLower = problemText.toLowerCase()
   const codeLower = userCode.toLowerCase()
 
+  // System design specific hints
+  if (problemType === 'system-design') {
+    // Level 1: Requirements gathering
+    if (!textLower.includes('requirement') && !codeLower.includes('requirement')) {
+      hints.push({
+        level: 1,
+        hint: "Start by clarifying requirements. Ask about scale (users, requests per second), functional requirements, and non-functional requirements (latency, availability).",
+      })
+    }
+    
+    // Level 2: Architecture components
+    if (!codeLower.includes('component') && !codeLower.includes('service') && !codeLower.includes('api')) {
+      hints.push({
+        level: 2,
+        hint: "Think about the major components: API layer, application servers, databases, caches, message queues. How do they communicate?",
+      })
+    }
+    
+    // Level 3: Scalability
+    if (!codeLower.includes('scale') && !codeLower.includes('shard') && !codeLower.includes('load balancer')) {
+      hints.push({
+        level: 3,
+        hint: "Consider scalability: How would you handle 10x traffic? Think about horizontal scaling, load balancing, database sharding, and caching strategies.",
+      })
+    }
+    
+    // Ensure at least one system design hint
+    if (hints.length === 0) {
+      hints.push({
+        level: 1,
+        hint: "For system design, start with requirements clarification, then high-level architecture, then deep dive into specific components.",
+      })
+    }
+    
+    return hints
+  }
+
   // Level 1: Gentle nudges based on problem type
   if (textLower.includes('two sum') || textLower.includes('pair') || textLower.includes('sum')) {
     hints.push({
@@ -241,8 +278,9 @@ async function handleGetSimilarSolutions(params: {
   userId: string
   problemText: string
   limit?: number
+  problemType?: string // Filter by problem type
 }) {
-  const { userId, problemText, limit = 5 } = params
+  const { userId, problemText, limit = 5, problemType } = params
 
   if (!userId || !problemText) {
     return NextResponse.json(
@@ -251,7 +289,7 @@ async function handleGetSimilarSolutions(params: {
     )
   }
 
-  const similar = await getSimilarSolutions(problemText, userId, { limit })
+  const similar = await getSimilarSolutions(problemText, userId, { limit, problemType })
 
   return NextResponse.json({
     similarSolutions: similar.map(s => ({
@@ -260,8 +298,8 @@ async function handleGetSimilarSolutions(params: {
       metadata: s.metadata,
     })),
     message: similar.length > 0
-      ? `Found ${similar.length} similar problems you've worked on before!`
-      : "No similar past solutions found. This is a new type of problem for you!",
+      ? `Found ${similar.length} similar ${problemType === 'system-design' ? 'design' : 'problem'}${similar.length > 1 ? 's' : ''} you've worked on before!`
+      : `No similar past ${problemType === 'system-design' ? 'designs' : 'solutions'} found. This is a new type of problem for you!`,
   })
 }
 
@@ -313,8 +351,9 @@ async function handleStoreSolution(params: {
   language: string
   passed: boolean
   score: number
+  problemType?: string // 'dsa' | 'bugfix' | 'system-design' | etc.
 }) {
-  const { userId, problemId, problemTitle, solutionCode, language, passed, score } = params
+  const { userId, problemId, problemTitle, solutionCode, language, passed, score, problemType } = params
 
   if (!userId || !problemId || !solutionCode) {
     return NextResponse.json(
@@ -323,17 +362,30 @@ async function handleStoreSolution(params: {
     )
   }
 
+  // For system design, solutionCode might be empty (chat-only submission)
+  // Still store it if there's any content or if it's explicitly a system design problem
+  const isSystemDesign = problemType === 'system-design'
+  if (!isSystemDesign && !solutionCode.trim()) {
+    return NextResponse.json(
+      { error: "solutionCode cannot be empty for non-system-design problems" },
+      { status: 400 }
+    )
+  }
+
   const embeddingId = await embedAndStoreSolution(userId, problemId, solutionCode, {
     problemTitle,
-    language,
+    language: isSystemDesign ? 'notes' : language, // System design uses notes, not code
     passed,
     score,
+    problemType,
   })
 
   return NextResponse.json({
     success: true,
     embeddingId,
-    message: "Solution stored for future reference",
+    message: isSystemDesign 
+      ? "Design notes stored for future reference"
+      : "Solution stored for future reference",
   })
 }
 

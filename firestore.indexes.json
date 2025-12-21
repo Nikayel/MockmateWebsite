@@ -59,6 +59,24 @@
       ]
     },
     {
+      "collectionGroup": "text_embeddings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "metadata.problemId", "order": "ASCENDING" },
+        { "fieldPath": "metadata.userId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "text_embeddings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "metadata.problemId", "order": "ASCENDING" },
+        { "fieldPath": "metadata.user_id", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "session_vectors",
       "queryScope": "COLLECTION",
       "fields": [
