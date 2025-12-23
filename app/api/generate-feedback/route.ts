@@ -245,6 +245,7 @@ function getDefaultValidation(): ConversationValidation {
 
 /**
  * Detect if design notes are just the blank template (not filled in)
+ * This is CRITICAL for scoring - empty submissions should get low scores
  */
 function isBlankDesignTemplate(designNotes: string): boolean {
   if (!designNotes || !designNotes.trim()) {
@@ -252,70 +253,118 @@ function isBlankDesignTemplate(designNotes: string): boolean {
   }
 
   const notes = designNotes.trim()
-  
-  // Template structure markers that indicate blank/unfilled sections
-  const blankPatterns = [
-    /\/\/\s*-\s*$/,                      // "// -" (blank bullet point)
-    /\/\/\s*$/,                          // "//" (blank comment line)
-    /\/\/\s*\d+\.\s*$/,                  // "// 1." "// 2." "// 3." (blank numbered items)
-    /\/\/\s*POST\s+\/api\/\.\.\./i,     // "// POST /api/..." (template endpoint)
-    /\/\/\s*GET\s+\/api\/\.\.\./i,      // "// GET /api/..." (template endpoint)
-    /\/\/\s*Scale:\s*$/i,                // "// - Scale:" (blank non-functional requirement)
-    /\/\/\s*Latency:\s*$/i,              // "// - Latency:" (blank non-functional requirement)
-    /\/\/\s*Availability:\s*$/i,         // "// - Availability:" (blank non-functional requirement)
+
+  // Known template placeholder patterns - these are NOT user content
+  const templatePlaceholders = [
+    /\/\/\s*-\s*$/m,                           // "// -" (blank bullet point)
+    /\/\/\s*$/m,                               // "//" (blank comment line)
+    /\/\/\s*\d+\.\s*$/m,                       // "// 1." "// 2." "// 3." (blank numbered items)
+    /\/\/\s*POST\s+\/api\/\.{3}/i,             // "// POST /api/..." (template endpoint)
+    /\/\/\s*GET\s+\/api\/\.{3}/i,              // "// GET /api/..." (template endpoint)
+    /\/\/\s*-\s*Scale:\s*$/im,                 // "// - Scale:" (blank)
+    /\/\/\s*-\s*Latency:\s*$/im,               // "// - Latency:" (blank)
+    /\/\/\s*-\s*Availability:\s*$/im,          // "// - Availability:" (blank)
+    /\/\/\s*Functional:\s*$/im,                // "// Functional:" (section header)
+    /\/\/\s*Non-Functional:\s*$/im,            // "// Non-Functional:" (section header)
+    /\/\/\s*Key Components:\s*$/im,            // "// Key Components:" (section header)
+    /\/\/\s*Tables\/Collections:\s*$/im,       // "// Tables/Collections:" (section header)
+    /\/\/\s*Endpoints:\s*$/im,                 // "// Endpoints:" (section header)
+    /\/\/\s*DESIGN NOTES:/i,                   // "// DESIGN NOTES:" (header)
+    /\/\/\s*Use this space to document/i,      // Template instruction
+    /\/\*\s*=+\s*$/m,                          // "/* ===" divider start
+    /\s*=+\s*\*\//m,                           // "==== */" divider end
+    /^\s*\d+\.\s*(REQUIREMENTS|HIGH-LEVEL|DATA MODEL|API DESIGN|SCALING)/im, // Section titles
   ]
 
-  // Count blank markers
-  const blankMarkerCount = blankPatterns.filter(pattern => pattern.test(notes)).length
-  
-  // Extract lines with actual content (not template structure)
-  const lines = notes.split('\n')
-  const contentLines = lines.filter(line => {
-    const trimmed = line.trim()
-    
-    // Skip empty lines
-    if (!trimmed) return false
-    
-    // Skip comment block headers (/* === */)
-    if (trimmed.startsWith('/*') || trimmed.startsWith('*/') || trimmed.includes('===')) {
-      return false
-    }
-    
-    // Skip template header comments
-    if (trimmed.startsWith('// DESIGN NOTES:') || trimmed.startsWith('// Use this space')) {
-      return false
-    }
-    
-    // Check comment lines for actual content
-    if (trimmed.startsWith('//')) {
-      const content = trimmed.replace(/^\/\/\s*/, '')
-      
-      // Skip blank template markers
-      if (blankPatterns.some(p => p.test(line))) {
-        return false
-      }
-      
-      // Skip section labels without content (e.g., "// Functional:", "// Key Components:")
-      if (/^(Functional|Non-Functional|Key Components|Tables|Collections|Endpoints|Scaling|Trade-offs):\s*$/i.test(content)) {
-        return false
-      }
-      
-      // If comment has meaningful content (more than 10 chars), count it
-      return content.length > 10
-    }
-    
-    // Non-comment lines with content
-    return trimmed.length > 3
-  })
+  // Count how many template patterns exist in the notes
+  const templatePatternMatches = templatePlaceholders.filter(p => p.test(notes)).length
 
-  // If there are many blank markers (>= 4) AND very few content lines (< 3), it's blank
-  if (blankMarkerCount >= 4 && contentLines.length < 3) {
+  // Extract lines and analyze for REAL user content
+  const lines = notes.split('\n')
+
+  let realContentLines = 0
+  let totalUserAddedChars = 0
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+
+    // Skip empty lines
+    if (!trimmed) continue
+
+    // Skip divider blocks (/* === */)
+    if (trimmed.startsWith('/*') || trimmed.startsWith('*/') || /^[=\s*\/]+$/.test(trimmed)) {
+      continue
+    }
+
+    // Skip section headers (numbers followed by section names)
+    if (/^\d+\.\s*(REQUIREMENTS|HIGH-LEVEL|DATA MODEL|API DESIGN|SCALING|ARCHITECTURE)/i.test(trimmed)) {
+      continue
+    }
+
+    // For comment lines, extract actual content
+    if (trimmed.startsWith('//')) {
+      const content = trimmed.replace(/^\/\/\s*/, '').trim()
+
+      // Skip if it's just a template placeholder
+      if (!content || content === '-' || /^\d+\.$/.test(content)) {
+        continue
+      }
+
+      // Skip known template text patterns
+      const isTemplateText = [
+        /^DESIGN NOTES:/i,
+        /^Use this space/i,
+        /^Functional:\s*$/i,
+        /^Non-Functional:\s*$/i,
+        /^Key Components:\s*$/i,
+        /^Tables\/Collections:\s*$/i,
+        /^Endpoints:\s*$/i,
+        /^POST\s+\/api\/\.{3}/i,
+        /^GET\s+\/api\/\.{3}/i,
+        /^-\s*Scale:\s*$/i,
+        /^-\s*Latency:\s*$/i,
+        /^-\s*Availability:\s*$/i,
+        /^-\s*$/,
+      ].some(p => p.test(content))
+
+      if (isTemplateText) continue
+
+      // This looks like real content - count it if substantial
+      if (content.length > 15) {
+        realContentLines++
+        totalUserAddedChars += content.length
+      }
+    } else {
+      // Non-comment content (actual code or text)
+      if (trimmed.length > 10) {
+        realContentLines++
+        totalUserAddedChars += trimmed.length
+      }
+    }
+  }
+
+  // STRICT VALIDATION:
+  // Template has ~40 lines, many template patterns, and no real content
+  // User who actually filled it in would have:
+  // - Added content to the placeholder sections
+  // - Written at least a few sentences about their design
+  // - Modified the template meaningfully
+
+  // If most of the content matches template patterns, it's blank
+  if (templatePatternMatches >= 8) {
+    // High template pattern count - only pass if there's substantial real content
+    if (realContentLines < 5 || totalUserAddedChars < 200) {
+      return true
+    }
+  }
+
+  // If very little real content was added, it's essentially blank
+  if (realContentLines < 3) {
     return true
   }
-  
-  // If there are very few content lines overall (< 5), likely blank
-  if (contentLines.length < 5) {
-    // But allow if there was substantial conversation (handled by caller)
+
+  // If total user-added content is minimal (less than a paragraph), it's insufficient
+  if (totalUserAddedChars < 100) {
     return true
   }
 
@@ -325,6 +374,9 @@ function isBlankDesignTemplate(designNotes: string): boolean {
 /**
  * SYSTEM DESIGN SCORING - focused on architecture and discussion quality
  * No test pass rate since system design is discussion-based
+ *
+ * CRITICAL: This function must be strict about empty/minimal submissions
+ * to prevent users gaming the system by not engaging.
  */
 function calculateSystemDesignScores(
   preScreen: ReturnType<typeof preScreenConversation>,
@@ -346,29 +398,76 @@ function calculateSystemDesignScores(
 
   // Check if design notes are blank template
   const hasBlankDesignNotes = designNotes ? isBlankDesignTemplate(designNotes) : true
-  
-  // If no conversation AND design notes are blank, return minimum scores
+
+  // Determine engagement level
   const hasNoConversation = !preScreen.hasContent || preScreen.candidateMessageCount === 0
+  const hasMinimalConversation = preScreen.candidateMessageCount > 0 && preScreen.candidateMessageCount < 3
+  const hasMinimalContent = preScreen.avgMessageLength < 30 // Very short messages
   const hasNoContent = hasNoConversation && hasBlankDesignNotes
-  
+
+  // CASE 1: Completely empty submission (no conversation + blank template)
+  // This is a clear "didn't even try" scenario
   if (hasNoContent) {
-    // Return low scores for completely empty submissions (no conversation + blank template)
     return {
-      understanding: 10,  // No requirements gathering
-      problemSolving: 10,  // No architecture discussion
-      codeQuality: 10,     // No design discussion
-      communication: 10,   // No communication
-      overall: 10          // Overall poor performance
+      understanding: 5,   // No requirements gathering - they typed nothing
+      problemSolving: 5,  // No architecture discussion - no engagement at all
+      codeQuality: 5,     // No design - blank template
+      communication: 5,   // Zero communication
+      overall: 5          // Fail - did not participate
     }
   }
 
+  // CASE 2: Blank design notes (even with some conversation)
+  // Submitted without filling in any design - severely penalize
+  if (hasBlankDesignNotes) {
+    // Cap all scores at 20 - can't pass without documenting your design
+    const maxScore = 20
+
+    // If they didn't even have a real conversation, score even lower
+    if (hasMinimalConversation || hasMinimalContent) {
+      return {
+        understanding: 10,
+        problemSolving: 10,
+        codeQuality: 10,
+        communication: Math.min(15, aiValidation.communicationScore),
+        overall: 11 // Clear fail
+      }
+    }
+
+    // Some conversation but no design notes - partial credit but still failing
+    const commScore = Math.min(maxScore, aiValidation.communicationScore)
+    return {
+      understanding: Math.min(maxScore, aiValidation.approachExplained ? 18 : 12),
+      problemSolving: Math.min(maxScore, aiValidation.alternativesDiscussed ? 18 : 12),
+      codeQuality: 10, // No design documented
+      communication: commScore,
+      overall: Math.round((18 + 18 + 10 + commScore) / 5) // ~14-16 range
+    }
+  }
+
+  // CASE 3: Minimal conversation but some design notes
+  // They wrote something but didn't engage with interviewer
+  if (hasNoConversation || (hasMinimalConversation && hasMinimalContent)) {
+    // Cap scores - can't get good communication score without communicating
+    return {
+      understanding: 25,  // Some credit for reading the problem
+      problemSolving: 25, // Some credit for attempting design notes
+      codeQuality: 30,    // They at least wrote something
+      communication: 10,  // Did not communicate
+      overall: 22         // Low D/F range - need to discuss with interviewer
+    }
+  }
+
+  // CASE 4: Normal evaluation - has conversation AND design notes
+  // Start with base scores and adjust based on quality
+
   // UNDERSTANDING = Requirements gathering + approach explanation
-  let understanding = 30 // Lower base score - must earn points
+  let understanding = 25 // Lower base - must earn points
   if (aiValidation.approachExplained && aiValidation.isCoherent) {
     const approachBonus = {
-      'excellent': 50,
-      'good': 35,
-      'basic': 20,
+      'excellent': 55,
+      'good': 40,
+      'basic': 25,
       'poor': 10,
       'none': 0
     }[aiValidation.approachQuality] || 0
@@ -376,70 +475,56 @@ function calculateSystemDesignScores(
   }
   // Penalize if no coherent discussion
   if (!aiValidation.isCoherent || !aiValidation.responsesRelevant) {
-    understanding = Math.max(10, understanding - 20)
-  }
-  // Severely penalize if design notes are blank (even if there was some conversation)
-  // Blank template = no documented design, which is critical for system design
-  if (hasBlankDesignNotes) {
-    // Cap understanding at 20 if design notes are blank (no requirements documented)
-    understanding = Math.min(20, understanding)
+    understanding = Math.max(15, understanding - 25)
   }
 
   // PROBLEM-SOLVING = Architecture quality + alternatives discussed
-  let problemSolving = 30 // Lower base score
+  let problemSolving = 25 // Lower base
   if (aiValidation.alternativesDiscussed && aiValidation.isCoherent) {
-    problemSolving = Math.min(90, problemSolving + 30)
+    problemSolving = Math.min(85, problemSolving + 35)
   }
   if (aiValidation.edgeCasesConsidered && aiValidation.isCoherent) {
     problemSolving = Math.min(95, problemSolving + 25)
   }
   // Penalize if no coherent discussion
   if (!aiValidation.isCoherent || !aiValidation.responsesRelevant) {
-    problemSolving = Math.max(10, problemSolving - 20)
-  }
-  // Severely penalize if design notes are blank (no architecture documented)
-  if (hasBlankDesignNotes) {
-    // Cap problemSolving at 20 if design notes are blank (no architecture documented)
-    problemSolving = Math.min(20, problemSolving)
+    problemSolving = Math.max(15, problemSolving - 25)
   }
 
-  // CODE QUALITY = For system design, this becomes "Design Quality"
+  // CODE QUALITY = For system design, this becomes "Design Quality/Scalability"
   // Based on discussion depth and coherence
-  let codeQuality = 30 // Lower base score
+  let codeQuality = 25 // Lower base
   if (aiValidation.isCoherent && preScreen.hasContent) {
     // Reward depth of discussion
     const messageCount = preScreen.candidateMessageCount || 0
-    if (messageCount >= 10) codeQuality = Math.min(90, codeQuality + 40)
-    else if (messageCount >= 5) codeQuality = Math.min(80, codeQuality + 30)
-    else if (messageCount >= 2) codeQuality = Math.min(70, codeQuality + 20)
-    else codeQuality = Math.min(50, codeQuality + 10)
+    if (messageCount >= 10) codeQuality = Math.min(90, codeQuality + 45)
+    else if (messageCount >= 5) codeQuality = Math.min(80, codeQuality + 35)
+    else if (messageCount >= 3) codeQuality = Math.min(70, codeQuality + 25)
+    else codeQuality = Math.min(55, codeQuality + 15)
   } else {
-    codeQuality = Math.max(10, codeQuality - 20)
-  }
-  // Severely penalize if design notes are blank (no design documented)
-  if (hasBlankDesignNotes) {
-    // Cap codeQuality at 20 if design notes are blank (no design documented)
-    codeQuality = Math.min(20, codeQuality)
+    codeQuality = Math.max(15, codeQuality - 15)
   }
 
   // COMMUNICATION = Most important for system design interviews
-  // Use AI validation score directly, but ensure it reflects reality
   let communication = aiValidation.communicationScore
-  
-  // Ensure communication score reflects actual communication
+
+  // Ensure communication score reflects actual engagement
   if (!aiValidation.isCoherent) {
-    communication = Math.min(20, communication)
+    communication = Math.min(25, communication)
   } else if (!aiValidation.responsesRelevant) {
-    communication = Math.min(30, communication)
-  } else if (preScreen.candidateMessageCount === 0) {
-    communication = 10 // No messages = no communication
+    communication = Math.min(35, communication)
   }
-  
+
   // Bonus for answering interviewer questions (only if coherent)
   if (aiValidation.isCoherent && aiValidation.questionsAsked > 0) {
     const answerRate = aiValidation.questionsAnswered / aiValidation.questionsAsked
     if (answerRate >= 0.8) communication = Math.min(95, communication + 10)
     else if (answerRate >= 0.5) communication = Math.min(90, communication + 5)
+  }
+
+  // Ensure minimum conversation depth for good communication score
+  if (preScreen.candidateMessageCount < 3) {
+    communication = Math.min(40, communication)
   }
 
   // System design weighting: Communication is most important
@@ -801,13 +886,20 @@ RULES:
 `
 
       if (scenarioType === 'system-design') {
-        return `You are a senior system design interviewer at a FAANG company delivering focused feedback. Be direct and constructive.
+        return `You are a brutally honest senior system design interviewer at a FAANG company. Be direct—if they didn't try, call it out.
 
 ${baseRules}
 
+## CRITICAL: HANDLE LOW SCORES APPROPRIATELY
+If overall score is below 25:
+- TL;DR must explicitly state they did NOT engage or participate meaningfully
+- "What Worked" should say "The candidate opened the problem" or similar minimal acknowledgment
+- "Fix Next" must lead with: "CRITICAL: You must actually participate in the interview"
+- Be blunt: "You submitted without discussing anything" / "You typed nothing" / "Zero engagement"
+
 ## OUTPUT FORMAT FOR SYSTEM DESIGN
 
-**TL;DR** – One sentence: what they did well in the design discussion + biggest gap.
+**TL;DR** – One sentence: If score < 25, state clearly they did not participate. Otherwise: what they did well + biggest gap.
 
 **Score Snapshot** (use the PRE-CALCULATED SCORES provided)
 - Requirements: X/100 – Did they clarify functional & non-functional requirements?
@@ -817,13 +909,15 @@ ${baseRules}
 - Overall: X/100
 
 **What Worked** (max 3 bullets)
-- specific design strength with evidence from discussion
+- If score >= 30: specific design strength with evidence from discussion
+- If score < 30: "The candidate opened the design template" (be honest - don't fabricate positives)
 
 **Fix Next** (max 3 bullets, prioritized)
+- If score < 25: Start with "ENGAGE WITH THE INTERVIEWER - system design is a CONVERSATION, not a silent exercise"
 - specific improvement for system design interviews
 
 **Action Plan** (3 numbered steps)
-1. Immediate action for next system design practice
+1. If score < 25: "IMMEDIATE: Understand that system design interviews require active discussion. Practice explaining your thoughts out loud."
 2. Short-term: concepts to study
 3. Long-term: projects to build
 
@@ -832,6 +926,7 @@ SYSTEM DESIGN FOCUS:
 - Focus on architecture decisions and trade-offs
 - Value clear communication and collaboration
 - Consider: Did they ask clarifying questions? Discuss alternatives? Handle scale?
+- BE HONEST: If they didn't engage, don't pretend they did. Call it out directly.
 `
       }
 
@@ -1031,32 +1126,61 @@ ${conversationSummary}`
       if (scenarioType === 'system-design') {
         // System design: focus on discussion, not code
         const hasDiscussion = preScreen.candidateMessageCount > 0
-        const discussionContext = hasDiscussion 
-          ? `The candidate engaged in a system design discussion with ${preScreen.candidateMessageCount} message(s).`
-          : `CRITICAL: The candidate submitted with NO conversation or discussion. They did not engage with the interviewer or discuss any design decisions.`
-        
+        const hasMinimalDiscussion = preScreen.candidateMessageCount > 0 && preScreen.candidateMessageCount < 3
+        const hasBlankNotes = code ? isBlankDesignTemplate(code) : true
+
+        // Determine engagement level for AI context
+        let engagementContext: string
+        if (!hasDiscussion && hasBlankNotes) {
+          engagementContext = `
+⚠️ ZERO ENGAGEMENT DETECTED ⚠️
+- Candidate messages: 0
+- Design notes: BLANK (only template placeholders)
+- This is a FAILED submission - they did not participate at all
+- Your feedback MUST reflect this: be direct that they typed nothing and engaged with nothing
+- Do NOT fabricate any positives - there is nothing to praise`
+        } else if (hasBlankNotes) {
+          engagementContext = `
+⚠️ MINIMAL ENGAGEMENT - BLANK DESIGN NOTES ⚠️
+- Candidate messages: ${preScreen.candidateMessageCount}
+- Design notes: BLANK (only template placeholders, no actual design written)
+- They may have said a few words but did NOT document any design
+- This is a failing submission - be direct about the lack of written design work`
+        } else if (!hasDiscussion || hasMinimalDiscussion) {
+          engagementContext = `
+⚠️ MINIMAL CONVERSATION ⚠️
+- Candidate messages: ${preScreen.candidateMessageCount}
+- They wrote some design notes but barely discussed with the interviewer
+- System design interviews REQUIRE active discussion - call this out`
+        } else {
+          engagementContext = `
+✓ Normal engagement level
+- Candidate messages: ${preScreen.candidateMessageCount}
+- Average message length: ${Math.round(preScreen.avgMessageLength)} chars
+- Has design content: YES`
+        }
+
         return `Generate system design interview feedback using the pre-calculated scores below.
 
 ${baseInfo}
 
-${discussionContext}
+${engagementContext}
 
-DESIGN NOTES (if any):
+DESIGN NOTES SUBMITTED:
 \`\`\`
-${code && code.trim() && !code.includes('// Design notes completed via discussion') && !code.includes('// Design discussion completed') 
+${code && code.trim()
   ? (code.length > 1500 ? code.slice(0, 1500) + '\n// ... [truncated]' : code)
-  : 'No design notes provided - only placeholder text'}
+  : '[EMPTY - No design notes provided]'}
 \`\`\`
 
-IMPORTANT:
-- This is a SYSTEM DESIGN interview - evaluate architecture discussion, NOT code execution
+CRITICAL INSTRUCTIONS:
 - Use the PRE-CALCULATED SCORES above exactly - they reflect what actually happened
-- Be HONEST: If no discussion occurred, say so clearly in "What Worked" and "Fix Next"
-- If scores are low (under 30), the candidate did NOT engage properly - reflect this accurately
-- Focus on: requirements gathering, architecture decisions, scalability trade-offs, communication
-- Do NOT use generic fallback text - base feedback on actual conversation analysis above
-- Do NOT mention test pass rates or code efficiency - these don't apply to system design
-- If candidate submitted with no discussion: emphasize they need to engage with the interviewer`
+- If overall score < 20: This is a FAILED submission. Be blunt: "You submitted without doing anything" / "Zero participation"
+- If overall score 20-30: They barely tried. Call out the specific failures (no discussion, blank template, etc.)
+- "What Worked" for empty submissions: ONLY say "The candidate opened the design problem" - nothing more
+- "Fix Next" for empty submissions: Lead with "You must actually ENGAGE in system design interviews"
+- Do NOT invent positives that don't exist. If they didn't discuss requirements, don't say they "showed potential"
+- Be a tough but fair interviewer - call out non-participation directly`
       }
 
       if (scenarioType === 'bugfix') {
