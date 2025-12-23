@@ -5,7 +5,7 @@ import {
   storeTextEmbedding,
   embedAndStoreHint,
   type TextEmbedding,
-} from "@/lib/embeddings"
+} from "@/lib/rag"
 import { getUserIdFromRequest } from "@/lib/auth-server"
 import { adminDb } from "@/lib/firebase-admin"
 

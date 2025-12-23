@@ -6,13 +6,11 @@ import {
   getSimilarSolutions,
   embedAndStoreSolution,
   getRecommendedNextProblems,
-} from "@/lib/embeddings"
-import {
   getRecommendedScenarios,
   getUserPerformanceProfile,
   findSimilarSessions,
   vectorizeSessionMetrics,
-} from "@/lib/vectorization"
+} from "@/lib/rag"
 
 /**
  * RAG API Endpoint

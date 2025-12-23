@@ -7,7 +7,7 @@ import {
   updateUserPerformanceProfile,
   type SessionVector,
   type SessionMetrics,
-} from "@/lib/vectorization"
+} from "@/lib/rag"
 
 /**
  * API endpoint to vectorize and store session data for RAG
