@@ -45,6 +45,28 @@ html {
   font-family: ${openSans.style.fontFamily};
 }
         `}</style>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined' && window.performance && window.performance.measure) {
+                const originalMeasure = window.performance.measure.bind(window.performance);
+                window.performance.measure = function(name, startMark, endMark) {
+                  try {
+                    return originalMeasure(name, startMark, endMark);
+                  } catch (error) {
+                    if (error instanceof TypeError && 
+                        (error.message.includes('cannot have a negative time stamp') ||
+                         error.message.includes('Slot.SlotClone'))) {
+                      // Suppress harmless development error
+                      return;
+                    }
+                    throw error;
+                  }
+                };
+              }
+            `,
+          }}
+        />
       </head>
       <body className={`${workSans.variable} ${openSans.variable} antialiased`}>
         <ErrorBoundaryProvider>
