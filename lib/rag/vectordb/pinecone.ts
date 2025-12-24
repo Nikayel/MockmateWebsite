@@ -74,9 +74,32 @@ export class PineconeVectorDB implements VectorDB {
 
     /**
      * Get the Pinecone index
+     * Throws a helpful error if the index doesn't exist
      */
-    private getIndex() {
+    private async getIndex() {
         const client = getPineconeClient()
+        
+        // Check if index exists first
+        try {
+            const indexList = await client.listIndexes()
+            const exists = indexList.indexes?.some(idx => idx.name === this.indexName)
+            
+            if (!exists) {
+                throw new Error(
+                    `Pinecone index '${this.indexName}' does not exist. ` +
+                    `Please create it by running: npx ts-node scripts/setup-pinecone.ts ` +
+                    `or set PINECONE_INDEX_NAME to an existing index name.`
+                )
+            }
+        } catch (error: any) {
+            // If listIndexes fails, it might be a permissions issue
+            if (error.message?.includes('does not exist')) {
+                throw error
+            }
+            // Otherwise, try to proceed - the index might exist but we can't list it
+            console.warn('[Pinecone] Could not verify index existence:', error.message)
+        }
+        
         return client.index(this.indexName)
     }
 
