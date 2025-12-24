@@ -1,4 +1,4 @@
 <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="24" cy="24" r="22" fill="#E50914"/>
-  <text x="24" y="30" text-anchor="middle" fill="white" font-family="system-ui" font-size="20" font-weight="bold">N</text>
+  <path fill="#E50914" d="M12 6h7l9 24V6h7v36h-7L19 18v24h-7V6z"/>
+  <path fill="#B20710" d="M19 6h7l9 24V6h-7z"/>
 </svg>

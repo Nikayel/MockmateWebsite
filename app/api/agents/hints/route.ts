@@ -5,7 +5,17 @@ import {
   type HintGenerationRequest,
   type StruggleMetrics,
 } from '@/lib/agents/hint-agent'
+import { rateLimit } from '@/lib/rate-limit'
+import { validateProblemText, validateUserCode, withTimeout, TimeoutError } from '@/lib/rag/utils'
 import type { DSAPattern } from '@/lib/types/dsa-patterns'
+
+// Rate limit: 15 requests per minute for hint generation (AI-intensive)
+const hintRateLimit = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+  maxRequests: 15,
+  prefix: 'rl:hints'
+})
 
 /**
  * Hint Agent API
@@ -20,6 +30,12 @@ import type { DSAPattern } from '@/lib/types/dsa-patterns'
 
 export async function POST(request: NextRequest) {
   try {
+    // Apply rate limiting
+    const rateLimitResponse = await hintRateLimit(request)
+    if (rateLimitResponse) {
+      return rateLimitResponse
+    }
+
     const body = await request.json()
     const { action, ...params } = body
 
@@ -78,9 +94,27 @@ async function handleGenerateHints(params: {
   } = params
 
   // Validate required fields
-  if (!userId || !problemId || !problemText) {
+  if (!userId || !problemId) {
     return NextResponse.json(
-      { error: 'userId, problemId, and problemText are required' },
+      { error: 'userId and problemId are required' },
+      { status: 400 }
+    )
+  }
+
+  // Validate and sanitize problem text
+  const problemValidation = validateProblemText(problemText)
+  if (!problemValidation.valid) {
+    return NextResponse.json(
+      { error: problemValidation.error },
+      { status: 400 }
+    )
+  }
+
+  // Validate user code if provided
+  const codeValidation = validateUserCode(userCode)
+  if (!codeValidation.valid) {
+    return NextResponse.json(
+      { error: codeValidation.error },
       { status: 400 }
     )
   }
@@ -96,31 +130,45 @@ async function handleGenerateHints(params: {
     errorCount: struggleMetrics.errorCount ?? 0,
   }
 
-  // Build request
+  // Build request with sanitized inputs
   const request: HintGenerationRequest = {
     userId,
     problemId,
     problemTitle,
-    problemText,
+    problemText: problemValidation.sanitized!,
     problemPattern: problemPattern as DSAPattern | undefined,
     difficulty: difficulty as 'easy' | 'medium' | 'hard',
-    userCode,
+    userCode: codeValidation.sanitized!,
     language,
     struggleMetrics: fullMetrics,
     existingHints,
     testResults,
   }
 
-  // Generate hints
-  const response = await generateHints(request)
+  try {
+    // Generate hints with timeout (45 seconds for AI-intensive operation)
+    const response = await withTimeout(
+      generateHints(request),
+      45000,
+      'Hint generation'
+    )
 
-  return NextResponse.json({
-    hints: response.hints,
-    struggleLevel: response.struggleLevel,
-    recommendedRevealLevel: response.recommendedRevealLevel,
-    personalizationApplied: response.personalizationApplied,
-    metadata: response.metadata,
-  })
+    return NextResponse.json({
+      hints: response.hints,
+      struggleLevel: response.struggleLevel,
+      recommendedRevealLevel: response.recommendedRevealLevel,
+      personalizationApplied: response.personalizationApplied,
+      metadata: response.metadata,
+    })
+  } catch (error) {
+    if (error instanceof TimeoutError) {
+      return NextResponse.json(
+        { error: 'Hint generation timed out. Please try again.' },
+        { status: 504 }
+      )
+    }
+    throw error
+  }
 }
 
 /**

@@ -15,6 +15,8 @@ import {
 import { buildHintContext } from "@/lib/rag/context-builder"
 import { getPatternKnowledge } from "@/lib/rag/knowledge-base/dsa-knowledge"
 import { advancedRetrieve } from "@/lib/rag/retrieval/advanced-retrieval"
+import { rateLimit } from "@/lib/rate-limit"
+import { withTimeout, validateProblemText, validateUserCode, TimeoutError } from "@/lib/rag/utils"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 
 /**
@@ -27,10 +29,33 @@ import type { DSAPattern } from "@/lib/types/dsa-patterns"
  * - POST solution: Store a solution for future retrieval
  */
 
+// Rate limit: 30 requests per minute for RAG operations
+const ragRateLimit = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+  maxRequests: 30,
+  prefix: 'rl:rag'
+})
+
+// Higher limit for storing operations (less compute intensive)
+const ragStorageRateLimit = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+  maxRequests: 50,
+  prefix: 'rl:rag-store'
+})
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { action, ...params } = body
+
+    // Apply appropriate rate limit based on action
+    const isStorageAction = ['store-solution', 'store-onboarding'].includes(action)
+    const rateLimitResponse = await (isStorageAction ? ragStorageRateLimit : ragRateLimit)(request)
+    if (rateLimitResponse) {
+      return rateLimitResponse
+    }
 
     switch (action) {
       case 'get-hints':

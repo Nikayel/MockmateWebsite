@@ -1,4 +1,5 @@
 <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="24" cy="24" r="22" fill="#0052FF"/>
-  <text x="24" y="30" text-anchor="middle" fill="white" font-family="system-ui" font-size="20" font-weight="bold">C</text>
+  <rect fill="#0052FF" x="4" y="4" width="40" height="40" rx="8"/>
+  <circle fill="#fff" cx="24" cy="24" r="12"/>
+  <circle fill="#0052FF" cx="24" cy="24" r="6"/>
 </svg>
