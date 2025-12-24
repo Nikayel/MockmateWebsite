@@ -1,19 +1,23 @@
 /**
  * RAG Orchestrator
- * 
+ *
  * Main entry point for RAG operations
  * Provides a clean API that abstracts the underlying implementation
+ * Supports both Firestore and Pinecone backends
  */
 
 import { TFIDFEmbeddingProvider } from './embeddings/provider'
 import { embeddingCache } from './embeddings/cache'
-import { vectorDB } from './vectordb'
-import type { TextEmbedding, SimilarResult, SimilaritySearchOptions } from './types'
+import { vectorDB, isPineconeEnabled, getVectorDBProvider } from './vectordb'
+import type { TextEmbedding, SimilarResult, SimilaritySearchOptions, VectorDocument } from './types'
 import { adminDb } from '../firebase-admin'
 import { Timestamp } from 'firebase-admin/firestore'
 
 // Initialize embedding provider
 const embeddingProvider = new TFIDFEmbeddingProvider()
+
+// Log which vector DB is being used on startup
+console.log(`[RAG] Initialized with ${getVectorDBProvider()} backend`)
 
 /**
  * Generate text embedding (with caching)
@@ -34,6 +38,7 @@ export async function generateTextEmbedding(text: string): Promise<number[]> {
 
 /**
  * Store a text embedding in the vector database
+ * Uses Pinecone when available, with Firestore as backup for metadata
  */
 export async function storeTextEmbedding(embedding: TextEmbedding): Promise<string> {
     try {
@@ -41,15 +46,47 @@ export async function storeTextEmbedding(embedding: TextEmbedding): Promise<stri
             ? Timestamp.fromDate(new Date(embedding.metadata.timestamp))
             : Timestamp.now()
 
-        const docRef = await adminDb.collection('text_embeddings').add({
-            ...embedding,
+        const timestampStr = timestamp.toDate().toISOString()
+
+        // Generate a unique ID
+        const docId = embedding.id || `${embedding.type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+        // Store in the vector database (Pinecone or Firestore depending on config)
+        const vectorDoc: VectorDocument = {
+            id: docId,
+            vector: embedding.vector,
+            text: embedding.text,
             metadata: {
                 ...embedding.metadata,
-                timestamp: timestamp.toDate().toISOString(),
+                type: embedding.type,
+                timestamp: timestampStr,
             },
-            createdAt: Timestamp.now(),
-        })
-        return docRef.id
+        }
+
+        await vectorDB.upsert([vectorDoc])
+
+        // If using Pinecone, also store metadata in Firestore for backup/debugging
+        if (isPineconeEnabled()) {
+            try {
+                await adminDb.collection('text_embeddings').doc(docId).set({
+                    text: embedding.text,
+                    type: embedding.type,
+                    // Don't store vector in Firestore when using Pinecone (save space)
+                    vectorStoredIn: 'pinecone',
+                    metadata: {
+                        ...embedding.metadata,
+                        timestamp: timestampStr,
+                    },
+                    createdAt: Timestamp.now(),
+                })
+            } catch (firestoreError) {
+                // Log but don't fail - Pinecone is the primary store
+                console.warn('[RAG] Failed to backup metadata to Firestore:', firestoreError)
+            }
+        }
+
+        console.log(`[RAG] Stored embedding ${docId} (type: ${embedding.type}) in ${getVectorDBProvider()}`)
+        return docId
     } catch (error) {
         console.error('Error storing text embedding:', error)
         throw error
@@ -104,13 +141,25 @@ export async function getSimilarProblems(
         minSimilarity: 0.3,
     })
 
-    // Fetch full text for results
+    // Enrich results with text
     const enrichedResults = await Promise.all(
         results.map(async (result) => {
-            const doc = await adminDb.collection('text_embeddings').doc(result.id).get()
-            return {
-                ...result,
-                text: doc.data()?.text || result.text,
+            // If using Pinecone, text is in metadata
+            if (isPineconeEnabled() && result.metadata?.text) {
+                return {
+                    ...result,
+                    text: result.metadata.text,
+                }
+            }
+            // Fallback to Firestore for text
+            try {
+                const doc = await adminDb.collection('text_embeddings').doc(result.id).get()
+                return {
+                    ...result,
+                    text: doc.data()?.text || result.text || '',
+                }
+            } catch {
+                return { ...result, text: result.text || '' }
             }
         })
     )
@@ -137,13 +186,25 @@ export async function getRelevantHints(
         minSimilarity: 0.35,
     })
 
-    // Fetch full text for results
+    // Enrich results with text
     const enrichedResults = await Promise.all(
         results.map(async (result) => {
-            const doc = await adminDb.collection('text_embeddings').doc(result.id).get()
-            return {
-                ...result,
-                text: doc.data()?.text || result.text,
+            // If using Pinecone, text is in metadata
+            if (isPineconeEnabled() && result.metadata?.text) {
+                return {
+                    ...result,
+                    text: result.metadata.text,
+                }
+            }
+            // Fallback to Firestore for text
+            try {
+                const doc = await adminDb.collection('text_embeddings').doc(result.id).get()
+                return {
+                    ...result,
+                    text: doc.data()?.text || result.text || '',
+                }
+            } catch {
+                return { ...result, text: result.text || '' }
             }
         })
     )
@@ -172,13 +233,25 @@ export async function getSimilarSolutions(
         problemType: options.problemType,
     })
 
-    // Fetch full text for results
+    // Enrich results with text
     const enrichedResults = await Promise.all(
         results.map(async (result) => {
-            const doc = await adminDb.collection('text_embeddings').doc(result.id).get()
-            return {
-                ...result,
-                text: doc.data()?.text || result.text,
+            // If using Pinecone, text is in metadata
+            if (isPineconeEnabled() && result.metadata?.text) {
+                return {
+                    ...result,
+                    text: result.metadata.text,
+                }
+            }
+            // Fallback to Firestore for text
+            try {
+                const doc = await adminDb.collection('text_embeddings').doc(result.id).get()
+                return {
+                    ...result,
+                    text: doc.data()?.text || result.text || '',
+                }
+            } catch {
+                return { ...result, text: result.text || '' }
             }
         })
     )
