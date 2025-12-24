@@ -148,7 +148,7 @@ export class PineconeVectorDB implements VectorDB {
             includeValues = false,
         } = options
 
-        const index = this.getIndex()
+        const index = await this.getIndex()
 
         // Determine namespace from filter type
         const docType = filter.type || 'general'
@@ -198,6 +198,14 @@ export class PineconeVectorDB implements VectorDB {
             if (error.message?.includes('Namespace not found')) {
                 console.log(`[Pinecone] Namespace ${namespace} not found, returning empty results`)
                 return []
+            }
+            // Handle index not found (404)
+            if (error.message?.includes('404') || error.message?.includes('not found') || 
+                error.status === 404 || error.response?.status === 404) {
+                throw new Error(
+                    `Pinecone index '${this.indexName}' does not exist. ` +
+                    `Please create it by running: npx ts-node scripts/setup-pinecone.ts`
+                )
             }
             throw error
         }
