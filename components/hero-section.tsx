@@ -174,17 +174,12 @@ export function HeroSection() {
             </span>
           </motion.div>
 
-          {/* VS Code Coming Soon - More subtle */}
+          {/* Trust indicator - subtle social proof */}
           <motion.div
             variants={staggerItem}
-            className="max-w-md mx-auto"
+            className="max-w-md mx-auto text-xs text-gray-700"
           >
-            <Link href="/install" className="block">
-              <div className="text-sm text-gray-600 hover:text-gray-400 transition-colors">
-                <span className="text-neural">VS Code extension</span> coming soon
-                <ArrowRight className="w-3 h-3 inline-block ml-1" />
-              </div>
-            </Link>
+            Powered by cognitive science • SM-2 algorithm • Spaced repetition
           </motion.div>
         </div>
       </motion.div>

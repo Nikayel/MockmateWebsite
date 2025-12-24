@@ -37,7 +37,7 @@ import {
   Repeat
 } from "lucide-react"
 
-// Learning science data
+// Learning science data with proper research citations
 const sciencePrinciples = [
   {
     icon: RefreshCw,
@@ -45,7 +45,9 @@ const sciencePrinciples = [
     improvement: "10-30%",
     description: "Distributed practice beats cramming. Our algorithm spaces your reviews for optimal long-term retention.",
     color: "accent",
-    visual: "wave" // organic shape type
+    visual: "wave",
+    citation: "Cepeda et al., 2006",
+    source: "Psychological Bulletin"
   },
   {
     icon: BrainCircuit,
@@ -53,7 +55,9 @@ const sciencePrinciples = [
     improvement: "50%",
     description: "Active recall strengthens memory more than passive review. Every practice session is a retrieval opportunity.",
     color: "neural",
-    visual: "pulse"
+    visual: "pulse",
+    citation: "Roediger & Karpicke, 2006",
+    source: "Psychological Science"
   },
   {
     icon: Layers,
@@ -61,7 +65,9 @@ const sciencePrinciples = [
     improvement: "43%",
     description: "Mixing different patterns daily improves transfer to new problems. We intelligently vary your practice.",
     color: "purple",
-    visual: "layers"
+    visual: "layers",
+    citation: "Rohrer & Taylor, 2007",
+    source: "Instructional Science"
   },
   {
     icon: TrendingUp,
@@ -69,7 +75,9 @@ const sciencePrinciples = [
     improvement: "Optimal",
     description: "Review at 70-80% retention for maximum efficiency. Our algorithm knows exactly when you're about to forget.",
     color: "amber",
-    visual: "curve"
+    visual: "curve",
+    citation: "Ebbinghaus, 1885",
+    source: "Memory: A Contribution to Experimental Psychology"
   }
 ]
 
@@ -192,6 +200,9 @@ export default function WhySkilonPage() {
               <p className="text-xl text-gray-400 leading-relaxed">
                 Without a system, you <span className="text-red-400 font-medium">forget 80%</span> of what you learn within a week.
                 Random problem selection leaves weak patterns untouched.
+              </p>
+              <p className="text-sm text-gray-600 mt-4 italic">
+                Based on Ebbinghaus's forgetting curve research (1885)
               </p>
             </div>
           </ScrollReveal>
@@ -330,7 +341,10 @@ export default function WhySkilonPage() {
                       </div>
                     </div>
                     <h3 className="text-xl font-bold text-white mt-4 mb-2">{principle.title}</h3>
-                    <p className="text-gray-400 leading-relaxed">{principle.description}</p>
+                    <p className="text-gray-400 leading-relaxed mb-3">{principle.description}</p>
+                    <p className="text-xs text-gray-600 italic">
+                      {principle.citation} — <span className="text-gray-700">{principle.source}</span>
+                    </p>
                   </div>
                 </div>
               </ScrollReveal>
@@ -584,6 +598,43 @@ export default function WhySkilonPage() {
                     </div>
                   </ScrollReveal>
                 ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Research References Section */}
+      <section className="py-16 bg-gray-950/50 border-t border-gray-800/30">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto">
+            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-6 text-center">
+              Scientific References
+            </h3>
+            <div className="grid md:grid-cols-2 gap-4 text-xs text-gray-600">
+              <div className="p-4 rounded-lg bg-gray-900/30 border border-gray-800/30">
+                <p className="font-medium text-gray-500 mb-1">Spacing Effect</p>
+                <p>Cepeda, N.J., et al. (2006). Distributed practice in verbal recall tasks: A review and quantitative synthesis. <span className="italic">Psychological Bulletin, 132</span>(3), 354-380.</p>
+              </div>
+              <div className="p-4 rounded-lg bg-gray-900/30 border border-gray-800/30">
+                <p className="font-medium text-gray-500 mb-1">Testing Effect</p>
+                <p>Roediger, H.L., & Karpicke, J.D. (2006). Test-enhanced learning. <span className="italic">Psychological Science, 17</span>(3), 249-255.</p>
+              </div>
+              <div className="p-4 rounded-lg bg-gray-900/30 border border-gray-800/30">
+                <p className="font-medium text-gray-500 mb-1">Interleaving</p>
+                <p>Rohrer, D., & Taylor, K. (2007). The shuffling of mathematics problems improves learning. <span className="italic">Instructional Science, 35</span>(6), 481-498.</p>
+              </div>
+              <div className="p-4 rounded-lg bg-gray-900/30 border border-gray-800/30">
+                <p className="font-medium text-gray-500 mb-1">Forgetting Curve</p>
+                <p>Ebbinghaus, H. (1885). <span className="italic">Memory: A Contribution to Experimental Psychology.</span> Teachers College, Columbia University.</p>
+              </div>
+              <div className="p-4 rounded-lg bg-gray-900/30 border border-gray-800/30">
+                <p className="font-medium text-gray-500 mb-1">Sleep Consolidation</p>
+                <p>Walker, M.P. (2017). <span className="italic">Why We Sleep: Unlocking the Power of Sleep and Dreams.</span> Scribner.</p>
+              </div>
+              <div className="p-4 rounded-lg bg-gray-900/30 border border-gray-800/30">
+                <p className="font-medium text-gray-500 mb-1">SM-2 Algorithm</p>
+                <p>Wozniak, P.A., & Gorzelanczyk, E.J. (1994). Optimization of repetition spacing in the practice of learning. <span className="italic">Acta Neurobiologiae Experimentalis, 54</span>, 59-62.</p>
               </div>
             </div>
           </div>

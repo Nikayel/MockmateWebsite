@@ -7,6 +7,7 @@ import { Logo } from "@/components/Logo"
 import Link from "next/link"
 import { signOut } from "@/lib/auth"
 import { useAuth } from "@/lib/auth-context"
+import { NotificationBell } from "@/components/notification-bell"
 
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -74,6 +75,7 @@ export function Header() {
                   <span>Roadmap</span>
                 </Link>
                 <div className="flex items-center space-x-3 pl-4 border-l border-white/10">
+                  <NotificationBell />
                   <span className="text-sm text-gray-400">{user.user_metadata?.full_name || user.email}</span>
                   <Button
                     onClick={handleSignOut}
