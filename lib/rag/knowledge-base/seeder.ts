@@ -11,6 +11,15 @@ import type { VectorDocument } from '../types'
 import type { KnowledgeDocument, SeedingProgress, KnowledgeType } from './types'
 import { DSA_PATTERN_KNOWLEDGE, patternKnowledgeToDocument } from './dsa-knowledge'
 import { COMPANY_INTERVIEW_KNOWLEDGE, companyKnowledgeToDocument } from './company-knowledge'
+import {
+  SPACED_REPETITION_SCHEDULES,
+  NOTIFICATION_KNOWLEDGE,
+  LEARNING_SCIENCE_KNOWLEDGE,
+  PATTERN_REVIEW_STRATEGIES,
+  spacedRepetitionToDocument,
+  notificationKnowledgeToDocument,
+  learningPrincipleToDocument,
+} from './notification-knowledge'
 import { adminDb } from '@/lib/firebase-admin'
 import { Timestamp } from 'firebase-admin/firestore'
 
@@ -45,9 +54,9 @@ export class KnowledgeBaseSeeder {
    */
   async seedAll(options: {
     force?: boolean  // Force re-seed even if already seeded
-    categories?: ('dsa-patterns' | 'company-knowledge' | 'interview-tips')[]
+    categories?: ('dsa-patterns' | 'company-knowledge' | 'interview-tips' | 'notification-knowledge')[]
   } = {}): Promise<SeedingProgress> {
-    const categories = options.categories || ['dsa-patterns', 'company-knowledge', 'interview-tips']
+    const categories = options.categories || ['dsa-patterns', 'company-knowledge', 'interview-tips', 'notification-knowledge']
 
     this.progress = this.createInitialProgress()
     this.progress.status = 'in_progress'
@@ -79,6 +88,10 @@ export class KnowledgeBaseSeeder {
 
       if (categories.includes('interview-tips')) {
         documents.push(...this.createInterviewTipDocuments())
+      }
+
+      if (categories.includes('notification-knowledge')) {
+        documents.push(...this.createNotificationKnowledgeDocuments())
       }
 
       this.progress.totalDocuments = documents.length
@@ -414,6 +427,103 @@ This is a ${pattern.frequency >= 80 ? 'must-know' : pattern.frequency >= 60 ? 'v
   }
 
   /**
+   * Create notification and spaced repetition knowledge documents
+   */
+  private createNotificationKnowledgeDocuments(): KnowledgeDocument[] {
+    const now = new Date()
+    const documents: KnowledgeDocument[] = []
+
+    // Spaced repetition schedules
+    for (const schedule of SPACED_REPETITION_SCHEDULES) {
+      documents.push({
+        id: `spaced-repetition-${schedule.id}`,
+        type: 'spaced-repetition' as KnowledgeType,
+        title: schedule.name,
+        content: spacedRepetitionToDocument(schedule),
+        metadata: {
+          tags: ['spaced-repetition', schedule.forScenario, 'learning'],
+          category: 'learning-optimization',
+          importance: 9,
+          verified: true,
+        },
+        createdAt: now,
+        updatedAt: now,
+      })
+    }
+
+    // Notification types
+    for (const notification of NOTIFICATION_KNOWLEDGE) {
+      documents.push({
+        id: `notification-${notification.type}`,
+        type: 'notification' as KnowledgeType,
+        title: notification.name,
+        content: notificationKnowledgeToDocument(notification),
+        metadata: {
+          tags: ['notification', notification.type, notification.priority],
+          category: 'notifications',
+          importance: notification.priority === 'critical' ? 10 : notification.priority === 'high' ? 8 : 6,
+          verified: true,
+        },
+        createdAt: now,
+        updatedAt: now,
+      })
+    }
+
+    // Learning science principles
+    for (const principle of LEARNING_SCIENCE_KNOWLEDGE) {
+      documents.push({
+        id: `learning-science-${principle.id}`,
+        type: 'learning-science' as KnowledgeType,
+        title: principle.name,
+        content: learningPrincipleToDocument(principle),
+        metadata: {
+          tags: ['learning-science', 'psychology', 'retention'],
+          category: 'learning-optimization',
+          importance: 9,
+          verified: true,
+        },
+        createdAt: now,
+        updatedAt: now,
+      })
+    }
+
+    // Pattern-specific review strategies
+    for (const strategy of PATTERN_REVIEW_STRATEGIES) {
+      documents.push({
+        id: `pattern-review-${strategy.pattern}`,
+        type: 'pattern-review' as KnowledgeType,
+        title: `${strategy.pattern} Review Strategy`,
+        content: `
+# ${strategy.pattern} Review Strategy
+
+## Review Notes
+${strategy.reviewNotes}
+
+## Optimal Review Intervals (days)
+${strategy.optimalIntervals.map((d, i) => `- Review ${i + 1}: Day ${d}`).join('\n')}
+
+## Prerequisite Review Triggers
+${strategy.prerequisiteReviewTrigger.map(t => `- ${t}`).join('\n')}
+
+## Common Decay Indicators
+${strategy.commonDecayIndicators.map(d => `- ${d}`).join('\n')}
+        `.trim(),
+        metadata: {
+          pattern: strategy.pattern,
+          tags: ['pattern-review', strategy.pattern, 'spaced-repetition'],
+          category: 'learning-optimization',
+          importance: 8,
+          verified: true,
+        },
+        createdAt: now,
+        updatedAt: now,
+      })
+    }
+
+    return documents
+  }
+
+  /**
    * Check if knowledge base has already been seeded
    */
   private async checkIfSeeded(): Promise<boolean> {
@@ -480,7 +590,7 @@ export function getKnowledgeBaseSeeder(): KnowledgeBaseSeeder {
  */
 export async function seedKnowledgeBase(options?: {
   force?: boolean
-  categories?: ('dsa-patterns' | 'company-knowledge' | 'interview-tips')[]
+  categories?: ('dsa-patterns' | 'company-knowledge' | 'interview-tips' | 'notification-knowledge')[]
 }): Promise<SeedingProgress> {
   return getKnowledgeBaseSeeder().seedAll(options)
 }

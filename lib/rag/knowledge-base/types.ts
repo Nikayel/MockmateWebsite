@@ -18,6 +18,10 @@ export type KnowledgeType =
   | 'concept'               // General CS concepts
   | 'time-complexity'       // Time/space complexity guides
   | 'code-pattern'          // Common code patterns
+  | 'notification'          // Notification triggers and strategies
+  | 'spaced-repetition'     // Spaced repetition schedules
+  | 'learning-science'      // Learning principles and research
+  | 'pattern-review'        // Pattern-specific review strategies
 
 /**
  * Base knowledge document
