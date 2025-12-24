@@ -2989,7 +2989,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             showSendButton={!voiceModeLive}
                             compact={true}
                           />
-                          {/* Text input for typing */}
+                          {/* Text input for typing - only show send button in live mode */}
                           {!isRecordingInterviewer && (
                             <div className="flex space-x-1">
                               <Input
@@ -3001,15 +3001,17 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                 disabled={isLoadingInterviewer || isGeneratingDiscussion}
                                 aria-label="Chat with interviewer"
                               />
-                              <Button
-                                onClick={() => handleSendMessage(true)}
-                                className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white h-7 px-2"
-                                loading={isLoadingInterviewer || isGeneratingDiscussion}
-                                disabled={!interviewerInput.trim()}
-                                aria-label="Send message"
-                              >
-                                {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-3 w-3" aria-hidden="true" />}
-                              </Button>
+                              {voiceModeLive && (
+                                <Button
+                                  onClick={() => handleSendMessage(true)}
+                                  className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white h-7 px-2"
+                                  loading={isLoadingInterviewer || isGeneratingDiscussion}
+                                  disabled={!interviewerInput.trim()}
+                                  aria-label="Send message"
+                                >
+                                  {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-3 w-3" aria-hidden="true" />}
+                                </Button>
+                              )}
                             </div>
                           )}
                         </div>
