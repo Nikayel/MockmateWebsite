@@ -189,6 +189,10 @@ export default function InterviewPage() {
   const [ragHints, setRagHints] = useState<{ level: number; hint: string }[]>([])
   const [isLoadingHints, setIsLoadingHints] = useState(false)
 
+  // Voice mode states
+  const [voiceModeLive, setVoiceModeLive] = useState(false) // false = manual, true = live
+  const [revealedHintIndices, setRevealedHintIndices] = useState<Set<number>>(new Set()) // Track which hints are revealed
+
   // Test states
   const [testResults, setTestResults] = useState<TestResult[]>([])
   const [isRunningTests, setIsRunningTests] = useState(false)
@@ -453,7 +457,17 @@ Let's continue!`
             toast.success("Session resumed")
           } else {
             // Fresh start - no previous progress
-            initialMessage = `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${scenario.title}**, a ${scenario.difficulty} ${problemType} problem.
+            const isDSAScenario = scenario.type === 'dsa'
+            initialMessage = isDSAScenario
+              ? `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${scenario.title}**, a ${scenario.difficulty} ${problemType} problem.
+
+Here's what I expect:
+- Walk me through your plan before you code; if you skip that, I'll call it out.
+- Narrate while you build so I can understand your reasoning.
+- This is a pure coding challenge—no AI assistance. Just you and the problem, like a real technical interview.
+
+Take a breath, study the prompt on the left, and tell me how you plan to attack this.`
+              : `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${scenario.title}**, a ${scenario.difficulty} ${problemType} problem.
 
 Here's what I expect:
 - Walk me through your plan before you code; if you skip that, I'll call it out.
@@ -463,10 +477,14 @@ Here's what I expect:
 Take a breath, study the prompt on the left, and tell me how you plan to attack this.`
 
             setInterviewerMessages([{ type: "ai", message: initialMessage }])
-            setChatMessages([{
-              type: "ai",
-              message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
-            }])
+            if (!isDSAScenario) {
+              setChatMessages([{
+                type: "ai",
+                message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
+              }])
+            } else {
+              setChatMessages([]) // No AI partner for DSA
+            }
           }
         } else {
           toast.error("Scenario not found")
@@ -1374,6 +1392,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setEfficiencyMetrics(null)
     setElapsedTime(0)
     setRevealedHints(0)
+    setRevealedHintIndices(new Set())
+    setRagHints([])
     setWorkspaceContext([])
     setComprehensiveFeedback("")
     setPerformanceScore(null)
@@ -1469,7 +1489,18 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     const problemType = selectedScenario.type === 'bugfix' ? 'BUG FIX' :
       selectedScenario.type === 'add-functionality' ? 'ADD FUNCTIONALITY' :
         selectedScenario.type.toUpperCase()
-    const initialMessage = `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${selectedScenario.title}**, a ${selectedScenario.difficulty} ${problemType} problem.
+    // Different initial message for DSA vs other scenarios
+    const isDSA = selectedScenario.type === 'dsa'
+    const initialMessage = isDSA
+      ? `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${selectedScenario.title}**, a ${selectedScenario.difficulty} ${problemType} problem.
+
+Here's what I expect:
+- Walk me through your plan before you code; if you skip that, I'll call it out.
+- Narrate while you build so I can understand your reasoning.
+- This is a pure coding challenge—no AI assistance. Just you and the problem, like a real technical interview.
+
+Take a breath, study the prompt on the left, and tell me how you plan to attack this.`
+      : `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${selectedScenario.title}**, a ${selectedScenario.difficulty} ${problemType} problem.
 
 Here's what I expect:
 - Walk me through your plan before you code; if you skip that, I'll call it out.
@@ -1479,10 +1510,18 @@ Here's what I expect:
 Take a breath, study the prompt on the left, and tell me how you plan to attack this.`
 
     setInterviewerMessages([{ type: "ai", message: initialMessage }])
-    setChatMessages([{
-      type: "ai",
-      message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${selectedScenario.title}. Just ask!`,
-    }])
+    // Only set chat messages for non-DSA scenarios (DSA has no AI partner)
+    if (!isDSA) {
+      setChatMessages([{
+        type: "ai",
+        message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${selectedScenario.title}. Just ask!`,
+      }])
+    } else {
+      setChatMessages([]) // Clear chat messages for DSA
+    }
+
+    // Fetch RAG hints for the problem (async, non-blocking)
+    fetchRAGHints()
   }
 
   const resetInterview = async () => {
@@ -1602,6 +1641,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     setLastCodeHash("")
     setCurrentSessionId(null)
     setRevealedHints(0)
+    setRevealedHintIndices(new Set())
+    setRagHints([])
     setWorkspaceContext([])
     setEfficiencyMetrics(null)
     setProtectedElements(null)
@@ -1674,19 +1715,35 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
   // Voice recording with Deepgram (or Web Speech API fallback)
   const toggleVoiceRecording = async (isInterviewer: boolean) => {
     const voice = isInterviewer ? interviewerVoice : partnerVoice
+    const setInput = isInterviewer ? setInterviewerInput : setChatInput
+    const currentInput = isInterviewer ? interviewerInput : chatInput
 
     try {
       if (voice.isRecording) {
         // Stop recording
         const finalTranscript = voice.stopRecording()
         if (finalTranscript) {
-          toast.success("Voice input captured", { duration: 2000 })
+          // In Live mode, auto-submit the message
+          if (voiceModeLive && finalTranscript.trim()) {
+            // Set the input first then submit
+            setInput(finalTranscript)
+            // Use setTimeout to ensure state is updated before submitting
+            setTimeout(() => {
+              handleSendMessage(isInterviewer)
+            }, 100)
+            toast.success("Message sent!", { duration: 1500 })
+          } else {
+            toast.success("Voice input captured", { duration: 2000 })
+          }
         }
       } else {
         // Start recording
         await voice.startRecording()
-        const provider = voice.provider === 'deepgram' ? 'Deepgram' : 'Voice'
-        toast.success(`${provider} listening... Speak now`, { duration: 2000 })
+        if (voiceModeLive) {
+          toast.success("Live mode active - Sable will send when you stop speaking", { duration: 3000 })
+        } else {
+          toast.success("Sable is listening... Speak now", { duration: 2000 })
+        }
       }
     } catch (err: any) {
       console.error('Voice recording error:', err)
@@ -2311,7 +2368,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                               <div className="flex items-center justify-between mb-2">
                                 <h3 className="text-white font-semibold flex items-center space-x-1 text-xs">
                                   <Lightbulb className="h-3 w-3 text-yellow-400" />
-                                  <span>Hints ({revealedHints}/{(selectedScenario as any).hints.length})</span>
+                                  <span>Hints ({revealedHintIndices.size}/{revealedHints} unlocked)</span>
                                 </h3>
                                 {revealedHints < (selectedScenario as any).hints.length && (
                                   <span className="text-xs text-gray-400">
@@ -2321,18 +2378,69 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                               </div>
                               {revealedHints > 0 ? (
                                 <div className="space-y-2">
-                                  {(selectedScenario as any).hints.slice(0, revealedHints).map((hint: string, i: number) => (
-                                    <div key={i} className="bg-yellow-500/10 border border-yellow-500/20 rounded p-2">
-                                      <p className="text-yellow-200 text-xs leading-relaxed">
-                                        <span className="font-semibold">Hint {i + 1}:</span> {hint}
-                                      </p>
-                                    </div>
-                                  ))}
+                                  {(selectedScenario as any).hints.slice(0, revealedHints).map((hint: string, i: number) => {
+                                    const isHintRevealed = revealedHintIndices.has(i)
+                                    return (
+                                      <div
+                                        key={i}
+                                        className={`bg-yellow-500/10 border border-yellow-500/20 rounded p-2 transition-all cursor-pointer ${!isHintRevealed ? 'hover:bg-yellow-500/15' : ''}`}
+                                        onClick={() => {
+                                          if (!isHintRevealed) {
+                                            setRevealedHintIndices(prev => new Set([...prev, i]))
+                                          }
+                                        }}
+                                      >
+                                        {isHintRevealed ? (
+                                          <p className="text-yellow-200 text-xs leading-relaxed">
+                                            <span className="font-semibold">Hint {i + 1}:</span> {hint}
+                                          </p>
+                                        ) : (
+                                          <div className="relative">
+                                            <p className="text-yellow-200/30 text-xs leading-relaxed blur-sm select-none pointer-events-none">
+                                              <span className="font-semibold">Hint {i + 1}:</span> {hint.substring(0, 50)}...
+                                            </p>
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                              <div className="flex items-center gap-1 text-yellow-400 text-xs bg-yellow-500/10 px-2 py-0.5 rounded border border-yellow-500/30">
+                                                <HelpCircle className="h-3 w-3" />
+                                                <span>Click to reveal Hint {i + 1}</span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  })}
                                 </div>
                               ) : (
                                 <p className="text-gray-400 text-xs italic">
                                   Hints will unlock every 3 minutes as you work on the problem
                                 </p>
+                              )}
+
+                              {/* RAG-powered AI Hints */}
+                              {ragHints.length > 0 && (
+                                <div className="mt-3 pt-2 border-t border-gray-700/50">
+                                  <div className="flex items-center gap-1 mb-2">
+                                    <Sparkles className="h-3 w-3 text-purple-400" />
+                                    <span className="text-xs text-purple-400">AI Insights</span>
+                                  </div>
+                                  <div className="space-y-1">
+                                    {ragHints.map((hint, i) => (
+                                      <div
+                                        key={`rag-${i}`}
+                                        className="bg-purple-500/10 border border-purple-500/20 rounded p-1.5 text-[10px] text-purple-200"
+                                      >
+                                        {hint.hint}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {isLoadingHints && (
+                                <div className="mt-2 flex items-center gap-1 text-[10px] text-gray-500">
+                                  <div className="h-2 w-2 border border-gray-500 border-t-transparent rounded-full animate-spin" />
+                                  Loading AI hints...
+                                </div>
                               )}
                             </div>
                           )}
@@ -2793,32 +2901,57 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         )}
                       </div>
                       {(isInterviewStarted || showPostInterviewDiscussion) && (
-                        <div className="flex space-x-1 flex-shrink-0 border-t border-gray-700 pt-2">
-                          <Input
-                            value={interviewerInput}
-                            onChange={(e) => setInterviewerInput(e.target.value)}
-                            placeholder={isRecordingInterviewer ? "Listening..." : (showPostInterviewDiscussion ? "Ask about optimization or improvements..." : "Ask a question...")}
-                            className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-xs h-7"
-                            onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
-                            disabled={isLoadingInterviewer || isGeneratingDiscussion || isRecordingInterviewer}
-                            aria-label="Chat with interviewer"
-                          />
-                          <Button
-                            onClick={() => toggleVoiceRecording(true)}
-                            className={`h-7 px-2 ${isRecordingInterviewer ? 'bg-red-500 hover:bg-red-600 animate-pulse' : 'bg-gray-700 hover:bg-gray-600'} text-white`}
-                            aria-label={isRecordingInterviewer ? "Stop recording" : "Start voice input"}
-                            disabled={isLoadingInterviewer || isGeneratingDiscussion}
-                          >
-                            {isRecordingInterviewer ? <MicOff className="h-3 w-3" aria-hidden="true" /> : <Mic className="h-3 w-3" aria-hidden="true" />}
-                          </Button>
-                          <Button
-                            onClick={() => handleSendMessage(true)}
-                            className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white h-7 px-2"
-                            loading={isLoadingInterviewer || isGeneratingDiscussion}
-                            aria-label={(isLoadingInterviewer || isGeneratingDiscussion) ? "Sending message" : "Send message"}
-                          >
-                            {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-3 w-3" aria-hidden="true" />}
-                          </Button>
+                        <div className="flex flex-col gap-1 flex-shrink-0 border-t border-gray-700 pt-2">
+                          {/* Voice mode toggle */}
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => setVoiceModeLive(false)}
+                                className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${!voiceModeLive ? 'bg-gray-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                              >
+                                Manual
+                              </button>
+                              <button
+                                onClick={() => setVoiceModeLive(true)}
+                                className={`text-[9px] px-1.5 py-0.5 rounded transition-colors flex items-center gap-1 ${voiceModeLive ? 'bg-green-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full ${voiceModeLive ? 'bg-green-300 animate-pulse' : 'bg-gray-400'}`}></span>
+                                Live
+                              </button>
+                            </div>
+                            <span className="text-[9px] text-gray-500">
+                              {voiceModeLive ? 'Auto-sends when you stop' : 'Click mic, speak, click send'}
+                            </span>
+                          </div>
+                          <div className="flex space-x-1">
+                            <Input
+                              value={interviewerInput}
+                              onChange={(e) => setInterviewerInput(e.target.value)}
+                              placeholder={isRecordingInterviewer ? (voiceModeLive ? "Listening... will auto-send" : "Listening...") : (showPostInterviewDiscussion ? "Ask about optimization or improvements..." : "Ask a question...")}
+                              className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-xs h-7"
+                              onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
+                              disabled={isLoadingInterviewer || isGeneratingDiscussion || isRecordingInterviewer}
+                              aria-label="Chat with interviewer"
+                            />
+                            <Button
+                              onClick={() => toggleVoiceRecording(true)}
+                              className={`h-7 px-2 ${isRecordingInterviewer ? (voiceModeLive ? 'bg-green-500 hover:bg-green-600 animate-pulse' : 'bg-red-500 hover:bg-red-600 animate-pulse') : 'bg-gray-700 hover:bg-gray-600'} text-white`}
+                              aria-label={isRecordingInterviewer ? "Stop recording" : "Start voice input"}
+                              disabled={isLoadingInterviewer || isGeneratingDiscussion}
+                            >
+                              {isRecordingInterviewer ? <MicOff className="h-3 w-3" aria-hidden="true" /> : <Mic className="h-3 w-3" aria-hidden="true" />}
+                            </Button>
+                            {!voiceModeLive && (
+                              <Button
+                                onClick={() => handleSendMessage(true)}
+                                className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white h-7 px-2"
+                                loading={isLoadingInterviewer || isGeneratingDiscussion}
+                                aria-label={(isLoadingInterviewer || isGeneratingDiscussion) ? "Sending message" : "Send message"}
+                              >
+                                {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-3 w-3" aria-hidden="true" />}
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       )}
                     </CardContent>
@@ -2963,32 +3096,57 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       </div>
 
                       {/* Chat Input */}
-                      <div className="flex space-x-2 border-t border-gray-700 pt-4">
-                        <Input
-                          value={interviewerInput}
-                          onChange={(e) => setInterviewerInput(e.target.value)}
-                          placeholder={isRecordingInterviewer ? "Listening..." : "Ask about optimization, complexity, or improvements..."}
-                          className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
-                          onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
-                          disabled={isLoadingInterviewer || isGeneratingDiscussion || isRecordingInterviewer}
-                          aria-label="Chat with interviewer"
-                        />
-                        <Button
-                          onClick={() => toggleVoiceRecording(true)}
-                          className={`${isRecordingInterviewer ? 'bg-red-500 hover:bg-red-600 animate-pulse' : 'bg-gray-700 hover:bg-gray-600'} text-white`}
-                          aria-label={isRecordingInterviewer ? "Stop recording" : "Start voice input"}
-                          disabled={isLoadingInterviewer || isGeneratingDiscussion}
-                        >
-                          {isRecordingInterviewer ? <MicOff className="h-4 w-4" aria-hidden="true" /> : <Mic className="h-4 w-4" aria-hidden="true" />}
-                        </Button>
-                        <Button
-                          onClick={() => handleSendMessage(true)}
-                          className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white"
-                          loading={isLoadingInterviewer || isGeneratingDiscussion}
-                          aria-label={(isLoadingInterviewer || isGeneratingDiscussion) ? "Sending message" : "Send message"}
-                        >
-                          {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-4 w-4" aria-hidden="true" />}
-                        </Button>
+                      <div className="flex flex-col gap-2 border-t border-gray-700 pt-4">
+                        {/* Voice mode toggle */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setVoiceModeLive(false)}
+                              className={`text-xs px-2 py-1 rounded transition-colors ${!voiceModeLive ? 'bg-gray-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                            >
+                              Manual
+                            </button>
+                            <button
+                              onClick={() => setVoiceModeLive(true)}
+                              className={`text-xs px-2 py-1 rounded transition-colors flex items-center gap-1 ${voiceModeLive ? 'bg-green-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                            >
+                              <span className={`w-2 h-2 rounded-full ${voiceModeLive ? 'bg-green-300 animate-pulse' : 'bg-gray-400'}`}></span>
+                              Live
+                            </button>
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            {voiceModeLive ? 'Auto-sends when you stop speaking' : 'Click mic, speak, then click send'}
+                          </span>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Input
+                            value={interviewerInput}
+                            onChange={(e) => setInterviewerInput(e.target.value)}
+                            placeholder={isRecordingInterviewer ? (voiceModeLive ? "Listening... will auto-send" : "Listening...") : "Ask about optimization, complexity, or improvements..."}
+                            className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                            onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
+                            disabled={isLoadingInterviewer || isGeneratingDiscussion || isRecordingInterviewer}
+                            aria-label="Chat with interviewer"
+                          />
+                          <Button
+                            onClick={() => toggleVoiceRecording(true)}
+                            className={`${isRecordingInterviewer ? (voiceModeLive ? 'bg-green-500 hover:bg-green-600 animate-pulse' : 'bg-red-500 hover:bg-red-600 animate-pulse') : 'bg-gray-700 hover:bg-gray-600'} text-white`}
+                            aria-label={isRecordingInterviewer ? "Stop recording" : "Start voice input"}
+                            disabled={isLoadingInterviewer || isGeneratingDiscussion}
+                          >
+                            {isRecordingInterviewer ? <MicOff className="h-4 w-4" aria-hidden="true" /> : <Mic className="h-4 w-4" aria-hidden="true" />}
+                          </Button>
+                          {!voiceModeLive && (
+                            <Button
+                              onClick={() => handleSendMessage(true)}
+                              className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white"
+                              loading={isLoadingInterviewer || isGeneratingDiscussion}
+                              aria-label={(isLoadingInterviewer || isGeneratingDiscussion) ? "Sending message" : "Send message"}
+                            >
+                              {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-4 w-4" aria-hidden="true" />}
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
