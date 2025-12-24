@@ -591,3 +591,12 @@ export {
     type CostEstimate,
 } from './monitoring'
 
+// Problem vectorization
+export {
+    vectorizeAllProblems,
+    vectorizeSingleProblem,
+    getVectorizationStatus,
+    type VectorizationResult,
+    type VectorizationProgressCallback,
+} from './problem-vectorization'
+
