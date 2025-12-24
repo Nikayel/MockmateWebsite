@@ -217,7 +217,7 @@ export class PineconeVectorDB implements VectorDB {
     async delete(ids: string[]): Promise<void> {
         if (ids.length === 0) return
 
-        const index = this.getIndex()
+        const index = await this.getIndex()
 
         // Delete from all namespaces since we don't know which one
         const namespaces = ['problem', 'solution', 'hint', 'feedback', 'onboarding', 'general']
@@ -264,7 +264,7 @@ export class PineconeVectorDB implements VectorDB {
         totalVectors: number
         namespaces: Record<string, number>
     }> {
-        const index = this.getIndex()
+        const index = await this.getIndex()
         const stats = await index.describeIndexStats()
 
         return {
