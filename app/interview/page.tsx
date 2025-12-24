@@ -174,7 +174,8 @@ export default function InterviewPage() {
     },
     onUtteranceEnd: (transcript) => {
       // Auto-send when user stops speaking in live mode
-      if (voiceModeLive && transcript.trim() && !pendingAutoSendRef.current.interviewer) {
+      // Use ref to get current value (avoids stale closure issue)
+      if (voiceModeLiveRef.current && transcript.trim() && !pendingAutoSendRef.current.interviewer) {
         console.log('[Live Mode] Utterance end detected, auto-sending:', transcript.substring(0, 50))
         pendingAutoSendRef.current.interviewer = true
         setInterviewerInput(transcript)
@@ -196,7 +197,8 @@ export default function InterviewPage() {
     },
     onUtteranceEnd: (transcript) => {
       // Auto-send when user stops speaking in live mode
-      if (voiceModeLive && transcript.trim() && !pendingAutoSendRef.current.partner) {
+      // Use ref to get current value (avoids stale closure issue)
+      if (voiceModeLiveRef.current && transcript.trim() && !pendingAutoSendRef.current.partner) {
         console.log('[Live Mode] Utterance end detected for partner, auto-sending:', transcript.substring(0, 50))
         pendingAutoSendRef.current.partner = true
         setChatInput(transcript)
@@ -222,6 +224,12 @@ export default function InterviewPage() {
 
   // Voice mode states
   const [voiceModeLive, setVoiceModeLive] = useState(false) // false = manual, true = live
+  const voiceModeLiveRef = useRef(voiceModeLive) // Ref to track current value for callbacks
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    voiceModeLiveRef.current = voiceModeLive
+  }, [voiceModeLive])
   const [revealedHintIndices, setRevealedHintIndices] = useState<Set<number>>(new Set()) // Track which hints are revealed
 
   // Test states
@@ -1371,14 +1379,22 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     }
   }
 
-  const startInterview = async () => {
-    if (!selectedScenario) {
+  const startInterview = async (scenarioOverride?: Scenario) => {
+    // Use passed scenario if provided, otherwise use state (handles race condition)
+    const scenario = scenarioOverride || selectedScenario
+
+    if (!scenario) {
       toast.error("Please select a scenario first")
       return
     }
 
+    // If we received a scenario override, update state
+    if (scenarioOverride) {
+      setSelectedScenario(scenarioOverride)
+    }
+
     // Check usage limit before starting - redirect to limit page (skip for DSA questions)
-    if (user && usageLimit && !usageLimit.allowed && selectedScenario.type !== 'dsa') {
+    if (user && usageLimit && !usageLimit.allowed && scenario.type !== 'dsa') {
       router.push("/limit-reached")
       return
     }
@@ -1390,10 +1406,10 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         // Create session document first
         const sessionId = await createInterviewSession(
           user.id,
-          selectedScenario.title,
-          selectedScenario.type,
-          selectedScenario.difficulty,
-          selectedScenario.id
+          scenario.title,
+          scenario.type,
+          scenario.difficulty,
+          scenario.id
         )
         setCurrentSessionId(sessionId)
 
@@ -1431,12 +1447,12 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
     // Initialize code based on scenario type
     let initialCode: string
-    if (selectedScenario.type === 'bugfix') {
+    if (scenario.type === 'bugfix') {
       // For bug fixes, load buggy code
-      initialCode = (selectedScenario as any).buggyCode?.[selectedLanguage] || `// Bug fix code not available for ${selectedLanguage}`
+      initialCode = (scenario as any).buggyCode?.[selectedLanguage] || `// Bug fix code not available for ${selectedLanguage}`
 
       // Auto-load codebase files into workspace context for bug fixes
-      const codebaseFiles = (selectedScenario as any).codebaseFiles?.[selectedLanguage] || []
+      const codebaseFiles = (scenario as any).codebaseFiles?.[selectedLanguage] || []
       if (codebaseFiles.length > 0) {
         const contextFiles = codebaseFiles.map((file: any) => ({
           path: file.fileName,
@@ -1445,12 +1461,12 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         setWorkspaceContext(contextFiles)
         toast.success(`Loaded ${contextFiles.length} codebase file(s) for context`)
       }
-    } else if (selectedScenario.type === 'add-functionality') {
+    } else if (scenario.type === 'add-functionality') {
       // For Add Functionality scenarios, load existing code to extend
-      initialCode = (selectedScenario as any).existingCode?.[selectedLanguage] || `// Add functionality to the existing codebase`
+      initialCode = (scenario as any).existingCode?.[selectedLanguage] || `// Add functionality to the existing codebase`
 
       // Auto-load codebase files into workspace context
-      const codebaseFiles = (selectedScenario as any).codebaseFiles?.[selectedLanguage] || []
+      const codebaseFiles = (scenario as any).codebaseFiles?.[selectedLanguage] || []
       if (codebaseFiles.length > 0) {
         const contextFiles = codebaseFiles.map((file: any) => ({
           path: file.fileName,
@@ -1460,9 +1476,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         setWorkspaceContext(contextFiles)
         toast.success(`Loaded ${contextFiles.length} codebase file(s) - review them to understand the existing code`)
       }
-    } else if (selectedScenario.type === 'system-design') {
+    } else if (scenario.type === 'system-design') {
       // For system design, provide a design notes template
-      initialCode = `// DESIGN NOTES: ${selectedScenario.title}
+      initialCode = `// DESIGN NOTES: ${scenario.title}
 // Use this space to document your design decisions
 
 /* ============================================
@@ -1504,7 +1520,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 `
     } else {
       // For DSA problems, load starter code
-      initialCode = (selectedScenario as any).starterCode?.[selectedLanguage] || `function solution() {
+      initialCode = (scenario as any).starterCode?.[selectedLanguage] || `function solution() {
   // Write your solution here
 
 }`
@@ -1517,13 +1533,13 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setProtectedElements(protectedElementsData)
 
     // Initialize interviewer with welcome message (problem details are now in left panel)
-    const problemType = selectedScenario.type === 'bugfix' ? 'BUG FIX' :
-      selectedScenario.type === 'add-functionality' ? 'ADD FUNCTIONALITY' :
-        selectedScenario.type.toUpperCase()
+    const problemType = scenario.type === 'bugfix' ? 'BUG FIX' :
+      scenario.type === 'add-functionality' ? 'ADD FUNCTIONALITY' :
+        scenario.type.toUpperCase()
     // Different initial message for DSA vs other scenarios
-    const isDSA = selectedScenario.type === 'dsa'
+    const isDSA = scenario.type === 'dsa'
     const initialMessage = isDSA
-      ? `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${selectedScenario.title}**, a ${selectedScenario.difficulty} ${problemType} problem.
+      ? `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${scenario.title}**, a ${scenario.difficulty} ${problemType} problem.
 
 Here's what I expect:
 - Walk me through your plan before you code; if you skip that, I'll call it out.
@@ -1531,7 +1547,7 @@ Here's what I expect:
 - This is a pure coding challenge—no AI assistance. Just you and the problem, like a real technical interview.
 
 Take a breath, study the prompt on the left, and tell me how you plan to attack this.`
-      : `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${selectedScenario.title}**, a ${selectedScenario.difficulty} ${problemType} problem.
+      : `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${scenario.title}**, a ${scenario.difficulty} ${problemType} problem.
 
 Here's what I expect:
 - Walk me through your plan before you code; if you skip that, I'll call it out.
@@ -1545,7 +1561,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     if (!isDSA) {
       setChatMessages([{
         type: "ai",
-        message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${selectedScenario.title}. Just ask!`,
+        message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
       }])
     } else {
       setChatMessages([]) // Clear chat messages for DSA
@@ -1633,6 +1649,24 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       url.searchParams.delete('session')
       url.searchParams.delete('scenario')
       window.history.replaceState({}, '', url.toString())
+    }
+
+    // Clear auto-save data to prevent "session restored" toast on next visit
+    if (firebaseUser && selectedScenario) {
+      const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
+      try {
+        localStorage.removeItem(storageKey)
+      } catch (e) {
+        // Silent failure - localStorage might be unavailable
+      }
+    }
+
+    // Stop any active voice recordings to prevent Deepgram billing
+    if (interviewerVoice.isRecording) {
+      interviewerVoice.stopRecording()
+    }
+    if (partnerVoice.isRecording) {
+      partnerVoice.stopRecording()
     }
 
     // Clear all proactive interview timers
@@ -2283,9 +2317,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       {showScenarioBrowser && (
         <ScenarioBrowser
           onStartInterview={async (scenario) => {
-            // Select and start the interview using existing logic
-            setSelectedScenario(scenario)
-            await startInterview()
+            // Pass scenario directly to avoid race condition with state update
+            await startInterview(scenario)
           }}
           usageLimit={usageLimit}
           completedProblems={completedProblems}
