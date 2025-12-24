@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, BookOpen, Target, Sparkles, Trophy, AlertTriangle, Clock, RefreshCw, PartyPopper, Calendar, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, BookOpen, Target, Sparkles, Trophy, AlertTriangle, Clock, RefreshCw, PartyPopper, Calendar, ArrowRight, ChevronDown, ChevronUp, Archive, CheckCircle2, XCircle } from 'lucide-react'
 import Link from 'next/link'
 
 import { Header } from '@/components/header'
@@ -18,10 +18,12 @@ import { useRoadmapStore, useActiveRoadmap } from '@/lib/stores/roadmap-store'
 import { getCompanyById } from '@/lib/data/company-questions'
 import { getStudyRecommendations } from '@/lib/roadmap/prioritization-algorithm'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/lib/auth-context'
 
 export default function RoadmapPage() {
   const router = useRouter()
   const roadmap = useActiveRoadmap()
+  const { user, initialized } = useAuth()
   const {
     selectedDayIndex,
     selectDay,
@@ -30,6 +32,9 @@ export default function RoadmapPage() {
     setActiveRoadmap,
   } = useRoadmapStore()
   const [isInternBannerExpanded, setIsInternBannerExpanded] = useState(false)
+  const [isLoadingRoadmap, setIsLoadingRoadmap] = useState(true)
+  const [allRoadmaps, setAllRoadmaps] = useState<any[]>([])
+  const [showArchived, setShowArchived] = useState(false)
 
   // Get today's plan
   const today = new Date()
@@ -40,6 +45,63 @@ export default function RoadmapPage() {
     planDate.setHours(0, 0, 0, 0)
     return planDate.getTime() === today.getTime()
   }) ?? 0
+
+  // Load roadmaps from Firebase on mount
+  useEffect(() => {
+    if (!initialized) return
+
+    const loadRoadmaps = async () => {
+      if (!user?.id) {
+        setIsLoadingRoadmap(false)
+        return
+      }
+
+      try {
+        // Load active roadmap
+        const activeResponse = await fetch('/api/roadmap')
+        if (activeResponse.ok) {
+          const activeData = await activeResponse.json()
+          if (activeData.roadmap) {
+            // Convert date strings back to Date objects for the store
+            const roadmap = {
+              ...activeData.roadmap,
+              interviewDate: new Date(activeData.roadmap.interviewDate),
+              createdAt: activeData.roadmap.createdAt ? new Date(activeData.roadmap.createdAt) : new Date(),
+              updatedAt: activeData.roadmap.updatedAt ? new Date(activeData.roadmap.updatedAt) : new Date(),
+              dailyPlans: activeData.roadmap.dailyPlans?.map((plan: any) => ({
+                ...plan,
+                date: new Date(plan.date),
+                questions: plan.questions?.map((q: any) => ({
+                  ...q,
+                  completedAt: q.completedAt ? new Date(q.completedAt) : undefined,
+                })),
+              })) || [],
+              milestones: activeData.roadmap.milestones?.map((m: any) => ({
+                ...m,
+                targetDate: new Date(m.targetDate),
+              })) || [],
+            }
+            setActiveRoadmap(roadmap)
+          }
+        }
+
+        // Load all roadmaps for the list view
+        const allResponse = await fetch('/api/roadmap?all=true')
+        if (allResponse.ok) {
+          const allData = await allResponse.json()
+          if (allData.roadmaps) {
+            setAllRoadmaps(allData.roadmaps)
+          }
+        }
+      } catch (error) {
+        console.error('Error loading roadmaps:', error)
+      } finally {
+        setIsLoadingRoadmap(false)
+      }
+    }
+
+    loadRoadmaps()
+  }, [user?.id, initialized, setActiveRoadmap])
 
   // Set selected day to today on initial mount only
   useEffect(() => {
@@ -63,8 +125,29 @@ export default function RoadmapPage() {
     markQuestionCompleted(scenarioId)
   }
 
-  // No active roadmap - show empty state
+  // Loading state
+  if (!initialized || isLoadingRoadmap) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="flex items-center justify-center min-h-[calc(100vh-80px)] pt-24">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading your roadmap...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // No active roadmap - show list of archived roadmaps or empty state
   if (!roadmap) {
+    const archivedRoadmaps = allRoadmaps.filter(r => r.status === 'archived' || r.status === 'completed' || r.status === 'abandoned')
+    
+    if (archivedRoadmaps.length > 0) {
+      return <RoadmapListView roadmaps={allRoadmaps} onCreateNew={() => router.push('/roadmap/new')} />
+    }
+    
     return <EmptyState />
   }
 
@@ -79,7 +162,31 @@ export default function RoadmapPage() {
 
   // Roadmap is expired - show expired state
   if (isExpired) {
-    return <ExpiredState roadmap={roadmap} onCreateNew={() => router.push('/roadmap/new')} onArchive={() => setActiveRoadmap(null)} />
+    return <ExpiredState 
+      roadmap={roadmap} 
+      onCreateNew={() => router.push('/roadmap/new')} 
+      onArchive={async () => {
+        // Archive the roadmap
+        try {
+          await fetch('/api/roadmap', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roadmapId: roadmap.id, status: 'archived' }),
+          })
+          setActiveRoadmap(null)
+          // Reload roadmaps
+          const response = await fetch('/api/roadmap?all=true')
+          if (response.ok) {
+            const data = await response.json()
+            if (data.roadmaps) {
+              setAllRoadmaps(data.roadmaps)
+            }
+          }
+        } catch (error) {
+          console.error('Error archiving roadmap:', error)
+        }
+      }} 
+    />
   }
 
   // Roadmap is completed - show completion celebration
@@ -97,8 +204,29 @@ export default function RoadmapPage() {
       <Header />
 
       <main className="container mx-auto px-4 py-6 pt-24 space-y-4 md:space-y-6">
-        {/* Top section: Header info on left, Pattern Coverage & Milestones on right */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+        {/* View archived roadmaps button */}
+        {allRoadmaps.filter(r => r.status === 'archived' || r.status === 'completed' || r.status === 'abandoned').length > 0 && (
+          <div className="flex justify-end">
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
+            >
+              <Archive className="h-4 w-4" />
+              {showArchived ? 'Hide' : 'View'} Archived Roadmaps
+            </button>
+          </div>
+        )}
+
+        {showArchived ? (
+          <RoadmapListView 
+            roadmaps={allRoadmaps} 
+            onCreateNew={() => router.push('/roadmap/new')}
+            onClose={() => setShowArchived(false)}
+          />
+        ) : (
+          <>
+            {/* Top section: Header info on left, Pattern Coverage & Milestones on right */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Left column - Header sections and Today's Focus */}
           <div className="lg:col-span-2 space-y-4">
             {/* Intern-specific banner - Collapsible */}
@@ -268,8 +396,188 @@ export default function RoadmapPage() {
             <CompanyInterviewGuide company={companyData} isIntern={isIntern} />
           </div>
         )}
+          </>
+        )}
       </main>
     </div>
+  )
+}
+
+// Roadmap List View - Shows all roadmaps (active and archived)
+function RoadmapListView({
+  roadmaps,
+  onCreateNew,
+  onClose,
+}: {
+  roadmaps: any[]
+  onCreateNew: () => void
+  onClose?: () => void
+}) {
+  const activeRoadmaps = roadmaps.filter(r => r.status === 'active')
+  const archivedRoadmaps = roadmaps.filter(r => r.status === 'archived' || r.status === 'completed' || r.status === 'abandoned')
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      <main className="container mx-auto px-4 py-6 pt-24 space-y-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">My Roadmaps</h1>
+            <p className="text-muted-foreground mt-1">View and manage all your interview preparation roadmaps</p>
+          </div>
+          <div className="flex gap-3">
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
+              >
+                Close
+              </button>
+            )}
+            <button
+              onClick={onCreateNew}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              New Roadmap
+            </button>
+          </div>
+        </div>
+
+        {/* Active Roadmaps */}
+        {activeRoadmaps.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-foreground">Active</h2>
+            <div className="grid gap-4">
+              {activeRoadmaps.map((roadmap) => (
+                <RoadmapCard key={roadmap.id} roadmap={roadmap} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Archived Roadmaps */}
+        {archivedRoadmaps.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-foreground">Archived</h2>
+            <div className="grid gap-4">
+              {archivedRoadmaps.map((roadmap) => (
+                <RoadmapCard key={roadmap.id} roadmap={roadmap} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {roadmaps.length === 0 && (
+          <div className="text-center py-12">
+            <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground mb-4">No roadmaps yet</p>
+            <button
+              onClick={onCreateNew}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="h-5 w-5" />
+              Create Your First Roadmap
+            </button>
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}
+
+// Roadmap Card Component
+function RoadmapCard({ roadmap }: { roadmap: any }) {
+  const interviewDate = new Date(roadmap.interviewDate)
+  const progress = Math.round((roadmap.questionsCompleted / roadmap.totalQuestions) * 100)
+  const companyName = roadmap.companyName || roadmap.targetCompany
+  const status = roadmap.status
+
+  const getStatusIcon = () => {
+    switch (status) {
+      case 'active':
+        return <Target className="h-4 w-4 text-primary" />
+      case 'completed':
+        return <CheckCircle2 className="h-4 w-4 text-green-600" />
+      case 'archived':
+        return <Archive className="h-4 w-4 text-muted-foreground" />
+      case 'abandoned':
+        return <XCircle className="h-4 w-4 text-muted-foreground" />
+      default:
+        return <BookOpen className="h-4 w-4 text-muted-foreground" />
+    }
+  }
+
+  const getStatusColor = () => {
+    switch (status) {
+      case 'active':
+        return 'border-primary/30 bg-primary/5'
+      case 'completed':
+        return 'border-green-500/30 bg-green-500/5'
+      case 'archived':
+        return 'border-border bg-muted/30'
+      case 'abandoned':
+        return 'border-border bg-muted/30'
+      default:
+        return 'border-border bg-card'
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={cn(
+        'border rounded-xl p-6 hover:shadow-md transition-all cursor-pointer',
+        getStatusColor()
+      )}
+    >
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          {getStatusIcon()}
+          <div>
+            <h3 className="font-semibold text-foreground">{companyName}</h3>
+            <p className="text-sm text-muted-foreground capitalize">{status}</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-muted-foreground">Interview Date</p>
+          <p className="text-sm font-medium text-foreground">
+            {interviewDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm text-muted-foreground">Progress</span>
+            <span className="text-sm font-medium text-foreground">{progress}%</span>
+          </div>
+          <div className="w-full bg-muted rounded-full h-2">
+            <div
+              className="bg-primary h-2 rounded-full transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4 text-center pt-2 border-t border-border">
+          <div>
+            <p className="text-lg font-semibold text-foreground">{roadmap.questionsCompleted}</p>
+            <p className="text-xs text-muted-foreground">Completed</p>
+          </div>
+          <div>
+            <p className="text-lg font-semibold text-foreground">{roadmap.totalQuestions}</p>
+            <p className="text-xs text-muted-foreground">Total</p>
+          </div>
+          <div>
+            <p className="text-lg font-semibold text-foreground">{Math.round(roadmap.actualHoursSpent || 0)}h</p>
+            <p className="text-xs text-muted-foreground">Studied</p>
+          </div>
+        </div>
+      </div>
+    </motion.div>
   )
 }
 
