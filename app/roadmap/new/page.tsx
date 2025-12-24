@@ -13,6 +13,7 @@ import { getCompanyById } from '@/lib/data/company-questions'
 import { generatePersonalizedRoadmap } from '@/lib/roadmap/prioritization-algorithm'
 import { UserRoadmapAssessment } from '@/lib/data/company-questions/types'
 import { scenarios } from '@/lib/scenarios'
+import { useAuth } from '@/lib/auth-context'
 
 type Step = 'company' | 'date' | 'assessment' | 'generating'
 
@@ -21,6 +22,7 @@ export default function NewRoadmapPage() {
   const [step, setStep] = useState<Step>('company')
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth()
 
   const {
     selectedCompany,
@@ -49,6 +51,12 @@ export default function NewRoadmapPage() {
   const handleAssessmentComplete = async (result: AssessmentResult) => {
     if (!selectedCompany || !selectedDate) return
 
+    if (!user?.id) {
+      setError('You must be logged in to create a roadmap')
+      setStep('assessment')
+      return
+    }
+
     setStep('generating')
     setIsGenerating(true)
     setError(null)
@@ -71,16 +79,29 @@ export default function NewRoadmapPage() {
         targetScore: 80,
       }
 
-      // Get all DSA scenarios (filter for roadmap)
-      const dsaScenarios = scenarios.filter(s => s.type === 'dsa')
+      // Call API endpoint to create and save roadmap to Firebase
+      const response = await fetch('/api/roadmap', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          targetCompany: selectedCompany,
+          interviewDate: selectedDate.toISOString(),
+          experienceLevel: result.experienceLevel,
+          problemsSolved: result.problemsSolved,
+          hoursPerDay: result.hoursPerDay,
+          patternFamiliarity: result.patternFamiliarity,
+        }),
+      })
 
-      // Generate roadmap
-      // Note: In production, you'd want to call an API endpoint that also saves to Firestore
-      const roadmap = generatePersonalizedRoadmap(
-        dsaScenarios,
-        assessment,
-        'temp-user-id' // Would be actual user ID
-      )
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to create roadmap' }))
+        throw new Error(errorData.error || 'Failed to create roadmap')
+      }
+
+      const data = await response.json()
+      const roadmap = data.roadmap
 
       if (!roadmap) {
         throw new Error('Failed to generate roadmap')
