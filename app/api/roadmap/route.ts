@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
 import { verifyAuth } from '@/lib/auth-helpers'
 import { generatePersonalizedRoadmap } from '@/lib/roadmap/prioritization-algorithm'
+import { generateRAGEnhancedRoadmap, type RAGEnhancedRoadmap } from '@/lib/rag/roadmap-rag'
 import { scenarios } from '@/lib/scenarios'
 import { UserRoadmapAssessment, PersonalizedRoadmap } from '@/lib/data/company-questions/types'
 
@@ -111,6 +112,8 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/roadmap - Create a new roadmap
+ * Query params:
+ *   - rag=true: Enable RAG-enhanced generation with personalized insights
  */
 export async function POST(request: NextRequest) {
   try {
@@ -121,6 +124,8 @@ export async function POST(request: NextRequest) {
 
     const userId = authResult.userId
     const body = await request.json()
+    const { searchParams } = new URL(request.url)
+    const enableRAG = searchParams.get('rag') !== 'false' // RAG enabled by default
 
     const {
       targetCompany,
@@ -159,8 +164,22 @@ export async function POST(request: NextRequest) {
     // Get DSA scenarios
     const dsaScenarios = scenarios.filter(s => s.type === 'dsa')
 
-    // Generate roadmap
-    const roadmap = generatePersonalizedRoadmap(dsaScenarios, assessment, userId)
+    // Generate roadmap - use RAG-enhanced version if enabled
+    let roadmap: PersonalizedRoadmap | RAGEnhancedRoadmap | null
+
+    if (enableRAG) {
+      console.log('[Roadmap] Generating RAG-enhanced roadmap for user:', userId)
+      roadmap = await generateRAGEnhancedRoadmap({
+        userId,
+        assessment,
+        scenarios: dsaScenarios,
+        enableRAG: true,
+        enableAIInsights: true,
+      })
+    } else {
+      console.log('[Roadmap] Generating standard roadmap for user:', userId)
+      roadmap = generatePersonalizedRoadmap(dsaScenarios, assessment, userId)
+    }
 
     if (!roadmap) {
       return NextResponse.json(
@@ -182,6 +201,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Prepare roadmap for Firestore (convert dates)
+    const ragEnhancements = 'ragEnhancements' in roadmap ? roadmap.ragEnhancements : null
     const roadmapDoc = {
       ...roadmap,
       createdAt: new Date(),
@@ -199,6 +219,8 @@ export async function POST(request: NextRequest) {
         ...m,
         targetDate: new Date(m.targetDate),
       })),
+      // Include RAG enhancements if present
+      ...(ragEnhancements ? { ragEnhancements } : {}),
     }
 
     // Save new roadmap
