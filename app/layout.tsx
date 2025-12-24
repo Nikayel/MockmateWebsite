@@ -5,6 +5,7 @@ import { Toaster } from "sonner"
 import { AuthProvider } from "@/lib/auth-context"
 import { ErrorBoundaryProvider } from "@/components/providers/error-boundary-provider"
 import { CookieConsent } from "@/components/CookieConsent"
+import { PerformancePolyfill } from "@/components/performance-polyfill"
 import "./globals.css"
 
 const workSans = Work_Sans({
