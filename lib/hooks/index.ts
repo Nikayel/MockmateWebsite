@@ -26,3 +26,9 @@ export type {
   UseCodeExecutionOptions,
   UseCodeExecutionReturn,
 } from "./useCodeExecution"
+
+export { useNotifications } from "./useNotifications"
+export type {
+  UseNotificationsOptions,
+  UseNotificationsReturn,
+} from "./useNotifications"

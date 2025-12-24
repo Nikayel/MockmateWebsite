@@ -1,47 +1,40 @@
 "use client"
 
 import { MagneticButton } from "@/components/ui/magnetic-button"
-import { Brain, Code2, MessageSquare, BarChart3, Zap, Shield, Play } from "lucide-react"
+import { Brain, Code2, BarChart3, Zap, Play } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { ScrollReveal } from "@/lib/motion"
 import Image from "next/image"
 
+/**
+ * Features optimized for cognitive load
+ * Miller's Law: 4±1 items is optimal for working memory
+ * Focusing on the 4 most differentiating features
+ */
 const features = [
   {
     icon: Brain,
     title: "AI Interviewer",
-    description: "Adapts to your skill level with realistic scenarios",
+    description: "Adaptive difficulty. Natural conversation. Just like the real thing.",
     color: "#00d9ff",
   },
   {
     icon: Code2,
     title: "Real-Time Feedback",
-    description: "Instant suggestions as you code",
+    description: "Instant code review and suggestions while you solve.",
     color: "#00ff88",
-  },
-  {
-    icon: MessageSquare,
-    title: "Natural Conversations",
-    description: "Discuss your approach like a real interview",
-    color: "#00d9ff",
   },
   {
     icon: BarChart3,
-    title: "Progress Tracking",
-    description: "See your improvement over time",
-    color: "#00ff88",
-  },
-  {
-    icon: Zap,
-    title: "Instant Results",
-    description: "Get detailed feedback after each session",
+    title: "Spaced Repetition",
+    description: "Science-backed scheduling. Review at the optimal moment.",
     color: "#00d9ff",
   },
   {
-    icon: Shield,
-    title: "Private & Secure",
-    description: "Your code stays yours",
+    icon: Zap,
+    title: "Pattern Mastery",
+    description: "Track proficiency across 15 DSA patterns. Know your gaps.",
     color: "#00ff88",
   },
 ]
@@ -76,9 +69,9 @@ export function FeaturesSection() {
           </motion.div>
         </ScrollReveal>
 
-        {/* Features Grid - Clean minimal style */}
+        {/* Features Grid - 2x2 layout optimized for cognitive load (Miller's Law) */}
         <ScrollReveal>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-16 mb-32">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-12 max-w-3xl mx-auto mb-32">
             {features.map((feature, index) => (
               <motion.div
                 key={feature.title}

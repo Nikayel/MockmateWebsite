@@ -258,6 +258,67 @@ service cloud.firestore {
     }
 
     // ============================================================================
+    // NOTIFICATION SYSTEM
+    // ============================================================================
+
+    match /notification_preferences/{userId} {
+      // Users can read/write their own notification preferences
+      allow read: if isOwner(userId);
+      allow create: if isAuthenticated()
+                    && request.auth.uid == userId
+                    && request.resource.data.userId == userId;
+      allow update: if isOwner(userId)
+                    && request.resource.data.userId == userId;
+      allow delete: if isOwner(userId);
+    }
+
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isAuthenticated()
+                  && documentExists()
+                  && resource.data.userId == request.auth.uid;
+
+      // Users can update their own notifications (mark as read/dismissed)
+      allow update: if isAuthenticated()
+                    && documentExists()
+                    && resource.data.userId == request.auth.uid
+                    && request.resource.data.userId == request.auth.uid;
+
+      // Only backend can create/delete notifications
+      allow create: if false;
+      allow delete: if false;
+    }
+
+    match /in_app_notifications/{notificationId} {
+      // Users can read their own in-app notifications
+      allow read: if isAuthenticated()
+                  && documentExists()
+                  && resource.data.userId == request.auth.uid;
+
+      // Users can update (mark as read)
+      allow update: if isAuthenticated()
+                    && documentExists()
+                    && resource.data.userId == request.auth.uid;
+
+      // Only backend can create in-app notifications
+      allow create: if false;
+      allow delete: if false;
+    }
+
+    match /notification_analytics/{userId} {
+      // Users can read their own notification analytics
+      allow read: if isOwner(userId);
+
+      // Only backend can write analytics
+      allow write: if false;
+    }
+
+    match /notification_queue/{queueId} {
+      // No client access - only Firebase Admin SDK
+      allow read, write: if false;
+    }
+
+    // ============================================================================
     // DEFAULT DENY ALL
     // ============================================================================
 
