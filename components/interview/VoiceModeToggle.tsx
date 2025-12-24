@@ -182,7 +182,7 @@ export function VoiceModeToggle({
               ? isLiveMode
                 ? "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 shadow-lg shadow-green-500/30"
                 : "bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 shadow-lg shadow-red-500/30 animate-pulse"
-              : "bg-gray-700 hover:bg-gray-600"
+              : "bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white shadow-md hover:shadow-lg hover:shadow-[#00d9ff]/30"
           )}
         >
           {isRecording ? (
