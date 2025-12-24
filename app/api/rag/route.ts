@@ -12,6 +12,10 @@ import {
   findSimilarSessions,
   vectorizeSessionMetrics,
 } from "@/lib/rag"
+import { buildHintContext } from "@/lib/rag/context-builder"
+import { getPatternKnowledge } from "@/lib/rag/knowledge-base/dsa-knowledge"
+import { advancedRetrieve } from "@/lib/rag/retrieval/advanced-retrieval"
+import type { DSAPattern } from "@/lib/types/dsa-patterns"
 
 /**
  * RAG API Endpoint
@@ -70,6 +74,7 @@ export async function POST(request: NextRequest) {
 
 /**
  * Get contextual hints based on problem and user's current code
+ * Enhanced with RAG v2 context builder and advanced retrieval
  */
 async function handleGetHints(params: {
   problemText: string
@@ -77,16 +82,18 @@ async function handleGetHints(params: {
   userCode?: string
   difficulty?: string
   problemType?: string
+  problemPattern?: string
+  userId?: string
   limit?: number
 }) {
-  const { problemText, problemTitle, userCode = '', difficulty, problemType, limit = 3 } = params
+  const { problemText, problemTitle, userCode = '', difficulty, problemType, problemPattern, userId, limit = 3 } = params
 
   if (!problemText) {
     return NextResponse.json({ error: "problemText is required" }, { status: 400 })
   }
 
-  // Generate hints based on problem analysis
-  const hints = await generateContextualHints(
+  // Generate hints based on problem analysis (basic rule-based hints)
+  const basicHints = await generateContextualHints(
     problemText,
     problemTitle,
     userCode,
@@ -94,16 +101,80 @@ async function handleGetHints(params: {
     problemType || 'dsa'
   )
 
-  // Also try to get hints from stored embeddings
+  // Also try to get hints from stored embeddings (legacy)
   const storedHints = await getRelevantHints(problemText, userCode, { limit })
 
+  // NEW: Use RAG v2 context builder for enhanced hints
+  let ragEnhancedHints: { level: number; hint: string; source: string }[] = []
+  let patternInsights: { pattern: string; keyTechniques: string[]; commonMistakes: string[] } | null = null
+
+  try {
+    // Get pattern-specific knowledge if pattern is known
+    if (problemPattern) {
+      const patternKnowledge = getPatternKnowledge(problemPattern as DSAPattern)
+      if (patternKnowledge) {
+        patternInsights = {
+          pattern: patternKnowledge.displayName,
+          keyTechniques: patternKnowledge.keyTechniques,
+          commonMistakes: patternKnowledge.commonMistakes.slice(0, 3),
+        }
+
+        // Add pattern-specific hints
+        ragEnhancedHints.push({
+          level: 1,
+          hint: `This is a ${patternKnowledge.displayName} problem. ${patternKnowledge.whenToUse[0]}`,
+          source: 'pattern-knowledge',
+        })
+
+        if (patternKnowledge.keyInsights.length > 0) {
+          ragEnhancedHints.push({
+            level: 2,
+            hint: patternKnowledge.keyInsights[0],
+            source: 'pattern-knowledge',
+          })
+        }
+      }
+    }
+
+    // Build full hint context from RAG
+    const hintContext = await buildHintContext({
+      problemText,
+      problemPattern: problemPattern as DSAPattern,
+      userCode,
+      userId,
+    })
+
+    // Extract relevant hints from retrieved documents
+    if (hintContext.retrievedDocs.length > 0) {
+      const topDocs = hintContext.retrievedDocs.slice(0, 2)
+      for (const doc of topDocs) {
+        if (doc.text && doc.text.length > 20) {
+          ragEnhancedHints.push({
+            level: 3,
+            hint: doc.text.substring(0, 300) + (doc.text.length > 300 ? '...' : ''),
+            source: 'rag-retrieval',
+          })
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[RAG API] Enhanced hints error:', error)
+    // Continue with basic hints if RAG fails
+  }
+
   return NextResponse.json({
-    contextualHints: hints,
+    contextualHints: basicHints,
     relatedHints: storedHints.map(h => ({
       text: h.text,
       similarity: h.similarity,
       level: h.metadata?.tags?.find((t: string) => t.startsWith('level-'))?.replace('level-', '') || '1',
     })),
+    ragEnhancedHints,
+    patternInsights,
+    metadata: {
+      ragEnabled: true,
+      totalHints: basicHints.length + storedHints.length + ragEnhancedHints.length,
+    },
   })
 }
 

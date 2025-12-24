@@ -5,6 +5,10 @@ import { generateAIResponse, validateResponseRelevance, type TaskComplexity } fr
 import { trackAIChatServer } from "@/lib/analytics-server"
 import { getCompanyStyle, getPatternMetadata, type DSAPattern } from "@/lib/types/dsa-patterns"
 import { logger } from "@/lib/logger"
+import { buildHintContext, buildFeedbackContext } from "@/lib/rag/context-builder"
+import { getPatternKnowledge } from "@/lib/rag/knowledge-base/dsa-knowledge"
+import { getCompanyInterviewKnowledge } from "@/lib/rag/knowledge-base/company-knowledge"
+import type { CompanyId } from "@/lib/data/company-questions/types"
 
 interface UserContext {
   email?: string
@@ -89,6 +93,100 @@ function manageWorkspaceContext(
       ? file.content.slice(0, maxFileSize) + '\n// ... [file truncated for context management]'
       : file.content
   }))
+}
+
+/**
+ * Build RAG-enhanced context for the AI partner role
+ * Retrieves relevant patterns, hints, and knowledge from the RAG system
+ */
+async function buildRAGContext(options: {
+  scenarioTitle?: string
+  scenarioPattern?: string
+  scenarioCompany?: string
+  scenarioType?: string
+  problemText?: string
+  userCode?: string
+  userId?: string
+}): Promise<string> {
+  const ragContextParts: string[] = []
+
+  try {
+    // 1. Get pattern-specific knowledge if pattern is known
+    if (options.scenarioPattern) {
+      const patternKnowledge = getPatternKnowledge(options.scenarioPattern as DSAPattern)
+      if (patternKnowledge) {
+        ragContextParts.push(`
+## Pattern Knowledge: ${patternKnowledge.displayName}
+
+### When to Use
+${patternKnowledge.whenToUse.slice(0, 3).map(w => `- ${w}`).join('\n')}
+
+### Key Insights
+${patternKnowledge.keyInsights.slice(0, 3).map(i => `- ${i}`).join('\n')}
+
+### Common Mistakes to Avoid
+${patternKnowledge.commonMistakes.slice(0, 2).map(m => `- ${m}`).join('\n')}
+
+### Expected Complexity
+- Time: ${patternKnowledge.timeComplexity.typical}
+- Space: ${patternKnowledge.spaceComplexity.typical}
+`)
+      }
+    }
+
+    // 2. Get company-specific interview knowledge
+    if (options.scenarioCompany && options.scenarioCompany !== 'Generic') {
+      const companyKnowledge = getCompanyInterviewKnowledge(options.scenarioCompany as CompanyId)
+      if (companyKnowledge) {
+        ragContextParts.push(`
+## ${companyKnowledge.company} Interview Tips
+
+### Interview Style
+${companyKnowledge.interviewStyle}
+
+### Focus Areas
+${companyKnowledge.topPatterns.slice(0, 4).map(p => `- ${p}`).join('\n')}
+
+### What They Value
+${companyKnowledge.cultureTips.slice(0, 2).map(t => `- ${t}`).join('\n')}
+`)
+      }
+    }
+
+    // 3. Build hint context from RAG if we have problem text
+    if (options.problemText && options.problemText.length > 20) {
+      const hintContext = await buildHintContext({
+        problemText: options.problemText,
+        problemPattern: options.scenarioPattern as DSAPattern,
+        userCode: options.userCode,
+        userId: options.userId,
+      })
+
+      if (hintContext.retrievedDocs.length > 0) {
+        ragContextParts.push(`
+## Relevant Knowledge from RAG (${hintContext.retrievedDocs.length} documents)
+
+${hintContext.retrievedDocs.slice(0, 2).map((doc, i) => `
+### Reference ${i + 1}
+${doc.text.substring(0, 400)}${doc.text.length > 400 ? '...' : ''}
+`).join('\n')}
+`)
+      }
+    }
+  } catch (error) {
+    // RAG errors should not break the chat - log and continue
+    console.error('[Chat API] RAG context build error:', error)
+  }
+
+  if (ragContextParts.length === 0) {
+    return ''
+  }
+
+  return `
+=== RAG-ENHANCED CONTEXT ===
+${ragContextParts.join('\n')}
+=== END RAG CONTEXT ===
+`
 }
 
 export async function POST(request: NextRequest) {
@@ -383,7 +481,24 @@ STAY IN CHARACTER: You are an AI coding assistant helping with the interview. St
 Keep responses brief, actionable, and helpful. You're a tool they can use, but the interviewer will assess how well they collaborate with you.`,
     }
 
-    const systemPrompt = systemPrompts[role as keyof typeof systemPrompts] || systemPrompts.partner
+    let systemPrompt = systemPrompts[role as keyof typeof systemPrompts] || systemPrompts.partner
+
+    // For partner role, enhance with RAG context for better hints
+    if (role === 'partner') {
+      const ragContext = await buildRAGContext({
+        scenarioTitle,
+        scenarioPattern,
+        scenarioCompany,
+        scenarioType,
+        problemText: scenarioTitle, // Use title as problem text
+        userCode: currentCode,
+        userId,
+      })
+
+      if (ragContext) {
+        systemPrompt = systemPrompt + '\n\n' + ragContext
+      }
+    }
 
     // Manage conversation history with sliding window
     const managedContext = manageContextWindow(context)
