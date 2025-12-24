@@ -69,6 +69,7 @@ html {
         />
       </head>
       <body className={`${workSans.variable} ${openSans.variable} antialiased`}>
+        <PerformancePolyfill />
         <ErrorBoundaryProvider>
           <AuthProvider>
             {children}
