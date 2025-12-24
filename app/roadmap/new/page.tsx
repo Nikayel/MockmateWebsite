@@ -22,7 +22,7 @@ export default function NewRoadmapPage() {
   const [step, setStep] = useState<Step>('company')
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { user } = useAuth()
+  const { user, firebaseUser } = useAuth()
 
   const {
     selectedCompany,
@@ -51,7 +51,7 @@ export default function NewRoadmapPage() {
   const handleAssessmentComplete = async (result: AssessmentResult) => {
     if (!selectedCompany || !selectedDate) return
 
-    if (!user?.id) {
+    if (!user?.id || !firebaseUser) {
       setError('You must be logged in to create a roadmap')
       setStep('assessment')
       return
@@ -62,6 +62,9 @@ export default function NewRoadmapPage() {
     setError(null)
 
     try {
+      // Get Firebase ID token for authentication
+      const idToken = await firebaseUser.getIdToken()
+
       // Calculate days remaining
       const now = new Date()
       const daysRemaining = Math.max(1, Math.ceil((selectedDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
@@ -84,6 +87,7 @@ export default function NewRoadmapPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
         },
         body: JSON.stringify({
           targetCompany: selectedCompany,
