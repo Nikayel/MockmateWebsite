@@ -6,34 +6,36 @@
  * Supports both Firestore and Pinecone backends
  */
 
-import { TFIDFEmbeddingProvider } from './embeddings/provider'
+import { HybridEmbeddingProvider, getHybridProvider } from './embeddings/hybrid-provider'
 import { embeddingCache } from './embeddings/cache'
 import { vectorDB, isPineconeEnabled, getVectorDBProvider } from './vectordb'
 import type { TextEmbedding, SimilarResult, SimilaritySearchOptions, VectorDocument } from './types'
 import { adminDb } from '../firebase-admin'
 import { Timestamp } from 'firebase-admin/firestore'
 
-// Initialize embedding provider
-const embeddingProvider = new TFIDFEmbeddingProvider()
+// Initialize hybrid embedding provider
+// Uses OpenAI (small) as primary for better accuracy, with TF-IDF fallback for speed/cost
+// Mode: 'openai-with-fallback' - tries OpenAI first, falls back to TF-IDF if unavailable
+// Model: 'text-embedding-3-small' - 1536 dimensions, fastest and cheapest OpenAI option
+const embeddingProvider = getHybridProvider({
+    mode: 'openai-with-fallback',
+    openaiModel: 'text-embedding-3-small',
+    openaiDimensions: 1536, // Matches Pinecone index dimensions
+    cacheEnabled: true, // Enable caching for speed and cost savings
+})
 
-// Log which vector DB is being used on startup
-console.log(`[RAG] Initialized with ${getVectorDBProvider()} backend`)
+// Log which vector DB and embedding provider is being used on startup
+const activeProvider = embeddingProvider.getActiveProvider()
+console.log(`[RAG] Initialized with ${getVectorDBProvider()} backend and ${activeProvider} embeddings`)
 
 /**
  * Generate text embedding (with caching)
+ * Uses hybrid provider which handles caching internally
  */
 export async function generateTextEmbedding(text: string): Promise<number[]> {
-    // Check cache first
-    const cached = embeddingCache.get(text)
-    if (cached) return cached
-
-    // Generate embedding
-    const embedding = await embeddingProvider.generateEmbedding(text)
-
-    // Cache it
-    embeddingCache.set(text, embedding)
-
-    return embedding
+    // Hybrid provider handles caching internally with mode-aware keys
+    // This ensures cache hits work correctly regardless of which provider is used
+    return await embeddingProvider.generateEmbedding(text)
 }
 
 /**

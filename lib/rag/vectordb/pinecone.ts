@@ -92,16 +92,23 @@ export class PineconeVectorDB implements VectorDB {
                 )
             }
 
-            // Validate dimensions - our TF-IDF embeddings use 256 dimensions
-            const EXPECTED_DIMENSIONS = 256
-            if (indexInfo.dimension !== EXPECTED_DIMENSIONS) {
+            // Validate dimensions - support both TF-IDF (256) and OpenAI small (1536)
+            const SUPPORTED_DIMENSIONS = [256, 1536]
+            if (!SUPPORTED_DIMENSIONS.includes(indexInfo.dimension)) {
                 throw new Error(
-                    `Pinecone index '${this.indexName}' has dimension mismatch. ` +
-                    `Expected ${EXPECTED_DIMENSIONS} dimensions (for TF-IDF embeddings), ` +
-                    `but index has ${indexInfo.dimension} dimensions. ` +
-                    `Please delete the existing index and create a new one with ${EXPECTED_DIMENSIONS} dimensions, ` +
+                    `Pinecone index '${this.indexName}' has unsupported dimensions. ` +
+                    `Supported dimensions: ${SUPPORTED_DIMENSIONS.join(' or ')} (256 for TF-IDF, 1536 for OpenAI small). ` +
+                    `Index has ${indexInfo.dimension} dimensions. ` +
+                    `Please delete the existing index and create a new one with one of the supported dimensions, ` +
                     `or update your embedding provider to match the index dimensions.`
                 )
+            }
+            
+            // Log which embedding type matches this index
+            if (indexInfo.dimension === 1536) {
+                console.log(`[Pinecone] Index configured for OpenAI embeddings (1536 dimensions)`)
+            } else if (indexInfo.dimension === 256) {
+                console.log(`[Pinecone] Index configured for TF-IDF embeddings (256 dimensions)`)
             }
         } catch (error: any) {
             // If listIndexes fails, it might be a permissions issue
