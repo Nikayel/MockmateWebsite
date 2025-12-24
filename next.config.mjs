@@ -45,7 +45,7 @@ const nextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()'
+            value: 'camera=(), microphone=(self), geolocation=()'
           },
           {
             key: 'Content-Security-Policy',
@@ -55,7 +55,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data: https://fonts.gstatic.com",
-              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com https://*.firebase.googleapis.com https://*.google-analytics.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://oauth2.googleapis.com https://www.googleapis.com wss://*.firebaseio.com https://api.stripe.com https://cdn.jsdelivr.net",
+              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com https://*.firebase.googleapis.com https://*.google-analytics.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://oauth2.googleapis.com https://www.googleapis.com wss://*.firebaseio.com https://api.stripe.com https://cdn.jsdelivr.net wss://api.deepgram.com wss://*.deepgram.com",
               "worker-src 'self' blob: https://cdn.jsdelivr.net",
               "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://www.youtube.com https://accounts.google.com https://*.googleapis.com https://*.firebaseapp.com https://*.web.app",
               "object-src 'none'",
