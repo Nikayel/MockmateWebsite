@@ -14,13 +14,15 @@ import { adminDb } from '../firebase-admin'
 import { Timestamp } from 'firebase-admin/firestore'
 
 // Initialize hybrid embedding provider
-// Uses OpenAI (small) as primary for better accuracy, with TF-IDF fallback for speed/cost
-// Mode: 'openai-with-fallback' - tries OpenAI first, falls back to TF-IDF if unavailable
-// Model: 'text-embedding-3-small' - 1536 dimensions, fastest and cheapest OpenAI option
+// Uses Gemini text-embedding-004 as primary (768D, most cost-effective)
+// Mode: 'gemini-with-fallback' - tries Gemini first, falls back to TF-IDF if unavailable
+// Model: 'text-embedding-004' - 768 dimensions, high quality and free tier available
 const embeddingProvider = getHybridProvider({
-    mode: 'openai-with-fallback',
+    mode: 'gemini-with-fallback',
+    geminiModel: 'text-embedding-004',
+    // Keep OpenAI as secondary fallback
     openaiModel: 'text-embedding-3-small',
-    openaiDimensions: 1536, // Matches Pinecone index dimensions
+    openaiDimensions: 1536,
     cacheEnabled: true, // Enable caching for speed and cost savings
 })
 
@@ -493,6 +495,13 @@ export {
 // ============================================
 
 // Embedding providers
+export {
+    GeminiEmbeddingProvider,
+    getGeminiProvider,
+    isGeminiAvailable,
+    resetGeminiProvider,
+} from './embeddings/gemini-provider'
+
 export {
     OpenAIEmbeddingProvider,
     getOpenAIProvider,
