@@ -19,8 +19,26 @@ import { getHybridProvider } from '@/lib/rag/embeddings/hybrid-provider'
 import { seedKnowledgeBase, isKnowledgeBaseSeeded, getKnowledgeBaseSeeder } from '@/lib/rag/knowledge-base/seeder'
 import { getPatternKnowledge, patternKnowledgeToDocument } from '@/lib/rag/knowledge-base/dsa-knowledge'
 import { getCompanyInterviewKnowledge, companyKnowledgeToDocument } from '@/lib/rag/knowledge-base/company-knowledge'
+import { rateLimit } from '@/lib/rate-limit'
+import { withTimeout, validateRAGQuery, TimeoutError } from '@/lib/rag/utils'
 import type { DSAPattern } from '@/lib/types/dsa-patterns'
 import type { CompanyId } from '@/lib/data/company-questions/types'
+
+// Rate limit: 30 requests per minute for RAG v2 operations
+const ragV2RateLimit = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+  maxRequests: 30,
+  prefix: 'rl:rag-v2'
+})
+
+// Stricter limit for embedding generation (expensive operation)
+const embeddingRateLimit = rateLimit({
+  interval: 60 * 1000,
+  uniqueTokenPerInterval: 500,
+  maxRequests: 20,
+  prefix: 'rl:rag-embedding'
+})
 
 /**
  * POST /api/rag/v2 - Execute RAG operations
@@ -48,6 +66,13 @@ export async function POST(request: NextRequest) {
         { error: 'Action is required' },
         { status: 400 }
       )
+    }
+
+    // Apply rate limiting based on action
+    const isEmbeddingAction = action === 'generate-embedding'
+    const rateLimitResponse = await (isEmbeddingAction ? embeddingRateLimit : ragV2RateLimit)(request)
+    if (rateLimitResponse) {
+      return rateLimitResponse
     }
 
     // Actions that require authentication
@@ -127,19 +152,22 @@ async function handleRetrieve(params: {
 }) {
   const { query } = params
 
-  if (!query) {
+  // Validate query input
+  const validation = validateRAGQuery(query)
+  if (!validation.valid) {
     return NextResponse.json(
-      { error: 'Query is required' },
+      { error: validation.error },
       { status: 400 }
     )
   }
 
+  const sanitizedQuery = validation.sanitized!
   const retriever = getAdvancedRetriever()
   const startTime = Date.now()
 
   const options: AdvancedRetrievalOptions = {
-    query,
-    limit: params.limit || 10,
+    query: sanitizedQuery,
+    limit: Math.min(params.limit || 10, 50), // Cap at 50 results
     minSimilarity: params.minSimilarity || 0.3,
     types: params.types as AdvancedRetrievalOptions['types'],
     patterns: params.patterns,
@@ -149,15 +177,30 @@ async function handleRetrieve(params: {
     enableReranking: params.enableReranking ?? true,
   }
 
-  const { results, analytics } = await retriever.retrieve(options)
+  try {
+    // Wrap retrieval in timeout (30 seconds max)
+    const { results, analytics } = await withTimeout(
+      retriever.retrieve(options),
+      30000,
+      'RAG retrieval'
+    )
 
-  return NextResponse.json({
-    results,
-    analytics: {
-      ...analytics,
-      totalTimeMs: Date.now() - startTime,
-    },
-  })
+    return NextResponse.json({
+      results,
+      analytics: {
+        ...analytics,
+        totalTimeMs: Date.now() - startTime,
+      },
+    })
+  } catch (error) {
+    if (error instanceof TimeoutError) {
+      return NextResponse.json(
+        { error: 'Request timed out. Please try a simpler query.' },
+        { status: 504 }
+      )
+    }
+    throw error
+  }
 }
 
 /**

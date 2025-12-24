@@ -1,4 +1,5 @@
 <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="24" cy="24" r="22" fill="#101820"/>
-  <text x="24" y="30" text-anchor="middle" fill="white" font-family="system-ui" font-size="20" font-weight="bold">P</text>
+  <rect fill="#101820" x="4" y="4" width="40" height="40" rx="8"/>
+  <path fill="#fff" d="M24 10l-14 14 14 14 14-14-14-14zm0 5l9 9-9 9-9-9 9-9z"/>
+  <circle fill="#fff" cx="24" cy="24" r="4"/>
 </svg>
