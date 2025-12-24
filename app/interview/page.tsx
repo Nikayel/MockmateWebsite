@@ -3170,7 +3170,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           showSendButton={!voiceModeLive}
                           compact={false}
                         />
-                        {/* Text input for typing when not recording */}
+                        {/* Text input for typing when not recording - only show send button in live mode */}
                         {!isRecordingInterviewer && (
                           <div className="flex space-x-2">
                             <Input
@@ -3182,15 +3182,17 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                               disabled={isLoadingInterviewer || isGeneratingDiscussion}
                               aria-label="Chat with interviewer"
                             />
-                            <Button
-                              onClick={() => handleSendMessage(true)}
-                              className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white"
-                              loading={isLoadingInterviewer || isGeneratingDiscussion}
-                              disabled={!interviewerInput.trim()}
-                              aria-label="Send message"
-                            >
-                              {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-4 w-4" aria-hidden="true" />}
-                            </Button>
+                            {voiceModeLive && (
+                              <Button
+                                onClick={() => handleSendMessage(true)}
+                                className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white"
+                                loading={isLoadingInterviewer || isGeneratingDiscussion}
+                                disabled={!interviewerInput.trim()}
+                                aria-label="Send message"
+                              >
+                                {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-4 w-4" aria-hidden="true" />}
+                              </Button>
+                            )}
                           </div>
                         )}
                       </div>
