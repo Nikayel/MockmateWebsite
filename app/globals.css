@@ -295,6 +295,21 @@
   }
 }
 
+/* Audio Waveform - Voice recording visualization */
+@keyframes waveform {
+  0%, 100% {
+    height: 4px;
+  }
+  50% {
+    height: 16px;
+  }
+}
+
+/* Waveform utility class */
+.animate-waveform {
+  animation: waveform 0.5s ease-in-out infinite;
+}
+
 /* === UTILITY CLASSES === */
 
 .animate-neural-pulse {

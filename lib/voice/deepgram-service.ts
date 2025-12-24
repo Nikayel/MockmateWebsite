@@ -52,6 +52,7 @@ export interface DeepgramConnection {
 type TranscriptCallback = (transcript: string, isFinal: boolean) => void
 type ErrorCallback = (error: Error) => void
 type StatusCallback = (status: 'connecting' | 'connected' | 'disconnected' | 'error') => void
+type UtteranceEndCallback = (transcript: string) => void
 
 /**
  * Deepgram Voice Service
@@ -64,8 +65,11 @@ export class DeepgramVoiceService {
   private onTranscript: TranscriptCallback | null = null
   private onError: ErrorCallback | null = null
   private onStatus: StatusCallback | null = null
+  private onUtteranceEnd: UtteranceEndCallback | null = null
   private accumulatedTranscript: string = ''
   private keepAliveInterval: ReturnType<typeof setInterval> | null = null
+  private utteranceBuffer: string = ''
+  private lastSentTranscript: string = ''
 
   constructor(config: DeepgramConfig = {}) {
     this.config = {
@@ -116,6 +120,14 @@ export class DeepgramVoiceService {
    */
   setOnStatus(callback: StatusCallback): void {
     this.onStatus = callback
+  }
+
+  /**
+   * Set callback for utterance end events (when user stops speaking)
+   * This is useful for live mode auto-send functionality
+   */
+  setOnUtteranceEnd(callback: UtteranceEndCallback): void {
+    this.onUtteranceEnd = callback
   }
 
   /**
@@ -198,6 +210,8 @@ export class DeepgramVoiceService {
             if (transcript) {
               if (isFinal) {
                 this.accumulatedTranscript += (this.accumulatedTranscript ? ' ' : '') + transcript
+                // Track what's new since last utterance end
+                this.utteranceBuffer = this.accumulatedTranscript.substring(this.lastSentTranscript.length).trim()
                 this.onTranscript?.(this.accumulatedTranscript, true)
               } else {
                 // Show interim result with accumulated + current
@@ -207,8 +221,16 @@ export class DeepgramVoiceService {
               }
             }
           } else if (data.type === 'UtteranceEnd') {
-            // Speech pause detected - finalize current segment
-            if (this.accumulatedTranscript) {
+            // Speech pause detected - this is the key event for live mode auto-send
+            console.log('[Deepgram] Utterance end detected')
+            if (this.accumulatedTranscript && this.accumulatedTranscript !== this.lastSentTranscript) {
+              const newContent = this.accumulatedTranscript.substring(this.lastSentTranscript.length).trim()
+              if (newContent) {
+                // Call utterance end callback with the full accumulated transcript
+                this.onUtteranceEnd?.(this.accumulatedTranscript)
+                // Track what we've sent to avoid duplicates
+                this.lastSentTranscript = this.accumulatedTranscript
+              }
               this.onTranscript?.(this.accumulatedTranscript, true)
             }
           }
@@ -281,8 +303,19 @@ export class DeepgramVoiceService {
 
     const finalTranscript = this.accumulatedTranscript
     this.accumulatedTranscript = ''
+    this.utteranceBuffer = ''
+    this.lastSentTranscript = ''
 
     return finalTranscript
+  }
+
+  /**
+   * Clear the sent transcript tracker (used after sending a message in live mode)
+   * This allows the next utterance to be detected as new content
+   */
+  clearSentTracker(): void {
+    this.lastSentTranscript = this.accumulatedTranscript
+    this.utteranceBuffer = ''
   }
 
   /**
@@ -290,6 +323,8 @@ export class DeepgramVoiceService {
    */
   resetTranscript(): void {
     this.accumulatedTranscript = ''
+    this.utteranceBuffer = ''
+    this.lastSentTranscript = ''
   }
 
   /**

@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { CodeViewerSidePanel } from "@/components/CodeViewerSidePanel"
 import { GradingCriteriaTooltip } from "@/components/GradingCriteria"
-import { ScenarioBrowser } from "@/components/interview"
+import { ScenarioBrowser, VoiceModeToggle } from "@/components/interview"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { useVoiceInput } from "@/lib/voice"
 
@@ -163,11 +163,29 @@ export default function InterviewPage() {
   const [isLoadingChat, setIsLoadingChat] = useState(false)
   const [isLoadingInterviewer, setIsLoadingInterviewer] = useState(false)
 
+  // Track pending auto-send to avoid duplicate sends
+  const pendingAutoSendRef = useRef<{ interviewer: boolean; partner: boolean }>({ interviewer: false, partner: false })
+
   // Voice recording - using Deepgram with Web Speech API fallback
   const interviewerVoice = useVoiceInput({
     fallbackToWebSpeech: true,
     onTranscript: (transcript, isFinal) => {
       setInterviewerInput(transcript)
+    },
+    onUtteranceEnd: (transcript) => {
+      // Auto-send when user stops speaking in live mode
+      if (voiceModeLive && transcript.trim() && !pendingAutoSendRef.current.interviewer) {
+        console.log('[Live Mode] Utterance end detected, auto-sending:', transcript.substring(0, 50))
+        pendingAutoSendRef.current.interviewer = true
+        setInterviewerInput(transcript)
+        // Small delay to ensure state is updated
+        setTimeout(() => {
+          handleSendMessage(true)
+          pendingAutoSendRef.current.interviewer = false
+          // Clear the sent tracker so next utterance is detected as new
+          interviewerVoice.clearSentTracker()
+        }, 100)
+      }
     },
   })
 
@@ -175,6 +193,19 @@ export default function InterviewPage() {
     fallbackToWebSpeech: true,
     onTranscript: (transcript, isFinal) => {
       setChatInput(transcript)
+    },
+    onUtteranceEnd: (transcript) => {
+      // Auto-send when user stops speaking in live mode
+      if (voiceModeLive && transcript.trim() && !pendingAutoSendRef.current.partner) {
+        console.log('[Live Mode] Utterance end detected for partner, auto-sending:', transcript.substring(0, 50))
+        pendingAutoSendRef.current.partner = true
+        setChatInput(transcript)
+        setTimeout(() => {
+          handleSendMessage(false)
+          pendingAutoSendRef.current.partner = false
+          partnerVoice.clearSentTracker()
+        }, 100)
+      }
     },
   })
 
@@ -1716,33 +1747,44 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
   const toggleVoiceRecording = async (isInterviewer: boolean) => {
     const voice = isInterviewer ? interviewerVoice : partnerVoice
     const setInput = isInterviewer ? setInterviewerInput : setChatInput
-    const currentInput = isInterviewer ? interviewerInput : chatInput
 
     try {
       if (voice.isRecording) {
         // Stop recording
         const finalTranscript = voice.stopRecording()
         if (finalTranscript) {
-          // In Live mode, auto-submit the message
-          if (voiceModeLive && finalTranscript.trim()) {
-            // Set the input first then submit
-            setInput(finalTranscript)
-            // Use setTimeout to ensure state is updated before submitting
-            setTimeout(() => {
-              handleSendMessage(isInterviewer)
-            }, 100)
-            toast.success("Message sent!", { duration: 1500 })
+          // In Live mode, messages are auto-sent on utterance end (when user pauses)
+          // So when manually stopping, we just capture what's left
+          if (voiceModeLive) {
+            // If there's unsent content, send it now
+            if (finalTranscript.trim()) {
+              setInput(finalTranscript)
+              setTimeout(() => {
+                handleSendMessage(isInterviewer)
+              }, 100)
+            }
+            toast.success("Recording stopped", { duration: 1500 })
           } else {
-            toast.success("Voice input captured", { duration: 2000 })
+            // Manual mode: just capture the transcript, user will click send
+            toast.success("Voice captured - click send when ready", { duration: 2000 })
           }
         }
       } else {
         // Start recording
+        // Reset the transcript before starting
+        voice.resetTranscript()
+        setInput('')
         await voice.startRecording()
         if (voiceModeLive) {
-          toast.success("Live mode active - Sable will send when you stop speaking", { duration: 3000 })
+          toast.success("Live mode active - messages send automatically when you pause", {
+            duration: 3000,
+            icon: '🎙️',
+          })
         } else {
-          toast.success("Sable is listening... Speak now", { duration: 2000 })
+          toast.success("Recording... Click mic again to stop", {
+            duration: 2000,
+            icon: '🎤',
+          })
         }
       }
     } catch (err: any) {
@@ -2901,57 +2943,42 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         )}
                       </div>
                       {(isInterviewStarted || showPostInterviewDiscussion) && (
-                        <div className="flex flex-col gap-1 flex-shrink-0 border-t border-gray-700 pt-2">
-                          {/* Voice mode toggle */}
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => setVoiceModeLive(false)}
-                                className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${!voiceModeLive ? 'bg-gray-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
-                              >
-                                Manual
-                              </button>
-                              <button
-                                onClick={() => setVoiceModeLive(true)}
-                                className={`text-[9px] px-1.5 py-0.5 rounded transition-colors flex items-center gap-1 ${voiceModeLive ? 'bg-green-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
-                              >
-                                <span className={`w-1.5 h-1.5 rounded-full ${voiceModeLive ? 'bg-green-300 animate-pulse' : 'bg-gray-400'}`}></span>
-                                Live
-                              </button>
-                            </div>
-                            <span className="text-[9px] text-gray-500">
-                              {voiceModeLive ? 'Auto-sends when you stop' : 'Click mic, speak, click send'}
-                            </span>
-                          </div>
-                          <div className="flex space-x-1">
-                            <Input
-                              value={interviewerInput}
-                              onChange={(e) => setInterviewerInput(e.target.value)}
-                              placeholder={isRecordingInterviewer ? (voiceModeLive ? "Listening... will auto-send" : "Listening...") : (showPostInterviewDiscussion ? "Ask about optimization or improvements..." : "Ask a question...")}
-                              className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-xs h-7"
-                              onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
-                              disabled={isLoadingInterviewer || isGeneratingDiscussion || isRecordingInterviewer}
-                              aria-label="Chat with interviewer"
-                            />
-                            <Button
-                              onClick={() => toggleVoiceRecording(true)}
-                              className={`h-7 px-2 ${isRecordingInterviewer ? (voiceModeLive ? 'bg-green-500 hover:bg-green-600 animate-pulse' : 'bg-red-500 hover:bg-red-600 animate-pulse') : 'bg-gray-700 hover:bg-gray-600'} text-white`}
-                              aria-label={isRecordingInterviewer ? "Stop recording" : "Start voice input"}
-                              disabled={isLoadingInterviewer || isGeneratingDiscussion}
-                            >
-                              {isRecordingInterviewer ? <MicOff className="h-3 w-3" aria-hidden="true" /> : <Mic className="h-3 w-3" aria-hidden="true" />}
-                            </Button>
-                            {!voiceModeLive && (
+                        <div className="flex flex-col gap-2 flex-shrink-0 border-t border-gray-700 pt-3">
+                          {/* Enhanced Voice Mode Toggle */}
+                          <VoiceModeToggle
+                            isLiveMode={voiceModeLive}
+                            onModeChange={setVoiceModeLive}
+                            isRecording={isRecordingInterviewer}
+                            onToggleRecording={() => toggleVoiceRecording(true)}
+                            onSendMessage={() => handleSendMessage(true)}
+                            transcript={interviewerInput}
+                            disabled={isLoadingInterviewer || isGeneratingDiscussion}
+                            showSendButton={!voiceModeLive}
+                            compact={true}
+                          />
+                          {/* Text input for typing */}
+                          {!isRecordingInterviewer && (
+                            <div className="flex space-x-1">
+                              <Input
+                                value={interviewerInput}
+                                onChange={(e) => setInterviewerInput(e.target.value)}
+                                placeholder={showPostInterviewDiscussion ? "Type or use voice..." : "Type a question..."}
+                                className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-xs h-7"
+                                onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
+                                disabled={isLoadingInterviewer || isGeneratingDiscussion}
+                                aria-label="Chat with interviewer"
+                              />
                               <Button
                                 onClick={() => handleSendMessage(true)}
                                 className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white h-7 px-2"
                                 loading={isLoadingInterviewer || isGeneratingDiscussion}
-                                aria-label={(isLoadingInterviewer || isGeneratingDiscussion) ? "Sending message" : "Send message"}
+                                disabled={!interviewerInput.trim()}
+                                aria-label="Send message"
                               >
                                 {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-3 w-3" aria-hidden="true" />}
                               </Button>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </CardContent>
@@ -3095,58 +3122,42 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         <div ref={interviewerEndRef} />
                       </div>
 
-                      {/* Chat Input */}
-                      <div className="flex flex-col gap-2 border-t border-gray-700 pt-4">
-                        {/* Voice mode toggle */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => setVoiceModeLive(false)}
-                              className={`text-xs px-2 py-1 rounded transition-colors ${!voiceModeLive ? 'bg-gray-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
-                            >
-                              Manual
-                            </button>
-                            <button
-                              onClick={() => setVoiceModeLive(true)}
-                              className={`text-xs px-2 py-1 rounded transition-colors flex items-center gap-1 ${voiceModeLive ? 'bg-green-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
-                            >
-                              <span className={`w-2 h-2 rounded-full ${voiceModeLive ? 'bg-green-300 animate-pulse' : 'bg-gray-400'}`}></span>
-                              Live
-                            </button>
-                          </div>
-                          <span className="text-xs text-gray-500">
-                            {voiceModeLive ? 'Auto-sends when you stop speaking' : 'Click mic, speak, then click send'}
-                          </span>
-                        </div>
-                        <div className="flex space-x-2">
-                          <Input
-                            value={interviewerInput}
-                            onChange={(e) => setInterviewerInput(e.target.value)}
-                            placeholder={isRecordingInterviewer ? (voiceModeLive ? "Listening... will auto-send" : "Listening...") : "Ask about optimization, complexity, or improvements..."}
-                            className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
-                            onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
-                            disabled={isLoadingInterviewer || isGeneratingDiscussion || isRecordingInterviewer}
-                            aria-label="Chat with interviewer"
-                          />
-                          <Button
-                            onClick={() => toggleVoiceRecording(true)}
-                            className={`${isRecordingInterviewer ? (voiceModeLive ? 'bg-green-500 hover:bg-green-600 animate-pulse' : 'bg-red-500 hover:bg-red-600 animate-pulse') : 'bg-gray-700 hover:bg-gray-600'} text-white`}
-                            aria-label={isRecordingInterviewer ? "Stop recording" : "Start voice input"}
-                            disabled={isLoadingInterviewer || isGeneratingDiscussion}
-                          >
-                            {isRecordingInterviewer ? <MicOff className="h-4 w-4" aria-hidden="true" /> : <Mic className="h-4 w-4" aria-hidden="true" />}
-                          </Button>
-                          {!voiceModeLive && (
+                      {/* Chat Input with Enhanced Voice Mode */}
+                      <div className="flex flex-col gap-3 border-t border-gray-700 pt-4">
+                        <VoiceModeToggle
+                          isLiveMode={voiceModeLive}
+                          onModeChange={setVoiceModeLive}
+                          isRecording={isRecordingInterviewer}
+                          onToggleRecording={() => toggleVoiceRecording(true)}
+                          onSendMessage={() => handleSendMessage(true)}
+                          transcript={interviewerInput}
+                          disabled={isLoadingInterviewer || isGeneratingDiscussion}
+                          showSendButton={!voiceModeLive}
+                          compact={false}
+                        />
+                        {/* Text input for typing when not recording */}
+                        {!isRecordingInterviewer && (
+                          <div className="flex space-x-2">
+                            <Input
+                              value={interviewerInput}
+                              onChange={(e) => setInterviewerInput(e.target.value)}
+                              placeholder="Type or use voice above..."
+                              className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                              onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
+                              disabled={isLoadingInterviewer || isGeneratingDiscussion}
+                              aria-label="Chat with interviewer"
+                            />
                             <Button
                               onClick={() => handleSendMessage(true)}
                               className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white"
                               loading={isLoadingInterviewer || isGeneratingDiscussion}
-                              aria-label={(isLoadingInterviewer || isGeneratingDiscussion) ? "Sending message" : "Send message"}
+                              disabled={!interviewerInput.trim()}
+                              aria-label="Send message"
                             >
                               {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-4 w-4" aria-hidden="true" />}
                             </Button>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
