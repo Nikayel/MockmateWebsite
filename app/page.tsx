@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import { Header } from "@/components/header"
 import { HeroSection } from "@/components/hero-section"
+import { ProblemTeaser } from "@/components/problem-teaser"
 import { FeaturesSection } from "@/components/features-section"
 import { AIAssistedSection } from "@/components/ai-assisted-section"
 import { Footer } from "@/components/footer"
@@ -277,6 +278,7 @@ export default function HomePage() {
     <main className="min-h-screen bg-black">
       <Header />
       <HeroSection />
+      <ProblemTeaser />
       <AIAssistedSection />
       <FeaturesSection />
       <Footer />
