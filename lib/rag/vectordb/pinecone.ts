@@ -9,7 +9,8 @@ import { Pinecone } from '@pinecone-database/pinecone'
 import type { VectorDB, VectorDocument, QueryOptions, QueryResult } from '../types'
 
 // Pinecone index configuration
-const INDEX_NAME = process.env.PINECONE_INDEX_NAME || 'skillon-rag'
+// Default to skillon-raggemini for Gemini embeddings (768D)
+const INDEX_NAME = process.env.PINECONE_INDEX_NAME || 'skillon-raggemini'
 const NAMESPACE_PREFIX = 'mockmate_'
 
 // Singleton Pinecone client
@@ -92,20 +93,22 @@ export class PineconeVectorDB implements VectorDB {
                 )
             }
 
-            // Validate dimensions - support both TF-IDF (256) and OpenAI small (1536)
-            const SUPPORTED_DIMENSIONS = [256, 1536]
+            // Validate dimensions - support Gemini (768), TF-IDF (256), and OpenAI (1536)
+            const SUPPORTED_DIMENSIONS = [256, 768, 1536]
             if (!SUPPORTED_DIMENSIONS.includes(indexInfo.dimension)) {
                 throw new Error(
                     `Pinecone index '${this.indexName}' has unsupported dimensions. ` +
-                    `Supported dimensions: ${SUPPORTED_DIMENSIONS.join(' or ')} (256 for TF-IDF, 1536 for OpenAI small). ` +
+                    `Supported dimensions: ${SUPPORTED_DIMENSIONS.join(', ')} (256 for TF-IDF, 768 for Gemini, 1536 for OpenAI). ` +
                     `Index has ${indexInfo.dimension} dimensions. ` +
                     `Please delete the existing index and create a new one with one of the supported dimensions, ` +
                     `or update your embedding provider to match the index dimensions.`
                 )
             }
-            
+
             // Log which embedding type matches this index
-            if (indexInfo.dimension === 1536) {
+            if (indexInfo.dimension === 768) {
+                console.log(`[Pinecone] Index configured for Gemini embeddings (768 dimensions)`)
+            } else if (indexInfo.dimension === 1536) {
                 console.log(`[Pinecone] Index configured for OpenAI embeddings (1536 dimensions)`)
             } else if (indexInfo.dimension === 256) {
                 console.log(`[Pinecone] Index configured for TF-IDF embeddings (256 dimensions)`)
@@ -300,9 +303,10 @@ export class PineconeVectorDB implements VectorDB {
 /**
  * Create and initialize a Pinecone index (run once during setup)
  * This should be called from a setup script, not during normal operation
+ * Default dimension is 768 for Gemini text-embedding-004
  */
 export async function createPineconeIndex(
-    dimension: number = 256,
+    dimension: number = 768,
     metric: 'cosine' | 'euclidean' | 'dotproduct' = 'cosine'
 ): Promise<void> {
     const client = getPineconeClient()

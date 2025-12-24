@@ -406,18 +406,39 @@ DO NOT:
 ` : ''
 
     const systemPrompts = {
-      interviewer: `You are a professional technical interviewer${isGenericCompany ? '' : ` at ${companyStyle.company}`}. Be direct and concise.
+      interviewer: `You are a professional technical interviewer${isGenericCompany ? '' : ` at ${companyStyle.company}`}. Be direct and concise. You are conducting a REAL interview where the candidate speaks their thought process aloud (voice or text).
 
 ${companyContext}
 ${userContextString}${problemContext}
 ${isSystemDesign ? systemDesignContext : isBugFix ? bugFixContext : patternContext}
+
+INTERVIEW STYLE - ACT LIKE A REAL INTERVIEWER:
+You are having a natural conversation with the candidate. They may:
+- Talk through their thinking aloud (encourage this!)
+- Type code while explaining their approach
+- Ask clarifying questions
+- Get stuck or go quiet
+
+YOUR BEHAVIOR AS A REAL INTERVIEWER:
+1. LISTEN ACTIVELY: When they explain their thinking, respond naturally like you're in the same room
+2. JUMP IN NATURALLY: If they pause or seem stuck, ask a guiding question (don't wait for them to ask)
+3. PROBE THEIR REASONING: "Why did you choose that approach?" "What's the tradeoff there?"
+4. CHALLENGE CONSTRUCTIVELY: "What if the input was very large?" "Have you considered edge cases?"
+5. ENCOURAGE VERBALIZATION: "Walk me through your thought process" "What are you thinking?"
 
 CORE RULES:
 - Keep responses SHORT (2-4 sentences max)
 - Ask ONE question at a time
 ${isGenericCompany ? '- Conduct a standard technical interview without mentioning any company' : `- Adapt your style to ${companyStyle.company}'s interview culture`}
 - No generic praise until tests pass
-- Sound natural, not robotic
+- Sound natural, conversational, like a real person
+
+PROACTIVE ENGAGEMENT (JUMP IN WHEN):
+- They've been silent for a while: "What are you thinking about?"
+- They write code without explaining: "Can you walk me through that?"
+- They seem stuck: "Would it help to think about a simpler case first?"
+- They make an interesting choice: "Interesting approach - what led you to that?"
+- They might have a bug: "Let's trace through with an example - what happens with [input]?"
 
 COMPANY-SPECIFIC FOLLOW-UPS:
 ${companyStyle.commonFollowUps.slice(0, 3).map(q => `- ${q}`).join('\n')}
@@ -427,15 +448,17 @@ WHAT TO DO:
 - When they explain: Acknowledge briefly, then probe deeper with ONE follow-up
 - When stuck: Give a small hint, not a lecture
 - When tests pass: Brief acknowledgment, then ask a follow-up question
+- When they verbalize their thinking: Respond like a real interviewer would
 
 WHAT NOT TO DO:
 - Don't give long speeches or multiple questions at once
 - Don't say "Great question!" or "That's a good point!" repeatedly
 - Don't summarize what they just said back to them
+- Don't be robotic or overly formal
 
 ${scenarioTitle ? `Problem: ${scenarioTitle}` : ''}
 
-You've already introduced yourself. Continue naturally. Use their first name only.`,
+You've already introduced yourself. Continue naturally. Use their first name only. Remember: this is a CONVERSATION, not a Q&A session.`,
 
       partner: `You are an AI coding assistant (similar to ChatGPT, GitHub Copilot, or Claude) that candidates can use during technical interviews, similar to Meta's pilot program allowing AI tools.
 
@@ -483,19 +506,28 @@ Keep responses brief, actionable, and helpful. You're a tool they can use, but t
 
     let systemPrompt = systemPrompts[role as keyof typeof systemPrompts] || systemPrompts.partner
 
-    // For partner role, enhance with RAG context for better hints
-    if (role === 'partner') {
-      const ragContext = await buildRAGContext({
-        scenarioTitle,
-        scenarioPattern,
-        scenarioCompany,
-        scenarioType,
-        problemText: scenarioTitle, // Use title as problem text
-        userCode: currentCode,
-        userId,
-      })
+    // Enhance both interviewer and partner roles with RAG context
+    const ragContext = await buildRAGContext({
+      scenarioTitle,
+      scenarioPattern,
+      scenarioCompany,
+      scenarioType,
+      problemText: scenarioTitle, // Use title as problem text
+      userCode: currentCode,
+      userId,
+    })
 
-      if (ragContext) {
+    if (ragContext) {
+      if (role === 'interviewer') {
+        // For interviewer, add RAG context to help ask better questions
+        systemPrompt = systemPrompt + '\n\n' + ragContext + `
+
+USE THIS KNOWLEDGE TO:
+- Ask more targeted questions based on the pattern
+- Challenge them on common pitfalls for this problem type
+- Guide them towards optimal solutions
+- Recognize when they're on the right track`
+      } else {
         systemPrompt = systemPrompt + '\n\n' + ragContext
       }
     }
@@ -523,9 +555,9 @@ Keep responses brief, actionable, and helpful. You're a tool they can use, but t
     let fullUserMessage = ""
 
     if (isProactive && role === "interviewer") {
-      // DISABLED: Proactive messages were too intrusive and awkward
-      // Instead, just return a simple check-in if they have substantial code
+      // Smart proactive engagement - jump in like a real interviewer
       const hasSubstantialCode = currentCode && currentCode.trim().length > 100
+      const codeLines = currentCode?.split('\n').length || 0
 
       if (!hasSubstantialCode) {
         // Don't interrupt if they haven't written much yet
@@ -536,12 +568,34 @@ Keep responses brief, actionable, and helpful. You're a tool they can use, but t
         })
       }
 
-      // Keep proactive message SHORT and non-intrusive
-      fullUserMessage = `[BRIEF CHECK-IN] The candidate has code. Ask ONE short question about complexity or edge cases. Keep it under 15 words. Example: "What's the time complexity?" or "What if the input is empty?"
+      // Determine the best proactive response based on context
+      const proactivePrompts = [
+        "Walk me through what you're doing here.",
+        "What's your approach for this?",
+        "Can you explain your thought process?",
+        "What's the time complexity of this approach?",
+        "Have you considered any edge cases?",
+        "What happens with an empty input?",
+        "Interesting approach - what led you to this?",
+        "Let's trace through an example together.",
+      ]
+
+      // Use RAG context to ask smarter questions
+      const patternSpecificQuestion = scenarioPattern
+        ? `Based on the ${scenarioPattern} pattern, ask a relevant question about their approach or potential issues.`
+        : ''
+
+      // Keep proactive message SHORT and natural - like a real interviewer jumping in
+      fullUserMessage = `[NATURAL CHECK-IN] The candidate has been working on code. Act like a real interviewer who just noticed something interesting or wants to understand their thinking.
 
 ${currentCodeContext}
 
-Ask ONE brief question:`
+${patternSpecificQuestion}
+
+Options for how to engage:
+${proactivePrompts.slice(0, 3).map(p => `- "${p}"`).join('\n')}
+
+Pick ONE natural response (or create your own). Keep it under 20 words. Sound like a real person in the room, not a robot.`
     } else {
       // Regular message
       fullUserMessage = message

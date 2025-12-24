@@ -14,6 +14,7 @@ import { CodeViewerSidePanel } from "@/components/CodeViewerSidePanel"
 import { GradingCriteriaTooltip } from "@/components/GradingCriteria"
 import { ScenarioBrowser } from "@/components/interview"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { useVoiceInput } from "@/lib/voice"
 
 // Inline error fallback for components that fail to load
 function ComponentErrorFallback({ componentName }: { componentName: string }) {
@@ -162,10 +163,25 @@ export default function InterviewPage() {
   const [isLoadingChat, setIsLoadingChat] = useState(false)
   const [isLoadingInterviewer, setIsLoadingInterviewer] = useState(false)
 
-  // Voice recording states
-  const [isRecordingPartner, setIsRecordingPartner] = useState(false)
-  const [isRecordingInterviewer, setIsRecordingInterviewer] = useState(false)
-  const recognitionRef = useRef<any>(null)
+  // Voice recording - using Deepgram with Web Speech API fallback
+  const interviewerVoice = useVoiceInput({
+    fallbackToWebSpeech: true,
+    onTranscript: (transcript, isFinal) => {
+      setInterviewerInput(transcript)
+    },
+  })
+
+  const partnerVoice = useVoiceInput({
+    fallbackToWebSpeech: true,
+    onTranscript: (transcript, isFinal) => {
+      setChatInput(transcript)
+    },
+  })
+
+  // Backwards compatible aliases
+  const isRecordingPartner = partnerVoice.isRecording
+  const isRecordingInterviewer = interviewerVoice.isRecording
+  const recognitionRef = useRef<any>(null) // Keep for any legacy usage
 
   // AI hints states
   const [showAITips, setShowAITips] = useState(false)
@@ -1655,97 +1671,33 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     },
   ]
 
-  // Voice recording with Web Speech API - with proper permission handling
+  // Voice recording with Deepgram (or Web Speech API fallback)
   const toggleVoiceRecording = async (isInterviewer: boolean) => {
-    const isRecording = isInterviewer ? isRecordingInterviewer : isRecordingPartner
-    const setIsRecording = isInterviewer ? setIsRecordingInterviewer : setIsRecordingPartner
-    const setInput = isInterviewer ? setInterviewerInput : setChatInput
+    const voice = isInterviewer ? interviewerVoice : partnerVoice
 
-    if (isRecording) {
-      // Stop recording
-      if (recognitionRef.current) {
-        recognitionRef.current.stop()
-        recognitionRef.current = null
-      }
-      setIsRecording(false)
-      return
-    }
-
-    // Check for browser support
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognition) {
-      toast.error("Voice input is not supported in your browser. Try Chrome or Edge.")
-      return
-    }
-
-    // First, explicitly request microphone permission
     try {
-      // Check current permission status
-      if (navigator.permissions) {
-        const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName })
-        if (permissionStatus.state === 'denied') {
-          toast.error("Microphone access is blocked. Please enable it in your browser settings.")
-          return
+      if (voice.isRecording) {
+        // Stop recording
+        const finalTranscript = voice.stopRecording()
+        if (finalTranscript) {
+          toast.success("Voice input captured", { duration: 2000 })
         }
+      } else {
+        // Start recording
+        await voice.startRecording()
+        const provider = voice.provider === 'deepgram' ? 'Deepgram' : 'Voice'
+        toast.success(`${provider} listening... Speak now`, { duration: 2000 })
       }
-
-      // Request microphone access explicitly before starting speech recognition
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      // Stop the stream immediately - we just needed permission
-      stream.getTracks().forEach(track => track.stop())
-
-      toast.info("Microphone access granted. Starting voice input...")
     } catch (err: any) {
-      console.error('Microphone permission error:', err)
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      console.error('Voice recording error:', err)
+      if (err.message?.includes('denied') || err.message?.includes('NotAllowed')) {
         toast.error("Microphone access denied. Please allow microphone access in your browser.")
-      } else if (err.name === 'NotFoundError') {
+      } else if (err.message?.includes('NotFound')) {
         toast.error("No microphone found. Please connect a microphone and try again.")
       } else {
-        toast.error("Could not access microphone. Please check your browser settings.")
+        toast.error("Voice input error. Please try again.")
       }
-      return
     }
-
-    // Start recording with speech recognition
-    const recognition = new SpeechRecognition()
-    recognition.continuous = true
-    recognition.interimResults = true
-    recognition.lang = 'en-US'
-
-    recognition.onstart = () => {
-      setIsRecording(true)
-      toast.success("Listening... Speak now", { duration: 2000 })
-    }
-
-    recognition.onresult = (event: any) => {
-      let transcript = ''
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript
-      }
-      setInput(transcript)
-    }
-
-    recognition.onerror = (event: any) => {
-      console.error('Speech recognition error:', event.error)
-      if (event.error === 'not-allowed') {
-        toast.error("Microphone access denied. Please allow microphone access in your browser settings.")
-      } else if (event.error === 'no-speech') {
-        toast.info("No speech detected. Try speaking louder or closer to the microphone.")
-      } else if (event.error !== 'aborted') {
-        toast.error("Voice recognition error. Please try again.")
-      }
-      setIsRecording(false)
-      recognitionRef.current = null
-    }
-
-    recognition.onend = () => {
-      setIsRecording(false)
-      recognitionRef.current = null
-    }
-
-    recognitionRef.current = recognition
-    recognition.start()
   }
 
   const handleSendMessage = async (isInterviewer = false) => {
