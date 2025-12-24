@@ -20,3 +20,7 @@ export { MinimalAICompanion } from "./MinimalAICompanion"
 export { InterviewTimer } from "./InterviewTimer"
 export { TestResultsPanel } from "./TestResultsPanel"
 export { HintsPanel } from "./HintsPanel"
+
+// RAG-enhanced hints
+export { RAGHintCard } from "./RAGHintCard"
+export { EnhancedHintsPanel } from "./EnhancedHintsPanel"
