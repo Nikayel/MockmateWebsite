@@ -74,7 +74,7 @@ export class PineconeVectorDB implements VectorDB {
 
     /**
      * Get the Pinecone index
-     * Throws a helpful error if the index doesn't exist
+     * Throws a helpful error if the index doesn't exist or has wrong dimensions
      */
     private async getIndex() {
         const client = getPineconeClient()
@@ -82,18 +82,30 @@ export class PineconeVectorDB implements VectorDB {
         // Check if index exists first
         try {
             const indexList = await client.listIndexes()
-            const exists = indexList.indexes?.some(idx => idx.name === this.indexName)
+            const indexInfo = indexList.indexes?.find(idx => idx.name === this.indexName)
 
-            if (!exists) {
+            if (!indexInfo) {
                 throw new Error(
                     `Pinecone index '${this.indexName}' does not exist. ` +
                     `Please create it by running: npx ts-node scripts/setup-pinecone.ts ` +
                     `or set PINECONE_INDEX_NAME to an existing index name.`
                 )
             }
+
+            // Validate dimensions - our TF-IDF embeddings use 256 dimensions
+            const EXPECTED_DIMENSIONS = 256
+            if (indexInfo.dimension !== EXPECTED_DIMENSIONS) {
+                throw new Error(
+                    `Pinecone index '${this.indexName}' has dimension mismatch. ` +
+                    `Expected ${EXPECTED_DIMENSIONS} dimensions (for TF-IDF embeddings), ` +
+                    `but index has ${indexInfo.dimension} dimensions. ` +
+                    `Please delete the existing index and create a new one with ${EXPECTED_DIMENSIONS} dimensions, ` +
+                    `or update your embedding provider to match the index dimensions.`
+                )
+            }
         } catch (error: any) {
             // If listIndexes fails, it might be a permissions issue
-            if (error.message?.includes('does not exist')) {
+            if (error.message?.includes('does not exist') || error.message?.includes('dimension mismatch')) {
                 throw error
             }
             // Otherwise, try to proceed - the index might exist but we can't list it
