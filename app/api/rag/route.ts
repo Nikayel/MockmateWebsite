@@ -5,6 +5,7 @@ import {
   getRelevantHints,
   getSimilarSolutions,
   embedAndStoreSolution,
+  embedAndStoreOnboarding,
   getRecommendedNextProblems,
   getRecommendedScenarios,
   getUserPerformanceProfile,
@@ -48,6 +49,9 @@ export async function POST(request: NextRequest) {
 
       case 'get-next-problems':
         return handleGetNextProblems(params)
+
+      case 'store-onboarding':
+        return handleStoreOnboarding(params)
 
       default:
         return NextResponse.json(
@@ -514,5 +518,31 @@ async function handleGetNextProblems(params: {
     message: recommendations.length > 0
       ? `Found ${recommendations.length} similar problems you haven't solved yet!`
       : "No similar unsolved problems found. Try something new!",
+  })
+}
+
+/**
+ * Store onboarding data as an embedding
+ */
+async function handleStoreOnboarding(params: {
+  userId: string
+  role: string
+  goal: string
+}) {
+  const { userId, role, goal } = params
+
+  if (!userId || !role || !goal) {
+    return NextResponse.json(
+      { error: "userId, role, and goal are required" },
+      { status: 400 }
+    )
+  }
+
+  const embeddingId = await embedAndStoreOnboarding(userId, role, goal)
+
+  return NextResponse.json({
+    success: true,
+    embeddingId,
+    message: "Onboarding data stored for personalized recommendations",
   })
 }

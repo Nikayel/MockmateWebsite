@@ -295,6 +295,41 @@ export async function embedAndStoreHint(
 }
 
 /**
+ * Store onboarding data as an embedding for RAG retrieval
+ * This allows us to find users with similar backgrounds/goals
+ */
+export async function embedAndStoreOnboarding(
+    userId: string,
+    role: string,
+    goal: string
+): Promise<string> {
+    // Convert onboarding data to text that can be embedded
+    // This text will be used to find similar users
+    const onboardingText = `User profile: ${role} engineer with goal of ${goal}`
+
+    // Generate embedding from the text
+    const vector = await generateTextEmbedding(onboardingText)
+
+    // Create the embedding object
+    const embedding: TextEmbedding = {
+        text: onboardingText,
+        type: 'onboarding',
+        vector,
+        metadata: {
+            userId,
+            user_id: userId, // For Firestore rules compatibility
+            role,
+            goal,
+            tags: [role, goal],
+            timestamp: new Date().toISOString(),
+        },
+    }
+
+    // Store it in the database
+    return storeTextEmbedding(embedding)
+}
+
+/**
  * Check if user has solved a problem by problemId
  */
 export async function hasUserSolvedProblem(

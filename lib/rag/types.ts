@@ -5,7 +5,7 @@
 export interface TextEmbedding {
     id?: string
     text: string
-    type: 'problem' | 'solution' | 'hint' | 'feedback'
+    type: 'problem' | 'solution' | 'hint' | 'feedback' | 'onboarding'
     vector: number[]
     metadata: {
         problemId?: string
@@ -14,6 +14,8 @@ export interface TextEmbedding {
         difficulty?: string
         tags?: string[]
         timestamp: string
+        role?: string
+        goal?: string
     }
 }
 
@@ -163,7 +165,7 @@ export interface VectorDB {
 export interface QueryOptions {
     topK?: number
     filter?: {
-        type?: 'problem' | 'solution' | 'hint' | 'feedback'
+        type?: 'problem' | 'solution' | 'hint' | 'feedback' | 'onboarding'
         userId?: string
         problemType?: string
         excludeIds?: string[]
@@ -187,7 +189,7 @@ export interface SimilaritySearchOptions {
     excludeIds?: string[]
     userId?: string
     problemType?: string
-    type?: 'problem' | 'solution' | 'hint' | 'feedback'
+    type?: 'problem' | 'solution' | 'hint' | 'feedback' | 'onboarding'
 }
 
 export interface RerankerOptions {

@@ -50,6 +50,21 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
       }, { merge: true })
 
       console.log("Onboarding data saved to profile:", { userId, role: selectedRole, goal: selectedGoal })
+      
+      // Store onboarding data for RAG (non-blocking)
+      fetch("/api/rag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "store-onboarding",
+          userId,
+          role: selectedRole,
+          goal: selectedGoal || "general",
+        }),
+      }).catch((err) => {
+        console.error("Failed to store onboarding embedding (non-blocking):", err)
+      })
+      
       onComplete(takeTour)
     } catch (error: any) {
       console.error("Failed to save onboarding data:", error)
