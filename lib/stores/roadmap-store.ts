@@ -45,7 +45,7 @@ interface RoadmapState {
 
   // Actions - Roadmap
   setActiveRoadmap: (roadmap: PersonalizedRoadmap | null) => void
-  markQuestionCompleted: (scenarioId: string, score?: number) => void
+  markQuestionCompleted: (scenarioId: string, score?: number, timeSpentMinutes?: number) => void
   markQuestionSkipped: (scenarioId: string) => void
   markQuestionPending: (scenarioId: string) => void
   selectDay: (index: number) => void
@@ -146,8 +146,9 @@ export const useRoadmapStore = create<RoadmapState>()(
         selectedDayIndex: 0,
       }),
 
-      markQuestionCompleted: (scenarioId, score) => set((state) => {
-        if (!state.activeRoadmap) return state
+      markQuestionCompleted: (scenarioId, score, timeSpentMinutes) => {
+        const state = get()
+        if (!state.activeRoadmap) return
 
         const updatedPlans = state.activeRoadmap.dailyPlans.map((plan) => ({
           ...plan,
@@ -174,19 +175,47 @@ export const useRoadmapStore = create<RoadmapState>()(
           }
         })
 
-        return {
-          activeRoadmap: {
-            ...state.activeRoadmap,
-            dailyPlans: updatedPlans,
-            questionsCompleted: completedCount,
-            patternCoverage,
-            updatedAt: new Date(),
-          },
+        // Update actualHoursSpent if timeSpentMinutes is provided
+        let actualHoursSpent = state.activeRoadmap.actualHoursSpent
+        if (timeSpentMinutes) {
+          actualHoursSpent += timeSpentMinutes / 60
         }
-      }),
 
-      markQuestionSkipped: (scenarioId) => set((state) => {
-        if (!state.activeRoadmap) return state
+        const updatedRoadmap = {
+          ...state.activeRoadmap,
+          dailyPlans: updatedPlans,
+          questionsCompleted: completedCount,
+          patternCoverage,
+          actualHoursSpent,
+          updatedAt: new Date(),
+        }
+
+        // Update local state immediately (optimistic update)
+        set({ activeRoadmap: updatedRoadmap })
+
+        // Sync to Firebase in the background
+        if (state.activeRoadmap.id) {
+          fetch('/api/roadmap/progress', {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              roadmapId: state.activeRoadmap.id,
+              scenarioId,
+              status: 'completed',
+              score,
+              timeSpentMinutes,
+            }),
+          }).catch((error) => {
+            console.error('Failed to sync progress to Firebase:', error)
+          })
+        }
+      },
+
+      markQuestionSkipped: (scenarioId) => {
+        const state = get()
+        if (!state.activeRoadmap) return
 
         const updatedPlans = state.activeRoadmap.dailyPlans.map((plan) => ({
           ...plan,
@@ -201,15 +230,33 @@ export const useRoadmapStore = create<RoadmapState>()(
           .flatMap((p) => p.questions)
           .filter((q) => q.status === 'skipped').length
 
-        return {
-          activeRoadmap: {
-            ...state.activeRoadmap,
-            dailyPlans: updatedPlans,
-            questionsSkipped: skippedCount,
-            updatedAt: new Date(),
-          },
+        const updatedRoadmap = {
+          ...state.activeRoadmap,
+          dailyPlans: updatedPlans,
+          questionsSkipped: skippedCount,
+          updatedAt: new Date(),
         }
-      }),
+
+        // Update local state immediately (optimistic update)
+        set({ activeRoadmap: updatedRoadmap })
+
+        // Sync to Firebase in the background
+        if (state.activeRoadmap.id) {
+          fetch('/api/roadmap/progress', {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              roadmapId: state.activeRoadmap.id,
+              scenarioId,
+              status: 'skipped',
+            }),
+          }).catch((error) => {
+            console.error('Failed to sync progress to Firebase:', error)
+          })
+        }
+      },
 
       markQuestionPending: (scenarioId) => set((state) => {
         if (!state.activeRoadmap) return state
@@ -234,16 +281,23 @@ export const useRoadmapStore = create<RoadmapState>()(
 
       selectDay: (index) => set({ selectedDayIndex: index }),
 
-      addActualTime: (minutes) => set((state) => {
-        if (!state.activeRoadmap) return state
-        return {
-          activeRoadmap: {
-            ...state.activeRoadmap,
-            actualHoursSpent: state.activeRoadmap.actualHoursSpent + minutes / 60,
-            updatedAt: new Date(),
-          },
+      addActualTime: (minutes) => {
+        const state = get()
+        if (!state.activeRoadmap) return
+
+        const updatedRoadmap = {
+          ...state.activeRoadmap,
+          actualHoursSpent: state.activeRoadmap.actualHoursSpent + minutes / 60,
+          updatedAt: new Date(),
         }
-      }),
+
+        // Update local state immediately
+        set({ activeRoadmap: updatedRoadmap })
+
+        // Sync to Firebase in the background
+        // Note: We'll update the actualHoursSpent on the next progress update
+        // For now, we just update locally. If needed, we can add a separate endpoint.
+      },
 
       // UI actions
       setLoading: (loading) => set({ isLoading: loading }),
