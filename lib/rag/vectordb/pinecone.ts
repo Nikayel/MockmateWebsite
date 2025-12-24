@@ -109,7 +109,7 @@ export class PineconeVectorDB implements VectorDB {
     async upsert(documents: VectorDocument[]): Promise<void> {
         if (documents.length === 0) return
 
-        const index = this.getIndex()
+        const index = await this.getIndex()
 
         // Determine namespace from the first document's type
         const docType = documents[0].metadata?.type || 'general'
