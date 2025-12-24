@@ -24,3 +24,6 @@ export { HintsPanel } from "./HintsPanel"
 // RAG-enhanced hints
 export { RAGHintCard } from "./RAGHintCard"
 export { EnhancedHintsPanel } from "./EnhancedHintsPanel"
+
+// Voice mode toggle for live transcription
+export { VoiceModeToggle } from "./VoiceModeToggle"

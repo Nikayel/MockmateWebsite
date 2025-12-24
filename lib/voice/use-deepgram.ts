@@ -16,6 +16,7 @@ export interface UseDeepgramOptions extends DeepgramConfig {
   onTranscript?: (transcript: string, isFinal: boolean) => void
   onError?: (error: Error) => void
   onStatusChange?: (status: VoiceStatus) => void
+  onUtteranceEnd?: (transcript: string) => void
   autoSubmitOnSilence?: boolean
   silenceThresholdMs?: number
 }
@@ -32,6 +33,7 @@ export interface UseDeepgramReturn {
   stopRecording: () => string
   resetTranscript: () => void
   toggleRecording: () => Promise<void>
+  clearSentTracker: () => void
 
   // Info
   isConfigured: boolean
@@ -97,6 +99,11 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
       options.onStatusChange?.(mappedStatus)
     })
 
+    // Set up utterance end callback for live mode auto-send
+    serviceRef.current.setOnUtteranceEnd((text) => {
+      options.onUtteranceEnd?.(text)
+    })
+
     return () => {
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current)
@@ -139,6 +146,10 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
     setTranscript('')
   }, [])
 
+  const clearSentTracker = useCallback(() => {
+    serviceRef.current?.clearSentTracker()
+  }, [])
+
   const toggleRecording = useCallback(async () => {
     if (isRecording) {
       stopRecording()
@@ -158,6 +169,7 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
     stopRecording,
     resetTranscript,
     toggleRecording,
+    clearSentTracker,
     isConfigured,
   }
 }
@@ -239,6 +251,7 @@ export function useVoiceInput(options: UseDeepgramOptions & { fallbackToWebSpeec
           await startWebSpeechRecording()
         }
       },
+      clearSentTracker: () => {}, // No-op for Web Speech API
       isConfigured: true,
       provider: 'web-speech' as const,
     }
