@@ -88,6 +88,9 @@ export function Header() {
               </>
             ) : (
               <>
+                <Link href="/why-skillon" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
+                  Why Skillon
+                </Link>
                 <a href="/#features" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
                   Features
                 </a>
@@ -185,6 +188,13 @@ export function Header() {
                 </>
               ) : (
                 <>
+                  <Link
+                    href="/why-skillon"
+                    className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Why Skillon
+                  </Link>
                   <a
                     href="/#features"
                     className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
