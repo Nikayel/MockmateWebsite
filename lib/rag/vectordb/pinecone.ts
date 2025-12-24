@@ -9,7 +9,7 @@ import { Pinecone } from '@pinecone-database/pinecone'
 import type { VectorDB, VectorDocument, QueryOptions, QueryResult } from '../types'
 
 // Pinecone index configuration
-const INDEX_NAME = process.env.PINECONE_INDEX_NAME || 'mockmate-rag'
+const INDEX_NAME = process.env.PINECONE_INDEX_NAME || 'skillon-rag'
 const NAMESPACE_PREFIX = 'mockmate_'
 
 // Singleton Pinecone client
@@ -78,12 +78,12 @@ export class PineconeVectorDB implements VectorDB {
      */
     private async getIndex() {
         const client = getPineconeClient()
-        
+
         // Check if index exists first
         try {
             const indexList = await client.listIndexes()
             const exists = indexList.indexes?.some(idx => idx.name === this.indexName)
-            
+
             if (!exists) {
                 throw new Error(
                     `Pinecone index '${this.indexName}' does not exist. ` +
@@ -99,7 +99,7 @@ export class PineconeVectorDB implements VectorDB {
             // Otherwise, try to proceed - the index might exist but we can't list it
             console.warn('[Pinecone] Could not verify index existence:', error.message)
         }
-        
+
         return client.index(this.indexName)
     }
 
@@ -200,7 +200,7 @@ export class PineconeVectorDB implements VectorDB {
                 return []
             }
             // Handle index not found (404)
-            if (error.message?.includes('404') || error.message?.includes('not found') || 
+            if (error.message?.includes('404') || error.message?.includes('not found') ||
                 error.status === 404 || error.response?.status === 404) {
                 throw new Error(
                     `Pinecone index '${this.indexName}' does not exist. ` +
