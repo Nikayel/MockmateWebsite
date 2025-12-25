@@ -35,6 +35,10 @@ import {
   getBehindScheduleEmailSubject,
   getBehindScheduleEmailHtml,
   BehindScheduleEmailData,
+  getPaymentFailedEmailSubject,
+  getPaymentFailedEmailHtml,
+  getPaymentFailedEmailText,
+  PaymentFailedEmailData,
 } from "./templates";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://mockmate.dev";
@@ -197,6 +201,28 @@ export async function sendBehindScheduleEmail(
     subject: getBehindScheduleEmailSubject(emailData),
     htmlContent: getBehindScheduleEmailHtml(emailData),
     tags: ["roadmap", "behind-schedule"],
+  });
+}
+
+// ============================================
+// PAYMENT FAILURE NOTIFICATION
+// ============================================
+
+export async function sendPaymentFailedEmail(
+  email: string,
+  data: Omit<PaymentFailedEmailData, "appUrl">
+): Promise<EmailResult> {
+  const emailData: PaymentFailedEmailData = {
+    ...data,
+    appUrl: APP_URL,
+  };
+
+  return sendEmail({
+    to: [{ email, name: data.userName }],
+    subject: getPaymentFailedEmailSubject(),
+    htmlContent: getPaymentFailedEmailHtml(emailData),
+    textContent: getPaymentFailedEmailText(emailData),
+    tags: ["payment", "payment-failed"],
   });
 }
 

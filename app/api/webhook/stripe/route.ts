@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { adminDb } from "@/lib/firebase-admin"
 import { PRICING_CONFIG } from "@/lib/config"
+import { sendPaymentFailedEmail } from "@/lib/email"
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY environment variable is required")
@@ -332,8 +333,21 @@ export async function POST(request: NextRequest) {
 
           console.log(`⚠️ User ${userId} subscription marked as past_due due to payment failure`)
 
-          // Note: In production, you should also send an email notification here
-          // using a service like SendGrid, Resend, or AWS SES
+          // Send payment failure email notification
+          const profile = profileDoc.data()
+          if (profile?.email) {
+            try {
+              await sendPaymentFailedEmail(profile.email, {
+                userName: profile.full_name || "",
+                userEmail: profile.email,
+                failureReason: invoice.last_finalization_error?.message || "Payment declined",
+              })
+              console.log(`📧 Payment failure email sent to ${profile.email}`)
+            } catch (emailError) {
+              console.error(`❌ Failed to send payment failure email:`, emailError)
+              // Don't fail the webhook if email fails
+            }
+          }
         }
       }
     } catch (error) {
