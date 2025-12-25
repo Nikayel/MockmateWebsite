@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, memo } from "react"
 import Link from "next/link"
 import { Search, Play, LayoutGrid, List, Target, Bug, Wrench, Cpu, Shield, Zap, Check } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -81,7 +81,7 @@ const EXERCISE_TYPES = [
   },
 ] as const
 
-export function ScenarioBrowser({ onStartInterview, usageLimit, completedProblems }: ScenarioBrowserProps) {
+export const ScenarioBrowser = memo(function ScenarioBrowser({ onStartInterview, usageLimit, completedProblems }: ScenarioBrowserProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('roadmap')
   const {
     selectedScenario,
@@ -509,4 +509,4 @@ export function ScenarioBrowser({ onStartInterview, usageLimit, completedProblem
       </div>
     </section>
   )
-}
+})

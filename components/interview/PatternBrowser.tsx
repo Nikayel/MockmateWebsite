@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, memo } from "react"
 import { Play, ChevronDown, ChevronUp, Lock, Check, Code, Hash, Layers, GitBranch, Binary, List, TreeDeciduous, Network, Cpu, Zap, Box, Repeat, BarChart3, Calculator, Grid3X3 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -235,7 +235,7 @@ const getDifficultyColor = (difficulty: DifficultyLevel) => {
   }
 }
 
-export function PatternBrowser({ onStartInterview, completedProblems = [] }: PatternBrowserProps) {
+export const PatternBrowser = memo(function PatternBrowser({ onStartInterview, completedProblems = [] }: PatternBrowserProps) {
   const [expandedPattern, setExpandedPattern] = useState<string | null>(null)
 
   // Group DSA scenarios by pattern
@@ -433,4 +433,4 @@ export function PatternBrowser({ onStartInterview, completedProblems = [] }: Pat
       </div>
     </div>
   )
-}
+})
