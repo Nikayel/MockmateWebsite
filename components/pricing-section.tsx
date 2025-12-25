@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { MagneticButton } from "@/components/ui/magnetic-button"
-import { Check, X, Crown, Sparkles, Building2, ArrowRight, Infinity, Shield, TrendingUp, Users } from "lucide-react"
+import { Check, X, Zap, Crown, Sparkles, ArrowRight, Infinity, Shield, TrendingUp, Users, Building2 } from "lucide-react"
 import { PRICING_CONFIG, getProPricing } from "@/lib/config"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
