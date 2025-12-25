@@ -69,6 +69,9 @@ export async function checkRateLimit(
   tier: RateLimitTier = 'free',
   estimatedTokens: number = 500
 ): Promise<RateLimitResult> {
+  // Perform lazy cleanup to prevent memory buildup
+  lazyCleanup()
+
   const limits = RATE_LIMITS[tier] || RATE_LIMITS.free
   const now = Date.now()
 
@@ -224,7 +227,9 @@ function getOldestRequestTime(userId: string): number | null {
 }
 
 /**
- * Clean up old entries from all windows (call periodically)
+ * Clean up old entries from all windows
+ * Called lazily during request processing to avoid memory leaks from global setInterval
+ * in serverless environments where each instance has its own memory
  */
 export function cleanupWindows(): void {
   const now = Date.now()
@@ -239,8 +244,21 @@ export function cleanupWindows(): void {
   }
 }
 
-// Run cleanup every 5 minutes
-setInterval(cleanupWindows, 5 * 60 * 1000)
+// Track last cleanup time for lazy cleanup
+let lastCleanupTime = Date.now()
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
+
+/**
+ * Perform lazy cleanup if enough time has passed
+ * This avoids memory leaks from global setInterval in serverless environments
+ */
+function lazyCleanup(): void {
+  const now = Date.now()
+  if (now - lastCleanupTime > CLEANUP_INTERVAL_MS) {
+    cleanupWindows()
+    lastCleanupTime = now
+  }
+}
 
 /**
  * Rate limit decorator for API routes

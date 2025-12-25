@@ -3,7 +3,7 @@
  */
 
 import { db } from "./firebase"
-import { doc, setDoc, getDoc, collection, query, where, getDocs, runTransaction, increment } from "firebase/firestore"
+import { doc, setDoc, getDoc, collection, query, where, getDocs, runTransaction, increment, limit, orderBy } from "firebase/firestore"
 import { Profile, ProfileQuota } from "./types"
 import { PRICING_CONFIG } from "./config"
 
@@ -168,10 +168,12 @@ export async function initializeUserQuota(userId: string, subscriptionTier: "fre
   const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
 
-  // Query by user_id only (no composite index needed)
+  // Query by user_id with limit to prevent unbounded reads
+  // Limit to 12 months of quota history (reasonable maximum)
   const quotaQuery = query(
     collection(db, "profile_quota"),
-    where("user_id", "==", userId)
+    where("user_id", "==", userId),
+    limit(12)
   )
 
   const quotaSnap = await getDocs(quotaQuery)

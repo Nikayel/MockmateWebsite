@@ -1,6 +1,6 @@
 "use client"
 
-import React, { memo, useEffect, useRef } from "react"
+import React, { memo, useRef } from "react"
 import Editor, { OnChange, OnMount } from "@monaco-editor/react"
 import type { editor } from "monaco-editor"
 
@@ -35,57 +35,10 @@ function MonacoEditorComponent({
     }
   }
 
-  // Handle editor mount with diagnostics
-  const handleEditorDidMount: OnMount = (editor, monaco) => {
+  // Handle editor mount
+  const handleEditorDidMount: OnMount = (editor) => {
     editorRef.current = editor
-
-    // Diagnostic logging
-    if (process.env.NODE_ENV === "development") {
-      console.log("[Monaco] Editor mounted successfully")
-      console.log("[Monaco] Editor instance:", editor)
-      console.log("[Monaco] Container:", containerRef.current)
-      
-      // Check for interfering elements
-      const editorElement = editor.getContainerDomNode()
-      console.log("[Monaco] Editor DOM element:", editorElement)
-      console.log("[Monaco] Editor element position:", editorElement.getBoundingClientRect())
-      
-      // Check for native-edit-context
-      const nativeEditContext = editorElement.querySelector(".native-edit-context") as HTMLElement
-      if (nativeEditContext) {
-        console.log("[Monaco] Found native-edit-context:", nativeEditContext)
-        console.log("[Monaco] native-edit-context styles:", window.getComputedStyle(nativeEditContext))
-        console.log("[Monaco] native-edit-context position:", nativeEditContext.getBoundingClientRect())
-        console.log("[Monaco] native-edit-context pointer-events:", window.getComputedStyle(nativeEditContext).pointerEvents)
-        console.log("[Monaco] native-edit-context opacity:", window.getComputedStyle(nativeEditContext).opacity)
-      } else {
-        console.warn("[Monaco] WARNING: native-edit-context not found!")
-      }
-
-      // Monitor cursor position changes
-      editor.onDidChangeCursorPosition((e) => {
-        console.log("[Monaco] Cursor position changed:", e.position)
-      })
-
-      // Monitor selection changes
-      editor.onDidChangeCursorSelection((e) => {
-        console.log("[Monaco] Selection changed:", e.selection)
-      })
-
-      // Check for overlaying elements
-      setTimeout(() => {
-        const rect = editorElement.getBoundingClientRect()
-        const centerX = rect.left + rect.width / 2
-        const centerY = rect.top + rect.height / 2
-        const elementAtPoint = document.elementFromPoint(centerX, centerY)
-        console.log("[Monaco] Element at center point:", elementAtPoint)
-        if (elementAtPoint && !editorElement.contains(elementAtPoint)) {
-          console.warn("[Monaco] WARNING: Overlaying element detected at center:", elementAtPoint)
-        }
-      }, 1000)
-    }
-
-    // Focus the editor
+    // Focus the editor on mount
     editor.focus()
   }
 

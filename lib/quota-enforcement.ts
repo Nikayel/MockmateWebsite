@@ -65,54 +65,57 @@ async function getUserIdFromRequest(request: NextRequest): Promise<string | null
 }
 
 /**
- * Get user ID from request body (fallback for routes that pass userId in body)
+ * SECURITY NOTE: We intentionally do NOT allow userId from request body
+ * as this could allow users to spoof another user's identity and affect their quota.
+ * All quota checks must use verified auth tokens only.
  */
-async function getUserIdFromBody(request: NextRequest): Promise<string | null> {
-  try {
-    const body = await request.clone().json()
-    return body.userId || null
-  } catch {
-    return null
-  }
-}
 
 /**
  * Get user's current quota for the billing period
+ *
+ * NOTE: This is a read-only check for enforcing limits, not for incrementing usage.
+ * The actual usage increment happens in firestore-helpers.ts with proper transactions.
+ * Small race windows here are acceptable since this is a soft limit check.
  */
 async function getUserQuota(userId: string): Promise<UserQuota | null> {
   try {
     const now = new Date()
     const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-
-    // Get user profile for tier
-    const profileDoc = await adminDb.collection('profiles').doc(userId).get()
-    const profile = profileDoc.data()
-    const tier = (profile?.subscription_tier || 'free') as 'free' | 'pro' | 'enterprise'
-
-    // Get quota document
-    const quotaQuery = await adminDb
-      .collection('profile_quota')
-      .where('user_id', '==', userId)
-      .get()
-
-    // Find current period quota
     const currentPeriodStart = new Date(now.getFullYear(), now.getMonth(), 1)
     const currentPeriodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
-    let quota = quotaQuery.docs
+    // Batch fetch profile and quota in parallel for better performance
+    const [profileDoc, quotaQuery, usageSummaryDoc] = await Promise.all([
+      // Get user profile for tier
+      adminDb.collection('profiles').doc(userId).get(),
+
+      // Get quota documents - limit to recent entries only (max 12 months of history)
+      adminDb
+        .collection('profile_quota')
+        .where('user_id', '==', userId)
+        .orderBy('period_start', 'desc')
+        .limit(12)
+        .get(),
+
+      // Get usage summary for budget tracking
+      adminDb
+        .collection('users')
+        .doc(userId)
+        .collection('usage_summaries')
+        .doc(periodKey)
+        .get(),
+    ])
+
+    const profile = profileDoc.data()
+    const tier = (profile?.subscription_tier || 'free') as 'free' | 'pro' | 'enterprise'
+
+    // Find current period quota from limited results
+    const quota = quotaQuery.docs
       .map((doc) => doc.data())
       .find((q) => {
         const qStart = new Date(q.period_start)
         return qStart >= currentPeriodStart && qStart <= currentPeriodEnd
       })
-
-    // Get usage summary for budget tracking
-    const usageSummaryDoc = await adminDb
-      .collection('users')
-      .doc(userId)
-      .collection('usage_summaries')
-      .doc(periodKey)
-      .get()
 
     const usageSummary = usageSummaryDoc.data()
     const budgetUsed = usageSummary?.totalCost || 0
@@ -146,11 +149,8 @@ async function getUserQuota(userId: string): Promise<UserQuota | null> {
 export async function checkQuota(
   request: NextRequest
 ): Promise<QuotaCheckResult & { response?: NextResponse }> {
-  // Get user ID from auth header or body
-  let userId = await getUserIdFromRequest(request)
-  if (!userId) {
-    userId = await getUserIdFromBody(request)
-  }
+  // Get user ID from auth header only (never from body for security)
+  const userId = await getUserIdFromRequest(request)
 
   // If no user ID, allow request (unauthenticated users have other rate limits)
   if (!userId) {
