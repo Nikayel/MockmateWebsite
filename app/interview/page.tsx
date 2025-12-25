@@ -37,6 +37,9 @@ import {
   HelpCircle,
   Maximize2,
   Minimize2,
+  Eye,
+  EyeOff,
+  Leaf,
 } from "lucide-react"
 import {
   AlertDialog,
@@ -242,14 +245,10 @@ export default function InterviewPage() {
   const [ragHints, setRagHints] = useState<{ level: number; hint: string }[]>([])
   const [isLoadingHints, setIsLoadingHints] = useState(false)
 
-  // Voice mode states
-  const [voiceModeLive, setVoiceModeLive] = useState(false) // false = manual, true = live
-  const voiceModeLiveRef = useRef(voiceModeLive) // Ref to track current value for callbacks
-
-  // Keep ref in sync with state
-  useEffect(() => {
-    voiceModeLiveRef.current = voiceModeLive
-  }, [voiceModeLive])
+  // Voice mode - always auto-send on pause (research-backed simplification)
+  // Removed manual/live toggle to reduce cognitive load
+  const voiceAutoSend = true // Always enabled now
+  const voiceModeLiveRef = useRef(true) // Keep ref for callbacks
   const [revealedHintIndices, setRevealedHintIndices] = useState<Set<number>>(new Set()) // Track which hints are revealed
 
   // Test states
@@ -291,8 +290,24 @@ export default function InterviewPage() {
   // Focus mode - reduces cognitive load by hiding non-essential panels
   // Research: Selective attention (Broadbent, 1958) - reducing distractors improves performance
   const [focusMode, setFocusMode] = useState(false)
+  // Calm mode - muted colors for anxiety reduction (research-backed)
+  // Source: Color Psychology in UI Design 2025, UXmatters Calm Design Principles
+  const [calmMode, setCalmMode] = useState(false)
+  // Hide timer option - reduces time pressure anxiety
+  // Research: WCAG 2.1 recommends letting users manage time on their terms
+  const [hideTimer, setHideTimer] = useState(false)
   // Mobile panel switcher - only one visible at a time (Miller's Law)
   const [activePanel, setActivePanel] = useState<'problem' | 'editor' | 'chat'>('editor')
+
+  // Toggle calm mode on document for CSS cascade
+  useEffect(() => {
+    if (calmMode) {
+      document.documentElement.classList.add('calm')
+    } else {
+      document.documentElement.classList.remove('calm')
+    }
+    return () => document.documentElement.classList.remove('calm')
+  }, [calmMode])
 
   // Code protection state
   const [protectedElements, setProtectedElements] = useState<ReturnType<typeof extractProtectedElements> | null>(null)
@@ -1823,8 +1838,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         if (finalTranscript) {
           // In Live mode, messages are auto-sent on utterance end (when user pauses)
           // So when manually stopping, we just capture what's left
-          if (voiceModeLive) {
-            // If there's unsent content, send it now
+          if (voiceAutoSend) {
+            // Auto-send is always on now - if there's unsent content, send it
             if (finalTranscript.trim()) {
               setInput(finalTranscript)
               setTimeout(() => {
@@ -1843,12 +1858,13 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         voice.resetTranscript()
         setInput('')
         await voice.startRecording()
-        if (voiceModeLive) {
-          toast.success("Live mode active - messages send automatically when you pause", {
-            duration: 3000,
-            icon: '🎙️',
-          })
-        } else {
+        // Always show simplified voice feedback
+        toast.success("Speak now - sends automatically when you pause", {
+          duration: 2000,
+          icon: '🎙️',
+        })
+        // Removed manual mode branch - always auto-send now
+        if (false) {
           toast.success("Recording... Click mic again to stop", {
             duration: 2000,
             icon: '🎤',
@@ -2414,8 +2430,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   <button
                     onClick={() => setActivePanel('problem')}
                     className={`px-2.5 py-1 rounded text-[10px] font-medium transition-all ${activePanel === 'problem'
-                        ? 'bg-[#00d9ff] text-black'
-                        : 'text-gray-400 hover:text-white'
+                        ? 'bg-accent text-accent-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
                       }`}
                     title="Problem"
                   >
@@ -2424,8 +2440,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   <button
                     onClick={() => setActivePanel('editor')}
                     className={`px-2.5 py-1 rounded text-[10px] font-medium transition-all ${activePanel === 'editor'
-                        ? 'bg-[#00d9ff] text-black'
-                        : 'text-gray-400 hover:text-white'
+                        ? 'bg-accent text-accent-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
                       }`}
                     title="Code Editor"
                   >
@@ -2434,8 +2450,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   <button
                     onClick={() => setActivePanel('chat')}
                     className={`px-2.5 py-1 rounded text-[10px] font-medium transition-all ${activePanel === 'chat'
-                        ? 'bg-[#00d9ff] text-black'
-                        : 'text-gray-400 hover:text-white'
+                        ? 'bg-accent text-accent-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
                       }`}
                     title="Interview Chat"
                   >
@@ -2443,31 +2459,65 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   </button>
                 </div>
 
-                {/* Right: Actions */}
-                <div className="flex items-center gap-2 shrink-0">
+                {/* Right: Actions - Research-backed controls for cognitive load reduction */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {/* Timer with hide toggle - WCAG 2.1: Let users manage time on their terms */}
                   {isInterviewStarted && (
-                    <div className="flex items-center space-x-2 text-white bg-gray-800 px-2 py-1 rounded-lg">
-                      <Clock className="h-3 w-3 text-[#00d9ff]" />
-                      <span className="text-xs font-mono">{formatTime(elapsedTime)}</span>
+                    <div className="flex items-center bg-secondary/50 rounded-lg overflow-hidden">
+                      {!hideTimer && (
+                        <div className="flex items-center space-x-1.5 px-2 py-1">
+                          <Clock className="h-3 w-3 text-accent" />
+                          <span className="text-xs font-mono text-foreground">{formatTime(elapsedTime)}</span>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setHideTimer(!hideTimer)}
+                        className="px-1.5 py-1 hover:bg-secondary/80 transition-colors"
+                        title={hideTimer ? "Show timer" : "Hide timer (reduce time pressure)"}
+                      >
+                        {hideTimer ? <EyeOff className="h-3 w-3 text-muted-foreground" /> : <Eye className="h-3 w-3 text-muted-foreground" />}
+                      </button>
                     </div>
                   )}
+
+                  {/* Calm Mode Toggle - Research: Muted colors reduce anxiety */}
+                  <button
+                    onClick={() => setCalmMode(!calmMode)}
+                    className={`hidden sm:flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all ${calmMode
+                        ? 'bg-neural/20 text-neural border border-neural/30'
+                        : 'bg-secondary/50 text-muted-foreground hover:text-foreground'
+                      }`}
+                    title={calmMode ? "Exit Calm Mode" : "Calm Mode (muted colors for focus)"}
+                  >
+                    <Leaf className="h-3 w-3" />
+                    <span className="hidden lg:inline">{calmMode ? 'Calm' : 'Calm'}</span>
+                  </button>
+
                   {/* Focus Mode Toggle - Desktop only */}
                   <button
-                    onClick={() => setFocusMode(!focusMode)}
+                    onClick={() => {
+                      const newFocusMode = !focusMode
+                      setFocusMode(newFocusMode)
+                      // Auto-enable calm mode when entering focus
+                      if (newFocusMode && !calmMode) {
+                        setCalmMode(true)
+                      }
+                    }}
                     className={`hidden lg:flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all ${focusMode
-                        ? 'bg-[#00d9ff] text-black'
-                        : 'bg-gray-800 text-gray-400 hover:text-white'
+                        ? 'bg-accent text-accent-foreground'
+                        : 'bg-secondary/50 text-muted-foreground hover:text-foreground'
                       }`}
-                    title={focusMode ? "Exit Focus Mode" : "Focus Mode (hide panels)"}
+                    title={focusMode ? "Exit Focus Mode" : "Focus Mode (editor only + calm colors)"}
                   >
                     {focusMode ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
                     <span className="hidden xl:inline">{focusMode ? 'Exit Focus' : 'Focus'}</span>
                   </button>
+
                   <Button
                     onClick={() => setShowCloseDialog(true)}
                     variant="outline"
                     size="sm"
-                    className="border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent h-7 text-xs"
+                    className="border-border text-muted-foreground hover:bg-secondary bg-transparent h-7 text-xs"
                   >
                     <ArrowLeft className="mr-1 h-3 w-3" />
                     <span className="hidden sm:inline">Close</span>
@@ -2501,7 +2551,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     } ${activePanel === 'problem' ? 'flex' : 'hidden lg:flex'}`}>
                     <CardHeader className="pb-2 flex-shrink-0">
                       <CardTitle className="text-white flex items-center space-x-2 text-sm">
-                        <Target className="h-4 w-4 text-[#00d9ff]" />
+                        <Target className="h-4 w-4 text-accent" />
                         <span>Problem</span>
                       </CardTitle>
                     </CardHeader>
@@ -2710,7 +2760,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     <CardHeader className="pb-2 flex-shrink-0 px-6">
                       <CardTitle className="text-white flex items-center justify-between text-xs">
                         <div className="flex items-center space-x-1">
-                          <Code className="h-3 w-3 text-[#00d9ff]" />
+                          <Code className="h-3 w-3 text-accent" />
                           {selectedScenario?.type === 'system-design' ? (
                             <span>Design Notes</span>
                           ) : (
@@ -2722,8 +2772,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           <GradingCriteriaTooltip />
                           {isInterviewStarted && (
                             <div className="flex items-center space-x-1">
-                              <div className="w-1.5 h-1.5 bg-[#00d9ff] rounded-full animate-pulse"></div>
-                              <span className="text-[#00d9ff] text-xs">LIVE</span>
+                              <div className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse"></div>
+                              <span className="text-accent text-xs">LIVE</span>
                             </div>
                           )}
                         </div>
@@ -2755,8 +2805,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         {selectedScenario && !isInterviewStarted && !showScenarioBrowser && (
                           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-10">
                             <div className="text-center p-6 max-w-md">
-                              <div className="w-16 h-16 bg-[#00d9ff]/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <PlayCircle className="h-8 w-8 text-[#00d9ff]" />
+                              <div className="w-16 h-16 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <PlayCircle className="h-8 w-8 text-accent" />
                               </div>
                               <h3 className="text-xl font-bold text-white mb-2">Ready to Start?</h3>
                               <p className="text-gray-400 text-sm mb-4">
@@ -2764,7 +2814,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                               </p>
                               <Button
                                 onClick={startInterview}
-                                className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black font-semibold px-8 py-3 text-base"
+                                className="bg-accent hover:bg-accent/80 text-accent-foreground font-semibold px-8 py-3 text-base"
                               >
                                 <PlayCircle className="mr-2 h-5 w-5" />
                                 Start Interview
@@ -2813,13 +2863,13 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           <div className="flex-1 overflow-y-auto p-2 space-y-1 font-mono text-xs">
                             {/* Summary */}
                             <div className="text-gray-400 mb-2">
-                              <span className="text-[#00d9ff]">$</span> Running tests...
+                              <span className="text-accent">$</span> Running tests...
                             </div>
 
                             {/* Individual Test Results */}
                             {testResults.map((result, index) => (
                               <div key={index} className="mb-2">
-                                <div className={`flex items-center space-x-2 ${result.passed ? 'text-[#00d9ff]' : 'text-gray-400'}`}>
+                                <div className={`flex items-center space-x-2 ${result.passed ? 'text-neural' : 'text-muted-foreground'}`}>
                                   {result.passed ? (
                                     <CheckCircle className="h-3 w-3 flex-shrink-0" />
                                   ) : (
@@ -2899,7 +2949,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                               onClick={submitSystemDesign}
                               disabled={showFeedback || showPostInterviewDiscussion}
                               loading={isRunningTests}
-                              className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black font-semibold text-xs h-7"
+                              className="bg-accent hover:bg-accent/80 text-accent-foreground font-semibold text-xs h-7"
                               aria-label={isRunningTests ? "Submitting design..." : "Submit Design"}
                             >
                               {!isRunningTests && <CheckCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
@@ -2956,7 +3006,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                               onClick={() => setIsAIPartnerExpanded(true)}
                             >
                               <div className="flex items-center gap-2">
-                                <Bot className="h-3 w-3 text-[#00d9ff]" />
+                                <Bot className="h-3 w-3 text-accent" />
                                 <span className="text-[10px] text-gray-400">AI Assistant</span>
                                 <span className="text-[10px] text-gray-600">· optional</span>
                               </div>
@@ -2973,7 +3023,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                               {/* Header with collapse */}
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-1.5">
-                                  <Bot className="h-3 w-3 text-[#00d9ff]" />
+                                  <Bot className="h-3 w-3 text-accent" />
                                   <span className="text-[10px] text-gray-300">AI Assistant</span>
                                   <span className="text-[9px] text-gray-600 bg-gray-800 px-1 rounded">optional</span>
                                 </div>
@@ -3018,7 +3068,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                 <Button
                                   onClick={() => handleSendMessage(false)}
                                   disabled={!chatInput.trim() || isLoadingChat}
-                                  className="h-6 w-6 p-0 bg-[#00d9ff] hover:bg-[#00d9ff]/80"
+                                  className="h-6 w-6 p-0 bg-accent hover:bg-accent/80"
                                 >
                                   {isLoadingChat ? (
                                     <div className="h-2 w-2 border border-white/30 border-t-white rounded-full animate-spin" />
@@ -3043,10 +3093,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     <CardHeader className="pb-2 flex-shrink-0">
                       <CardTitle className="text-white flex items-center space-x-2 text-sm">
                         <div className="relative">
-                          <Brain className="h-4 w-4 text-[#00d9ff] animate-neural-pulse" />
-                          <div className="absolute inset-0 bg-[#00d9ff] rounded-full blur-md opacity-30"></div>
+                          <Brain className="h-4 w-4 text-accent animate-neural-pulse" />
+                          <div className="absolute inset-0 bg-accent rounded-full blur-md opacity-30"></div>
                         </div>
-                        <span className="bg-gradient-to-r from-[#00d9ff] to-[#00ff88] bg-clip-text text-transparent font-bold">Skillon AI</span>
+                        <span className="bg-gradient-to-r from-accent to-neural bg-clip-text text-transparent font-bold">Skillon AI</span>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="flex flex-col flex-1 min-h-0 overflow-hidden p-3">
@@ -3071,7 +3121,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                     {msg.type === "user" ? (
                                       <User className="h-3 w-3" />
                                     ) : (
-                                      <Brain className="h-3 w-3 text-[#00d9ff] animate-neural-pulse" />
+                                      <Brain className="h-3 w-3 text-accent animate-neural-pulse" />
                                     )}
                                     <span className="text-xs opacity-75">
                                       {msg.type === "user" ? "You" : "Skillon AI"}
@@ -3089,39 +3139,33 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         <div className="flex flex-col gap-2 flex-shrink-0 border-t border-gray-700 pt-3">
                           {/* Enhanced Voice Mode Toggle */}
                           <VoiceModeToggle
-                            isLiveMode={voiceModeLive}
-                            onModeChange={setVoiceModeLive}
                             isRecording={isRecordingInterviewer}
                             onToggleRecording={() => toggleVoiceRecording(true)}
-                            onSendMessage={() => handleSendMessage(true)}
                             transcript={interviewerInput}
                             disabled={isLoadingInterviewer || isGeneratingDiscussion}
-                            showSendButton={!voiceModeLive}
                             compact={true}
                           />
-                          {/* Text input for typing - only show send button in live mode */}
+                          {/* Text input for typing */}
                           {!isRecordingInterviewer && (
                             <div className="flex space-x-1">
                               <Input
                                 value={interviewerInput}
                                 onChange={(e) => setInterviewerInput(e.target.value)}
                                 placeholder={showPostInterviewDiscussion ? "Type or use voice..." : "Type a question..."}
-                                className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400 text-xs h-7"
+                                className="flex-1 bg-secondary border-border text-foreground placeholder-muted-foreground text-xs h-7"
                                 onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
                                 disabled={isLoadingInterviewer || isGeneratingDiscussion}
                                 aria-label="Chat with interviewer"
                               />
-                              {voiceModeLive && (
-                                <Button
-                                  onClick={() => handleSendMessage(true)}
-                                  className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white h-7 px-2"
-                                  loading={isLoadingInterviewer || isGeneratingDiscussion}
-                                  disabled={!interviewerInput.trim()}
-                                  aria-label="Send message"
-                                >
-                                  {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-3 w-3" aria-hidden="true" />}
-                                </Button>
-                              )}
+                              <Button
+                                onClick={() => handleSendMessage(true)}
+                                className="bg-accent hover:bg-accent/80 text-accent-foreground h-7 px-2"
+                                loading={isLoadingInterviewer || isGeneratingDiscussion}
+                                disabled={!interviewerInput.trim()}
+                                aria-label="Send message"
+                              >
+                                {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-3 w-3" aria-hidden="true" />}
+                              </Button>
                             </div>
                           )}
                         </div>
@@ -3133,7 +3177,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 /* Post-Interview Discussion Phase */
                 <div className="max-w-7xl mx-auto py-8 px-4">
                   <div className="text-center mb-6">
-                    <CheckCircle className="h-12 w-12 text-[#00d9ff] mx-auto mb-3" />
+                    <CheckCircle className="h-12 w-12 text-accent mx-auto mb-3" />
                     <h2 className="text-2xl font-heading font-bold text-white mb-2">Solution Complete!</h2>
                     <p className="text-gray-300 mb-4">All tests passed! Let's discuss your solution with the interviewer.</p>
                     {testSummary.total > 0 && (
@@ -3168,7 +3212,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     >
                       <CardTitle className="text-white flex items-center justify-between">
                         <div className="flex items-center space-x-2">
-                          <Code className="h-5 w-5 text-[#00d9ff]" />
+                          <Code className="h-5 w-5 text-accent" />
                           <span>Your Solution</span>
                           <Badge variant="outline" className="border-gray-600 text-gray-400">
                             {selectedLanguage}
@@ -3220,10 +3264,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     <CardHeader>
                       <CardTitle className="text-white flex items-center space-x-2">
                         <div className="relative">
-                          <Brain className="h-5 w-5 text-[#00d9ff] animate-neural-pulse" />
-                          <div className="absolute inset-0 bg-[#00d9ff] rounded-full blur-md opacity-30"></div>
+                          <Brain className="h-5 w-5 text-accent animate-neural-pulse" />
+                          <div className="absolute inset-0 bg-accent rounded-full blur-md opacity-30"></div>
                         </div>
-                        <span className="bg-gradient-to-r from-[#00d9ff] to-[#00ff88] bg-clip-text text-transparent font-bold">Post-Interview Discussion</span>
+                        <span className="bg-gradient-to-r from-accent to-neural bg-clip-text text-transparent font-bold">Post-Interview Discussion</span>
                         {isGeneratingDiscussion && (
                           <span className="text-xs text-gray-400 ml-2">(Analyzing your solution...)</span>
                         )}
@@ -3244,7 +3288,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                 {msg.type === "user" ? (
                                   <User className="h-4 w-4" />
                                 ) : (
-                                  <Brain className="h-4 w-4 text-[#00d9ff] animate-neural-pulse" />
+                                  <Brain className="h-4 w-4 text-accent animate-neural-pulse" />
                                 )}
                                 <span className="text-sm font-medium">
                                   {msg.type === "user" ? "You" : "Skillon AI"}
@@ -3267,42 +3311,36 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         <div ref={interviewerEndRef} />
                       </div>
 
-                      {/* Chat Input with Enhanced Voice Mode */}
-                      <div className="flex flex-col gap-3 border-t border-gray-700 pt-4">
+                      {/* Chat Input with Simplified Voice Mode */}
+                      <div className="flex flex-col gap-3 border-t border-border pt-4">
                         <VoiceModeToggle
-                          isLiveMode={voiceModeLive}
-                          onModeChange={setVoiceModeLive}
                           isRecording={isRecordingInterviewer}
                           onToggleRecording={() => toggleVoiceRecording(true)}
-                          onSendMessage={() => handleSendMessage(true)}
                           transcript={interviewerInput}
                           disabled={isLoadingInterviewer || isGeneratingDiscussion}
-                          showSendButton={!voiceModeLive}
                           compact={false}
                         />
-                        {/* Text input for typing when not recording - only show send button in live mode */}
+                        {/* Text input for typing when not recording */}
                         {!isRecordingInterviewer && (
                           <div className="flex space-x-2">
                             <Input
                               value={interviewerInput}
                               onChange={(e) => setInterviewerInput(e.target.value)}
                               placeholder="Type or use voice above..."
-                              className="flex-1 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                              className="flex-1 bg-secondary border-border text-foreground placeholder-muted-foreground"
                               onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
                               disabled={isLoadingInterviewer || isGeneratingDiscussion}
                               aria-label="Chat with interviewer"
                             />
-                            {voiceModeLive && (
-                              <Button
-                                onClick={() => handleSendMessage(true)}
-                                className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white"
-                                loading={isLoadingInterviewer || isGeneratingDiscussion}
-                                disabled={!interviewerInput.trim()}
-                                aria-label="Send message"
-                              >
-                                {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-4 w-4" aria-hidden="true" />}
-                              </Button>
-                            )}
+                            <Button
+                              onClick={() => handleSendMessage(true)}
+                              className="bg-accent hover:bg-accent/80 text-accent-foreground"
+                              loading={isLoadingInterviewer || isGeneratingDiscussion}
+                              disabled={!interviewerInput.trim()}
+                              aria-label="Send message"
+                            >
+                              {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-4 w-4" aria-hidden="true" />}
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -3313,7 +3351,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   <div className="flex justify-center gap-4">
                     <Button
                       onClick={proceedToFinalFeedback}
-                      className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white px-6"
+                      className="bg-accent hover:bg-accent/80 text-accent-foreground px-6"
                     >
                       View Detailed Feedback
                       <ArrowRight className="ml-2 h-4 w-4" />
@@ -3321,7 +3359,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     <Button
                       onClick={resetInterview}
                       variant="outline"
-                      className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                      className="border-border text-muted-foreground hover:bg-secondary"
                     >
                       Try Another Problem
                     </Button>

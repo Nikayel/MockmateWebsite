@@ -1,6 +1,6 @@
 "use client"
 
-import React, { memo, useMemo, useCallback } from "react"
+import React, { memo, useMemo, useCallback, useEffect, useState } from "react"
 import CodeMirror, { ReactCodeMirrorRef } from "@uiw/react-codemirror"
 import { javascript } from "@codemirror/lang-javascript"
 import { python } from "@codemirror/lang-python"
@@ -21,6 +21,8 @@ export interface CodeMirrorEditorProps {
   // Support both CodeMirror style ("dark"/"light") and Monaco style ("vs-dark"/"vs-light"/"hc-black")
   theme?: "dark" | "light" | "vs-dark" | "vs-light" | "hc-black"
   className?: string
+  // New: Support calm mode for reduced visual stress
+  calmMode?: boolean
 }
 
 // Language extension mapping
@@ -48,34 +50,48 @@ const getLanguageExtension = (language: string): Extension | null => {
   return factory ? factory() : null
 }
 
-// Custom theme to match your Neural Minimalism design
-const customTheme = EditorView.theme({
+/*
+ * Research-Backed Editor Themes
+ *
+ * Key improvements based on cognitive load research:
+ * 1. Editor background is LIGHTER than app background (reduces "cave effect")
+ * 2. Calmer selection colors (40% desaturated cyan)
+ * 3. Softer contrast for reduced eye strain
+ * 4. Warm undertones in dark mode
+ *
+ * Sources: NN/G Dark Mode Study, ACM Eye Tracking 2025
+ */
+
+// Dark theme - Calmer, research-backed colors
+const customDarkTheme = EditorView.theme({
   "&": {
-    backgroundColor: "#1e1e1e",
-    color: "#d4d4d4",
+    // Lighter than app background (#1c1c1e) for better depth perception
+    backgroundColor: "#222228",
+    color: "#d8d8dc",
     height: "100%",
   },
   ".cm-content": {
-    caretColor: "#ffffff",
+    caretColor: "#e8e8e8",
     fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
     fontSize: "14px",
     lineHeight: "22px",
     padding: "8px 0",
   },
   ".cm-cursor": {
-    borderLeftColor: "#ffffff",
+    borderLeftColor: "#e8e8e8",
     borderLeftWidth: "2px",
   },
   ".cm-activeLine": {
     backgroundColor: "transparent",
   },
   "&.cm-focused .cm-activeLine": {
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
   },
   ".cm-gutters": {
-    backgroundColor: "#1e1e1e",
-    color: "#858585",
+    backgroundColor: "#252530",
+    color: "#707080",
     border: "none",
+    borderRight: "1px solid rgba(255, 255, 255, 0.06)",
     paddingRight: "8px",
   },
   ".cm-lineNumbers .cm-gutterElement": {
@@ -86,46 +102,108 @@ const customTheme = EditorView.theme({
     overflow: "auto",
     fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
   },
+  // Calmer selection - 40% desaturated cyan
   ".cm-selectionBackground": {
-    backgroundColor: "rgba(0, 217, 255, 0.2) !important",
+    backgroundColor: "rgba(95, 180, 217, 0.18) !important",
   },
   "&.cm-focused .cm-selectionBackground": {
-    backgroundColor: "rgba(0, 217, 255, 0.3) !important",
+    backgroundColor: "rgba(95, 180, 217, 0.25) !important",
   },
   ".cm-matchingBracket": {
-    backgroundColor: "rgba(0, 217, 255, 0.3)",
+    backgroundColor: "rgba(95, 180, 217, 0.25)",
+    outline: "none",
+  },
+  // Calmer search highlights
+  ".cm-searchMatch": {
+    backgroundColor: "rgba(95, 217, 154, 0.2)",
+  },
+  ".cm-searchMatch.cm-searchMatch-selected": {
+    backgroundColor: "rgba(95, 180, 217, 0.35)",
+  },
+})
+
+// Calm mode dark theme - Even more muted for anxiety reduction
+const calmDarkTheme = EditorView.theme({
+  "&": {
+    // Slight blue tint for relaxation
+    backgroundColor: "#202028",
+    color: "#d0d0d8",
+    height: "100%",
+  },
+  ".cm-content": {
+    caretColor: "#c0c0c8",
+    fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
+    fontSize: "14px",
+    lineHeight: "24px", // Slightly more line height for readability
+    padding: "10px 0",
+  },
+  ".cm-cursor": {
+    borderLeftColor: "#a0a0b0",
+    borderLeftWidth: "2px",
+  },
+  ".cm-activeLine": {
+    backgroundColor: "transparent",
+  },
+  "&.cm-focused .cm-activeLine": {
+    backgroundColor: "rgba(122, 184, 204, 0.04)",
+  },
+  ".cm-gutters": {
+    backgroundColor: "#1a1a22",
+    color: "#606070",
+    border: "none",
+    borderRight: "1px solid rgba(255, 255, 255, 0.04)",
+    paddingRight: "8px",
+  },
+  ".cm-lineNumbers .cm-gutterElement": {
+    minWidth: "3ch",
+    padding: "0 8px 0 0",
+  },
+  ".cm-scroller": {
+    overflow: "auto",
+    fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
+  },
+  // Very muted selection for minimal visual stimulation
+  ".cm-selectionBackground": {
+    backgroundColor: "rgba(122, 184, 204, 0.12) !important",
+  },
+  "&.cm-focused .cm-selectionBackground": {
+    backgroundColor: "rgba(122, 184, 204, 0.18) !important",
+  },
+  ".cm-matchingBracket": {
+    backgroundColor: "rgba(122, 184, 204, 0.15)",
     outline: "none",
   },
 })
 
-// Light theme variant
+// Light theme - Reduced glare with off-white background
 const lightTheme = EditorView.theme({
   "&": {
-    backgroundColor: "#ffffff",
-    color: "#1e1e1e",
+    backgroundColor: "#fafafa",
+    color: "#1a1a1e",
     height: "100%",
   },
   ".cm-content": {
-    caretColor: "#000000",
+    caretColor: "#1a1a1e",
     fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
     fontSize: "14px",
     lineHeight: "22px",
     padding: "8px 0",
   },
   ".cm-cursor": {
-    borderLeftColor: "#000000",
+    borderLeftColor: "#1a1a1e",
     borderLeftWidth: "2px",
   },
   ".cm-activeLine": {
     backgroundColor: "transparent",
   },
   "&.cm-focused .cm-activeLine": {
-    backgroundColor: "rgba(0, 0, 0, 0.05)",
+    backgroundColor: "rgba(95, 180, 217, 0.06)",
   },
   ".cm-gutters": {
     backgroundColor: "#f5f5f5",
-    color: "#6e6e6e",
+    color: "#6e6e78",
     border: "none",
+    borderRight: "1px solid rgba(0, 0, 0, 0.06)",
     paddingRight: "8px",
   },
   ".cm-lineNumbers .cm-gutterElement": {
@@ -137,12 +215,19 @@ const lightTheme = EditorView.theme({
     fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
   },
   ".cm-selectionBackground": {
-    backgroundColor: "rgba(0, 100, 200, 0.2) !important",
+    backgroundColor: "rgba(95, 180, 217, 0.18) !important",
   },
   "&.cm-focused .cm-selectionBackground": {
-    backgroundColor: "rgba(0, 100, 200, 0.3) !important",
+    backgroundColor: "rgba(95, 180, 217, 0.25) !important",
+  },
+  ".cm-matchingBracket": {
+    backgroundColor: "rgba(95, 180, 217, 0.2)",
+    outline: "none",
   },
 })
+
+// Keep legacy name for backwards compatibility
+const customTheme = customDarkTheme
 
 // Base extensions for the editor
 const baseExtensions: Extension[] = [
@@ -157,8 +242,30 @@ function CodeMirrorEditorComponent({
   readOnly = false,
   theme = "dark",
   className = "",
+  calmMode = false,
 }: CodeMirrorEditorProps) {
   const editorRef = React.useRef<ReactCodeMirrorRef>(null)
+
+  // Detect calm mode from DOM if not explicitly passed
+  const [isCalm, setIsCalm] = useState(calmMode)
+
+  useEffect(() => {
+    // Check if calm class is on document
+    const checkCalmMode = () => {
+      const hasCalmClass = document.documentElement.classList.contains('calm') ||
+                          document.body.classList.contains('calm')
+      setIsCalm(calmMode || hasCalmClass)
+    }
+
+    checkCalmMode()
+
+    // Watch for class changes
+    const observer = new MutationObserver(checkCalmMode)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] })
+
+    return () => observer.disconnect()
+  }, [calmMode])
 
   // Normalize theme to dark/light
   const isDarkTheme = theme === "dark" || theme === "vs-dark" || theme === "hc-black" || !theme
@@ -173,15 +280,21 @@ function CodeMirrorEditorComponent({
       exts.push(langExt)
     }
 
-    // Add theme
+    // Add appropriate theme based on mode
     if (isDarkTheme) {
-      exts.push(customTheme, oneDark)
+      if (isCalm) {
+        // Use calm theme for reduced visual stress
+        exts.push(calmDarkTheme, oneDark)
+      } else {
+        // Use standard calmer dark theme
+        exts.push(customDarkTheme, oneDark)
+      }
     } else {
       exts.push(lightTheme)
     }
 
     return exts
-  }, [language, isDarkTheme])
+  }, [language, isDarkTheme, isCalm])
 
   // Handle value changes
   const handleChange = useCallback((val: string) => {
