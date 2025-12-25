@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, BookOpen, Target, Sparkles, Trophy, AlertTriangle, Clock, RefreshCw, PartyPopper, Calendar, ArrowRight, ChevronDown, ChevronUp, Archive, CheckCircle2, XCircle, Play, Flame, BarChart3, Info, Zap } from 'lucide-react'
+import { Plus, BookOpen, Target, Sparkles, Trophy, AlertTriangle, Clock, RefreshCw, PartyPopper, Calendar, ArrowRight, ChevronDown, ChevronUp, Archive, CheckCircle2, XCircle, Play, Flame, BarChart3, Info, Zap, Crown } from 'lucide-react'
 import Link from 'next/link'
 
 import { Header } from '@/components/header'
@@ -725,21 +725,26 @@ function EmptyState() {
       <Header />
       <div className="flex items-center justify-center min-h-[calc(100vh-80px)] pt-24">
         <div className="text-center max-w-md mx-auto px-4">
-          <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-            <BookOpen className="h-10 w-10 text-primary" />
+          <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <BookOpen className="h-10 w-10 text-white" />
+          </div>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 rounded-full text-xs font-semibold mb-4">
+            <Crown className="h-3.5 w-3.5" />
+            Pro Feature
           </div>
           <h1 className="text-2xl font-bold text-foreground mb-2">
-            Create Your Interview Roadmap
+            Personalized Interview Roadmaps
           </h1>
           <p className="text-muted-foreground mb-8">
-            Get a personalized study plan based on your target company, interview date, and current skill level.
+            Get AI-powered study plans tailored to your target company, interview date, and skill gaps.
+            Includes spaced repetition scheduling and pattern mastery tracking.
           </p>
           <Link
-            href="/roadmap/new"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+            href="/upgrade"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-yellow-500 text-black rounded-lg font-semibold hover:bg-yellow-400 transition-colors"
           >
-            <Plus className="h-5 w-5" />
-            Create Roadmap
+            <Crown className="h-5 w-5" />
+            Upgrade to Pro
           </Link>
 
           <div className="mt-12 grid grid-cols-3 gap-4 text-center">
@@ -748,13 +753,35 @@ function EmptyState() {
               <p className="text-xs text-muted-foreground">Companies</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-foreground">168</p>
+              <p className="text-2xl font-bold text-foreground">200+</p>
               <p className="text-xs text-muted-foreground">Questions</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-foreground">31</p>
+              <p className="text-2xl font-bold text-foreground">15</p>
               <p className="text-xs text-muted-foreground">Patterns</p>
             </div>
+          </div>
+
+          <div className="mt-8 p-4 bg-muted/50 rounded-xl text-left">
+            <h3 className="font-semibold text-foreground text-sm mb-2">What you'll get with Pro:</h3>
+            <ul className="text-xs text-muted-foreground space-y-1.5">
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                Custom study plan for your interview date
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                Spaced repetition for long-term retention
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                Pattern mastery tracking across 15 DSA patterns
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                Company-specific interview tips
+              </li>
+            </ul>
           </div>
         </div>
       </div>

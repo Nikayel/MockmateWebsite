@@ -114,6 +114,8 @@ export async function GET(request: NextRequest) {
  * POST /api/roadmap - Create a new roadmap
  * Query params:
  *   - rag=true: Enable RAG-enhanced generation with personalized insights
+ *
+ * Note: Roadmap creation is a Pro-only feature
  */
 export async function POST(request: NextRequest) {
   try {
@@ -123,6 +125,24 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = authResult.userId
+
+    // Check subscription tier - roadmap is a Pro-only feature
+    const profileDoc = await adminDb.collection('profiles').doc(userId).get()
+    const profile = profileDoc.data()
+    const subscriptionTier = profile?.subscription_tier || 'free'
+
+    if (subscriptionTier === 'free') {
+      return NextResponse.json(
+        {
+          error: 'Pro feature required',
+          message: 'Personalized study roadmaps are available with Pro. Upgrade to unlock custom prep plans tailored to your target company and interview date.',
+          code: 'PRO_REQUIRED',
+          upgradeUrl: '/upgrade'
+        },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
     const { searchParams } = new URL(request.url)
     const enableRAG = searchParams.get('rag') !== 'false' // RAG enabled by default
