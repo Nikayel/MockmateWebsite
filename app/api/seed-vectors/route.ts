@@ -13,20 +13,9 @@ import { adminDb } from "@/lib/firebase-admin"
 const ADMIN_USER_IDS = process.env.ADMIN_USER_IDS?.split(",") || []
 
 async function isAdmin(userId: string): Promise<boolean> {
-  if (ADMIN_USER_IDS.includes(userId)) return true
-
-  try {
-    const profileRef = adminDb.collection("profiles").doc(userId)
-    const profileSnap = await profileRef.get()
-    if (profileSnap.exists) {
-      const profile = profileSnap.data()
-      return profile?.role === "admin" || profile?.is_admin === true
-    }
-  } catch {
-    // Ignore errors
-  }
-
-  return false
+  // SECURITY: Only trust hardcoded admin list from environment variables
+  // Never read admin status from user-writable Firestore fields
+  return ADMIN_USER_IDS.includes(userId)
 }
 
 /**
