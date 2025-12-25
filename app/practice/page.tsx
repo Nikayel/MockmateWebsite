@@ -2,19 +2,30 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
-import {
-  StreakBanner,
-  DueForReview,
-  PatternMastery,
-  SmartRecommendations,
-  type DueItem,
-} from "@/components/practice";
+import { type DueItem } from "@/components/practice";
 import { Button } from "@/components/ui/button";
 import { Loader2, Lock, ArrowRight } from "lucide-react";
 import Link from "next/link";
+
+// Dynamic imports for heavy components - reduces initial bundle size
+const StreakBanner = dynamic(
+  () => import("@/components/practice").then((mod) => mod.StreakBanner),
+  { ssr: false, loading: () => <div className="h-16 bg-white/5 rounded-lg animate-pulse" /> }
+);
+
+const DueForReview = dynamic(
+  () => import("@/components/practice").then((mod) => mod.DueForReview),
+  { ssr: false, loading: () => <div className="h-64 bg-white/5 rounded-lg animate-pulse" /> }
+);
+
+const PatternMastery = dynamic(
+  () => import("@/components/practice").then((mod) => mod.PatternMastery),
+  { ssr: false, loading: () => <div className="h-48 bg-white/5 rounded-lg animate-pulse" /> }
+);
 
 interface StatsData {
   overall: {
@@ -64,26 +75,12 @@ interface DueData {
   };
 }
 
-interface Recommendation {
-  type: string;
-  scenario_id: string;
-  title: string;
-  pattern: string;
-  difficulty: "easy" | "medium" | "hard";
-  reason: string;
-  priority: number;
-  estimated_minutes: number;
-  companies?: string[];
-}
-
 export default function PracticePage() {
   const router = useRouter();
   const { user, loading: authLoading, initialized } = useAuth();
   const [stats, setStats] = useState<StatsData | null>(null);
   const [due, setDue] = useState<DueData | null>(null);
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshingRecs, setIsRefreshingRecs] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPro, setIsPro] = useState<boolean | null>(null);
 
@@ -104,25 +101,22 @@ export default function PracticePage() {
         "Content-Type": "application/json",
       };
 
-      const [statsRes, dueRes, recsRes] = await Promise.all([
+      const [statsRes, dueRes] = await Promise.all([
         fetch("/api/spaced-repetition/stats", { headers }),
         fetch("/api/spaced-repetition/due", { headers }),
-        fetch("/api/spaced-repetition/recommendations", { headers }),
       ]);
 
-      if (!statsRes.ok || !dueRes.ok || !recsRes.ok) {
+      if (!statsRes.ok || !dueRes.ok) {
         throw new Error("Failed to fetch data");
       }
 
-      const [statsData, dueData, recsData] = await Promise.all([
+      const [statsData, dueData] = await Promise.all([
         statsRes.json(),
         dueRes.json(),
-        recsRes.json(),
       ]);
 
       setStats(statsData);
       setDue(dueData);
-      setRecommendations(recsData.recommendations || []);
     } catch (err) {
       console.error("Error fetching practice data:", err);
       setError(err instanceof Error ? err.message : "Failed to load data");
@@ -130,28 +124,6 @@ export default function PracticePage() {
       setIsLoading(false);
     }
   }, [getAuthToken]);
-
-  const refreshRecommendations = async () => {
-    setIsRefreshingRecs(true);
-    try {
-      const token = await getAuthToken();
-      if (!token) return;
-
-      const res = await fetch("/api/spaced-repetition/recommendations", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setRecommendations(data.recommendations || []);
-      }
-    } finally {
-      setIsRefreshingRecs(false);
-    }
-  };
 
   const handleSkipProblem = async (problemId: string) => {
     try {
@@ -310,43 +282,27 @@ export default function PracticePage() {
             />
           </div>
 
-          {/* Main Grid */}
-          <div className="grid gap-8 lg:grid-cols-5">
-            {/* Due for Review - 3 columns */}
-            <div className="lg:col-span-3">
-              <div className="bg-gray-900/30 border border-white/5 rounded-xl p-6">
-                <DueForReview
-                  dueNow={due?.due_now || []}
-                  dueToday={due?.due_today || []}
-                  upcoming={due?.upcoming || []}
-                  totalDue={due?.stats.total_due || 0}
-                  overdueCount={due?.stats.overdue_count || 0}
-                  onSkip={handleSkipProblem}
-                  isLoading={isLoading}
-                />
-              </div>
+          {/* Main Content */}
+          <div className="space-y-8">
+            {/* Due for Review */}
+            <div className="bg-gray-900/30 border border-white/5 rounded-xl p-6">
+              <DueForReview
+                dueNow={due?.due_now || []}
+                dueToday={due?.due_today || []}
+                upcoming={due?.upcoming || []}
+                totalDue={due?.stats.total_due || 0}
+                overdueCount={due?.stats.overdue_count || 0}
+                onSkip={handleSkipProblem}
+                isLoading={isLoading}
+              />
             </div>
 
-            {/* Recommendations - 2 columns */}
-            <div className="lg:col-span-2">
-              <div className="bg-gray-900/30 border border-white/5 rounded-xl p-6">
-                <SmartRecommendations
-                  recommendations={recommendations as any}
-                  onRefresh={refreshRecommendations}
-                  isLoading={isLoading}
-                  isRefreshing={isRefreshingRecs}
-                />
-              </div>
-            </div>
-
-            {/* Pattern Mastery - Full width */}
-            <div className="lg:col-span-5">
-              <div className="bg-gray-900/30 border border-white/5 rounded-xl p-6">
-                <PatternMastery
-                  patterns={stats?.by_pattern || []}
-                  isLoading={isLoading}
-                />
-              </div>
+            {/* Pattern Mastery */}
+            <div className="bg-gray-900/30 border border-white/5 rounded-xl p-6">
+              <PatternMastery
+                patterns={stats?.by_pattern || []}
+                isLoading={isLoading}
+              />
             </div>
           </div>
 
