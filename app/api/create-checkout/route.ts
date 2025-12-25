@@ -96,6 +96,11 @@ export async function POST(request: NextRequest) {
       allow_promotion_codes: true,
       // Default to 'if_required' - will skip payment method if total is $0
       payment_method_collection: 'if_required',
+      // Enable automatic tax calculation based on customer location
+      // Requires Stripe Tax to be enabled in your Stripe Dashboard
+      automatic_tax: {
+        enabled: true,
+      },
     }
 
 

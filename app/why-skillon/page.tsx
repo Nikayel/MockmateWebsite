@@ -207,66 +207,144 @@ export default function WhySkilonPage() {
             </div>
           </ScrollReveal>
 
-          {/* Visual representation - Forgetting curve illustration */}
+          {/* Visual representation - Animated Forgetting curve (matches landing page) */}
           <ScrollReveal>
-            <div className="max-w-2xl mx-auto">
-              <div className="relative p-8 rounded-2xl bg-gradient-to-br from-gray-900/80 to-gray-900/40 border border-gray-800/50">
-                {/* Forgetting curve SVG illustration */}
-                <svg viewBox="0 0 400 200" className="w-full h-48 mb-4">
-                  {/* Grid lines */}
+            <div className="max-w-3xl mx-auto">
+              {/* Subtle glow behind the chart */}
+              <div className="absolute inset-0 bg-gradient-to-r from-accent/5 via-transparent to-neural/5 rounded-2xl blur-2xl" />
+
+              <div className="relative bg-gray-950/60 backdrop-blur-sm rounded-2xl border border-gray-800/40 p-6 md:p-8">
+                {/* SVG Visualization - Animated */}
+                <svg
+                  viewBox="0 0 400 160"
+                  className="w-full h-32 md:h-40 lg:h-48"
+                  aria-label="Forgetting curve comparison"
+                >
                   <defs>
-                    <linearGradient id="curveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#00d9ff" />
-                      <stop offset="100%" stopColor="#ff3366" />
+                    {/* Gradient for the forgetting curve */}
+                    <linearGradient id="forgetGradientWhy" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#00d9ff" stopOpacity="0.8" />
+                      <stop offset="100%" stopColor="#ff6b6b" stopOpacity="0.6" />
                     </linearGradient>
-                    <linearGradient id="optimalGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    {/* Gradient for the retention curve */}
+                    <linearGradient id="retainGradientWhy" x1="0%" y1="0%" x2="100%" y2="0%">
                       <stop offset="0%" stopColor="#00ff88" />
                       <stop offset="100%" stopColor="#00ff88" />
                     </linearGradient>
+                    {/* Glow filter */}
+                    <filter id="glowWhy">
+                      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                      <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                      </feMerge>
+                    </filter>
                   </defs>
 
-                  {/* Axis */}
-                  <line x1="40" y1="160" x2="380" y2="160" stroke="#333" strokeWidth="1" />
-                  <line x1="40" y1="20" x2="40" y2="160" stroke="#333" strokeWidth="1" />
+                  {/* Axis lines - subtle */}
+                  <line x1="40" y1="130" x2="380" y2="130" stroke="#333" strokeWidth="1" opacity="0.5" />
+                  <line x1="40" y1="20" x2="40" y2="130" stroke="#333" strokeWidth="1" opacity="0.5" />
 
-                  {/* Labels */}
-                  <text x="210" y="190" fill="#666" fontSize="12" textAnchor="middle">Time</text>
-                  <text x="15" y="90" fill="#666" fontSize="12" textAnchor="middle" transform="rotate(-90, 15, 90)">Memory</text>
+                  {/* Y-axis label */}
+                  <text x="20" y="75" fill="#666" fontSize="10" textAnchor="middle" transform="rotate(-90, 20, 75)">
+                    Memory
+                  </text>
 
-                  {/* Forgetting curve (without review) */}
-                  <path
-                    d="M 40 30 Q 100 50, 150 100 T 250 140 T 380 155"
-                    stroke="url(#curveGradient)"
-                    strokeWidth="3"
+                  {/* X-axis labels */}
+                  <text x="40" y="145" fill="#666" fontSize="9">Day 1</text>
+                  <text x="150" y="145" fill="#666" fontSize="9">Day 3</text>
+                  <text x="260" y="145" fill="#666" fontSize="9">Day 7</text>
+                  <text x="360" y="145" fill="#666" fontSize="9">Day 30</text>
+
+                  {/* Forgetting curve (without spaced repetition) - animated */}
+                  <motion.path
+                    d="M 40 25 Q 80 35, 120 70 T 200 105 T 300 120 T 380 125"
+                    stroke="url(#forgetGradientWhy)"
+                    strokeWidth="2.5"
                     fill="none"
                     strokeLinecap="round"
-                    opacity="0.7"
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    whileInView={{ pathLength: 1, opacity: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 1.2, ease: "easeOut" }}
                   />
 
-                  {/* Optimal review points */}
-                  <circle cx="100" cy="60" r="6" fill="#00ff88" />
-                  <circle cx="180" cy="75" r="6" fill="#00ff88" />
-                  <circle cx="280" cy="85" r="6" fill="#00ff88" />
-
-                  {/* With spaced repetition curve */}
-                  <path
-                    d="M 40 30 Q 70 35, 100 50 L 100 35 Q 140 45, 180 60 L 180 45 Q 230 55, 280 65 L 280 50 Q 330 55, 380 60"
-                    stroke="url(#optimalGradient)"
-                    strokeWidth="3"
+                  {/* Spaced repetition curve - animated with delay */}
+                  <motion.path
+                    d="M 40 25 C 60 28, 80 35, 95 45
+                       L 95 30 C 120 35, 145 45, 170 50
+                       L 170 38 C 210 42, 260 48, 300 52
+                       L 300 42 C 340 45, 360 48, 380 50"
+                    stroke="url(#retainGradientWhy)"
+                    strokeWidth="2.5"
                     fill="none"
                     strokeLinecap="round"
-                    strokeDasharray="8 4"
+                    filter="url(#glowWhy)"
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    whileInView={{ pathLength: 1, opacity: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 1.5, delay: 0.5, ease: "easeOut" }}
                   />
+
+                  {/* Review points - appear after curve */}
+                  {[
+                    { cx: 95, cy: 30 },
+                    { cx: 170, cy: 38 },
+                    { cx: 300, cy: 42 },
+                  ].map((point, i) => (
+                    <motion.circle
+                      key={i}
+                      cx={point.cx}
+                      cy={point.cy}
+                      r="4"
+                      fill="#00ff88"
+                      initial={{ scale: 0, opacity: 0 }}
+                      whileInView={{ scale: 1, opacity: 1 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: 1.2 + i * 0.2, type: "spring", stiffness: 300 }}
+                    />
+                  ))}
+
+                  {/* "20%" label at end of forgetting curve */}
+                  <motion.text
+                    x="385"
+                    y="125"
+                    fill="#ff6b6b"
+                    fontSize="11"
+                    fontWeight="600"
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 1.3 }}
+                  >
+                    20%
+                  </motion.text>
+
+                  {/* "90%" label at end of retention curve */}
+                  <motion.text
+                    x="385"
+                    y="50"
+                    fill="#00ff88"
+                    fontSize="11"
+                    fontWeight="600"
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 1.8 }}
+                  >
+                    90%
+                  </motion.text>
                 </svg>
 
-                <div className="flex justify-center gap-8 text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-gradient-to-r from-accent to-red-400" />
-                    <span className="text-gray-400">Without review</span>
+                {/* Legend - minimal */}
+                <div className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-8 mt-4 text-xs">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-6 h-0.5 bg-gradient-to-r from-accent to-red-400 rounded-full" />
+                    <span className="text-gray-500">Random practice</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-neural" />
-                    <span className="text-gray-400">With Skillon</span>
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-6 h-0.5 bg-neural rounded-full" />
+                    <span className="text-gray-500">With Skillon</span>
                   </div>
                 </div>
               </div>
@@ -367,19 +445,19 @@ export default function WhySkilonPage() {
           </ScrollReveal>
 
           <ScrollReveal>
-            <div className="max-w-2xl mx-auto">
+            <div className="max-w-2xl mx-auto overflow-x-auto">
               {/* Header */}
-              <div className="grid grid-cols-[1fr_100px_100px] gap-4 pb-4 border-b border-gray-800 mb-2">
-                <div className="text-gray-500 text-sm font-medium">Feature</div>
-                <div className="text-center text-accent font-bold">Skillon</div>
-                <div className="text-center text-gray-500 font-medium">LeetCode</div>
+              <div className="grid grid-cols-[1fr_80px_80px] sm:grid-cols-[1fr_100px_100px] gap-2 sm:gap-4 pb-4 border-b border-gray-800 mb-2 min-w-[320px]">
+                <div className="text-gray-500 text-xs sm:text-sm font-medium">Feature</div>
+                <div className="text-center text-accent font-bold text-sm sm:text-base">Skillon</div>
+                <div className="text-center text-gray-500 font-medium text-sm sm:text-base">LeetCode</div>
               </div>
 
               {/* Rows */}
               {comparisonFeatures.map((row, i) => (
                 <div
                   key={row.feature}
-                  className="grid grid-cols-[1fr_100px_100px] gap-4 py-4 border-b border-gray-800/30 hover:bg-gray-900/30 transition-colors rounded-lg px-2 -mx-2"
+                  className="grid grid-cols-[1fr_80px_80px] sm:grid-cols-[1fr_100px_100px] gap-2 sm:gap-4 py-3 sm:py-4 border-b border-gray-800/30 hover:bg-gray-900/30 transition-colors rounded-lg px-2 -mx-2 min-w-[320px]"
                 >
                   <div className="text-gray-300">{row.feature}</div>
                   <div className="text-center">
