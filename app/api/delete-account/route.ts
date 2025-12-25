@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminAuth, adminDb } from "@/lib/firebase-admin"
 import Stripe from "stripe"
+import { Pinecone } from "@pinecone-database/pinecone"
 
 export const dynamic = "force-dynamic"
 
@@ -105,7 +106,48 @@ export async function DELETE(request: NextRequest) {
     await batch.commit()
     console.log(`Deleted ${deletedDocCount} documents for user: ${userId}`)
 
-    // 4. Delete the Firebase Auth user account
+    // 4. Delete user vectors from Pinecone (GDPR compliance)
+    if (process.env.PINECONE_API_KEY) {
+      try {
+        const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY })
+        const indexName = process.env.PINECONE_INDEX_NAME || "skillon-raggemini"
+        const index = pinecone.index(indexName)
+
+        // Delete from all namespaces that might contain user data
+        const userNamespaces = [
+          "mockmate_solution",
+          "mockmate_feedback",
+          "mockmate_hint",
+          "mockmate_onboarding",
+          "mockmate_general",
+        ]
+
+        for (const namespace of userNamespaces) {
+          try {
+            // Delete vectors by userId metadata filter
+            await index.namespace(namespace).deleteMany({
+              filter: {
+                $or: [
+                  { userId: { $eq: userId } },
+                  { user_id: { $eq: userId } },
+                ],
+              },
+            })
+          } catch (nsError) {
+            // Namespace might not exist, continue
+            console.log(`Namespace ${namespace} cleanup skipped:`, nsError)
+          }
+        }
+
+        console.log(`Deleted Pinecone vectors for user: ${userId}`)
+      } catch (pineconeError) {
+        console.error("Failed to delete Pinecone vectors:", pineconeError)
+        // Continue with deletion even if Pinecone cleanup fails
+        // Log this for manual cleanup if needed
+      }
+    }
+
+    // 5. Delete the Firebase Auth user account
     try {
       await adminAuth.deleteUser(userId)
       console.log(`Deleted Firebase Auth user: ${userId}`)

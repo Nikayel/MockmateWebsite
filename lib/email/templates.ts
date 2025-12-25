@@ -781,3 +781,76 @@ export function getBehindScheduleEmailHtml(data: BehindScheduleEmailData): strin
 
   return emailWrapper(content);
 }
+
+// ============================================
+// PAYMENT FAILURE NOTIFICATION
+// ============================================
+
+export interface PaymentFailedEmailData {
+  userName: string;
+  userEmail: string;
+  failureReason?: string;
+  appUrl: string;
+}
+
+export function getPaymentFailedEmailSubject(): string {
+  return "Action required: Your Skillon payment failed";
+}
+
+export function getPaymentFailedEmailHtml(data: PaymentFailedEmailData): string {
+  const content = `
+    <h1>Hey ${data.userName || 'there'}, we had trouble processing your payment</h1>
+
+    <div class="tip-box" style="background: rgba(239, 68, 68, 0.1); border-left-color: #ef4444;">
+      <p style="color: #ef4444; margin: 0;">
+        Your recent payment for Skillon Pro could not be processed.
+        ${data.failureReason ? `<br/><strong>Reason:</strong> ${data.failureReason}` : ''}
+      </p>
+    </div>
+
+    <p style="margin-top: 24px;">To keep your Pro access and continue your interview preparation without interruption, please update your payment method.</p>
+
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="${data.appUrl}/settings/billing" class="cta-button">Update Payment Method</a>
+    </div>
+
+    <div class="science-note">
+      <p><strong>What happens next?</strong></p>
+      <ul style="margin: 8px 0; padding-left: 20px;">
+        <li>Your Pro access will remain active for a few more days while we retry</li>
+        <li>We'll attempt to charge your card again automatically</li>
+        <li>If payment continues to fail, your account will be downgraded to Free</li>
+      </ul>
+    </div>
+
+    <p style="color: #9ca3af; font-size: 14px;">
+      Need help? Reply to this email or contact us at support@skillon.ai
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
+
+export function getPaymentFailedEmailText(data: PaymentFailedEmailData): string {
+  return `
+Hey ${data.userName || 'there'},
+
+We had trouble processing your payment for Skillon Pro.
+${data.failureReason ? `Reason: ${data.failureReason}` : ''}
+
+To keep your Pro access, please update your payment method:
+${data.appUrl}/settings/billing
+
+What happens next:
+- Your Pro access will remain active for a few more days while we retry
+- We'll attempt to charge your card again automatically
+- If payment continues to fail, your account will be downgraded to Free
+
+Need help? Contact us at support@skillon.ai
+
+- The Skillon Team
+
+---
+Unsubscribe: ${data.appUrl}/settings/notifications
+  `.trim();
+}
