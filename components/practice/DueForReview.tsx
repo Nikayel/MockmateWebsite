@@ -53,6 +53,51 @@ function formatPattern(pattern: string): string {
   return pattern.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
 
+/**
+ * Get SM-2 based reasoning for why review is scheduled at this time.
+ * Based on Ebbinghaus forgetting curve and spaced repetition science.
+ */
+function getReviewReason(item: DueItem): string {
+  const daysUntil = item.days_until_review;
+  const retention = item.retention_estimate;
+
+  // Overdue items
+  if (daysUntil < 0) {
+    if (retention < 50) {
+      return "Memory fading quickly";
+    }
+    return "Review to strengthen memory";
+  }
+
+  // Based on mastery level and retention
+  if (item.mastery_level === "new" || item.mastery_level === "learning") {
+    if (daysUntil <= 1) {
+      return "Early stage: short intervals build foundation";
+    }
+    if (daysUntil <= 3) {
+      return "Building neural pathways";
+    }
+  }
+
+  if (item.mastery_level === "reviewing") {
+    if (retention >= 80) {
+      return "Retention high, extending interval";
+    }
+    return "Optimal spacing for long-term memory";
+  }
+
+  if (item.mastery_level === "mastered") {
+    return "Maintenance review to prevent decay";
+  }
+
+  // Default based on difficulty
+  if (item.difficulty === "hard") {
+    return "Harder problems need more practice";
+  }
+
+  return "Spaced review for optimal retention";
+}
+
 function formatReviewDate(item: DueItem): string {
   const daysUntil = item.days_until_review;
   if (daysUntil < 0) {
@@ -98,7 +143,7 @@ function DueItemRow({
               </span>
             )}
             {showUpcomingDate && item.days_until_review > 0 && (
-              <span className="text-xs text-gray-500 flex items-center gap-1">
+              <span className="text-xs text-gray-500 flex items-center gap-1" title={getReviewReason(item)}>
                 <Clock className="h-3 w-3" />
                 {formatReviewDate(item)}
               </span>
@@ -110,6 +155,9 @@ function DueItemRow({
             </span>
             <span className="text-gray-500">{formatPattern(item.pattern)}</span>
             <span className="text-gray-600">{item.estimated_minutes}m</span>
+            {showUpcomingDate && (
+              <span className="text-gray-600 italic">· {getReviewReason(item)}</span>
+            )}
           </div>
         </div>
       </div>
