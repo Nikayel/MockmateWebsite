@@ -1,12 +1,9 @@
 "use client"
 
-// Prevent static generation - this page requires client-side rendering
-export const dynamic = 'force-dynamic'
-
 import { useState, useEffect, useRef, useMemo, memo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import dynamic from "next/dynamic"
+import nextDynamic from "next/dynamic"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
@@ -59,7 +56,7 @@ import { extractProtectedElements, validateCodeProtection, enforceCodeProtection
 import { toast } from "sonner"
 
 // Dynamic imports for heavy components to reduce initial bundle size
-const ScenarioBrowser = dynamic(
+const ScenarioBrowser = nextDynamic(
   () => import("@/components/interview").then(mod => ({ default: mod.ScenarioBrowser })),
   {
     ssr: false,
@@ -71,17 +68,17 @@ const ScenarioBrowser = dynamic(
   }
 )
 
-const VoiceModeToggle = dynamic(
+const VoiceModeToggle = nextDynamic(
   () => import("@/components/interview").then(mod => ({ default: mod.VoiceModeToggle })),
   { ssr: false }
 )
 
-const CodeViewerSidePanel = dynamic(
+const CodeViewerSidePanel = nextDynamic(
   () => import("@/components/CodeViewerSidePanel").then(mod => ({ default: mod.CodeViewerSidePanel })),
   { ssr: false }
 )
 
-const GradingCriteriaTooltip = dynamic(
+const GradingCriteriaTooltip = nextDynamic(
   () => import("@/components/GradingCriteria").then(mod => ({ default: mod.GradingCriteriaTooltip })),
   { ssr: false }
 )
@@ -104,7 +101,7 @@ function ComponentErrorFallback({ componentName }: { componentName: string }) {
 }
 
 // Dynamically import heavy components to reduce initial bundle size
-const MonacoEditor = dynamic(
+const MonacoEditor = nextDynamic(
   () => import("@/components/editor").then(mod => mod.MonacoEditor),
   {
     ssr: false,
@@ -116,7 +113,7 @@ const MonacoEditor = dynamic(
   }
 )
 
-const PracticeFeedback = dynamic(
+const PracticeFeedback = nextDynamic(
   () => import("@/components/PracticeFeedback"),
   {
     ssr: false,
@@ -1319,7 +1316,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           // For system design, store design notes even if empty (chat-only submission)
           const isSystemDesign = selectedScenario?.type === 'system-design'
           const shouldStore = selectedScenario?.id && (code.trim() || isSystemDesign)
-          
+
           if (shouldStore) {
             fetch("/api/rag", {
               method: "POST",
@@ -1606,7 +1603,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     const isSystemDesign = selectedScenario?.type === 'system-design'
     const hasTests = testSummary.total > 0
     const shouldUpdate = currentSessionId && (showFeedback || showPostInterviewDiscussion) && (hasTests || isSystemDesign)
-    
+
     if (shouldUpdate) {
       try {
         // Use performance score if available (already 0-100), otherwise use pass rate
@@ -1614,7 +1611,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         const feedbackText = isSystemDesign
           ? comprehensiveFeedback || `Completed system design interview: ${selectedScenario?.title}`
           : comprehensiveFeedback || `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
-        
+
         await updateInterviewSession(
           currentSessionId,
           scoreToSave,
@@ -1628,7 +1625,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             efficiencyScore: efficiencyMetrics?.efficiencyScore,
           }
         )
-        
+
         // Store system design notes if not already stored
         if (isSystemDesign && selectedScenario?.id && user) {
           fetch("/api/rag", {
@@ -1928,7 +1925,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
         if (data.reply) {
           setMessages((prev) => [...prev, { type: "ai", message: data.reply }])
-          
+
           // For system design interviews, store design notes when session ends
           const isSystemDesign = selectedScenario?.type === 'system-design'
           if (isSystemDesign && isEndingSession && selectedScenario?.id && user) {
@@ -2055,7 +2052,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     try {
       // Generate feedback for system design based on conversation and design notes
       await triggerSystemDesignFeedback()
-      
+
       // Show success feedback
       playSound('success')
       toast.success("Design submitted!", {
@@ -2223,7 +2220,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
       // Trigger interviewer to provide final feedback
       const finalMessage = `The candidate has submitted their design. Please provide a brief summary of their performance, highlighting strengths and areas for improvement. Keep it concise (2-3 sentences).`
-      
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2406,33 +2403,30 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 <div className="flex lg:hidden items-center gap-1 bg-gray-800/50 rounded-lg p-0.5">
                   <button
                     onClick={() => setActivePanel('problem')}
-                    className={`px-2.5 py-1 rounded text-[10px] font-medium transition-all ${
-                      activePanel === 'problem'
+                    className={`px-2.5 py-1 rounded text-[10px] font-medium transition-all ${activePanel === 'problem'
                         ? 'bg-[#00d9ff] text-black'
                         : 'text-gray-400 hover:text-white'
-                    }`}
+                      }`}
                     title="Problem"
                   >
                     <Target className="h-3 w-3" />
                   </button>
                   <button
                     onClick={() => setActivePanel('editor')}
-                    className={`px-2.5 py-1 rounded text-[10px] font-medium transition-all ${
-                      activePanel === 'editor'
+                    className={`px-2.5 py-1 rounded text-[10px] font-medium transition-all ${activePanel === 'editor'
                         ? 'bg-[#00d9ff] text-black'
                         : 'text-gray-400 hover:text-white'
-                    }`}
+                      }`}
                     title="Code Editor"
                   >
                     <Code className="h-3 w-3" />
                   </button>
                   <button
                     onClick={() => setActivePanel('chat')}
-                    className={`px-2.5 py-1 rounded text-[10px] font-medium transition-all ${
-                      activePanel === 'chat'
+                    className={`px-2.5 py-1 rounded text-[10px] font-medium transition-all ${activePanel === 'chat'
                         ? 'bg-[#00d9ff] text-black'
                         : 'text-gray-400 hover:text-white'
-                    }`}
+                      }`}
                     title="Interview Chat"
                   >
                     <Brain className="h-3 w-3" />
@@ -2450,11 +2444,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   {/* Focus Mode Toggle - Desktop only */}
                   <button
                     onClick={() => setFocusMode(!focusMode)}
-                    className={`hidden lg:flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all ${
-                      focusMode
+                    className={`hidden lg:flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all ${focusMode
                         ? 'bg-[#00d9ff] text-black'
                         : 'bg-gray-800 text-gray-400 hover:text-white'
-                    }`}
+                      }`}
                     title={focusMode ? "Exit Focus Mode" : "Focus Mode (hide panels)"}
                   >
                     {focusMode ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
@@ -2485,19 +2478,17 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               ═══════════════════════════════════════════════════════════════ */}
               {!showFeedback && !showPostInterviewDiscussion ? (
                 <div
-                  className={`grid gap-1.5 sm:gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${
-                    focusMode
+                  className={`grid gap-1.5 sm:gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${focusMode
                       ? 'grid-cols-1' // Focus mode: editor only
                       : 'grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)_220px] xl:grid-cols-[260px_minmax(0,1fr)_260px] 2xl:grid-cols-[300px_minmax(0,1fr)_300px]'
-                  }`}
+                    }`}
                 >
                   {/* Left: Problem Description / File Upload
                       - Hidden in focus mode (desktop)
                       - Only visible when activePanel === 'problem' (mobile)
                   */}
-                  <Card className={`bg-gray-900/50 border-gray-700 glass-effect flex-col h-full overflow-hidden order-1 ${
-                    focusMode ? 'hidden' : '' // Hide in focus mode
-                  } ${activePanel === 'problem' ? 'flex' : 'hidden lg:flex'}`}>
+                  <Card className={`bg-gray-900/50 border-gray-700 glass-effect flex-col h-full overflow-hidden order-1 ${focusMode ? 'hidden' : '' // Hide in focus mode
+                    } ${activePanel === 'problem' ? 'flex' : 'hidden lg:flex'}`}>
                     <CardHeader className="pb-2 flex-shrink-0">
                       <CardTitle className="text-white flex items-center space-x-2 text-sm">
                         <Target className="h-4 w-4 text-[#00d9ff]" />
@@ -2704,9 +2695,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       - Always visible in focus mode
                       - Only visible when activePanel === 'editor' (mobile)
                   */}
-                  <Card className={`bg-gray-900/50 border-gray-700 glass-effect flex-col h-full overflow-hidden order-2 ${
-                    activePanel === 'editor' ? 'flex' : 'hidden lg:flex'
-                  }`}>
+                  <Card className={`bg-gray-900/50 border-gray-700 glass-effect flex-col h-full overflow-hidden order-2 ${activePanel === 'editor' ? 'flex' : 'hidden lg:flex'
+                    }`}>
                     <CardHeader className="pb-2 flex-shrink-0 px-6">
                       <CardTitle className="text-white flex items-center justify-between text-xs">
                         <div className="flex items-center space-x-1">
@@ -3038,9 +3028,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       - Hidden in focus mode (desktop)
                       - Only visible when activePanel === 'chat' (mobile)
                   */}
-                  <Card className={`bg-gray-900/50 border-gray-700 glass-effect h-full flex-col overflow-hidden order-3 ${
-                    focusMode ? 'hidden' : '' // Hide in focus mode
-                  } ${activePanel === 'chat' ? 'flex' : 'hidden lg:flex'}`}>
+                  <Card className={`bg-gray-900/50 border-gray-700 glass-effect h-full flex-col overflow-hidden order-3 ${focusMode ? 'hidden' : '' // Hide in focus mode
+                    } ${activePanel === 'chat' ? 'flex' : 'hidden lg:flex'}`}>
                     <CardHeader className="pb-2 flex-shrink-0">
                       <CardTitle className="text-white flex items-center space-x-2 text-sm">
                         <div className="relative">
