@@ -171,7 +171,7 @@ export function HeroSection() {
             variants={staggerItem}
             className="bg-gradient-to-r from-gray-900/50 via-gray-900/30 to-gray-900/50 rounded-xl border border-white/5 p-6 mb-12"
           >
-            <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12 text-center md:text-left">
+            <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 text-center md:text-left">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
                   <Mic className="w-5 h-5 text-accent" />
