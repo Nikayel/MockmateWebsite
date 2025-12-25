@@ -7,7 +7,7 @@ import { buildFeedbackContext } from "@/lib/rag/context-builder"
 import { getPatternKnowledge, patternKnowledgeToDocument } from "@/lib/rag/knowledge-base/dsa-knowledge"
 import { getUserPerformanceProfile, getUserRecommendations } from "@/lib/rag/user-performance-rag"
 import { embedAndStoreSolution } from "@/lib/rag"
-import { updateLearningStateAfterSession } from "@/lib/learning-state"
+import { updateLearningStateAfterSession, completeSessionWithMastery } from "@/lib/learning-state"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 
 // Structured feedback schema - NEW GRADING CRITERIA
@@ -1413,13 +1413,21 @@ IMPORTANT: Use the PRE-CALCULATED SCORES above exactly. Focus on generating help
     }
 
     // Update learning state for spaced repetition email reminders
-    if (userId && scenarioTitle) {
+    // Also update problem-level mastery for enhanced SM-2 spaced repetition
+    if (userId && scenarioTitle && sessionId) {
       try {
-        await updateLearningStateAfterSession(userId, {
-          topic: scenarioTitle,
+        const pattern = (efficiencyMetrics?.problemPattern || 'arrays-hashing') as DSAPattern
+        const difficulty = (efficiencyMetrics?.difficulty || 'medium') as 'easy' | 'medium' | 'hard'
+
+        // Update both topic-level (legacy) and problem-level mastery
+        await completeSessionWithMastery(userId, {
           scenarioId: sessionId,
-          pattern: efficiencyMetrics?.problemPattern,
+          title: scenarioTitle,
+          pattern,
+          difficulty,
           performanceScore: scores.overall,
+          timeSpentMinutes: timeSpent ? Math.round(timeSpent / 60) : undefined,
+          hintsUsed: interactionMetrics?.hintsUsed || 0,
           completedAt: new Date().toISOString(),
         })
       } catch (err) {
