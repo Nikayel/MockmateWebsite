@@ -7,12 +7,25 @@
 
 import { adminDb } from '../firebase-admin';
 import type { DSAPattern } from '../types/dsa-patterns';
+import { getScenarioById } from '../scenarios';
 import {
   calculateReviewPriority,
   estimateRetention,
   type Difficulty,
   type MasteryLevel,
 } from './sm2-algorithm';
+
+/**
+ * Validate and return the canonical difficulty for a scenario.
+ * Falls back to stored difficulty if scenario not found.
+ */
+function getCanonicalDifficulty(scenarioId: string, storedDifficulty: Difficulty): Difficulty {
+  const scenario = getScenarioById(scenarioId);
+  if (scenario) {
+    return scenario.difficulty as Difficulty;
+  }
+  return storedDifficulty;
+}
 
 // Types
 export interface ProblemMastery {
@@ -53,6 +66,8 @@ export interface DueItem {
   difficulty: Difficulty;
   last_score: number;
   days_overdue: number;
+  days_until_review: number; // Days until next review (negative if overdue)
+  next_review_at: string; // ISO date string
   priority: 'critical' | 'high' | 'medium' | 'low';
   priority_score: number;
   estimated_minutes: number;
@@ -160,17 +175,22 @@ export async function getDueProblems(
       data.review_count
     );
 
+    // Use canonical difficulty from scenario definition to fix any data inconsistencies
+    const canonicalDifficulty = getCanonicalDifficulty(data.scenario_id, data.difficulty);
+
     const dueItem: DueItem = {
       problem_id: data.problem_id,
       scenario_id: data.scenario_id,
       title: data.title,
       pattern: data.pattern,
-      difficulty: data.difficulty,
+      difficulty: canonicalDifficulty,
       last_score: data.last_score,
       days_overdue: daysOverdue,
+      days_until_review: daysDiff, // Negative if overdue, positive if upcoming
+      next_review_at: data.next_review_at,
       priority: getPriorityLevel(priorityScore),
       priority_score: priorityScore,
-      estimated_minutes: ESTIMATED_TIME[data.difficulty],
+      estimated_minutes: ESTIMATED_TIME[canonicalDifficulty],
       mastery_level: data.mastery_level,
       retention_estimate: retention,
     };

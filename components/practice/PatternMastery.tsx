@@ -34,6 +34,19 @@ function getMasteryColor(percentage: number): string {
   return "bg-rose-400";
 }
 
+function getMasteryLabel(pattern: PatternStats): string {
+  if (pattern.total === 0) {
+    return "No problems yet";
+  }
+  if (pattern.mastered === pattern.total) {
+    return `${pattern.total} mastered`;
+  }
+  if (pattern.mastered === 0) {
+    return `${pattern.total} problem${pattern.total > 1 ? "s" : ""} · 0 mastered`;
+  }
+  return `${pattern.mastered} of ${pattern.total} mastered`;
+}
+
 function PatternRow({ pattern }: { pattern: PatternStats }) {
   const colorClass = getMasteryColor(pattern.mastery_percentage);
 
@@ -43,7 +56,7 @@ function PatternRow({ pattern }: { pattern: PatternStats }) {
         <div className="flex items-center gap-3">
           <span className="text-white font-medium">{formatPattern(pattern.pattern)}</span>
           <span className="text-xs text-gray-500">
-            {pattern.mastered}/{pattern.total}
+            {getMasteryLabel(pattern)}
           </span>
         </div>
         <div className="flex items-center gap-3">
