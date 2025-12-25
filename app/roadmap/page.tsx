@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, BookOpen, Target, Sparkles, Trophy, AlertTriangle, Clock, RefreshCw, PartyPopper, Calendar, ArrowRight, ChevronDown, ChevronUp, Archive, CheckCircle2, XCircle } from 'lucide-react'
+import { Plus, BookOpen, Target, Sparkles, Trophy, AlertTriangle, Clock, RefreshCw, PartyPopper, Calendar, ArrowRight, ChevronDown, ChevronUp, Archive, CheckCircle2, XCircle, Play, Flame, BarChart3, Info, Zap } from 'lucide-react'
 import Link from 'next/link'
 
 import { Header } from '@/components/header'
@@ -20,6 +20,20 @@ import { getStudyRecommendations } from '@/lib/roadmap/prioritization-algorithm'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth-context'
 
+/**
+ * Roadmap Page - Cognitive Load Optimized
+ *
+ * Design Principles Applied:
+ * 1. Miller's Law: Max 7±2 chunks visible at once
+ * 2. Progressive Disclosure: Details on demand via tabs
+ * 3. Single Primary Action: "Start Next Problem" always prominent
+ * 4. F-Pattern: Key info top-left, action top-right
+ * 5. Gestalt Grouping: Related items visually clustered
+ */
+
+// Tab-based view to reduce cognitive load
+type RoadmapTab = 'today' | 'schedule' | 'progress' | 'guide'
+
 export default function RoadmapPage() {
   const router = useRouter()
   const roadmap = useActiveRoadmap()
@@ -31,10 +45,11 @@ export default function RoadmapPage() {
     markQuestionSkipped,
     setActiveRoadmap,
   } = useRoadmapStore()
-  const [isInternBannerExpanded, setIsInternBannerExpanded] = useState(false)
+  const [activeTab, setActiveTab] = useState<RoadmapTab>('today')
   const [isLoadingRoadmap, setIsLoadingRoadmap] = useState(true)
   const [allRoadmaps, setAllRoadmaps] = useState<any[]>([])
   const [showArchived, setShowArchived] = useState(false)
+  const [showTips, setShowTips] = useState(false)
 
   // Get today's plan
   const today = new Date()
@@ -196,210 +211,333 @@ export default function RoadmapPage() {
 
   const companyData = getCompanyById(roadmap.targetCompany)
   const selectedPlan = roadmap.dailyPlans[selectedDayIndex]
+  const todayPlan = roadmap.dailyPlans[todayIndex >= 0 ? todayIndex : 0]
   const recommendations = getStudyRecommendations(roadmap)
   const topPatterns = companyData?.topPatterns.map((p) => p.pattern) || []
+
+  // Get first pending question for primary CTA
+  const nextQuestion = todayPlan?.questions.find(q => q.status === 'pending' || q.status === 'in_progress')
+  const todayCompleted = todayPlan?.questions.filter(q => q.status === 'completed').length || 0
+  const todayTotal = todayPlan?.questions.length || 0
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="container mx-auto px-4 py-6 pt-24 space-y-4 md:space-y-6">
-        {/* View archived roadmaps button */}
-        {allRoadmaps.filter(r => r.status === 'archived' || r.status === 'completed' || r.status === 'abandoned').length > 0 && (
-          <div className="flex justify-end">
-            <button
-              onClick={() => setShowArchived(!showArchived)}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
-            >
-              <Archive className="h-4 w-4" />
-              {showArchived ? 'Hide' : 'View'} Archived Roadmaps
-            </button>
-          </div>
-        )}
-
+      <main className="container mx-auto px-4 py-6 pt-24 max-w-4xl">
         {showArchived ? (
-          <RoadmapListView 
-            roadmaps={allRoadmaps} 
+          <RoadmapListView
+            roadmaps={allRoadmaps}
             onCreateNew={() => router.push('/roadmap/new')}
             onClose={() => setShowArchived(false)}
           />
         ) : (
-          <>
-            {/* Top section: Header info on left, Pattern Coverage & Milestones on right */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-          {/* Left column - Header sections and Today's Focus */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Intern-specific banner - Collapsible */}
-            {isIntern && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 border border-blue-500/20 rounded-lg overflow-hidden max-w-2xl"
-              >
-                <button
-                  onClick={() => setIsInternBannerExpanded(!isInternBannerExpanded)}
-                  className="w-full flex items-center justify-between p-2 hover:bg-blue-500/5 transition-colors"
+          <div className="space-y-6">
+            {/* ═══════════════════════════════════════════════════════════════
+                HERO SECTION: Single Clear Focus (Cognitive Load Principle #1)
+                - One primary action visible
+                - Key metrics at a glance (max 4 items)
+                - F-pattern: Company left, CTA right
+            ═══════════════════════════════════════════════════════════════ */}
+            <section className="relative">
+              {/* Urgent warning - only when critical (≤3 days) */}
+              {daysRemaining <= 3 && daysRemaining >= 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-4 py-2 flex items-center gap-3"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center shrink-0">
-                      <Sparkles className="h-3 w-3 text-white" />
-                    </div>
-                    <div className="text-left">
-                      <p className="font-semibold text-xs text-foreground">Internship Interview Track</p>
-                      {!isInternBannerExpanded && (
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          Your plan focuses on foundational patterns and easier problems
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  {isInternBannerExpanded ? (
-                    <ChevronUp className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  ) : (
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  )}
-                </button>
-                <AnimatePresence>
-                  {isInternBannerExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="overflow-hidden border-t border-blue-500/20"
-                    >
-                      <div className="p-2 pt-1.5">
-                        <p className="text-xs text-muted-foreground">
-                          Your plan focuses on foundational patterns and easier problems. Master the basics first!
-                        </p>
+                  <AlertTriangle className="h-4 w-4 text-yellow-600 shrink-0" />
+                  <span className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                    {daysRemaining === 0 ? 'Interview Day! Focus on confidence.' : `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left`}
+                  </span>
+                </motion.div>
+              )}
+
+              {/* Main Hero Card */}
+              <div className="bg-card border border-border rounded-xl overflow-hidden">
+                {/* Top Bar: Company + Days Remaining */}
+                <div className="px-5 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <Target className="h-5 w-5 text-primary" />
                       </div>
-                    </motion.div>
+                      <div>
+                        <h1 className="text-lg font-bold text-foreground">{roadmap.companyName}</h1>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          <span>{daysRemaining} days remaining</span>
+                          {isIntern && (
+                            <span className="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded text-[10px] font-medium">
+                              Intern Track
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Stats - Max 3 for cognitive load */}
+                    <div className="hidden sm:flex items-center gap-4">
+                      <QuickStat
+                        value={`${progress}%`}
+                        label="complete"
+                        color={progress >= 75 ? 'green' : progress >= 50 ? 'blue' : 'orange'}
+                      />
+                      <QuickStat
+                        value={`${roadmap.questionsCompleted}/${roadmap.totalQuestions}`}
+                        label="solved"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Primary Action Area: What to do NOW */}
+                <div className="p-5">
+                  {nextQuestion ? (
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                          <Flame className="h-3.5 w-3.5 text-orange-500" />
+                          <span>Today's Focus • {todayCompleted}/{todayTotal} done</span>
+                        </div>
+                        <h2 className="text-base font-semibold text-foreground mb-1">
+                          {nextQuestion.title}
+                        </h2>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className={cn(
+                            "px-1.5 py-0.5 rounded font-medium",
+                            nextQuestion.difficulty === 'easy' && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+                            nextQuestion.difficulty === 'medium' && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+                            nextQuestion.difficulty === 'hard' && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                          )}>
+                            {nextQuestion.difficulty}
+                          </span>
+                          <span className="text-muted-foreground">{nextQuestion.pattern.replace(/-/g, ' ')}</span>
+                          <span className="text-muted-foreground">• {nextQuestion.estimatedMinutes} min</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleStartQuestion(nextQuestion.scenarioId)}
+                        className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-primary/90 transition-all shadow-sm hover:shadow-md"
+                      >
+                        <Play className="h-4 w-4" />
+                        Start Problem
+                      </button>
+                    </div>
+                  ) : todayTotal > 0 && todayCompleted === todayTotal ? (
+                    <div className="flex items-center justify-center gap-3 py-2">
+                      <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+                        <Trophy className="h-5 w-5 text-white" />
+                      </div>
+                      <div className="text-center sm:text-left">
+                        <p className="font-semibold text-green-600 dark:text-green-400">Today complete!</p>
+                        <p className="text-xs text-muted-foreground">Great work on your interview prep</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-2 text-muted-foreground">
+                      <p>Select a day from the schedule to view problems</p>
+                    </div>
                   )}
-                </AnimatePresence>
-              </motion.div>
-            )}
-
-            {/* Near expiration warning */}
-            {daysRemaining <= 3 && daysRemaining >= 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4"
-              >
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0" />
-                  <div>
-                    <p className="font-semibold text-foreground">
-                      {daysRemaining === 0 ? 'Interview Day!' : `Only ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left!`}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {daysRemaining === 0
-                        ? 'Focus on reviewing what you know. You\'ve got this!'
-                        : 'Focus on your weakest patterns and must-know questions.'}
-                    </p>
-                  </div>
                 </div>
-              </motion.div>
-            )}
 
-            {/* Roadmap header with progress */}
-            <div className="max-w-2xl">
-              <RoadmapHeader roadmap={roadmap} />
-            </div>
-
-            {/* Recommendations alert */}
-            {recommendations.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-primary/5 border border-primary/20 rounded-lg p-2 max-w-2xl"
-              >
-                <div className="flex items-start gap-2">
-                  <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-xs text-foreground">Study Tips</p>
-                    <ul className="mt-1 text-xs text-muted-foreground space-y-0.5">
-                      {recommendations.slice(0, 2).map((rec, i) => (
-                        <li key={i}>• {rec}</li>
-                      ))}
-                    </ul>
+                {/* Tips Toggle - Collapsed by default */}
+                {recommendations.length > 0 && (
+                  <div className="border-t border-border">
+                    <button
+                      onClick={() => setShowTips(!showTips)}
+                      className="w-full px-5 py-2.5 flex items-center justify-between text-xs text-muted-foreground hover:bg-muted/30 transition-colors"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Zap className="h-3 w-3 text-primary" />
+                        Study tips available
+                      </span>
+                      {showTips ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                    </button>
+                    <AnimatePresence>
+                      {showTips && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="px-5 pb-4 text-xs text-muted-foreground space-y-1">
+                            {recommendations.slice(0, 2).map((rec, i) => (
+                              <p key={i}>• {rec}</p>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                </div>
-              </motion.div>
-            )}
+                )}
+              </div>
+            </section>
 
-            {/* Today's Focus - Moved up */}
-            {selectedPlan && (
-              <TodaysFocus
-                plan={selectedPlan}
-                onStartQuestion={handleStartQuestion}
-                onSkipQuestion={handleSkipQuestion}
-                onMarkComplete={handleMarkComplete}
+            {/* ═══════════════════════════════════════════════════════════════
+                TAB NAVIGATION: Progressive Disclosure (Principle #2)
+                - Reduces simultaneous information
+                - User controls what they see
+                - Max 4 tabs (Miller's Law)
+            ═══════════════════════════════════════════════════════════════ */}
+            <nav className="flex items-center gap-1 bg-muted/50 rounded-lg p-1" role="tablist">
+              <TabButton
+                active={activeTab === 'today'}
+                onClick={() => setActiveTab('today')}
+                icon={<Flame className="h-4 w-4" />}
+                label="Today"
               />
-            )}
-          </div>
+              <TabButton
+                active={activeTab === 'schedule'}
+                onClick={() => setActiveTab('schedule')}
+                icon={<Calendar className="h-4 w-4" />}
+                label="Schedule"
+              />
+              <TabButton
+                active={activeTab === 'progress'}
+                onClick={() => setActiveTab('progress')}
+                icon={<BarChart3 className="h-4 w-4" />}
+                label="Progress"
+              />
+              {companyData && (
+                <TabButton
+                  active={activeTab === 'guide'}
+                  onClick={() => setActiveTab('guide')}
+                  icon={<Info className="h-4 w-4" />}
+                  label="Guide"
+                />
+              )}
+            </nav>
 
-          {/* Right column - Pattern coverage & Milestones */}
-          <div className="space-y-4 md:space-y-6">
-            <PatternCoverage
-              roadmap={roadmap}
-              companyTopPatterns={topPatterns}
-            />
+            {/* ═══════════════════════════════════════════════════════════════
+                TAB CONTENT: One view at a time (Principle #3)
+            ═══════════════════════════════════════════════════════════════ */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.15 }}
+              >
+                {activeTab === 'today' && selectedPlan && (
+                  <TodaysFocus
+                    plan={selectedPlan}
+                    onStartQuestion={handleStartQuestion}
+                    onSkipQuestion={handleSkipQuestion}
+                    onMarkComplete={handleMarkComplete}
+                  />
+                )}
 
-            {/* Milestones */}
-            <div className="bg-card border border-border rounded-xl p-4 md:p-6">
-              <h3 className="font-semibold mb-3 md:mb-4 flex items-center gap-2 text-sm md:text-base">
-                <Target className="h-4 w-4 md:h-5 md:w-5 text-primary" />
-                Milestones
-              </h3>
-              <div className="space-y-2 md:space-y-3">
-                {roadmap.milestones.slice(0, 3).map((milestone) => (
-                  <div
-                    key={milestone.id}
-                    className={`p-2 md:p-3 rounded-lg border ${
-                      milestone.isCompleted
-                        ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800/30'
-                        : 'bg-muted/50 border-border'
-                    }`}
-                  >
-                    <p className="font-medium text-xs md:text-sm">{milestone.name}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {new Date(milestone.targetDate).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </p>
+                {activeTab === 'schedule' && (
+                  <div className="space-y-4">
+                    <WeeklyCalendar
+                      dailyPlans={roadmap.dailyPlans}
+                      selectedDayIndex={selectedDayIndex}
+                      onSelectDay={(index) => {
+                        selectDay(index)
+                        setActiveTab('today')
+                      }}
+                    />
+                    {/* Milestones - compact in schedule view */}
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <Target className="h-4 w-4 text-primary" />
+                        Milestones
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {roadmap.milestones.slice(0, 3).map((milestone) => (
+                          <div
+                            key={milestone.id}
+                            className={cn(
+                              "p-2.5 rounded-lg border text-center",
+                              milestone.isCompleted
+                                ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800/30"
+                                : "bg-muted/50 border-border"
+                            )}
+                          >
+                            <p className="font-medium text-xs truncate">{milestone.name}</p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              {new Date(milestone.targetDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
+                )}
 
-            {/* Company Interview Guide - Only on desktop sidebar */}
-            {companyData && (
-              <div className="hidden lg:block">
-                <CompanyInterviewGuide company={companyData} isIntern={isIntern} />
+                {activeTab === 'progress' && (
+                  <div className="space-y-4">
+                    <RoadmapHeader roadmap={roadmap} />
+                    <PatternCoverage roadmap={roadmap} companyTopPatterns={topPatterns} />
+                  </div>
+                )}
+
+                {activeTab === 'guide' && companyData && (
+                  <CompanyInterviewGuide company={companyData} isIntern={isIntern} />
+                )}
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Archived roadmaps link - minimal, bottom */}
+            {allRoadmaps.filter(r => r.status !== 'active').length > 0 && (
+              <div className="pt-4 border-t border-border text-center">
+                <button
+                  onClick={() => setShowArchived(true)}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Archive className="inline h-3 w-3 mr-1" />
+                  View archived roadmaps ({allRoadmaps.filter(r => r.status !== 'active').length})
+                </button>
               </div>
             )}
           </div>
-        </div>
-
-        {/* Weekly calendar */}
-        <WeeklyCalendar
-          dailyPlans={roadmap.dailyPlans}
-          selectedDayIndex={selectedDayIndex}
-          onSelectDay={selectDay}
-        />
-
-        {/* Company Interview Guide - Full width on mobile */}
-        {companyData && (
-          <div className="block lg:hidden">
-            <CompanyInterviewGuide company={companyData} isIntern={isIntern} />
-          </div>
-        )}
-          </>
         )}
       </main>
     </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPER COMPONENTS - Extracted for clarity
+// ═══════════════════════════════════════════════════════════════════════════
+
+function QuickStat({ value, label, color = 'default' }: { value: string; label: string; color?: 'green' | 'blue' | 'orange' | 'default' }) {
+  return (
+    <div className="text-center">
+      <p className={cn(
+        "text-lg font-bold",
+        color === 'green' && "text-green-600",
+        color === 'blue' && "text-primary",
+        color === 'orange' && "text-orange-500",
+        color === 'default' && "text-foreground"
+      )}>
+        {value}
+      </p>
+      <p className="text-[10px] text-muted-foreground">{label}</p>
+    </div>
+  )
+}
+
+function TabButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+  return (
+    <button
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        "flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
+        active
+          ? "bg-background text-foreground shadow-sm"
+          : "text-muted-foreground hover:text-foreground"
+      )}
+    >
+      {icon}
+      <span className="hidden sm:inline">{label}</span>
+    </button>
   )
 }
 
