@@ -4,6 +4,7 @@ import { executeRateLimit } from "@/lib/rate-limit"
 import { enforceQuota } from "@/lib/quota-enforcement"
 import { trackCodeExecutionServer } from "@/lib/analytics-server"
 import { executeWithPiston, parseExecutionOutput } from "@/lib/piston"
+import { logger } from "@/lib/logger"
 
 // Mark route as dynamic to avoid build-time issues
 export const dynamic = 'force-dynamic'
@@ -270,7 +271,7 @@ export async function POST(request: NextRequest) {
       totalTests: totalCount,
       passedTests: passedCount,
       executionTimeMs,
-    }).catch(err => console.error("Analytics tracking error:", err))
+    }).catch(err => logger.error("Analytics tracking error", { error: err }))
 
     return NextResponse.json({
       success: allPassed,
@@ -284,7 +285,7 @@ export async function POST(request: NextRequest) {
       error: null,
     })
   } catch (error) {
-    console.error("Execute API error:", error)
+    logger.error("Execute API error", { error, endpoint: '/api/execute' })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to execute code" },
       { status: 500 },

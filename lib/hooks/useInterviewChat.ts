@@ -6,7 +6,7 @@
  * - AI Interviewer (mock interview questions)
  */
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { User as FirebaseUser } from "firebase/auth"
 
 export interface ChatMessage {
@@ -65,6 +65,19 @@ export function useInterviewChat({
   // Abort controllers for cancelling requests
   const partnerAbortRef = useRef<AbortController | null>(null)
   const interviewerAbortRef = useRef<AbortController | null>(null)
+
+  // Cleanup abort controllers on unmount to prevent memory leaks
+  // and avoid setting state on unmounted components
+  useEffect(() => {
+    return () => {
+      if (partnerAbortRef.current) {
+        partnerAbortRef.current.abort()
+      }
+      if (interviewerAbortRef.current) {
+        interviewerAbortRef.current.abort()
+      }
+    }
+  }, [])
 
   const sendPartnerMessage = useCallback(async (
     code: string,

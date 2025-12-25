@@ -46,26 +46,35 @@ interface RateLimitStore {
  * In-Memory Rate Limit Store
  * WARNING: Only suitable for single-instance deployments or development
  * Each serverless instance will have its own store, allowing bypass
+ *
+ * NOTE: Uses lazy cleanup instead of setInterval to avoid memory leaks
+ * in serverless environments where global intervals never get cleared
  */
 class InMemoryRateLimitStore implements RateLimitStore {
   private store = new Map<string, RateLimitEntry>()
-  private cleanupInterval: ReturnType<typeof setInterval> | null = null
+  private lastCleanupTime = Date.now()
+  private readonly CLEANUP_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
 
-  constructor() {
-    // Cleanup old entries every 5 minutes
-    if (typeof setInterval !== 'undefined') {
-      this.cleanupInterval = setInterval(() => {
-        const now = Date.now()
-        for (const [key, entry] of this.store.entries()) {
-          if (entry.resetTime < now) {
-            this.store.delete(key)
-          }
+  /**
+   * Perform lazy cleanup of expired entries
+   * Called before each operation to prevent memory buildup
+   */
+  private lazyCleanup(): void {
+    const now = Date.now()
+    if (now - this.lastCleanupTime > this.CLEANUP_INTERVAL_MS) {
+      for (const [key, entry] of this.store.entries()) {
+        if (entry.resetTime < now) {
+          this.store.delete(key)
         }
-      }, 5 * 60 * 1000)
+      }
+      this.lastCleanupTime = now
     }
   }
 
   async get(key: string): Promise<RateLimitEntry | null> {
+    // Perform lazy cleanup on each access
+    this.lazyCleanup()
+
     const entry = this.store.get(key)
     if (!entry) return null
     if (entry.resetTime < Date.now()) {
@@ -80,6 +89,9 @@ class InMemoryRateLimitStore implements RateLimitStore {
   }
 
   async increment(key: string, config: RateLimitConfig): Promise<RateLimitResult> {
+    // Perform lazy cleanup on each access
+    this.lazyCleanup()
+
     const now = Date.now()
     let entry = this.store.get(key)
 
@@ -355,29 +367,37 @@ class FirestoreRateLimitStore implements RateLimitStore {
 
 /**
  * Get the appropriate rate limit store based on environment
+ *
+ * Priority:
+ * 1. Upstash Redis (fastest, recommended for Vercel)
+ * 2. Firestore (good if already using Firebase, default for production)
+ * 3. In-memory (development only)
  */
 function getRateLimitStore(): RateLimitStore {
-  // Check for Upstash Redis (recommended for Vercel)
+  // Check for Upstash Redis (recommended for Vercel - fastest option)
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
     logger.info('Using Upstash Redis for rate limiting')
     return new UpstashRateLimitStore()
   }
 
-  // Check for Firestore (if using Firebase)
-  if (process.env.FIREBASE_ADMIN_PRIVATE_KEY || process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    // Only use Firestore if explicitly enabled (to avoid overhead)
-    if (process.env.USE_FIRESTORE_RATE_LIMIT === 'true') {
-      logger.info('Using Firestore for rate limiting')
+  // In production, default to Firestore if Firebase is configured
+  // This ensures distributed rate limiting works across serverless instances
+  const isProduction = process.env.NODE_ENV === 'production'
+  const hasFirebaseConfig = process.env.FIREBASE_ADMIN_PRIVATE_KEY || process.env.GOOGLE_APPLICATION_CREDENTIALS
+
+  if (hasFirebaseConfig) {
+    // Use Firestore in production by default, or if explicitly enabled
+    if (isProduction || process.env.USE_FIRESTORE_RATE_LIMIT === 'true') {
+      logger.info('Using Firestore for distributed rate limiting')
       return new FirestoreRateLimitStore()
     }
   }
 
   // Fallback to in-memory (development only)
-  if (process.env.NODE_ENV === 'production') {
+  if (isProduction) {
     logger.warn(
-      'Using in-memory rate limiting in production. ' +
-      'This is NOT recommended for serverless deployments. ' +
-      'Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for distributed rate limiting.'
+      'Using in-memory rate limiting in production - this may allow rate limit bypass. ' +
+      'Configure UPSTASH_REDIS_REST_URL/TOKEN or ensure Firebase Admin is properly configured.'
     )
   }
   return new InMemoryRateLimitStore()

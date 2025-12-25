@@ -8,6 +8,7 @@ import { getPatternKnowledge, patternKnowledgeToDocument } from "@/lib/rag/knowl
 import { getUserPerformanceProfile, getUserRecommendations } from "@/lib/rag/user-performance-rag"
 import { embedAndStoreSolution } from "@/lib/rag"
 import { updateLearningStateAfterSession, completeSessionWithMastery } from "@/lib/learning-state"
+import { logger } from "@/lib/logger"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 
 // Structured feedback schema - NEW GRADING CRITERIA
@@ -222,7 +223,7 @@ Return ONLY the JSON object, nothing else.`
       }
     }
   } catch (error) {
-    console.error('AI validation parsing error:', error)
+    logger.error('AI validation parsing error', { error })
   }
 
   // Fallback if AI validation fails
@@ -941,7 +942,7 @@ ${recommendations.slice(0, 2).map((rec, i) => `${i + 1}. ${rec.reason || rec.sce
       }
     }
   } catch (error) {
-    console.error('[Feedback API] RAG context build error:', error)
+    logger.error('[Feedback API] RAG context build error', { error })
     // Continue without RAG context - don't fail the feedback generation
   }
 
@@ -1354,7 +1355,7 @@ IMPORTANT: Use the PRE-CALCULATED SCORES above exactly. Focus on generating help
         userId,
       })
     } catch (error) {
-      console.error('[Feedback API] RAG context failed, continuing without:', error)
+      logger.warn('[Feedback API] RAG context failed, continuing without', { error })
     }
 
     // Combine system instruction with RAG context
@@ -1409,7 +1410,7 @@ IMPORTANT: Use the PRE-CALCULATED SCORES above exactly. Focus on generating help
         scenarioType: scenarioType || 'unknown',
         performanceScore: scores.overall,
         durationMinutes,
-      }).catch(err => console.error("Analytics tracking error:", err))
+      }).catch(err => logger.error("Analytics tracking error", { error: err }))
     }
 
     // Update learning state for spaced repetition email reminders
@@ -1432,7 +1433,7 @@ IMPORTANT: Use the PRE-CALCULATED SCORES above exactly. Focus on generating help
         })
       } catch (err) {
         // Non-blocking - don't fail feedback if learning state update fails
-        console.error("Learning state update error:", err)
+        logger.error("Learning state update error", { error: err })
       }
     }
 
@@ -1449,7 +1450,7 @@ IMPORTANT: Use the PRE-CALCULATED SCORES above exactly. Focus on generating help
         })
       } catch (err) {
         // Non-blocking - don't fail feedback if RAG storage fails
-        console.error("RAG solution storage error:", err)
+        logger.error("RAG solution storage error", { error: err })
       }
     }
 
@@ -1462,7 +1463,7 @@ IMPORTANT: Use the PRE-CALCULATED SCORES above exactly. Focus on generating help
       latencyMs: aiResponse.latencyMs,
     })
   } catch (error) {
-    console.error("Feedback generation error:", error)
+    logger.error("Feedback generation error", { error, endpoint: '/api/generate-feedback' })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to generate feedback" },
       { status: 500 }

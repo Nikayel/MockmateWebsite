@@ -175,7 +175,7 @@ ${doc.text.substring(0, 400)}${doc.text.length > 400 ? '...' : ''}
     }
   } catch (error) {
     // RAG errors should not break the chat - log and continue
-    console.error('[Chat API] RAG context build error:', error)
+    logger.error('[Chat API] RAG context build error', { error })
   }
 
   if (ragContextParts.length === 0) {
@@ -652,7 +652,7 @@ Pick ONE natural response (or create your own). Keep it under 20 words. Sound li
     })
 
     if (!validation.valid) {
-      console.warn('[Chat API] Response may have relevance issues:', validation.issues)
+      logger.warn('[Chat API] Response may have relevance issues', { issues: validation.issues })
       // Don't fail, but log for monitoring
     }
 
@@ -666,7 +666,7 @@ Pick ONE natural response (or create your own). Keep it under 20 words. Sound li
       messageLength: message?.length || 0,
       responseTimeMs,
       provider: aiResponse.provider, // Track which provider was used
-    }).catch(err => console.error("Analytics tracking error:", err))
+    }).catch(err => logger.error("Analytics tracking error", { error: err }))
 
     return NextResponse.json({
       reply: aiResponse.text,
@@ -674,11 +674,11 @@ Pick ONE natural response (or create your own). Keep it under 20 words. Sound li
       latencyMs: aiResponse.latencyMs,
     })
   } catch (error: any) {
-    console.error("Chat API error:", error)
-    console.error("Error details:", {
+    logger.error("Chat API error", {
+      error,
       message: error?.message,
       status: error?.status,
-      stack: error?.stack,
+      endpoint: '/api/chat'
     })
     return NextResponse.json(
       { 

@@ -2,9 +2,8 @@
 const nextConfig = {
   // Empty turbopack config to use Turbopack with custom webpack config
   turbopack: {},
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // TypeScript errors must be fixed - do not ignore build errors in production
+  // This was previously set to true which masked real bugs
   images: {
     // Enable Next.js image optimization for better performance
     unoptimized: false,
