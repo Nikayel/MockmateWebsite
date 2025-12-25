@@ -65,8 +65,7 @@ export function HeroSection() {
                 variants={staggerItem}
                 className="text-lg text-gray-400 mb-6 leading-relaxed"
               >
-                Talk through your approach. Think out loud.
-                Our AI listens and responds—just like a real interviewer would.
+                Our AI interviewer is trained on 500+ real company interview docs and scenarios. Think out loud—it actually listens and responds naturally, just like a real interviewer would.
               </motion.p>
 
               {/* CTA */}
@@ -220,13 +219,13 @@ export function HeroSection() {
               </div>
               <div className="w-px h-8 bg-white/10 hidden md:block" />
               <div>
-                <div className="text-2xl font-bold text-white">500+</div>
+                <div className="text-2xl font-bold text-white">200+</div>
                 <div className="text-xs text-gray-500">problems</div>
               </div>
               <div className="w-px h-8 bg-white/10 hidden md:block" />
               <div>
-                <div className="text-xs text-gray-500 mb-1">Used by engineers at</div>
-                <div className="text-sm text-gray-400">Meta, Google, Amazon</div>
+                <div className="text-xs text-gray-500 mb-1">Includes simulations from</div>
+                <div className="text-sm text-gray-400">20+ companies</div>
               </div>
             </div>
 
