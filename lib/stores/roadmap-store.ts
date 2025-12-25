@@ -11,6 +11,7 @@ import {
   DailyPlan,
 } from '@/lib/data/company-questions/types'
 import { DSAPattern } from '@/lib/types/dsa-patterns'
+import { getCurrentUserToken } from '@/lib/firebase-lazy'
 
 interface RoadmapState {
   // Current roadmap
@@ -197,21 +198,31 @@ export const useRoadmapStore = create<RoadmapState>()(
 
         // Sync to Firebase in the background
         if (state.activeRoadmap.id) {
-          fetch('/api/roadmap/progress', {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              roadmapId: state.activeRoadmap.id,
-              scenarioId,
-              status: 'completed',
-              score,
-              timeSpentMinutes,
-            }),
-          }).catch((error) => {
-            console.error('Failed to sync progress to Firebase:', error)
-          })
+          (async () => {
+            try {
+              const token = await getCurrentUserToken()
+              if (!token) {
+                console.error('Failed to sync progress: No auth token')
+                return
+              }
+              await fetch('/api/roadmap/progress', {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  roadmapId: state.activeRoadmap.id,
+                  scenarioId,
+                  status: 'completed',
+                  score,
+                  timeSpentMinutes,
+                }),
+              })
+            } catch (error) {
+              console.error('Failed to sync progress to Firebase:', error)
+            }
+          })()
         }
       },
 
@@ -244,19 +255,29 @@ export const useRoadmapStore = create<RoadmapState>()(
 
         // Sync to Firebase in the background
         if (state.activeRoadmap.id) {
-          fetch('/api/roadmap/progress', {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              roadmapId: state.activeRoadmap.id,
-              scenarioId,
-              status: 'skipped',
-            }),
-          }).catch((error) => {
-            console.error('Failed to sync progress to Firebase:', error)
-          })
+          (async () => {
+            try {
+              const token = await getCurrentUserToken()
+              if (!token) {
+                console.error('Failed to sync progress: No auth token')
+                return
+              }
+              await fetch('/api/roadmap/progress', {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  roadmapId: state.activeRoadmap.id,
+                  scenarioId,
+                  status: 'skipped',
+                }),
+              })
+            } catch (error) {
+              console.error('Failed to sync progress to Firebase:', error)
+            }
+          })()
         }
       },
 
