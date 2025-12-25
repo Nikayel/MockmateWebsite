@@ -145,7 +145,8 @@
 }
 
 @layer base {
-  *:not(.monaco-editor):not(.monaco-editor *) {
+  /* Exclude code editor from global border styles */
+  *:not(.cm-editor):not(.cm-editor *) {
     @apply border-border outline-ring/50;
   }
 
@@ -407,9 +408,25 @@
   transform: translateY(-2px);
 }
 
-/* ===== MONACO EDITOR STYLES ===== */
-/* REMOVED ALL CUSTOM STYLING - Let Monaco handle everything internally */
-/* Any interference with Monaco's internal elements breaks cursor/selection */
+/* ===== CODEMIRROR EDITOR STYLES ===== */
+/* CodeMirror 6 handles its own styling - minimal overrides needed */
+.cm-editor {
+  height: 100%;
+  font-family: "Fira Code", "Consolas", "Monaco", monospace;
+}
+
+.cm-editor.cm-focused {
+  outline: none;
+}
+
+/* Ensure CodeMirror fills container */
+.editor-wrapper .cm-editor {
+  height: 100%;
+}
+
+.editor-wrapper .cm-scroller {
+  overflow: auto;
+}
 
 /* Responsive improvements */
 @media (max-width: 1024px) {

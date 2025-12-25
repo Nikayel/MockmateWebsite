@@ -101,8 +101,9 @@ function ComponentErrorFallback({ componentName }: { componentName: string }) {
 }
 
 // Dynamically import heavy components to reduce initial bundle size
-const MonacoEditor = nextDynamic(
-  () => import("@/components/editor").then(mod => mod.MonacoEditor),
+// CodeMirror 6 is used instead of Monaco for ~95% smaller bundle
+const CodeEditor = nextDynamic(
+  () => import("@/components/editor").then(mod => mod.CodeMirrorEditor),
   {
     ssr: false,
     loading: () => (
@@ -646,11 +647,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     }
   }, [interviewerMessages])
 
-  // Monaco Editor handles layout automatically with automaticLayout: true
+  // CodeMirror 6 handles layout automatically
   // No manual height tracking needed
 
   // Initialize code when scenario is selected (before interview starts)
-  // This ensures Monaco always has a stable value without needing fallbacks
+  // This ensures the editor always has a stable value without needing fallbacks
   useEffect(() => {
     if (selectedScenario && !isInterviewStarted && !code) {
       let initialCode: string
@@ -1674,23 +1675,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       }
     }
 
-    // Monaco cleanup - dispose all models to prevent memory leaks
-    if (typeof window !== 'undefined' && (window as any).monaco?.editor) {
-      try {
-        const models = (window as any).monaco.editor.getModels()
-        models.forEach((model: any) => {
-          try {
-            if (!model.isDisposed()) {
-              model.dispose()
-            }
-          } catch (e) {
-            // Model may already be disposed
-          }
-        })
-      } catch (e) {
-        // Silent failure
-      }
-    }
+    // CodeMirror 6 handles cleanup automatically through React lifecycle
 
     // Clear URL params when resetting
     if (typeof window !== 'undefined') {
@@ -2744,11 +2729,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         </div>
                       </CardTitle>
                     </CardHeader>
-                    {/* Code Editor - Using centralized MonacoEditor component */}
+                    {/* Code Editor - Using CodeMirror 6 for lightweight editing */}
                     <div className="flex flex-col flex-1 min-h-0 gap-2 px-3 pb-3">
                       <div ref={editorContainerRef} className="flex-1 min-h-0 rounded border border-gray-700 overflow-hidden relative">
                         <ErrorBoundary>
-                          <MonacoEditor
+                          <CodeEditor
                             height="100%"
                             language={selectedLanguage}
                             value={code}
@@ -3199,7 +3184,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     {showCodeInDiscussion && (
                       <CardContent>
                         <div className="border border-gray-700 rounded-lg overflow-hidden">
-                          <MonacoEditor
+                          <CodeEditor
                             height="400px"
                             language={selectedLanguage}
                             value={code}
