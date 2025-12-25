@@ -26,9 +26,11 @@ export interface Profile {
   subscription_current_period_end?: string // ISO date string when current period ends
   created_at: string
   updated_at: string
-  // Onboarding fields (minimal MVP)
+  // Onboarding fields
   role?: "student" | "junior" | "mid" | "senior"
   goal?: "faang" | "startup" | "general" | "promotion"
+  target_company?: string // Target company for FAANG goal (Google, Meta, etc.)
+  daily_goal?: number // Daily practice goal (1, 3, 5 problems)
   onboarding_completed?: boolean
   onboarding_completed_at?: string
   // Product tour fields

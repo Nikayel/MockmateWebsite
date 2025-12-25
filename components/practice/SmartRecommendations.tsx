@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import {
-  Lightbulb,
-  PlayCircle,
-  Building2,
+  Play,
+  RefreshCw,
   Target,
   TrendingUp,
-  RefreshCw,
-  BookOpen,
-  Sparkles,
+  Building2,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -40,79 +38,61 @@ interface SmartRecommendationsProps {
   isRefreshing?: boolean;
 }
 
-const typeIcons: Record<RecommendationType, typeof Target> = {
-  review: RefreshCw,
-  practice_weakness: Target,
-  similar_to_failed: TrendingUp,
-  company_relevant: Building2,
-  next_in_roadmap: BookOpen,
-  strengthen_pattern: Sparkles,
+const typeLabels: Record<RecommendationType, { label: string; color: string }> = {
+  review: { label: "Review", color: "text-blue-400" },
+  practice_weakness: { label: "Weak Area", color: "text-amber-400" },
+  similar_to_failed: { label: "Practice", color: "text-purple-400" },
+  company_relevant: { label: "Company", color: "text-emerald-400" },
+  next_in_roadmap: { label: "Roadmap", color: "text-cyan-400" },
+  strengthen_pattern: { label: "Pattern", color: "text-rose-400" },
 };
 
-const typeLabels: Record<RecommendationType, string> = {
-  review: "Review",
-  practice_weakness: "Weakness",
-  similar_to_failed: "Similar Practice",
-  company_relevant: "Company Prep",
-  next_in_roadmap: "Roadmap",
-  strengthen_pattern: "Strengthen",
-};
-
-const difficultyColors = {
-  easy: "text-green-400 bg-green-500/10",
-  medium: "text-yellow-400 bg-yellow-500/10",
-  hard: "text-red-400 bg-red-500/10",
+const difficultyStyles = {
+  easy: "text-emerald-400",
+  medium: "text-amber-400",
+  hard: "text-rose-400",
 };
 
 function formatPattern(pattern: string): string {
-  return pattern
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+  return pattern.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
 
-function RecommendationCard({ rec }: { rec: Recommendation }) {
-  const Icon = typeIcons[rec.type];
+function RecommendationRow({ rec }: { rec: Recommendation }) {
+  const typeInfo = typeLabels[rec.type];
 
   return (
-    <div className="p-4 rounded-lg border border-white/10 hover:border-accent/30 transition-all bg-white/5 group">
-      <div className="flex items-start gap-3">
-        <div className="p-2 rounded-lg bg-accent/10 text-accent group-hover:bg-accent/20 transition-colors">
-          <Icon className="h-5 w-5" />
+    <Link
+      href={`/interview?scenario=${rec.scenario_id}`}
+      className="group flex items-center justify-between py-3 px-4 -mx-4 hover:bg-white/[0.02] rounded-lg transition-colors"
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <span className={`text-xs font-medium ${typeInfo.color}`}>
+            {typeInfo.label}
+          </span>
+          <span className="text-gray-600">·</span>
+          <span className={`text-xs ${difficultyStyles[rec.difficulty]}`}>
+            {rec.difficulty}
+          </span>
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs text-accent bg-accent/10 px-2 py-0.5 rounded-full">
-              {typeLabels[rec.type]}
-            </span>
-            <span className={`text-xs px-2 py-0.5 rounded-full ${difficultyColors[rec.difficulty]}`}>
-              {rec.difficulty.charAt(0).toUpperCase() + rec.difficulty.slice(1)}
-            </span>
-          </div>
-          <h4 className="font-medium text-white truncate">{rec.title}</h4>
-          <p className="text-sm text-gray-400 mt-1">{rec.reason}</p>
-          <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-            <span>{formatPattern(rec.pattern)}</span>
-            <span>~{rec.estimated_minutes}min</span>
-            {rec.companies && rec.companies.length > 0 && (
+        <div className="text-white font-medium truncate">{rec.title}</div>
+        <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
+          <span>{formatPattern(rec.pattern)}</span>
+          <span>·</span>
+          <span>{rec.estimated_minutes}m</span>
+          {rec.companies && rec.companies.length > 0 && (
+            <>
+              <span>·</span>
               <span className="flex items-center gap-1">
                 <Building2 className="h-3 w-3" />
                 {rec.companies.slice(0, 2).join(", ")}
               </span>
-            )}
-          </div>
+            </>
+          )}
         </div>
-        <Link href={`/interview?scenario=${rec.scenario_id}`}>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-accent hover:bg-accent/10 hover:text-accent"
-          >
-            <PlayCircle className="h-4 w-4" />
-          </Button>
-        </Link>
       </div>
-    </div>
+      <ArrowRight className="h-4 w-4 text-gray-600 group-hover:text-white transition-colors" />
+    </Link>
   );
 }
 
@@ -124,62 +104,54 @@ export function SmartRecommendations({
 }: SmartRecommendationsProps) {
   if (isLoading) {
     return (
-      <div className="glass-card p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-6 bg-white/10 rounded w-48" />
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-24 bg-white/5 rounded-lg" />
-            ))}
-          </div>
-        </div>
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-20 bg-white/5 rounded-lg animate-pulse" />
+        ))}
       </div>
     );
   }
 
   if (recommendations.length === 0) {
     return (
-      <div className="glass-card p-6 text-center">
-        <Lightbulb className="h-12 w-12 text-gray-500 mx-auto mb-3" />
-        <h3 className="text-lg font-medium text-white mb-1">
-          No recommendations yet
-        </h3>
-        <p className="text-gray-400">
-          Complete some problems to get personalized recommendations.
+      <div className="text-center py-12">
+        <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-4">
+          <Target className="h-6 w-6 text-gray-500" />
+        </div>
+        <h3 className="text-lg font-medium text-white mb-1">No recommendations yet</h3>
+        <p className="text-gray-500 text-sm">
+          Complete some problems to get personalized suggestions.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="glass-card p-6">
+    <div>
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <Lightbulb className="h-5 w-5 text-accent" />
-          <h3 className="text-lg font-medium text-white">Recommended Next</h3>
-        </div>
+        <h3 className="text-lg font-medium text-white">Recommended</h3>
         {onRefresh && (
           <Button
             variant="ghost"
             size="sm"
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="text-gray-400 hover:text-white"
+            className="text-gray-500 hover:text-gray-300 h-8 w-8 p-0"
           >
-            <RefreshCw
-              className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-            />
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </Button>
         )}
       </div>
 
-      <p className="text-sm text-gray-400 mb-4">
-        Based on your weak areas, company targets, and learning progress
+      <p className="text-sm text-gray-500 mb-4">
+        Based on your progress and weak areas
       </p>
 
-      <div className="space-y-3">
+      {/* Recommendations */}
+      <div className="divide-y divide-white/5">
         {recommendations.map((rec, index) => (
-          <RecommendationCard key={`${rec.scenario_id}-${index}`} rec={rec} />
+          <RecommendationRow key={`${rec.scenario_id}-${index}`} rec={rec} />
         ))}
       </div>
     </div>

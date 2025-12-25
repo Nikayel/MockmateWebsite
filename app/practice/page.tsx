@@ -85,8 +85,6 @@ export default function PracticePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshingRecs, setIsRefreshingRecs] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Check if user is Pro
   const [isPro, setIsPro] = useState<boolean | null>(null);
 
   const getAuthToken = useCallback(async () => {
@@ -106,7 +104,6 @@ export default function PracticePage() {
         "Content-Type": "application/json",
       };
 
-      // Fetch all data in parallel
       const [statsRes, dueRes, recsRes] = await Promise.all([
         fetch("/api/spaced-repetition/stats", { headers }),
         fetch("/api/spaced-repetition/due", { headers }),
@@ -171,7 +168,6 @@ export default function PracticePage() {
       });
 
       if (res.ok) {
-        // Refresh due data
         const dueRes = await fetch("/api/spaced-repetition/due", {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -222,73 +218,61 @@ export default function PracticePage() {
     }
   }, [user, initialized]);
 
-  // Fetch data when user is authenticated
   useEffect(() => {
     if (initialized && user && isPro) {
       fetchData();
     }
   }, [initialized, user, isPro, fetchData]);
 
-  // Redirect if not authenticated
   useEffect(() => {
     if (initialized && !user && !authLoading) {
       router.push("/login?redirect=/practice");
     }
   }, [initialized, user, authLoading, router]);
 
-  // Show loading while checking auth
   if (!initialized || authLoading || isPro === null) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-white" />
       </div>
     );
   }
 
-  // Show upgrade prompt for non-Pro users
+  // Upgrade prompt for non-Pro users
   if (!isPro) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-black">
         <Header />
         <main className="container mx-auto px-4 pt-24 pb-16">
-          <div className="max-w-2xl mx-auto text-center">
-            <div className="glass-card p-8">
-              <Lock className="h-16 w-16 text-accent mx-auto mb-4" />
-              <h1 className="text-3xl font-bold text-white mb-3">
-                Spaced Repetition Practice
-              </h1>
-              <p className="text-gray-400 mb-6">
-                Unlock smart practice sessions with spaced repetition to maximize your
-                learning. Our AI-powered system schedules reviews at optimal intervals
-                based on your performance.
-              </p>
-              <div className="space-y-4">
-                <div className="grid gap-3 text-left max-w-md mx-auto">
-                  <div className="flex items-center gap-3 text-gray-300">
-                    <div className="w-2 h-2 rounded-full bg-accent" />
-                    <span>Scientifically-optimized review intervals</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-gray-300">
-                    <div className="w-2 h-2 rounded-full bg-accent" />
-                    <span>Pattern mastery tracking</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-gray-300">
-                    <div className="w-2 h-2 rounded-full bg-accent" />
-                    <span>AI-powered recommendations</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-gray-300">
-                    <div className="w-2 h-2 rounded-full bg-accent" />
-                    <span>Streak tracking and daily goals</span>
-                  </div>
-                </div>
-                <Link href="/pricing">
-                  <Button className="bg-accent hover:bg-accent/80 text-black mt-4">
-                    Upgrade to Pro
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
-                </Link>
-              </div>
+          <div className="max-w-lg mx-auto text-center">
+            <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-6">
+              <Lock className="h-8 w-8 text-gray-500" />
             </div>
+            <h1 className="text-2xl font-bold text-white mb-3">
+              Spaced Repetition Practice
+            </h1>
+            <p className="text-gray-400 mb-8">
+              Smart practice sessions with spaced repetition to maximize your learning and retention.
+            </p>
+            <div className="space-y-3 text-left max-w-sm mx-auto mb-8">
+              {[
+                "Optimized review intervals",
+                "Pattern mastery tracking",
+                "Personalized recommendations",
+                "Daily goals and streaks",
+              ].map((feature, i) => (
+                <div key={i} className="flex items-center gap-3 text-gray-300">
+                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                  <span>{feature}</span>
+                </div>
+              ))}
+            </div>
+            <Link href="/pricing">
+              <Button className="bg-white text-black hover:bg-gray-200">
+                Upgrade to Pro
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </Link>
           </div>
         </main>
         <Footer />
@@ -297,28 +281,26 @@ export default function PracticePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-black">
       <Header />
       <main className="container mx-auto px-4 pt-24 pb-16">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-5xl mx-auto">
           {/* Page Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">
-              Practice Dashboard
-            </h1>
-            <p className="text-gray-400">
-              Review problems at optimal intervals to maximize retention
+            <h1 className="text-2xl font-bold text-white mb-1">Practice</h1>
+            <p className="text-gray-500">
+              Review problems at optimal intervals
             </p>
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
+            <div className="mb-6 p-4 bg-rose-500/5 border border-rose-500/10 rounded-lg text-rose-400 text-sm">
               {error}
             </div>
           )}
 
           {/* Streak Banner */}
-          <div className="mb-6">
+          <div className="mb-8 pb-6 border-b border-white/5">
             <StreakBanner
               streakDays={stats?.overall.streak_days || 0}
               dailyGoal={stats?.daily_goal || 5}
@@ -329,65 +311,71 @@ export default function PracticePage() {
           </div>
 
           {/* Main Grid */}
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Due for Review - Takes 2 columns */}
-            <div className="lg:col-span-2">
-              <DueForReview
-                dueNow={due?.due_now || []}
-                dueToday={due?.due_today || []}
-                upcoming={due?.upcoming || []}
-                totalDue={due?.stats.total_due || 0}
-                overdueCount={due?.stats.overdue_count || 0}
-                onSkip={handleSkipProblem}
-                isLoading={isLoading}
-              />
+          <div className="grid gap-8 lg:grid-cols-5">
+            {/* Due for Review - 3 columns */}
+            <div className="lg:col-span-3">
+              <div className="bg-gray-900/30 border border-white/5 rounded-xl p-6">
+                <DueForReview
+                  dueNow={due?.due_now || []}
+                  dueToday={due?.due_today || []}
+                  upcoming={due?.upcoming || []}
+                  totalDue={due?.stats.total_due || 0}
+                  overdueCount={due?.stats.overdue_count || 0}
+                  onSkip={handleSkipProblem}
+                  isLoading={isLoading}
+                />
+              </div>
             </div>
 
-            {/* Smart Recommendations - 1 column */}
-            <div>
-              <SmartRecommendations
-                recommendations={recommendations as any}
-                onRefresh={refreshRecommendations}
-                isLoading={isLoading}
-                isRefreshing={isRefreshingRecs}
-              />
+            {/* Recommendations - 2 columns */}
+            <div className="lg:col-span-2">
+              <div className="bg-gray-900/30 border border-white/5 rounded-xl p-6">
+                <SmartRecommendations
+                  recommendations={recommendations as any}
+                  onRefresh={refreshRecommendations}
+                  isLoading={isLoading}
+                  isRefreshing={isRefreshingRecs}
+                />
+              </div>
             </div>
 
             {/* Pattern Mastery - Full width */}
-            <div className="lg:col-span-3">
-              <PatternMastery
-                patterns={stats?.by_pattern || []}
-                isLoading={isLoading}
-              />
+            <div className="lg:col-span-5">
+              <div className="bg-gray-900/30 border border-white/5 rounded-xl p-6">
+                <PatternMastery
+                  patterns={stats?.by_pattern || []}
+                  isLoading={isLoading}
+                />
+              </div>
             </div>
           </div>
 
           {/* Stats Summary */}
           {stats && !isLoading && (
-            <div className="mt-6 grid gap-4 md:grid-cols-4">
-              <div className="glass-card p-4 text-center">
-                <div className="text-3xl font-bold text-white">
+            <div className="mt-8 grid gap-4 grid-cols-2 md:grid-cols-4">
+              <div className="text-center py-4">
+                <div className="text-2xl font-bold text-white">
                   {stats.overall.total_problems_seen}
                 </div>
-                <div className="text-sm text-gray-400">Problems Practiced</div>
+                <div className="text-sm text-gray-500">Problems</div>
               </div>
-              <div className="glass-card p-4 text-center">
-                <div className="text-3xl font-bold text-green-400">
+              <div className="text-center py-4">
+                <div className="text-2xl font-bold text-emerald-400">
                   {stats.overall.problems_mastered}
                 </div>
-                <div className="text-sm text-gray-400">Mastered</div>
+                <div className="text-sm text-gray-500">Mastered</div>
               </div>
-              <div className="glass-card p-4 text-center">
-                <div className="text-3xl font-bold text-accent">
+              <div className="text-center py-4">
+                <div className="text-2xl font-bold text-white">
                   {stats.overall.average_score}%
                 </div>
-                <div className="text-sm text-gray-400">Average Score</div>
+                <div className="text-sm text-gray-500">Avg Score</div>
               </div>
-              <div className="glass-card p-4 text-center">
-                <div className="text-3xl font-bold text-white">
+              <div className="text-center py-4">
+                <div className="text-2xl font-bold text-white">
                   {Math.round(stats.overall.total_time_minutes / 60)}h
                 </div>
-                <div className="text-sm text-gray-400">Total Practice Time</div>
+                <div className="text-sm text-gray-500">Practice Time</div>
               </div>
             </div>
           )}

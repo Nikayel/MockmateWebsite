@@ -35,9 +35,13 @@ const CRON_SECRET = process.env.CRON_SECRET;
 
 export async function GET(request: NextRequest) {
   try {
-    // Verify the request is from Vercel Cron
+    // Verify the request is from Vercel Cron - ALWAYS require secret
     const authHeader = request.headers.get("authorization");
-    if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+    if (!CRON_SECRET) {
+      console.error("[Cron Email] CRON_SECRET not configured - rejecting request");
+      return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
+    }
+    if (authHeader !== `Bearer ${CRON_SECRET}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

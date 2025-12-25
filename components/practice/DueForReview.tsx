@@ -4,12 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   Clock,
-  PlayCircle,
+  Play,
   ChevronDown,
   ChevronUp,
-  AlertCircle,
-  CheckCircle,
-  Timer,
+  AlertTriangle,
+  Check,
   SkipForward,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -42,113 +41,67 @@ interface DueForReviewProps {
   isLoading?: boolean;
 }
 
-const priorityColors: Record<Priority, { bg: string; text: string; dot: string }> = {
-  critical: {
-    bg: "bg-red-500/10 border-red-500/30",
-    text: "text-red-400",
-    dot: "bg-red-500",
-  },
-  high: {
-    bg: "bg-orange-500/10 border-orange-500/30",
-    text: "text-orange-400",
-    dot: "bg-orange-500",
-  },
-  medium: {
-    bg: "bg-yellow-500/10 border-yellow-500/30",
-    text: "text-yellow-400",
-    dot: "bg-yellow-500",
-  },
-  low: {
-    bg: "bg-green-500/10 border-green-500/30",
-    text: "text-green-400",
-    dot: "bg-green-500",
-  },
-};
-
-const difficultyColors = {
-  easy: "text-green-400 bg-green-500/10",
-  medium: "text-yellow-400 bg-yellow-500/10",
-  hard: "text-red-400 bg-red-500/10",
+const difficultyStyles = {
+  easy: "text-emerald-400",
+  medium: "text-amber-400",
+  hard: "text-rose-400",
 };
 
 function formatPattern(pattern: string): string {
-  return pattern
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+  return pattern.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
 
-function DueItemCard({
+function DueItemRow({
   item,
   onSkip,
   isSkipping,
+  showOverdue = false,
 }: {
   item: DueItem;
   onSkip?: (problemId: string) => Promise<void>;
   isSkipping?: boolean;
+  showOverdue?: boolean;
 }) {
-  const priorityStyle = priorityColors[item.priority];
-
   return (
-    <div
-      className={`p-4 rounded-lg border transition-all hover:border-accent/40 ${priorityStyle.bg}`}
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <div className={`w-2 h-2 rounded-full ${priorityStyle.dot}`} />
-            <h4 className="font-medium text-white">{item.title}</h4>
+    <div className="group flex items-center justify-between py-3 px-4 -mx-4 hover:bg-white/[0.02] rounded-lg transition-colors">
+      <div className="flex items-center gap-4 min-w-0 flex-1">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-white font-medium truncate">{item.title}</span>
+            {showOverdue && item.days_overdue > 0 && (
+              <span className="text-xs text-rose-400 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                {item.days_overdue}d overdue
+              </span>
+            )}
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span
-              className={`px-2 py-0.5 rounded-full ${
-                difficultyColors[item.difficulty]
-              }`}
-            >
-              {item.difficulty.charAt(0).toUpperCase() + item.difficulty.slice(1)}
+          <div className="flex items-center gap-3 mt-1 text-sm">
+            <span className={difficultyStyles[item.difficulty]}>
+              {item.difficulty}
             </span>
-            <span className="text-gray-400">{formatPattern(item.pattern)}</span>
-            <span className="text-gray-500 flex items-center gap-1">
-              <Timer className="h-3 w-3" />
-              {item.estimated_minutes}m
-            </span>
+            <span className="text-gray-500">{formatPattern(item.pattern)}</span>
+            <span className="text-gray-600">{item.estimated_minutes}m</span>
           </div>
-          {item.days_overdue > 0 && (
-            <div className={`flex items-center gap-1 mt-2 text-sm ${priorityStyle.text}`}>
-              <AlertCircle className="h-3 w-3" />
-              <span>{item.days_overdue} days overdue</span>
-            </div>
-          )}
-          {item.last_score > 0 && (
-            <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
-              <span>Last score: {item.last_score}%</span>
-              <span className="mx-1">•</span>
-              <span>Retention: {item.retention_estimate}%</span>
-            </div>
-          )}
         </div>
-        <div className="flex items-center gap-2">
-          {onSkip && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-gray-400 hover:text-white"
-              onClick={() => onSkip(item.problem_id)}
-              disabled={isSkipping}
-            >
-              <SkipForward className="h-4 w-4" />
-            </Button>
-          )}
-          <Link href={`/interview?scenario=${item.scenario_id}`}>
-            <Button
-              size="sm"
-              className="bg-accent hover:bg-accent/80 text-black"
-            >
-              <PlayCircle className="h-4 w-4 mr-1" />
-              Review
-            </Button>
-          </Link>
-        </div>
+      </div>
+      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        {onSkip && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-gray-500 hover:text-gray-300 h-8 w-8 p-0"
+            onClick={() => onSkip(item.problem_id)}
+            disabled={isSkipping}
+          >
+            <SkipForward className="h-4 w-4" />
+          </Button>
+        )}
+        <Link href={`/interview?scenario=${item.scenario_id}`}>
+          <Button size="sm" className="h-8 bg-white text-black hover:bg-gray-200">
+            <Play className="h-3 w-3 mr-1" />
+            Start
+          </Button>
+        </Link>
       </div>
     </div>
   );
@@ -178,15 +131,10 @@ export function DueForReview({
 
   if (isLoading) {
     return (
-      <div className="glass-card p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-6 bg-white/10 rounded w-48" />
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-24 bg-white/5 rounded-lg" />
-            ))}
-          </div>
-        </div>
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-16 bg-white/5 rounded-lg animate-pulse" />
+        ))}
       </div>
     );
   }
@@ -195,62 +143,60 @@ export function DueForReview({
 
   if (allDue.length === 0 && upcoming.length === 0) {
     return (
-      <div className="glass-card p-6 text-center">
-        <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-3" />
-        <h3 className="text-lg font-medium text-white mb-1">All caught up!</h3>
-        <p className="text-gray-400">
-          No problems due for review. Check back tomorrow or practice new
-          problems.
+      <div className="text-center py-12">
+        <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+          <Check className="h-6 w-6 text-emerald-400" />
+        </div>
+        <h3 className="text-lg font-medium text-white mb-1">All caught up</h3>
+        <p className="text-gray-500 text-sm">
+          No reviews due. Check back later or practice new problems.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="glass-card p-6">
+    <div>
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <Clock className="h-5 w-5 text-accent" />
           <h3 className="text-lg font-medium text-white">Due for Review</h3>
           {totalDue > 0 && (
-            <span className="px-2 py-0.5 bg-accent/20 text-accent text-sm rounded-full">
-              {totalDue}
-            </span>
+            <span className="text-sm text-gray-500">{totalDue} problems</span>
           )}
         </div>
         {allDue.length > 0 && (
           <Link href={`/interview?scenario=${allDue[0].scenario_id}`}>
-            <Button className="bg-accent hover:bg-accent/80 text-black">
-              <PlayCircle className="h-4 w-4 mr-2" />
+            <Button size="sm" className="bg-white text-black hover:bg-gray-200">
+              <Play className="h-3 w-3 mr-1.5" />
               Start Review
             </Button>
           </Link>
         )}
       </div>
 
+      {/* Overdue warning */}
       {overdueCount > 0 && (
-        <div className="flex items-center gap-2 mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-          <AlertCircle className="h-4 w-4 text-red-400" />
-          <span className="text-red-400 text-sm">
-            {overdueCount} problem{overdueCount !== 1 ? "s" : ""} overdue - review
-            soon to maintain retention!
-          </span>
+        <div className="flex items-center gap-2 mb-4 py-2 px-3 bg-rose-500/5 border border-rose-500/10 rounded-lg text-rose-400 text-sm">
+          <AlertTriangle className="h-4 w-4" />
+          <span>{overdueCount} overdue - review soon to maintain retention</span>
         </div>
       )}
 
-      {/* Due Now (Overdue) */}
+      {/* Overdue */}
       {dueNow.length > 0 && (
         <div className="mb-6">
-          <h4 className="text-sm font-medium text-gray-400 mb-3 uppercase tracking-wider">
+          <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
             Overdue
           </h4>
-          <div className="space-y-3">
+          <div className="divide-y divide-white/5">
             {dueNow.map((item) => (
-              <DueItemCard
+              <DueItemRow
                 key={item.problem_id}
                 item={item}
                 onSkip={onSkip ? handleSkip : undefined}
                 isSkipping={skippingId === item.problem_id}
+                showOverdue
               />
             ))}
           </div>
@@ -260,12 +206,12 @@ export function DueForReview({
       {/* Due Today */}
       {dueToday.length > 0 && (
         <div className="mb-6">
-          <h4 className="text-sm font-medium text-gray-400 mb-3 uppercase tracking-wider">
+          <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
             Due Today
           </h4>
-          <div className="space-y-3">
+          <div className="divide-y divide-white/5">
             {dueToday.map((item) => (
-              <DueItemCard
+              <DueItemRow
                 key={item.problem_id}
                 item={item}
                 onSkip={onSkip ? handleSkip : undefined}
@@ -281,19 +227,19 @@ export function DueForReview({
         <div>
           <button
             onClick={() => setIsUpcomingExpanded(!isUpcomingExpanded)}
-            className="flex items-center gap-2 text-sm font-medium text-gray-400 mb-3 uppercase tracking-wider hover:text-white transition-colors"
+            className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 hover:text-gray-400 transition-colors"
           >
             <span>Upcoming ({upcoming.length})</span>
             {isUpcomingExpanded ? (
-              <ChevronUp className="h-4 w-4" />
+              <ChevronUp className="h-3 w-3" />
             ) : (
-              <ChevronDown className="h-4 w-4" />
+              <ChevronDown className="h-3 w-3" />
             )}
           </button>
           {isUpcomingExpanded && (
-            <div className="space-y-3">
+            <div className="divide-y divide-white/5">
               {upcoming.map((item) => (
-                <DueItemCard key={item.problem_id} item={item} />
+                <DueItemRow key={item.problem_id} item={item} />
               ))}
             </div>
           )}

@@ -136,7 +136,14 @@ export async function POST(request: NextRequest) {
           )
         }
 
-        await markInAppNotificationRead(body.notificationId)
+        // Verify user owns the notification before marking as read
+        const marked = await markInAppNotificationRead(body.notificationId, userId)
+        if (!marked) {
+          return NextResponse.json(
+            { error: 'Notification not found or access denied' },
+            { status: 404 }
+          )
+        }
 
         return NextResponse.json({ success: true })
       }

@@ -333,10 +333,27 @@ export async function getInAppNotifications(
  * Mark in-app notification as read
  */
 export async function markInAppNotificationRead(
-  notificationId: string
-): Promise<void> {
+  notificationId: string,
+  userId?: string
+): Promise<boolean> {
   const notifRef = doc(db, 'in_app_notifications', notificationId)
+  const notifSnap = await getDoc(notifRef)
+
+  if (!notifSnap.exists()) {
+    return false
+  }
+
+  // If userId provided, verify ownership
+  if (userId) {
+    const notifData = notifSnap.data()
+    if (notifData.userId !== userId) {
+      console.warn(`[Notification] User ${userId} attempted to mark notification ${notificationId} owned by ${notifData.userId}`)
+      return false
+    }
+  }
+
   await updateDoc(notifRef, { read: true })
+  return true
 }
 
 /**
