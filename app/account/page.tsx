@@ -12,8 +12,10 @@ import { signOut } from "@/lib/auth"
 import { getUserProfile } from "@/lib/firestore-helpers"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore"
-import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle, XCircle, Shield, Download, Trash2, Cookie } from "lucide-react"
-import { Profile, ProfileQuota, InterviewSession } from "@/lib/types"
+import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle, XCircle, Shield, Download, Trash2, Cookie, Bell } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { Profile, ProfileQuota, InterviewSession, NotificationPreferences } from "@/lib/types"
 import { PRICING_CONFIG } from "@/lib/config"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -39,6 +41,15 @@ export default function AccountPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>({
+    email_notifications_enabled: true,
+    welcome_email: true,
+    inactivity_reminders: true,
+    spaced_repetition_reminders: true,
+    milestone_celebrations: true,
+    marketing_emails: false,
+  })
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false)
 
   // Separate effect to handle auth check with delay to prevent race condition on refresh
   useEffect(() => {
@@ -104,6 +115,10 @@ export default function AccountPage() {
         // Set profile data
         if (userProfile) {
           setProfile(userProfile)
+          // Load notification preferences from profile
+          if (userProfile.notification_preferences) {
+            setNotificationPrefs(userProfile.notification_preferences)
+          }
 
           // If user has Stripe IDs, sync subscription to get latest details (non-blocking)
           // This ensures subscription dates, status, etc. are up to date
@@ -311,6 +326,38 @@ export default function AccountPage() {
     // Clear consent to re-show cookie banner
     localStorage.removeItem("skillon_cookie_consent")
     window.location.reload()
+  }
+
+  const handleUpdateNotificationPref = async (key: keyof NotificationPreferences, value: boolean) => {
+    if (!firebaseUser) return
+
+    const newPrefs = { ...notificationPrefs, [key]: value }
+    setNotificationPrefs(newPrefs)
+    setIsSavingPrefs(true)
+
+    try {
+      const idToken = await firebaseUser.getIdToken()
+      const response = await fetch("/api/user/notification-preferences", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ preferences: newPrefs }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to update preferences")
+      }
+
+      toast.success("Notification preferences updated")
+    } catch (error) {
+      // Revert on error
+      setNotificationPrefs(notificationPrefs)
+      toast.error("Failed to update notification preferences")
+    } finally {
+      setIsSavingPrefs(false)
+    }
   }
 
   if (authLoading || dataLoading) {
@@ -535,6 +582,117 @@ export default function AccountPage() {
                   </Button>
                   <p className="text-gray-500 text-xs mt-2">
                     This action is permanent and cannot be undone.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Email Notification Settings */}
+          <Card className="bg-gray-900/50 border-gray-700 mb-6">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center">
+                <Bell className="mr-2 h-5 w-5" />
+                Email Notifications
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-400 text-sm mb-4">
+                Get science-backed reminders to help you retain what you've learned. Based on the Ebbinghaus forgetting curve and spaced repetition research.
+              </p>
+              <div className="space-y-4">
+                {/* Master toggle */}
+                <div className="flex items-center justify-between py-2 border-b border-gray-700">
+                  <div>
+                    <Label htmlFor="email-enabled" className="text-white font-medium">
+                      Enable Email Notifications
+                    </Label>
+                    <p className="text-gray-500 text-sm">
+                      Turn off all email notifications
+                    </p>
+                  </div>
+                  <Switch
+                    id="email-enabled"
+                    checked={notificationPrefs.email_notifications_enabled}
+                    onCheckedChange={(checked) => handleUpdateNotificationPref("email_notifications_enabled", checked)}
+                    disabled={isSavingPrefs}
+                  />
+                </div>
+
+                {/* Individual toggles */}
+                <div className={`space-y-4 ${!notificationPrefs.email_notifications_enabled ? "opacity-50 pointer-events-none" : ""}`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="inactivity" className="text-white">
+                        Inactivity Reminders
+                      </Label>
+                      <p className="text-gray-500 text-sm">
+                        Nudge when you haven't practiced in 24+ hours
+                      </p>
+                    </div>
+                    <Switch
+                      id="inactivity"
+                      checked={notificationPrefs.inactivity_reminders}
+                      onCheckedChange={(checked) => handleUpdateNotificationPref("inactivity_reminders", checked)}
+                      disabled={isSavingPrefs}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="spaced-rep" className="text-white">
+                        Spaced Repetition Reminders
+                      </Label>
+                      <p className="text-gray-500 text-sm">
+                        Review topics at optimal times (based on forgetting curve)
+                      </p>
+                    </div>
+                    <Switch
+                      id="spaced-rep"
+                      checked={notificationPrefs.spaced_repetition_reminders}
+                      onCheckedChange={(checked) => handleUpdateNotificationPref("spaced_repetition_reminders", checked)}
+                      disabled={isSavingPrefs}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="milestones" className="text-white">
+                        Milestone Celebrations
+                      </Label>
+                      <p className="text-gray-500 text-sm">
+                        Celebrate achievements and progress
+                      </p>
+                    </div>
+                    <Switch
+                      id="milestones"
+                      checked={notificationPrefs.milestone_celebrations}
+                      onCheckedChange={(checked) => handleUpdateNotificationPref("milestone_celebrations", checked)}
+                      disabled={isSavingPrefs}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-700">
+                    <div>
+                      <Label htmlFor="marketing" className="text-white">
+                        Product Updates & Tips
+                      </Label>
+                      <p className="text-gray-500 text-sm">
+                        New features and interview tips
+                      </p>
+                    </div>
+                    <Switch
+                      id="marketing"
+                      checked={notificationPrefs.marketing_emails}
+                      onCheckedChange={(checked) => handleUpdateNotificationPref("marketing_emails", checked)}
+                      disabled={isSavingPrefs}
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-[#00d9ff]/10 border border-[#00d9ff]/20 rounded-lg p-3 mt-4">
+                  <p className="text-[#00d9ff] text-sm">
+                    <strong>Science tip:</strong> Research shows we forget 33% of new skills within 24 hours. Our smart reminders help you review at the optimal time to maximize retention.
                   </p>
                 </div>
               </div>
