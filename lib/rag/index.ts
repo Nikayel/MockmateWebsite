@@ -344,31 +344,180 @@ export async function embedAndStoreSolution(
 
 /**
  * Store a hint for future retrieval
+ * Enhanced with level, category, and pattern metadata for better retrieval
  */
 export async function embedAndStoreHint(
     problemId: string,
     hintText: string,
-    hintLevel: number,
+    hintLevel: 1 | 2 | 3 | 4,
     metadata: {
         problemTitle: string
         problemType: string
-        tags: string[]
+        pattern?: string
+        category?: 'conceptual' | 'approach' | 'implementation' | 'optimization' | 'debugging'
+        tags?: string[]
+        userId?: string
     }
 ): Promise<string> {
-    const vector = await generateTextEmbedding(hintText)
+    // Create a rich text representation for better embedding
+    const enrichedText = `
+Problem: ${metadata.problemTitle}
+Pattern: ${metadata.pattern || 'general'}
+Hint Level ${hintLevel}: ${hintText}
+Category: ${metadata.category || 'approach'}
+`.trim()
+
+    const vector = await generateTextEmbedding(enrichedText)
+
+    const allTags = [
+        ...(metadata.tags || []),
+        `level-${hintLevel}`,
+        metadata.pattern || 'general',
+        metadata.category || 'approach',
+        metadata.problemType || 'dsa',
+    ]
 
     const embedding: TextEmbedding = {
+        id: `hint_${problemId}_${hintLevel}_${Date.now()}`,
         text: hintText,
         type: 'hint',
         vector,
         metadata: {
             problemId,
-            tags: [...metadata.tags, `level-${hintLevel}`],
+            problemTitle: metadata.problemTitle,
+            hintLevel,
+            category: metadata.category || 'approach',
+            pattern: metadata.pattern || 'general',
+            problemType: metadata.problemType,
+            userId: metadata.userId,
+            tags: allTags,
             timestamp: new Date().toISOString(),
         },
     }
 
     return storeTextEmbedding(embedding)
+}
+
+/**
+ * Get similar hints from the vector DB based on problem context
+ * Returns hints from similar problems that may be relevant
+ */
+export async function getSimilarHintsFromRAG(
+    problemText: string,
+    userCode: string,
+    options: {
+        problemId?: string
+        pattern?: string
+        hintLevel?: 1 | 2 | 3 | 4
+        category?: string
+        limit?: number
+        minSimilarity?: number
+    } = {}
+): Promise<Array<{
+    id: string
+    content: string
+    level: number
+    category: string
+    pattern: string
+    problemTitle: string
+    similarity: number
+}>> {
+    // Create a query that combines problem context and user's current code
+    const queryText = `
+Problem: ${problemText}
+Current code approach:
+${userCode.substring(0, 500)}
+Pattern: ${options.pattern || 'unknown'}
+`.trim()
+
+    const queryVector = await generateTextEmbedding(queryText)
+
+    const results = await findSimilarTexts(queryVector, {
+        type: 'hint',
+        limit: options.limit || 10,
+        excludeIds: options.problemId ? [] : [],
+        minSimilarity: options.minSimilarity || 0.35,
+    })
+
+    // Filter and enrich results
+    const enrichedHints = results
+        .filter(r => {
+            // Exclude hints from the exact same problem
+            if (options.problemId && r.metadata?.problemId === options.problemId) {
+                return false
+            }
+            // Filter by level if specified
+            if (options.hintLevel && r.metadata?.hintLevel !== options.hintLevel) {
+                return false
+            }
+            return true
+        })
+        .map(r => ({
+            id: r.id,
+            content: r.metadata?.text || r.text || '',
+            level: r.metadata?.hintLevel || 2,
+            category: r.metadata?.category || 'approach',
+            pattern: r.metadata?.pattern || 'general',
+            problemTitle: r.metadata?.problemTitle || 'Similar Problem',
+            similarity: r.similarity,
+        }))
+
+    return enrichedHints.slice(0, options.limit || 5)
+}
+
+/**
+ * Get hints that were previously generated for the same pattern
+ * Useful for finding pattern-specific hints without regenerating
+ */
+export async function getPatternHintsFromRAG(
+    pattern: string,
+    options: {
+        hintLevel?: 1 | 2 | 3 | 4
+        limit?: number
+    } = {}
+): Promise<Array<{
+    id: string
+    content: string
+    level: number
+    category: string
+    problemTitle: string
+}>> {
+    const queryText = `${pattern} pattern hints coding interview`
+    const queryVector = await generateTextEmbedding(queryText)
+
+    const results = await vectorDB.query(queryVector, {
+        topK: options.limit || 5,
+        filter: {
+            type: 'hint',
+        },
+        includeMetadata: true,
+    })
+
+    // Filter by pattern match in tags
+    return results
+        .filter(r => {
+            const tags = r.metadata?.tags
+            if (typeof tags === 'string') {
+                return tags.includes(pattern)
+            }
+            if (Array.isArray(tags)) {
+                return tags.some(t => t.toLowerCase().includes(pattern.toLowerCase()))
+            }
+            return r.metadata?.pattern === pattern
+        })
+        .filter(r => {
+            if (options.hintLevel && r.metadata?.hintLevel !== options.hintLevel) {
+                return false
+            }
+            return true
+        })
+        .map(r => ({
+            id: r.id,
+            content: r.metadata?.text || '',
+            level: r.metadata?.hintLevel || 2,
+            category: r.metadata?.category || 'approach',
+            problemTitle: r.metadata?.problemTitle || 'Pattern Problem',
+        }))
 }
 
 /**
