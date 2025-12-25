@@ -1,272 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getScenarioById } from "@/lib/scenarios"
-import { runInNewContext } from "vm"
 import { executeRateLimit } from "@/lib/rate-limit"
 import { enforceQuota } from "@/lib/quota-enforcement"
-import { spawn } from "child_process"
 import { trackCodeExecutionServer } from "@/lib/analytics-server"
+import { executeWithPiston, parseExecutionOutput } from "@/lib/piston"
 
 // Mark route as dynamic to avoid build-time issues
 export const dynamic = 'force-dynamic'
-
-// Language-specific code execution
-async function executeJavaScript(code: string, testCase: any, scenarioType: string) {
-  try {
-    // Trim and validate code
-    const trimmedCode = code.trim()
-    if (!trimmedCode || trimmedCode.length === 0) {
-      return { result: null, error: "Code is empty" }
-    }
-
-    // Check for obviously invalid code patterns
-    if (trimmedCode.length < 10) {
-      return { result: null, error: "Code is too short to be a valid solution" }
-    }
-
-    // Create a sandboxed context with limited access
-    const sandbox = {
-      console: {
-        log: () => {}, // Disable console output
-        error: () => {},
-        warn: () => {},
-        info: () => {},
-      },
-      setTimeout: undefined,
-      setInterval: undefined,
-      setImmediate: undefined,
-      Buffer: undefined,
-      process: undefined,
-      require: undefined,
-      global: undefined,
-      module: undefined,
-      exports: undefined,
-      __dirname: undefined,
-      __filename: undefined,
-    }
-
-    let func: any
-
-    // Try multiple strategies to extract and execute the function
-    try {
-      // Strategy 1: Code is a function expression/declaration that can be returned
-      try {
-        func = runInNewContext("(" + trimmedCode + ")", sandbox, { timeout: 5000 })
-      } catch {
-        // Strategy 2: Code might be a function declaration, try wrapping differently
-        try {
-          // Try as an IIFE that returns a function
-          // For bugfix and add-functionality scenarios, look for test functions and main functions
-          const wrapped = runInNewContext(`
-            (function() {
-              ${trimmedCode}
-              // Try to find and return the function
-              // Check for test functions first (add-functionality scenarios)
-              if (typeof testCache === 'function') return testCache;
-              if (typeof testRateLimiter === 'function') return testRateLimiter;
-              if (typeof testTextSearch === 'function') return testTextSearch;
-              if (typeof testAutocomplete === 'function') return testAutocomplete;
-              if (typeof testStateHistory === 'function') return testStateHistory;
-              if (typeof testEventAggregator === 'function') return testEventAggregator;
-              if (typeof test_cache === 'function') return test_cache;
-              if (typeof test_rate_limiter === 'function') return test_rate_limiter;
-              if (typeof test_text_search === 'function') return test_text_search;
-              if (typeof test_autocomplete === 'function') return test_autocomplete;
-              if (typeof test_state_history === 'function') return test_state_history;
-              if (typeof test_event_aggregator === 'function') return test_event_aggregator;
-
-              // Check common function names
-              if (typeof solution === 'function') return solution;
-              if (typeof twoSum === 'function') return twoSum;
-              if (typeof main === 'function') return main;
-
-              // For bugfix scenarios, find the last defined function (usually the main one)
-              // that's not an export/helper function
-              const functionNames = Object.getOwnPropertyNames(this).filter(name =>
-                typeof this[name] === 'function' &&
-                name !== 'constructor' &&
-                !name.startsWith('is') && // Skip helper functions like isSignificantChange
-                !name.includes('calculate') && // Skip utility functions like calculateChange
-                !name.includes('validate') // Skip validation functions
-              );
-
-              // Also check for specific bugfix function names
-              if (typeof processAdjacentPairs === 'function') return processAdjacentPairs;
-              if (typeof getUserEmailFormatted === 'function') return getUserEmailFormatted;
-              if (typeof PaymentProcessor === 'function') return PaymentProcessor;
-
-              // Return the first non-utility function found
-              if (functionNames.length > 0) {
-                return this[functionNames[0]];
-              }
-
-              throw new Error('No function found in code');
-            })()
-          `, sandbox, { timeout: 5000 })
-          func = wrapped
-        } catch (wrapError) {
-          // Strategy 3: Code is the function body itself, wrap it
-          try {
-            const paramNames = Object.keys(testCase.input).join(', ')
-            func = runInNewContext(`(function(${paramNames}) { ${trimmedCode} })`, sandbox, { timeout: 5000 })
-          } catch (paramError) {
-            return { result: null, error: `Code must define a callable function. Found: ${typeof func}` }
-          }
-        }
-      }
-    } catch (parseError) {
-      return { result: null, error: `Invalid JavaScript syntax: ${parseError instanceof Error ? parseError.message : "Parse error"}` }
-    }
-
-    // Final validation
-    if (typeof func !== 'function') {
-      return { result: null, error: "Code must define a function that can be called" }
-    }
-
-    // Execute the function with test case inputs in the sandbox
-    try {
-      const inputValues = Object.values(testCase.input)
-      const result = func(...inputValues)
-      return { result, error: null }
-    } catch (execError) {
-      return {
-        result: null,
-        error: `Runtime error: ${execError instanceof Error ? execError.message : "Unknown execution error"}`
-      }
-    }
-  } catch (error) {
-    return { result: null, error: error instanceof Error ? error.message : "Execution error" }
-  }
-}
-
-async function executePython(code: string, testCase: any, scenarioType: string) {
-  try {
-    // Trim and validate code
-    const trimmedCode = code.trim()
-    if (!trimmedCode || trimmedCode.length === 0) {
-      return { result: null, error: "Code is empty" }
-    }
-
-    // Check for obviously invalid code patterns
-    if (trimmedCode.length < 10) {
-      return { result: null, error: "Code is too short to be a valid solution" }
-    }
-
-    // Extract function name from code (handle both twoSum and two_sum)
-    let functionName = null
-    const functionMatch = trimmedCode.match(/def\s+(\w+)\s*\(/i)
-    if (functionMatch) {
-      functionName = functionMatch[1]
-    } else {
-      return { result: null, error: "Code must define a function using 'def function_name(...)'" }
-    }
-
-    // Prepare test case inputs
-    const inputValues = Object.values(testCase.input)
-
-    // Create Python script that executes the function
-    // Use stdin to pass input data to avoid shell escaping issues
-    const pythonScript = `
-import json
-import sys
-
-${trimmedCode}
-
-# Get input from stdin
-try:
-    input_str = sys.stdin.read()
-    input_data = json.loads(input_str)
-    result = ${functionName}(*input_data)
-    print(json.dumps(result))
-except Exception as e:
-    print(json.dumps({"error": str(e)}), file=sys.stderr)
-    sys.exit(1)
-`
-
-    // Execute Python code with timeout
-    const TIMEOUT_MS = 5000
-    return new Promise((resolve) => {
-      const pythonProcess = spawn('python3', ['-c', pythonScript], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-      })
-
-      let stdout = ''
-      let stderr = ''
-      let timeoutId: NodeJS.Timeout
-
-      // Set timeout
-      timeoutId = setTimeout(() => {
-        pythonProcess.kill()
-        resolve({ result: null, error: "Execution timeout: code took too long to execute" })
-      }, TIMEOUT_MS)
-
-      // Collect stdout
-      pythonProcess.stdout.on('data', (data) => {
-        stdout += data.toString()
-      })
-
-      // Collect stderr
-      pythonProcess.stderr.on('data', (data) => {
-        stderr += data.toString()
-      })
-
-      // Handle process completion
-      pythonProcess.on('close', (code) => {
-        clearTimeout(timeoutId)
-
-        if (stderr) {
-          try {
-            const errorData = JSON.parse(stderr)
-            if (errorData.error) {
-              resolve({ result: null, error: `Runtime error: ${errorData.error}` })
-              return
-            }
-          } catch {
-            // If stderr is not JSON, it might be a Python error
-            if (stderr.trim()) {
-              resolve({ result: null, error: `Python error: ${stderr.trim()}` })
-              return
-            }
-          }
-        }
-
-        if (stdout) {
-          try {
-            const result = JSON.parse(stdout.trim())
-            resolve({ result, error: null })
-            return
-          } catch (parseError) {
-            resolve({ result: null, error: `Failed to parse result: ${stdout.trim()}` })
-            return
-          }
-        }
-
-        if (code !== 0) {
-          resolve({ result: null, error: `Process exited with code ${code}` })
-          return
-        }
-
-        resolve({ result: null, error: "No output from Python execution" })
-      })
-
-      // Handle spawn errors
-      pythonProcess.on('error', (error: any) => {
-        clearTimeout(timeoutId)
-        if (error.code === 'ENOENT' || error.message.includes('python3')) {
-          resolve({ result: null, error: "Python 3 is not installed or not available in PATH. Please ensure Python 3 is installed." })
-        } else {
-          resolve({ result: null, error: `Execution error: ${error.message || "Unknown error"}` })
-        }
-      })
-
-      // Send input data to stdin
-      const inputJson = JSON.stringify(inputValues)
-      pythonProcess.stdin.write(inputJson)
-      pythonProcess.stdin.end()
-    })
-  } catch (error) {
-    return { result: null, error: error instanceof Error ? error.message : "Execution error" }
-  }
-}
 
 // Validate test results with improved edge case handling
 function validateResult(actual: any, expected: any, testCase: any, scenarioType: string): boolean {
@@ -351,9 +91,9 @@ function validateResult(actual: any, expected: any, testCase: any, scenarioType:
       // Handle nested objects
       const expectedKeys = Object.keys(expected).sort()
       const actualKeys = Object.keys(actual).sort()
-      
+
       if (expectedKeys.length !== actualKeys.length) return false
-      
+
       return expectedKeys.every(key => {
         return validateResult(actual[key], expected[key], { ...testCase, orderMatters: true }, scenarioType)
       })
@@ -365,6 +105,49 @@ function validateResult(actual: any, expected: any, testCase: any, scenarioType:
 
   // Default strict comparison
   return expected === actual
+}
+
+/**
+ * Build full code with supporting codebase files for bugfix/add-functionality scenarios
+ */
+function buildFullCode(code: string, scenario: any, language: string): string {
+  if (scenario.type !== 'bugfix' && scenario.type !== 'add-functionality') {
+    return code
+  }
+
+  const scenarioWithCodebase = scenario as any
+  const codebaseFiles = scenarioWithCodebase.codebaseFiles?.[language] || []
+
+  if (codebaseFiles.length === 0) {
+    return code
+  }
+
+  const supportingCode = codebaseFiles
+    .map((file: any) => {
+      let fileContent = file.content
+
+      // For JavaScript/TypeScript, remove ES6 export/import statements
+      if (language === 'javascript' || language === 'typescript') {
+        fileContent = fileContent.replace(/export\s+(function|const|let|var|class|default)\s+/g, '$1 ')
+        fileContent = fileContent.replace(/export\s*\{[^}]*\}/g, '')
+        fileContent = fileContent.replace(/import\s+.*?from\s+['"][^'"]*['"]\s*;?/g, '')
+        fileContent = fileContent.replace(/import\s+['"][^'"]*['"]\s*;?/g, '')
+      }
+
+      // For Python, remove import statements from local modules
+      if (language === 'python') {
+        fileContent = fileContent.replace(/from\s+\.\w*\s+import\s+[^\n]+/g, '')
+        fileContent = fileContent.replace(/from\s+(?!typing|collections|functools|itertools|math|re|json|datetime|os|sys)\w+\s+import\s+[^\n]+/g, '')
+      }
+
+      const header = language === 'python'
+        ? `# File: ${file.fileName}\n`
+        : `// File: ${file.fileName}\n`
+      return header + fileContent
+    })
+    .join('\n\n')
+
+  return supportingCode + '\n\n' + code
 }
 
 export async function POST(request: NextRequest) {
@@ -415,82 +198,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No test cases defined for this scenario" }, { status: 400 })
     }
 
-    // For bugfix AND add-functionality scenarios, prepend codebase files to provide supporting functions
-    let fullCode = code
-    if (scenario.type === 'bugfix' || scenario.type === 'add-functionality') {
-      const scenarioWithCodebase = scenario as any
-      const codebaseFiles = scenarioWithCodebase.codebaseFiles?.[language] || []
-
-      if (codebaseFiles.length > 0) {
-        const supportingCode = codebaseFiles
-          .map((file: any) => {
-            let fileContent = file.content
-
-            // For JavaScript/TypeScript, remove ES6 export/import statements
-            // since we're running in a non-module context
-            if (language === 'javascript' || language === 'typescript') {
-              // Remove export statements (export function, export const, etc.)
-              fileContent = fileContent.replace(/export\s+(function|const|let|var|class|default)\s+/g, '$1 ')
-              // Remove standalone export { ... }
-              fileContent = fileContent.replace(/export\s*\{[^}]*\}/g, '')
-              // Remove import statements
-              fileContent = fileContent.replace(/import\s+.*?from\s+['"][^'"]*['"]\s*;?/g, '')
-              fileContent = fileContent.replace(/import\s+['"][^'"]*['"]\s*;?/g, '')
-            }
-
-            // For Python, remove import statements from local modules
-            if (language === 'python') {
-              // Remove relative imports
-              fileContent = fileContent.replace(/from\s+\.\w*\s+import\s+[^\n]+/g, '')
-              // Remove local module imports but keep standard library
-              fileContent = fileContent.replace(/from\s+(?!typing|collections|functools|itertools|math|re|json|datetime|os|sys)\w+\s+import\s+[^\n]+/g, '')
-            }
-
-            // Add a comment header for context
-            const header = language === 'python'
-              ? `# File: ${file.fileName}\n`
-              : `// File: ${file.fileName}\n`
-            return header + fileContent
-          })
-          .join('\n\n')
-
-        fullCode = supportingCode + '\n\n' + code
-      }
-    }
+    // Build full code with supporting files for bugfix/add-functionality
+    const fullCode = buildFullCode(code, scenario, language)
 
     const results = []
     let allPassed = true
-    let executionError = null
 
-    // Execute each test case with timeout protection
+    // Execute each test case using Piston (secure sandbox)
     for (const testCase of testCases) {
-      let executionResult: any
-      const TIMEOUT_MS = 10000 // 10 second timeout per test case
-
       try {
-        // Create a timeout promise
-        const timeoutPromise = new Promise<{ result: null; error: string }>((resolve) => {
-          setTimeout(() => {
-            resolve({ result: null, error: 'Execution timeout: code took too long to execute' })
-          }, TIMEOUT_MS)
-        })
+        const executionResult = await executeWithPiston(fullCode, language, testCase.input)
 
-        // Execute based on language with Promise.race to enforce timeout
-        const executionPromise = (async () => {
-          switch (language) {
-            case 'python':
-              return await executePython(fullCode, testCase, scenario.type)
-            case 'javascript':
-            case 'typescript':
-            default:
-              return await executeJavaScript(fullCode, testCase, scenario.type)
-          }
-        })()
-
-        // Race between execution and timeout
-        executionResult = await Promise.race([executionPromise, timeoutPromise])
-
-        if (executionResult.error) {
+        if (!executionResult.success || executionResult.error) {
           allPassed = false
           results.push({
             description: testCase.description,
@@ -498,13 +217,16 @@ export async function POST(request: NextRequest) {
             expected: testCase.expected,
             actual: null,
             passed: false,
-            error: executionResult.error,
+            error: executionResult.error || 'Execution failed',
           })
           continue
         }
 
+        // Parse the output
+        const actualResult = parseExecutionOutput(executionResult.output || '')
+
         // Validate result
-        const passed = validateResult(executionResult.result, testCase.expected, testCase, scenario.type)
+        const passed = validateResult(actualResult, testCase.expected, testCase, scenario.type)
 
         if (!passed) {
           allPassed = false
@@ -514,7 +236,7 @@ export async function POST(request: NextRequest) {
           description: testCase.description,
           input: testCase.input,
           expected: testCase.expected,
-          actual: executionResult.result,
+          actual: actualResult,
           passed,
           error: null,
         })
@@ -551,7 +273,7 @@ export async function POST(request: NextRequest) {
     }).catch(err => console.error("Analytics tracking error:", err))
 
     return NextResponse.json({
-      success: !executionError && allPassed,
+      success: allPassed,
       results,
       summary: {
         total: totalCount,
@@ -559,7 +281,7 @@ export async function POST(request: NextRequest) {
         failed: totalCount - passedCount,
         passRate,
       },
-      error: executionError,
+      error: null,
     })
   } catch (error) {
     console.error("Execute API error:", error)
