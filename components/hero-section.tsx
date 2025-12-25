@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import { MagneticButton } from "@/components/ui/magnetic-button"
-import { Play, ArrowRight, CheckCircle2 } from "lucide-react"
+import { Play, ArrowRight, Mic, MessageCircle } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
@@ -16,15 +15,12 @@ const SubtleParticles = dynamic(
 )
 
 /**
- * Hero Section - Redesigned with Cognitive Science Principles
+ * Hero Section - Authentic, developer-focused design
  *
- * Applied research:
- * - Hick's Law: Reduced choices (one primary CTA, one secondary)
- * - Visual Hierarchy: Clear H1 > subtitle > CTA progression
- * - F-Pattern: Content flows left-to-right, top-to-bottom
- * - Gestalt Proximity: Related elements grouped with consistent spacing
- * - Von Restorff Effect: Primary CTA stands out with color/size
- * - Cognitive Load: Removed animated typing (distracting), simplified message
+ * Key messaging:
+ * - Think out loud, just like a real interview
+ * - AI listens and responds naturally
+ * - Casual, honest tone - not corporate
  */
 export function HeroSection() {
   return (
@@ -40,53 +36,41 @@ export function HeroSection() {
         secondaryColor="#00ff88"
       />
 
-      {/* Content - with proper header offset and vertical rhythm */}
+      {/* Content */}
       <motion.div
-        className="container mx-auto px-4 relative z-10 pt-32 pb-20 lg:pt-40 lg:pb-28"
+        className="container mx-auto px-4 relative z-10 pt-28 pb-16 lg:pt-32"
         variants={staggerContainer}
         initial="initial"
         animate="animate"
       >
-        {/* Two-column layout for better space utilization on larger screens */}
         <div className="max-w-6xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
 
-            {/* Left Column - Message (Following F-pattern reading) */}
-            <div className="text-center lg:text-left">
-              {/* Social Proof Badge - Von Restorff: distinctive but not distracting */}
-              <motion.div variants={staggerItem} className="mb-8">
-                <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-gray-400 text-sm">
-                  <span className="w-2 h-2 rounded-full bg-neural animate-pulse" />
-                  Now used by engineers at Meta, Google & Amazon
-                </span>
-              </motion.div>
+          {/* Top: Headline + Demo side by side */}
+          <div className="grid lg:grid-cols-5 gap-8 lg:gap-12 items-start mb-12">
 
-              {/* Main Headline - Visual Hierarchy: largest, boldest */}
+            {/* Left: Headline (2 cols) */}
+            <div className="lg:col-span-2 text-center lg:text-left pt-4">
               <motion.h1
                 variants={staggerItem}
-                className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-heading font-black mb-6 leading-[1.1] tracking-tight"
+                className="text-4xl sm:text-5xl lg:text-6xl font-heading font-black mb-5 leading-[1.1] tracking-tight"
               >
-                <span className="text-white">Ace Your Next</span>
+                <span className="text-white">Practice like</span>
                 <br />
                 <span className="bg-gradient-to-r from-accent via-neural to-accent bg-clip-text text-transparent">
-                  Technical Interview
+                  it's the real thing
                 </span>
               </motion.h1>
 
-              {/* Value Proposition - Clear, scannable */}
               <motion.p
                 variants={staggerItem}
-                className="text-lg md:text-xl text-gray-400 mb-8 max-w-xl mx-auto lg:mx-0 leading-relaxed"
+                className="text-lg text-gray-400 mb-6 leading-relaxed"
               >
-                Practice with an AI interviewer that adapts to your level.
-                Get instant feedback. Build lasting skills with spaced repetition.
+                Talk through your approach. Think out loud.
+                Our AI listens and responds—just like a real interviewer would.
               </motion.p>
 
-              {/* CTAs - Hick's Law: One primary action, one secondary */}
-              <motion.div
-                variants={staggerItem}
-                className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-10"
-              >
+              {/* CTA */}
+              <motion.div variants={staggerItem} className="mb-6">
                 <Link href="/interview">
                   <MagneticButton
                     size="lg"
@@ -96,99 +80,86 @@ export function HeroSection() {
                     className="w-full sm:w-auto"
                   >
                     <Play className="w-5 h-5" />
-                    Start Free Practice
+                    Start practicing
                     <ArrowRight className="w-5 h-5" />
                   </MagneticButton>
                 </Link>
-
-                <Link href="/why-skillon">
-                  <MagneticButton
-                    size="lg"
-                    variant="outline"
-                    glowColor="none"
-                    className="w-full sm:w-auto"
-                  >
-                    How It Works
-                  </MagneticButton>
-                </Link>
               </motion.div>
 
-              {/* Trust Signals - Proximity: grouped benefits */}
-              <motion.div
-                variants={staggerItem}
-                className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center lg:justify-start text-sm text-gray-500"
-              >
-                <span className="flex items-center gap-2 justify-center lg:justify-start">
-                  <CheckCircle2 className="w-4 h-4 text-neural" />
-                  No credit card required
-                </span>
-                <span className="flex items-center gap-2 justify-center lg:justify-start">
-                  <CheckCircle2 className="w-4 h-4 text-neural" />
-                  2 free sessions/month
-                </span>
-              </motion.div>
+              <motion.p variants={staggerItem} className="text-sm text-gray-600">
+                Free to try. No card needed.
+              </motion.p>
             </div>
 
-            {/* Right Column - Visual Demo */}
+            {/* Right: Live Demo (3 cols) - More prominent */}
             <motion.div
               variants={staggerItem}
-              className="relative hidden lg:block"
+              className="lg:col-span-3"
             >
-              {/* Demo Terminal - Shows the product in action */}
               <div className="relative">
-                {/* Glow effect */}
-                <div className="absolute -inset-4 bg-gradient-to-r from-accent/20 to-neural/20 rounded-3xl blur-2xl opacity-50" />
+                {/* Glow */}
+                <div className="absolute -inset-3 bg-gradient-to-r from-accent/15 to-neural/15 rounded-2xl blur-xl" />
 
-                <div className="relative bg-gray-950/90 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
+                <div className="relative bg-gray-950/95 backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden shadow-2xl">
                   {/* Browser chrome */}
-                  <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5 bg-gray-900/50">
-                    <div className="w-3 h-3 bg-red-500/60 rounded-full" />
-                    <div className="w-3 h-3 bg-yellow-500/60 rounded-full" />
-                    <div className="w-3 h-3 bg-green-500/60 rounded-full" />
-                    <span className="ml-4 text-xs text-gray-600 font-mono">skillon.dev/interview</span>
+                  <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/5 bg-gray-900/60">
+                    <div className="flex gap-1.5">
+                      <div className="w-2.5 h-2.5 bg-red-500/50 rounded-full" />
+                      <div className="w-2.5 h-2.5 bg-yellow-500/50 rounded-full" />
+                      <div className="w-2.5 h-2.5 bg-green-500/50 rounded-full" />
+                    </div>
+                    <span className="ml-3 text-xs text-gray-600 font-mono">skillon.dev/interview</span>
+
+                    {/* Live indicator */}
+                    <div className="ml-auto flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-neural animate-pulse" />
+                      <span className="text-[10px] text-gray-500 uppercase tracking-wider">Live</span>
+                    </div>
                   </div>
 
-                  {/* Interview simulation */}
-                  <div className="p-6 space-y-4">
-                    {/* AI Message */}
-                    <div className="flex gap-3">
-                      <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
-                        <span className="text-accent text-xs font-bold">AI</span>
-                      </div>
-                      <div className="bg-gray-800/50 rounded-lg rounded-tl-none p-3 max-w-[280px]">
+                  {/* Interview conversation */}
+                  <div className="p-5 space-y-4">
+
+                    {/* You speaking (voice) */}
+                    <div className="flex gap-3 justify-end">
+                      <div className="bg-accent/10 border border-accent/20 rounded-lg rounded-tr-none p-3 max-w-[300px]">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <Mic className="w-3 h-3 text-accent" />
+                          <span className="text-[10px] text-accent uppercase tracking-wider">You (speaking)</span>
+                        </div>
                         <p className="text-sm text-gray-300">
-                          Great approach! Can you optimize the time complexity from O(n²) to O(n)?
+                          "So I'm thinking... if I use a hashmap here, I can look up values in O(1) instead of looping through again..."
+                        </p>
+                      </div>
+                      <div className="w-7 h-7 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0 text-xs">
+                        You
+                      </div>
+                    </div>
+
+                    {/* AI responds */}
+                    <div className="flex gap-3">
+                      <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-accent text-[10px] font-bold">AI</span>
+                      </div>
+                      <div className="bg-gray-800/60 rounded-lg rounded-tl-none p-3 max-w-[300px]">
+                        <p className="text-sm text-gray-300">
+                          Exactly right. Walk me through what you'd store in the hashmap and how you'd handle the lookup.
                         </p>
                       </div>
                     </div>
 
-                    {/* Code snippet */}
-                    <div className="bg-gray-900 rounded-lg p-4 font-mono text-sm">
-                      <div className="text-gray-500 mb-2">// Your solution</div>
-                      <div>
-                        <span className="text-purple-400">function</span>{" "}
-                        <span className="text-accent">twoSum</span>
-                        <span className="text-gray-400">(nums, target) {"{"}</span>
+                    {/* Code + feedback */}
+                    <div className="bg-gray-900/80 rounded-lg p-3 font-mono text-xs">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-gray-500">// your solution</span>
+                        <div className="flex gap-2">
+                          <span className="px-1.5 py-0.5 rounded bg-neural/20 text-neural text-[10px]">O(n)</span>
+                          <span className="px-1.5 py-0.5 rounded bg-accent/20 text-accent text-[10px]">HashMap</span>
+                        </div>
                       </div>
-                      <div className="pl-4">
-                        <span className="text-purple-400">const</span>{" "}
-                        <span className="text-white">map</span>{" "}
-                        <span className="text-gray-400">= new</span>{" "}
-                        <span className="text-neural">Map</span>
-                        <span className="text-gray-400">();</span>
+                      <div className="text-gray-400">
+                        <span className="text-purple-400">const</span> map = <span className="text-neural">new Map</span>();
                       </div>
-                      <div className="pl-4 text-gray-600">// ...</div>
-                      <div className="text-gray-400">{"}"}</div>
-                    </div>
-
-                    {/* Feedback badge */}
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="px-2 py-1 rounded bg-neural/20 text-neural">
-                        Optimal: O(n)
-                      </span>
-                      <span className="px-2 py-1 rounded bg-accent/20 text-accent">
-                        HashMap pattern
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -196,37 +167,88 @@ export function HeroSection() {
             </motion.div>
           </div>
 
-          {/* Bottom Stats - Social Proof (Desktop only) */}
+          {/* Middle: Key differentiator - Voice/Think out loud */}
           <motion.div
             variants={staggerItem}
-            className="hidden md:flex justify-center lg:justify-start gap-12 mt-16 pt-8 border-t border-white/5"
+            className="bg-gradient-to-r from-gray-900/50 via-gray-900/30 to-gray-900/50 rounded-xl border border-white/5 p-6 mb-12"
           >
-            <div className="text-center lg:text-left">
-              <div className="text-3xl font-bold text-white">15+</div>
-              <div className="text-sm text-gray-500">DSA Patterns</div>
+            <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12 text-center md:text-left">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
+                  <Mic className="w-5 h-5 text-accent" />
+                </div>
+                <div>
+                  <div className="text-white font-medium">Think out loud</div>
+                  <div className="text-sm text-gray-500">Just talk through your approach</div>
+                </div>
+              </div>
+
+              <div className="hidden md:block w-px h-10 bg-white/10" />
+
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-neural/10 flex items-center justify-center">
+                  <MessageCircle className="w-5 h-5 text-neural" />
+                </div>
+                <div>
+                  <div className="text-white font-medium">Real-time responses</div>
+                  <div className="text-sm text-gray-500">AI follows your reasoning</div>
+                </div>
+              </div>
+
+              <div className="hidden md:block w-px h-10 bg-white/10" />
+
+              <div className="text-center md:text-left">
+                <div className="text-gray-400 text-sm">
+                  No awkward silence. No typing everything out.
+                  <br className="hidden md:block" />
+                  <span className="text-white">Just a real conversation about code.</span>
+                </div>
+              </div>
             </div>
-            <div className="text-center lg:text-left">
-              <div className="text-3xl font-bold text-white">500+</div>
-              <div className="text-sm text-gray-500">Practice Problems</div>
+          </motion.div>
+
+          {/* Bottom: Social proof + secondary CTA */}
+          <motion.div
+            variants={staggerItem}
+            className="flex flex-col md:flex-row items-center justify-between gap-6"
+          >
+            {/* Left: Stats */}
+            <div className="flex items-center gap-8 text-center md:text-left">
+              <div>
+                <div className="text-2xl font-bold text-white">15+</div>
+                <div className="text-xs text-gray-500">DSA patterns</div>
+              </div>
+              <div className="w-px h-8 bg-white/10 hidden md:block" />
+              <div>
+                <div className="text-2xl font-bold text-white">500+</div>
+                <div className="text-xs text-gray-500">problems</div>
+              </div>
+              <div className="w-px h-8 bg-white/10 hidden md:block" />
+              <div>
+                <div className="text-xs text-gray-500 mb-1">Used by engineers at</div>
+                <div className="text-sm text-gray-400">Meta, Google, Amazon</div>
+              </div>
             </div>
-            <div className="text-center lg:text-left">
-              <div className="text-3xl font-bold text-white">SM-2</div>
-              <div className="text-sm text-gray-500">Algorithm</div>
-            </div>
+
+            {/* Right: Learn more */}
+            <Link href="/why-skillon" className="text-sm text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1.5">
+              How it actually works
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </motion.div>
         </div>
       </motion.div>
 
       {/* Scroll indicator */}
       <motion.div
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10"
-        animate={{ y: [0, 8, 0] }}
+        className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10"
+        animate={{ y: [0, 6, 0] }}
         transition={{ duration: 2, repeat: Infinity }}
       >
-        <div className="w-6 h-10 rounded-full border-2 border-white/20 flex items-start justify-center p-2">
+        <div className="w-5 h-8 rounded-full border border-white/20 flex items-start justify-center p-1.5">
           <motion.div
-            className="w-1 h-2 bg-white/40 rounded-full"
-            animate={{ y: [0, 12, 0] }}
+            className="w-1 h-1.5 bg-white/30 rounded-full"
+            animate={{ y: [0, 10, 0] }}
             transition={{ duration: 2, repeat: Infinity }}
           />
         </div>
