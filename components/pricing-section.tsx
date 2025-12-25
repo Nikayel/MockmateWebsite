@@ -18,14 +18,14 @@ export function PricingSection() {
     : proPricing.monthly
 
   return (
-    <section id="pricing" className="relative py-24 md:py-32 bg-black overflow-hidden">
+    <section id="pricing" className="relative py-16 md:py-20 bg-black overflow-hidden">
       {/* Background elements */}
       <div className="absolute inset-0 bg-gradient-to-b from-black via-neural/5 to-black pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,217,255,0.03),transparent_50%)]" />
 
       <div className="container mx-auto px-4 relative z-10">
         {/* Section Header */}
-        <ScrollReveal className="text-center mb-12 md:mb-16">
+        <ScrollReveal className="text-center mb-8 md:mb-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -50,7 +50,7 @@ export function PricingSection() {
         </ScrollReveal>
 
         {/* Billing Toggle */}
-        <ScrollReveal className="flex justify-center mb-12">
+        <ScrollReveal className="flex justify-center mb-8">
           <div className="relative inline-flex items-center gap-3 p-1.5 rounded-full bg-white/5 border border-white/10">
             <button
               onClick={() => setBillingPeriod('monthly')}
@@ -105,11 +105,11 @@ export function PricingSection() {
         </ScrollReveal>
 
         {/* Pricing Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 max-w-6xl mx-auto mb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 max-w-5xl mx-auto mb-10">
           {/* Free Plan */}
           <ScrollReveal delay={0}>
             <motion.div
-              className="relative rounded-3xl p-8 md:p-10 border glass-minimal border-white/[0.08] hover:border-accent/30 hover:shadow-[0_0_40px_rgba(0,217,255,0.1)] transition-all duration-500 group h-full flex flex-col"
+              className="relative rounded-2xl p-6 md:p-8 border glass-minimal border-white/[0.08] hover:border-accent/30 hover:shadow-[0_0_40px_rgba(0,217,255,0.1)] transition-all duration-500 group h-full flex flex-col"
               whileHover={{ y: -8 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
             >
@@ -176,7 +176,7 @@ export function PricingSection() {
           {/* Pro Plan */}
           <ScrollReveal delay={0.1}>
             <motion.div
-              className="relative rounded-3xl p-8 md:p-10 border bg-gradient-to-br from-accent/10 to-neural/10 border-accent/50 hover:border-accent hover:shadow-[0_0_50px_rgba(0,217,255,0.2)] transition-all duration-500 group h-full flex flex-col"
+              className="relative rounded-2xl p-6 md:p-8 border bg-gradient-to-br from-accent/10 to-neural/10 border-accent/50 hover:border-accent hover:shadow-[0_0_50px_rgba(0,217,255,0.2)] transition-all duration-500 group h-full flex flex-col"
               whileHover={{ y: -8 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
             >
@@ -288,7 +288,7 @@ export function PricingSection() {
           {/* Enterprise Plan */}
           <ScrollReveal delay={0.2}>
             <motion.div
-              className="relative rounded-3xl p-8 md:p-10 border glass-minimal border-white/[0.08] hover:border-accent/30 hover:shadow-[0_0_40px_rgba(0,217,255,0.1)] transition-all duration-500 group h-full flex flex-col"
+              className="relative rounded-2xl p-6 md:p-8 border glass-minimal border-white/[0.08] hover:border-accent/30 hover:shadow-[0_0_40px_rgba(0,217,255,0.1)] transition-all duration-500 group h-full flex flex-col"
               whileHover={{ y: -8 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
             >
@@ -338,30 +338,6 @@ export function PricingSection() {
             </motion.div>
           </ScrollReveal>
         </div>
-
-        {/* Social Proof / Testimonial */}
-        <ScrollReveal>
-          <div className="max-w-3xl mx-auto mb-16">
-            <div className="relative p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/10">
-              <div className="absolute -top-3 left-8">
-                <span className="text-4xl text-accent/50">&ldquo;</span>
-              </div>
-              <blockquote className="text-lg md:text-xl text-gray-300 leading-relaxed mb-4 pl-4">
-                I was grinding 200+ problems with no system. Skillon&apos;s spaced repetition helped me actually retain patterns.
-                Got offers from Google and Meta within 6 weeks.
-              </blockquote>
-              <div className="flex items-center gap-3 pl-4">
-                <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold">
-                  JC
-                </div>
-                <div>
-                  <div className="text-white font-medium">James C.</div>
-                  <div className="text-gray-500 text-sm">Software Engineer → Google L4</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </ScrollReveal>
 
         {/* Value Explainer with ROI */}
         <ScrollReveal>
