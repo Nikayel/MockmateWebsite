@@ -18,53 +18,46 @@ export function PricingSection() {
     : proPricing.monthly
 
   return (
-    <section id="pricing" className="relative py-16 md:py-20 bg-black overflow-hidden">
-      {/* Background elements */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black via-neural/5 to-black pointer-events-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,217,255,0.03),transparent_50%)]" />
+    <section id="pricing" className="relative py-12 md:py-16 bg-background overflow-hidden">
 
       <div className="container mx-auto px-4 relative z-10">
-        {/* Section Header */}
-        <ScrollReveal className="text-center mb-8 md:mb-10">
+        {/* Section Header - Compact */}
+        <ScrollReveal className="text-center mb-6 md:mb-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-neural/30 bg-neural/5 text-neural text-sm font-medium mb-6">
-              <TrendingUp className="w-4 h-4" />
-              Join 2,000+ developers practicing smarter
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-neural/30 bg-neural/5 text-neural text-xs font-medium mb-4">
+              <TrendingUp className="w-3.5 h-3.5" />
+              Join 2,000+ developers
             </span>
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading font-black text-white mb-6">
-              Land Your Dream Job
-              <br />
-              <span className="bg-gradient-to-r from-accent via-neural to-accent bg-clip-text text-transparent">
-                For Less Than Coffee
-              </span>
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-heading font-bold text-foreground mb-3">
+              Simple, Transparent Pricing
             </h2>
-            <p className="text-lg md:text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
-              LeetCode Premium costs $35/mo. We give you more for less. Start free, upgrade when you&apos;re ready.
+            <p className="text-sm md:text-base text-muted-foreground max-w-xl mx-auto">
+              Start free, upgrade when you&apos;re ready. Cancel anytime.
             </p>
           </motion.div>
         </ScrollReveal>
 
-        {/* Billing Toggle */}
-        <ScrollReveal className="flex justify-center mb-8">
-          <div className="relative inline-flex items-center gap-3 p-1.5 rounded-full bg-white/5 border border-white/10">
+        {/* Billing Toggle - Compact */}
+        <ScrollReveal className="flex justify-center mb-6">
+          <div className="relative inline-flex items-center gap-1 p-1 rounded-full bg-muted border border-border">
             <button
               onClick={() => setBillingPeriod('monthly')}
               className={cn(
-                "relative px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300",
+                "relative px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-300",
                 billingPeriod === 'monthly'
-                  ? "text-black"
-                  : "text-gray-400 hover:text-white"
+                  ? "text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               )}
             >
               {billingPeriod === 'monthly' && (
                 <motion.div
                   layoutId="billingToggle"
-                  className="absolute inset-0 bg-white rounded-full"
+                  className="absolute inset-0 bg-primary rounded-full"
                   transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                 />
               )}
@@ -73,16 +66,16 @@ export function PricingSection() {
             <button
               onClick={() => setBillingPeriod('yearly')}
               className={cn(
-                "relative px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300",
+                "relative px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-300",
                 billingPeriod === 'yearly'
-                  ? "text-black"
-                  : "text-gray-400 hover:text-white"
+                  ? "text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               )}
             >
               {billingPeriod === 'yearly' && (
                 <motion.div
                   layoutId="billingToggle"
-                  className="absolute inset-0 bg-white rounded-full"
+                  className="absolute inset-0 bg-primary rounded-full"
                   transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                 />
               )}
@@ -95,7 +88,7 @@ export function PricingSection() {
                   initial={{ opacity: 0, scale: 0.8, x: -10 }}
                   animate={{ opacity: 1, scale: 1, x: 0 }}
                   exit={{ opacity: 0, scale: 0.8, x: -10 }}
-                  className="absolute -right-24 md:-right-28 px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs font-semibold border border-green-500/30"
+                  className="absolute -right-20 px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-[10px] font-semibold border border-green-500/30"
                 >
                   Save 25%
                 </motion.span>
@@ -104,57 +97,42 @@ export function PricingSection() {
           </div>
         </ScrollReveal>
 
-        {/* Pricing Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 max-w-5xl mx-auto mb-10">
+        {/* Pricing Cards - Compact */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4 max-w-4xl mx-auto mb-8">
           {/* Free Plan */}
           <ScrollReveal delay={0}>
             <motion.div
-              className="relative rounded-2xl p-6 md:p-8 border glass-minimal border-white/[0.08] hover:border-accent/30 hover:shadow-[0_0_40px_rgba(0,217,255,0.1)] transition-all duration-500 group h-full flex flex-col"
-              whileHover={{ y: -8 }}
+              className="relative rounded-xl p-4 md:p-5 border bg-card border-border hover:border-accent/30 transition-all duration-300 group h-full flex flex-col"
+              whileHover={{ y: -4 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
             >
               {/* Plan Header */}
-              <div className="mb-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Sparkles className="w-6 h-6 text-neural" />
-                  <h3 className="text-2xl font-heading font-bold text-white">{PRICING_CONFIG.free.name}</h3>
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="w-4 h-4 text-neural" />
+                  <h3 className="text-lg font-heading font-bold text-foreground">{PRICING_CONFIG.free.name}</h3>
                 </div>
-                <div className="flex items-baseline gap-2 mb-2">
-                  <span className="text-5xl md:text-6xl font-black text-white">
+                <div className="flex items-baseline gap-1 mb-1">
+                  <span className="text-3xl font-bold text-foreground">
                     {PRICING_CONFIG.free.priceDisplay}
                   </span>
                 </div>
-                <p className="text-gray-400">{PRICING_CONFIG.free.description}</p>
+                <p className="text-xs text-muted-foreground">{PRICING_CONFIG.free.description}</p>
               </div>
 
               {/* Features */}
-              <ul className="space-y-4 mb-8 flex-grow">
+              <ul className="space-y-2 mb-4 flex-grow">
                 {PRICING_CONFIG.free.features.map((feature, featureIndex) => (
-                  <motion.li
-                    key={featureIndex}
-                    className="flex items-start gap-3"
-                    initial={{ opacity: 0, x: -10 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: featureIndex * 0.05 }}
-                  >
-                    <Check className="w-5 h-5 flex-shrink-0 mt-0.5 text-neural" />
-                    <span className="text-gray-300 leading-relaxed">{feature}</span>
-                  </motion.li>
+                  <li key={featureIndex} className="flex items-start gap-2 text-sm">
+                    <Check className="w-4 h-4 flex-shrink-0 mt-0.5 text-neural" />
+                    <span className="text-muted-foreground">{feature}</span>
+                  </li>
                 ))}
-                {/* Show limitations */}
-                {PRICING_CONFIG.free.limitations.map((limitation, idx) => (
-                  <motion.li
-                    key={`limit-${idx}`}
-                    className="flex items-start gap-3"
-                    initial={{ opacity: 0, x: -10 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: (PRICING_CONFIG.free.features.length + idx) * 0.05 }}
-                  >
-                    <X className="w-5 h-5 flex-shrink-0 mt-0.5 text-gray-600" />
-                    <span className="text-gray-500 leading-relaxed">{limitation}</span>
-                  </motion.li>
+                {PRICING_CONFIG.free.limitations.slice(0, 2).map((limitation, idx) => (
+                  <li key={`limit-${idx}`} className="flex items-start gap-2 text-sm">
+                    <X className="w-4 h-4 flex-shrink-0 mt-0.5 text-muted-foreground/50" />
+                    <span className="text-muted-foreground/60">{limitation}</span>
+                  </li>
                 ))}
               </ul>
 
@@ -163,8 +141,8 @@ export function PricingSection() {
                 <MagneticButton
                   variant="outline"
                   glowColor="none"
-                  className="w-full justify-center"
-                  size="lg"
+                  className="w-full justify-center text-sm"
+                  size="default"
                   strength={0.3}
                 >
                   {PRICING_CONFIG.free.buttonText}
@@ -176,87 +154,68 @@ export function PricingSection() {
           {/* Pro Plan */}
           <ScrollReveal delay={0.1}>
             <motion.div
-              className="relative rounded-2xl p-6 md:p-8 border bg-gradient-to-br from-accent/10 to-neural/10 border-accent/50 hover:border-accent hover:shadow-[0_0_50px_rgba(0,217,255,0.2)] transition-all duration-500 group h-full flex flex-col"
-              whileHover={{ y: -8 }}
+              className="relative rounded-xl p-4 md:p-5 border bg-accent/5 border-accent/40 hover:border-accent transition-all duration-300 group h-full flex flex-col"
+              whileHover={{ y: -4 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
             >
-              {/* Popular Badge with social proof */}
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                <span className="px-4 py-1.5 rounded-full bg-accent text-black text-sm font-semibold flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5" />
-                  Chosen by 87% of users
+              {/* Popular Badge */}
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="px-3 py-1 rounded-full bg-accent text-black text-xs font-semibold flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  Most Popular
                 </span>
               </div>
 
               {/* Plan Header */}
-              <div className="mb-6 mt-2">
-                <div className="flex items-center gap-2 mb-4">
-                  <Crown className="w-6 h-6 text-accent" />
-                  <h3 className="text-2xl font-heading font-bold text-white">Pro</h3>
+              <div className="mb-4 mt-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <Crown className="w-4 h-4 text-accent" />
+                  <h3 className="text-lg font-heading font-bold text-foreground">Pro</h3>
                 </div>
-                <div className="flex items-baseline gap-2 mb-1">
+                <div className="flex items-baseline gap-1 mb-1">
                   <AnimatePresence mode="wait">
                     <motion.span
                       key={billingPeriod}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="text-5xl md:text-6xl font-black text-accent"
+                      className="text-3xl font-bold text-accent"
                     >
                       {currentProPrice.priceDisplay}
                     </motion.span>
                   </AnimatePresence>
-                  <span className="text-gray-400 text-lg">{currentProPrice.period}</span>
-                  {/* Price anchoring - show monthly crossed out when yearly */}
+                  <span className="text-muted-foreground text-sm">{currentProPrice.period}</span>
                   {billingPeriod === 'yearly' && (
                     <motion.span
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="text-gray-600 text-lg line-through ml-2"
+                      className="text-muted-foreground/50 text-sm line-through ml-1"
                     >
-                      $25/mo
+                      $25
                     </motion.span>
                   )}
                 </div>
-                <p className="text-gray-400 text-sm">
+                <p className="text-xs text-muted-foreground">
                   {currentProPrice.billingNote}
                 </p>
                 {billingPeriod === 'yearly' && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-green-400 text-sm mt-1 font-medium"
-                  >
-                    Save ${proPricing.yearly.savings}/year — that&apos;s 3 months free
-                  </motion.p>
+                  <p className="text-green-400 text-xs mt-1 font-medium">
+                    Save ${proPricing.yearly.savings}/year
+                  </p>
                 )}
               </div>
 
-              {/* Value Props - Unique to Pro */}
-              <div className="mb-6 p-4 rounded-xl bg-white/5 border border-white/10">
-                <div className="flex items-center gap-2 mb-3">
-                  <Infinity className="w-5 h-5 text-accent" />
-                  <span className="text-white font-semibold text-sm">Unlimited Practice</span>
-                </div>
-                <p className="text-gray-400 text-sm leading-relaxed">
-                  35 scenarios/month, each with 10+ problems. Practice each problem unlimited times—only scenarios count.
-                </p>
-              </div>
-
               {/* Features */}
-              <ul className="space-y-3 mb-8 flex-grow">
-                {PRICING_CONFIG.pro.highlights.map((feature, featureIndex) => (
-                  <motion.li
-                    key={featureIndex}
-                    className="flex items-start gap-3"
-                    initial={{ opacity: 0, x: -10 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: featureIndex * 0.05 }}
-                  >
-                    <Check className="w-5 h-5 flex-shrink-0 mt-0.5 text-accent" />
-                    <span className="text-gray-300 leading-relaxed text-sm">{feature}</span>
-                  </motion.li>
+              <ul className="space-y-2 mb-4 flex-grow">
+                <li className="flex items-start gap-2 text-sm">
+                  <Infinity className="w-4 h-4 flex-shrink-0 mt-0.5 text-accent" />
+                  <span className="text-foreground font-medium">35 scenarios/month</span>
+                </li>
+                {PRICING_CONFIG.pro.highlights.slice(0, 4).map((feature, featureIndex) => (
+                  <li key={featureIndex} className="flex items-start gap-2 text-sm">
+                    <Check className="w-4 h-4 flex-shrink-0 mt-0.5 text-accent" />
+                    <span className="text-muted-foreground">{feature}</span>
+                  </li>
                 ))}
               </ul>
 
@@ -265,61 +224,51 @@ export function PricingSection() {
                 <MagneticButton
                   variant="primary"
                   glowColor="accent"
-                  className="w-full justify-center group"
-                  size="lg"
+                  className="w-full justify-center group text-sm"
+                  size="default"
                   strength={0.3}
                 >
-                  Get Hired Faster
-                  <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                  Get Pro
+                  <ArrowRight className="w-3.5 h-3.5 ml-1.5 group-hover:translate-x-1 transition-transform" />
                 </MagneticButton>
               </Link>
 
               {/* Guarantee badge */}
-              <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-500">
-                <Shield className="w-3.5 h-3.5 text-green-500" />
-                <span>30-day money-back guarantee</span>
+              <div className="mt-3 flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground">
+                <Shield className="w-3 h-3 text-green-500" />
+                <span>30-day money-back</span>
               </div>
-
-              {/* Decorative corner */}
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-accent/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-3xl pointer-events-none" />
             </motion.div>
           </ScrollReveal>
 
           {/* Enterprise Plan */}
           <ScrollReveal delay={0.2}>
             <motion.div
-              className="relative rounded-2xl p-6 md:p-8 border glass-minimal border-white/[0.08] hover:border-accent/30 hover:shadow-[0_0_40px_rgba(0,217,255,0.1)] transition-all duration-500 group h-full flex flex-col"
-              whileHover={{ y: -8 }}
+              className="relative rounded-xl p-4 md:p-5 border bg-card border-border hover:border-accent/30 transition-all duration-300 group h-full flex flex-col"
+              whileHover={{ y: -4 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
             >
               {/* Plan Header */}
-              <div className="mb-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Building2 className="w-6 h-6 text-neural" />
-                  <h3 className="text-2xl font-heading font-bold text-white">{PRICING_CONFIG.enterprise.name}</h3>
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Building2 className="w-4 h-4 text-neural" />
+                  <h3 className="text-lg font-heading font-bold text-foreground">{PRICING_CONFIG.enterprise.name}</h3>
                 </div>
-                <div className="flex items-baseline gap-2 mb-2">
-                  <span className="text-5xl md:text-6xl font-black text-white">
+                <div className="flex items-baseline gap-1 mb-1">
+                  <span className="text-3xl font-bold text-foreground">
                     {PRICING_CONFIG.enterprise.priceDisplay}
                   </span>
                 </div>
-                <p className="text-gray-400">{PRICING_CONFIG.enterprise.description}</p>
+                <p className="text-xs text-muted-foreground">{PRICING_CONFIG.enterprise.description}</p>
               </div>
 
               {/* Features */}
-              <ul className="space-y-4 mb-8 flex-grow">
-                {PRICING_CONFIG.enterprise.features.map((feature, featureIndex) => (
-                  <motion.li
-                    key={featureIndex}
-                    className="flex items-start gap-3"
-                    initial={{ opacity: 0, x: -10 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: featureIndex * 0.05 }}
-                  >
-                    <Check className="w-5 h-5 flex-shrink-0 mt-0.5 text-neural" />
-                    <span className="text-gray-300 leading-relaxed">{feature}</span>
-                  </motion.li>
+              <ul className="space-y-2 mb-4 flex-grow">
+                {PRICING_CONFIG.enterprise.features.slice(0, 5).map((feature, featureIndex) => (
+                  <li key={featureIndex} className="flex items-start gap-2 text-sm">
+                    <Check className="w-4 h-4 flex-shrink-0 mt-0.5 text-neural" />
+                    <span className="text-muted-foreground">{feature}</span>
+                  </li>
                 ))}
               </ul>
 
@@ -328,8 +277,8 @@ export function PricingSection() {
                 <MagneticButton
                   variant="outline"
                   glowColor="none"
-                  className="w-full justify-center"
-                  size="lg"
+                  className="w-full justify-center text-sm"
+                  size="default"
                   strength={0.3}
                 >
                   {PRICING_CONFIG.enterprise.buttonText}
@@ -339,57 +288,12 @@ export function PricingSection() {
           </ScrollReveal>
         </div>
 
-        {/* Value Explainer with ROI */}
+        {/* Bottom Trust Signals - Compact */}
         <ScrollReveal>
-          <div className="max-w-4xl mx-auto mb-12">
-            <div className="text-center mb-8">
-              <h3 className="text-2xl font-heading font-bold text-white mb-2">
-                The Math Makes Sense
-              </h3>
-              <p className="text-gray-400">
-                A $10K salary increase pays for 33 years of Pro
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                className="p-6 rounded-2xl bg-white/5 border border-white/10 text-center"
-              >
-                <div className="text-3xl font-bold text-accent mb-2">$0.63</div>
-                <div className="text-gray-400 text-sm">per day with yearly plan</div>
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.1 }}
-                className="p-6 rounded-2xl bg-white/5 border border-white/10 text-center"
-              >
-                <div className="text-3xl font-bold text-neural mb-2">350+</div>
-                <div className="text-gray-400 text-sm">problems unlocked per month</div>
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.2 }}
-                className="p-6 rounded-2xl bg-white/5 border border-white/10 text-center"
-              >
-                <div className="text-3xl font-bold text-green-400 mb-2">29%</div>
-                <div className="text-gray-400 text-sm">cheaper than LeetCode Premium</div>
-              </motion.div>
-            </div>
-          </div>
-        </ScrollReveal>
-
-        {/* Bottom Trust Signals */}
-        <ScrollReveal>
-          <div className="text-center space-y-3">
-            <div className="flex items-center justify-center gap-6 text-gray-500 text-sm">
-              <span className="flex items-center gap-1.5">
-                <Shield className="w-4 h-4 text-green-500" />
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-4 text-muted-foreground text-xs">
+              <span className="flex items-center gap-1">
+                <Shield className="w-3 h-3 text-green-500" />
                 30-day money-back
               </span>
               <span>•</span>
@@ -397,9 +301,6 @@ export function PricingSection() {
               <span>•</span>
               <span>No hidden fees</span>
             </div>
-            <p className="text-gray-600 text-xs">
-              Trusted by engineers at Google, Meta, Amazon, and 50+ other companies
-            </p>
           </div>
         </ScrollReveal>
       </div>

@@ -17,7 +17,7 @@ export function RoadmapHeader({ roadmap }: RoadmapHeaderProps) {
   const daysRemaining = Math.max(0, Math.ceil((interviewDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
 
   return (
-    <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-lg p-2.5 border border-primary/20">
+    <div className="bg-card rounded-lg p-2.5 border border-border shadow-sm">
       {/* Single row layout - more compact */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
         {/* Left: Title & Date */}

@@ -257,7 +257,7 @@ export default function RoadmapPage() {
               {/* Main Hero Card */}
               <div className="bg-card border border-border rounded-xl overflow-hidden">
                 {/* Top Bar: Company + Days Remaining */}
-                <div className="px-5 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+                <div className="px-5 py-4 border-b border-border bg-accent/5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
