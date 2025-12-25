@@ -1,5 +1,8 @@
 "use client"
 
+// Prevent static generation - this page requires client-side rendering
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect, useRef, useMemo, memo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
