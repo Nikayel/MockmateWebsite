@@ -27,16 +27,37 @@ export default function AuthCallback() {
           
           // Create/update profile in Firestore immediately
           // This MUST complete before redirecting to ensure profile is saved
+          let isNewUser = false
           try {
-            await createOrUpdateProfile(
+            const profile = await createOrUpdateProfile(
               firebaseUser.uid,
               firebaseUser.email || "",
               firebaseUser.displayName,
               firebaseUser.photoURL
             )
+            // Check if this is a new user (created just now)
+            const createdAt = new Date(profile.created_at)
+            const now = new Date()
+            const diffMs = now.getTime() - createdAt.getTime()
+            isNewUser = diffMs < 60000 // Created within last minute
           } catch {
             // Profile creation failed - don't block the flow
             // User can still use the app, profile sync will retry on next auth
+          }
+
+          // Send welcome email for new users (non-blocking)
+          if (isNewUser && firebaseUser.email) {
+            fetch("/api/email/welcome", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId: firebaseUser.uid,
+                email: firebaseUser.email,
+                displayName: firebaseUser.displayName,
+              }),
+            }).catch(() => {
+              // Non-blocking - welcome email is not critical
+            })
           }
           
           // Get ID token for VS Code deep link

@@ -6,6 +6,7 @@ import { trackFeedbackGenerationServer } from "@/lib/analytics-server"
 import { buildFeedbackContext } from "@/lib/rag/context-builder"
 import { getPatternKnowledge, patternKnowledgeToDocument } from "@/lib/rag/knowledge-base/dsa-knowledge"
 import { getUserPerformanceProfile, getUserRecommendations } from "@/lib/rag/user-performance-rag"
+import { updateLearningStateAfterSession } from "@/lib/learning-state"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 
 // Structured feedback schema - NEW GRADING CRITERIA
@@ -1408,6 +1409,22 @@ IMPORTANT: Use the PRE-CALCULATED SCORES above exactly. Focus on generating help
         performanceScore: scores.overall,
         durationMinutes,
       }).catch(err => console.error("Analytics tracking error:", err))
+    }
+
+    // Update learning state for spaced repetition email reminders
+    if (userId && scenarioTitle) {
+      try {
+        await updateLearningStateAfterSession(userId, {
+          topic: scenarioTitle,
+          scenarioId: sessionId,
+          pattern: efficiencyMetrics?.problemPattern,
+          performanceScore: scores.overall,
+          completedAt: new Date().toISOString(),
+        })
+      } catch (err) {
+        // Non-blocking - don't fail feedback if learning state update fails
+        console.error("Learning state update error:", err)
+      }
     }
 
     return NextResponse.json({

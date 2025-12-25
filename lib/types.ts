@@ -35,6 +35,22 @@ export interface Profile {
   tour_completed?: boolean
   tour_skipped?: boolean
   tour_completed_at?: string
+  // Email notification preferences
+  notification_preferences?: NotificationPreferences
+  last_email_sent_at?: string
+  emails_sent_today?: number
+  welcome_email_sent?: boolean
+}
+
+export interface NotificationPreferences {
+  email_notifications_enabled: boolean
+  welcome_email: boolean
+  inactivity_reminders: boolean
+  spaced_repetition_reminders: boolean
+  milestone_celebrations: boolean
+  marketing_emails: boolean
+  timezone?: string
+  preferred_hours?: number[]
 }
 
 export interface ProfileQuota {
@@ -84,4 +100,52 @@ export interface ErrorState {
   message: string
   code?: string
   details?: string
+}
+
+/**
+ * User Learning State for Spaced Repetition
+ * Tracks per-topic progress for email reminders
+ */
+export interface UserLearningState {
+  user_id: string
+  topics: {
+    [topic_id: string]: TopicLearningState
+  }
+  last_session_at?: string
+  streak_days: number
+  created_at: string
+  updated_at: string
+}
+
+export interface TopicLearningState {
+  topic_name: string
+  pattern?: string
+  scenario_id?: string
+  last_practiced_at: string
+  performance_score: number
+  review_count: number
+  next_review_at: string
+  interval_days: number
+  ease_factor: number // SM-2 algorithm ease factor (default 2.5)
+}
+
+/**
+ * Email Notification Record
+ * Tracks sent emails for rate limiting and analytics
+ */
+export interface EmailNotificationRecord {
+  id: string
+  user_id: string
+  email_type: "welcome" | "inactivity_24h" | "inactivity_48h" | "inactivity_72h" | "spaced_repetition" | "milestone"
+  status: "pending" | "sent" | "failed" | "opened" | "clicked"
+  scheduled_at: string
+  sent_at?: string
+  opened_at?: string
+  clicked_at?: string
+  metadata?: {
+    topic?: string
+    retention_estimate?: number
+    last_session_id?: string
+  }
+  created_at: string
 }
