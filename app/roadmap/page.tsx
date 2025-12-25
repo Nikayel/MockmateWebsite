@@ -62,17 +62,23 @@ export default function RoadmapPage() {
   }) ?? 0
 
   // Load roadmaps from Firebase on mount
+  // IMPORTANT: Clear stale roadmap first to prevent cross-user data leaks
   useEffect(() => {
     if (!initialized) return
 
     const loadRoadmaps = async () => {
       if (!user?.id) {
+        // No user - clear any stale roadmap data
+        setActiveRoadmap(null)
         setIsLoadingRoadmap(false)
         return
       }
 
+      // Clear existing roadmap before loading to prevent showing stale data
+      setActiveRoadmap(null)
+
       try {
-        // Load active roadmap
+        // Load active roadmap from Firebase (source of truth)
         const activeResponse = await fetch('/api/roadmap')
         if (activeResponse.ok) {
           const activeData = await activeResponse.json()

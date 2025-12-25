@@ -75,6 +75,8 @@ export const useRoadmapStore = create<RoadmapState>()(
   persist(
     (set, get) => ({
       // Initial state
+      // NOTE: activeRoadmap is NOT persisted to avoid cross-user data leaks
+      // It's always loaded fresh from Firebase when the page mounts
       activeRoadmap: null,
       wizardStep: 'company',
       selectedCompany: null,
@@ -347,10 +349,13 @@ export const useRoadmapStore = create<RoadmapState>()(
     }),
     {
       name: 'roadmap-storage',
+      // IMPORTANT: Do NOT persist activeRoadmap - it must be loaded fresh from Firebase
+      // to prevent cross-user data leaks when multiple users use the same browser
       partialize: (state) => ({
-        activeRoadmap: state.activeRoadmap,
+        // Only persist wizard state, NOT the roadmap itself
         selectedCompany: state.selectedCompany,
         selectedDate: state.selectedDate,
+        // wizardStep and assessmentAnswers are not persisted to ensure clean state
       }),
     }
   )
