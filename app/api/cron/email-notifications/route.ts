@@ -20,6 +20,9 @@ import { adminDb } from "@/lib/firebase-admin";
 import {
   sendInactivityEmail,
   sendSpacedRepetitionEmail,
+  sendDailyRoadmapEmail,
+  sendInterviewCountdownEmail,
+  sendBehindScheduleEmail,
   canSendEmail,
   calculateRetention,
 } from "@/lib/email";
@@ -41,6 +44,7 @@ export async function GET(request: NextRequest) {
     const results = {
       inactivityEmails: { sent: 0, skipped: 0, failed: 0 },
       spacedRepetitionEmails: { sent: 0, skipped: 0, failed: 0 },
+      roadmapEmails: { sent: 0, skipped: 0, failed: 0 },
       errors: [] as string[],
     };
 
@@ -69,6 +73,11 @@ export async function GET(request: NextRequest) {
     // 2. SPACED REPETITION REMINDERS
     // ============================================
     await processSpacedRepetitionReminders(now, results);
+
+    // ============================================
+    // 3. ROADMAP-BASED REMINDERS
+    // ============================================
+    await processRoadmapReminders(now, results);
 
     return NextResponse.json({
       success: true,
@@ -306,6 +315,204 @@ async function processSpacedRepetitionReminders(
       results.errors.push(`Error processing ${userId}: ${error.message}`);
     }
   }
+}
+
+async function processRoadmapReminders(
+  now: Date,
+  results: any
+): Promise<void> {
+  // Get all active roadmaps
+  const roadmapsSnap = await db
+    .collection("user_roadmaps")
+    .where("status", "==", "active")
+    .limit(100)
+    .get();
+
+  for (const doc of roadmapsSnap.docs) {
+    const roadmap = doc.data();
+    const userId = roadmap.userId;
+
+    try {
+      // Get user profile
+      const profileSnap = await db.collection("profiles").doc(userId).get();
+      if (!profileSnap.exists) continue;
+
+      const profile = profileSnap.data() as Profile;
+
+      // Check if user has email notifications enabled
+      if (!profile.notification_preferences?.email_notifications_enabled) {
+        results.roadmapEmails.skipped++;
+        continue;
+      }
+
+      // Check rate limits
+      const rateCheck = canSendEmail(
+        profile.last_email_sent_at,
+        profile.emails_sent_today
+      );
+      if (!rateCheck.allowed) {
+        results.roadmapEmails.skipped++;
+        continue;
+      }
+
+      // Calculate days until interview
+      const interviewDate = roadmap.interviewDate?.toDate?.() || new Date(roadmap.interviewDate);
+      const daysUntilInterview = Math.ceil(
+        (interviewDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      // Skip if interview has passed
+      if (daysUntilInterview <= 0) continue;
+
+      // Get today's questions from dailyPlans
+      const todaysQuestions: Array<{
+        title: string;
+        pattern: string;
+        difficulty: string;
+        scenarioId?: string;
+      }> = [];
+
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(now);
+      todayEnd.setHours(23, 59, 59, 999);
+
+      for (const plan of roadmap.dailyPlans || []) {
+        const planDate = plan.date?.toDate?.() || new Date(plan.date);
+        if (planDate >= todayStart && planDate <= todayEnd) {
+          for (const q of plan.questions || []) {
+            if (q.status !== "completed") {
+              todaysQuestions.push({
+                title: q.title || q.scenarioTitle || "Practice Problem",
+                pattern: q.pattern || "DSA",
+                difficulty: q.difficulty || "Medium",
+                scenarioId: q.scenarioId,
+              });
+            }
+          }
+        }
+      }
+
+      // Calculate progress
+      const questionsCompleted = roadmap.questionsCompleted || 0;
+      const totalQuestions = roadmap.totalQuestions || 1;
+      const isOnTrack = roadmap.isOnTrack !== false;
+
+      // Determine which type of email to send
+
+      // 1. Interview countdown (at 7, 3, 1 days)
+      if ([7, 3, 1].includes(daysUntilInterview)) {
+        // Find patterns that need focus (incomplete or low scoring)
+        const patternsToFocus: string[] = [];
+        for (const plan of roadmap.dailyPlans || []) {
+          for (const q of plan.questions || []) {
+            if (q.status !== "completed" && q.pattern && !patternsToFocus.includes(q.pattern)) {
+              patternsToFocus.push(q.pattern);
+              if (patternsToFocus.length >= 3) break;
+            }
+          }
+          if (patternsToFocus.length >= 3) break;
+        }
+
+        const result = await sendInterviewCountdownEmail(profile.email, {
+          userName: profile.full_name || "",
+          userEmail: profile.email,
+          targetCompany: roadmap.assessment?.targetCompany || roadmap.targetCompany || "your target company",
+          daysUntilInterview,
+          questionsCompleted,
+          totalQuestions,
+          patternsToFocus,
+        });
+
+        if (result.success) {
+          results.roadmapEmails.sent++;
+          await updateEmailTracking(userId, profile, now);
+          await logEmailNotification(userId, "interview_countdown", now);
+        } else {
+          results.roadmapEmails.failed++;
+          results.errors.push(`Countdown email failed for ${userId}: ${result.error}`);
+        }
+        continue;
+      }
+
+      // 2. Behind schedule alert (if significantly behind)
+      if (!isOnTrack && daysUntilInterview > 3) {
+        // Calculate how many questions behind
+        const expectedProgress = ((roadmap.dailyPlans?.length || 1) - daysUntilInterview) / (roadmap.dailyPlans?.length || 1);
+        const actualProgress = questionsCompleted / totalQuestions;
+        const questionsBehind = Math.round((expectedProgress - actualProgress) * totalQuestions);
+
+        if (questionsBehind > 2) {
+          const suggestedDaily = Math.ceil((totalQuestions - questionsCompleted) / daysUntilInterview);
+
+          const result = await sendBehindScheduleEmail(profile.email, {
+            userName: profile.full_name || "",
+            userEmail: profile.email,
+            targetCompany: roadmap.assessment?.targetCompany || roadmap.targetCompany || "your target company",
+            daysUntilInterview,
+            questionsBehind,
+            suggestedDailyQuestions: Math.max(1, suggestedDaily),
+          });
+
+          if (result.success) {
+            results.roadmapEmails.sent++;
+            await updateEmailTracking(userId, profile, now);
+            await logEmailNotification(userId, "behind_schedule", now);
+          } else {
+            results.roadmapEmails.failed++;
+            results.errors.push(`Behind schedule email failed for ${userId}: ${result.error}`);
+          }
+          continue;
+        }
+      }
+
+      // 3. Daily roadmap reminder (if there are questions for today)
+      if (todaysQuestions.length > 0) {
+        const result = await sendDailyRoadmapEmail(profile.email, {
+          userName: profile.full_name || "",
+          userEmail: profile.email,
+          targetCompany: roadmap.assessment?.targetCompany || roadmap.targetCompany || "your target company",
+          daysUntilInterview,
+          todaysQuestions,
+          questionsCompleted,
+          totalQuestions,
+          isOnTrack,
+        });
+
+        if (result.success) {
+          results.roadmapEmails.sent++;
+          await updateEmailTracking(userId, profile, now);
+          await logEmailNotification(userId, "daily_roadmap", now);
+        } else {
+          results.roadmapEmails.failed++;
+          results.errors.push(`Daily roadmap email failed for ${userId}: ${result.error}`);
+        }
+      }
+    } catch (error: any) {
+      results.roadmapEmails.failed++;
+      results.errors.push(`Error processing roadmap for ${userId}: ${error.message}`);
+    }
+  }
+}
+
+// Helper to update email tracking on profile
+async function updateEmailTracking(userId: string, profile: Profile, now: Date): Promise<void> {
+  await db.collection("profiles").doc(userId).update({
+    last_email_sent_at: now.toISOString(),
+    emails_sent_today: (profile.emails_sent_today || 0) + 1,
+  });
+}
+
+// Helper to log email notification
+async function logEmailNotification(userId: string, emailType: string, now: Date): Promise<void> {
+  await db.collection("email_notifications").add({
+    user_id: userId,
+    email_type: emailType,
+    status: "sent",
+    scheduled_at: now.toISOString(),
+    sent_at: now.toISOString(),
+    created_at: now.toISOString(),
+  });
 }
 
 // Support POST for manual triggering

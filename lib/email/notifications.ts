@@ -25,6 +25,16 @@ import {
   getMilestoneEmailSubject,
   getMilestoneEmailHtml,
   MilestoneEmailData,
+  getDailyRoadmapEmailSubject,
+  getDailyRoadmapEmailHtml,
+  getDailyRoadmapEmailText,
+  DailyRoadmapEmailData,
+  getInterviewCountdownEmailSubject,
+  getInterviewCountdownEmailHtml,
+  InterviewCountdownEmailData,
+  getBehindScheduleEmailSubject,
+  getBehindScheduleEmailHtml,
+  BehindScheduleEmailData,
 } from "./templates";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://mockmate.dev";
@@ -123,6 +133,70 @@ export async function sendMilestoneEmail(
     subject: getMilestoneEmailSubject(emailData),
     htmlContent: getMilestoneEmailHtml(emailData),
     tags: ["milestone", "celebration"],
+  });
+}
+
+// ============================================
+// ROADMAP: DAILY PRACTICE REMINDER
+// ============================================
+
+export async function sendDailyRoadmapEmail(
+  email: string,
+  data: Omit<DailyRoadmapEmailData, "appUrl">
+): Promise<EmailResult> {
+  const emailData: DailyRoadmapEmailData = {
+    ...data,
+    appUrl: APP_URL,
+  };
+
+  return sendEmail({
+    to: [{ email, name: data.userName }],
+    subject: getDailyRoadmapEmailSubject(emailData),
+    htmlContent: getDailyRoadmapEmailHtml(emailData),
+    textContent: getDailyRoadmapEmailText(emailData),
+    tags: ["roadmap", "daily-reminder"],
+  });
+}
+
+// ============================================
+// ROADMAP: INTERVIEW COUNTDOWN
+// ============================================
+
+export async function sendInterviewCountdownEmail(
+  email: string,
+  data: Omit<InterviewCountdownEmailData, "appUrl">
+): Promise<EmailResult> {
+  const emailData: InterviewCountdownEmailData = {
+    ...data,
+    appUrl: APP_URL,
+  };
+
+  return sendEmail({
+    to: [{ email, name: data.userName }],
+    subject: getInterviewCountdownEmailSubject(emailData),
+    htmlContent: getInterviewCountdownEmailHtml(emailData),
+    tags: ["roadmap", "interview-countdown"],
+  });
+}
+
+// ============================================
+// ROADMAP: BEHIND SCHEDULE ALERT
+// ============================================
+
+export async function sendBehindScheduleEmail(
+  email: string,
+  data: Omit<BehindScheduleEmailData, "appUrl">
+): Promise<EmailResult> {
+  const emailData: BehindScheduleEmailData = {
+    ...data,
+    appUrl: APP_URL,
+  };
+
+  return sendEmail({
+    to: [{ email, name: data.userName }],
+    subject: getBehindScheduleEmailSubject(emailData),
+    htmlContent: getBehindScheduleEmailHtml(emailData),
+    tags: ["roadmap", "behind-schedule"],
   });
 }
 

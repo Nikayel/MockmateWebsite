@@ -526,3 +526,258 @@ export function getMilestoneEmailHtml(data: MilestoneEmailData): string {
 
   return emailWrapper(content);
 }
+
+// ============================================
+// ROADMAP: DAILY PRACTICE REMINDER
+// ============================================
+
+export interface DailyRoadmapEmailData {
+  userName: string;
+  userEmail: string;
+  targetCompany: string;
+  daysUntilInterview: number;
+  todaysQuestions: Array<{
+    title: string;
+    pattern: string;
+    difficulty: string;
+    scenarioId?: string;
+  }>;
+  questionsCompleted: number;
+  totalQuestions: number;
+  isOnTrack: boolean;
+  appUrl: string;
+}
+
+export function getDailyRoadmapEmailSubject(data: DailyRoadmapEmailData): string {
+  if (data.daysUntilInterview <= 3) {
+    return `${data.daysUntilInterview} days until ${data.targetCompany}! Here's today's prep`;
+  }
+  return `Your ${data.targetCompany} prep for today (${data.todaysQuestions.length} questions)`;
+}
+
+export function getDailyRoadmapEmailHtml(data: DailyRoadmapEmailData): string {
+  const progressPercent = Math.round((data.questionsCompleted / data.totalQuestions) * 100);
+
+  const urgencyBanner = data.daysUntilInterview <= 7 ? `
+    <div class="tip-box" style="background: rgba(239, 68, 68, 0.1); border-left-color: #ef4444;">
+      <p style="color: #ef4444; margin: 0;">
+        <strong>${data.daysUntilInterview} day${data.daysUntilInterview !== 1 ? 's' : ''} until your ${data.targetCompany} interview!</strong>
+        Every practice session counts now.
+      </p>
+    </div>
+  ` : '';
+
+  const questionsHtml = data.todaysQuestions.map((q, i) => `
+    <div style="background: rgba(255,255,255,0.05); padding: 12px 16px; border-radius: 8px; margin-bottom: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <strong style="color: #fff;">${i + 1}. ${q.title}</strong>
+          <div style="font-size: 12px; color: #9ca3af; margin-top: 4px;">
+            ${q.pattern} • ${q.difficulty}
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  const content = `
+    <h1>Good morning, ${data.userName || 'there'}!</h1>
+
+    ${urgencyBanner}
+
+    <p>Here's your personalized practice plan for today based on your
+    <strong class="highlight">${data.targetCompany}</strong> roadmap:</p>
+
+    <h2 style="margin-top: 24px;">Today's Questions (${data.todaysQuestions.length})</h2>
+    ${questionsHtml}
+
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="${data.appUrl}/roadmap" class="cta-button">Start Today's Practice</a>
+    </div>
+
+    <div class="retention-bar" style="margin-top: 24px;">
+      <div class="retention-fill" style="width: ${progressPercent}%; background: linear-gradient(90deg, #00d9ff 0%, #10b981 100%);"></div>
+    </div>
+    <p style="text-align: center; font-size: 14px;">
+      Roadmap progress: <strong class="highlight">${progressPercent}%</strong>
+      (${data.questionsCompleted}/${data.totalQuestions} questions)
+    </p>
+
+    ${!data.isOnTrack ? `
+    <div class="tip-box" style="background: rgba(251, 191, 36, 0.1); border-left-color: #fbbf24;">
+      <p style="color: #fbbf24; margin: 0;">
+        <strong>You're slightly behind schedule.</strong> Try to complete today's questions to get back on track!
+      </p>
+    </div>
+    ` : `
+    <div class="tip-box">
+      <p><strong>You're on track!</strong> Keep up the great work. Consistency beats intensity.</p>
+    </div>
+    `}
+  `;
+
+  return emailWrapper(content);
+}
+
+export function getDailyRoadmapEmailText(data: DailyRoadmapEmailData): string {
+  const questionsText = data.todaysQuestions.map((q, i) =>
+    `${i + 1}. ${q.title} (${q.pattern}, ${q.difficulty})`
+  ).join('\n');
+
+  return `
+Good morning, ${data.userName || 'there'}!
+
+${data.daysUntilInterview <= 7 ? `${data.daysUntilInterview} days until your ${data.targetCompany} interview!` : ''}
+
+Here's your practice plan for today:
+
+${questionsText}
+
+Progress: ${data.questionsCompleted}/${data.totalQuestions} questions (${Math.round((data.questionsCompleted / data.totalQuestions) * 100)}%)
+
+Start practicing: ${data.appUrl}/roadmap
+
+- The Mockmate Team
+
+---
+Unsubscribe: ${data.appUrl}/settings/notifications
+  `.trim();
+}
+
+// ============================================
+// ROADMAP: INTERVIEW COUNTDOWN
+// ============================================
+
+export interface InterviewCountdownEmailData {
+  userName: string;
+  userEmail: string;
+  targetCompany: string;
+  daysUntilInterview: number;
+  questionsCompleted: number;
+  totalQuestions: number;
+  patternsToFocus: string[];
+  appUrl: string;
+}
+
+export function getInterviewCountdownEmailSubject(data: InterviewCountdownEmailData): string {
+  if (data.daysUntilInterview === 1) {
+    return `Tomorrow is your ${data.targetCompany} interview! Final prep tips`;
+  }
+  return `${data.daysUntilInterview} days until ${data.targetCompany} - Here's your focus`;
+}
+
+export function getInterviewCountdownEmailHtml(data: InterviewCountdownEmailData): string {
+  const progressPercent = Math.round((data.questionsCompleted / data.totalQuestions) * 100);
+
+  const focusPatterns = data.patternsToFocus.length > 0
+    ? data.patternsToFocus.map(p => `<li>${p}</li>`).join('')
+    : '<li>Review your completed problems</li>';
+
+  const dayLabel = data.daysUntilInterview === 1 ? 'TOMORROW' :
+                   data.daysUntilInterview === 7 ? '1 WEEK' :
+                   `${data.daysUntilInterview} DAYS`;
+
+  const content = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <div style="display: inline-block; background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); padding: 16px 32px; border-radius: 12px;">
+        <div style="font-size: 14px; color: rgba(255,255,255,0.8); text-transform: uppercase;">Interview In</div>
+        <div style="font-size: 36px; font-weight: bold; color: #fff;">${dayLabel}</div>
+        <div style="font-size: 14px; color: rgba(255,255,255,0.8);">${data.targetCompany}</div>
+      </div>
+    </div>
+
+    <h1>Hey ${data.userName || 'there'}, you've got this!</h1>
+
+    <p>Your ${data.targetCompany} interview is ${data.daysUntilInterview === 1 ? 'tomorrow' : `in ${data.daysUntilInterview} days`}.
+    Here's where you stand:</p>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">${progressPercent}%</div>
+        <div class="stat-label">Roadmap Complete</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${data.questionsCompleted}</div>
+        <div class="stat-label">Problems Solved</div>
+      </div>
+    </div>
+
+    <h2 style="margin-top: 24px;">Focus Areas for Final Days:</h2>
+    <ul style="color: #9ca3af; padding-left: 20px;">
+      ${focusPatterns}
+    </ul>
+
+    ${data.daysUntilInterview <= 3 ? `
+    <div class="science-note">
+      <p><strong>Final day tips:</strong></p>
+      <ul style="margin: 8px 0; padding-left: 20px;">
+        <li>Review patterns you've already solved - don't learn new ones</li>
+        <li>Get good sleep - it consolidates memory</li>
+        <li>Practice explaining your thought process out loud</li>
+      </ul>
+    </div>
+    ` : ''}
+
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="${data.appUrl}/roadmap" class="cta-button">Continue Preparing</a>
+    </div>
+
+    <p style="text-align: center; color: #9ca3af; font-size: 14px;">
+      You've put in the work. Trust your preparation!
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
+
+// ============================================
+// ROADMAP: BEHIND SCHEDULE ALERT
+// ============================================
+
+export interface BehindScheduleEmailData {
+  userName: string;
+  userEmail: string;
+  targetCompany: string;
+  daysUntilInterview: number;
+  questionsBehind: number;
+  suggestedDailyQuestions: number;
+  appUrl: string;
+}
+
+export function getBehindScheduleEmailSubject(data: BehindScheduleEmailData): string {
+  return `You're ${data.questionsBehind} questions behind on your ${data.targetCompany} prep`;
+}
+
+export function getBehindScheduleEmailHtml(data: BehindScheduleEmailData): string {
+  const content = `
+    <h1>Hey ${data.userName || 'there'}, let's get you back on track!</h1>
+
+    <div class="tip-box" style="background: rgba(251, 191, 36, 0.1); border-left-color: #fbbf24;">
+      <p style="color: #fbbf24; margin: 0;">
+        You're <strong>${data.questionsBehind} questions behind</strong> on your ${data.targetCompany} roadmap
+        with <strong>${data.daysUntilInterview} days</strong> until your interview.
+      </p>
+    </div>
+
+    <p style="margin-top: 24px;">Don't worry - you can catch up! Here's the plan:</p>
+
+    <div class="stat-card" style="text-align: center; margin: 24px 0;">
+      <div class="stat-value">${data.suggestedDailyQuestions}</div>
+      <div class="stat-label">Questions per Day to Catch Up</div>
+    </div>
+
+    <div class="science-note">
+      <p><strong>Psychology tip:</strong> Don't try to do it all at once. Consistent daily practice (even 1-2 problems) is more effective than cramming. Start with today's quota.</p>
+    </div>
+
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="${data.appUrl}/roadmap" class="cta-button">Start Catching Up</a>
+    </div>
+
+    <p style="color: #9ca3af; font-size: 14px;">
+      Remember: Every problem you solve increases your chances. Progress over perfection!
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
