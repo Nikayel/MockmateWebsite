@@ -70,8 +70,8 @@ export function TodaysFocus({
   if (totalCount === 0) {
     return (
       <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-500/10 to-transparent p-6 text-center">
-          <Coffee className="h-12 w-12 mx-auto text-blue-500 mb-3" />
+        <div className="p-6 text-center bg-blue-500/5">
+          <Coffee className="h-12 w-12 mx-auto text-blue-400 mb-3" />
           <h2 className="text-lg font-bold">{dateLabel}</h2>
           <p className="text-muted-foreground mt-1">{plan.theme}</p>
           {plan.notes && (
@@ -84,12 +84,12 @@ export function TodaysFocus({
 
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
-      {/* Header with progress */}
+      {/* Header with progress - subtle accent based on status */}
       <div className={cn(
         "p-4 md:p-5",
-        isToday && "bg-gradient-to-br from-primary/10 via-primary/5 to-transparent",
-        isPast && "bg-gradient-to-br from-yellow-500/10 to-transparent",
-        isFuture && "bg-gradient-to-br from-blue-500/5 to-transparent"
+        isToday && "bg-accent/5 border-b border-accent/10",
+        isPast && !allComplete && "bg-amber-500/5 border-b border-amber-500/10",
+        allComplete && "bg-green-500/5 border-b border-green-500/10"
       )}>
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
@@ -265,7 +265,7 @@ export function TodaysFocus({
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-5 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-t border-green-200 dark:border-green-800/30"
+          className="p-5 bg-green-500/10 border-t border-green-200 dark:border-green-800/30"
         >
           <div className="flex items-center justify-center gap-3">
             <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
@@ -318,7 +318,7 @@ function QuestionCard({
       className={cn(
         'group relative p-4 rounded-xl border transition-all',
         isFirst && !isSkipped
-          ? 'bg-gradient-to-r from-primary/5 to-transparent border-primary/30 shadow-sm'
+          ? 'bg-primary/5 border-primary/30 shadow-sm'
           : 'bg-background border-border hover:border-primary/30 hover:shadow-sm',
         isSkipped && 'bg-yellow-50/50 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-800/30',
         isInProgress && 'ring-2 ring-primary/50'
