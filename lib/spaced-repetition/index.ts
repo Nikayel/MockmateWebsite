@@ -1,11 +1,35 @@
 /**
  * Spaced Repetition System
  *
- * Production-ready spaced repetition using enhanced SM-2 algorithm
- * with RAG integration for personalized recommendations.
+ * Production-ready spaced repetition with:
+ * - FSRS algorithm (recommended - 20-30% more efficient than SM-2)
+ * - Legacy SM-2 for backward compatibility
+ * - RAG integration for personalized recommendations
  */
 
-// Core SM-2 Algorithm
+// FSRS Algorithm (Recommended - Modern, ML-optimized)
+export {
+  scheduleFSRS,
+  createFSRSCard,
+  calculateRetrievability,
+  mapPerformanceToFSRSRating,
+  getRatingDescription,
+  getEstimatedRetention,
+  isDue,
+  getDaysUntilReview,
+  getReviewPriority,
+  getDueCards,
+  getMasteryLevel as getFSRSMasteryLevel,
+  getConfidence as getFSRSConfidence,
+  DEFAULT_FSRS_CONFIG,
+  DEFAULT_FSRS_WEIGHTS,
+  type FSRSCard,
+  type FSRSConfig,
+  type FSRSRating,
+  type FSRSState,
+} from './fsrs-algorithm';
+
+// Legacy SM-2 Algorithm (kept for backward compatibility)
 export {
   calculateNextInterval,
   mapScoreToQuality,
