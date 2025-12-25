@@ -5,10 +5,13 @@
  * - Updates learning state after session completion
  * - Calculates next review dates using SM-2 algorithm
  * - Tracks streak days
+ * - Integrates with problem-level mastery tracking
  */
 
 import { adminDb, FieldValue } from "./firebase-admin";
 import type { UserLearningState, TopicLearningState } from "./types";
+import type { DSAPattern } from "./types/dsa-patterns";
+import type { Difficulty } from "./spaced-repetition/sm2-algorithm";
 
 /**
  * Calculate next review date using SM-2 spaced repetition algorithm
@@ -230,4 +233,134 @@ export async function resetDailyEmailCounters(): Promise<void> {
   });
 
   await batch.commit();
+}
+
+/**
+ * Update user's longest streak if current streak exceeds it
+ */
+export async function updateLongestStreak(userId: string): Promise<void> {
+  const learningState = await getUserLearningState(userId);
+
+  if (!learningState) return;
+
+  const currentStreak = learningState.streak_days || 0;
+  const longestStreak = (learningState as any).longest_streak_days || 0;
+
+  if (currentStreak > longestStreak) {
+    await adminDb.collection("user_learning_state").doc(userId).update({
+      longest_streak_days: currentStreak,
+      updated_at: new Date().toISOString(),
+    });
+  }
+}
+
+/**
+ * Complete session and update both topic-level and problem-level mastery
+ * This is the main entry point for recording completed practice sessions
+ */
+export async function completeSessionWithMastery(
+  userId: string,
+  sessionData: {
+    scenarioId: string;
+    title: string;
+    pattern: DSAPattern;
+    difficulty: Difficulty;
+    performanceScore: number;
+    timeSpentMinutes?: number;
+    hintsUsed?: number;
+    completedAt?: string;
+  }
+): Promise<{
+  nextReviewAt: string;
+  intervalDays: number;
+  masteryLevel: string;
+  streakDays: number;
+}> {
+  const completedAt = sessionData.completedAt || new Date().toISOString();
+
+  // Update topic-level learning state (legacy)
+  await updateLearningStateAfterSession(userId, {
+    topic: sessionData.title,
+    scenarioId: sessionData.scenarioId,
+    pattern: sessionData.pattern,
+    performanceScore: sessionData.performanceScore,
+    completedAt,
+  });
+
+  // Update problem-level mastery
+  const { initializeProblemMasteryFromSession, updateProblemMastery, getAllUserProblems } =
+    await import("./spaced-repetition/scheduler");
+  const { calculateNextInterval } = await import("./spaced-repetition/sm2-algorithm");
+
+  // Check if problem mastery exists
+  const problems = await getAllUserProblems(userId);
+  const existingMastery = problems.find((p) => p.problem_id === sessionData.scenarioId);
+
+  let masteryResult;
+
+  if (existingMastery) {
+    // Calculate new interval using enhanced SM-2
+    const learningState = await getUserLearningState(userId);
+    const streakDays = learningState?.streak_days || 0;
+
+    const now = new Date();
+    const lastReviewAt = new Date(existingMastery.last_reviewed_at);
+    const nextReviewAt = new Date(existingMastery.next_review_at);
+    const daysOverdue = nextReviewAt < now
+      ? Math.floor((now.getTime() - nextReviewAt.getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+    const isEarlyReview = nextReviewAt > now;
+
+    const sm2Result = calculateNextInterval({
+      previousInterval: existingMastery.interval_days,
+      previousEaseFactor: existingMastery.ease_factor,
+      performanceScore: sessionData.performanceScore,
+      reviewCount: existingMastery.review_count,
+      lastReviewDate: lastReviewAt,
+      problemDifficulty: sessionData.difficulty,
+      streakDays,
+      scoresHistory: existingMastery.scores_history,
+      isEarlyReview,
+      daysOverdue,
+    });
+
+    const nextReview = new Date(now);
+    nextReview.setDate(nextReview.getDate() + sm2Result.nextInterval);
+
+    masteryResult = await updateProblemMastery(userId, sessionData.scenarioId, {
+      performance_score: sessionData.performanceScore,
+      time_spent_minutes: sessionData.timeSpentMinutes,
+      hints_used: sessionData.hintsUsed,
+      ease_factor: sm2Result.newEaseFactor,
+      interval_days: sm2Result.nextInterval,
+      review_count: existingMastery.review_count + 1,
+      next_review_at: nextReview.toISOString(),
+      mastery_level: sm2Result.masteryLevel,
+      confidence: sm2Result.confidence,
+    });
+  } else {
+    // Initialize new problem mastery
+    masteryResult = await initializeProblemMasteryFromSession(userId, {
+      scenario_id: sessionData.scenarioId,
+      title: sessionData.title,
+      pattern: sessionData.pattern,
+      difficulty: sessionData.difficulty,
+      performance_score: sessionData.performanceScore,
+      time_spent_minutes: sessionData.timeSpentMinutes,
+      hints_used: sessionData.hintsUsed,
+    });
+  }
+
+  // Update longest streak
+  await updateLongestStreak(userId);
+
+  // Get updated streak
+  const updatedLearningState = await getUserLearningState(userId);
+
+  return {
+    nextReviewAt: masteryResult.next_review_at,
+    intervalDays: masteryResult.interval_days,
+    masteryLevel: masteryResult.mastery_level,
+    streakDays: updatedLearningState?.streak_days || 1,
+  };
 }
