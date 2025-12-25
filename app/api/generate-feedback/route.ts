@@ -973,7 +973,7 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
-    const { code, scenarioTitle, scenarioType, testResults, language, timeSpent, aiCollaborationMetrics, interactionMetrics, efficiencyMetrics, conversationTranscript, sessionId, userId } = await request.json()
+    const { code, scenarioTitle, scenarioType, scenarioId, scenarioDifficulty, scenarioPattern, testResults, language, timeSpent, aiCollaborationMetrics, interactionMetrics, efficiencyMetrics, conversationTranscript, sessionId, userId } = await request.json()
 
     if (!code || !scenarioTitle) {
       return NextResponse.json({ error: "Code and scenario title are required" }, { status: 400 })
@@ -1415,14 +1415,16 @@ IMPORTANT: Use the PRE-CALCULATED SCORES above exactly. Focus on generating help
 
     // Update learning state for spaced repetition email reminders
     // Also update problem-level mastery for enhanced SM-2 spaced repetition
-    if (userId && scenarioTitle && sessionId) {
+    // Use scenarioId (e.g., 'dsa-two-sum') for spaced repetition tracking, not sessionId (Firebase session UUID)
+    if (userId && scenarioTitle && scenarioId) {
       try {
-        const pattern = (efficiencyMetrics?.problemPattern || 'arrays-hashing') as DSAPattern
-        const difficulty = (efficiencyMetrics?.difficulty || 'medium') as 'easy' | 'medium' | 'hard'
+        // Use canonical values from frontend, with fallbacks
+        const pattern = (scenarioPattern || efficiencyMetrics?.problemPattern || 'arrays-hashing') as DSAPattern
+        const difficulty = (scenarioDifficulty || efficiencyMetrics?.difficulty || 'medium') as 'easy' | 'medium' | 'hard'
 
         // Update both topic-level (legacy) and problem-level mastery
         await completeSessionWithMastery(userId, {
-          scenarioId: sessionId,
+          scenarioId: scenarioId,
           title: scenarioTitle,
           pattern,
           difficulty,
