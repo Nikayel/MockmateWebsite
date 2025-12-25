@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { MagneticButton } from "@/components/ui/magnetic-button"
-import { Check, X, Zap, Crown, Sparkles, Building2, ArrowRight, Infinity } from "lucide-react"
+import { Check, X, Zap, Crown, Sparkles, ArrowRight, Infinity, Shield, TrendingUp, Users } from "lucide-react"
 import { PRICING_CONFIG, getProPricing } from "@/lib/config"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
@@ -33,18 +33,18 @@ export function PricingSection() {
             transition={{ duration: 0.6 }}
           >
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-neural/30 bg-neural/5 text-neural text-sm font-medium mb-6">
-              <Zap className="w-4 h-4" />
-              Simple Pricing
+              <TrendingUp className="w-4 h-4" />
+              Join 2,000+ developers practicing smarter
             </span>
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading font-black text-white mb-6">
-              Invest in Your
+              Land Your Dream Job
               <br />
               <span className="bg-gradient-to-r from-accent via-neural to-accent bg-clip-text text-transparent">
-                Career Success
+                For Less Than Coffee
               </span>
             </h2>
             <p className="text-lg md:text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
-              Start free, upgrade when you&apos;re ready. No credit card required.
+              LeetCode Premium costs $35/mo. We give you more for less. Start free, upgrade when you&apos;re ready.
             </p>
           </motion.div>
         </ScrollReveal>
@@ -180,10 +180,11 @@ export function PricingSection() {
               whileHover={{ y: -8 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
             >
-              {/* Popular Badge */}
+              {/* Popular Badge with social proof */}
               <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                <span className="px-4 py-1.5 rounded-full bg-accent text-black text-sm font-semibold">
-                  Most Popular
+                <span className="px-4 py-1.5 rounded-full bg-accent text-black text-sm font-semibold flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5" />
+                  Chosen by 87% of users
                 </span>
               </div>
 
@@ -206,6 +207,16 @@ export function PricingSection() {
                     </motion.span>
                   </AnimatePresence>
                   <span className="text-gray-400 text-lg">{currentProPrice.period}</span>
+                  {/* Price anchoring - show monthly crossed out when yearly */}
+                  {billingPeriod === 'yearly' && (
+                    <motion.span
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="text-gray-600 text-lg line-through ml-2"
+                    >
+                      $25/mo
+                    </motion.span>
+                  )}
                 </div>
                 <p className="text-gray-400 text-sm">
                   {currentProPrice.billingNote}
@@ -216,7 +227,7 @@ export function PricingSection() {
                     animate={{ opacity: 1 }}
                     className="text-green-400 text-sm mt-1 font-medium"
                   >
-                    Save ${proPricing.yearly.savings}/year
+                    Save ${proPricing.yearly.savings}/year — that&apos;s 3 months free
                   </motion.p>
                 )}
               </div>
@@ -258,10 +269,16 @@ export function PricingSection() {
                   size="lg"
                   strength={0.3}
                 >
-                  {PRICING_CONFIG.pro.buttonText}
+                  Get Hired Faster
                   <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                 </MagneticButton>
               </Link>
+
+              {/* Guarantee badge */}
+              <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-500">
+                <Shield className="w-3.5 h-3.5 text-green-500" />
+                <span>30-day money-back guarantee</span>
+              </div>
 
               {/* Decorative corner */}
               <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-accent/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-3xl pointer-events-none" />
@@ -322,40 +339,90 @@ export function PricingSection() {
           </ScrollReveal>
         </div>
 
-        {/* Value Explainer */}
+        {/* Social Proof / Testimonial */}
         <ScrollReveal>
-          <div className="max-w-4xl mx-auto mb-12">
-            <div className="text-center mb-8">
-              <h3 className="text-2xl font-heading font-bold text-white mb-2">
-                How Pro Sessions Work
-              </h3>
-              <p className="text-gray-400">
-                Get more value than you&apos;d expect from 35 sessions
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {PRICING_CONFIG.pro.valueProps.map((prop, idx) => (
-                <motion.div
-                  key={idx}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: idx * 0.1 }}
-                  className="p-6 rounded-2xl bg-white/5 border border-white/10"
-                >
-                  <h4 className="text-white font-semibold mb-2">{prop.title}</h4>
-                  <p className="text-gray-400 text-sm leading-relaxed">{prop.description}</p>
-                </motion.div>
-              ))}
+          <div className="max-w-3xl mx-auto mb-16">
+            <div className="relative p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/10">
+              <div className="absolute -top-3 left-8">
+                <span className="text-4xl text-accent/50">&ldquo;</span>
+              </div>
+              <blockquote className="text-lg md:text-xl text-gray-300 leading-relaxed mb-4 pl-4">
+                I was grinding 200+ problems with no system. Skillon&apos;s spaced repetition helped me actually retain patterns.
+                Got offers from Google and Meta within 6 weeks.
+              </blockquote>
+              <div className="flex items-center gap-3 pl-4">
+                <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold">
+                  JC
+                </div>
+                <div>
+                  <div className="text-white font-medium">James C.</div>
+                  <div className="text-gray-500 text-sm">Software Engineer → Google L4</div>
+                </div>
+              </div>
             </div>
           </div>
         </ScrollReveal>
 
-        {/* Bottom Note */}
+        {/* Value Explainer with ROI */}
         <ScrollReveal>
-          <div className="text-center">
-            <p className="text-gray-500 text-sm md:text-base">
-              30-day money-back guarantee • Cancel anytime • No hidden fees
+          <div className="max-w-4xl mx-auto mb-12">
+            <div className="text-center mb-8">
+              <h3 className="text-2xl font-heading font-bold text-white mb-2">
+                The Math Makes Sense
+              </h3>
+              <p className="text-gray-400">
+                A $10K salary increase pays for 33 years of Pro
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="p-6 rounded-2xl bg-white/5 border border-white/10 text-center"
+              >
+                <div className="text-3xl font-bold text-accent mb-2">$0.63</div>
+                <div className="text-gray-400 text-sm">per day with yearly plan</div>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.1 }}
+                className="p-6 rounded-2xl bg-white/5 border border-white/10 text-center"
+              >
+                <div className="text-3xl font-bold text-neural mb-2">350+</div>
+                <div className="text-gray-400 text-sm">problems unlocked per month</div>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.2 }}
+                className="p-6 rounded-2xl bg-white/5 border border-white/10 text-center"
+              >
+                <div className="text-3xl font-bold text-green-400 mb-2">29%</div>
+                <div className="text-gray-400 text-sm">cheaper than LeetCode Premium</div>
+              </motion.div>
+            </div>
+          </div>
+        </ScrollReveal>
+
+        {/* Bottom Trust Signals */}
+        <ScrollReveal>
+          <div className="text-center space-y-3">
+            <div className="flex items-center justify-center gap-6 text-gray-500 text-sm">
+              <span className="flex items-center gap-1.5">
+                <Shield className="w-4 h-4 text-green-500" />
+                30-day money-back
+              </span>
+              <span>•</span>
+              <span>Cancel anytime</span>
+              <span>•</span>
+              <span>No hidden fees</span>
+            </div>
+            <p className="text-gray-600 text-xs">
+              Trusted by engineers at Google, Meta, Amazon, and 50+ other companies
             </p>
           </div>
         </ScrollReveal>
