@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
+import { ChevronLeft, Loader2, AlertCircle, RefreshCw, Crown, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
 import { Header } from '@/components/header'
@@ -101,6 +101,12 @@ export default function NewRoadmapPage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Failed to create roadmap' }))
+        // Handle Pro-only feature restriction
+        if (errorData.code === 'PRO_REQUIRED') {
+          setError('PRO_REQUIRED')
+          setStep('assessment')
+          return
+        }
         throw new Error(errorData.error || 'Failed to create roadmap')
       }
 
@@ -137,6 +143,7 @@ export default function NewRoadmapPage() {
 
   // Check for rate limit error
   const isRateLimited = error?.toLowerCase().includes('rate') || error?.toLowerCase().includes('limit') || error?.toLowerCase().includes('too many')
+  const isProRequired = error === 'PRO_REQUIRED'
 
   return (
     <div className="min-h-screen bg-background">
@@ -154,8 +161,45 @@ export default function NewRoadmapPage() {
           <StepIndicator label="Generate" active={step === 'generating'} completed={false} />
         </div>
 
+        {/* Pro Upgrade Prompt */}
+        {isProRequired && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-2xl mx-auto mb-6 p-6 rounded-xl border bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/30"
+          >
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center shrink-0">
+                <Crown className="h-6 w-6 text-black" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-foreground text-lg mb-1">Upgrade to Pro for Personalized Roadmaps</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Get AI-powered study plans tailored to your target company, interview date, and skill level.
+                  Pro includes spaced repetition, pattern mastery tracking, and more.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <Link
+                    href="/upgrade"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500 text-black rounded-lg font-semibold hover:bg-yellow-400 transition-colors text-sm"
+                  >
+                    Upgrade to Pro
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <button
+                    onClick={() => setError(null)}
+                    className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Continue as Free
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Error message */}
-        {error && (
+        {error && !isProRequired && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}

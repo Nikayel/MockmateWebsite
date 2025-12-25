@@ -6,6 +6,7 @@ import { trackFeedbackGenerationServer } from "@/lib/analytics-server"
 import { buildFeedbackContext } from "@/lib/rag/context-builder"
 import { getPatternKnowledge, patternKnowledgeToDocument } from "@/lib/rag/knowledge-base/dsa-knowledge"
 import { getUserPerformanceProfile, getUserRecommendations } from "@/lib/rag/user-performance-rag"
+import { embedAndStoreSolution } from "@/lib/rag"
 import { updateLearningStateAfterSession } from "@/lib/learning-state"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 
@@ -931,10 +932,10 @@ ${userProfile.weaknesses.slice(0, 2).map(w => `- ${w}`).join('\n')}
 
         // Get personalized recommendations
         const recommendations = await getUserRecommendations(options.userId)
-        if (recommendations.nextSteps.length > 0) {
+        if (recommendations && recommendations.length > 0) {
           ragParts.push(`
 ### Personalized Recommendations
-${recommendations.nextSteps.slice(0, 2).map((step, i) => `${i + 1}. ${step}`).join('\n')}
+${recommendations.slice(0, 2).map((rec, i) => `${i + 1}. ${rec.reason || rec.scenario?.title || 'Practice similar problems'}`).join('\n')}
 `)
         }
       }
@@ -1424,6 +1425,23 @@ IMPORTANT: Use the PRE-CALCULATED SCORES above exactly. Focus on generating help
       } catch (err) {
         // Non-blocking - don't fail feedback if learning state update fails
         console.error("Learning state update error:", err)
+      }
+    }
+
+    // Store solution in RAG vector store for future similarity matching
+    if (userId && sessionId && code) {
+      try {
+        await embedAndStoreSolution(userId, sessionId, code, {
+          problemTitle: scenarioTitle,
+          language: language || 'javascript',
+          passed: scores.overall >= 70,
+          score: scores.overall,
+          problemType: scenarioType || 'dsa',
+          patterns: efficiencyMetrics?.problemPattern ? [efficiencyMetrics.problemPattern] : [],
+        })
+      } catch (err) {
+        // Non-blocking - don't fail feedback if RAG storage fails
+        console.error("RAG solution storage error:", err)
       }
     }
 

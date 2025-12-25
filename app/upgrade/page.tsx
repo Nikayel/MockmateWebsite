@@ -29,7 +29,9 @@ function UpgradePageContent() {
   const [profileLoading, setProfileLoading] = useState(true)
   const [loading, setLoading] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('yearly')
   const proPricing = getProPricing('website') // Website pricing
+  const currentPrice = billingPeriod === 'yearly' ? proPricing.yearly : proPricing.monthly
 
   useEffect(() => {
     setMounted(true)
@@ -208,95 +210,95 @@ function UpgradePageContent() {
             </p>
           </div>
 
-          {/* Pro Plan Options */}
+          {/* Billing Toggle */}
           {!isProUser && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-              {/* Monthly Plan */}
+            <div className="flex justify-center mb-8">
+              <div className="relative inline-flex items-center gap-3 p-1.5 rounded-full bg-white/5 border border-white/10">
+                <button
+                  onClick={() => setBillingPeriod('monthly')}
+                  className={`relative px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
+                    billingPeriod === 'monthly' ? "text-black bg-white" : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setBillingPeriod('yearly')}
+                  className={`relative px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
+                    billingPeriod === 'yearly' ? "text-black bg-white" : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Yearly
+                </button>
+                {billingPeriod === 'yearly' && (
+                  <span className="absolute -right-24 md:-right-28 px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs font-semibold border border-green-500/30">
+                    Save 25%
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Pro Plan */}
+          {!isProUser && (
+            <div className="max-w-lg mx-auto mb-12">
               <Card className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border-yellow-500/30 relative">
                 <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                   <Badge className="bg-yellow-500 text-black font-semibold">
                     <Star className="mr-1 h-3 w-3" />
-                    Most Popular
+                    {billingPeriod === 'yearly' ? 'Best Value' : 'Most Popular'}
                   </Badge>
                 </div>
-                <CardHeader>
+                <CardHeader className="pt-8">
                   <CardTitle className="text-white flex items-center">
                     <Crown className="mr-2 h-5 w-5 text-yellow-400" />
-                    Pro Monthly
+                    Pro {billingPeriod === 'yearly' ? 'Yearly' : 'Monthly'}
                   </CardTitle>
-                  <div className="text-3xl font-bold text-white">
-                    {proPricing.monthly.priceDisplay}
-                    <span className="text-sm font-normal text-gray-400">{proPricing.monthly.period}</span>
+                  <div className="text-4xl font-bold text-white">
+                    {currentPrice.priceDisplay}
+                    <span className="text-sm font-normal text-gray-400">{currentPrice.period}</span>
                   </div>
+                  <div className="text-sm text-gray-400">
+                    {currentPrice.billingNote}
+                  </div>
+                  {billingPeriod === 'yearly' && (
+                    <>
+                      <div className="text-sm text-green-400 mt-2 font-medium">
+                        Save ${proPricing.yearly.savings}/year vs monthly
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        One-time payment for 12 months access
+                      </div>
+                    </>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {PRICING_CONFIG.pro.features.map((feature, index) => (
+                  {/* Value highlight */}
+                  <div className="p-4 rounded-xl bg-white/5 border border-white/10 mb-4">
+                    <p className="text-white text-sm font-medium mb-1">Unlimited Practice</p>
+                    <p className="text-gray-400 text-xs">
+                      35 scenarios/month, each with 10+ problems. Practice unlimited times—only scenarios count.
+                    </p>
+                  </div>
+
+                  {PRICING_CONFIG.pro.highlights.map((feature, index) => (
                     <div key={index} className="flex items-center space-x-2">
-                      <Check className="h-4 w-4 text-green-400" />
-                      <span className="text-white">{feature}</span>
+                      <Check className="h-4 w-4 text-green-400 flex-shrink-0" />
+                      <span className="text-white text-sm">{feature}</span>
                     </div>
                   ))}
                   <Button
-                    onClick={() => handleUpgrade('monthly')}
-                    disabled={loading === 'monthly'}
+                    onClick={() => handleUpgrade(billingPeriod)}
+                    disabled={loading === billingPeriod}
                     size="lg"
                     className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-semibold mt-4"
                   >
-                    {loading === 'monthly' ? (
+                    {loading === billingPeriod ? (
                       "Processing..."
                     ) : (
                       <>
                         <Zap className="mr-2 h-5 w-5" />
-                        Subscribe Monthly
-                        <ArrowRight className="ml-2 h-5 w-5" />
-                      </>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Yearly Plan */}
-              <Card className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-blue-500/30 relative">
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <Badge className="bg-blue-500 text-white font-semibold">
-                    Best Value
-                  </Badge>
-                </div>
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center">
-                    <Crown className="mr-2 h-5 w-5 text-blue-400" />
-                    Pro Yearly
-                  </CardTitle>
-                  <div className="text-3xl font-bold text-white">
-                    {proPricing.yearly.priceDisplay}
-                    <span className="text-sm font-normal text-gray-400">{proPricing.yearly.period}</span>
-                  </div>
-                  <div className="text-sm text-green-400 mt-2">
-                    Save $75 compared to monthly
-                  </div>
-                  <div className="text-xs text-gray-400 mt-1">
-                    One-time payment, no renewal
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {PRICING_CONFIG.pro.features.map((feature, index) => (
-                    <div key={index} className="flex items-center space-x-2">
-                      <Check className="h-4 w-4 text-green-400" />
-                      <span className="text-white">{feature}</span>
-                    </div>
-                  ))}
-                  <Button
-                    onClick={() => handleUpgrade('yearly')}
-                    disabled={loading === 'yearly'}
-                    size="lg"
-                    className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold mt-4"
-                  >
-                    {loading === 'yearly' ? (
-                      "Processing..."
-                    ) : (
-                      <>
-                        <Zap className="mr-2 h-5 w-5" />
-                        Buy Yearly
+                        {billingPeriod === 'yearly' ? `Get Pro for ${proPricing.yearly.totalDisplay}` : 'Subscribe Monthly'}
                         <ArrowRight className="ml-2 h-5 w-5" />
                       </>
                     )}
