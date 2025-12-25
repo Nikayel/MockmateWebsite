@@ -38,7 +38,7 @@ export function HeroSection() {
 
       {/* Content */}
       <motion.div
-        className="container mx-auto px-4 relative z-10 pt-28 pb-16 lg:pt-32"
+        className="container mx-auto px-4 relative z-10 pt-20 pb-12 lg:pt-24"
         variants={staggerContainer}
         initial="initial"
         animate="animate"
@@ -46,13 +46,13 @@ export function HeroSection() {
         <div className="max-w-6xl mx-auto">
 
           {/* Top: Headline + Demo side by side */}
-          <div className="grid lg:grid-cols-5 gap-8 lg:gap-12 items-start mb-12">
+          <div className="grid lg:grid-cols-5 gap-6 lg:gap-8 items-start mb-8">
 
             {/* Left: Headline (2 cols) */}
             <div className="lg:col-span-2 text-center lg:text-left pt-4">
               <motion.h1
                 variants={staggerItem}
-                className="text-4xl sm:text-5xl lg:text-6xl font-heading font-black mb-5 leading-[1.1] tracking-tight"
+                className="text-4xl sm:text-5xl lg:text-5xl font-heading font-black mb-4 leading-[1.1] tracking-tight"
               >
                 <span className="text-white">Practice like</span>
                 <br />
@@ -63,13 +63,13 @@ export function HeroSection() {
 
               <motion.p
                 variants={staggerItem}
-                className="text-lg text-gray-400 mb-6 leading-relaxed"
+                className="text-base lg:text-lg text-gray-400 mb-4 leading-relaxed"
               >
                 Our AI interviewer is trained on 500+ real company interview docs and scenarios. Think out loud—it actually listens and responds naturally, just like a real interviewer would. After each session, we analyze where you need to improve to nail your next interview.
               </motion.p>
 
               {/* CTA */}
-              <motion.div variants={staggerItem} className="mb-6">
+              <motion.div variants={staggerItem} className="mb-4">
                 <Link href="/interview">
                   <MagneticButton
                     size="lg"
@@ -101,7 +101,7 @@ export function HeroSection() {
 
                 <div className="relative bg-gray-950/95 backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden shadow-2xl">
                   {/* Browser chrome */}
-                  <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/5 bg-gray-900/60">
+                  <div className="flex items-center gap-2 px-3 py-2 border-b border-white/5 bg-gray-900/60">
                     <div className="flex gap-1.5">
                       <div className="w-2.5 h-2.5 bg-red-500/50 rounded-full" />
                       <div className="w-2.5 h-2.5 bg-yellow-500/50 rounded-full" />
@@ -117,38 +117,38 @@ export function HeroSection() {
                   </div>
 
                   {/* Interview conversation */}
-                  <div className="p-5 space-y-4">
+                  <div className="p-4 space-y-3">
 
                     {/* You speaking (voice) */}
-                    <div className="flex gap-3 justify-end">
-                      <div className="bg-accent/10 border border-accent/20 rounded-lg rounded-tr-none p-3 max-w-[300px]">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <Mic className="w-3 h-3 text-accent" />
-                          <span className="text-[10px] text-accent uppercase tracking-wider">You (speaking)</span>
+                    <div className="flex gap-2.5 justify-end">
+                      <div className="bg-accent/10 border border-accent/20 rounded-lg rounded-tr-none p-2.5 max-w-[280px]">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Mic className="w-2.5 h-2.5 text-accent" />
+                          <span className="text-[9px] text-accent uppercase tracking-wider">You (speaking)</span>
                         </div>
-                        <p className="text-sm text-gray-300">
+                        <p className="text-xs text-gray-300">
                           "So I'm thinking... if I use a hashmap here, I can look up values in O(1) instead of looping through again..."
                         </p>
                       </div>
-                      <div className="w-7 h-7 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0 text-xs">
+                      <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0 text-[10px]">
                         You
                       </div>
                     </div>
 
                     {/* AI responds */}
-                    <div className="flex gap-3">
-                      <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
-                        <span className="text-accent text-[10px] font-bold">AI</span>
+                    <div className="flex gap-2.5">
+                      <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-accent text-[9px] font-bold">AI</span>
                       </div>
-                      <div className="bg-gray-800/60 rounded-lg rounded-tl-none p-3 max-w-[300px]">
-                        <p className="text-sm text-gray-300">
+                      <div className="bg-gray-800/60 rounded-lg rounded-tl-none p-2.5 max-w-[280px]">
+                        <p className="text-xs text-gray-300">
                           Exactly right. Walk me through what you'd store in the hashmap and how you'd handle the lookup.
                         </p>
                       </div>
                     </div>
 
                     {/* Code + feedback */}
-                    <div className="bg-gray-900/80 rounded-lg p-3 font-mono text-xs">
+                    <div className="bg-gray-900/80 rounded-lg p-2.5 font-mono text-xs">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-gray-500">// your solution</span>
                         <div className="flex gap-2">
@@ -169,28 +169,28 @@ export function HeroSection() {
           {/* Middle: Key differentiator - Voice/Think out loud */}
           <motion.div
             variants={staggerItem}
-            className="bg-gradient-to-r from-gray-900/50 via-gray-900/30 to-gray-900/50 rounded-xl border border-white/5 p-6 mb-12"
+            className="bg-gradient-to-r from-gray-900/50 via-gray-900/30 to-gray-900/50 rounded-xl border border-white/5 p-4 md:p-5 mb-6"
           >
-            <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 text-center md:text-left">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
-                  <Mic className="w-5 h-5 text-accent" />
+            <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12 text-center md:text-left">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center">
+                  <Mic className="w-4 h-4 text-accent" />
                 </div>
                 <div>
-                  <div className="text-white font-medium">Think out loud</div>
-                  <div className="text-sm text-gray-500">Just talk through your approach</div>
+                  <div className="text-white font-medium text-sm md:text-base">Think out loud</div>
+                  <div className="text-xs text-gray-500">Just talk through your approach</div>
                 </div>
               </div>
 
-              <div className="hidden md:block w-px h-10 bg-white/10" />
+              <div className="hidden md:block w-px h-8 bg-white/10" />
 
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-neural/10 flex items-center justify-center">
-                  <MessageCircle className="w-5 h-5 text-neural" />
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full bg-neural/10 flex items-center justify-center">
+                  <MessageCircle className="w-4 h-4 text-neural" />
                 </div>
                 <div>
-                  <div className="text-white font-medium">Real-time responses</div>
-                  <div className="text-sm text-gray-500">AI follows your reasoning</div>
+                  <div className="text-white font-medium text-sm md:text-base">Real-time responses</div>
+                  <div className="text-xs text-gray-500">AI follows your reasoning</div>
                 </div>
               </div>
 
@@ -200,7 +200,7 @@ export function HeroSection() {
           {/* Bottom: Social proof + secondary CTA */}
           <motion.div
             variants={staggerItem}
-            className="flex flex-col md:flex-row items-center justify-between gap-6"
+            className="flex flex-col md:flex-row items-center justify-between gap-4"
           >
             {/* Left: Stats */}
             <div className="flex items-center gap-8 text-center md:text-left">
