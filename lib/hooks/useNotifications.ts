@@ -259,16 +259,27 @@ export function useNotifications(
     []
   )
 
-  // Initial fetch
+  // Track if initial fetch has been done
+  const initialFetchDone = useRef(false)
+
+  // Initial fetch - only runs once when fetchOnMount becomes true
   useEffect(() => {
-    if (fetchOnMount) {
+    if (fetchOnMount && !initialFetchDone.current) {
+      initialFetchDone.current = true
       refresh()
       fetchPreferences()
     }
   }, [fetchOnMount, refresh, fetchPreferences])
 
-  // Polling
+  // Polling - only active when pollInterval > 0
   useEffect(() => {
+    // Clear any existing interval
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+
+    // Only start polling if interval is positive
     if (pollInterval > 0) {
       pollRef.current = setInterval(refresh, pollInterval)
     }
@@ -276,6 +287,7 @@ export function useNotifications(
     return () => {
       if (pollRef.current) {
         clearInterval(pollRef.current)
+        pollRef.current = null
       }
     }
   }, [pollInterval, refresh])

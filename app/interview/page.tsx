@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo, memo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import dynamic from "next/dynamic"
@@ -10,11 +10,36 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { CodeViewerSidePanel } from "@/components/CodeViewerSidePanel"
-import { GradingCriteriaTooltip } from "@/components/GradingCriteria"
-import { ScenarioBrowser, VoiceModeToggle } from "@/components/interview"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { useVoiceInput } from "@/lib/voice"
+
+// Dynamic imports for heavy components to reduce initial bundle size
+const ScenarioBrowser = dynamic(
+  () => import("@/components/interview").then(mod => ({ default: mod.ScenarioBrowser })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-gray-400">Loading scenarios...</div>
+      </div>
+    )
+  }
+)
+
+const VoiceModeToggle = dynamic(
+  () => import("@/components/interview").then(mod => ({ default: mod.VoiceModeToggle })),
+  { ssr: false }
+)
+
+const CodeViewerSidePanel = dynamic(
+  () => import("@/components/CodeViewerSidePanel").then(mod => ({ default: mod.CodeViewerSidePanel })),
+  { ssr: false }
+)
+
+const GradingCriteriaTooltip = dynamic(
+  () => import("@/components/GradingCriteria").then(mod => ({ default: mod.GradingCriteriaTooltip })),
+  { ssr: false }
+)
 
 // Inline error fallback for components that fail to load
 function ComponentErrorFallback({ componentName }: { componentName: string }) {
@@ -57,11 +82,10 @@ const PracticeFeedback = dynamic(
     )
   }
 )
-import { db } from "@/lib/firebase"
-import { collection, getDocs, query, where } from "firebase/firestore"
+import { getDbLazy } from "@/lib/firebase-lazy"
+import { collection, getDocs, query, where, Firestore } from "firebase/firestore"
 import {
   Play,
-  RotateCcw,
   Code,
   MessageSquare,
   CheckCircle,
@@ -72,27 +96,17 @@ import {
   Sparkles,
   Lightbulb,
   Target,
-  TrendingUp,
   Send,
   PlayCircle,
   XCircle,
   AlertCircle,
-  Search,
-  Filter,
-  X,
-  ChevronRight,
   ArrowRight,
   ArrowLeft,
   ChevronDown,
   ChevronUp,
-  Mic,
-  MicOff,
   HelpCircle,
   Maximize2,
   Minimize2,
-  PanelLeftClose,
-  PanelRightClose,
-  Layers,
 } from "lucide-react"
 import {
   AlertDialog,
@@ -334,6 +348,8 @@ export default function InterviewPage() {
       if (!firebaseUser) return
 
       try {
+        // Lazy load Firestore
+        const db = await getDbLazy()
         const sessionsQuery = query(
           collection(db, "interview_sessions"),
           where("user_id", "==", firebaseUser.uid)

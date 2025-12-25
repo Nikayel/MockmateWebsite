@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Bell, Check, X, ExternalLink, RefreshCw } from "lucide-react"
 import { useNotifications } from "@/lib/hooks/useNotifications"
 import { motion, AnimatePresence } from "framer-motion"
@@ -11,9 +11,13 @@ import Link from "next/link"
  *
  * Displays a bell icon with unread count badge.
  * Opens a dropdown with recent notifications.
+ *
+ * Performance optimization: Defers notification fetching and polling
+ * until the bell is first clicked to reduce initial page load.
  */
 export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false)
+  const [hasBeenOpened, setHasBeenOpened] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const {
@@ -25,9 +29,21 @@ export function NotificationBell() {
     markRead,
     markAllRead,
   } = useNotifications({
-    pollInterval: 60000, // Poll every minute
-    fetchOnMount: true,
+    // Only poll after user has opened the bell (performance optimization)
+    pollInterval: hasBeenOpened ? 60000 : 0,
+    // Only fetch on mount if user has previously opened the bell
+    fetchOnMount: hasBeenOpened,
   })
+
+  // Handle bell click - start fetching on first open
+  const handleBellClick = useCallback(() => {
+    if (!hasBeenOpened) {
+      setHasBeenOpened(true)
+      // Fetch immediately on first open
+      refresh()
+    }
+    setIsOpen(!isOpen)
+  }, [hasBeenOpened, isOpen, refresh])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -78,7 +94,7 @@ export function NotificationBell() {
     <div className="relative" ref={dropdownRef}>
       {/* Bell Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleBellClick}
         className="relative p-2 text-white/70 hover:text-white transition-colors rounded-lg hover:bg-white/5"
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
       >

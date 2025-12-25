@@ -1,8 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react"
-import { User as FirebaseUser, onAuthStateChanged } from "firebase/auth"
-import { auth } from "./firebase"
+import { User as FirebaseUser, onAuthStateChanged, Auth } from "firebase/auth"
 import { User as UserType } from "./types"
 import { convertFirebaseUser } from "./auth"
 
@@ -29,44 +28,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true
     let authStateResolved = false
+    let unsubscribe: (() => void) | null = null
 
-    // Single auth state listener for the entire app
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (!mounted) return
+    // Lazily initialize Firebase Auth
+    const initAuth = async () => {
+      try {
+        // Dynamic import for lazy loading
+        const { getAuthLazy } = await import("./firebase-lazy")
+        const auth = await getAuthLazy()
 
-      authStateResolved = true
+        if (!mounted) return
 
-      setFirebaseUser(firebaseUser)
+        // Single auth state listener for the entire app
+        unsubscribe = onAuthStateChanged(auth, (fbUser) => {
+          if (!mounted) return
 
-      if (firebaseUser) {
-        const convertedUser = convertFirebaseUser(firebaseUser)
-        setUser(convertedUser)
-      } else {
-        setUser(null)
+          authStateResolved = true
+
+          setFirebaseUser(fbUser)
+
+          if (fbUser) {
+            const convertedUser = convertFirebaseUser(fbUser)
+            setUser(convertedUser)
+          } else {
+            setUser(null)
+          }
+
+          setLoading(false)
+          setInitialized(true)
+        }, (error) => {
+          if (!mounted) return
+          console.error("Auth state change error:", error)
+          authStateResolved = true
+          setLoading(false)
+          setInitialized(true)
+        })
+      } catch (error) {
+        console.error("Failed to initialize Firebase Auth:", error)
+        if (mounted) {
+          setLoading(false)
+          setInitialized(true)
+        }
       }
+    }
 
-      setLoading(false)
-      setInitialized(true)
-    }, (error) => {
-      if (!mounted) return
-      console.error("Auth state change error:", error)
-      authStateResolved = true
-      setLoading(false)
-      setInitialized(true)
-    })
+    initAuth()
 
     // Safety timeout to prevent infinite loading
     // Firebase should respond quickly, but if it doesn't, we mark as initialized anyway
-    // Reduced to 2 seconds for faster perceived performance
     const timeout = setTimeout(() => {
       if (mounted && !authStateResolved) {
         console.warn("Auth initialization timeout - marking as initialized")
-        console.log('Auth state:', { 
-          firebaseUser: !!firebaseUser, 
-          user: !!user, 
-          loading, 
-          authStateResolved 
-        })
         setLoading(false)
         setInitialized(true)
       }
@@ -75,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false
       clearTimeout(timeout)
-      unsubscribe()
+      if (unsubscribe) unsubscribe()
     }
   }, []) // Empty dependency array - only run once on mount
 
