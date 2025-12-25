@@ -32,19 +32,10 @@ async function verifyAdminAccess(request: NextRequest): Promise<{ authorized: bo
     const decodedToken = await adminAuth.verifyIdToken(token)
     const userId = decodedToken.uid
 
-    // Check if user is in admin list
+    // SECURITY: Only trust hardcoded admin list from environment variables
+    // Never read admin status from user-writable Firestore fields
     if (ADMIN_USER_IDS.includes(userId)) {
       return { authorized: true, userId }
-    }
-
-    // Check Firestore for admin role
-    if (adminDb) {
-      const userDoc = await adminDb.collection('profiles').doc(userId).get()
-      const userData = userDoc.data()
-
-      if (userData?.role === 'admin' || userData?.subscription_tier === 'enterprise') {
-        return { authorized: true, userId }
-      }
     }
 
     return { authorized: false }
