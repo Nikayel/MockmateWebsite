@@ -7,44 +7,44 @@ import { ArrowRight, Zap } from "lucide-react"
 import Link from "next/link"
 
 /**
- * AIAssistedSection - Marketing content about AI-assisted interviews
+ * AIAssistedSection - How our AI interviewer evaluates you
  *
- * Design: Unique horizontal visualization, NOT rectangular cards
- * Keep it subtle and different from typical AI-generated designs
+ * These weights match our actual scoring algorithm in lib/scoring.ts
+ * Design: Unique horizontal visualization with accurate grading criteria
  */
 
 const criteria = [
-  { id: 'understanding', label: 'Understanding', percent: 30, color: '#00d9ff', hint: 'Explain your approach' },
-  { id: 'problem-solving', label: 'Problem-Solving', percent: 25, color: '#00ff88', hint: 'Debug & optimize' },
-  { id: 'code-quality', label: 'Code Quality', percent: 25, color: '#a78bfa', hint: 'Clean & efficient' },
-  { id: 'communication', label: 'Communication', percent: 20, color: '#fbbf24', hint: 'Think out loud' },
+  { id: 'code-quality', label: 'Code Quality', percent: 30, color: '#00d9ff', hint: 'Tests pass, efficient, readable' },
+  { id: 'problem-solving', label: 'Problem-Solving', percent: 25, color: '#00ff88', hint: 'Approach, debugging, optimization' },
+  { id: 'understanding', label: 'Understanding', percent: 25, color: '#a78bfa', hint: 'Explain your code & complexity' },
+  { id: 'communication', label: 'Communication', percent: 20, color: '#fbbf24', hint: 'Share your thought process' },
 ];
 
 const companies = ['Meta', 'Google', 'Amazon', 'Microsoft'];
 
 export function AIAssistedSection() {
   return (
-    <section className="relative py-32 bg-black overflow-hidden">
+    <section className="relative py-16 md:py-20 bg-black overflow-hidden">
       {/* Subtle gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-gray-950/30 to-transparent" />
 
       <div className="container mx-auto px-4 relative z-10">
         {/* Header */}
-        <ScrollReveal className="text-center mb-20">
+        <ScrollReveal className="text-center mb-12">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
             <p className="text-sm text-gray-500 uppercase tracking-widest mb-4">
-              The future is here
+              How our AI grades you
             </p>
             <h2 className="text-4xl md:text-5xl font-heading font-bold text-white mb-4">
-              AI-Assisted Interviews
+              Real Interview Scoring
             </h2>
             <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-              {companies.join(', ')} are rolling out AI-assisted coding interviews.
-              They want to see if you can use AI as a <span className="text-white">tool</span>, not a crutch.
+              Our AI interviewer evaluates you the same way {companies.join(', ')} interviewers do.
+              <span className="text-white"> AI usage is optional</span>—you&apos;re never penalized for not using it.
             </p>
           </motion.div>
         </ScrollReveal>
@@ -52,13 +52,13 @@ export function AIAssistedSection() {
         {/* Grading visualization - horizontal bar style */}
         <ScrollReveal>
           <motion.div
-            className="max-w-3xl mx-auto mb-20"
+            className="max-w-3xl mx-auto mb-12"
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
           >
-            <p className="text-center text-xs text-gray-600 uppercase tracking-widest mb-8">
-              What you're evaluated on
+            <p className="text-center text-xs text-gray-600 uppercase tracking-widest mb-6">
+              What you&apos;re evaluated on
             </p>
 
             {/* Horizontal stacked bar */}
@@ -105,42 +105,26 @@ export function AIAssistedSection() {
           </motion.div>
         </ScrollReveal>
 
-        {/* What's NOT evaluated - simple text list */}
-        <ScrollReveal>
-          <motion.div
-            className="max-w-xl mx-auto text-center mb-16"
-            initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
-            <p className="text-xs text-gray-600 uppercase tracking-widest mb-4">
-              What doesn't matter
-            </p>
-            <p className="text-gray-500 text-sm leading-relaxed">
-              <span className="line-through text-gray-600">How often you use AI</span>
-              <span className="mx-2 text-gray-700">·</span>
-              <span className="line-through text-gray-600">Typing speed</span>
-              <span className="mx-2 text-gray-700">·</span>
-              <span className="line-through text-gray-600">Memorized algorithms</span>
-            </p>
-          </motion.div>
-        </ScrollReveal>
-
         {/* Key message */}
         <ScrollReveal>
           <motion.div
-            className="max-w-lg mx-auto text-center mb-12"
+            className="max-w-xl mx-auto text-center mb-10"
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
           >
-            <p className="text-gray-300 text-lg leading-relaxed">
-              Real interviewers want to see you{' '}
-              <span className="text-white font-medium">think</span>,{' '}
-              <span className="text-white font-medium">debug</span>, and{' '}
-              <span className="text-white font-medium">explain</span>.
-              <br />
-              <span className="text-gray-500 text-sm">AI is optional. Understanding isn't.</span>
+            <p className="text-gray-300 text-lg leading-relaxed mb-4">
+              The goal: Can you <span className="text-white font-medium">solve problems</span>,{' '}
+              <span className="text-white font-medium">explain your thinking</span>, and{' '}
+              <span className="text-white font-medium">write clean code</span>?
+            </p>
+            <p className="text-gray-500 text-sm">
+              <span className="line-through">How often you use AI</span>
+              <span className="mx-2">·</span>
+              <span className="line-through">Typing speed</span>
+              <span className="mx-2">·</span>
+              <span className="line-through">Memorized syntax</span>
+              <span className="mx-3 text-gray-600">← These don&apos;t matter</span>
             </p>
           </motion.div>
         </ScrollReveal>

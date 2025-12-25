@@ -292,32 +292,6 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Testimonial */}
-      <section className="py-16 bg-black border-t border-gray-900">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto">
-            <div className="relative p-8 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/10">
-              <div className="absolute -top-3 left-8">
-                <span className="text-4xl text-accent/50">&ldquo;</span>
-              </div>
-              <blockquote className="text-lg md:text-xl text-gray-300 leading-relaxed mb-4 pl-4">
-                I was grinding 200+ problems with no system. Skillon's spaced repetition helped me actually retain patterns.
-                Got offers from Google and Meta within 6 weeks.
-              </blockquote>
-              <div className="flex items-center gap-3 pl-4">
-                <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold">
-                  JC
-                </div>
-                <div>
-                  <div className="text-white font-medium">James C.</div>
-                  <div className="text-gray-500 text-sm">Software Engineer → Google L4</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* FAQ Section */}
       <section className="py-16 bg-black border-t border-gray-900">
         <div className="container mx-auto px-4">

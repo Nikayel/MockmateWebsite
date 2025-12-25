@@ -445,19 +445,19 @@ export default function WhySkilonPage() {
           </ScrollReveal>
 
           <ScrollReveal>
-            <div className="max-w-2xl mx-auto overflow-x-auto">
+            <div className="max-w-2xl mx-auto">
               {/* Header */}
-              <div className="grid grid-cols-[1fr_80px_80px] sm:grid-cols-[1fr_100px_100px] gap-2 sm:gap-4 pb-4 border-b border-gray-800 mb-2 min-w-[320px]">
+              <div className="grid grid-cols-[1fr_70px_70px] sm:grid-cols-[1fr_100px_100px] gap-2 sm:gap-4 pb-4 border-b border-gray-800 mb-2">
                 <div className="text-gray-500 text-xs sm:text-sm font-medium">Feature</div>
-                <div className="text-center text-accent font-bold text-sm sm:text-base">Skillon</div>
-                <div className="text-center text-gray-500 font-medium text-sm sm:text-base">LeetCode</div>
+                <div className="text-center text-accent font-bold text-xs sm:text-base">Skillon</div>
+                <div className="text-center text-gray-500 font-medium text-xs sm:text-base">LeetCode</div>
               </div>
 
               {/* Rows */}
               {comparisonFeatures.map((row, i) => (
                 <div
                   key={row.feature}
-                  className="grid grid-cols-[1fr_80px_80px] sm:grid-cols-[1fr_100px_100px] gap-2 sm:gap-4 py-3 sm:py-4 border-b border-gray-800/30 hover:bg-gray-900/30 transition-colors rounded-lg px-2 -mx-2 min-w-[320px]"
+                  className="grid grid-cols-[1fr_70px_70px] sm:grid-cols-[1fr_100px_100px] gap-2 sm:gap-4 py-3 sm:py-4 border-b border-gray-800/30 hover:bg-gray-900/30 transition-colors rounded-lg px-2 -mx-2"
                 >
                   <div className="text-gray-300">{row.feature}</div>
                   <div className="text-center">
