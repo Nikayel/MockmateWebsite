@@ -164,12 +164,12 @@ export default function RoadmapPage() {
   // No active roadmap - show list of archived roadmaps or empty state
   if (!roadmap) {
     const archivedRoadmaps = allRoadmaps.filter(r => r.status === 'archived' || r.status === 'completed' || r.status === 'abandoned')
-    
+
     if (archivedRoadmaps.length > 0) {
       return <RoadmapListView roadmaps={allRoadmaps} onCreateNew={() => router.push('/roadmap/new')} />
     }
-    
-    return <EmptyState />
+
+    return <EmptyState onCreateNew={() => router.push('/roadmap/new')} />
   }
 
   // Check for edge cases
@@ -725,7 +725,123 @@ function RoadmapCard({ roadmap }: { roadmap: any }) {
   )
 }
 
-function EmptyState() {
+function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
+  const { user, firebaseUser, initialized } = useAuth()
+  const [isPro, setIsPro] = useState<boolean | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Check user's subscription status
+  useEffect(() => {
+    const checkSubscription = async () => {
+      if (!initialized || !user?.id || !firebaseUser) {
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        const token = await firebaseUser.getIdToken()
+        const response = await fetch('/api/user/subscription-status', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setIsPro(data.tier === 'pro' || data.tier === 'enterprise')
+        }
+      } catch (error) {
+        console.error('Error checking subscription:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    checkSubscription()
+  }, [user?.id, firebaseUser, initialized])
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="flex items-center justify-center min-h-[calc(100vh-80px)] pt-24">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Pro user - show create roadmap CTA
+  if (isPro) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="flex items-center justify-center min-h-[calc(100vh-80px)] pt-24">
+          <div className="text-center max-w-md mx-auto px-4">
+            <div className="w-20 h-20 bg-gradient-to-br from-primary to-primary/60 rounded-full flex items-center justify-center mx-auto mb-6">
+              <BookOpen className="h-10 w-10 text-primary-foreground" />
+            </div>
+            <h1 className="text-2xl font-bold text-foreground mb-2">
+              Create Your Interview Roadmap
+            </h1>
+            <p className="text-muted-foreground mb-8">
+              Get a personalized AI-powered study plan tailored to your target company, interview date, and skill gaps.
+              Includes spaced repetition scheduling and pattern mastery tracking.
+            </p>
+            <button
+              onClick={onCreateNew}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="h-5 w-5" />
+              Create Roadmap
+            </button>
+
+            <div className="mt-12 grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-2xl font-bold text-foreground">20+</p>
+                <p className="text-xs text-muted-foreground">Companies</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">200+</p>
+                <p className="text-xs text-muted-foreground">Questions</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">15</p>
+                <p className="text-xs text-muted-foreground">Patterns</p>
+              </div>
+            </div>
+
+            <div className="mt-8 p-4 bg-primary/5 border border-primary/20 rounded-xl text-left">
+              <h3 className="font-semibold text-foreground text-sm mb-2">Your roadmap will include:</h3>
+              <ul className="text-xs text-muted-foreground space-y-1.5">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                  Custom study plan for your interview date
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                  Spaced repetition for long-term retention
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                  Pattern mastery tracking across 15 DSA patterns
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                  Company-specific interview tips
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Free user - show upgrade prompt
   return (
     <div className="min-h-screen bg-background">
       <Header />
