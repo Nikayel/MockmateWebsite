@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Menu, X, User, LayoutDashboard, Clock, Terminal, LogOut, Map } from "lucide-react"
+import { Menu, X, User, LayoutDashboard, Clock, Terminal, LogOut, Map, Brain } from "lucide-react"
 import { Logo } from "@/components/Logo"
 import Link from "next/link"
 import { signOut } from "@/lib/auth"
@@ -73,6 +73,10 @@ export function Header() {
                 <Link href="/roadmap" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
                   <Map className="h-4 w-4" />
                   <span>Roadmap</span>
+                </Link>
+                <Link href="/practice" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
+                  <Brain className="h-4 w-4" />
+                  <span>Review</span>
                 </Link>
                 <div className="flex items-center space-x-3 pl-4 border-l border-white/10">
                   <NotificationBell />
@@ -172,6 +176,14 @@ export function Header() {
                   >
                     <Map className="h-4 w-4" />
                     <span>Roadmap</span>
+                  </Link>
+                  <Link
+                    href="/practice"
+                    className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-2"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <Brain className="h-4 w-4" />
+                    <span>Review</span>
                   </Link>
                   <div className="pt-4 border-t border-white/10">
                     <p className="text-sm text-gray-400 mb-2">{user.user_metadata?.full_name || user.email}</p>

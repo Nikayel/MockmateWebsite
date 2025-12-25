@@ -149,3 +149,120 @@ export interface EmailNotificationRecord {
   }
   created_at: string
 }
+
+/**
+ * Spaced Repetition Types
+ */
+export type SpacedRepetitionDifficulty = "easy" | "medium" | "hard"
+export type SpacedRepetitionMasteryLevel = "new" | "learning" | "reviewing" | "mastered"
+export type SpacedRepetitionPriority = "critical" | "high" | "medium" | "low"
+
+/**
+ * Problem-level mastery tracking for spaced repetition
+ */
+export interface ProblemMasteryRecord {
+  problem_id: string
+  scenario_id: string
+  title: string
+  pattern: string
+  difficulty: SpacedRepetitionDifficulty
+
+  // SM-2 State
+  ease_factor: number
+  interval_days: number
+  review_count: number
+  next_review_at: string
+
+  // Performance History
+  last_score: number
+  average_score: number
+  best_score: number
+  scores_history: number[]
+
+  // Metadata
+  first_seen_at: string
+  last_reviewed_at: string
+  time_spent_minutes: number
+  hints_used_total: number
+
+  // Mastery
+  mastery_level: SpacedRepetitionMasteryLevel
+  confidence: number
+}
+
+/**
+ * Due item for review queue
+ */
+export interface DueReviewItem {
+  problem_id: string
+  scenario_id: string
+  title: string
+  pattern: string
+  difficulty: SpacedRepetitionDifficulty
+  last_score: number
+  days_overdue: number
+  priority: SpacedRepetitionPriority
+  priority_score: number
+  estimated_minutes: number
+  mastery_level: SpacedRepetitionMasteryLevel
+  retention_estimate: number
+}
+
+/**
+ * Smart recommendation from RAG system
+ */
+export interface SmartPracticeRecommendation {
+  type: "review" | "practice_weakness" | "similar_to_failed" | "company_relevant" | "next_in_roadmap" | "strengthen_pattern"
+  scenario_id: string
+  title: string
+  pattern: string
+  difficulty: SpacedRepetitionDifficulty
+  reason: string
+  priority: number
+  estimated_minutes: number
+  companies?: string[]
+}
+
+/**
+ * User mastery statistics
+ */
+export interface UserMasteryStatistics {
+  overall: {
+    total_problems_seen: number
+    problems_mastered: number
+    problems_reviewing: number
+    problems_learning: number
+    problems_new: number
+    mastery_percentage: number
+    streak_days: number
+    longest_streak_days: number
+    total_reviews: number
+    average_score: number
+    total_time_minutes: number
+  }
+  by_pattern: {
+    pattern: string
+    total: number
+    mastered: number
+    average_score: number
+    mastery_percentage: number
+  }[]
+  by_difficulty: {
+    difficulty: SpacedRepetitionDifficulty
+    total: number
+    mastered: number
+    average_score: number
+  }[]
+  trends: {
+    last_7_days: {
+      reviews: number
+      average_score: number
+      new_mastered: number
+    }
+    last_30_days: {
+      reviews: number
+      average_score: number
+      new_mastered: number
+    }
+  }
+}
