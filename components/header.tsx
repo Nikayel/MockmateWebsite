@@ -58,9 +58,9 @@ export function Header() {
                   <LayoutDashboard className="h-4 w-4" />
                   <span>Dashboard</span>
                 </Link>
-                <Link href="/profile" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
+                <Link href="/account" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
                   <User className="h-4 w-4" />
-                  <span>Profile</span>
+                  <span>Account</span>
                 </Link>
                 <Link href="/sessions" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
                   <Clock className="h-4 w-4" />
@@ -146,12 +146,12 @@ export function Header() {
                     <span>Dashboard</span>
                   </Link>
                   <Link
-                    href="/profile"
+                    href="/account"
                     className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-2"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <User className="h-4 w-4" />
-                    <span>Profile</span>
+                    <span>Account</span>
                   </Link>
                   <Link
                     href="/sessions"
