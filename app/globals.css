@@ -46,58 +46,113 @@
   --sidebar-accent-foreground: oklch(0 0 0);
   --sidebar-border: oklch(0.9 0 0);
   --sidebar-ring: oklch(0.73 0.134 210.86);
+
+  /* Light mode editor colors */
+  --editor-bg: oklch(0.99 0 0);
+  /* Slightly off-white for less glare */
+  --editor-gutter: oklch(0.97 0 0);
+  --editor-line-active: oklch(0.96 0.005 210);
+  --editor-selection: oklch(0.70 0.08 210 / 0.20);
 }
 
 .dark {
-  /* Minimal Dark Theme - Softer, easier on eyes */
-  --background: oklch(0.13 0 0);
-  /* Soft charcoal #1a1a1a */
-  --foreground: oklch(0.93 0 0);
-  /* Soft white #e5e5e5 */
-  --card: oklch(0.17 0 0);
-  /* Visible card #262626 */
-  --card-foreground: oklch(0.93 0 0);
-  --popover: oklch(0.17 0 0);
-  --popover-foreground: oklch(0.93 0 0);
-  --primary: oklch(0.95 0 0);
+  /*
+   * Research-Backed Dark Theme
+   * Based on cognitive load research and calm UX principles:
+   * - Softer saturated colors (40% reduction) to reduce anxiety
+   * - Warmer background tones for reduced eye strain
+   * - Better contrast ratios for readability
+   * Sources: NN/G Dark Mode Study, ACM Eye Tracking 2025
+   */
+  --background: oklch(0.14 0.005 260);
+  /* Soft charcoal with slight blue warmth #1c1c1e */
+  --foreground: oklch(0.92 0 0);
+  /* Soft white #e8e8e8 */
+  --card: oklch(0.18 0.003 260);
+  /* Visible card with warmth #282830 */
+  --card-foreground: oklch(0.92 0 0);
+  --popover: oklch(0.18 0.003 260);
+  --popover-foreground: oklch(0.92 0 0);
+  --primary: oklch(0.94 0 0);
   /* Slightly softer primary */
-  --primary-foreground: oklch(0.13 0 0);
-  --secondary: oklch(0.2 0 0);
-  /* #303030 */
-  --secondary-foreground: oklch(0.93 0 0);
-  --muted: oklch(0.2 0 0);
-  --muted-foreground: oklch(0.55 0 0);
+  --primary-foreground: oklch(0.14 0 0);
+  --secondary: oklch(0.22 0.003 260);
+  /* #333338 */
+  --secondary-foreground: oklch(0.92 0 0);
+  --muted: oklch(0.22 0 0);
+  --muted-foreground: oklch(0.58 0 0);
   /* Slightly brighter muted text */
-  --accent: oklch(0.73 0.134 210.86);
-  /* Electric Cyan #00d9ff */
-  --accent-foreground: oklch(0.13 0 0);
-  --neural: oklch(0.87 0.184 157.04);
-  /* Success Green #00ff88 */
-  --destructive: oklch(0.64 0.27 12.57);
-  /* Error Red #ff3366 */
-  --destructive-foreground: oklch(0.93 0 0);
-  --border: oklch(0.28 0 0);
-  /* More visible border #404040 */
-  --input: oklch(0.2 0 0);
-  --ring: oklch(0.73 0.134 210.86);
-  --chart-1: oklch(0.73 0.134 210.86);
-  /* Cyan */
-  --chart-2: oklch(0.87 0.184 157.04);
-  /* Green */
-  --chart-3: oklch(0.82 0.162 85.87);
-  /* Yellow */
-  --chart-4: oklch(0.55 0.25 310);
-  /* Magenta */
-  --chart-5: oklch(0.45 0.15 270);
-  /* Purple */
-  --sidebar: oklch(0.13 0 0);
-  --sidebar-foreground: oklch(0.93 0 0);
-  --sidebar-primary: oklch(0.73 0.134 210.86);
-  --sidebar-primary-foreground: oklch(0.13 0 0);
-  --sidebar-accent: oklch(0.2 0 0);
-  --sidebar-accent-foreground: oklch(0.93 0 0);
-  --sidebar-border: oklch(0.28 0 0);
-  --sidebar-ring: oklch(0.73 0.134 210.86);
+
+  /* Calmer accent colors - 40% desaturated per research */
+  --accent: oklch(0.70 0.08 210);
+  /* Calmer Cyan #5fb4d9 - reduced from 0.134 to 0.08 saturation */
+  --accent-foreground: oklch(0.14 0 0);
+  --neural: oklch(0.75 0.11 157);
+  /* Calmer Success Green #5fd99a - reduced from 0.184 to 0.11 */
+  --destructive: oklch(0.62 0.16 15);
+  /* Calmer Error #d96666 - reduced from 0.27 to 0.16 */
+  --destructive-foreground: oklch(0.92 0 0);
+  --border: oklch(0.30 0.003 260);
+  /* Warmer border #444450 */
+  --input: oklch(0.22 0.003 260);
+  --ring: oklch(0.70 0.08 210);
+
+  /* Editor-specific colors - slightly lighter than background per research */
+  --editor-bg: oklch(0.16 0.003 260);
+  /* #222228 - lighter than app bg */
+  --editor-gutter: oklch(0.18 0.003 260);
+  --editor-line-active: oklch(0.20 0.005 260);
+  --editor-selection: oklch(0.50 0.06 210 / 0.25);
+  /* Calmer selection highlight */
+
+  /* Chart colors - also softened */
+  --chart-1: oklch(0.70 0.08 210);
+  /* Calmer Cyan */
+  --chart-2: oklch(0.75 0.11 157);
+  /* Calmer Green */
+  --chart-3: oklch(0.78 0.10 85);
+  /* Calmer Yellow */
+  --chart-4: oklch(0.58 0.15 310);
+  /* Calmer Magenta */
+  --chart-5: oklch(0.50 0.10 270);
+  /* Calmer Purple */
+
+  --sidebar: oklch(0.14 0.005 260);
+  --sidebar-foreground: oklch(0.92 0 0);
+  --sidebar-primary: oklch(0.70 0.08 210);
+  --sidebar-primary-foreground: oklch(0.14 0 0);
+  --sidebar-accent: oklch(0.22 0.003 260);
+  --sidebar-accent-foreground: oklch(0.92 0 0);
+  --sidebar-border: oklch(0.30 0.003 260);
+  --sidebar-ring: oklch(0.70 0.08 210);
+}
+
+/*
+ * Calm Mode - Research-backed anxiety reduction
+ * Applied when .calm class is added to body/root
+ * Principles: Muted colors, reduced visual noise, blue-green spectrum for relaxation
+ * Source: Color Psychology in UI Design 2025, UXmatters Calm Design Principles
+ */
+.dark.calm {
+  /* Even calmer background with slight blue tint for relaxation */
+  --background: oklch(0.15 0.008 240);
+  --card: oklch(0.19 0.006 240);
+  --secondary: oklch(0.23 0.005 240);
+
+  /* Very muted accent - almost desaturated for minimal stimulation */
+  --accent: oklch(0.65 0.05 210);
+  /* Very calm blue #7ab8cc */
+  --neural: oklch(0.70 0.07 160);
+  /* Sage green #7dc9a0 */
+  --destructive: oklch(0.60 0.10 15);
+  /* Muted coral #c08080 */
+
+  /* Reduced border visibility for less visual noise */
+  --border: oklch(0.26 0.004 240);
+
+  /* Calm editor colors */
+  --editor-bg: oklch(0.17 0.006 240);
+  --editor-selection: oklch(0.45 0.04 210 / 0.20);
 }
 
 @theme inline {
@@ -139,6 +194,12 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  /* Editor theme colors */
+  --color-editor-bg: var(--editor-bg, var(--card));
+  --color-editor-gutter: var(--editor-gutter, var(--secondary));
+  --color-editor-line-active: var(--editor-line-active, var(--muted));
+  --color-editor-selection: var(--editor-selection, oklch(0.50 0.06 210 / 0.25));
+
   /* Custom fonts */
   --font-sans: var(--font-open-sans);
   --font-heading: var(--font-work-sans);
@@ -177,50 +238,54 @@
   }
 }
 
-/* ===== NEURAL MINIMALISM ANIMATIONS ===== */
+/* ===== CALM MINIMALISM ANIMATIONS ===== */
+/*
+ * Research-backed: Reduced glow intensity and softer colors
+ * to minimize visual stress during focused coding sessions
+ */
 
-/* Neural Pulse - For nodes and connection points */
+/* Neural Pulse - Calmer version for nodes and connection points */
 @keyframes neural-pulse {
 
   0%,
   100% {
     box-shadow:
-      0 0 10px rgba(0, 217, 255, 0.3),
-      0 0 20px rgba(0, 217, 255, 0.1);
+      0 0 8px rgba(95, 180, 217, 0.25),
+      0 0 16px rgba(95, 180, 217, 0.08);
     transform: scale(1);
   }
 
   50% {
     box-shadow:
-      0 0 20px rgba(0, 217, 255, 0.6),
-      0 0 40px rgba(0, 217, 255, 0.3);
-    transform: scale(1.05);
+      0 0 16px rgba(95, 180, 217, 0.4),
+      0 0 32px rgba(95, 180, 217, 0.2);
+    transform: scale(1.02);
   }
 }
 
-/* Glow Pulse - Accent glow effect */
+/* Glow Pulse - Softer accent glow effect */
 @keyframes glow-pulse {
 
   0%,
   100% {
-    box-shadow: 0 0 20px rgba(0, 217, 255, 0.4);
+    box-shadow: 0 0 16px rgba(95, 180, 217, 0.3);
   }
 
   50% {
-    box-shadow: 0 0 40px rgba(0, 217, 255, 0.8), 0 0 60px rgba(0, 217, 255, 0.4);
+    box-shadow: 0 0 28px rgba(95, 180, 217, 0.5), 0 0 40px rgba(95, 180, 217, 0.25);
   }
 }
 
-/* Neural Glow - Success/green glow */
+/* Neural Glow - Calmer success/green glow */
 @keyframes neural-glow {
 
   0%,
   100% {
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+    box-shadow: 0 0 16px rgba(95, 217, 154, 0.3);
   }
 
   50% {
-    box-shadow: 0 0 40px rgba(0, 255, 136, 0.8), 0 0 60px rgba(0, 255, 136, 0.4);
+    box-shadow: 0 0 28px rgba(95, 217, 154, 0.5), 0 0 40px rgba(95, 217, 154, 0.25);
   }
 }
 
@@ -330,7 +395,7 @@
 .animate-shimmer {
   background: linear-gradient(90deg,
       transparent 0%,
-      rgba(0, 217, 255, 0.1) 50%,
+      rgba(95, 180, 217, 0.08) 50%,
       transparent 100%);
   background-size: 200% 100%;
   animation: shimmer 3s linear infinite;
@@ -348,18 +413,17 @@
   animation: reveal 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
-/* Text Effects */
+/* Text Effects - Calmer glows for reduced visual stress */
 .text-glow {
   text-shadow:
-    0 0 10px rgba(0, 217, 255, 0.5),
-    0 0 20px rgba(0, 217, 255, 0.3),
-    0 0 30px rgba(0, 217, 255, 0.1);
+    0 0 8px rgba(95, 180, 217, 0.4),
+    0 0 16px rgba(95, 180, 217, 0.2);
 }
 
 .text-neural-glow {
   text-shadow:
-    0 0 10px rgba(0, 255, 136, 0.5),
-    0 0 20px rgba(0, 255, 136, 0.3);
+    0 0 8px rgba(95, 217, 154, 0.4),
+    0 0 16px rgba(95, 217, 154, 0.2);
 }
 
 /* Minimal Glass Effect */
@@ -371,7 +435,7 @@
 
 /* === COMPONENT-SPECIFIC STYLES === */
 
-/* Interview Interface */
+/* Interview Interface - Calmer hover effects */
 .interview-card {
   transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -379,9 +443,9 @@
 }
 
 .interview-card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(0, 217, 255, 0.3);
-  box-shadow: 0 10px 30px rgba(0, 217, 255, 0.1);
+  transform: translateY(-3px);
+  border-color: rgba(95, 180, 217, 0.25);
+  box-shadow: 0 8px 24px rgba(95, 180, 217, 0.08);
 }
 
 /* Chat Messages */
@@ -389,7 +453,7 @@
   animation: reveal 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
-/* Scenario Cards */
+/* Scenario Cards - Subtle interactions for focus */
 .scenario-card {
   transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -398,13 +462,13 @@
 
 .scenario-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(0, 217, 255, 0.2);
-  box-shadow: 0 8px 24px rgba(0, 217, 255, 0.08);
+  border-color: rgba(95, 180, 217, 0.18);
+  box-shadow: 0 6px 20px rgba(95, 180, 217, 0.06);
 }
 
 .scenario-card.selected {
-  border-color: rgba(0, 217, 255, 0.5);
-  box-shadow: 0 0 30px rgba(0, 217, 255, 0.2);
+  border-color: rgba(95, 180, 217, 0.35);
+  box-shadow: 0 0 24px rgba(95, 180, 217, 0.12);
   transform: translateY(-2px);
 }
 

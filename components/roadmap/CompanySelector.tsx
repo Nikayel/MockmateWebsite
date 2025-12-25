@@ -159,13 +159,20 @@ function CompanyCard({
 
       {/* Company header with logo */}
       <div className="flex items-center gap-3 mb-2">
-        <div className="w-10 h-10 bg-white rounded-lg border border-border flex items-center justify-center overflow-hidden shrink-0">
+        <div className="w-10 h-10 bg-background rounded-lg border border-border flex items-center justify-center overflow-hidden shrink-0 p-1">
+          {/* Use unoptimized for local SVGs - better compatibility */}
           <Image
             src={company.logo}
             alt={`${company.name} logo`}
             width={32}
             height={32}
-            className="w-8 h-8 object-contain"
+            className="w-full h-full object-contain"
+            unoptimized
+            onError={(e) => {
+              // Fallback to Building icon if logo fails to load
+              e.currentTarget.style.display = 'none'
+              e.currentTarget.parentElement?.classList.add('logo-fallback')
+            }}
           />
         </div>
         <h3 className="font-semibold text-lg text-foreground">{company.name}</h3>
