@@ -23,23 +23,19 @@ export default function NotFound() {
         </p>
 
         <div className="flex gap-3 justify-center">
-          <Button asChild className="bg-primary hover:bg-primary/90">
-            <Link href="/">
-              <span className="flex items-center">
-                <Home className="mr-2 h-4 w-4" />
-                Go Home
-              </span>
-            </Link>
-          </Button>
+          <Link href="/">
+            <Button className="bg-primary hover:bg-primary/90">
+              <Home className="mr-2 h-4 w-4" />
+              Go Home
+            </Button>
+          </Link>
 
-          <Button asChild variant="outline">
-            <Link href="/interview">
-              <span className="flex items-center">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Start Interview
-              </span>
-            </Link>
-          </Button>
+          <Link href="/interview">
+            <Button variant="outline">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Start Interview
+            </Button>
+          </Link>
         </div>
 
         <div className="mt-12 pt-8 border-t border-border">
