@@ -8,12 +8,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { signOut } from "@/lib/auth"
 import { useAuth } from "@/lib/auth-context"
 import { getUserProfile } from "@/lib/firestore-helpers"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore"
-import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle, Terminal, RefreshCw, Clock, XCircle } from "lucide-react"
+import { User, Crown, BarChart3, Calendar, ExternalLink, AlertCircle, Terminal, RefreshCw, Clock, XCircle } from "lucide-react"
 import { User as UserType, Profile, ProfileQuota } from "@/lib/types"
 import { PRICING_CONFIG } from "@/lib/config"
 import { toast } from "sonner"
@@ -153,18 +152,6 @@ export default function ProfilePage() {
     loadUserData()
   }, [authLoading, firebaseUser, router, initialized, authCheckComplete])
 
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-      window.location.href = "/"
-    } catch (error) {
-      console.error("Sign out error:", error)
-      toast.error("Failed to sign out", {
-        description: error instanceof Error ? error.message : "Please try again",
-      })
-    }
-  }
-
   const handleSyncSubscription = async () => {
     if (!user || !firebaseUser) return
 
@@ -273,7 +260,7 @@ export default function ProfilePage() {
 
           {/* Profile Header */}
           <div className="mb-8">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center mb-6">
               <div className="flex items-center space-x-4">
                 <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center">
                   <User className="h-8 w-8 text-white" />
@@ -283,14 +270,6 @@ export default function ProfilePage() {
                   <p className="text-gray-400">{user?.email}</p>
                 </div>
               </div>
-              <Button
-                onClick={handleSignOut}
-                variant="outline"
-                className="border-gray-600 text-white hover:bg-gray-800 bg-transparent"
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                Sign Out
-              </Button>
             </div>
 
             <div className="flex items-center space-x-3">
