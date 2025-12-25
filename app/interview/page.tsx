@@ -275,7 +275,7 @@ export default function InterviewPage() {
 
   // Workspace context
   const [workspaceContext, setWorkspaceContext] = useState<Array<{ path: string; content: string }>>([])
-  const [lastCodeHash, setLastCodeHash] = useState<string>("")
+  const lastCodeHashRef = useRef<string>("")
   const [proactiveTimer, setProactiveTimer] = useState<NodeJS.Timeout | null>(null)
   const [usageLimit, setUsageLimit] = useState<{ used: number; limit: number; allowed: boolean } | null>(null)
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
@@ -649,6 +649,24 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
   // Monaco Editor handles layout automatically with automaticLayout: true
   // No manual height tracking needed
 
+  // Initialize code when scenario is selected (before interview starts)
+  // This ensures Monaco always has a stable value without needing fallbacks
+  useEffect(() => {
+    if (selectedScenario && !isInterviewStarted && !code) {
+      let initialCode: string
+      if (selectedScenario.type === 'bugfix') {
+        initialCode = (selectedScenario as any).buggyCode?.[selectedLanguage] || `// Bug fix code not available for ${selectedLanguage}`
+      } else if (selectedScenario.type === 'add-functionality') {
+        initialCode = (selectedScenario as any).existingCode?.[selectedLanguage] || `// Add functionality code not available for ${selectedLanguage}`
+      } else if (selectedScenario.type === 'system-design') {
+        initialCode = `// DESIGN NOTES: ${selectedScenario.title}\n// Use this space to document your design decisions\n`
+      } else {
+        initialCode = (selectedScenario as any).starterCode?.[selectedLanguage] || `function solution() {\n  // Write your solution here\n\n}`
+      }
+      setCode(initialCode)
+    }
+  }, [selectedScenario, isInterviewStarted, selectedLanguage, code])
+
   // Update code and workspace files when language changes during interview
   useEffect(() => {
     if (isInterviewStarted && selectedScenario && !showFeedback) {
@@ -723,10 +741,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     const codeHash = code.trim().replace(/\s+/g, " ")
 
     // Track code changes (for metrics only, no proactive triggering)
-    if (codeHash !== lastCodeHash) {
+    // Using ref instead of state to avoid re-renders on every keystroke
+    if (codeHash !== lastCodeHashRef.current) {
       lastCodeChangeRef.current = Date.now()
       hasTriggeredInactivityRef.current = false
-      setLastCodeHash(codeHash)
+      lastCodeHashRef.current = codeHash
     }
 
     // DISABLED: Automatic proactive messages were too intrusive
@@ -738,7 +757,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         clearTimeout(proactiveTimer)
       }
     }
-  }, [code, isInterviewStarted, showFeedback, showPostInterviewDiscussion, lastCodeHash])
+  }, [code, isInterviewStarted, showFeedback, showPostInterviewDiscussion, proactiveTimer])
 
   // Proactive interviewer - INACTIVITY detection - DISABLED
   // Was too intrusive and interrupted user flow
@@ -1730,7 +1749,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     setTestSummary({ total: 0, passed: 0, failed: 0, passRate: 0 })
     setStartTime(null)
     setElapsedTime(0)
-    setLastCodeHash("")
+    lastCodeHashRef.current = ""
     setCurrentSessionId(null)
     setRevealedHints(0)
     setRevealedHintIndices(new Set())
@@ -2726,7 +2745,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           <MonacoEditor
                             height="100%"
                             language={selectedLanguage}
-                            value={code || (selectedScenario ? ((selectedScenario as any).starterCode?.[selectedLanguage] || (selectedScenario as any).buggyCode?.[selectedLanguage] || (selectedScenario as any).existingCode?.[selectedLanguage] || '') : '')}
+                            value={code}
                             onChange={(newCode) => {
                               // Enforce code protection if enabled
                               if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
