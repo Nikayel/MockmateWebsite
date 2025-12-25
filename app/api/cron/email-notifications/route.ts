@@ -201,7 +201,124 @@ async function processSpacedRepetitionReminders(
   now: Date,
   results: any
 ): Promise<void> {
-  // Find topics due for review
+  // Find users with problem mastery data (new system)
+  const problemMasteryUsersSnap = await db
+    .collection("problem_mastery")
+    .limit(100)
+    .get();
+
+  const processedUsers = new Set<string>();
+
+  // Process problem-level mastery (new system)
+  for (const userDoc of problemMasteryUsersSnap.docs) {
+    const userId = userDoc.id;
+    processedUsers.add(userId);
+
+    try {
+      // Get problems due for this user
+      const problemsSnap = await db
+        .collection("problem_mastery")
+        .doc(userId)
+        .collection("problems")
+        .where("next_review_at", "<=", now.toISOString())
+        .limit(10)
+        .get();
+
+      if (problemsSnap.empty) continue;
+
+      // Calculate problems due with days overdue
+      const problemsDue = problemsSnap.docs.map((doc) => {
+        const problem = doc.data();
+        const nextReviewAt = new Date(problem.next_review_at);
+        const daysOverdue = Math.floor(
+          (now.getTime() - nextReviewAt.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        return { ...problem, daysOverdue };
+      }).filter((p) => p.daysOverdue >= 1); // At least 1 day overdue
+
+      if (problemsDue.length === 0) continue;
+
+      // Get user profile
+      const profileSnap = await db.collection("profiles").doc(userId).get();
+      if (!profileSnap.exists) continue;
+
+      const profile = profileSnap.data() as Profile;
+
+      // Check if user has email notifications enabled
+      if (!profile.notification_preferences?.spaced_repetition_reminders) {
+        results.spacedRepetitionEmails.skipped++;
+        continue;
+      }
+
+      if (!profile.notification_preferences?.email_notifications_enabled) {
+        results.spacedRepetitionEmails.skipped++;
+        continue;
+      }
+
+      // Check rate limits
+      const rateCheck = canSendEmail(
+        profile.last_email_sent_at,
+        profile.emails_sent_today
+      );
+      if (!rateCheck.allowed) {
+        results.spacedRepetitionEmails.skipped++;
+        continue;
+      }
+
+      // Send reminder for the most overdue problem
+      const mostOverdue = problemsDue.sort(
+        (a, b) => b.daysOverdue - a.daysOverdue
+      )[0];
+
+      const result = await sendSpacedRepetitionEmail(profile.email, {
+        userName: profile.full_name || "",
+        userEmail: profile.email,
+        topic: mostOverdue.title,
+        pattern: mostOverdue.pattern,
+        daysSinceReview: mostOverdue.daysOverdue,
+        lastScore: mostOverdue.last_score,
+        reviewCount: mostOverdue.review_count,
+        scenarioId: mostOverdue.scenario_id,
+      });
+
+      if (result.success) {
+        results.spacedRepetitionEmails.sent++;
+
+        // Update profile with email tracking
+        await db.collection("profiles").doc(userId).update({
+          last_email_sent_at: now.toISOString(),
+          emails_sent_today: (profile.emails_sent_today || 0) + 1,
+        });
+
+        // Log the notification
+        await db.collection("email_notifications").add({
+          user_id: userId,
+          email_type: "spaced_repetition",
+          status: "sent",
+          scheduled_at: now.toISOString(),
+          sent_at: now.toISOString(),
+          metadata: {
+            topic: mostOverdue.title,
+            problem_id: mostOverdue.problem_id,
+            mastery_level: mostOverdue.mastery_level,
+            retention_estimate: calculateRetention(
+              mostOverdue.daysOverdue,
+              mostOverdue.last_score
+            ),
+          },
+          created_at: now.toISOString(),
+        });
+      } else {
+        results.spacedRepetitionEmails.failed++;
+        results.errors.push(`SR email failed for ${userId}: ${result.error}`);
+      }
+    } catch (error: any) {
+      results.spacedRepetitionEmails.failed++;
+      results.errors.push(`Error processing problem mastery for ${userId}: ${error.message}`);
+    }
+  }
+
+  // Also process legacy topic-level data for users not in new system
   const learningStatesSnap = await db
     .collection("user_learning_state")
     .limit(100)
@@ -210,6 +327,9 @@ async function processSpacedRepetitionReminders(
   for (const doc of learningStatesSnap.docs) {
     const learningState = doc.data() as UserLearningState;
     const userId = learningState.user_id;
+
+    // Skip if already processed via problem_mastery
+    if (processedUsers.has(userId)) continue;
 
     // Find topics due for review
     const topicsDue: Array<{
