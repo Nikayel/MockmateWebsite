@@ -65,7 +65,7 @@ export function HeroSection() {
                 variants={staggerItem}
                 className="text-lg text-gray-400 mb-6 leading-relaxed"
               >
-                Our AI interviewer is trained on 500+ real company interview docs and scenarios. Think out loud—it actually listens and responds naturally, just like a real interviewer would.
+                Our AI interviewer is trained on 500+ real company interview docs and scenarios. Think out loud—it actually listens and responds naturally, just like a real interviewer would. After each session, we analyze where you need to improve to nail your next interview.
               </motion.p>
 
               {/* CTA */}
