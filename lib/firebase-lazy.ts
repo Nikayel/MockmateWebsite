@@ -127,3 +127,19 @@ export async function getFirebaseServices() {
 
   return { auth, db }
 }
+
+/**
+ * Get the current user's ID token for API authentication
+ * Returns null if no user is signed in
+ */
+export async function getCurrentUserToken(): Promise<string | null> {
+  try {
+    const auth = await getAuthLazy()
+    const currentUser = auth.currentUser
+    if (!currentUser) return null
+    return await currentUser.getIdToken()
+  } catch (error) {
+    console.error('Failed to get user token:', error)
+    return null
+  }
+}

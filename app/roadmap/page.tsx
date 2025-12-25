@@ -37,7 +37,7 @@ type RoadmapTab = 'today' | 'schedule' | 'progress' | 'guide'
 export default function RoadmapPage() {
   const router = useRouter()
   const roadmap = useActiveRoadmap()
-  const { user, initialized } = useAuth()
+  const { user, firebaseUser, initialized } = useAuth()
   const {
     selectedDayIndex,
     selectDay,
@@ -67,7 +67,7 @@ export default function RoadmapPage() {
     if (!initialized) return
 
     const loadRoadmaps = async () => {
-      if (!user?.id) {
+      if (!user?.id || !firebaseUser) {
         // No user - clear any stale roadmap data
         setActiveRoadmap(null)
         setIsLoadingRoadmap(false)
@@ -78,8 +78,15 @@ export default function RoadmapPage() {
       setActiveRoadmap(null)
 
       try {
+        // Get ID token for authorization
+        const idToken = await firebaseUser.getIdToken()
+        const authHeaders = {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json',
+        }
+
         // Load active roadmap from Firebase (source of truth)
-        const activeResponse = await fetch('/api/roadmap')
+        const activeResponse = await fetch('/api/roadmap', { headers: authHeaders })
         if (activeResponse.ok) {
           const activeData = await activeResponse.json()
           if (activeData.roadmap) {
@@ -107,7 +114,7 @@ export default function RoadmapPage() {
         }
 
         // Load all roadmaps for the list view
-        const allResponse = await fetch('/api/roadmap?all=true')
+        const allResponse = await fetch('/api/roadmap?all=true', { headers: authHeaders })
         if (allResponse.ok) {
           const allData = await allResponse.json()
           if (allData.roadmaps) {
@@ -122,7 +129,7 @@ export default function RoadmapPage() {
     }
 
     loadRoadmaps()
-  }, [user?.id, initialized, setActiveRoadmap])
+  }, [user?.id, firebaseUser, initialized, setActiveRoadmap])
 
   // Set selected day to today on initial mount only
   useEffect(() => {
@@ -188,15 +195,21 @@ export default function RoadmapPage() {
       onCreateNew={() => router.push('/roadmap/new')} 
       onArchive={async () => {
         // Archive the roadmap
+        if (!firebaseUser) return
         try {
+          const idToken = await firebaseUser.getIdToken()
+          const authHeaders = {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json',
+          }
           await fetch('/api/roadmap', {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders,
             body: JSON.stringify({ roadmapId: roadmap.id, status: 'archived' }),
           })
           setActiveRoadmap(null)
           // Reload roadmaps
-          const response = await fetch('/api/roadmap?all=true')
+          const response = await fetch('/api/roadmap?all=true', { headers: authHeaders })
           if (response.ok) {
             const data = await response.json()
             if (data.roadmaps) {
