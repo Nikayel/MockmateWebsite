@@ -341,8 +341,12 @@ export async function updateProblemMastery(
   // Calculate new best
   const newBest = Math.max(current.best_score, update.performance_score);
 
+  // Always correct difficulty to canonical value (fixes any previously incorrect data)
+  const canonicalDifficulty = getCanonicalDifficulty(current.scenario_id, current.difficulty);
+
   const updateData: Partial<ProblemMastery> = {
     ...update,
+    difficulty: canonicalDifficulty,
     last_score: update.performance_score,
     average_score: Math.round(newAverage),
     best_score: newBest,
