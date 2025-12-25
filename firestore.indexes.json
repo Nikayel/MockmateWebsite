@@ -135,6 +135,36 @@
         { "fieldPath": "scheduledFor", "order": "ASCENDING" },
         { "fieldPath": "priority", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "notification_queue",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "user_learning_state",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "last_session_at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "user_roadmaps",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "in_app_notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

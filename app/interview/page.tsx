@@ -12,6 +12,48 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { useVoiceInput } from "@/lib/voice"
+import { getDbLazy } from "@/lib/firebase-lazy"
+import { collection, getDocs, query, where, Firestore } from "firebase/firestore"
+import {
+  Play,
+  Code,
+  MessageSquare,
+  CheckCircle,
+  Clock,
+  User,
+  Bot,
+  Brain,
+  Sparkles,
+  Lightbulb,
+  Target,
+  Send,
+  PlayCircle,
+  XCircle,
+  AlertCircle,
+  ArrowRight,
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp,
+  HelpCircle,
+  Maximize2,
+  Minimize2,
+} from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { useAuth } from "@/lib/auth-context"
+import { checkUsageLimit, recordSessionStart, getUserProfile, createInterviewSession, updateInterviewSession, checkSessionCost, saveSessionState, getSessionState } from "@/lib/firestore-helpers"
+import { useRoadmapStore } from "@/lib/stores/roadmap-store"
+import { scenarios, filterScenarios, getScenarioById, type Scenario, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
+import { extractProtectedElements, validateCodeProtection, enforceCodeProtection } from "@/lib/code-protection"
+import { toast } from "sonner"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = dynamic(
@@ -82,48 +124,6 @@ const PracticeFeedback = dynamic(
     )
   }
 )
-import { getDbLazy } from "@/lib/firebase-lazy"
-import { collection, getDocs, query, where, Firestore } from "firebase/firestore"
-import {
-  Play,
-  Code,
-  MessageSquare,
-  CheckCircle,
-  Clock,
-  User,
-  Bot,
-  Brain,
-  Sparkles,
-  Lightbulb,
-  Target,
-  Send,
-  PlayCircle,
-  XCircle,
-  AlertCircle,
-  ArrowRight,
-  ArrowLeft,
-  ChevronDown,
-  ChevronUp,
-  HelpCircle,
-  Maximize2,
-  Minimize2,
-} from "lucide-react"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { useAuth } from "@/lib/auth-context"
-import { checkUsageLimit, recordSessionStart, getUserProfile, createInterviewSession, updateInterviewSession, checkSessionCost, saveSessionState, getSessionState } from "@/lib/firestore-helpers"
-import { useRoadmapStore } from "@/lib/stores/roadmap-store"
-import { scenarios, filterScenarios, getScenarioById, type Scenario, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
-import { extractProtectedElements, validateCodeProtection, enforceCodeProtection } from "@/lib/code-protection"
-import { toast } from "sonner"
 
 // Supported languages for code execution
 // JavaScript and Python are fully supported; others are coming soon

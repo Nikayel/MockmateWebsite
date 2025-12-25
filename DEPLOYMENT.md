@@ -128,6 +128,9 @@ STRIPE_WEBHOOK_SECRET=whsec_live_xxx
 # App Configuration
 NEXT_PUBLIC_APP_URL=https://yourdomain.com
 NODE_ENV=production
+
+# Cron Jobs (for scheduled email notifications)
+CRON_SECRET=your_secure_random_string_here
 ```
 
 **⚠️ SECURITY WARNING:**
@@ -177,6 +180,13 @@ Add all production environment variables in the Vercel UI:
 | `GEMINI_API_KEY` | ✅ | ✅ | ✅ |
 | `STRIPE_SECRET_KEY` | ✅ (live) | ❌ (test) | ❌ (test) |
 | `NEXT_PUBLIC_APP_URL` | ✅ | ✅ | ❌ |
+| `CRON_SECRET` | ✅ | ✅ | ✅ |
+
+**Note on CRON_SECRET:**
+- Required for securing the `/api/cron/email-notifications` endpoint
+- Generate a secure random string (e.g., `openssl rand -hex 32`)
+- Vercel Cron Jobs will automatically include this in the `Authorization` header
+- Set the same value in Vercel environment variables
 
 #### Step 4: Deploy
 

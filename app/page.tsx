@@ -11,6 +11,13 @@ import { AIAssistedSection } from "@/components/ai-assisted-section"
 import { Footer } from "@/components/footer"
 import { useAuth } from "@/lib/auth-context"
 import { getUserProfile, checkUsageLimit } from "@/lib/firestore-helpers"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { Terminal, ArrowRight, Crown, BarChart3 } from "lucide-react"
+import Link from "next/link"
+import type { Profile } from "@/lib/types"
 
 // Dynamically import heavy components to reduce initial bundle size
 const OnboardingModal = dynamic(() => import("@/components/OnboardingModal").then(mod => mod.OnboardingModal), {
@@ -20,13 +27,6 @@ const OnboardingModal = dynamic(() => import("@/components/OnboardingModal").the
 const ProductTour = dynamic(() => import("@/components/ProductTour").then(mod => mod.ProductTour), {
   ssr: false
 })
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Terminal, ArrowRight, Crown, BarChart3 } from "lucide-react"
-import Link from "next/link"
-import type { Profile } from "@/lib/types"
 
 export default function HomePage() {
   const router = useRouter()
