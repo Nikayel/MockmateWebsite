@@ -156,6 +156,45 @@ export default function PracticePage() {
     }
   };
 
+  const handleMarkReviewed = async (problemId: string, scenarioId: string) => {
+    try {
+      const token = await getAuthToken();
+      if (!token) return;
+
+      const res = await fetch("/api/spaced-repetition/mark-reviewed", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ problem_id: problemId, scenario_id: scenarioId }),
+      });
+
+      if (res.ok) {
+        // Refresh both due items and stats
+        const [dueRes, statsRes] = await Promise.all([
+          fetch("/api/spaced-repetition/due", {
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          }),
+          fetch("/api/spaced-repetition/stats", {
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          }),
+        ]);
+
+        if (dueRes.ok) {
+          const dueData = await dueRes.json();
+          setDue(dueData);
+        }
+        if (statsRes.ok) {
+          const statsData = await statsRes.json();
+          setStats(statsData);
+        }
+      }
+    } catch (err) {
+      console.error("Error marking problem as reviewed:", err);
+    }
+  };
+
   // Check subscription
   useEffect(() => {
     const checkSubscription = async () => {
@@ -293,6 +332,7 @@ export default function PracticePage() {
                 totalDue={due?.stats.total_due || 0}
                 overdueCount={due?.stats.overdue_count || 0}
                 onSkip={handleSkipProblem}
+                onMarkReviewed={handleMarkReviewed}
                 isLoading={isLoading}
               />
             </div>

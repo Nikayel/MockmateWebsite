@@ -40,6 +40,7 @@ interface DueForReviewProps {
   totalDue: number;
   overdueCount: number;
   onSkip?: (problemId: string) => Promise<void>;
+  onMarkReviewed?: (problemId: string, scenarioId: string) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -176,15 +177,28 @@ function getNextReviewDisplay(item: DueItem): { timing: string; context: string 
 }
 
 /**
- * Info icon with tooltip for showing science behind spaced repetition
+ * Info icon with proper hover tooltip for showing science behind spaced repetition
  */
 function InfoTooltip({ text }: { text: string }) {
+  const [isVisible, setIsVisible] = useState(false);
+
   return (
     <span
-      className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-700/50 text-gray-400 text-[10px] cursor-help ml-1"
-      title={text}
+      className="relative inline-flex items-center"
+      onMouseEnter={() => setIsVisible(true)}
+      onMouseLeave={() => setIsVisible(false)}
+      onClick={() => setIsVisible(!isVisible)}
     >
-      ?
+      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-700/50 text-gray-400 text-[10px] cursor-help ml-1 hover:bg-gray-600/50 hover:text-gray-300 transition-colors">
+        ?
+      </span>
+      {isVisible && (
+        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-gray-800 border border-gray-700 rounded-lg shadow-xl text-xs text-gray-300 leading-relaxed z-50">
+          <span className="block font-medium text-white mb-1">Why this interval?</span>
+          {text}
+          <span className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-gray-700" />
+        </span>
+      )}
     </span>
   );
 }
@@ -192,13 +206,17 @@ function InfoTooltip({ text }: { text: string }) {
 function DueItemRow({
   item,
   onSkip,
+  onMarkReviewed,
   isSkipping,
+  isMarkingReviewed,
   showOverdue = false,
   showUpcomingDate = false,
 }: {
   item: DueItem;
   onSkip?: (problemId: string) => Promise<void>;
+  onMarkReviewed?: (problemId: string, scenarioId: string) => Promise<void>;
   isSkipping?: boolean;
+  isMarkingReviewed?: boolean;
   showOverdue?: boolean;
   showUpcomingDate?: boolean;
 }) {
@@ -250,8 +268,22 @@ function DueItemRow({
             className="text-gray-500 hover:text-gray-300 h-8 w-8 p-0"
             onClick={() => onSkip(item.problem_id)}
             disabled={isSkipping}
+            title="Skip for now"
           >
             <SkipForward className="h-4 w-4" />
+          </Button>
+        )}
+        {onMarkReviewed && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-emerald-500 hover:text-emerald-400 h-8 px-2"
+            onClick={() => onMarkReviewed(item.problem_id, item.scenario_id)}
+            disabled={isMarkingReviewed}
+            title="Mark as reviewed (practiced elsewhere)"
+          >
+            <Check className="h-4 w-4 mr-1" />
+            Done
           </Button>
         )}
         <Link href={`/interview?scenario=${item.scenario_id}`}>
@@ -272,10 +304,12 @@ export function DueForReview({
   totalDue,
   overdueCount,
   onSkip,
+  onMarkReviewed,
   isLoading = false,
 }: DueForReviewProps) {
   const [isUpcomingExpanded, setIsUpcomingExpanded] = useState(false);
   const [skippingId, setSkippingId] = useState<string | null>(null);
+  const [markingReviewedId, setMarkingReviewedId] = useState<string | null>(null);
 
   const handleSkip = async (problemId: string) => {
     if (!onSkip) return;
@@ -284,6 +318,16 @@ export function DueForReview({
       await onSkip(problemId);
     } finally {
       setSkippingId(null);
+    }
+  };
+
+  const handleMarkReviewed = async (problemId: string, scenarioId: string) => {
+    if (!onMarkReviewed) return;
+    setMarkingReviewedId(problemId);
+    try {
+      await onMarkReviewed(problemId, scenarioId);
+    } finally {
+      setMarkingReviewedId(null);
     }
   };
 
@@ -353,7 +397,9 @@ export function DueForReview({
                 key={item.problem_id}
                 item={item}
                 onSkip={onSkip ? handleSkip : undefined}
+                onMarkReviewed={onMarkReviewed ? handleMarkReviewed : undefined}
                 isSkipping={skippingId === item.problem_id}
+                isMarkingReviewed={markingReviewedId === item.problem_id}
                 showOverdue
               />
             ))}
@@ -373,7 +419,9 @@ export function DueForReview({
                 key={item.problem_id}
                 item={item}
                 onSkip={onSkip ? handleSkip : undefined}
+                onMarkReviewed={onMarkReviewed ? handleMarkReviewed : undefined}
                 isSkipping={skippingId === item.problem_id}
+                isMarkingReviewed={markingReviewedId === item.problem_id}
               />
             ))}
           </div>

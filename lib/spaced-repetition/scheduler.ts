@@ -7,7 +7,7 @@
 
 import { adminDb } from '../firebase-admin';
 import type { DSAPattern } from '../types/dsa-patterns';
-import { getScenarioById } from '../scenarios';
+import { getScenarioById, scenarios } from '../scenarios';
 import {
   calculateReviewPriority,
   estimateRetention,
@@ -17,14 +17,36 @@ import {
 
 /**
  * Validate and return the canonical difficulty for a scenario.
- * Falls back to stored difficulty if scenario not found.
+ * Tries multiple strategies:
+ * 1. Look up by scenario ID (e.g., 'dsa-two-sum')
+ * 2. Look up by title (e.g., 'Two Sum') - handles old data with wrong IDs
+ * 3. Falls back to stored difficulty if nothing found
  */
-function getCanonicalDifficulty(scenarioId: string, storedDifficulty: Difficulty): Difficulty {
-  const scenario = getScenarioById(scenarioId);
-  if (scenario) {
-    return scenario.difficulty as Difficulty;
+function getCanonicalDifficulty(scenarioId: string, storedDifficulty: Difficulty, title?: string): Difficulty {
+  // Strategy 1: Look up by ID
+  const scenarioById = getScenarioById(scenarioId);
+  if (scenarioById) {
+    return scenarioById.difficulty as Difficulty;
   }
+
+  // Strategy 2: Look up by title (handles old data with wrong scenario_id)
+  if (title) {
+    const scenarioByTitle = scenarios.find(s => s.title === title);
+    if (scenarioByTitle) {
+      return scenarioByTitle.difficulty as Difficulty;
+    }
+  }
+
+  // Strategy 3: Fall back to stored difficulty
   return storedDifficulty;
+}
+
+/**
+ * Get correct scenario ID from title (for fixing old data)
+ */
+function getScenarioIdByTitle(title: string): string | undefined {
+  const scenario = scenarios.find(s => s.title === title);
+  return scenario?.id;
 }
 
 // Types
@@ -176,7 +198,8 @@ export async function getDueProblems(
     );
 
     // Use canonical difficulty from scenario definition to fix any data inconsistencies
-    const canonicalDifficulty = getCanonicalDifficulty(data.scenario_id, data.difficulty);
+    // Pass title as fallback for old data that has wrong scenario_id
+    const canonicalDifficulty = getCanonicalDifficulty(data.scenario_id, data.difficulty, data.title);
 
     const dueItem: DueItem = {
       problem_id: data.problem_id,
@@ -342,10 +365,15 @@ export async function updateProblemMastery(
   const newBest = Math.max(current.best_score, update.performance_score);
 
   // Always correct difficulty to canonical value (fixes any previously incorrect data)
-  const canonicalDifficulty = getCanonicalDifficulty(current.scenario_id, current.difficulty);
+  // Pass title as fallback for old data that has wrong scenario_id
+  const canonicalDifficulty = getCanonicalDifficulty(current.scenario_id, current.difficulty, current.title);
+
+  // Also fix scenario_id if it doesn't match a known scenario
+  const correctScenarioId = getScenarioIdByTitle(current.title) || current.scenario_id;
 
   const updateData: Partial<ProblemMastery> = {
     ...update,
+    scenario_id: correctScenarioId, // Fix old data with wrong scenario_id
     difficulty: canonicalDifficulty,
     last_score: update.performance_score,
     average_score: Math.round(newAverage),
