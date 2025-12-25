@@ -13,6 +13,14 @@ import type { Difficulty } from './sm2-algorithm';
 import { getWeakPatterns, getUserMasteryStats } from './mastery-calculator';
 import { getAllUserProblems, type ProblemMastery } from './scheduler';
 
+/**
+ * Get canonical difficulty from scenario definition
+ */
+function getCanonicalDifficulty(scenarioId: string, fallback: Difficulty): Difficulty {
+  const scenario = getScenarioById(scenarioId);
+  return (scenario?.difficulty as Difficulty) || fallback;
+}
+
 export type RecommendationType =
   | 'review'
   | 'practice_weakness'
@@ -119,12 +127,18 @@ async function getSimilarProblems(
       (s) => s.id === result.id || s.title === result.metadata?.title
     );
 
+    // Use canonical difficulty from scenario definition
+    const canonicalDifficulty = getCanonicalDifficulty(
+      result.id,
+      (result.metadata?.difficulty as Difficulty) || 'medium'
+    );
+
     return {
       type: 'similar_to_failed' as RecommendationType,
       scenario_id: result.id,
       title: (result.metadata?.title as string) || result.id,
       pattern: failedProblem.pattern,
-      difficulty: (result.metadata?.difficulty as Difficulty) || 'medium',
+      difficulty: canonicalDifficulty,
       reason: `Similar to "${failedProblem.title}" which you scored ${failedProblem.score}%`,
       priority: 80 - index * 5, // Decrease priority for each subsequent result
       estimated_minutes: matchedScenario?.estimatedTime || 20,

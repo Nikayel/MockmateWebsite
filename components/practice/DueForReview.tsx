@@ -24,6 +24,8 @@ export interface DueItem {
   difficulty: "easy" | "medium" | "hard";
   last_score: number;
   days_overdue: number;
+  days_until_review: number; // Days until next review (negative if overdue)
+  next_review_at: string; // ISO date string
   priority: Priority;
   priority_score: number;
   estimated_minutes: number;
@@ -51,16 +53,37 @@ function formatPattern(pattern: string): string {
   return pattern.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
 
+function formatReviewDate(item: DueItem): string {
+  const daysUntil = item.days_until_review;
+  if (daysUntil < 0) {
+    return `${Math.abs(daysUntil)}d overdue`;
+  }
+  if (daysUntil === 0) {
+    return "Today";
+  }
+  if (daysUntil === 1) {
+    return "Tomorrow";
+  }
+  if (daysUntil <= 7) {
+    return `in ${daysUntil} days`;
+  }
+  // Format as date for items more than a week away
+  const date = new Date(item.next_review_at);
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 function DueItemRow({
   item,
   onSkip,
   isSkipping,
   showOverdue = false,
+  showUpcomingDate = false,
 }: {
   item: DueItem;
   onSkip?: (problemId: string) => Promise<void>;
   isSkipping?: boolean;
   showOverdue?: boolean;
+  showUpcomingDate?: boolean;
 }) {
   return (
     <div className="group flex items-center justify-between py-3 px-4 -mx-4 hover:bg-white/[0.02] rounded-lg transition-colors">
@@ -72,6 +95,12 @@ function DueItemRow({
               <span className="text-xs text-rose-400 flex items-center gap-1">
                 <AlertTriangle className="h-3 w-3" />
                 {item.days_overdue}d overdue
+              </span>
+            )}
+            {showUpcomingDate && item.days_until_review > 0 && (
+              <span className="text-xs text-gray-500 flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {formatReviewDate(item)}
               </span>
             )}
           </div>
@@ -239,7 +268,7 @@ export function DueForReview({
           {isUpcomingExpanded && (
             <div className="divide-y divide-white/5">
               {upcoming.map((item) => (
-                <DueItemRow key={item.problem_id} item={item} />
+                <DueItemRow key={item.problem_id} item={item} showUpcomingDate />
               ))}
             </div>
           )}
