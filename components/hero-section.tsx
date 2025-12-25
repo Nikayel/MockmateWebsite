@@ -194,15 +194,6 @@ export function HeroSection() {
                 </div>
               </div>
 
-              <div className="hidden md:block w-px h-10 bg-white/10" />
-
-              <div className="text-center md:text-left">
-                <div className="text-gray-400 text-sm">
-                  No awkward silence. No typing everything out.
-                  <br className="hidden md:block" />
-                  <span className="text-white">Just a real conversation about code.</span>
-                </div>
-              </div>
             </div>
           </motion.div>
 
