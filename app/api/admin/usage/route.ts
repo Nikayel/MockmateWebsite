@@ -7,7 +7,16 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb, adminAuth } from '@/lib/firebase-admin'
-import { getAdminUsageStats, getUserUsageSummary, BUDGET_CAPS } from '@/lib/usage-tracking'
+import {
+  getAdminUsageStats,
+  getUserUsageSummary,
+  getServiceBreakdown,
+  getUserServiceBreakdown,
+  BUDGET_CAPS,
+  DEEPGRAM_COSTS,
+  EMBEDDING_COSTS,
+  PROVIDER_COSTS,
+} from '@/lib/usage-tracking'
 import { getCacheStats } from '@/lib/ai-cache'
 
 // Admin user IDs - requires proper env configuration
@@ -74,6 +83,7 @@ export async function GET(request: NextRequest) {
         // Get overall usage stats
         const stats = await getAdminUsageStats()
         const cacheStats = getCacheStats()
+        const serviceBreakdown = await getServiceBreakdown()
 
         return NextResponse.json({
           success: true,
@@ -87,6 +97,15 @@ export async function GET(request: NextRequest) {
             cache: cacheStats,
             topUsers: stats.userStats.slice(0, 20),
             budgetCaps: BUDGET_CAPS,
+            // Service breakdown by type
+            services: serviceBreakdown.byService,
+            providers: serviceBreakdown.byProvider,
+            // Cost reference
+            costs: {
+              llm: PROVIDER_COSTS,
+              voice: DEEPGRAM_COSTS,
+              embeddings: EMBEDDING_COSTS,
+            },
           },
         })
       }
@@ -120,9 +139,10 @@ export async function GET(request: NextRequest) {
           )
         }
 
-        // Get user profile
+        // Get user profile and service breakdown
         const userDoc = await adminDb.collection('users').doc(userId).get()
         const profile = userDoc.data()
+        const serviceBreakdown = await getUserServiceBreakdown(userId)
 
         return NextResponse.json({
           success: true,
@@ -134,6 +154,7 @@ export async function GET(request: NextRequest) {
               createdAt: profile?.created_at,
             },
             usage: summary,
+            services: serviceBreakdown,
           },
         })
       }

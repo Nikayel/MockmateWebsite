@@ -28,6 +28,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { UsageWidget } from "@/components/dashboard/usage-widget"
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -193,7 +194,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             {/* Usage Card */}
             <Card className="bg-gray-900/50 border-gray-700">
               <CardHeader className="pb-3">
@@ -212,6 +213,9 @@ export default function DashboardPage() {
                 </p>
               </CardContent>
             </Card>
+
+            {/* AI Token Usage */}
+            <UsageWidget />
 
             {/* Plan Card */}
             <Card className="bg-gray-900/50 border-gray-700">

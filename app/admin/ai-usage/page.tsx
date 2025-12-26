@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { MetricCard } from "@/components/admin/charts"
-import { Cpu, DollarSign, Zap, Database, RefreshCw, Users } from "lucide-react"
+import { Cpu, DollarSign, Zap, Database, RefreshCw, Users, Mic, Code, MessageSquare } from "lucide-react"
 import { getProviderCostInfo, AI_BUDGET_CAPS } from "@/lib/pricing"
 
 interface AIUsageData {
@@ -29,6 +29,12 @@ interface AIUsageData {
     budgetUsedPercent: number
   }>
   budgetCaps: Record<string, number>
+  services?: {
+    llm: { requests: number; cost: number; tokens: number }
+    voice: { requests: number; cost: number; durationSeconds: number }
+    embeddings: { requests: number; cost: number; characterCount: number }
+  }
+  providers?: Record<string, { requests: number; cost: number }>
 }
 
 export default function AIUsagePage() {
@@ -123,6 +129,87 @@ export default function AIUsagePage() {
               iconColor="text-[#00d9ff]"
             />
           </div>
+
+          {/* Service Breakdown */}
+          {aiUsage.services && (
+            <Card className="bg-gray-900/50 border-gray-800">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-[#00d9ff]" />
+                  Usage by Service
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* LLM Usage */}
+                  <div className="p-4 bg-gray-800/50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-3">
+                      <MessageSquare className="h-5 w-5 text-blue-400" />
+                      <span className="text-white font-medium">LLM (Chat/Feedback)</span>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">Requests</span>
+                        <span className="text-white font-mono">{aiUsage.services.llm.requests.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">Tokens</span>
+                        <span className="text-white font-mono">{aiUsage.services.llm.tokens.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">Cost</span>
+                        <span className="text-green-400 font-mono">${aiUsage.services.llm.cost.toFixed(4)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Voice Usage */}
+                  <div className="p-4 bg-gray-800/50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Mic className="h-5 w-5 text-purple-400" />
+                      <span className="text-white font-medium">Voice (Deepgram)</span>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">Sessions</span>
+                        <span className="text-white font-mono">{aiUsage.services.voice.requests.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">Duration</span>
+                        <span className="text-white font-mono">{Math.round(aiUsage.services.voice.durationSeconds / 60)} min</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">Cost</span>
+                        <span className="text-green-400 font-mono">${aiUsage.services.voice.cost.toFixed(4)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Embeddings Usage */}
+                  <div className="p-4 bg-gray-800/50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Code className="h-5 w-5 text-yellow-400" />
+                      <span className="text-white font-medium">Embeddings (RAG)</span>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">Requests</span>
+                        <span className="text-white font-mono">{aiUsage.services.embeddings.requests.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">Characters</span>
+                        <span className="text-white font-mono">{Math.round(aiUsage.services.embeddings.characterCount / 1000)}K</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">Cost</span>
+                        <span className="text-green-400 font-mono">${aiUsage.services.embeddings.cost.toFixed(4)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Budget Caps */}
           <Card className="bg-gray-900/50 border-gray-800">

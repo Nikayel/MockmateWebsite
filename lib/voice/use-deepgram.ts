@@ -19,6 +19,9 @@ export interface UseDeepgramOptions extends DeepgramConfig {
   onUtteranceEnd?: (transcript: string) => void
   autoSubmitOnSilence?: boolean
   silenceThresholdMs?: number
+  // Usage tracking
+  sessionId?: string
+  authToken?: string  // Firebase auth token for tracking API
 }
 
 export interface UseDeepgramReturn {
@@ -50,6 +53,7 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
 
   const serviceRef = useRef<DeepgramVoiceService | null>(null)
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const recordingStartTimeRef = useRef<number | null>(null)
 
   // Initialize service on mount
   useEffect(() => {
@@ -119,10 +123,12 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
 
     setError(null)
     setStatus('connecting')
+    recordingStartTimeRef.current = Date.now()
 
     try {
       await serviceRef.current.startTranscription()
     } catch (err) {
+      recordingStartTimeRef.current = null
       const error = err instanceof Error ? err : new Error(String(err))
       setError(error)
       setStatus('error')
@@ -138,8 +144,35 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
     const finalTranscript = serviceRef.current.stopTranscription()
     setStatus('idle')
     setIsRecording(false)
+
+    // Track voice usage if we have a valid recording session
+    if (recordingStartTimeRef.current && options.authToken) {
+      const durationSeconds = (Date.now() - recordingStartTimeRef.current) / 1000
+
+      // Only track if recording was at least 1 second
+      if (durationSeconds >= 1) {
+        fetch('/api/usage/voice', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${options.authToken}`,
+          },
+          body: JSON.stringify({
+            sessionId: options.sessionId,
+            durationSeconds,
+            model: options.model || 'nova-2',
+            transcriptLength: finalTranscript.length,
+          }),
+        }).catch((err) => {
+          // Non-critical - log but don't throw
+          console.warn('[Voice Usage] Failed to track usage:', err)
+        })
+      }
+    }
+
+    recordingStartTimeRef.current = null
     return finalTranscript
-  }, [])
+  }, [options.authToken, options.sessionId, options.model])
 
   const resetTranscript = useCallback(() => {
     serviceRef.current?.resetTranscript()
