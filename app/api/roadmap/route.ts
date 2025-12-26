@@ -18,10 +18,13 @@ export async function GET(request: NextRequest) {
   try {
     const authResult = await verifyAuth(request)
     if (!authResult.authenticated || !authResult.userId) {
+      console.log('[Roadmap API] Unauthorized request')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const userId = authResult.userId
+    console.log('[Roadmap API] GET request for user:', userId)
+
     const { searchParams } = new URL(request.url)
     const getAll = searchParams.get('all') === 'true'
     const statusFilter = searchParams.get('status')
@@ -33,6 +36,8 @@ export async function GET(request: NextRequest) {
       .where('userId', '==', userId)
       .where('status', '==', 'active')
       .get()
+
+    console.log('[Roadmap API] Found', activeSnapshot.docs.length, 'active roadmaps')
 
     const batch = adminDb.batch()
     let hasExpired = false
@@ -79,8 +84,77 @@ export async function GET(request: NextRequest) {
     }
 
     if (snapshot.empty) {
+      console.log('[Roadmap API] No roadmaps found matching query')
+
+      // Check if there are any roadmaps without proper status field (legacy data fix)
+      const allDocsSnapshot = await adminDb
+        .collection(COLLECTION)
+        .where('userId', '==', userId)
+        .get()
+
+      console.log('[Roadmap API] Total documents for user:', allDocsSnapshot.docs.length)
+
+      // Find roadmaps that need status field fix
+      const docsNeedingFix = allDocsSnapshot.docs.filter(doc => {
+        const data = doc.data()
+        const hasNoStatus = !data.status
+        const interviewDate = data.interviewDate?.toDate?.() || new Date(data.interviewDate)
+        const isNotExpired = interviewDate >= new Date()
+        console.log('[Roadmap API] Doc:', doc.id, 'status:', data.status, 'company:', data.targetCompany || data.companyName, 'needsFix:', hasNoStatus && isNotExpired)
+        return hasNoStatus && isNotExpired
+      })
+
+      // Fix legacy roadmaps missing status field
+      if (docsNeedingFix.length > 0 && !getAll) {
+        console.log('[Roadmap API] Fixing', docsNeedingFix.length, 'legacy roadmaps missing status field')
+        const batch = adminDb.batch()
+
+        // Set the most recent one as active, others as abandoned
+        const sortedDocs = docsNeedingFix.sort((a, b) => {
+          const aCreated = a.data().createdAt?.toDate?.() || new Date(0)
+          const bCreated = b.data().createdAt?.toDate?.() || new Date(0)
+          return bCreated.getTime() - aCreated.getTime()
+        })
+
+        sortedDocs.forEach((doc, index) => {
+          batch.update(doc.ref, {
+            status: index === 0 ? 'active' : 'abandoned',
+            updatedAt: new Date(),
+          })
+        })
+
+        await batch.commit()
+
+        // Return the now-active roadmap
+        const fixedDoc = sortedDocs[0]
+        const data = fixedDoc.data()
+
+        // Convert all date fields properly
+        const convertedRoadmap = {
+          id: fixedDoc.id,
+          ...data,
+          status: 'active',
+          createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
+          updatedAt: new Date().toISOString(),
+          interviewDate: data.interviewDate?.toDate?.()?.toISOString() || data.interviewDate,
+          dailyPlans: data.dailyPlans?.map((plan: any) => ({
+            ...plan,
+            date: plan.date?.toDate?.()?.toISOString() || plan.date,
+          })) || [],
+          milestones: data.milestones?.map((m: any) => ({
+            ...m,
+            targetDate: m.targetDate?.toDate?.()?.toISOString() || m.targetDate,
+          })) || [],
+        }
+
+        console.log('[Roadmap API] Returning fixed roadmap:', convertedRoadmap.id)
+        return NextResponse.json({ roadmap: convertedRoadmap })
+      }
+
       return NextResponse.json(getAll ? { roadmaps: [] } : { roadmap: null })
     }
+
+    console.log('[Roadmap API] Found', snapshot.docs.length, 'roadmaps matching query')
 
     const convertRoadmap = (doc: any) => {
       const data = doc.data()
@@ -91,6 +165,15 @@ export async function GET(request: NextRequest) {
         createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
         updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt,
         interviewDate: data.interviewDate?.toDate?.()?.toISOString() || data.interviewDate,
+        // Convert nested dates in dailyPlans and milestones
+        dailyPlans: data.dailyPlans?.map((plan: any) => ({
+          ...plan,
+          date: plan.date?.toDate?.()?.toISOString() || plan.date,
+        })) || [],
+        milestones: data.milestones?.map((m: any) => ({
+          ...m,
+          targetDate: m.targetDate?.toDate?.()?.toISOString() || m.targetDate,
+        })) || [],
       }
     }
 
@@ -224,6 +307,9 @@ export async function POST(request: NextRequest) {
     const ragEnhancements = 'ragEnhancements' in roadmap ? roadmap.ragEnhancements : null
     const roadmapDoc = {
       ...roadmap,
+      // Explicitly set status to 'active' (ensure it's always present)
+      status: 'active',
+      userId,
       createdAt: new Date(),
       updatedAt: new Date(),
       interviewDate: interview,

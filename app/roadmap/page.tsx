@@ -3,10 +3,18 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, BookOpen, Target, Sparkles, Trophy, AlertTriangle, Clock, RefreshCw, PartyPopper, Calendar, ArrowRight, ChevronDown, ChevronUp, Archive, CheckCircle2, XCircle, Play, Flame, BarChart3, Info, Zap, Crown } from 'lucide-react'
+import { Plus, BookOpen, Target, Sparkles, Trophy, AlertTriangle, Clock, RefreshCw, PartyPopper, Calendar, ArrowRight, ChevronDown, ChevronUp, Archive, CheckCircle2, XCircle, Play, Flame, BarChart3, Info, Zap, Crown, StopCircle } from 'lucide-react'
 import Link from 'next/link'
 
 import { Header } from '@/components/header'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   RoadmapHeader,
   TodaysFocus,
@@ -50,6 +58,8 @@ export default function RoadmapPage() {
   const [allRoadmaps, setAllRoadmaps] = useState<any[]>([])
   const [showArchived, setShowArchived] = useState(false)
   const [showTips, setShowTips] = useState(false)
+  const [showEndRoadmapDialog, setShowEndRoadmapDialog] = useState(false)
+  const [isArchiving, setIsArchiving] = useState(false)
 
   // Get today's plan
   const today = new Date()
@@ -86,9 +96,16 @@ export default function RoadmapPage() {
         }
 
         // Load active roadmap from Firebase (source of truth)
+        console.log('[Roadmap] Fetching active roadmap...')
         const activeResponse = await fetch('/api/roadmap', { headers: authHeaders })
-        if (activeResponse.ok) {
+
+        if (!activeResponse.ok) {
+          const errorText = await activeResponse.text()
+          console.error('[Roadmap] API error:', activeResponse.status, errorText)
+        } else {
           const activeData = await activeResponse.json()
+          console.log('[Roadmap] API response:', activeData)
+
           if (activeData.roadmap) {
             // Convert date strings back to Date objects for the store
             const roadmap = {
@@ -109,7 +126,10 @@ export default function RoadmapPage() {
                 targetDate: new Date(m.targetDate),
               })) || [],
             }
+            console.log('[Roadmap] Setting active roadmap:', roadmap.id, roadmap.companyName)
             setActiveRoadmap(roadmap)
+          } else {
+            console.log('[Roadmap] No active roadmap found in response')
           }
         }
 
@@ -153,6 +173,110 @@ export default function RoadmapPage() {
     markQuestionCompleted(scenarioId)
   }
 
+  // Handle reactivating an archived/abandoned roadmap
+  const handleReactivateRoadmap = async (roadmapId: string) => {
+    if (!firebaseUser) return
+
+    try {
+      const idToken = await firebaseUser.getIdToken()
+      const authHeaders = {
+        'Authorization': `Bearer ${idToken}`,
+        'Content-Type': 'application/json',
+      }
+
+      // Reactivate the roadmap
+      const response = await fetch('/api/roadmap', {
+        method: 'PATCH',
+        headers: authHeaders,
+        body: JSON.stringify({ roadmapId, status: 'active' }),
+      })
+
+      if (!response.ok) {
+        console.error('[Roadmap] Failed to reactivate roadmap')
+        return
+      }
+
+      // Reload roadmaps to get the updated state
+      const activeResponse = await fetch('/api/roadmap', { headers: authHeaders })
+      if (activeResponse.ok) {
+        const activeData = await activeResponse.json()
+        if (activeData.roadmap) {
+          const roadmap = {
+            ...activeData.roadmap,
+            interviewDate: new Date(activeData.roadmap.interviewDate),
+            createdAt: activeData.roadmap.createdAt ? new Date(activeData.roadmap.createdAt) : new Date(),
+            updatedAt: activeData.roadmap.updatedAt ? new Date(activeData.roadmap.updatedAt) : new Date(),
+            dailyPlans: activeData.roadmap.dailyPlans?.map((plan: any) => ({
+              ...plan,
+              date: new Date(plan.date),
+              questions: plan.questions?.map((q: any) => ({
+                ...q,
+                completedAt: q.completedAt ? new Date(q.completedAt) : undefined,
+              })),
+            })) || [],
+            milestones: activeData.roadmap.milestones?.map((m: any) => ({
+              ...m,
+              targetDate: new Date(m.targetDate),
+            })) || [],
+          }
+          setActiveRoadmap(roadmap)
+        }
+      }
+
+      // Update all roadmaps list
+      const allResponse = await fetch('/api/roadmap?all=true', { headers: authHeaders })
+      if (allResponse.ok) {
+        const allData = await allResponse.json()
+        if (allData.roadmaps) {
+          setAllRoadmaps(allData.roadmaps)
+        }
+      }
+    } catch (error) {
+      console.error('Error reactivating roadmap:', error)
+    }
+  }
+
+  // Handle archiving the current roadmap (end early)
+  const handleArchiveRoadmap = async () => {
+    if (!firebaseUser || !roadmap) return
+
+    setIsArchiving(true)
+    try {
+      const idToken = await firebaseUser.getIdToken()
+      const authHeaders = {
+        'Authorization': `Bearer ${idToken}`,
+        'Content-Type': 'application/json',
+      }
+
+      const response = await fetch('/api/roadmap', {
+        method: 'PATCH',
+        headers: authHeaders,
+        body: JSON.stringify({ roadmapId: roadmap.id, status: 'archived' }),
+      })
+
+      if (!response.ok) {
+        console.error('[Roadmap] Failed to archive roadmap')
+        return
+      }
+
+      setActiveRoadmap(null)
+      setShowEndRoadmapDialog(false)
+
+      // Reload all roadmaps
+      const allResponse = await fetch('/api/roadmap?all=true', { headers: authHeaders })
+      if (allResponse.ok) {
+        const allData = await allResponse.json()
+        if (allData.roadmaps) {
+          setAllRoadmaps(allData.roadmaps)
+        }
+      }
+    } catch (error) {
+      console.error('Error archiving roadmap:', error)
+    } finally {
+      setIsArchiving(false)
+    }
+  }
+
   // Loading state
   if (!initialized || isLoadingRoadmap) {
     return (
@@ -173,7 +297,13 @@ export default function RoadmapPage() {
     const archivedRoadmaps = allRoadmaps.filter(r => r.status === 'archived' || r.status === 'completed' || r.status === 'abandoned')
 
     if (archivedRoadmaps.length > 0) {
-      return <RoadmapListView roadmaps={allRoadmaps} onCreateNew={() => router.push('/roadmap/new')} />
+      return (
+        <RoadmapListView
+          roadmaps={allRoadmaps}
+          onCreateNew={() => router.push('/roadmap/new')}
+          onReactivate={handleReactivateRoadmap}
+        />
+      )
     }
 
     return <EmptyState onCreateNew={() => router.push('/roadmap/new')} />
@@ -249,6 +379,7 @@ export default function RoadmapPage() {
             roadmaps={allRoadmaps}
             onCreateNew={() => router.push('/roadmap/new')}
             onClose={() => setShowArchived(false)}
+            onReactivate={handleReactivateRoadmap}
           />
         ) : (
           <div className="space-y-6">
@@ -501,20 +632,73 @@ export default function RoadmapPage() {
               </motion.div>
             </AnimatePresence>
 
-            {/* Archived roadmaps link - minimal, bottom */}
-            {allRoadmaps.filter(r => r.status !== 'active').length > 0 && (
-              <div className="pt-4 border-t border-border text-center">
+            {/* Footer links - archived roadmaps and end roadmap */}
+            <div className="pt-4 border-t border-border flex items-center justify-between">
+              {allRoadmaps.filter(r => r.status !== 'active').length > 0 ? (
                 <button
                   onClick={() => setShowArchived(true)}
                   className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <Archive className="inline h-3 w-3 mr-1" />
-                  View archived roadmaps ({allRoadmaps.filter(r => r.status !== 'active').length})
+                  View archived ({allRoadmaps.filter(r => r.status !== 'active').length})
                 </button>
-              </div>
-            )}
+              ) : (
+                <div />
+              )}
+              <button
+                onClick={() => setShowEndRoadmapDialog(true)}
+                className="text-xs text-muted-foreground hover:text-red-500 transition-colors"
+              >
+                <StopCircle className="inline h-3 w-3 mr-1" />
+                End Roadmap
+              </button>
+            </div>
           </div>
         )}
+
+        {/* Confirmation Dialog for Ending Roadmap */}
+        <Dialog open={showEndRoadmapDialog} onOpenChange={setShowEndRoadmapDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                End This Roadmap?
+              </DialogTitle>
+              <DialogDescription className="text-left pt-2">
+                Are you sure you want to end your {roadmap?.companyName} roadmap early?
+                <ul className="mt-3 space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <span className="text-muted-foreground">•</span>
+                    <span>Your progress ({roadmap?.questionsCompleted}/{roadmap?.totalQuestions} questions) will be saved</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-muted-foreground">•</span>
+                    <span>You can resume this roadmap later if the interview date hasn't passed</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-muted-foreground">•</span>
+                    <span>You can create a new roadmap for a different company</span>
+                  </li>
+                </ul>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-row gap-2 sm:justify-end">
+              <button
+                onClick={() => setShowEndRoadmapDialog(false)}
+                className="flex-1 sm:flex-none px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
+              >
+                Keep Studying
+              </button>
+              <button
+                onClick={handleArchiveRoadmap}
+                disabled={isArchiving}
+                className="flex-1 sm:flex-none px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                {isArchiving ? 'Ending...' : 'End Roadmap'}
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   )
@@ -565,13 +749,26 @@ function RoadmapListView({
   roadmaps,
   onCreateNew,
   onClose,
+  onReactivate,
 }: {
   roadmaps: any[]
   onCreateNew: () => void
   onClose?: () => void
+  onReactivate?: (roadmapId: string) => Promise<void>
 }) {
+  const [reactivatingId, setReactivatingId] = useState<string | null>(null)
   const activeRoadmaps = roadmaps.filter(r => r.status === 'active')
   const archivedRoadmaps = roadmaps.filter(r => r.status === 'archived' || r.status === 'completed' || r.status === 'abandoned')
+
+  const handleReactivate = async (roadmapId: string) => {
+    if (!onReactivate) return
+    setReactivatingId(roadmapId)
+    try {
+      await onReactivate(roadmapId)
+    } finally {
+      setReactivatingId(null)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -617,9 +814,17 @@ function RoadmapListView({
         {archivedRoadmaps.length > 0 && (
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-foreground">Archived</h2>
+            <p className="text-sm text-muted-foreground">
+              Resume an archived roadmap or create a new one.
+            </p>
             <div className="grid gap-4">
               {archivedRoadmaps.map((roadmap) => (
-                <RoadmapCard key={roadmap.id} roadmap={roadmap} />
+                <RoadmapCard
+                  key={roadmap.id}
+                  roadmap={roadmap}
+                  onReactivate={handleReactivate}
+                  isReactivating={reactivatingId === roadmap.id}
+                />
               ))}
             </div>
           </div>
@@ -644,11 +849,21 @@ function RoadmapListView({
 }
 
 // Roadmap Card Component
-function RoadmapCard({ roadmap }: { roadmap: any }) {
+function RoadmapCard({
+  roadmap,
+  onReactivate,
+  isReactivating
+}: {
+  roadmap: any
+  onReactivate?: (roadmapId: string) => Promise<void>
+  isReactivating?: boolean
+}) {
   const interviewDate = new Date(roadmap.interviewDate)
   const progress = Math.round((roadmap.questionsCompleted / roadmap.totalQuestions) * 100)
   const companyName = roadmap.companyName || roadmap.targetCompany
   const status = roadmap.status
+  const isExpired = interviewDate < new Date()
+  const canReactivate = (status === 'archived' || status === 'abandoned') && !isExpired
 
   const getStatusIcon = () => {
     switch (status) {
@@ -680,12 +895,19 @@ function RoadmapCard({ roadmap }: { roadmap: any }) {
     }
   }
 
+  const handleReactivate = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (onReactivate && !isReactivating) {
+      await onReactivate(roadmap.id)
+    }
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
-        'border rounded-xl p-6 hover:shadow-md transition-all cursor-pointer',
+        'border rounded-xl p-6 hover:shadow-md transition-all',
         getStatusColor()
       )}
     >
@@ -699,8 +921,12 @@ function RoadmapCard({ roadmap }: { roadmap: any }) {
         </div>
         <div className="text-right">
           <p className="text-xs text-muted-foreground">Interview Date</p>
-          <p className="text-sm font-medium text-foreground">
+          <p className={cn(
+            "text-sm font-medium",
+            isExpired ? "text-red-500" : "text-foreground"
+          )}>
             {interviewDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            {isExpired && <span className="text-xs ml-1">(expired)</span>}
           </p>
         </div>
       </div>
@@ -733,6 +959,29 @@ function RoadmapCard({ roadmap }: { roadmap: any }) {
             <p className="text-xs text-muted-foreground">Studied</p>
           </div>
         </div>
+
+        {/* Action buttons for non-active roadmaps */}
+        {canReactivate && onReactivate && (
+          <div className="pt-3 border-t border-border">
+            <button
+              onClick={handleReactivate}
+              disabled={isReactivating}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {isReactivating ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Reactivating...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Resume This Roadmap
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </motion.div>
   )
