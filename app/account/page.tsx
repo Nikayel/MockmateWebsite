@@ -12,10 +12,10 @@ import { signOut } from "@/lib/auth"
 import { getUserProfile } from "@/lib/firestore-helpers"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore"
-import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle, XCircle, Shield, Download, Trash2, Cookie, Bell, RefreshCw } from "lucide-react"
+import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle, XCircle, Shield, Download, Trash2, Cookie, Bell, RefreshCw, CreditCard, Receipt } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Profile, ProfileQuota, InterviewSession, NotificationPreferences } from "@/lib/types"
+import { Profile, ProfileQuota, InterviewSession, NotificationPreferences, PaymentHistory } from "@/lib/types"
 import { PRICING_CONFIG } from "@/lib/config"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -35,6 +35,7 @@ export default function AccountPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [usage, setUsage] = useState<ProfileQuota | null>(null)
   const [sessions, setSessions] = useState<InterviewSession[]>([])
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
@@ -75,7 +76,7 @@ export default function AccountPage() {
 
       try {
         // Parallelize all data fetching for faster page load
-        const [userProfile, usageSnap, sessionsSnap] = await Promise.all([
+        const [userProfile, usageSnap, sessionsSnap, paymentsSnap] = await Promise.all([
           getUserProfile(firebaseUser.uid).catch(err => {
             console.error("Error fetching profile:", err)
             setError("Failed to load profile data")
@@ -108,6 +109,19 @@ export default function AccountPage() {
               return await getDocs(sessionsQuery)
             } catch (sessionError) {
               console.error("Error fetching sessions:", sessionError)
+              return null
+            }
+          })(),
+          // Fetch payment history
+          (async () => {
+            try {
+              const paymentsQuery = query(
+                collection(db, "payment_history"),
+                where("user_id", "==", firebaseUser.uid)
+              )
+              return await getDocs(paymentsQuery)
+            } catch (paymentError) {
+              console.error("Error fetching payment history:", paymentError)
               return null
             }
           })()
@@ -175,6 +189,23 @@ export default function AccountPage() {
           })
 
           setSessions(sessionsData.slice(0, 5))
+        }
+
+        // Set payment history
+        if (paymentsSnap && !paymentsSnap.empty) {
+          const paymentsData = paymentsSnap.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          } as PaymentHistory))
+
+          // Sort by created_at descending
+          paymentsData.sort((a, b) => {
+            const dateA = new Date(a.created_at).getTime()
+            const dateB = new Date(b.created_at).getTime()
+            return dateB - dateA
+          })
+
+          setPaymentHistory(paymentsData)
         }
       } catch (error) {
         console.error("Error loading user data:", error)
@@ -815,6 +846,83 @@ export default function AccountPage() {
                     </Button>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Payment History */}
+          {(paymentHistory.length > 0 || profile?.stripe_customer_id) && (
+            <Card className="bg-gray-900/50 border-gray-700 mb-6">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center">
+                  <Receipt className="mr-2 h-5 w-5" />
+                  Payment History
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {paymentHistory.length === 0 ? (
+                  <div className="text-center py-6">
+                    <CreditCard className="h-8 w-8 text-gray-600 mx-auto mb-2" />
+                    <p className="text-gray-400 text-sm">No payment history available</p>
+                    <p className="text-gray-500 text-xs mt-1">Your payments will appear here after your next billing cycle</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {paymentHistory.slice(0, 5).map((payment) => (
+                      <div
+                        key={payment.id}
+                        className="p-3 bg-gray-800/50 rounded-lg"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="text-white font-medium text-sm mb-1">
+                              {payment.description || (payment.type === "subscription" ? "Subscription Payment" : "One-time Payment")}
+                            </h4>
+                            <div className="flex items-center gap-2 text-xs text-gray-400">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(payment.created_at).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric'
+                              })}
+                              {payment.period_start && payment.period_end && (
+                                <>
+                                  <span>•</span>
+                                  <span>
+                                    {new Date(payment.period_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                    {' - '}
+                                    {new Date(payment.period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-white font-medium text-sm">
+                              ${(payment.amount / 100).toFixed(2)} {payment.currency.toUpperCase()}
+                            </p>
+                            <Badge
+                              className={
+                                payment.status === "succeeded"
+                                  ? "bg-green-500/20 text-green-400 border-green-500/30"
+                                  : payment.status === "refunded"
+                                    ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
+                                    : "bg-red-500/20 text-red-400 border-red-500/30"
+                              }
+                            >
+                              {payment.status === "succeeded" ? "Paid" : payment.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {paymentHistory.length > 5 && (
+                      <p className="text-center text-gray-500 text-xs pt-2">
+                        Showing 5 of {paymentHistory.length} payments
+                      </p>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
