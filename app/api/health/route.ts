@@ -89,6 +89,7 @@ async function checkStripe(): Promise<{ status: "pass" | "fail" | "warn"; latenc
 
 /**
  * Check environment configuration
+ * SECURITY: Never expose which environment variables are missing to prevent information disclosure
  */
 function checkEnvironment(): { status: "pass" | "fail" | "warn"; message?: string } {
   const requiredEnvVars = [
@@ -104,20 +105,21 @@ function checkEnvironment(): { status: "pass" | "fail" | "warn"; message?: strin
     "GEMINI_API_KEY",
   ]
 
-  const missingRequired = requiredEnvVars.filter((v) => !process.env[v])
-  const missingOptional = optionalEnvVars.filter((v) => !process.env[v])
+  const missingRequiredCount = requiredEnvVars.filter((v) => !process.env[v]).length
+  const missingOptionalCount = optionalEnvVars.filter((v) => !process.env[v]).length
 
-  if (missingRequired.length > 0) {
+  // SECURITY: Use generic messages - don't expose which variables are missing
+  if (missingRequiredCount > 0) {
     return {
       status: "fail",
-      message: `Missing required env vars: ${missingRequired.join(", ")}`,
+      message: "Required configuration missing",
     }
   }
 
-  if (missingOptional.length > 0) {
+  if (missingOptionalCount > 0) {
     return {
       status: "warn",
-      message: `Missing optional env vars: ${missingOptional.join(", ")}`,
+      message: "Some optional features not configured",
     }
   }
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,6 +22,72 @@ import {
 } from "lucide-react"
 import { doc, setDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+
+// =============================================================================
+// ACCESSIBILITY: Focus Trap Hook
+// =============================================================================
+/**
+ * Custom hook to trap focus within a modal for accessibility
+ * Ensures keyboard users can't tab outside the modal
+ */
+function useFocusTrap(isActive: boolean) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const previousActiveElement = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (!isActive) return
+
+    // Store the currently focused element to restore later
+    previousActiveElement.current = document.activeElement as HTMLElement
+
+    // Focus the first focusable element in the modal
+    const container = containerRef.current
+    if (container) {
+      const focusableElements = container.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )
+      if (focusableElements.length > 0) {
+        focusableElements[0].focus()
+      }
+    }
+
+    // Cleanup: restore focus when modal closes
+    return () => {
+      if (previousActiveElement.current) {
+        previousActiveElement.current.focus()
+      }
+    }
+  }, [isActive])
+
+  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    if (event.key !== 'Tab') return
+
+    const container = containerRef.current
+    if (!container) return
+
+    const focusableElements = container.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+
+    if (focusableElements.length === 0) return
+
+    const firstElement = focusableElements[0]
+    const lastElement = focusableElements[focusableElements.length - 1]
+
+    // Shift+Tab on first element -> go to last
+    if (event.shiftKey && document.activeElement === firstElement) {
+      event.preventDefault()
+      lastElement.focus()
+    }
+    // Tab on last element -> go to first
+    else if (!event.shiftKey && document.activeElement === lastElement) {
+      event.preventDefault()
+      firstElement.focus()
+    }
+  }, [])
+
+  return { containerRef, handleKeyDown }
+}
 
 interface OnboardingModalProps {
   isOpen: boolean
@@ -82,6 +148,28 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const totalSteps = 5 // Welcome, Role, Goal, Daily Goal, System Overview
+
+  // Accessibility: Focus trap for modal
+  const { containerRef, handleKeyDown } = useFocusTrap(isOpen)
+
+  // Accessibility: Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isOpen])
+
+  // Step titles for ARIA labels
+  const stepTitles = [
+    "Welcome to Skillon",
+    "Select your experience level",
+    "Choose your goal",
+    "Set your daily practice goal",
+    "How Skillon works for you"
+  ]
 
   const handleComplete = async (takeTour: boolean) => {
     if (!selectedRole) return
@@ -164,21 +252,40 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 overflow-y-auto"
+        role="presentation"
+        aria-hidden="true"
       >
         <motion.div
+          ref={containerRef}
+          onKeyDown={handleKeyDown}
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           className="w-full max-w-xl bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden my-auto"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="onboarding-title"
+          aria-describedby="onboarding-description"
         >
-          {/* Progress bar */}
-          <div className="h-1 bg-gray-800">
+          {/* Progress bar - Accessibility: aria-valuenow for screen readers */}
+          <div
+            className="h-1 bg-gray-800"
+            role="progressbar"
+            aria-valuenow={step + 1}
+            aria-valuemin={1}
+            aria-valuemax={totalSteps}
+            aria-label={`Step ${step + 1} of ${totalSteps}: ${stepTitles[step]}`}
+          >
             <motion.div
               className="h-full bg-[#00d9ff]"
               initial={{ width: 0 }}
               animate={{ width: `${((step + 1) / totalSteps) * 100}%` }}
               transition={{ duration: 0.3 }}
             />
+          </div>
+          {/* Hidden live region for step announcements */}
+          <div className="sr-only" aria-live="polite" aria-atomic="true">
+            Step {step + 1} of {totalSteps}: {stepTitles[step]}
           </div>
 
           <AnimatePresence mode="wait">
@@ -192,13 +299,13 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
                 className="p-8"
               >
                 <div className="text-center mb-8">
-                  <div className="w-16 h-16 bg-gradient-to-br from-[#00d9ff] to-[#00ff88] rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-[#00d9ff] to-[#00ff88] rounded-2xl flex items-center justify-center mx-auto mb-4" aria-hidden="true">
                     <Sparkles className="h-8 w-8 text-black" />
                   </div>
-                  <h2 className="text-2xl font-bold text-white mb-2">
+                  <h2 id="onboarding-title" className="text-2xl font-bold text-white mb-2">
                     {userName ? `Welcome, ${userName}!` : "Welcome to Skillon!"}
                   </h2>
-                  <p className="text-gray-400">
+                  <p id="onboarding-description" className="text-gray-400">
                     Let's set up your personalized practice experience in 4 quick steps.
                   </p>
                 </div>
@@ -241,7 +348,11 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
                   <p className="text-sm text-gray-400 mt-1">This helps us calibrate problem difficulty.</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 mb-6">
+                <div
+                  className="grid grid-cols-2 gap-3 mb-6"
+                  role="radiogroup"
+                  aria-label="Experience level selection"
+                >
                   {roles.map((role) => {
                     const Icon = role.icon
                     const isSelected = selectedRole === role.id
@@ -249,13 +360,16 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
                       <button
                         key={role.id}
                         onClick={() => setSelectedRole(role.id)}
+                        role="radio"
+                        aria-checked={isSelected}
+                        aria-label={`${role.label}: ${role.description}`}
                         className={`p-4 rounded-xl border text-left transition-all ${
                           isSelected
                             ? "border-[#00d9ff] bg-[#00d9ff]/10"
                             : "border-gray-700 hover:border-gray-600 bg-gray-800/50"
                         }`}
                       >
-                        <Icon className={`h-5 w-5 mb-2 ${isSelected ? "text-[#00d9ff]" : "text-gray-400"}`} />
+                        <Icon className={`h-5 w-5 mb-2 ${isSelected ? "text-[#00d9ff]" : "text-gray-400"}`} aria-hidden="true" />
                         <div className={`font-medium ${isSelected ? "text-white" : "text-gray-200"}`}>
                           {role.label}
                         </div>
@@ -295,7 +409,11 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
                   <p className="text-sm text-gray-400 mt-1">We'll tailor recommendations based on your target.</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 mb-4">
+                <div
+                  className="grid grid-cols-2 gap-3 mb-4"
+                  role="radiogroup"
+                  aria-label="Goal selection"
+                >
                   {goals.map((goal) => {
                     const Icon = goal.icon
                     const isSelected = selectedGoal === goal.id
@@ -306,13 +424,16 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
                           setSelectedGoal(goal.id)
                           if (goal.id !== "faang") setTargetCompany(null)
                         }}
+                        role="radio"
+                        aria-checked={isSelected}
+                        aria-label={`${goal.label}: ${goal.description}`}
                         className={`p-4 rounded-xl border text-left transition-all ${
                           isSelected
                             ? "border-[#00d9ff] bg-[#00d9ff]/10"
                             : "border-gray-700 hover:border-gray-600 bg-gray-800/50"
                         }`}
                       >
-                        <Icon className={`h-5 w-5 mb-2 ${isSelected ? "text-[#00d9ff]" : "text-gray-400"}`} />
+                        <Icon className={`h-5 w-5 mb-2 ${isSelected ? "text-[#00d9ff]" : "text-gray-400"}`} aria-hidden="true" />
                         <div className={`font-medium ${isSelected ? "text-white" : "text-gray-200"}`}>
                           {goal.label}
                         </div>
@@ -377,13 +498,20 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
                   <p className="text-sm text-gray-400 mt-1">Set a daily goal. You can adjust this anytime.</p>
                 </div>
 
-                <div className="space-y-3 mb-6">
+                <div
+                  className="space-y-3 mb-6"
+                  role="radiogroup"
+                  aria-label="Daily practice goal selection"
+                >
                   {dailyGoals.map((goal) => {
                     const isSelected = dailyGoal === goal.value
                     return (
                       <button
                         key={goal.value}
                         onClick={() => setDailyGoal(goal.value)}
+                        role="radio"
+                        aria-checked={isSelected}
+                        aria-label={`${goal.label}, ${goal.desc}, approximately ${goal.time}`}
                         className={`w-full p-4 rounded-xl border text-left transition-all flex items-center justify-between ${
                           isSelected
                             ? "border-[#00d9ff] bg-[#00d9ff]/10"
@@ -391,7 +519,7 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <Clock className={`h-5 w-5 ${isSelected ? "text-[#00d9ff]" : "text-gray-400"}`} />
+                          <Clock className={`h-5 w-5 ${isSelected ? "text-[#00d9ff]" : "text-gray-400"}`} aria-hidden="true" />
                           <div>
                             <div className={`font-medium ${isSelected ? "text-white" : "text-gray-200"}`}>
                               {goal.label}
@@ -399,7 +527,7 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
                             <div className="text-xs text-gray-500">{goal.desc}</div>
                           </div>
                         </div>
-                        <div className="text-sm text-gray-400">{goal.time}</div>
+                        <div className="text-sm text-gray-400" aria-hidden="true">{goal.time}</div>
                       </button>
                     )
                   })}

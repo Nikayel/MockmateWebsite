@@ -21,6 +21,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai"
 import { generateCacheKey, getCachedResponse, setCachedResponse } from './ai-cache'
 import { trackUsageEvent, calculateCost, PROVIDER_COSTS } from './usage-tracking'
 import { checkRateLimit, recordRequestStart, recordRequestEnd, updateTokenCount, RateLimitTier } from './rate-limiter'
+import { logger } from './logger'
 
 // Provider types
 export type AIProvider = 'gemini' | 'deepseek' | 'claude'
@@ -174,7 +175,7 @@ async function callGemini(
       errorString.includes('quotafailure')
 
     if (isQuotaError) {
-      console.log(`[Gemini] Quota error detected: ${errorMessage.substring(0, 200)}`)
+      logger.warn('[Gemini] Quota error detected', { message: errorMessage.substring(0, 200) })
       throw {
         status: 429,
         message: errorMessage,
@@ -215,7 +216,7 @@ async function callDeepseek(
       { role: 'user', content: userMessage },
     ]
 
-    console.log(`[DeepSeek] Calling API with model: ${config.model}, messages: ${messages.length}`)
+    logger.debug('[DeepSeek] Calling API', { model: config.model, messageCount: messages.length })
 
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -241,8 +242,7 @@ async function callDeepseek(
       }
 
       const errorMessage = errorData.error?.message || errorData.message || response.statusText
-      console.error(`[DeepSeek] API error (${response.status}):`, errorMessage)
-      console.error(`[DeepSeek] Full error response:`, errorText)
+      logger.error('[DeepSeek] API error', { status: response.status, message: errorMessage, fullResponse: errorText })
 
       throw {
         status: response.status,
@@ -255,7 +255,7 @@ async function callDeepseek(
     const content = data.choices[0]?.message?.content || ''
 
     if (!content) {
-      console.error(`[DeepSeek] Empty response:`, JSON.stringify(data, null, 2))
+      logger.error('[DeepSeek] Empty response', { data })
       throw {
         status: 500,
         message: 'DeepSeek returned empty response',
@@ -263,7 +263,7 @@ async function callDeepseek(
       }
     }
 
-    console.log(`[DeepSeek] Success: ${content.length} characters`)
+    logger.debug('[DeepSeek] Success', { responseLength: content.length })
     return content
   } catch (error: any) {
     // Re-throw with better context
@@ -452,20 +452,16 @@ export async function generateAIResponse(
   const enabledProviders = providerOrder.filter(p => PROVIDERS[p].enabled)
   const disabledProviders = providerOrder.filter(p => !PROVIDERS[p].enabled)
 
-  // Log provider status for debugging
-  console.log(`[AI Provider] Provider status check:`)
-  providerOrder.forEach(p => {
-    const config = PROVIDERS[p]
-    const hasKey = !!config.apiKey
-    const enabled = config.enabled
-    const status = enabled ? '✅ enabled' : `❌ disabled (${hasKey ? 'key exists but disabled' : 'no API key'})`
-    console.log(`  ${p}: ${status}`)
-  })
+  // Log provider status for debugging (only in development)
+  const providerStatuses = Object.fromEntries(
+    providerOrder.map(p => [p, PROVIDERS[p].enabled ? 'enabled' : 'disabled'])
+  )
+  logger.debug('[AI Provider] Provider status check', { providers: providerStatuses })
 
   if (disabledProviders.length > 0) {
-    console.log(`[AI Provider] ⚠️ Disabled providers will be skipped: ${disabledProviders.join(', ')}`)
+    logger.debug('[AI Provider] Disabled providers will be skipped', { providers: disabledProviders })
   }
-  console.log(`[AI Provider] Will try providers in order: ${enabledProviders.join(' → ')}`)
+  logger.debug('[AI Provider] Provider order', { order: enabledProviders })
 
   providerOrder = enabledProviders
 
@@ -482,12 +478,12 @@ export async function generateAIResponse(
 
   // Try each provider in order
   for (const provider of providerOrder) {
-    console.log(`[AI Provider] 🔄 Attempting provider: ${provider} (${PROVIDERS[provider].model})`)
+    logger.debug('[AI Provider] Attempting provider', { provider, model: PROVIDERS[provider].model })
     // Retry loop for each provider
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         if (attempt > 0) {
-          console.log(`[AI Provider] Retry attempt ${attempt + 1}/${maxRetries} for ${provider}`)
+          logger.debug('[AI Provider] Retry attempt', { attempt: attempt + 1, maxRetries, provider })
         }
 
         const text = await callProvider(provider, systemPrompt, userMessage, history, temperature)
@@ -539,7 +535,7 @@ export async function generateAIResponse(
           })
         }
 
-        console.log(`[AI Provider] ✅ Successfully used ${provider} (${latencyMs}ms, ${totalTokens} tokens)`)
+        logger.info('[AI Provider] Success', { provider, latencyMs, tokens: totalTokens })
         return {
           text,
           provider,
@@ -552,7 +548,10 @@ export async function generateAIResponse(
         // Log error details for debugging
         const errorMessage = error?.message || error?.toString() || 'Unknown error'
         const errorStatus = error?.status || 'unknown'
-        console.log(`[AI Provider] ❌ ${provider} failed (attempt ${attempt + 1}/${maxRetries}):`, {
+        logger.warn('[AI Provider] Provider failed', {
+          provider,
+          attempt: attempt + 1,
+          maxRetries,
           status: errorStatus,
           message: errorMessage.substring(0, 300),
           quotaExceeded: error?.quotaExceeded,
@@ -582,14 +581,12 @@ export async function generateAIResponse(
 
         if (isQuotaError) {
           // Quota errors should immediately fallback - don't retry
-          console.log(`[AI Provider] ⚠️ QUOTA EXCEEDED for ${provider} - immediately falling back`)
-          console.log(`[AI Provider] Error message:`, errorMessage.substring(0, 300))
           const remainingProviders = providerOrder.slice(providerOrder.indexOf(provider) + 1)
-          if (remainingProviders.length > 0) {
-            console.log(`[AI Provider] ✅ Falling back to: ${remainingProviders.join(' → ')}`)
-          } else {
-            console.log(`[AI Provider] ❌ No more providers available for fallback`)
-          }
+          logger.warn('[AI Provider] Quota exceeded, falling back', {
+            provider,
+            message: errorMessage.substring(0, 300),
+            fallbackProviders: remainingProviders,
+          })
           break
         }
 
@@ -684,16 +681,16 @@ export function getProviderStatus(): Record<AIProvider, { enabled: boolean; mode
   }
 }
 
-// Log provider status on module load (server-side only)
+// Log provider status on module load (server-side only, development only via logger)
 if (typeof window === 'undefined') {
   const status = getProviderStatus()
-  console.log('[AI Providers] Configuration status:')
-  Object.entries(status).forEach(([provider, config]) => {
-    const statusIcon = config.enabled ? '✅' : '❌'
-    const apiKeySet = provider === 'gemini' ? !!process.env.GEMINI_API_KEY :
-      provider === 'deepseek' ? !!process.env.DEEPSEEK_API_KEY :
-        !!process.env.ANTHROPIC_API_KEY
-    console.log(`  ${statusIcon} ${provider}: ${config.enabled ? 'enabled' : 'disabled'} (${config.model})${config.enabled ? '' : ` - API key ${apiKeySet ? 'exists but provider disabled' : 'missing'}`}`)
+  logger.info('[AI Providers] Configuration status', {
+    providers: Object.fromEntries(
+      Object.entries(status).map(([provider, config]) => [
+        provider,
+        { enabled: config.enabled, model: config.model }
+      ])
+    )
   })
 }
 

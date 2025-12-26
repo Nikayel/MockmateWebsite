@@ -12,6 +12,65 @@ import {
 import { auth } from "./firebase"
 import { trackLogin, trackSignup } from "./analytics"
 
+// =============================================================================
+// SECURITY: Redirect URL Validation
+// =============================================================================
+// Whitelist of allowed redirect paths to prevent open redirect attacks
+const ALLOWED_REDIRECT_PATHS = [
+  'dashboard',
+  'interview',
+  'practice',
+  'account',
+  'profile',
+  'sessions',
+  'roadmap',
+  'pricing',
+  'admin',
+] as const
+
+/**
+ * Validates a redirect path against the whitelist
+ * Prevents open redirect vulnerabilities by only allowing known paths
+ */
+export function isValidRedirectPath(path: string | null | undefined): boolean {
+  if (!path || typeof path !== 'string') return false
+
+  // Remove leading/trailing slashes and normalize
+  const normalizedPath = path.replace(/^\/+|\/+$/g, '').toLowerCase()
+
+  // Check if path starts with any allowed path
+  return ALLOWED_REDIRECT_PATHS.some(allowed =>
+    normalizedPath === allowed || normalizedPath.startsWith(`${allowed}/`)
+  )
+}
+
+/**
+ * Safely stores a redirect path in localStorage after validation
+ */
+export function storeRedirectPath(redirect: string | undefined): void {
+  if (redirect && isValidRedirectPath(redirect)) {
+    localStorage.setItem("auth_redirect", redirect)
+  }
+  // Invalid redirects are silently ignored for security
+}
+
+/**
+ * Retrieves and validates a stored redirect path
+ * Returns null if invalid or not present
+ */
+export function getStoredRedirectPath(): string | null {
+  if (typeof window === 'undefined') return null
+
+  const savedRedirect = localStorage.getItem("auth_redirect")
+  localStorage.removeItem("auth_redirect") // Always clear after reading
+
+  if (savedRedirect && isValidRedirectPath(savedRedirect)) {
+    return savedRedirect
+  }
+
+  return null
+}
+
 // Helper function to get user-friendly error messages
 function getAuthErrorMessage(error: any): string {
   const code = error?.code || ""
@@ -99,10 +158,8 @@ export async function signInWithGitHub(redirect?: string) {
   // Validate auth is initialized
   validateAuth()
 
-  // Store redirect in localStorage to retrieve after auth
-  if (redirect) {
-    localStorage.setItem("auth_redirect", redirect)
-  }
+  // Store redirect in localStorage to retrieve after auth (with validation)
+  storeRedirectPath(redirect)
 
   const provider = new GithubAuthProvider()
   provider.addScope('read:user')
@@ -195,10 +252,8 @@ export async function signInWithGoogle(redirect?: string) {
   // Validate auth is initialized
   validateAuth()
 
-  // Store redirect in localStorage to retrieve after auth
-  if (redirect) {
-    localStorage.setItem("auth_redirect", redirect)
-  }
+  // Store redirect in localStorage to retrieve after auth (with validation)
+  storeRedirectPath(redirect)
 
   const provider = new GoogleAuthProvider()
   provider.addScope('profile')
@@ -317,9 +372,8 @@ export function generateVSCodeDeepLink(token: string) {
 export async function signInWithGitHubRedirect(redirect?: string) {
   validateAuth()
 
-  if (redirect) {
-    localStorage.setItem("auth_redirect", redirect)
-  }
+  // Store redirect in localStorage to retrieve after auth (with validation)
+  storeRedirectPath(redirect)
 
   const provider = new GithubAuthProvider()
   provider.addScope('read:user')
@@ -331,9 +385,8 @@ export async function signInWithGitHubRedirect(redirect?: string) {
 export async function signInWithGoogleRedirect(redirect?: string) {
   validateAuth()
 
-  if (redirect) {
-    localStorage.setItem("auth_redirect", redirect)
-  }
+  // Store redirect in localStorage to retrieve after auth (with validation)
+  storeRedirectPath(redirect)
 
   const provider = new GoogleAuthProvider()
   provider.addScope('profile')
