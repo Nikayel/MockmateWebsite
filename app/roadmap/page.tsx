@@ -163,6 +163,69 @@ export default function RoadmapPage() {
     markQuestionCompleted(scenarioId)
   }
 
+  // Handle reactivating an archived/abandoned roadmap
+  const handleReactivateRoadmap = async (roadmapId: string) => {
+    if (!firebaseUser) return
+
+    try {
+      const idToken = await firebaseUser.getIdToken()
+      const authHeaders = {
+        'Authorization': `Bearer ${idToken}`,
+        'Content-Type': 'application/json',
+      }
+
+      // Reactivate the roadmap
+      const response = await fetch('/api/roadmap', {
+        method: 'PATCH',
+        headers: authHeaders,
+        body: JSON.stringify({ roadmapId, status: 'active' }),
+      })
+
+      if (!response.ok) {
+        console.error('[Roadmap] Failed to reactivate roadmap')
+        return
+      }
+
+      // Reload roadmaps to get the updated state
+      const activeResponse = await fetch('/api/roadmap', { headers: authHeaders })
+      if (activeResponse.ok) {
+        const activeData = await activeResponse.json()
+        if (activeData.roadmap) {
+          const roadmap = {
+            ...activeData.roadmap,
+            interviewDate: new Date(activeData.roadmap.interviewDate),
+            createdAt: activeData.roadmap.createdAt ? new Date(activeData.roadmap.createdAt) : new Date(),
+            updatedAt: activeData.roadmap.updatedAt ? new Date(activeData.roadmap.updatedAt) : new Date(),
+            dailyPlans: activeData.roadmap.dailyPlans?.map((plan: any) => ({
+              ...plan,
+              date: new Date(plan.date),
+              questions: plan.questions?.map((q: any) => ({
+                ...q,
+                completedAt: q.completedAt ? new Date(q.completedAt) : undefined,
+              })),
+            })) || [],
+            milestones: activeData.roadmap.milestones?.map((m: any) => ({
+              ...m,
+              targetDate: new Date(m.targetDate),
+            })) || [],
+          }
+          setActiveRoadmap(roadmap)
+        }
+      }
+
+      // Update all roadmaps list
+      const allResponse = await fetch('/api/roadmap?all=true', { headers: authHeaders })
+      if (allResponse.ok) {
+        const allData = await allResponse.json()
+        if (allData.roadmaps) {
+          setAllRoadmaps(allData.roadmaps)
+        }
+      }
+    } catch (error) {
+      console.error('Error reactivating roadmap:', error)
+    }
+  }
+
   // Loading state
   if (!initialized || isLoadingRoadmap) {
     return (
@@ -181,11 +244,17 @@ export default function RoadmapPage() {
   // No active roadmap - show list of archived roadmaps or empty state
   if (!roadmap) {
     const archivedRoadmaps = allRoadmaps.filter(r => r.status === 'archived' || r.status === 'completed' || r.status === 'abandoned')
-    
+
     if (archivedRoadmaps.length > 0) {
-      return <RoadmapListView roadmaps={allRoadmaps} onCreateNew={() => router.push('/roadmap/new')} />
+      return (
+        <RoadmapListView
+          roadmaps={allRoadmaps}
+          onCreateNew={() => router.push('/roadmap/new')}
+          onReactivate={handleReactivateRoadmap}
+        />
+      )
     }
-    
+
     return <EmptyState />
   }
 
@@ -259,6 +328,7 @@ export default function RoadmapPage() {
             roadmaps={allRoadmaps}
             onCreateNew={() => router.push('/roadmap/new')}
             onClose={() => setShowArchived(false)}
+            onReactivate={handleReactivateRoadmap}
           />
         ) : (
           <div className="space-y-6">
