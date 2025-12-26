@@ -12,7 +12,7 @@ import { signOut } from "@/lib/auth"
 import { getUserProfile } from "@/lib/firestore-helpers"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore"
-import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle, XCircle, Shield, Download, Trash2, Cookie, Bell } from "lucide-react"
+import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle, XCircle, Shield, Download, Trash2, Cookie, Bell, RefreshCw } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Profile, ProfileQuota, InterviewSession, NotificationPreferences } from "@/lib/types"
@@ -50,6 +50,7 @@ export default function AccountPage() {
     marketing_emails: false,
   })
   const [isSavingPrefs, setIsSavingPrefs] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   // Separate effect to handle auth check with delay to prevent race condition on refresh
   useEffect(() => {
@@ -234,6 +235,49 @@ export default function AccountPage() {
       toast.error("Failed to open subscription portal", {
         description: error instanceof Error ? error.message : "Please try again",
       })
+    }
+  }
+
+  const handleSyncSubscription = async () => {
+    if (!user || !firebaseUser) return
+
+    setIsSyncing(true)
+    try {
+      const idToken = await firebaseUser.getIdToken()
+
+      toast.info("Syncing subscription from Stripe...")
+      const response = await fetch("/api/sync-subscription", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ userId: user.id }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success(`Subscription synced! Status: ${data.profile.subscription_tier}`)
+        // Reload profile
+        const userProfile = await getUserProfile(firebaseUser.uid)
+        if (userProfile) {
+          setProfile(userProfile)
+        }
+        // Reload page to show updated status
+        setTimeout(() => {
+          window.location.reload()
+        }, 1000)
+      } else {
+        throw new Error(data.error || "Sync failed")
+      }
+    } catch (error) {
+      console.error("Sync subscription error:", error)
+      toast.error("Failed to sync subscription", {
+        description: error instanceof Error ? error.message : "Please try again",
+      })
+    } finally {
+      setIsSyncing(false)
     }
   }
 
@@ -528,6 +572,19 @@ export default function AccountPage() {
                 >
                   View Documentation
                 </Button>
+
+                {/* Sync subscription button - show if user has Stripe IDs */}
+                {(profile?.stripe_subscription_id || profile?.stripe_customer_id) && (
+                  <Button
+                    onClick={handleSyncSubscription}
+                    variant="outline"
+                    className="w-full border-gray-600 text-white hover:bg-gray-800 bg-transparent"
+                    disabled={isSyncing}
+                  >
+                    <RefreshCw className={`mr-2 h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                    {isSyncing ? "Syncing..." : "Sync Subscription Status"}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           </div>
