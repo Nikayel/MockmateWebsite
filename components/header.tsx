@@ -95,19 +95,13 @@ export function Header() {
             ) : (
               <>
                 <Link href="/why-skillon" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
-                  Why Skillon
+                  How it works
                 </Link>
                 <a href="/#features" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
                   Features
                 </a>
-                <Link href="/pricing" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
-                  Pricing
-                </Link>
                 <Link href="/docs" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
                   Docs
-                </Link>
-                <Link href="/careers" className="text-white/50 hover:text-accent transition-colors duration-300 cursor-pointer text-sm">
-                  Join us
                 </Link>
                 <Link href="/login">
                   <Button
@@ -207,7 +201,7 @@ export function Header() {
                     className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    Why Skillon
+                    How it works
                   </Link>
                   <a
                     href="/#features"
@@ -217,25 +211,11 @@ export function Header() {
                     Features
                   </a>
                   <Link
-                    href="/pricing"
-                    className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Pricing
-                  </Link>
-                  <Link
                     href="/docs"
                     className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Docs
-                  </Link>
-                  <Link
-                    href="/careers"
-                    className="text-white/50 hover:text-accent transition-colors duration-300 cursor-pointer text-sm"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Join us
                   </Link>
                   <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
                     <Button

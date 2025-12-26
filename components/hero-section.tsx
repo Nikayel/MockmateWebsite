@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic"
 import { MagneticButton } from "@/components/ui/magnetic-button"
 import { TypewriterText } from "@/components/ui/rotating-text"
-import { Play, ArrowRight, Mic, MessageCircle, Brain, BarChart3, Target, Sparkles } from "lucide-react"
+import { Play, ArrowRight, Mic, Brain, Target, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
@@ -27,14 +27,13 @@ const SubtleParticles = dynamic(
  * Sources: NN/G, Voyage AI patterns, 2025 Eye Tracking Studies
  */
 
-// Capabilities to rotate through - shows breadth without overwhelming
+// Capabilities to rotate through - focused on real value
 const capabilities = [
   "Voice-enabled mock interviews",
+  "Available 24/7, no scheduling",
   "Real-time AI feedback",
-  "Spaced repetition scheduling",
-  "200+ DSA problems",
-  "FAANG interview simulations",
-  "Pattern mastery tracking",
+  "15 DSA patterns covered",
+  "200+ curated problems",
 ]
 
 export function HeroSection() {
@@ -65,14 +64,13 @@ export function HeroSection() {
 
             {/* Left: Headline (2 cols) */}
             <div className="lg:col-span-2 text-center lg:text-left pt-4">
-              {/* Product descriptor - tells users WHAT this is immediately */}
+              {/* Authentic badge - student-built credibility */}
               <motion.div
                 variants={staggerItem}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/10 border border-accent/20 mb-4"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-neural/10 border border-neural/20 mb-4"
               >
-                <Brain className="w-3.5 h-3.5 text-accent" />
-                <span className="text-xs text-accent font-medium tracking-wide uppercase">
-                  AI Mock Interview Platform
+                <span className="text-xs text-neural font-medium">
+                  Built by a CS student, for CS students
                 </span>
               </motion.div>
 
@@ -80,10 +78,10 @@ export function HeroSection() {
                 variants={staggerItem}
                 className="text-4xl sm:text-5xl lg:text-5xl font-heading font-black mb-4 leading-[1.1] tracking-tight"
               >
-                <span className="text-foreground">Practice like</span>
+                <span className="text-foreground">Ace your next</span>
                 <br />
                 <span className="bg-gradient-to-r from-accent via-neural to-accent bg-clip-text text-transparent">
-                  it's the real thing
+                  tech interview
                 </span>
               </motion.h1>
 
@@ -108,10 +106,10 @@ export function HeroSection() {
                 variants={staggerItem}
                 className="text-sm lg:text-base text-muted-foreground mb-4 leading-relaxed"
               >
-                AI trained on 500+ real company interviews. Think out loud—it listens and responds naturally. Get detailed feedback to nail your next interview.
+                An AI interviewer you can practice with anytime. Talk through problems out loud, get instant feedback, and stop grinding LeetCode alone.
               </motion.p>
 
-              {/* CTA */}
+              {/* Single CTA - friction-free */}
               <motion.div variants={staggerItem} className="mb-4">
                 <Link href="/interview">
                   <MagneticButton
@@ -122,14 +120,14 @@ export function HeroSection() {
                     className="w-full sm:w-auto"
                   >
                     <Play className="w-5 h-5" />
-                    Start practicing
+                    Try a free mock interview
                     <ArrowRight className="w-5 h-5" />
                   </MagneticButton>
                 </Link>
               </motion.div>
 
               <motion.p variants={staggerItem} className="text-sm text-muted-foreground/60">
-                Free to try. No card needed.
+                No signup required. Just start practicing.
               </motion.p>
             </div>
 
@@ -209,7 +207,7 @@ export function HeroSection() {
             </motion.div>
           </div>
 
-          {/* Middle: Key differentiator - Voice/Think out loud */}
+          {/* Middle: Key differentiators - What students care about */}
           <motion.div
             variants={staggerItem}
             className="bg-gradient-to-r from-secondary/50 via-secondary/30 to-secondary/50 rounded-xl border border-border/50 p-4 md:p-5 mb-6"
@@ -217,11 +215,11 @@ export function HeroSection() {
             <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12 text-center md:text-left">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center">
-                  <Mic className="w-4 h-4 text-accent" />
+                  <Brain className="w-4 h-4 text-accent" />
                 </div>
                 <div>
-                  <div className="text-foreground font-medium text-sm md:text-base">Think out loud</div>
-                  <div className="text-xs text-muted-foreground">Just talk through your approach</div>
+                  <div className="text-foreground font-medium text-sm md:text-base">AI interviewer</div>
+                  <div className="text-xs text-muted-foreground">Responds like a real interviewer</div>
                 </div>
               </div>
 
@@ -229,11 +227,11 @@ export function HeroSection() {
 
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-full bg-neural/10 flex items-center justify-center">
-                  <MessageCircle className="w-4 h-4 text-neural" />
+                  <Mic className="w-4 h-4 text-neural" />
                 </div>
                 <div>
-                  <div className="text-foreground font-medium text-sm md:text-base">Real-time responses</div>
-                  <div className="text-xs text-muted-foreground">AI follows your reasoning</div>
+                  <div className="text-foreground font-medium text-sm md:text-base">Practice anytime</div>
+                  <div className="text-xs text-muted-foreground">Available 24/7, no scheduling</div>
                 </div>
               </div>
 
@@ -241,11 +239,11 @@ export function HeroSection() {
 
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center">
-                  <BarChart3 className="w-4 h-4 text-accent" />
+                  <Target className="w-4 h-4 text-accent" />
                 </div>
                 <div>
-                  <div className="text-foreground font-medium text-sm md:text-base">Spaced repetition</div>
-                  <div className="text-xs text-muted-foreground">Science-backed review timing</div>
+                  <div className="text-foreground font-medium text-sm md:text-base">Learn patterns</div>
+                  <div className="text-xs text-muted-foreground">Not just memorize solutions</div>
                 </div>
               </div>
 
