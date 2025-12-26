@@ -31,6 +31,9 @@ export async function GET(request: NextRequest) {
 
     // Check for expired active roadmaps and archive them
     const now = new Date()
+
+    // Note: Avoid composite index requirement by not using orderBy with multiple where clauses
+    // We'll sort client-side instead
     const activeSnapshot = await adminDb
       .collection(COLLECTION)
       .where('userId', '==', userId)
@@ -56,13 +59,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Get roadmaps based on query params
+    // Note: Avoid composite index requirement by not using orderBy - we sort client-side
     let snapshot
     if (getAll) {
       // Get all roadmaps
       snapshot = await adminDb
         .collection(COLLECTION)
         .where('userId', '==', userId)
-        .orderBy('createdAt', 'desc')
         .get()
     } else if (statusFilter) {
       // Get roadmaps by status
@@ -70,7 +73,6 @@ export async function GET(request: NextRequest) {
         .collection(COLLECTION)
         .where('userId', '==', userId)
         .where('status', '==', statusFilter)
-        .orderBy('createdAt', 'desc')
         .get()
     } else {
       // Get active roadmap only (default behavior)
@@ -78,8 +80,6 @@ export async function GET(request: NextRequest) {
         .collection(COLLECTION)
         .where('userId', '==', userId)
         .where('status', '==', 'active')
-        .orderBy('createdAt', 'desc')
-        .limit(1)
         .get()
     }
 
@@ -178,10 +178,23 @@ export async function GET(request: NextRequest) {
     }
 
     if (getAll || statusFilter) {
-      const roadmaps = snapshot.docs.map(convertRoadmap)
+      // Sort by createdAt descending (client-side to avoid index requirement)
+      const roadmaps = snapshot.docs
+        .map(convertRoadmap)
+        .sort((a: any, b: any) => {
+          const aDate = new Date(a.createdAt || 0).getTime()
+          const bDate = new Date(b.createdAt || 0).getTime()
+          return bDate - aDate
+        })
       return NextResponse.json({ roadmaps })
     } else {
-      const roadmap = convertRoadmap(snapshot.docs[0])
+      // Get the most recent active roadmap (sort client-side)
+      const sortedDocs = snapshot.docs.sort((a, b) => {
+        const aCreated = a.data().createdAt?.toDate?.() || new Date(0)
+        const bCreated = b.data().createdAt?.toDate?.() || new Date(0)
+        return bCreated.getTime() - aCreated.getTime()
+      })
+      const roadmap = convertRoadmap(sortedDocs[0])
       return NextResponse.json({ roadmap })
     }
   } catch (error) {
