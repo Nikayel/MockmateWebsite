@@ -50,18 +50,45 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Support & Legal */}
+          {/* Legal */}
+          <div>
+            <h3 className="text-white font-semibold mb-4">Legal</h3>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <a href="/legal#privacy-policy" className="text-gray-400 hover:text-white transition-colors">
+                  Privacy Policy
+                </a>
+              </li>
+              <li>
+                <a href="/legal#terms-of-service" className="text-gray-400 hover:text-white transition-colors">
+                  Terms of Service
+                </a>
+              </li>
+              <li>
+                <a href="/legal#cookie-policy" className="text-gray-400 hover:text-white transition-colors">
+                  Cookie Policy
+                </a>
+              </li>
+              <li>
+                <a href="/legal#data-processing" className="text-gray-400 hover:text-white transition-colors">
+                  Your Data Rights
+                </a>
+              </li>
+              <li>
+                <a href="mailto:security@skillon.dev" className="text-gray-400 hover:text-white transition-colors">
+                  Security
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          {/* Support */}
           <div>
             <h3 className="text-white font-semibold mb-4">Support</h3>
             <ul className="space-y-2 text-sm">
               <li>
                 <a href="/docs" className="text-gray-400 hover:text-white transition-colors">
                   Help Center
-                </a>
-              </li>
-              <li>
-                <a href="/legal" className="text-gray-400 hover:text-white transition-colors">
-                  Privacy & Terms
                 </a>
               </li>
               <li>
@@ -77,13 +104,6 @@ export function Footer() {
                   Report Issues
                 </a>
               </li>
-            </ul>
-          </div>
-
-          {/* Company */}
-          <div>
-            <h3 className="text-white font-semibold mb-4">Company</h3>
-            <ul className="space-y-2 text-sm">
               <li>
                 <a href="/careers" className="text-gray-400 hover:text-white transition-colors">
                   Careers
