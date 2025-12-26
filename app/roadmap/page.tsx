@@ -3,10 +3,18 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, BookOpen, Target, Sparkles, Trophy, AlertTriangle, Clock, RefreshCw, PartyPopper, Calendar, ArrowRight, ChevronDown, ChevronUp, Archive, CheckCircle2, XCircle, Play, Flame, BarChart3, Info, Zap, Crown } from 'lucide-react'
+import { Plus, BookOpen, Target, Sparkles, Trophy, AlertTriangle, Clock, RefreshCw, PartyPopper, Calendar, ArrowRight, ChevronDown, ChevronUp, Archive, CheckCircle2, XCircle, Play, Flame, BarChart3, Info, Zap, Crown, StopCircle } from 'lucide-react'
 import Link from 'next/link'
 
 import { Header } from '@/components/header'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   RoadmapHeader,
   TodaysFocus,
@@ -50,6 +58,8 @@ export default function RoadmapPage() {
   const [allRoadmaps, setAllRoadmaps] = useState<any[]>([])
   const [showArchived, setShowArchived] = useState(false)
   const [showTips, setShowTips] = useState(false)
+  const [showEndRoadmapDialog, setShowEndRoadmapDialog] = useState(false)
+  const [isArchiving, setIsArchiving] = useState(false)
 
   // Get today's plan
   const today = new Date()
@@ -223,6 +233,47 @@ export default function RoadmapPage() {
       }
     } catch (error) {
       console.error('Error reactivating roadmap:', error)
+    }
+  }
+
+  // Handle archiving the current roadmap (end early)
+  const handleArchiveRoadmap = async () => {
+    if (!firebaseUser || !roadmap) return
+
+    setIsArchiving(true)
+    try {
+      const idToken = await firebaseUser.getIdToken()
+      const authHeaders = {
+        'Authorization': `Bearer ${idToken}`,
+        'Content-Type': 'application/json',
+      }
+
+      const response = await fetch('/api/roadmap', {
+        method: 'PATCH',
+        headers: authHeaders,
+        body: JSON.stringify({ roadmapId: roadmap.id, status: 'archived' }),
+      })
+
+      if (!response.ok) {
+        console.error('[Roadmap] Failed to archive roadmap')
+        return
+      }
+
+      setActiveRoadmap(null)
+      setShowEndRoadmapDialog(false)
+
+      // Reload all roadmaps
+      const allResponse = await fetch('/api/roadmap?all=true', { headers: authHeaders })
+      if (allResponse.ok) {
+        const allData = await allResponse.json()
+        if (allData.roadmaps) {
+          setAllRoadmaps(allData.roadmaps)
+        }
+      }
+    } catch (error) {
+      console.error('Error archiving roadmap:', error)
+    } finally {
+      setIsArchiving(false)
     }
   }
 
@@ -581,20 +632,73 @@ export default function RoadmapPage() {
               </motion.div>
             </AnimatePresence>
 
-            {/* Archived roadmaps link - minimal, bottom */}
-            {allRoadmaps.filter(r => r.status !== 'active').length > 0 && (
-              <div className="pt-4 border-t border-border text-center">
+            {/* Footer links - archived roadmaps and end roadmap */}
+            <div className="pt-4 border-t border-border flex items-center justify-between">
+              {allRoadmaps.filter(r => r.status !== 'active').length > 0 ? (
                 <button
                   onClick={() => setShowArchived(true)}
                   className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <Archive className="inline h-3 w-3 mr-1" />
-                  View archived roadmaps ({allRoadmaps.filter(r => r.status !== 'active').length})
+                  View archived ({allRoadmaps.filter(r => r.status !== 'active').length})
                 </button>
-              </div>
-            )}
+              ) : (
+                <div />
+              )}
+              <button
+                onClick={() => setShowEndRoadmapDialog(true)}
+                className="text-xs text-muted-foreground hover:text-red-500 transition-colors"
+              >
+                <StopCircle className="inline h-3 w-3 mr-1" />
+                End Roadmap
+              </button>
+            </div>
           </div>
         )}
+
+        {/* Confirmation Dialog for Ending Roadmap */}
+        <Dialog open={showEndRoadmapDialog} onOpenChange={setShowEndRoadmapDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                End This Roadmap?
+              </DialogTitle>
+              <DialogDescription className="text-left pt-2">
+                Are you sure you want to end your {roadmap?.companyName} roadmap early?
+                <ul className="mt-3 space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <span className="text-muted-foreground">•</span>
+                    <span>Your progress ({roadmap?.questionsCompleted}/{roadmap?.totalQuestions} questions) will be saved</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-muted-foreground">•</span>
+                    <span>You can resume this roadmap later if the interview date hasn't passed</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-muted-foreground">•</span>
+                    <span>You can create a new roadmap for a different company</span>
+                  </li>
+                </ul>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-row gap-2 sm:justify-end">
+              <button
+                onClick={() => setShowEndRoadmapDialog(false)}
+                className="flex-1 sm:flex-none px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
+              >
+                Keep Studying
+              </button>
+              <button
+                onClick={handleArchiveRoadmap}
+                disabled={isArchiving}
+                className="flex-1 sm:flex-none px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                {isArchiving ? 'Ending...' : 'End Roadmap'}
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   )
