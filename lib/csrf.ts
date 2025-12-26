@@ -10,6 +10,29 @@ const CSRF_COOKIE_NAME = "csrf_token"
 const CSRF_TOKEN_LENGTH = 32
 
 /**
+ * Constant-time string comparison to prevent timing attacks
+ * Returns true if strings are equal, false otherwise
+ * Always takes the same amount of time regardless of where strings differ
+ */
+function constantTimeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    // Still do a comparison to maintain constant time even for length mismatch
+    // Compare against self to consume similar time
+    let result = 0
+    for (let i = 0; i < a.length; i++) {
+      result |= a.charCodeAt(i) ^ a.charCodeAt(i)
+    }
+    return false
+  }
+
+  let result = 0
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  }
+  return result === 0
+}
+
+/**
  * Generate a random CSRF token
  */
 function generateCSRFToken(): string {
@@ -52,8 +75,8 @@ export function verifyCSRFToken(request: NextRequest): boolean {
     return false
   }
 
-  // Constant-time comparison to prevent timing attacks
-  return tokenFromHeader === tokenFromCookie
+  // Use constant-time comparison to prevent timing attacks
+  return constantTimeCompare(tokenFromHeader, tokenFromCookie)
 }
 
 /**

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
-import { generateVSCodeDeepLink } from "@/lib/auth"
+import { generateVSCodeDeepLink, getStoredRedirectPath } from "@/lib/auth"
 import { createOrUpdateProfile } from "@/lib/firestore-helpers"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -65,15 +65,12 @@ export function AuthCallbackClient() {
           const vscodeLink = generateVSCodeDeepLink(token)
           setDeepLink(vscodeLink)
 
-          // Check for redirect in localStorage (only in browser)
-          if (typeof window !== 'undefined') {
-            const savedRedirect = localStorage.getItem("auth_redirect")
-            if (savedRedirect) {
-              localStorage.removeItem("auth_redirect")
-              // Auto-redirect immediately for frictionless flow
-              router.push(`/${savedRedirect}`)
-              return
-            }
+          // Check for validated redirect path (security: only allows whitelisted paths)
+          const validatedRedirect = getStoredRedirectPath()
+          if (validatedRedirect) {
+            // Auto-redirect immediately for frictionless flow
+            router.push(`/${validatedRedirect}`)
+            return
           }
 
           // Default redirect to dashboard for new users
