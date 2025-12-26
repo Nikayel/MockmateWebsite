@@ -28,6 +28,27 @@ async function isAdmin(userId: string): Promise<boolean> {
  *   - action: 'vectorize-all' | 'vectorize-single' | 'status'
  */
 
+/**
+ * Validate admin API key
+ */
+function validateAdminAuth(request: NextRequest): boolean {
+  const adminKey = process.env.ADMIN_API_KEY
+  if (!adminKey) {
+    console.warn('[Vectorize API] ADMIN_API_KEY not configured')
+    return false
+  }
+
+  const authHeader = request.headers.get('authorization')
+  if (!authHeader) return false
+
+  // Support both "Bearer <key>" and just "<key>"
+  const providedKey = authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : authHeader
+
+  return providedKey === adminKey
+}
+
 export async function GET() {
   try {
     const status = await getVectorizationStatus()
@@ -49,6 +70,17 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  // Require admin authentication for write operations
+  if (!validateAdminAuth(request)) {
+    return NextResponse.json(
+      {
+        error: 'Unauthorized',
+        message: 'Valid ADMIN_API_KEY required. Use Authorization header: "Bearer <your-key>"'
+      },
+      { status: 401 }
+    )
+  }
+
   try {
     // Check for API key first (for scripts/automation)
     const apiKey = request.headers.get('x-api-key') || request.headers.get('authorization')?.replace('Bearer ', '')
