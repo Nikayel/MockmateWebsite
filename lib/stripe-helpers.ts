@@ -22,7 +22,7 @@ try {
   const secretKey = process.env.STRIPE_SECRET_KEY
   if (secretKey) {
     stripe = new Stripe(secretKey, {
-      apiVersion: "2024-11-20.acacia",
+      apiVersion: "2025-10-29.clover",
     })
   }
 } catch (error) {
@@ -47,13 +47,10 @@ async function updateQuotaForSubscriptionTierAdmin(userId: string, subscriptionT
     .get()
 
   // Find current period quota
-  let currentQuotaDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null
-  quotaSnapshot.docs.forEach(doc => {
+  const currentQuotaDoc = quotaSnapshot.docs.find(doc => {
     const data = doc.data()
     const quotaStart = new Date(data.period_start)
-    if (quotaStart >= periodStart && quotaStart <= periodEnd) {
-      currentQuotaDoc = doc
-    }
+    return quotaStart >= periodStart && quotaStart <= periodEnd
   })
 
   if (currentQuotaDoc) {
@@ -210,8 +207,9 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
         const subscriptionStartDate = subscription.created
           ? new Date(subscription.created * 1000).toISOString()
           : undefined
-        const currentPeriodEnd = subscription.current_period_end
-          ? new Date(subscription.current_period_end * 1000).toISOString()
+        const periodEnd = subscription.items?.data?.[0]?.current_period_end
+        const currentPeriodEnd = periodEnd
+          ? new Date(periodEnd * 1000).toISOString()
           : undefined
 
         // Update profile with subscription info

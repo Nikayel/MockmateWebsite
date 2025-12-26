@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth-helpers';
 import { skipProblem } from '@/lib/spaced-repetition';
+import { logger } from '@/lib/logger';
 
 interface SkipRequestBody {
   problem_id: string;
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
       message: 'Problem skipped. It will appear again tomorrow with a slight penalty.',
     });
   } catch (error) {
-    console.error('Error skipping problem:', error);
+    logger.error('Error skipping problem', { error });
 
     // Handle case where problem mastery doesn't exist
     if (error instanceof Error && error.message.includes('not found')) {

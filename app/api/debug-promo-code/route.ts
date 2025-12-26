@@ -10,9 +10,10 @@ import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { getUserIdFromRequest } from "@/lib/auth-server"
 import { adminDb } from "@/lib/firebase-admin"
+import { logger } from "@/lib/logger"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2024-11-20.acacia",
+  apiVersion: "2025-10-29.clover",
 })
 
 // Admin user IDs - add your admin user IDs here
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
         const promo = await stripe.promotionCodes.retrieve(promoId)
         specificCode = [promo]
       } catch (err) {
-        console.error("Error retrieving promotion code by ID:", err)
+        logger.error("Error retrieving promotion code by ID", { error: err })
       }
     }
 
@@ -70,32 +71,44 @@ export async function GET(request: NextRequest) {
       specificCode = found.data
     }
 
+    // Helper to get coupon from promotion code (API changed in clover version)
+    const getCoupon = (pc: Stripe.PromotionCode) => {
+      const coupon = pc.promotion?.coupon
+      return typeof coupon === 'object' && coupon ? coupon : null
+    }
+
     return NextResponse.json({
       mode,
       searchingFor: code?.toUpperCase() || promoId || "all",
       totalPromoCodes: allPromoCodes.data.length,
-      allPromoCodes: allPromoCodes.data.map(pc => ({
-        code: pc.code,
-        active: pc.active,
-        couponId: pc.coupon.id,
-        couponName: pc.coupon.name,
-        expiresAt: pc.expires_at,
-        maxRedemptions: pc.max_redemptions,
-        timesRedeemed: pc.times_redeemed,
-      })),
-      foundCode: specificCode.length > 0 ? {
-        id: specificCode[0].id,
-        code: specificCode[0].code,
-        active: specificCode[0].active,
-        couponId: specificCode[0].coupon.id,
-        couponName: specificCode[0].coupon.name,
-        couponPercentOff: specificCode[0].coupon.percent_off,
-        couponAmountOff: specificCode[0].coupon.amount_off,
-        expiresAt: specificCode[0].expires_at,
-        maxRedemptions: specificCode[0].max_redemptions,
-        timesRedeemed: specificCode[0].times_redeemed,
-        restrictions: specificCode[0].restrictions,
-      } : null,
+      allPromoCodes: allPromoCodes.data.map(pc => {
+        const coupon = getCoupon(pc)
+        return {
+          code: pc.code,
+          active: pc.active,
+          couponId: coupon?.id,
+          couponName: coupon?.name,
+          expiresAt: pc.expires_at,
+          maxRedemptions: pc.max_redemptions,
+          timesRedeemed: pc.times_redeemed,
+        }
+      }),
+      foundCode: specificCode.length > 0 ? (() => {
+        const coupon = getCoupon(specificCode[0])
+        return {
+          id: specificCode[0].id,
+          code: specificCode[0].code,
+          active: specificCode[0].active,
+          couponId: coupon?.id,
+          couponName: coupon?.name,
+          couponPercentOff: coupon?.percent_off,
+          couponAmountOff: coupon?.amount_off,
+          expiresAt: specificCode[0].expires_at,
+          maxRedemptions: specificCode[0].max_redemptions,
+          timesRedeemed: specificCode[0].times_redeemed,
+          restrictions: specificCode[0].restrictions,
+        }
+      })() : null,
       instructions: [
         `You are using ${mode} mode keys`,
         `Make sure your promotion code is created in ${mode} mode in Stripe Dashboard`,

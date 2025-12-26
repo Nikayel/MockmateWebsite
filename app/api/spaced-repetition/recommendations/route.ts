@@ -14,6 +14,7 @@ import {
   getSmartRecommendations,
   getPatternRecommendations,
 } from '@/lib/spaced-repetition';
+import { logger } from '@/lib/logger';
 import type { DSAPattern } from '@/lib/types/dsa-patterns';
 
 export async function GET(request: NextRequest) {
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
       count: recommendations.length,
     });
   } catch (error) {
-    console.error('Error getting recommendations:', error);
+    logger.error('Error getting recommendations', { error });
     return NextResponse.json(
       {
         error: 'Internal Server Error',

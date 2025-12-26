@@ -9,9 +9,10 @@ import { getUserIdFromRequest } from "@/lib/auth-server"
 import { adminDb } from "@/lib/firebase-admin"
 import { Profile } from "@/lib/types"
 import Stripe from "stripe"
+import { logger } from "@/lib/logger"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2024-11-20.acacia",
+  apiVersion: "2025-10-29.clover",
 })
 
 // Mark route as dynamic to avoid build-time issues with server-only packages
@@ -27,18 +28,9 @@ export async function POST(request: NextRequest) {
     const userId = await getUserIdFromRequest(request)
 
     if (!userId) {
-      console.error("❌ Customer portal: Unauthorized - no valid user ID")
-      console.error("Auth header:", request.headers.get("authorization") ? "Present" : "Missing")
-
-      // Check if token was provided but verification failed
-      const authHeader = request.headers.get("authorization")
-      if (authHeader && authHeader.startsWith("Bearer ")) {
-        console.error("Token was provided but verification failed")
-        console.error("This could indicate:")
-        console.error("  1. Firebase Admin SDK not properly initialized")
-        console.error("  2. Token expired or invalid")
-        console.error("  3. Service account credentials missing or incorrect")
-      }
+      logger.warn("Customer portal: Unauthorized - no valid user ID", {
+        hasAuthHeader: !!request.headers.get("authorization")
+      })
 
       return NextResponse.json(
         {
@@ -49,15 +41,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log("✅ Customer portal: Authenticated user:", userId)
-
     // Get user profile to find Stripe customer ID
     // Use Admin SDK to bypass security rules (we've already verified the user is authenticated)
     const profileRef = adminDb.collection("profiles").doc(userId)
     const profileSnap = await profileRef.get()
 
     if (!profileSnap.exists) {
-      console.error("❌ Customer portal: Profile not found for user:", userId)
+      logger.error("Customer portal: Profile not found", { userId })
       return NextResponse.json(
         {
           error: "Profile not found",
@@ -72,7 +62,6 @@ export async function POST(request: NextRequest) {
 
     // If customer ID is missing but we have a subscription ID, try to get it from Stripe
     if (!stripeCustomerId && profile.stripe_subscription_id) {
-      console.log("⚠️ Customer portal: No customer ID, but subscription ID found. Looking up from Stripe...")
       try {
         const subscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id)
         stripeCustomerId = subscription.customer as string
@@ -83,19 +72,18 @@ export async function POST(request: NextRequest) {
             stripe_customer_id: stripeCustomerId,
             updated_at: new Date().toISOString()
           })
-          console.log("✅ Customer portal: Retrieved and saved customer ID from subscription")
         }
-      } catch (stripeError: any) {
-        console.error("❌ Customer portal: Failed to retrieve subscription from Stripe:", stripeError)
-        // Continue to check if we have customer ID from profile
+      } catch (stripeError) {
+        logger.error("Customer portal: Failed to retrieve subscription from Stripe", { error: stripeError })
       }
     }
 
     if (!stripeCustomerId) {
-      console.warn("⚠️ Customer portal: No Stripe customer ID for user:", userId)
-      console.warn("   Profile subscription_tier:", profile.subscription_tier)
-      console.warn("   Profile stripe_subscription_id:", profile.stripe_subscription_id)
-      console.warn("   Profile stripe_customer_id:", profile.stripe_customer_id)
+      logger.warn("Customer portal: No Stripe customer ID for user", {
+        userId,
+        subscriptionTier: profile.subscription_tier,
+        hasSubscriptionId: !!profile.stripe_subscription_id
+      })
 
       // If user is Pro but missing customer ID, suggest syncing
       if (profile.subscription_tier === "pro") {
@@ -117,39 +105,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log("✅ Customer portal: Creating session for Stripe customer:", stripeCustomerId)
-
     // Create customer portal session
     const session = await stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,
       return_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/profile`,
     })
 
-    console.log("✅ Customer portal: Session created successfully")
-
     return NextResponse.json({
       success: true,
       url: session.url,
     })
   } catch (error) {
-    console.error("❌ Customer portal error:", error)
+    logger.error("Customer portal error", { error })
 
-    // Provide more detailed error information
-    if (error instanceof Error) {
-      console.error("Error name:", error.name)
-      console.error("Error message:", error.message)
-      console.error("Error stack:", error.stack)
-
-      // Check for Stripe-specific errors
-      if (error.message.includes("No such customer")) {
-        return NextResponse.json(
-          {
-            error: "Stripe customer not found",
-            message: "Your subscription information could not be found. Please contact support."
-          },
-          { status: 404 }
-        )
-      }
+    // Check for Stripe-specific errors
+    if (error instanceof Error && error.message.includes("No such customer")) {
+      return NextResponse.json(
+        {
+          error: "Stripe customer not found",
+          message: "Your subscription information could not be found. Please contact support."
+        },
+        { status: 404 }
+      )
     }
 
     return NextResponse.json(

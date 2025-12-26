@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth-helpers';
 import { getScenarioById, scenarios } from '@/lib/scenarios';
+import { logger } from '@/lib/logger';
 import {
   calculateNextInterval,
   updateProblemMastery,
@@ -126,7 +127,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('Error marking problem as reviewed:', error);
+    logger.error('Error marking problem as reviewed', { error });
     return NextResponse.json(
       { error: 'Internal Server Error', message: error.message },
       { status: 500 }

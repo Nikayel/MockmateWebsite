@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth-helpers';
 import { getScenarioById } from '@/lib/scenarios';
+import { logger } from '@/lib/logger';
 import {
   calculateNextInterval,
   updateProblemMastery,
@@ -195,7 +196,7 @@ export async function POST(request: NextRequest) {
       achievements_unlocked: [], // TODO: Implement achievements
     });
   } catch (error) {
-    console.error('Error completing review:', error);
+    logger.error('Error completing review', { error });
     return NextResponse.json(
       {
         error: 'Internal Server Error',

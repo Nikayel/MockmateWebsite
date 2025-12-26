@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth-helpers';
 import { getDueProblems } from '@/lib/spaced-repetition';
+import { logger } from '@/lib/logger';
 import type { DSAPattern } from '@/lib/types/dsa-patterns';
 import type { Difficulty } from '@/lib/spaced-repetition';
 
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(dueQueue);
   } catch (error) {
-    console.error('Error getting due problems:', error);
+    logger.error('Error getting due problems', { error });
     return NextResponse.json(
       {
         error: 'Internal Server Error',
