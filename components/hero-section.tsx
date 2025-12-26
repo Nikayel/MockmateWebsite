@@ -32,8 +32,8 @@ const capabilities = [
   "Voice-enabled mock interviews",
   "Available 24/7, no scheduling",
   "Real-time AI feedback",
+  "Spaced repetition scheduling",
   "15 DSA patterns covered",
-  "200+ curated problems",
 ]
 
 export function HeroSection() {
@@ -127,7 +127,7 @@ export function HeroSection() {
               </motion.div>
 
               <motion.p variants={staggerItem} className="text-sm text-muted-foreground/60">
-                No signup required. Just start practicing.
+                Free to start. No credit card needed.
               </motion.p>
             </div>
 
