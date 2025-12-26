@@ -17,7 +17,7 @@ import Link from "next/link"
 
 export function ProblemTeaser() {
   return (
-    <section className="relative py-20 bg-black overflow-hidden">
+    <section className="relative py-20 bg-background overflow-hidden">
       {/* Subtle gradient flow - guides eye downward */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-gray-950/20 to-transparent" />
 

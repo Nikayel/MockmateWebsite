@@ -40,11 +40,11 @@ const sampleSessions = [
 
 export default function SamplesPage() {
   return (
-    <main className="min-h-screen bg-black">
+    <main className="min-h-screen bg-background">
       <Header />
 
       {/* Hero Section */}
-      <section className="pt-24 pb-12 bg-gradient-to-br from-black via-gray-900 to-black">
+      <section className="pt-24 pb-12 bg-gradient-to-br from-background via-secondary to-background">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30 mb-6">Sample Feedback Reports</Badge>

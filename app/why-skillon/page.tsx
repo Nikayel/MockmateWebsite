@@ -109,7 +109,7 @@ const comparisonFeatures = [
 
 export default function WhySkilonPage() {
   return (
-    <main className="min-h-screen bg-black">
+    <main className="min-h-screen bg-background">
       <Header />
 
       {/* Hero Section - Organic, less boxy */}

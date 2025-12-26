@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic"
 import { MagneticButton } from "@/components/ui/magnetic-button"
-import { Play, ArrowRight, Mic, MessageCircle } from "lucide-react"
+import { TypewriterText } from "@/components/ui/rotating-text"
+import { Play, ArrowRight, Mic, MessageCircle, Brain, BarChart3, Target, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
@@ -15,16 +16,30 @@ const SubtleParticles = dynamic(
 )
 
 /**
- * Hero Section - Authentic, developer-focused design
+ * Hero Section - Research-backed UX improvements
  *
- * Key messaging:
- * - Think out loud, just like a real interview
- * - AI listens and responds naturally
- * - Casual, honest tone - not corporate
+ * Changes based on cognitive load research:
+ * 1. Clear product descriptor above headline ("AI Mock Interview Platform")
+ * 2. Rotating text showing capabilities - progressive disclosure
+ * 3. Softer background (bg-background instead of bg-black)
+ * 4. Clearer value proposition hierarchy
+ *
+ * Sources: NN/G, Voyage AI patterns, 2025 Eye Tracking Studies
  */
+
+// Capabilities to rotate through - shows breadth without overwhelming
+const capabilities = [
+  "Voice-enabled mock interviews",
+  "Real-time AI feedback",
+  "Spaced repetition scheduling",
+  "200+ DSA problems",
+  "FAANG interview simulations",
+  "Pattern mastery tracking",
+]
+
 export function HeroSection() {
   return (
-    <section className="relative min-h-screen flex flex-col justify-center overflow-hidden bg-black">
+    <section className="relative min-h-screen flex flex-col justify-center overflow-hidden bg-background">
       {/* CSS Background - lightweight base */}
       <GridBackground />
 
@@ -50,22 +65,50 @@ export function HeroSection() {
 
             {/* Left: Headline (2 cols) */}
             <div className="lg:col-span-2 text-center lg:text-left pt-4">
+              {/* Product descriptor - tells users WHAT this is immediately */}
+              <motion.div
+                variants={staggerItem}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/10 border border-accent/20 mb-4"
+              >
+                <Brain className="w-3.5 h-3.5 text-accent" />
+                <span className="text-xs text-accent font-medium tracking-wide uppercase">
+                  AI Mock Interview Platform
+                </span>
+              </motion.div>
+
               <motion.h1
                 variants={staggerItem}
                 className="text-4xl sm:text-5xl lg:text-5xl font-heading font-black mb-4 leading-[1.1] tracking-tight"
               >
-                <span className="text-white">Practice like</span>
+                <span className="text-foreground">Practice like</span>
                 <br />
                 <span className="bg-gradient-to-r from-accent via-neural to-accent bg-clip-text text-transparent">
                   it's the real thing
                 </span>
               </motion.h1>
 
+              {/* Rotating capabilities - progressive disclosure */}
+              <motion.div
+                variants={staggerItem}
+                className="h-8 mb-4 flex items-center justify-center lg:justify-start"
+              >
+                <div className="flex items-center gap-2 text-base lg:text-lg">
+                  <Sparkles className="w-4 h-4 text-neural flex-shrink-0" />
+                  <TypewriterText
+                    texts={capabilities}
+                    typingSpeed={40}
+                    deletingSpeed={25}
+                    pauseDuration={2500}
+                    className="text-gray-300"
+                  />
+                </div>
+              </motion.div>
+
               <motion.p
                 variants={staggerItem}
-                className="text-base lg:text-lg text-gray-400 mb-4 leading-relaxed"
+                className="text-sm lg:text-base text-muted-foreground mb-4 leading-relaxed"
               >
-                Our AI interviewer is trained on 500+ real company interview docs and scenarios. Think out loud—it actually listens and responds naturally, just like a real interviewer would. After each session, we analyze where you need to improve to nail your next interview.
+                AI trained on 500+ real company interviews. Think out loud—it listens and responds naturally. Get detailed feedback to nail your next interview.
               </motion.p>
 
               {/* CTA */}
@@ -85,7 +128,7 @@ export function HeroSection() {
                 </Link>
               </motion.div>
 
-              <motion.p variants={staggerItem} className="text-sm text-gray-600">
+              <motion.p variants={staggerItem} className="text-sm text-muted-foreground/60">
                 Free to try. No card needed.
               </motion.p>
             </div>
@@ -99,20 +142,20 @@ export function HeroSection() {
                 {/* Glow */}
                 <div className="absolute -inset-3 bg-gradient-to-r from-accent/15 to-neural/15 rounded-2xl blur-xl" />
 
-                <div className="relative bg-gray-950/95 backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden shadow-2xl">
+                <div className="relative bg-card/95 backdrop-blur-sm rounded-xl border border-border overflow-hidden shadow-2xl">
                   {/* Browser chrome */}
-                  <div className="flex items-center gap-2 px-3 py-2 border-b border-white/5 bg-gray-900/60">
+                  <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-secondary/60">
                     <div className="flex gap-1.5">
                       <div className="w-2.5 h-2.5 bg-red-500/50 rounded-full" />
                       <div className="w-2.5 h-2.5 bg-yellow-500/50 rounded-full" />
                       <div className="w-2.5 h-2.5 bg-green-500/50 rounded-full" />
                     </div>
-                    <span className="ml-3 text-xs text-gray-600 font-mono">skillon.dev/interview</span>
+                    <span className="ml-3 text-xs text-muted-foreground font-mono">skillon.dev/interview</span>
 
                     {/* Live indicator */}
                     <div className="ml-auto flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-neural animate-pulse" />
-                      <span className="text-[10px] text-gray-500 uppercase tracking-wider">Live</span>
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Live</span>
                     </div>
                   </div>
 
@@ -126,11 +169,11 @@ export function HeroSection() {
                           <Mic className="w-2.5 h-2.5 text-accent" />
                           <span className="text-[9px] text-accent uppercase tracking-wider">You (speaking)</span>
                         </div>
-                        <p className="text-xs text-gray-300">
+                        <p className="text-xs text-foreground/80">
                           "So I'm thinking... if I use a hashmap here, I can look up values in O(1) instead of looping through again..."
                         </p>
                       </div>
-                      <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0 text-[10px]">
+                      <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center flex-shrink-0 text-[10px]">
                         You
                       </div>
                     </div>
@@ -140,23 +183,23 @@ export function HeroSection() {
                       <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0">
                         <span className="text-accent text-[9px] font-bold">AI</span>
                       </div>
-                      <div className="bg-gray-800/60 rounded-lg rounded-tl-none p-2.5 max-w-[280px]">
-                        <p className="text-xs text-gray-300">
+                      <div className="bg-secondary/60 rounded-lg rounded-tl-none p-2.5 max-w-[280px]">
+                        <p className="text-xs text-foreground/80">
                           Exactly right. Walk me through what you'd store in the hashmap and how you'd handle the lookup.
                         </p>
                       </div>
                     </div>
 
                     {/* Code + feedback */}
-                    <div className="bg-gray-900/80 rounded-lg p-2.5 font-mono text-xs">
+                    <div className="bg-background/80 rounded-lg p-2.5 font-mono text-xs">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-gray-500">// your solution</span>
+                        <span className="text-muted-foreground">// your solution</span>
                         <div className="flex gap-2">
                           <span className="px-1.5 py-0.5 rounded bg-neural/20 text-neural text-[10px]">O(n)</span>
                           <span className="px-1.5 py-0.5 rounded bg-accent/20 text-accent text-[10px]">HashMap</span>
                         </div>
                       </div>
-                      <div className="text-gray-400">
+                      <div className="text-foreground/70">
                         <span className="text-purple-400">const</span> map = <span className="text-neural">new Map</span>();
                       </div>
                     </div>
@@ -169,7 +212,7 @@ export function HeroSection() {
           {/* Middle: Key differentiator - Voice/Think out loud */}
           <motion.div
             variants={staggerItem}
-            className="bg-gradient-to-r from-gray-900/50 via-gray-900/30 to-gray-900/50 rounded-xl border border-white/5 p-4 md:p-5 mb-6"
+            className="bg-gradient-to-r from-secondary/50 via-secondary/30 to-secondary/50 rounded-xl border border-border/50 p-4 md:p-5 mb-6"
           >
             <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12 text-center md:text-left">
               <div className="flex items-center gap-2.5">
@@ -177,20 +220,32 @@ export function HeroSection() {
                   <Mic className="w-4 h-4 text-accent" />
                 </div>
                 <div>
-                  <div className="text-white font-medium text-sm md:text-base">Think out loud</div>
-                  <div className="text-xs text-gray-500">Just talk through your approach</div>
+                  <div className="text-foreground font-medium text-sm md:text-base">Think out loud</div>
+                  <div className="text-xs text-muted-foreground">Just talk through your approach</div>
                 </div>
               </div>
 
-              <div className="hidden md:block w-px h-8 bg-white/10" />
+              <div className="hidden md:block w-px h-8 bg-border" />
 
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-full bg-neural/10 flex items-center justify-center">
                   <MessageCircle className="w-4 h-4 text-neural" />
                 </div>
                 <div>
-                  <div className="text-white font-medium text-sm md:text-base">Real-time responses</div>
-                  <div className="text-xs text-gray-500">AI follows your reasoning</div>
+                  <div className="text-foreground font-medium text-sm md:text-base">Real-time responses</div>
+                  <div className="text-xs text-muted-foreground">AI follows your reasoning</div>
+                </div>
+              </div>
+
+              <div className="hidden md:block w-px h-8 bg-border" />
+
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center">
+                  <BarChart3 className="w-4 h-4 text-accent" />
+                </div>
+                <div>
+                  <div className="text-foreground font-medium text-sm md:text-base">Spaced repetition</div>
+                  <div className="text-xs text-muted-foreground">Science-backed review timing</div>
                 </div>
               </div>
 
@@ -205,23 +260,23 @@ export function HeroSection() {
             {/* Left: Stats */}
             <div className="flex items-center gap-8 text-center md:text-left">
               <div>
-                <div className="text-2xl font-bold text-white">15+</div>
-                <div className="text-xs text-gray-500">DSA patterns</div>
+                <div className="text-2xl font-bold text-foreground">15+</div>
+                <div className="text-xs text-muted-foreground">DSA patterns</div>
               </div>
-              <div className="w-px h-8 bg-white/10 hidden md:block" />
+              <div className="w-px h-8 bg-border hidden md:block" />
               <div>
-                <div className="text-2xl font-bold text-white">200+</div>
-                <div className="text-xs text-gray-500">problems</div>
+                <div className="text-2xl font-bold text-foreground">200+</div>
+                <div className="text-xs text-muted-foreground">problems</div>
               </div>
-              <div className="w-px h-8 bg-white/10 hidden md:block" />
+              <div className="w-px h-8 bg-border hidden md:block" />
               <div>
-                <div className="text-xs text-gray-500 mb-1">Includes simulations from</div>
-                <div className="text-sm text-gray-400">20+ companies</div>
+                <div className="text-xs text-muted-foreground mb-1">Includes simulations from</div>
+                <div className="text-sm text-foreground/80">20+ companies</div>
               </div>
             </div>
 
             {/* Right: Learn more */}
-            <Link href="/why-skillon" className="text-sm text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1.5">
+            <Link href="/why-skillon" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
               How it actually works
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
@@ -235,9 +290,9 @@ export function HeroSection() {
         animate={{ y: [0, 6, 0] }}
         transition={{ duration: 2, repeat: Infinity }}
       >
-        <div className="w-5 h-8 rounded-full border border-white/20 flex items-start justify-center p-1.5">
+        <div className="w-5 h-8 rounded-full border border-border flex items-start justify-center p-1.5">
           <motion.div
-            className="w-1 h-1.5 bg-white/30 rounded-full"
+            className="w-1 h-1.5 bg-muted-foreground/30 rounded-full"
             animate={{ y: [0, 10, 0] }}
             transition={{ duration: 2, repeat: Infinity }}
           />
