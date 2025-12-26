@@ -91,7 +91,7 @@ export default function HomePage() {
   // Show loading while auth is initializing
   if (authLoading || !initialized) {
     return (
-      <main className="min-h-screen bg-black flex items-center justify-center">
+      <main className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
       </main>
     )
@@ -102,7 +102,7 @@ export default function HomePage() {
     const userName = user.user_metadata?.full_name?.split(' ')[0] || firebaseUser.displayName?.split(' ')[0]
 
     return (
-      <main className="min-h-screen bg-black">
+      <main className="min-h-screen bg-background">
         {/* Onboarding modal for first-time users */}
         <OnboardingModal
           isOpen={showOnboarding}
@@ -276,7 +276,7 @@ export default function HomePage() {
 
   // For non-signed-in users, show the marketing page
   return (
-    <main className="min-h-screen bg-black">
+    <main className="min-h-screen bg-background">
       <Header />
       <HeroSection />
       <ProblemTeaser />

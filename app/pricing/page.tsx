@@ -50,7 +50,7 @@ export default function PricingPage() {
     : proPricing.monthly
 
   return (
-    <main className="min-h-screen bg-black">
+    <main className="min-h-screen bg-background">
       <Header />
 
       {/* Hero Section */}
@@ -79,7 +79,7 @@ export default function PricingPage() {
       </section>
 
       {/* Billing Toggle */}
-      <section className="pb-8 bg-black">
+      <section className="pb-8 bg-background">
         <div className="container mx-auto px-4">
           <div className="flex justify-center">
             <div className="relative inline-flex items-center gap-3 p-1.5 rounded-full bg-white/5 border border-white/10">
@@ -123,13 +123,13 @@ export default function PricingPage() {
       </section>
 
       {/* Pricing Cards */}
-      <section className="py-8 bg-black">
+      <section className="py-8 bg-background">
         <div className="container mx-auto px-4">
           <div className="max-w-5xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Free Plan */}
               <motion.div
-                className="relative rounded-3xl p-8 md:p-10 border bg-gray-900/30 border-white/10 hover:border-white/20 transition-all duration-300"
+                className="relative rounded-3xl p-8 md:p-10 border bg-card/30 border-border hover:border-accent/20 transition-all duration-300"
                 whileHover={{ y: -4 }}
               >
                 <div className="mb-6">
@@ -268,7 +268,7 @@ export default function PricingPage() {
       </section>
 
       {/* Comparison Stats */}
-      <section className="py-16 bg-black">
+      <section className="py-16 bg-background">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
             <h2 className="text-2xl font-heading font-bold text-white text-center mb-8">
@@ -293,7 +293,7 @@ export default function PricingPage() {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-16 bg-black border-t border-gray-900">
+      <section className="py-16 bg-background border-t border-border">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto">
             <h2 className="text-3xl font-heading font-bold text-white text-center mb-12">
@@ -307,7 +307,7 @@ export default function PricingPage() {
                 >
                   <button
                     onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
-                    className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-900/50 transition-colors"
+                    className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-secondary/50 transition-colors"
                   >
                     <span className="text-white font-medium">{faq.question}</span>
                     <ChevronDown
@@ -340,7 +340,7 @@ export default function PricingPage() {
       </section>
 
       {/* Bottom Trust Signals */}
-      <section className="py-12 bg-black border-t border-gray-900">
+      <section className="py-12 bg-background border-t border-border">
         <div className="container mx-auto px-4">
           <div className="text-center space-y-3">
             <div className="flex items-center justify-center gap-6 text-gray-500 text-sm flex-wrap">

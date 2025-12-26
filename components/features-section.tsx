@@ -41,9 +41,9 @@ const features = [
 
 export function FeaturesSection() {
   return (
-    <section id="features" className="relative py-32 bg-black overflow-hidden">
+    <section id="features" className="relative py-32 bg-background overflow-hidden">
       {/* Subtle background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-950/50 to-black pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-secondary/30 to-background pointer-events-none" />
 
       <div className="container mx-auto px-4 relative z-10">
         {/* Section Header */}
