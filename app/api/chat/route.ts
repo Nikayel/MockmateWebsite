@@ -139,13 +139,15 @@ ${patternKnowledge.commonMistakes.slice(0, 2).map(m => `- ${m}`).join('\n')}
       const companyKnowledge = getCompanyInterviewKnowledge(options.scenarioCompany as CompanyId)
       if (companyKnowledge) {
         ragContextParts.push(`
-## ${companyKnowledge.company} Interview Tips
+## ${companyKnowledge.companyName} Interview Tips
 
 ### Interview Style
-${companyKnowledge.interviewStyle}
+${companyKnowledge.interviewStyle.description}
+Pace: ${companyKnowledge.interviewStyle.pace}
+Expectations: ${companyKnowledge.interviewStyle.expectations.slice(0, 3).map(e => `- ${e}`).join('\n')}
 
 ### Focus Areas
-${companyKnowledge.topPatterns.slice(0, 4).map(p => `- ${p}`).join('\n')}
+${companyKnowledge.topPatterns.slice(0, 4).map(p => `- ${p.pattern}`).join('\n')}
 
 ### What They Value
 ${companyKnowledge.cultureTips.slice(0, 2).map(t => `- ${t}`).join('\n')}
