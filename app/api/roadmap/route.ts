@@ -18,10 +18,13 @@ export async function GET(request: NextRequest) {
   try {
     const authResult = await verifyAuth(request)
     if (!authResult.authenticated || !authResult.userId) {
+      console.log('[Roadmap API] Unauthorized request')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const userId = authResult.userId
+    console.log('[Roadmap API] GET request for user:', userId)
+
     const { searchParams } = new URL(request.url)
     const getAll = searchParams.get('all') === 'true'
     const statusFilter = searchParams.get('status')
@@ -33,6 +36,8 @@ export async function GET(request: NextRequest) {
       .where('userId', '==', userId)
       .where('status', '==', 'active')
       .get()
+
+    console.log('[Roadmap API] Found', activeSnapshot.docs.length, 'active roadmaps')
 
     const batch = adminDb.batch()
     let hasExpired = false
@@ -79,8 +84,21 @@ export async function GET(request: NextRequest) {
     }
 
     if (snapshot.empty) {
+      console.log('[Roadmap API] No roadmaps found matching query')
+      // Debug: Let's also check what documents exist for this user without status filter
+      const allDocsSnapshot = await adminDb
+        .collection(COLLECTION)
+        .where('userId', '==', userId)
+        .get()
+      console.log('[Roadmap API] Total documents for user:', allDocsSnapshot.docs.length)
+      allDocsSnapshot.docs.forEach(doc => {
+        const data = doc.data()
+        console.log('[Roadmap API] Doc:', doc.id, 'status:', data.status, 'company:', data.targetCompany || data.companyName)
+      })
       return NextResponse.json(getAll ? { roadmaps: [] } : { roadmap: null })
     }
+
+    console.log('[Roadmap API] Found', snapshot.docs.length, 'roadmaps matching query')
 
     const convertRoadmap = (doc: any) => {
       const data = doc.data()
@@ -224,6 +242,9 @@ export async function POST(request: NextRequest) {
     const ragEnhancements = 'ragEnhancements' in roadmap ? roadmap.ragEnhancements : null
     const roadmapDoc = {
       ...roadmap,
+      // Explicitly set status to 'active' (ensure it's always present)
+      status: 'active',
+      userId,
       createdAt: new Date(),
       updatedAt: new Date(),
       interviewDate: interview,
