@@ -1,26 +1,26 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
+import { useEffect, useState, useCallback } from "react"
+import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { useAuth } from "@/lib/auth-context"
+import {
+  MetricCard,
+  TimeSeriesChart,
+  FunnelChart,
+  DistributionChart,
+} from "@/components/admin/charts"
 import {
   Users,
-  Crown,
-  BarChart3,
+  DollarSign,
   Terminal,
   TrendingUp,
-  DollarSign,
   AlertCircle,
   Activity,
-  Target,
+  RefreshCw,
+  Crown,
   Zap,
-  Database,
-  Cpu,
 } from "lucide-react"
 
 interface AnalyticsMetrics {
@@ -57,601 +57,394 @@ interface AnalyticsMetrics {
     total: number
     recent: Array<{
       timestamp: string
-      errorType: string
-      errorMessage: string
-      page?: string
-      userId?: string
+      errorType?: string
+      errorMessage?: string
     }>
   }
-  firebaseAnalytics?: {
-    activeUsers: number
-    newUsers: number
-    pageViews: number
-    sessions: number
-    avgSessionDuration: number
-    bounceRate: number
-    engagementRate: number
-    eventsByType: Record<string, number>
-    acquisition: Array<{ source: string; users: number }>
-    conversions: Record<string, number>
-  } | null
+  timeSeries?: {
+    users: Array<{ date: string; total: number; free: number; pro: number; enterprise: number }>
+    sessions: Array<{ date: string; total: number; completed: number }>
+    revenue: Array<{ date: string; mrr: number }>
+  }
 }
 
-interface AIUsageData {
-  overview: {
-    totalUsers: number
-    totalCost: number
-    totalRequests: number
-    averageCostPerUser: number
+interface FunnelData {
+  stages: Array<{ name: string; value: number; color?: string }>
+  conversionRates: {
+    visitToSignup: number
+    signupToSession: number
+    sessionToComplete: number
+    completeToSubscribe: number
+    overallConversion: number
   }
-  cache: {
-    memoryCacheSize: number
-    memoryHits: number
-  }
-  topUsers: Array<{
-    userId: string
-    email: string
-    tier: string
-    cost: number
-    requests: number
-    budgetUsedPercent: number
-  }>
-  budgetCaps: Record<string, number>
 }
 
 export default function AdminDashboard() {
-  const router = useRouter()
-  const { firebaseUser, loading: authLoading } = useAuth()
+  const { firebaseUser } = useAuth()
   const [metrics, setMetrics] = useState<AnalyticsMetrics | null>(null)
-  const [aiUsage, setAiUsage] = useState<AIUsageData | null>(null)
+  const [funnel, setFunnel] = useState<FunnelData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [timeRange, setTimeRange] = useState("7d")
+  const [error, setError] = useState<string | null>(null)
+
+  const loadMetrics = useCallback(async (showRefreshing = false) => {
+    if (!firebaseUser) return
+
+    if (showRefreshing) setRefreshing(true)
+    setError(null)
+
+    try {
+      const token = await firebaseUser.getIdToken()
+      const headers = { Authorization: `Bearer ${token}` }
+
+      // Fetch analytics and funnel data in parallel
+      const [analyticsRes, funnelRes] = await Promise.all([
+        fetch(`/api/admin/analytics?timeRange=${timeRange}`, { headers }),
+        fetch(`/api/admin/funnel?timeRange=${timeRange}`, { headers }),
+      ])
+
+      if (!analyticsRes.ok) {
+        throw new Error("Failed to load analytics")
+      }
+
+      const analyticsData = await analyticsRes.json()
+      if (analyticsData.success && analyticsData.metrics) {
+        setMetrics(analyticsData.metrics)
+      }
+
+      if (funnelRes.ok) {
+        const funnelData = await funnelRes.json()
+        if (funnelData.success && funnelData.funnel) {
+          setFunnel(funnelData.funnel)
+        }
+      }
+    } catch (err) {
+      console.error("Error loading metrics:", err)
+      setError(err instanceof Error ? err.message : "Failed to load data")
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }, [firebaseUser, timeRange])
 
   useEffect(() => {
-    const loadMetrics = async () => {
-      if (authLoading) return
-
-      // TODO: Add proper admin authentication
-      // For now, any logged-in user can access
-      if (!firebaseUser) {
-        router.push("/login?redirect=admin")
-        return
-      }
-
-      try {
-        // Fetch main analytics
-        const response = await fetch(`/api/admin/analytics?timeRange=${timeRange}`)
-
-        if (!response.ok) {
-          console.error("Analytics API error:", response.status, response.statusText)
-          const errorData = await response.json().catch(() => ({}))
-          console.error("Error details:", errorData)
-          return
-        }
-
-        const data = await response.json()
-
-        if (data.success && data.metrics) {
-          setMetrics(data.metrics)
-        } else {
-          console.error("Failed to load metrics:", data.error || "Unknown error")
-        }
-
-        // Fetch AI usage data
-        try {
-          const usageResponse = await fetch('/api/admin/usage?view=overview', {
-            headers: { Authorization: `Bearer ${firebaseUser?.uid}` },
-          })
-          const usageData = await usageResponse.json()
-          if (usageData.success) {
-            setAiUsage(usageData.data)
-          }
-        } catch (usageError) {
-          console.error("Error loading AI usage:", usageError)
-        }
-      } catch (error) {
-        console.error("Error loading admin metrics:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     loadMetrics()
-  }, [authLoading, firebaseUser, router, timeRange])
+  }, [loadMetrics])
 
-  if (loading || authLoading) {
+  const handleRefresh = () => loadMetrics(true)
+
+  if (loading) {
     return (
-      <main className="min-h-screen bg-black flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
-      </main>
+      </div>
     )
   }
 
-  if (!metrics) {
+  if (error || !metrics) {
     return (
-      <main className="min-h-screen bg-black">
-        <Header />
-        <div className="pt-24 pb-16">
-          <div className="container mx-auto px-4 max-w-7xl">
-            <Card className="bg-red-900/20 border-red-500/30">
-              <CardContent className="p-8 text-center">
-                <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-                <p className="text-red-400 font-medium">Failed to load analytics data</p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-        <Footer />
-      </main>
+      <Card className="bg-red-900/20 border-red-500/30">
+        <CardContent className="p-8 text-center">
+          <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+          <p className="text-red-400 font-medium">{error || "Failed to load analytics data"}</p>
+          <Button onClick={handleRefresh} className="mt-4" variant="outline">
+            Try Again
+          </Button>
+        </CardContent>
+      </Card>
     )
   }
 
   const conversionRate = metrics.users.total > 0
-    ? Math.round((metrics.users.byTier.pro / metrics.users.total) * 100)
-    : 0
+    ? ((metrics.users.byTier.pro / metrics.users.total) * 100).toFixed(1)
+    : "0"
 
   const completionRate = metrics.sessions.total > 0
-    ? Math.round((metrics.sessions.completed / metrics.sessions.total) * 100)
-    : 0
+    ? ((metrics.sessions.completed / metrics.sessions.total) * 100).toFixed(1)
+    : "0"
+
+  // Prepare tier distribution data
+  const tierDistribution = [
+    { name: "Free", value: metrics.users.byTier.free, color: "#6B7280" },
+    { name: "Pro", value: metrics.users.byTier.pro, color: "#FBBF24" },
+    { name: "Enterprise", value: metrics.users.byTier.enterprise, color: "#A855F7" },
+  ]
+
+  // Prepare difficulty distribution
+  const difficultyDistribution = Object.entries(metrics.sessions.byDifficulty).map(
+    ([name, value]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      value,
+      color: name === "easy" ? "#00ff88" : name === "medium" ? "#FBBF24" : "#EF4444",
+    })
+  )
 
   return (
-    <main className="min-h-screen bg-black">
-      <Header />
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-heading font-bold text-white">Dashboard Overview</h1>
+          <p className="text-gray-400 mt-1">Real-time platform analytics and metrics</p>
+        </div>
 
-      <div className="pt-24 pb-16">
-        <div className="container mx-auto px-4 max-w-7xl">
-          {/* Header */}
-          <div className="mb-8 flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-heading font-bold text-white mb-2">Admin Dashboard</h1>
-              <p className="text-gray-400">Platform analytics and metrics</p>
-            </div>
-
-            {/* Time Range Selector */}
-            <div className="flex gap-2">
-              {["7d", "30d", "90d", "all"].map((range) => (
-                <Button
-                  key={range}
-                  variant={timeRange === range ? "default" : "outline"}
-                  onClick={() => setTimeRange(range)}
-                  className={
-                    timeRange === range
-                      ? "bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
-                      : "border-gray-600 text-white hover:bg-gray-800 bg-transparent"
-                  }
-                >
-                  {range === "all" ? "All Time" : range.toUpperCase()}
-                </Button>
-              ))}
-            </div>
+        <div className="flex items-center gap-3">
+          {/* Time Range Selector */}
+          <div className="flex gap-1 bg-gray-900 rounded-lg p-1">
+            {["7d", "30d", "90d", "all"].map((range) => (
+              <Button
+                key={range}
+                size="sm"
+                variant={timeRange === range ? "default" : "ghost"}
+                onClick={() => setTimeRange(range)}
+                className={
+                  timeRange === range
+                    ? "bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+                    : "text-gray-400 hover:text-white hover:bg-gray-800"
+                }
+              >
+                {range === "all" ? "All" : range.toUpperCase()}
+              </Button>
+            ))}
           </div>
 
-          {/* Key Metrics Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {/* Total Users */}
-            <Card className="bg-gray-900/50 border-gray-700">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-white text-sm font-medium flex items-center">
-                  <Users className="h-4 w-4 mr-2" />
-                  Total Users
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-white mb-1">{metrics.users.total}</div>
-                <p className="text-xs text-gray-400">{metrics.users.byTier.pro} Pro ({conversionRate}%)</p>
-              </CardContent>
-            </Card>
-
-            {/* MRR */}
-            <Card className="bg-gray-900/50 border-gray-700">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-white text-sm font-medium flex items-center">
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  MRR
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-green-400 mb-1">
-                  ${metrics.revenue.mrr.toLocaleString()}
-                </div>
-                <p className="text-xs text-gray-400">ARR: ${metrics.revenue.arr.toLocaleString()}</p>
-              </CardContent>
-            </Card>
-
-            {/* Total Sessions */}
-            <Card className="bg-gray-900/50 border-gray-700">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-white text-sm font-medium flex items-center">
-                  <Terminal className="h-4 w-4 mr-2" />
-                  Sessions
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-white mb-1">{metrics.sessions.total}</div>
-                <p className="text-xs text-gray-400">{completionRate}% completion rate</p>
-              </CardContent>
-            </Card>
-
-            {/* Avg Performance */}
-            <Card className="bg-gray-900/50 border-gray-700">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-white text-sm font-medium flex items-center">
-                  <TrendingUp className="h-4 w-4 mr-2" />
-                  Avg Score
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-[#00d9ff] mb-1">
-                  {metrics.sessions.avgPerformanceScore}%
-                </div>
-                <p className="text-xs text-gray-400">Across all sessions</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Secondary Metrics Row */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {/* Code Execution Stats */}
-            <Card className="bg-gray-900/50 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  <Zap className="h-5 w-5 mr-2 text-[#00d9ff]" />
-                  Code Executions
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400 text-sm">Total</span>
-                    <span className="text-white font-semibold">{metrics.analytics.codeExecutions.total}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400 text-sm">Passed</span>
-                    <span className="text-green-400 font-semibold">{metrics.analytics.codeExecutions.passed}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400 text-sm">Pass Rate</span>
-                    <span className="text-[#00d9ff] font-semibold">{metrics.analytics.codeExecutions.passRate}%</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Session Types */}
-            <Card className="bg-gray-900/50 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  <Target className="h-5 w-5 mr-2 text-[#00d9ff]" />
-                  Session Types
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {Object.entries(metrics.sessions.byType).map(([type, count]) => (
-                    <div key={type} className="flex justify-between">
-                      <span className="text-gray-400 text-sm capitalize">{type}</span>
-                      <span className="text-white font-semibold">{count}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Session Difficulty */}
-            <Card className="bg-gray-900/50 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  <BarChart3 className="h-5 w-5 mr-2 text-[#00d9ff]" />
-                  Difficulty
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {Object.entries(metrics.sessions.byDifficulty).map(([difficulty, count]) => (
-                    <div key={difficulty} className="flex justify-between">
-                      <Badge
-                        className={
-                          difficulty === "easy"
-                            ? "bg-green-600/20 text-green-400 border-green-600/30"
-                            : difficulty === "medium"
-                              ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
-                              : "bg-red-600/20 text-red-400 border-red-600/30"
-                        }
-                      >
-                        {difficulty.toUpperCase()}
-                      </Badge>
-                      <span className="text-white font-semibold">{count}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Subscription Breakdown */}
-          <Card className="bg-gray-900/50 border-gray-700 mb-8">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <Crown className="h-5 w-5 mr-2 text-yellow-400" />
-                Subscription Breakdown
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-8">
-                <div className="text-center">
-                  <div className="text-4xl font-bold text-gray-400 mb-2">{metrics.users.byTier.free}</div>
-                  <p className="text-gray-400 text-sm">Free Users</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {metrics.users.total > 0 ? Math.round((metrics.users.byTier.free / metrics.users.total) * 100) : 0}% of total
-                  </p>
-                </div>
-                <div className="text-center">
-                  <div className="text-4xl font-bold text-yellow-400 mb-2">{metrics.users.byTier.pro}</div>
-                  <p className="text-yellow-400 text-sm">Pro Users</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {metrics.users.total > 0 ? Math.round((metrics.users.byTier.pro / metrics.users.total) * 100) : 0}% of total
-                  </p>
-                </div>
-                <div className="text-center">
-                  <div className="text-4xl font-bold text-purple-400 mb-2">{metrics.users.byTier.enterprise}</div>
-                  <p className="text-purple-400 text-sm">Enterprise Users</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {metrics.users.total > 0 ? Math.round((metrics.users.byTier.enterprise / metrics.users.total) * 100) : 0}% of total
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Analytics Events */}
-          <Card className="bg-gray-900/50 border-gray-700 mb-8">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <Activity className="h-5 w-5 mr-2 text-[#00d9ff]" />
-                Analytics Events ({metrics.analytics.totalEvents} total)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {Object.entries(metrics.analytics.byEventType).map(([eventType, count]) => (
-                  <div key={eventType} className="bg-gray-800/50 p-3 rounded-lg">
-                    <div className="text-2xl font-bold text-white mb-1">{count}</div>
-                    <p className="text-xs text-gray-400 capitalize">{eventType.replace(/_/g, " ")}</p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Firebase Analytics */}
-          {metrics.firebaseAnalytics && (
-            <>
-              <Card className="bg-gray-900/50 border-gray-700 mb-8">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center">
-                    <BarChart3 className="h-5 w-5 mr-2 text-[#00d9ff]" />
-                    Firebase Analytics
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-gray-800/50 p-4 rounded-lg">
-                      <div className="text-2xl font-bold text-[#00d9ff] mb-1">
-                        {metrics.firebaseAnalytics.activeUsers.toLocaleString()}
-                      </div>
-                      <p className="text-xs text-gray-400">Active Users</p>
-                    </div>
-                    <div className="bg-gray-800/50 p-4 rounded-lg">
-                      <div className="text-2xl font-bold text-green-400 mb-1">
-                        {metrics.firebaseAnalytics.newUsers.toLocaleString()}
-                      </div>
-                      <p className="text-xs text-gray-400">New Users</p>
-                    </div>
-                    <div className="bg-gray-800/50 p-4 rounded-lg">
-                      <div className="text-2xl font-bold text-white mb-1">
-                        {metrics.firebaseAnalytics.pageViews.toLocaleString()}
-                      </div>
-                      <p className="text-xs text-gray-400">Page Views</p>
-                    </div>
-                    <div className="bg-gray-800/50 p-4 rounded-lg">
-                      <div className="text-2xl font-bold text-purple-400 mb-1">
-                        {metrics.firebaseAnalytics.sessions.toLocaleString()}
-                      </div>
-                      <p className="text-xs text-gray-400">Sessions</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div className="bg-gray-800/30 p-3 rounded">
-                      <span className="text-gray-400 text-sm">Avg Session Duration</span>
-                      <div className="text-lg font-semibold text-white mt-1">
-                        {Math.floor(metrics.firebaseAnalytics.avgSessionDuration / 60)}m {metrics.firebaseAnalytics.avgSessionDuration % 60}s
-                      </div>
-                    </div>
-                    <div className="bg-gray-800/30 p-3 rounded">
-                      <span className="text-gray-400 text-sm">Bounce Rate</span>
-                      <div className="text-lg font-semibold text-white mt-1">
-                        {metrics.firebaseAnalytics.bounceRate.toFixed(1)}%
-                      </div>
-                    </div>
-                    <div className="bg-gray-800/30 p-3 rounded">
-                      <span className="text-gray-400 text-sm">Engagement Rate</span>
-                      <div className="text-lg font-semibold text-[#00d9ff] mt-1">
-                        {metrics.firebaseAnalytics.engagementRate.toFixed(1)}%
-                      </div>
-                    </div>
-                  </div>
-
-                  {Object.keys(metrics.firebaseAnalytics.eventsByType).length > 0 && (
-                    <div className="mb-6">
-                      <h4 className="text-sm font-medium text-gray-400 mb-3">Top Events</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {Object.entries(metrics.firebaseAnalytics.eventsByType)
-                          .slice(0, 8)
-                          .map(([eventName, count]) => (
-                            <div key={eventName} className="bg-gray-800/30 p-2 rounded">
-                              <div className="text-lg font-semibold text-white">{count.toLocaleString()}</div>
-                              <p className="text-xs text-gray-400 capitalize">{eventName.replace(/_/g, " ")}</p>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {metrics.firebaseAnalytics.acquisition && metrics.firebaseAnalytics.acquisition.length > 0 && (
-                    <div className="mb-6">
-                      <h4 className="text-sm font-medium text-gray-400 mb-3">User Acquisition</h4>
-                      <div className="space-y-2">
-                        {metrics.firebaseAnalytics.acquisition.slice(0, 5).map((item) => (
-                          <div key={item.source} className="flex items-center justify-between bg-gray-800/30 px-3 py-2 rounded">
-                            <span className="text-white text-sm capitalize">{item.source || "direct"}</span>
-                            <span className="text-[#00d9ff] font-semibold">{item.users.toLocaleString()}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {Object.keys(metrics.firebaseAnalytics.conversions).length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-400 mb-3">Conversions</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                        {Object.entries(metrics.firebaseAnalytics.conversions).map(([eventName, count]) => (
-                          <div key={eventName} className="bg-gray-800/30 p-2 rounded">
-                            <div className="text-lg font-semibold text-green-400">{count.toLocaleString()}</div>
-                            <p className="text-xs text-gray-400 capitalize">{eventName.replace(/_/g, " ")}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </>
-          )}
-
-          {/* AI Usage & Costs */}
-          {aiUsage && (
-            <Card className="bg-gray-900/50 border-gray-700 mb-8">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  <Cpu className="h-5 w-5 mr-2 text-[#00ff88]" />
-                  AI Usage & Costs (This Month)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {/* AI Cost Overview */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  <div className="bg-gray-800/50 p-4 rounded-lg">
-                    <div className="text-2xl font-bold text-[#00ff88]">${aiUsage.overview.totalCost.toFixed(4)}</div>
-                    <p className="text-xs text-gray-400">Total AI Cost</p>
-                  </div>
-                  <div className="bg-gray-800/50 p-4 rounded-lg">
-                    <div className="text-2xl font-bold text-white">{aiUsage.overview.totalRequests}</div>
-                    <p className="text-xs text-gray-400">AI Requests</p>
-                  </div>
-                  <div className="bg-gray-800/50 p-4 rounded-lg">
-                    <div className="text-2xl font-bold text-[#00d9ff]">{aiUsage.cache.memoryCacheSize}</div>
-                    <p className="text-xs text-gray-400">Cache Entries</p>
-                  </div>
-                  <div className="bg-gray-800/50 p-4 rounded-lg">
-                    <div className="text-2xl font-bold text-purple-400">{aiUsage.cache.memoryHits}</div>
-                    <p className="text-xs text-gray-400">Cache Hits</p>
-                  </div>
-                </div>
-
-                {/* Budget Caps */}
-                <div className="mb-6">
-                  <h4 className="text-sm font-medium text-gray-400 mb-3">Budget Caps by Tier</h4>
-                  <div className="flex gap-4">
-                    {aiUsage.budgetCaps && Object.entries(aiUsage.budgetCaps).map(([tier, cap]) => (
-                      <div key={tier} className="bg-gray-800/30 px-3 py-2 rounded">
-                        <span className="text-gray-400 text-xs capitalize">{tier}:</span>
-                        <span className="text-white text-sm font-medium ml-2">${cap}/mo</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Top Users by AI Cost */}
-                {aiUsage.topUsers && aiUsage.topUsers.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-400 mb-3">Top Users by AI Cost</h4>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {aiUsage.topUsers.slice(0, 10).map((user) => (
-                        <div key={user.userId} className="flex items-center justify-between bg-gray-800/30 px-3 py-2 rounded">
-                          <div className="flex items-center gap-3">
-                            <span className="text-white text-sm">{user.email}</span>
-                            <Badge
-                              className={
-                                user.tier === "enterprise"
-                                  ? "bg-purple-600/20 text-purple-400 border-purple-600/30"
-                                  : user.tier === "pro"
-                                    ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
-                                    : "bg-gray-600/20 text-gray-400 border-gray-600/30"
-                              }
-                            >
-                              {user.tier}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <span className="text-[#00ff88] text-sm font-medium">${user.cost.toFixed(4)}</span>
-                            <div className="w-20 h-2 bg-gray-700 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full ${user.budgetUsedPercent > 80 ? "bg-red-500" :
-                                  user.budgetUsedPercent > 50 ? "bg-yellow-500" :
-                                    "bg-[#00ff88]"
-                                  }`}
-                                style={{ width: `${Math.min(100, user.budgetUsedPercent)}%` }}
-                              />
-                            </div>
-                            <span className="text-gray-500 text-xs w-10">{user.budgetUsedPercent.toFixed(0)}%</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Recent Errors */}
-          {metrics.errors.total > 0 && (
-            <Card className="bg-gray-900/50 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center justify-between">
-                  <span className="flex items-center">
-                    <AlertCircle className="h-5 w-5 mr-2 text-red-400" />
-                    Recent Errors ({metrics.errors.total} total)
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {metrics.errors.recent.slice(0, 10).map((error, index) => (
-                    <div key={index} className="bg-red-900/10 border border-red-500/20 p-3 rounded-lg">
-                      <div className="flex items-start justify-between mb-2">
-                        <Badge className="bg-red-600/20 text-red-400 border-red-600/30">
-                          {error.errorType}
-                        </Badge>
-                        <span className="text-xs text-gray-500">
-                          {new Date(error.timestamp).toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="text-sm text-red-300 mb-1">{error.errorMessage}</p>
-                      {error.page && <p className="text-xs text-gray-500">Page: {error.page}</p>}
-                      {error.userId && <p className="text-xs text-gray-500">User: {error.userId.substring(0, 8)}...</p>}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {/* Refresh Button */}
+          <Button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            variant="outline"
+            size="sm"
+            className="border-gray-700 text-gray-400 hover:text-white"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
         </div>
       </div>
 
-      <Footer />
-    </main>
+      {/* Key Metrics Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <MetricCard
+          title="Total Users"
+          value={metrics.users.total}
+          subtitle={`${metrics.users.byTier.pro} Pro (${conversionRate}%)`}
+          icon={Users}
+          sparklineData={metrics.timeSeries?.users.slice(-7).map((u) => u.total)}
+          sparklineColor="#00d9ff"
+        />
+        <MetricCard
+          title="MRR"
+          value={`$${metrics.revenue.mrr.toLocaleString()}`}
+          subtitle={`ARR: $${metrics.revenue.arr.toLocaleString()}`}
+          icon={DollarSign}
+          valueColor="text-green-400"
+          iconColor="text-green-400"
+          sparklineData={metrics.timeSeries?.revenue.slice(-7).map((r) => r.mrr)}
+          sparklineColor="#00ff88"
+        />
+        <MetricCard
+          title="Sessions"
+          value={metrics.sessions.total}
+          subtitle={`${completionRate}% completion rate`}
+          icon={Terminal}
+          sparklineData={metrics.timeSeries?.sessions.slice(-7).map((s) => s.total)}
+          sparklineColor="#FBBF24"
+        />
+        <MetricCard
+          title="Avg Score"
+          value={`${metrics.sessions.avgPerformanceScore}%`}
+          subtitle="Across all sessions"
+          icon={TrendingUp}
+          valueColor="text-[#00d9ff]"
+        />
+      </div>
+
+      {/* Charts Row 1 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* User Growth Chart */}
+        {metrics.timeSeries?.users && metrics.timeSeries.users.length > 0 && (
+          <TimeSeriesChart
+            title="User Growth"
+            subtitle={timeRange.toUpperCase()}
+            data={metrics.timeSeries.users}
+            series={[
+              { key: "free", name: "Free", color: "#6B7280" },
+              { key: "pro", name: "Pro", color: "#FBBF24" },
+              { key: "enterprise", name: "Enterprise", color: "#A855F7" },
+            ]}
+            stacked
+            icon={Users}
+          />
+        )}
+
+        {/* Revenue Chart */}
+        {metrics.timeSeries?.revenue && metrics.timeSeries.revenue.length > 0 && (
+          <TimeSeriesChart
+            title="Revenue Trend"
+            subtitle="MRR over time"
+            data={metrics.timeSeries.revenue}
+            series={[{ key: "mrr", name: "MRR", color: "#00ff88" }]}
+            icon={DollarSign}
+            valueFormatter={(v) => `$${v.toLocaleString()}`}
+          />
+        )}
+      </div>
+
+      {/* Charts Row 2 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Conversion Funnel */}
+        {funnel && (
+          <div className="lg:col-span-2">
+            <FunnelChart
+              title="Conversion Funnel"
+              subtitle={timeRange.toUpperCase()}
+              stages={funnel.stages}
+              icon={TrendingUp}
+            />
+          </div>
+        )}
+
+        {/* Tier Distribution */}
+        <DistributionChart
+          title="User Tiers"
+          data={tierDistribution}
+          type="pie"
+          icon={Crown}
+          height={280}
+        />
+      </div>
+
+      {/* Charts Row 3 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Sessions Chart */}
+        {metrics.timeSeries?.sessions && metrics.timeSeries.sessions.length > 0 && (
+          <div className="lg:col-span-2">
+            <TimeSeriesChart
+              title="Session Activity"
+              subtitle="Sessions started vs completed"
+              data={metrics.timeSeries.sessions}
+              series={[
+                { key: "total", name: "Started", color: "#00d9ff" },
+                { key: "completed", name: "Completed", color: "#00ff88" },
+              ]}
+              icon={Activity}
+            />
+          </div>
+        )}
+
+        {/* Difficulty Distribution */}
+        {difficultyDistribution.length > 0 && (
+          <DistributionChart
+            title="Session Difficulty"
+            data={difficultyDistribution}
+            type="bar"
+            icon={Zap}
+            height={280}
+          />
+        )}
+      </div>
+
+      {/* Code Execution Stats */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="bg-gray-900/50 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <Zap className="h-5 w-5 text-[#00d9ff]" />
+              Code Executions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Total Executions</span>
+                <span className="text-2xl font-bold text-white">
+                  {metrics.analytics.codeExecutions.total.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Passed</span>
+                <span className="text-xl font-semibold text-green-400">
+                  {metrics.analytics.codeExecutions.passed.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Pass Rate</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-green-400 rounded-full"
+                      style={{ width: `${metrics.analytics.codeExecutions.passRate}%` }}
+                    />
+                  </div>
+                  <span className="text-[#00d9ff] font-semibold">
+                    {metrics.analytics.codeExecutions.passRate}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Event Types */}
+        <Card className="bg-gray-900/50 border-gray-800 lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <Activity className="h-5 w-5 text-[#00d9ff]" />
+              Analytics Events ({metrics.analytics.totalEvents.toLocaleString()} total)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {Object.entries(metrics.analytics.byEventType)
+                .sort(([, a], [, b]) => b - a)
+                .slice(0, 8)
+                .map(([eventType, count]) => (
+                  <div key={eventType} className="bg-gray-800/50 p-3 rounded-lg">
+                    <div className="text-xl font-bold text-white">{count.toLocaleString()}</div>
+                    <p className="text-xs text-gray-400 capitalize truncate">
+                      {eventType.replace(/_/g, " ")}
+                    </p>
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Errors */}
+      {metrics.errors.total > 0 && (
+        <Card className="bg-gray-900/50 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-400" />
+              Recent Errors ({metrics.errors.total})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {metrics.errors.recent.slice(0, 5).map((error, index) => (
+                <div
+                  key={index}
+                  className="bg-red-900/10 border border-red-500/20 p-3 rounded-lg"
+                >
+                  <div className="flex items-start justify-between">
+                    <Badge className="bg-red-600/20 text-red-400 border-red-600/30">
+                      {error.errorType || "Error"}
+                    </Badge>
+                    <span className="text-xs text-gray-500">
+                      {new Date(error.timestamp).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-sm text-red-300 mt-2 line-clamp-2">
+                    {error.errorMessage || "Unknown error"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   )
 }
