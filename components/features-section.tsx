@@ -81,18 +81,12 @@ const itemVariants = {
 export function FeaturesSection() {
   return (
     <section id="features" className="relative py-24 md:py-32 overflow-hidden">
-      {/* Gradient background - lighter than rest of site */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-slate-900/50 to-slate-800/30" />
+      {/* Cluely-inspired gradient background - lighter, more colorful */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-950/40 to-slate-900" />
 
-      {/* Subtle grid pattern */}
-      <div
-        className="absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-                           linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-          backgroundSize: '60px 60px',
-        }}
-      />
+      {/* Soft glow orbs for depth */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-neural/10 rounded-full blur-3xl" />
 
       <div className="container mx-auto px-4 relative z-10">
         {/* Section Header */}
@@ -112,7 +106,7 @@ export function FeaturesSection() {
               ace your interview
             </span>
           </h2>
-          <p className="text-lg text-slate-400 max-w-xl mx-auto">
+          <p className="text-lg text-white/60 max-w-xl mx-auto">
             Practice with an AI that understands code, gives real feedback, and helps you improve faster than grinding alone.
           </p>
         </motion.div>
@@ -131,7 +125,7 @@ export function FeaturesSection() {
               variants={itemVariants}
               className="group relative"
             >
-              <div className="relative h-full p-6 rounded-2xl bg-slate-800/40 border border-slate-700/50 backdrop-blur-sm transition-all duration-300 hover:bg-slate-800/60 hover:border-slate-600/50 hover:-translate-y-1">
+              <div className="relative h-full p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md transition-all duration-300 hover:bg-white/10 hover:border-white/20 hover:-translate-y-1 hover:shadow-xl hover:shadow-accent/5">
                 {/* Icon */}
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent/20 to-neural/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
                   <feature.icon className="w-6 h-6 text-accent" />
@@ -141,7 +135,7 @@ export function FeaturesSection() {
                 <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-accent transition-colors duration-300">
                   {feature.title}
                 </h3>
-                <p className="text-slate-400 text-sm leading-relaxed mb-3">
+                <p className="text-white/50 text-sm leading-relaxed mb-3">
                   {feature.description}
                 </p>
 
@@ -166,16 +160,16 @@ export function FeaturesSection() {
             {/* Glow effect */}
             <div className="absolute -inset-4 bg-gradient-to-r from-accent/10 to-neural/10 rounded-3xl blur-2xl" />
 
-            <div className="relative bg-slate-900/80 rounded-2xl border border-slate-700/50 overflow-hidden backdrop-blur-sm">
+            <div className="relative bg-white/5 rounded-2xl border border-white/10 overflow-hidden backdrop-blur-md">
               {/* Browser chrome */}
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-700/50 bg-slate-800/50">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-white/5">
                 <div className="flex gap-1.5">
                   <div className="w-3 h-3 rounded-full bg-red-500/60" />
                   <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
                   <div className="w-3 h-3 rounded-full bg-green-500/60" />
                 </div>
                 <div className="flex-1 text-center">
-                  <span className="text-xs text-slate-500 font-mono">skillon.dev/interview</span>
+                  <span className="text-xs text-white/40 font-mono">skillon.dev/interview</span>
                 </div>
               </div>
 
@@ -193,7 +187,7 @@ export function FeaturesSection() {
 
           {/* CTA */}
           <div className="text-center mt-10">
-            <p className="text-slate-400 mb-6 text-sm">
+            <p className="text-white/50 mb-6 text-sm">
               See how our AI provides detailed, actionable feedback after every session
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
