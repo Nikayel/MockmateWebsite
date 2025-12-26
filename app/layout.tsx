@@ -73,7 +73,6 @@ html {
         <PerformancePolyfill />
         <ErrorBoundaryProvider>
           <AuthProvider>
-            <SpeedInsights />
             {children}
             <Toaster position="top-right" richColors />
             <CookieConsent />
