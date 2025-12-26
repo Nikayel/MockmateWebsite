@@ -1,239 +1,253 @@
 "use client"
 
 import { MagneticButton } from "@/components/ui/magnetic-button"
-import { Brain, Code2, BarChart3, Play, Mic, Target, Clock, Sparkles } from "lucide-react"
+import { Play, Mic, Code2, Wrench, Layers, Shield, Zap, Bot, Clock, Building2, Sparkles } from "lucide-react"
 import Link from "next/link"
-import { motion } from "framer-motion"
-import Image from "next/image"
+import { motion, useScroll, useTransform } from "framer-motion"
+import { useRef } from "react"
 
 /**
- * Features Section - Bento Grid Layout
- * Inspired by Apple, Linear, and modern SaaS designs
- *
- * Key principles:
- * - Varied card sizes create visual hierarchy
- * - Large cards for hero features, small for supporting
- * - Subtle animations on scroll
- * - Light glassmorphic aesthetic
+ * Features Section - Clean two-column layout
+ * Left: Sticky intro, Right: Scrolling features
+ * Based on actual platform capabilities from codebase research
  */
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.1,
-    },
-  },
-}
+const interviewTypes = [
+  { name: "DSA", description: "15 patterns from arrays to graphs", icon: Code2 },
+  { name: "System Design", description: "Architecture & scalability", icon: Layers },
+  { name: "Bug Fix", description: "Debug real codebases", icon: Wrench },
+  { name: "Add Functionality", description: "Build on existing code", icon: Zap },
+  { name: "Real-World", description: "60-min company rounds", icon: Building2 },
+  { name: "Security", description: "Code quality & safety", icon: Shield },
+]
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 20, scale: 0.98 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: 0.5,
-      ease: [0.25, 0.46, 0.45, 0.94],
-    },
+const features = [
+  {
+    id: "ai-collaboration",
+    label: "AI Collaboration",
+    title: "Use AI during interviews. Never penalized.",
+    description: "Like Meta's new interview format—you can ask your AI partner for hints, debugging help, or algorithm suggestions. We grade you on understanding, not whether you used AI.",
+    highlight: "Simulates real AI-enabled interview formats",
+    visual: (
+      <div className="flex items-center gap-3 p-4 rounded-xl bg-white/5 border border-white/10">
+        <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center">
+          <Bot className="w-5 h-5 text-accent" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm text-white/70">"Can you help me think through the edge cases here?"</p>
+          <p className="text-xs text-white/40 mt-1">AI Partner is typing...</p>
+        </div>
+      </div>
+    ),
   },
-}
+  {
+    id: "voice-interviewer",
+    label: "Voice-Enabled",
+    title: "Talk through your approach. The AI listens.",
+    description: "Real interviews are conversations, not typing tests. Speak your thought process, and our AI interviewer responds naturally with follow-up questions—just like a real interviewer would.",
+    highlight: "Two channels: Interviewer + AI Partner",
+    visual: (
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/10 border border-accent/20">
+          <Mic className="w-4 h-4 text-accent animate-pulse" />
+          <span className="text-sm text-white/70">"I'm thinking a two-pointer approach here..."</span>
+        </div>
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-white/5 border border-white/10 ml-4">
+          <span className="text-xs text-accent font-medium">AI:</span>
+          <span className="text-sm text-white/60">"Good intuition. What's your time complexity?"</span>
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "real-codebases",
+    label: "Real-World Code",
+    title: "Multi-file codebases. Not just LeetCode.",
+    description: "Practice with real production contexts—payment processing bugs, feature implementations, e-commerce systems. Understand existing code before you write new code.",
+    highlight: "60-minute rounds: explore → fix → implement → extend",
+    visual: (
+      <div className="font-mono text-xs">
+        <div className="flex items-center gap-2 text-white/40 mb-2">
+          <span className="px-2 py-0.5 rounded bg-white/10">src/</span>
+          <span className="px-2 py-0.5 rounded bg-white/10">tests/</span>
+          <span className="px-2 py-0.5 rounded bg-accent/20 text-accent">payment.ts</span>
+        </div>
+        <div className="text-white/50">
+          <span className="text-purple-400">export</span> <span className="text-accent">function</span> processPayment(...)
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "smart-hints",
+    label: "Adaptive Hints",
+    title: "Progressive hints when you're stuck.",
+    description: "Our AI detects when you're struggling—stagnant code, failed tests, long pauses. It offers increasingly specific hints without giving away the answer. You stay in control.",
+    highlight: "4 levels: Nudge → Guide → Explain → Reveal",
+    visual: (
+      <div className="flex gap-2">
+        {["Nudge", "Guide", "Explain", "Reveal"].map((level, i) => (
+          <div
+            key={level}
+            className={`px-3 py-1.5 rounded-lg text-xs ${
+              i === 0 ? "bg-accent/20 text-accent border border-accent/30" : "bg-white/5 text-white/40 border border-white/10"
+            }`}
+          >
+            {level}
+          </div>
+        ))}
+      </div>
+    ),
+  },
+  {
+    id: "company-prep",
+    label: "70+ Scenarios",
+    title: "FAANG-specific interview simulations.",
+    description: "Practice with scenarios tailored to Google, Meta, Amazon, Apple, Netflix—plus Stripe, Airbnb, Shopify, and more. Each company has different patterns and expectations.",
+    highlight: "Company-specific knowledge base via RAG",
+    visual: (
+      <div className="flex flex-wrap gap-2">
+        {["Google", "Meta", "Amazon", "Apple", "Stripe", "Airbnb"].map((company) => (
+          <span key={company} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-white/60">
+            {company}
+          </span>
+        ))}
+        <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-white/40">
+          +64 more
+        </span>
+      </div>
+    ),
+  },
+  {
+    id: "accessibility",
+    label: "Built for Everyone",
+    title: "Calm mode. Focus mode. Your pace.",
+    description: "Interview anxiety is real. Hide the timer, mute distracting colors, collapse panels you don't need. Practice in an environment that works for you.",
+    highlight: "WCAG 2.1 compliant design",
+    visual: (
+      <div className="flex gap-3">
+        <div className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white/60">
+          <Clock className="w-4 h-4 mb-1 opacity-50" />
+          Hide Timer
+        </div>
+        <div className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white/60">
+          <Sparkles className="w-4 h-4 mb-1 opacity-50" />
+          Calm Mode
+        </div>
+      </div>
+    ),
+  },
+]
 
 export function FeaturesSection() {
+  const containerRef = useRef<HTMLDivElement>(null)
+
   return (
     <section id="features" className="relative py-24 md:py-32 overflow-hidden">
-      {/* Gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-950/30 to-slate-900" />
-
-      {/* Soft glow orbs */}
-      <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-accent/8 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-neural/8 rounded-full blur-3xl" />
+      {/* Background */}
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-slate-900/50 to-background" />
 
       <div className="container mx-auto px-4 relative z-10">
-        {/* Section Header */}
+        {/* Header */}
         <motion.div
-          className="max-w-2xl mx-auto text-center mb-16"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.6 }}
-        >
-          <span className="inline-block px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-medium mb-4">
-            Features
-          </span>
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-heading font-bold text-white mb-4 leading-tight">
-            Everything you need to
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-accent to-neural">
-              ace your interview
-            </span>
-          </h2>
-          <p className="text-lg text-white/60 max-w-xl mx-auto">
-            Practice with an AI that understands code and helps you improve faster than grinding alone.
-          </p>
-        </motion.div>
-
-        {/* Bento Grid */}
-        <motion.div
-          className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-16"
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-50px" }}
-        >
-          {/* Hero Feature - AI Interviewer (spans 2 cols) */}
-          <motion.div
-            variants={itemVariants}
-            className="md:col-span-2 group"
-          >
-            <div className="relative h-full p-8 rounded-3xl bg-gradient-to-br from-accent/10 to-transparent border border-white/10 backdrop-blur-sm overflow-hidden transition-all duration-500 hover:border-accent/30">
-              {/* Background pattern */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-accent/5 rounded-full blur-3xl" />
-
-              <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
-                    <Mic className="w-5 h-5 text-accent" />
-                  </div>
-                  <span className="text-xs text-accent font-medium uppercase tracking-wider">Voice-Enabled</span>
-                </div>
-
-                <h3 className="text-2xl md:text-3xl font-bold text-white mb-3">
-                  AI Interviewer
-                </h3>
-                <p className="text-white/60 text-base max-w-md mb-6">
-                  Talk through your approach like a real interview. The AI listens, responds naturally, and asks follow-up questions based on your explanation.
-                </p>
-
-                {/* Mini demo */}
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10 max-w-sm">
-                  <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center animate-pulse">
-                    <Mic className="w-4 h-4 text-accent" />
-                  </div>
-                  <span className="text-sm text-white/70">"I'm thinking a hashmap here for O(1) lookup..."</span>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Real-Time Feedback */}
-          <motion.div variants={itemVariants} className="group">
-            <div className="relative h-full p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-sm transition-all duration-500 hover:bg-white/8 hover:border-white/20">
-              <div className="w-10 h-10 rounded-xl bg-neural/20 flex items-center justify-center mb-4">
-                <Code2 className="w-5 h-5 text-neural" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Real-Time Feedback</h3>
-              <p className="text-white/50 text-sm leading-relaxed">
-                Get instant suggestions as you write. Catch bugs and optimize complexity before you submit.
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Spaced Repetition */}
-          <motion.div variants={itemVariants} className="group">
-            <div className="relative h-full p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-sm transition-all duration-500 hover:bg-white/8 hover:border-white/20">
-              <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center mb-4">
-                <BarChart3 className="w-5 h-5 text-accent" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Spaced Repetition</h3>
-              <p className="text-white/50 text-sm leading-relaxed">
-                Our algorithm schedules reviews at optimal times. Retain 90% instead of forgetting 80%.
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Pattern Mastery (spans 2 cols on lg) */}
-          <motion.div variants={itemVariants} className="lg:col-span-2 group">
-            <div className="relative h-full p-6 rounded-3xl bg-gradient-to-br from-neural/10 to-transparent border border-white/10 backdrop-blur-sm transition-all duration-500 hover:border-neural/30">
-              <div className="flex flex-col md:flex-row md:items-center gap-6">
-                <div className="flex-1">
-                  <div className="w-10 h-10 rounded-xl bg-neural/20 flex items-center justify-center mb-4">
-                    <Target className="w-5 h-5 text-neural" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">15 DSA Pattern Tracking</h3>
-                  <p className="text-white/50 text-sm leading-relaxed">
-                    Stop random grinding. Track proficiency across sliding window, two pointers, BFS/DFS, dynamic programming, and more.
-                  </p>
-                </div>
-
-                {/* Pattern pills */}
-                <div className="flex flex-wrap gap-2 md:max-w-[200px]">
-                  {["Two Pointers", "Sliding Window", "BFS/DFS", "DP", "Backtracking", "Graphs"].map((pattern) => (
-                    <span key={pattern} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-white/60">
-                      {pattern}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* 24/7 Available */}
-          <motion.div variants={itemVariants} className="group">
-            <div className="relative h-full p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-sm transition-all duration-500 hover:bg-white/8 hover:border-white/20">
-              <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center mb-4">
-                <Clock className="w-5 h-5 text-accent" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Available 24/7</h3>
-              <p className="text-white/50 text-sm leading-relaxed">
-                Practice anytime. No scheduling, no waiting for a partner, no timezone hassles.
-              </p>
-            </div>
-          </motion.div>
-
-          {/* AI-Enabled Interview Prep - NEW */}
-          <motion.div variants={itemVariants} className="md:col-span-2 lg:col-span-3 group">
-            <div className="relative p-6 rounded-3xl bg-gradient-to-r from-purple-500/10 via-accent/5 to-neural/10 border border-white/10 backdrop-blur-sm transition-all duration-500 hover:border-purple-500/30">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                    <Sparkles className="w-6 h-6 text-purple-400" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-lg font-semibold text-white">Ready for AI-Enabled Interviews</h3>
-                      <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-medium uppercase">New</span>
-                    </div>
-                    <p className="text-white/50 text-sm">
-                      Companies like Meta are testing AI-assisted interview formats. Practice with tools, just like the real thing.
-                    </p>
-                  </div>
-                </div>
-                <Link href="/why-skillon" className="text-sm text-purple-300 hover:text-purple-200 transition-colors whitespace-nowrap">
-                  Learn more →
-                </Link>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-
-        {/* CTA */}
-        <motion.div
-          className="text-center"
+          className="max-w-3xl mb-16"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.3 }}
+          transition={{ duration: 0.6 }}
         >
+          <span className="inline-block px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-medium mb-4">
+            More than mock interviews
+          </span>
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-heading font-bold text-white mb-6 leading-tight">
+            Practice the way
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-neural"> real interviews </span>
+            actually work
+          </h2>
+          <p className="text-lg text-white/60 max-w-2xl">
+            Modern tech interviews let you use AI tools. They test real-world coding, not memorization. Skillon simulates exactly that.
+          </p>
+        </motion.div>
+
+        {/* Interview Types Row */}
+        <motion.div
+          className="mb-20"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+        >
+          <p className="text-sm text-white/40 uppercase tracking-wider mb-4">6 Interview Types</p>
+          <div className="flex flex-wrap gap-3">
+            {interviewTypes.map((type) => (
+              <div
+                key={type.name}
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 hover:border-white/20 transition-colors"
+              >
+                <type.icon className="w-4 h-4 text-accent" />
+                <span className="text-sm text-white font-medium">{type.name}</span>
+                <span className="text-xs text-white/40 hidden sm:inline">— {type.description}</span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Features List */}
+        <div ref={containerRef} className="space-y-24 md:space-y-32">
+          {features.map((feature, index) => (
+            <motion.div
+              key={feature.id}
+              className="grid md:grid-cols-2 gap-8 md:gap-16 items-center"
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              {/* Text - alternates sides */}
+              <div className={index % 2 === 1 ? "md:order-2" : ""}>
+                <span className="inline-block px-2 py-1 rounded bg-white/5 text-xs text-white/50 font-medium mb-4">
+                  {feature.label}
+                </span>
+                <h3 className="text-2xl md:text-3xl font-bold text-white mb-4 leading-tight">
+                  {feature.title}
+                </h3>
+                <p className="text-white/60 mb-4 leading-relaxed">
+                  {feature.description}
+                </p>
+                <p className="text-sm text-accent">
+                  {feature.highlight}
+                </p>
+              </div>
+
+              {/* Visual */}
+              <div className={`p-6 rounded-2xl bg-white/[0.02] border border-white/10 ${index % 2 === 1 ? "md:order-1" : ""}`}>
+                {feature.visual}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <motion.div
+          className="text-center mt-24"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+        >
+          <p className="text-white/50 mb-6">
+            Ready to practice the way top companies actually interview?
+          </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link href="/interview">
-              <MagneticButton
-                size="lg"
-                variant="primary"
-                glowColor="accent"
-              >
+              <MagneticButton size="lg" variant="primary" glowColor="accent">
                 <Play className="w-5 h-5" />
                 Try It Free
               </MagneticButton>
             </Link>
-            <Link href="/samples">
-              <MagneticButton
-                size="lg"
-                variant="outline"
-                glowColor="none"
-              >
-                View Sample Reports
+            <Link href="/why-skillon">
+              <MagneticButton size="lg" variant="outline" glowColor="none">
+                How It Works
               </MagneticButton>
             </Link>
           </div>
