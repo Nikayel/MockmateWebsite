@@ -59,7 +59,6 @@ export default function LegalPage() {
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto space-y-12">
 
-            {/* ==================== PRIVACY POLICY ==================== */}
             <Card id="privacy-policy" className="bg-gray-900/50 border-gray-700 glass-effect scroll-mt-24">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
@@ -304,7 +303,6 @@ export default function LegalPage() {
               </CardContent>
             </Card>
 
-            {/* ==================== TERMS OF SERVICE ==================== */}
             <Card id="terms-of-service" className="bg-gray-900/50 border-gray-700 glass-effect scroll-mt-24">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
@@ -508,7 +506,6 @@ export default function LegalPage() {
               </CardContent>
             </Card>
 
-            {/* ==================== COOKIE POLICY ==================== */}
             <Card id="cookie-policy" className="bg-gray-900/50 border-gray-700 glass-effect scroll-mt-24">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
@@ -592,7 +589,6 @@ export default function LegalPage() {
               </CardContent>
             </Card>
 
-            {/* ==================== YOUR RIGHTS (GDPR/CCPA) ==================== */}
             <Card id="data-processing" className="bg-gray-900/50 border-gray-700 glass-effect scroll-mt-24">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
@@ -664,7 +660,6 @@ export default function LegalPage() {
               </CardContent>
             </Card>
 
-            {/* ==================== DATA BREACH NOTIFICATION ==================== */}
             <Card className="bg-gray-900/50 border-gray-700 glass-effect">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">
@@ -703,7 +698,6 @@ export default function LegalPage() {
               </CardContent>
             </Card>
 
-            {/* ==================== CONTACT INFORMATION ==================== */}
             <Card id="contact" className="bg-gray-900/50 border-gray-700 glass-effect scroll-mt-24">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-3">

@@ -185,9 +185,7 @@ const emailWrapper = (content: string) => `
 </html>
 `;
 
-// ============================================
 // WELCOME EMAIL
-// ============================================
 
 export interface WelcomeEmailData {
   userName: string;
@@ -255,9 +253,7 @@ Unsubscribe: ${data.appUrl}/settings/notifications
   `.trim();
 }
 
-// ============================================
 // INACTIVITY REMINDER (24h+)
-// ============================================
 
 export interface InactivityEmailData {
   userName: string;
@@ -351,9 +347,7 @@ Unsubscribe: ${data.appUrl}/settings/notifications
   `.trim();
 }
 
-// ============================================
 // SPACED REPETITION REMINDER (3+ days)
-// ============================================
 
 export interface SpacedRepetitionEmailData {
   userName: string;
@@ -446,9 +440,7 @@ Unsubscribe: ${data.appUrl}/settings/notifications
   `.trim();
 }
 
-// ============================================
 // MILESTONE CELEBRATION
-// ============================================
 
 export interface MilestoneEmailData {
   userName: string;
@@ -527,9 +519,7 @@ export function getMilestoneEmailHtml(data: MilestoneEmailData): string {
   return emailWrapper(content);
 }
 
-// ============================================
 // ROADMAP: DAILY PRACTICE REMINDER
-// ============================================
 
 export interface DailyRoadmapEmailData {
   userName: string;
@@ -644,9 +634,7 @@ Unsubscribe: ${data.appUrl}/settings/notifications
   `.trim();
 }
 
-// ============================================
 // ROADMAP: INTERVIEW COUNTDOWN
-// ============================================
 
 export interface InterviewCountdownEmailData {
   userName: string;
@@ -730,9 +718,7 @@ export function getInterviewCountdownEmailHtml(data: InterviewCountdownEmailData
   return emailWrapper(content);
 }
 
-// ============================================
 // ROADMAP: BEHIND SCHEDULE ALERT
-// ============================================
 
 export interface BehindScheduleEmailData {
   userName: string;
@@ -782,9 +768,7 @@ export function getBehindScheduleEmailHtml(data: BehindScheduleEmailData): strin
   return emailWrapper(content);
 }
 
-// ============================================
 // PAYMENT FAILURE NOTIFICATION
-// ============================================
 
 export interface PaymentFailedEmailData {
   userName: string;
@@ -855,9 +839,7 @@ Unsubscribe: ${data.appUrl}/settings/notifications
   `.trim();
 }
 
-// ============================================
 // SUBSCRIPTION CONFIRMATION
-// ============================================
 
 export interface SubscriptionConfirmationEmailData {
   userName: string;
@@ -957,9 +939,7 @@ Unsubscribe: ${data.appUrl}/settings/notifications
   `.trim();
 }
 
-// ============================================
 // SUBSCRIPTION CANCELLATION CONFIRMATION
-// ============================================
 
 export interface SubscriptionCancellationEmailData {
   userName: string;
@@ -1090,9 +1070,7 @@ Unsubscribe: ${data.appUrl}/settings/notifications
   `.trim();
 }
 
-// ============================================
 // TRIAL ENDING NOTIFICATION
-// ============================================
 
 export interface TrialEndingEmailData {
   userName: string;
