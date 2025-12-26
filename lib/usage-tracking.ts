@@ -24,6 +24,22 @@ export const PROVIDER_COSTS = {
   'gpt-4o-mini': 0.000375,  // GPT-4o mini: $0.15 in + $0.60 out per 1M
 } as const
 
+// Deepgram voice costs (per minute of audio)
+export const DEEPGRAM_COSTS = {
+  'nova-2': 0.0043,         // Nova-2: $0.0043/min (Pay As You Go)
+  'nova': 0.0041,           // Nova: $0.0041/min
+  'enhanced': 0.0145,       // Enhanced: $0.0145/min
+  'base': 0.0125,           // Base: $0.0125/min
+} as const
+
+// Embedding costs per 1K tokens
+export const EMBEDDING_COSTS = {
+  'text-embedding-004': 0.000025,        // Gemini: Free tier generous, ~$0.025/1M chars
+  'text-embedding-3-small': 0.00002,     // OpenAI: $0.02/1M tokens
+  'text-embedding-3-large': 0.00013,     // OpenAI: $0.13/1M tokens
+  'text-embedding-ada-002': 0.0001,      // OpenAI: $0.10/1M tokens (legacy)
+} as const
+
 // Budget caps per subscription tier (per billing cycle)
 export const BUDGET_CAPS = {
   free: 0.50,        // $0.50 - enough for ~50 sessions with Gemini
@@ -38,6 +54,8 @@ export type UsageEventType =
   | 'hint_request'
   | 'session_start'
   | 'session_end'
+  | 'voice_transcription'   // Deepgram STT
+  | 'embedding_generation'  // RAG embeddings
 
 export interface UsageEvent {
   id?: string
@@ -276,7 +294,7 @@ export async function checkUserBudget(userId: string): Promise<{
 }
 
 /**
- * Calculate cost from token counts
+ * Calculate cost from token counts (for LLM providers)
  */
 export function calculateCost(
   inputTokens: number,
@@ -286,6 +304,90 @@ export function calculateCost(
   const costPer1k = PROVIDER_COSTS[provider as keyof typeof PROVIDER_COSTS] || PROVIDER_COSTS.gemini
   const totalTokens = inputTokens + outputTokens
   return (totalTokens / 1000) * costPer1k
+}
+
+/**
+ * Calculate cost for voice transcription (Deepgram)
+ * @param durationSeconds - Duration of audio in seconds
+ * @param model - Deepgram model used
+ */
+export function calculateVoiceCost(
+  durationSeconds: number,
+  model: keyof typeof DEEPGRAM_COSTS = 'nova-2'
+): number {
+  const costPerMinute = DEEPGRAM_COSTS[model] || DEEPGRAM_COSTS['nova-2']
+  const minutes = durationSeconds / 60
+  return minutes * costPerMinute
+}
+
+/**
+ * Calculate cost for embedding generation
+ * @param characterCount - Number of characters in the text
+ * @param model - Embedding model used
+ */
+export function calculateEmbeddingCost(
+  characterCount: number,
+  model: keyof typeof EMBEDDING_COSTS = 'text-embedding-004'
+): number {
+  const costPer1k = EMBEDDING_COSTS[model] || EMBEDDING_COSTS['text-embedding-004']
+  // Rough estimate: ~4 characters per token
+  const estimatedTokens = characterCount / 4
+  return (estimatedTokens / 1000) * costPer1k
+}
+
+/**
+ * Track voice transcription usage
+ */
+export async function trackVoiceUsage(params: {
+  userId: string
+  sessionId?: string
+  durationSeconds: number
+  model?: keyof typeof DEEPGRAM_COSTS
+  transcriptLength?: number
+}): Promise<void> {
+  const { userId, sessionId, durationSeconds, model = 'nova-2', transcriptLength } = params
+  const cost = calculateVoiceCost(durationSeconds, model)
+
+  await trackUsageEvent({
+    userId,
+    eventType: 'voice_transcription',
+    provider: 'deepgram',
+    model,
+    cost,
+    sessionId,
+    metadata: {
+      durationSeconds,
+      transcriptLength,
+    },
+  })
+}
+
+/**
+ * Track embedding generation usage
+ */
+export async function trackEmbeddingUsage(params: {
+  userId: string
+  characterCount: number
+  embeddingCount: number
+  model: keyof typeof EMBEDDING_COSTS
+  provider: 'gemini' | 'openai'
+  latencyMs?: number
+}): Promise<void> {
+  const { userId, characterCount, embeddingCount, model, provider, latencyMs } = params
+  const cost = calculateEmbeddingCost(characterCount, model)
+
+  await trackUsageEvent({
+    userId,
+    eventType: 'embedding_generation',
+    provider,
+    model,
+    cost,
+    latencyMs,
+    metadata: {
+      characterCount,
+      embeddingCount,
+    },
+  })
 }
 
 /**
@@ -367,6 +469,139 @@ export async function getAdminUsageStats(options?: {
     totalRequests,
     userStats,
   }
+}
+
+/**
+ * Get usage breakdown by service type for admin dashboard
+ */
+export async function getServiceBreakdown(): Promise<{
+  byService: {
+    llm: { requests: number; cost: number; tokens: number }
+    voice: { requests: number; cost: number; durationSeconds: number }
+    embeddings: { requests: number; cost: number; characterCount: number }
+  }
+  byProvider: Record<string, { requests: number; cost: number }>
+}> {
+  const now = new Date()
+  const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+  const result = {
+    byService: {
+      llm: { requests: 0, cost: 0, tokens: 0 },
+      voice: { requests: 0, cost: 0, durationSeconds: 0 },
+      embeddings: { requests: 0, cost: 0, characterCount: 0 },
+    },
+    byProvider: {} as Record<string, { requests: number; cost: number }>,
+  }
+
+  try {
+    // Query usage_events for current month
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const eventsSnapshot = await adminDb
+      .collection('usage_events')
+      .where('createdAt', '>=', startOfMonth)
+      .get()
+
+    for (const doc of eventsSnapshot.docs) {
+      const event = doc.data()
+      const eventType = event.eventType as UsageEventType
+      const cost = event.cost || 0
+      const provider = event.provider || 'unknown'
+
+      // Aggregate by provider
+      if (!result.byProvider[provider]) {
+        result.byProvider[provider] = { requests: 0, cost: 0 }
+      }
+      result.byProvider[provider].requests++
+      result.byProvider[provider].cost += cost
+
+      // Aggregate by service type
+      if (eventType === 'voice_transcription') {
+        result.byService.voice.requests++
+        result.byService.voice.cost += cost
+        result.byService.voice.durationSeconds += event.metadata?.durationSeconds || 0
+      } else if (eventType === 'embedding_generation') {
+        result.byService.embeddings.requests++
+        result.byService.embeddings.cost += cost
+        result.byService.embeddings.characterCount += event.metadata?.characterCount || 0
+      } else {
+        // LLM events (chat_message, feedback_generation, etc.)
+        result.byService.llm.requests++
+        result.byService.llm.cost += cost
+        result.byService.llm.tokens += event.totalTokens || 0
+      }
+    }
+  } catch (error) {
+    console.error('[Usage Tracking] Failed to get service breakdown:', error)
+  }
+
+  return result
+}
+
+/**
+ * Get per-user usage summary for user dashboard
+ */
+export async function getUserServiceBreakdown(userId: string): Promise<{
+  llm: { requests: number; tokens: number; cost: number }
+  voice: { requests: number; durationSeconds: number; cost: number }
+  embeddings: { requests: number; characterCount: number; cost: number }
+  total: { requests: number; cost: number }
+}> {
+  const summary = await getUserUsageSummary(userId)
+
+  const result = {
+    llm: { requests: 0, tokens: 0, cost: 0 },
+    voice: { requests: 0, durationSeconds: 0, cost: 0 },
+    embeddings: { requests: 0, characterCount: 0, cost: 0 },
+    total: { requests: 0, cost: 0 },
+  }
+
+  if (!summary) {
+    return result
+  }
+
+  // Get detailed breakdown from usage_events
+  try {
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+    const eventsSnapshot = await adminDb
+      .collection('usage_events')
+      .where('userId', '==', userId)
+      .where('createdAt', '>=', startOfMonth)
+      .get()
+
+    for (const doc of eventsSnapshot.docs) {
+      const event = doc.data()
+      const eventType = event.eventType as UsageEventType
+      const cost = event.cost || 0
+
+      result.total.requests++
+      result.total.cost += cost
+
+      if (eventType === 'voice_transcription') {
+        result.voice.requests++
+        result.voice.cost += cost
+        result.voice.durationSeconds += event.metadata?.durationSeconds || 0
+      } else if (eventType === 'embedding_generation') {
+        result.embeddings.requests++
+        result.embeddings.cost += cost
+        result.embeddings.characterCount += event.metadata?.characterCount || 0
+      } else {
+        result.llm.requests++
+        result.llm.cost += cost
+        result.llm.tokens += event.totalTokens || 0
+      }
+    }
+  } catch (error) {
+    console.error('[Usage Tracking] Failed to get user service breakdown:', error)
+    // Fall back to summary data
+    result.llm.tokens = summary.totalTokens
+    result.total.requests = summary.totalRequests
+    result.total.cost = summary.totalCost
+  }
+
+  return result
 }
 
 /**

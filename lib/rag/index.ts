@@ -12,6 +12,7 @@ import { vectorDB, isPineconeEnabled, getVectorDBProvider } from './vectordb'
 import type { TextEmbedding, SimilarResult, SimilaritySearchOptions, VectorDocument } from './types'
 import { adminDb } from '../firebase-admin'
 import { Timestamp } from 'firebase-admin/firestore'
+import { trackEmbeddingUsage, EMBEDDING_COSTS } from '../usage-tracking'
 
 // Initialize hybrid embedding provider
 // Uses Gemini text-embedding-004 as primary (768D, most cost-effective)
@@ -38,6 +39,42 @@ export async function generateTextEmbedding(text: string): Promise<number[]> {
     // Hybrid provider handles caching internally with mode-aware keys
     // This ensures cache hits work correctly regardless of which provider is used
     return await embeddingProvider.generateEmbedding(text)
+}
+
+/**
+ * Generate text embedding with usage tracking
+ * Use this when you have user context to track costs
+ */
+export async function generateTrackedEmbedding(
+    text: string,
+    userId: string
+): Promise<number[]> {
+    const startTime = Date.now()
+    const embedding = await embeddingProvider.generateEmbedding(text)
+    const latencyMs = Date.now() - startTime
+
+    // Determine which model was used
+    const activeProvider = embeddingProvider.getActiveProvider()
+    const model = activeProvider === 'gemini'
+        ? 'text-embedding-004'
+        : activeProvider === 'openai'
+            ? 'text-embedding-3-small'
+            : 'text-embedding-004'
+    const provider = activeProvider === 'openai' ? 'openai' : 'gemini'
+
+    // Track the embedding usage (fire-and-forget)
+    trackEmbeddingUsage({
+        userId,
+        characterCount: text.length,
+        embeddingCount: 1,
+        model: model as keyof typeof EMBEDDING_COSTS,
+        provider,
+        latencyMs,
+    }).catch((err) => {
+        console.warn('[RAG] Failed to track embedding usage:', err)
+    })
+
+    return embedding
 }
 
 /**
@@ -313,7 +350,8 @@ export async function embedAndStoreSolution(
         ? `System Design Solution for ${metadata.problemTitle}:\n${solutionCode}`
         : `Solution for ${metadata.problemTitle} in ${metadata.language}:\n${solutionCode}`
 
-    const vector = await generateTextEmbedding(textToEmbed)
+    // Use tracked embedding since we have user context
+    const vector = await generateTrackedEmbedding(textToEmbed, userId)
 
     const tags = [metadata.language || 'notes']
     if (metadata.passed !== undefined) {
@@ -367,7 +405,10 @@ Hint Level ${hintLevel}: ${hintText}
 Category: ${metadata.category || 'approach'}
 `.trim()
 
-    const vector = await generateTextEmbedding(enrichedText)
+    // Use tracked embedding if we have user context, otherwise untracked
+    const vector = metadata.userId
+        ? await generateTrackedEmbedding(enrichedText, metadata.userId)
+        : await generateTextEmbedding(enrichedText)
 
     const allTags = [
         ...(metadata.tags || []),
@@ -533,8 +574,8 @@ export async function embedAndStoreOnboarding(
     // This text will be used to find similar users
     const onboardingText = `User profile: ${role} engineer with goal of ${goal}`
 
-    // Generate embedding from the text
-    const vector = await generateTextEmbedding(onboardingText)
+    // Generate embedding from the text (tracked since we have user context)
+    const vector = await generateTrackedEmbedding(onboardingText, userId)
 
     // Create the embedding object
     const embedding: TextEmbedding = {
