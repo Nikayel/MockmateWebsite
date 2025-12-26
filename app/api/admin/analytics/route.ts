@@ -1,49 +1,162 @@
 import { NextRequest, NextResponse } from "next/server"
-import { adminDb, adminAuth } from "@/lib/firebase-admin"
+import { adminDb } from "@/lib/firebase-admin"
 import {
   getFirebaseAnalyticsOverview,
   getFirebaseAnalyticsEvents,
   getFirebaseAnalyticsAcquisition,
   getFirebaseAnalyticsConversions,
 } from "@/lib/firebase-analytics-admin"
-
-// Admin user IDs (should match admin/usage route)
-const ADMIN_USER_IDS = [
-  process.env.ADMIN_USER_ID,
-].filter((id): id is string => Boolean(id))
+import { verifyAdminAccess, parseAdminQueryParams } from "@/lib/admin/middleware"
+import { calculateMRR, calculateARR, getMonthlyPrice } from "@/lib/pricing"
+import { format, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfDay, startOfWeek, startOfMonth, parseISO } from "date-fns"
 
 /**
- * Verify admin access using Firebase Auth token
+ * Generate time-series data for charts
  */
-async function verifyAdminAccess(request: NextRequest): Promise<{ authorized: boolean; userId?: string }> {
-  try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return { authorized: false }
-    }
+async function generateTimeSeriesData(
+  profilesSnapshot: FirebaseFirestore.QuerySnapshot | { docs: any[] },
+  sessionsSnapshot: FirebaseFirestore.QuerySnapshot | { docs: any[] },
+  startDate: Date | null,
+  timeRange: string
+): Promise<{
+  users: Array<{ date: string; total: number; free: number; pro: number; enterprise: number }>
+  sessions: Array<{ date: string; total: number; completed: number }>
+  revenue: Array<{ date: string; mrr: number }>
+}> {
+  const now = new Date()
+  const start = startDate || new Date(now.getFullYear() - 1, 0, 1)
 
-    const token = authHeader.replace('Bearer ', '')
+  // Determine interval based on time range
+  let intervals: Date[]
+  let dateFormat: string
+  let getIntervalStart: (date: Date) => Date
 
-    // Verify the Firebase ID token
-    if (!adminAuth) {
-      return { authorized: false }
-    }
-
-    const decodedToken = await adminAuth.verifyIdToken(token)
-    const userId = decodedToken.uid
-
-    // SECURITY: Only trust hardcoded admin list from environment variables
-    // Never read admin status from user-writable Firestore fields
-    if (ADMIN_USER_IDS.includes(userId)) {
-      return { authorized: true, userId }
-    }
-
-    return { authorized: false }
-  } catch (error) {
-    // Token verification failed
-    return { authorized: false }
+  if (timeRange === "7d") {
+    intervals = eachDayOfInterval({ start, end: now })
+    dateFormat = "MMM d"
+    getIntervalStart = startOfDay
+  } else if (timeRange === "30d") {
+    intervals = eachDayOfInterval({ start, end: now })
+    dateFormat = "MMM d"
+    getIntervalStart = startOfDay
+  } else if (timeRange === "90d") {
+    intervals = eachWeekOfInterval({ start, end: now })
+    dateFormat = "MMM d"
+    getIntervalStart = startOfWeek
+  } else {
+    intervals = eachMonthOfInterval({ start, end: now })
+    dateFormat = "MMM yyyy"
+    getIntervalStart = startOfMonth
   }
+
+  // Initialize data structures
+  const usersByDate: Record<string, { total: number; free: number; pro: number; enterprise: number }> = {}
+  const sessionsByDate: Record<string, { total: number; completed: number }> = {}
+
+  // Initialize all intervals
+  intervals.forEach((date) => {
+    const key = format(date, "yyyy-MM-dd")
+    usersByDate[key] = { total: 0, free: 0, pro: 0, enterprise: 0 }
+    sessionsByDate[key] = { total: 0, completed: 0 }
+  })
+
+  // Process profiles for user growth
+  if (profilesSnapshot.docs) {
+    profilesSnapshot.docs.forEach((doc: any) => {
+      const profile = doc.data()
+      const createdAt = profile.created_at || profile.createdAt
+
+      if (createdAt) {
+        try {
+          const date = typeof createdAt === "string"
+            ? parseISO(createdAt)
+            : createdAt.toDate?.() || new Date(createdAt)
+
+          const intervalStart = getIntervalStart(date)
+          const key = format(intervalStart, "yyyy-MM-dd")
+
+          if (usersByDate[key]) {
+            usersByDate[key].total++
+            const tier = profile.subscription_tier || "free"
+            if (tier === "pro") usersByDate[key].pro++
+            else if (tier === "enterprise") usersByDate[key].enterprise++
+            else usersByDate[key].free++
+          }
+        } catch {
+          // Skip invalid dates
+        }
+      }
+    })
+  }
+
+  // Process sessions
+  if (sessionsSnapshot.docs) {
+    sessionsSnapshot.docs.forEach((doc: any) => {
+      const session = doc.data()
+      const startedAt = session.started_at
+
+      if (startedAt) {
+        try {
+          const date = typeof startedAt === "string"
+            ? parseISO(startedAt)
+            : startedAt.toDate?.() || new Date(startedAt)
+
+          const intervalStart = getIntervalStart(date)
+          const key = format(intervalStart, "yyyy-MM-dd")
+
+          if (sessionsByDate[key]) {
+            sessionsByDate[key].total++
+            if (session.completed_at) {
+              sessionsByDate[key].completed++
+            }
+          }
+        } catch {
+          // Skip invalid dates
+        }
+      }
+    })
+  }
+
+  // Convert to arrays with cumulative counts for users
+  let cumulativeUsers = { total: 0, free: 0, pro: 0, enterprise: 0 }
+  const users = intervals.map((date) => {
+    const key = format(date, "yyyy-MM-dd")
+    const data = usersByDate[key] || { total: 0, free: 0, pro: 0, enterprise: 0 }
+
+    cumulativeUsers.total += data.total
+    cumulativeUsers.free += data.free
+    cumulativeUsers.pro += data.pro
+    cumulativeUsers.enterprise += data.enterprise
+
+    return {
+      date: format(date, dateFormat),
+      total: cumulativeUsers.total,
+      free: cumulativeUsers.free,
+      pro: cumulativeUsers.pro,
+      enterprise: cumulativeUsers.enterprise,
+    }
+  })
+
+  // Sessions are not cumulative
+  const sessions = intervals.map((date) => {
+    const key = format(date, "yyyy-MM-dd")
+    const data = sessionsByDate[key] || { total: 0, completed: 0 }
+    return {
+      date: format(date, dateFormat),
+      total: data.total,
+      completed: data.completed,
+    }
+  })
+
+  // Calculate revenue based on cumulative pro/enterprise users
+  const revenue = users.map((u) => ({
+    date: u.date,
+    mrr: u.pro * getMonthlyPrice("pro") + u.enterprise * getMonthlyPrice("enterprise"),
+  }))
+
+  return { users, sessions, revenue }
 }
+
 
 /**
  * Admin Analytics API
@@ -65,32 +178,17 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Verify admin access
-    const auth = await verifyAdminAccess(request)
-    if (!auth.authorized) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+    // Verify admin access using RBAC middleware
+    const authResult = await verifyAdminAccess(request)
+    if (!authResult.authorized) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status || 403 }
+      )
     }
 
-    const { searchParams } = new URL(request.url)
-    const timeRange = searchParams.get("timeRange") || "7d" // 7d, 30d, 90d, all
-
-    // Calculate date range
-    const now = new Date()
-    let startDate: Date | null = null
-
-    switch (timeRange) {
-      case "7d":
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-        break
-      case "30d":
-        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-        break
-      case "90d":
-        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-        break
-      default:
-        startDate = null
-    }
+    // Parse query params using middleware helper
+    const { timeRange, startDate } = parseAdminQueryParams(request)
 
     // Fetch all users
     let profilesSnapshot
@@ -209,8 +307,8 @@ export async function GET(request: NextRequest) {
       ? Math.round((passedCodeExecutions / totalCodeExecutions) * 100)
       : 0
 
-    // Calculate revenue metrics (assuming $25 for Pro)
-    const mrr = tierCounts.pro * 25 // Monthly Recurring Revenue
+    // Calculate revenue metrics using centralized pricing
+    const mrr = calculateMRR(tierCounts)
 
     // Fetch recent errors (last 100) - handle potential index error gracefully
     let recentErrors: Array<{
@@ -267,6 +365,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Generate time-series data for charts
+    const timeSeries = await generateTimeSeriesData(
+      profilesSnapshot,
+      sessionsSnapshot,
+      startDate,
+      timeRange
+    )
+
     // Fetch Firebase Analytics data (if configured)
     const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : timeRange === "90d" ? 90 : 365
     const firebaseAnalytics = await getFirebaseAnalyticsOverview(days)
@@ -295,7 +401,7 @@ export async function GET(request: NextRequest) {
         },
         revenue: {
           mrr,
-          arr: mrr * 12, // Annual Recurring Revenue
+          arr: calculateARR(mrr),
         },
         analytics: {
           totalEvents: eventsSnapshot.size || 0,
@@ -323,6 +429,8 @@ export async function GET(request: NextRequest) {
           acquisition: firebaseAcquisition || [],
           conversions: firebaseConversions || {},
         } : null,
+        // Time-series data for charts
+        timeSeries,
       },
     })
   } catch (error) {
