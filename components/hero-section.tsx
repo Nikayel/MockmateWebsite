@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic"
 import { MagneticButton } from "@/components/ui/magnetic-button"
 import { TypewriterText } from "@/components/ui/rotating-text"
-import { Play, ArrowRight, Mic, Brain, Target, Sparkles } from "lucide-react"
+import { Play, ArrowRight, Mic, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
@@ -59,18 +59,17 @@ export function HeroSection() {
       >
         <div className="max-w-6xl mx-auto">
 
-          {/* Top: Headline + Demo side by side */}
-          <div className="grid lg:grid-cols-5 gap-6 lg:gap-8 items-start mb-8">
+          {/* Headline + Demo side by side */}
+          <div className="grid lg:grid-cols-5 gap-6 lg:gap-8 items-center">
 
             {/* Left: Headline (2 cols) */}
             <div className="lg:col-span-2 text-center lg:text-left pt-4">
-              {/* Authentic badge - student-built credibility */}
               <motion.div
                 variants={staggerItem}
                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-neural/10 border border-neural/20 mb-4"
               >
                 <span className="text-xs text-neural font-medium">
-                  Built by a CS student, for CS students
+                  Interview prep that actually listens
                 </span>
               </motion.div>
 
@@ -207,78 +206,6 @@ export function HeroSection() {
             </motion.div>
           </div>
 
-          {/* Middle: Key differentiators - What students care about */}
-          <motion.div
-            variants={staggerItem}
-            className="bg-gradient-to-r from-secondary/50 via-secondary/30 to-secondary/50 rounded-xl border border-border/50 p-4 md:p-5 mb-6"
-          >
-            <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12 text-center md:text-left">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center">
-                  <Brain className="w-4 h-4 text-accent" />
-                </div>
-                <div>
-                  <div className="text-foreground font-medium text-sm md:text-base">AI interviewer</div>
-                  <div className="text-xs text-muted-foreground">Responds like a real interviewer</div>
-                </div>
-              </div>
-
-              <div className="hidden md:block w-px h-8 bg-border" />
-
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-neural/10 flex items-center justify-center">
-                  <Mic className="w-4 h-4 text-neural" />
-                </div>
-                <div>
-                  <div className="text-foreground font-medium text-sm md:text-base">Practice anytime</div>
-                  <div className="text-xs text-muted-foreground">Available 24/7, no scheduling</div>
-                </div>
-              </div>
-
-              <div className="hidden md:block w-px h-8 bg-border" />
-
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center">
-                  <Target className="w-4 h-4 text-accent" />
-                </div>
-                <div>
-                  <div className="text-foreground font-medium text-sm md:text-base">Learn patterns</div>
-                  <div className="text-xs text-muted-foreground">Not just memorize solutions</div>
-                </div>
-              </div>
-
-            </div>
-          </motion.div>
-
-          {/* Bottom: Social proof + secondary CTA */}
-          <motion.div
-            variants={staggerItem}
-            className="flex flex-col md:flex-row items-center justify-between gap-4"
-          >
-            {/* Left: Stats */}
-            <div className="flex items-center gap-8 text-center md:text-left">
-              <div>
-                <div className="text-2xl font-bold text-foreground">15+</div>
-                <div className="text-xs text-muted-foreground">DSA patterns</div>
-              </div>
-              <div className="w-px h-8 bg-border hidden md:block" />
-              <div>
-                <div className="text-2xl font-bold text-foreground">200+</div>
-                <div className="text-xs text-muted-foreground">problems</div>
-              </div>
-              <div className="w-px h-8 bg-border hidden md:block" />
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Includes simulations from</div>
-                <div className="text-sm text-foreground/80">20+ companies</div>
-              </div>
-            </div>
-
-            {/* Right: Learn more */}
-            <Link href="/why-skillon" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
-              How it actually works
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </motion.div>
         </div>
       </motion.div>
 
