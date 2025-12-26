@@ -12,6 +12,9 @@ import {
 import { auth } from "./firebase"
 import { trackLogin, trackSignup } from "./analytics"
 
+// Development mode check - logs only appear in development
+const isDev = process.env.NODE_ENV === 'development'
+
 // =============================================================================
 // SECURITY: Redirect URL Validation
 // =============================================================================
@@ -108,22 +111,24 @@ function getAuthErrorMessage(error: any): string {
 // Validate Firebase auth is initialized
 function validateAuth() {
   if (!auth) {
-    console.error("❌ Firebase Auth is not initialized")
+    if (isDev) console.error("Firebase Auth is not initialized")
     throw new Error("Firebase Auth is not initialized. Please check your Firebase configuration.")
   }
 
   // Check if auth domain is configured
   if (!auth.app.options.authDomain) {
-    console.error("❌ Firebase Auth domain is not configured")
-    console.error("Current Firebase config:", {
-      projectId: auth.app.options.projectId,
-      authDomain: auth.app.options.authDomain,
-      apiKey: auth.app.options.apiKey ? "***" : "missing"
-    })
+    if (isDev) {
+      console.error("Firebase Auth domain is not configured")
+      console.error("Current Firebase config:", {
+        projectId: auth.app.options.projectId,
+        authDomain: auth.app.options.authDomain,
+        apiKey: auth.app.options.apiKey ? "***" : "missing"
+      })
+    }
     throw new Error("Firebase Auth domain is not configured. Please check your environment variables.")
   }
 
-  // Log auth configuration for debugging
+  // Log auth configuration for debugging (dev only)
   const config = {
     projectId: auth.app.options.projectId,
     authDomain: auth.app.options.authDomain,
@@ -132,22 +137,22 @@ function validateAuth() {
     storageBucket: auth.app.options.storageBucket,
     appId: auth.app.options.appId ? auth.app.options.appId.substring(0, 10) + "..." : "missing"
   }
-  console.log("✅ Firebase Auth validated:", config)
+  if (isDev) console.log("Firebase Auth validated:", config)
 
   // Additional validation checks
-  if (typeof window !== "undefined") {
+  if (isDev && typeof window !== "undefined") {
     const currentHost = window.location.hostname
     const authDomain = auth.app.options.authDomain || ""
 
     // Warn if authDomain format looks wrong
     if (authDomain && !authDomain.includes(".") && currentHost !== "localhost") {
-      console.warn("⚠️ Auth domain format might be incorrect:", authDomain)
+      console.warn("Auth domain format might be incorrect:", authDomain)
     }
 
     // Check if we're on localhost but authDomain doesn't include it
     if (currentHost === "localhost" && authDomain && !authDomain.includes("localhost") && !authDomain.includes("127.0.0.1")) {
-      console.warn("⚠️ Running on localhost but authDomain doesn't include localhost:", authDomain)
-      console.warn("   Make sure 'localhost' is added to authorized domains in Firebase Console")
+      console.warn("Running on localhost but authDomain doesn't include localhost:", authDomain)
+      console.warn("Make sure 'localhost' is added to authorized domains in Firebase Console")
     }
   }
 
@@ -165,22 +170,24 @@ export async function signInWithGitHub(redirect?: string) {
   provider.addScope('read:user')
 
   try {
-    console.log("🔐 Attempting GitHub sign-in...")
-    console.log("Auth domain:", auth.app.options.authDomain)
-    console.log("Current origin:", typeof window !== "undefined" ? window.location.origin : "N/A")
+    if (isDev) {
+      console.log("Attempting GitHub sign-in...")
+      console.log("Auth domain:", auth.app.options.authDomain)
+      console.log("Current origin:", typeof window !== "undefined" ? window.location.origin : "N/A")
+    }
 
     // Check if popup might be blocked
     if (typeof window !== "undefined") {
       const testPopup = window.open("", "_blank", "width=1,height=1")
       if (!testPopup || testPopup.closed || typeof testPopup.closed === "undefined") {
-        console.warn("⚠️ Popup might be blocked, consider using redirect method")
+        if (isDev) console.warn("Popup might be blocked, consider using redirect method")
       } else {
         testPopup.close()
       }
     }
 
     const result = await signInWithPopup(auth, provider)
-    console.log("✅ GitHub sign-in successful")
+    if (isDev) console.log("GitHub sign-in successful")
 
     // Track login/signup event
     const isNewUser = result.user.metadata.creationTime === result.user.metadata.lastSignInTime
@@ -195,48 +202,50 @@ export async function signInWithGitHub(redirect?: string) {
       providerId: result.providerId,
     }
   } catch (error: any) {
-    console.error("❌ Error signing in with GitHub:", error)
-    console.error("Error code:", error?.code)
-    console.error("Error message:", error?.message)
-    console.error("Error name:", error?.name)
-    console.error("Error stack:", error?.stack)
+    if (isDev) {
+      console.error("Error signing in with GitHub:", error)
+      console.error("Error code:", error?.code)
+      console.error("Error message:", error?.message)
+      console.error("Error name:", error?.name)
+      console.error("Error stack:", error?.stack)
 
-    // Try to extract more details from the error
-    if (error?.customData) {
-      console.error("Error customData:", error.customData)
-    }
-    if (error?.cause) {
-      console.error("Error cause:", error.cause)
-    }
-
-    // Log Firebase configuration for debugging
-    if (error?.code === "auth/internal-error") {
-      console.error("🔍 Debugging auth/internal-error:")
-      console.error("- Auth domain:", auth.app.options.authDomain)
-      console.error("- Project ID:", auth.app.options.projectId)
-      console.error("- Has API key:", !!auth.app.options.apiKey)
-      console.error("- Current URL:", typeof window !== "undefined" ? window.location.href : "N/A")
-      console.error("- Current origin:", typeof window !== "undefined" ? window.location.origin : "N/A")
-      console.error("- User agent:", typeof window !== "undefined" ? navigator.userAgent : "N/A")
-
-      // Check if authDomain matches current origin
-      const currentHost = typeof window !== "undefined" ? window.location.hostname : ""
-      const authDomain = auth.app.options.authDomain || ""
-      if (authDomain && !authDomain.includes(currentHost) && currentHost !== "localhost") {
-        console.error("⚠️ WARNING: Auth domain doesn't match current hostname!")
-        console.error("  Auth domain:", authDomain)
-        console.error("  Current hostname:", currentHost)
+      // Try to extract more details from the error
+      if (error?.customData) {
+        console.error("Error customData:", error.customData)
+      }
+      if (error?.cause) {
+        console.error("Error cause:", error.cause)
       }
 
-      console.error("💡 Please verify:")
-      console.error("  1. GitHub OAuth provider is enabled in Firebase Console")
-      console.error("  2. Authorized domains include:", auth.app.options.authDomain, "and", currentHost)
-      console.error("  3. OAuth redirect URIs are configured correctly")
-      console.error("  4. Check browser console for CSP violations")
-      console.error("  5. Try disabling browser extensions that might block popups")
+      // Log Firebase configuration for debugging
+      if (error?.code === "auth/internal-error") {
+        console.error("Debugging auth/internal-error:")
+        console.error("- Auth domain:", auth.app.options.authDomain)
+        console.error("- Project ID:", auth.app.options.projectId)
+        console.error("- Has API key:", !!auth.app.options.apiKey)
+        console.error("- Current URL:", typeof window !== "undefined" ? window.location.href : "N/A")
+        console.error("- Current origin:", typeof window !== "undefined" ? window.location.origin : "N/A")
+        console.error("- User agent:", typeof window !== "undefined" ? navigator.userAgent : "N/A")
 
-      // Suggest using redirect as fallback
-      console.error("💡 Alternative: Try using redirect-based auth instead of popup")
+        // Check if authDomain matches current origin
+        const currentHost = typeof window !== "undefined" ? window.location.hostname : ""
+        const authDomain = auth.app.options.authDomain || ""
+        if (authDomain && !authDomain.includes(currentHost) && currentHost !== "localhost") {
+          console.error("WARNING: Auth domain doesn't match current hostname!")
+          console.error("  Auth domain:", authDomain)
+          console.error("  Current hostname:", currentHost)
+        }
+
+        console.error("Please verify:")
+        console.error("  1. GitHub OAuth provider is enabled in Firebase Console")
+        console.error("  2. Authorized domains include:", auth.app.options.authDomain, "and", currentHost)
+        console.error("  3. OAuth redirect URIs are configured correctly")
+        console.error("  4. Check browser console for CSP violations")
+        console.error("  5. Try disabling browser extensions that might block popups")
+
+        // Suggest using redirect as fallback
+        console.error("Alternative: Try using redirect-based auth instead of popup")
+      }
     }
 
     // Provide user-friendly error message
@@ -260,22 +269,24 @@ export async function signInWithGoogle(redirect?: string) {
   provider.addScope('email')
 
   try {
-    console.log("🔐 Attempting Google sign-in...")
-    console.log("Auth domain:", auth.app.options.authDomain)
-    console.log("Current origin:", typeof window !== "undefined" ? window.location.origin : "N/A")
+    if (isDev) {
+      console.log("Attempting Google sign-in...")
+      console.log("Auth domain:", auth.app.options.authDomain)
+      console.log("Current origin:", typeof window !== "undefined" ? window.location.origin : "N/A")
+    }
 
     // Check if popup might be blocked
     if (typeof window !== "undefined") {
       const testPopup = window.open("", "_blank", "width=1,height=1")
       if (!testPopup || testPopup.closed || typeof testPopup.closed === "undefined") {
-        console.warn("⚠️ Popup might be blocked, consider using redirect method")
+        if (isDev) console.warn("Popup might be blocked, consider using redirect method")
       } else {
         testPopup.close()
       }
     }
 
     const result = await signInWithPopup(auth, provider)
-    console.log("✅ Google sign-in successful")
+    if (isDev) console.log("Google sign-in successful")
 
     // Track login/signup event
     const isNewUser = result.user.metadata.creationTime === result.user.metadata.lastSignInTime
@@ -290,48 +301,50 @@ export async function signInWithGoogle(redirect?: string) {
       providerId: result.providerId,
     }
   } catch (error: any) {
-    console.error("❌ Error signing in with Google:", error)
-    console.error("Error code:", error?.code)
-    console.error("Error message:", error?.message)
-    console.error("Error name:", error?.name)
-    console.error("Error stack:", error?.stack)
+    if (isDev) {
+      console.error("Error signing in with Google:", error)
+      console.error("Error code:", error?.code)
+      console.error("Error message:", error?.message)
+      console.error("Error name:", error?.name)
+      console.error("Error stack:", error?.stack)
 
-    // Try to extract more details from the error
-    if (error?.customData) {
-      console.error("Error customData:", error.customData)
-    }
-    if (error?.cause) {
-      console.error("Error cause:", error.cause)
-    }
-
-    // Log Firebase configuration for debugging
-    if (error?.code === "auth/internal-error") {
-      console.error("🔍 Debugging auth/internal-error:")
-      console.error("- Auth domain:", auth.app.options.authDomain)
-      console.error("- Project ID:", auth.app.options.projectId)
-      console.error("- Has API key:", !!auth.app.options.apiKey)
-      console.error("- Current URL:", typeof window !== "undefined" ? window.location.href : "N/A")
-      console.error("- Current origin:", typeof window !== "undefined" ? window.location.origin : "N/A")
-      console.error("- User agent:", typeof window !== "undefined" ? navigator.userAgent : "N/A")
-
-      // Check if authDomain matches current origin
-      const currentHost = typeof window !== "undefined" ? window.location.hostname : ""
-      const authDomain = auth.app.options.authDomain || ""
-      if (authDomain && !authDomain.includes(currentHost) && currentHost !== "localhost") {
-        console.error("⚠️ WARNING: Auth domain doesn't match current hostname!")
-        console.error("  Auth domain:", authDomain)
-        console.error("  Current hostname:", currentHost)
+      // Try to extract more details from the error
+      if (error?.customData) {
+        console.error("Error customData:", error.customData)
+      }
+      if (error?.cause) {
+        console.error("Error cause:", error.cause)
       }
 
-      console.error("💡 Please verify:")
-      console.error("  1. Google OAuth provider is enabled in Firebase Console")
-      console.error("  2. Authorized domains include:", auth.app.options.authDomain, "and", currentHost)
-      console.error("  3. OAuth redirect URIs are configured correctly")
-      console.error("  4. Check browser console for CSP violations")
-      console.error("  5. Try disabling browser extensions that might block popups")
+      // Log Firebase configuration for debugging
+      if (error?.code === "auth/internal-error") {
+        console.error("Debugging auth/internal-error:")
+        console.error("- Auth domain:", auth.app.options.authDomain)
+        console.error("- Project ID:", auth.app.options.projectId)
+        console.error("- Has API key:", !!auth.app.options.apiKey)
+        console.error("- Current URL:", typeof window !== "undefined" ? window.location.href : "N/A")
+        console.error("- Current origin:", typeof window !== "undefined" ? window.location.origin : "N/A")
+        console.error("- User agent:", typeof window !== "undefined" ? navigator.userAgent : "N/A")
 
-      // Suggest using redirect as fallback
-      console.error("💡 Alternative: Try using redirect-based auth instead of popup")
+        // Check if authDomain matches current origin
+        const currentHost = typeof window !== "undefined" ? window.location.hostname : ""
+        const authDomain = auth.app.options.authDomain || ""
+        if (authDomain && !authDomain.includes(currentHost) && currentHost !== "localhost") {
+          console.error("WARNING: Auth domain doesn't match current hostname!")
+          console.error("  Auth domain:", authDomain)
+          console.error("  Current hostname:", currentHost)
+        }
+
+        console.error("Please verify:")
+        console.error("  1. Google OAuth provider is enabled in Firebase Console")
+        console.error("  2. Authorized domains include:", auth.app.options.authDomain, "and", currentHost)
+        console.error("  3. OAuth redirect URIs are configured correctly")
+        console.error("  4. Check browser console for CSP violations")
+        console.error("  5. Try disabling browser extensions that might block popups")
+
+        // Suggest using redirect as fallback
+        console.error("Alternative: Try using redirect-based auth instead of popup")
+      }
     }
 
     // Provide user-friendly error message
@@ -347,7 +360,7 @@ export async function signOut() {
   try {
     await firebaseSignOut(auth)
   } catch (error) {
-    console.error("Error signing out:", error)
+    if (isDev) console.error("Error signing out:", error)
     throw error
   }
 }
@@ -414,7 +427,7 @@ export async function handleAuthRedirect() {
     }
     return null
   } catch (error: any) {
-    console.error("Error handling auth redirect:", error)
+    if (isDev) console.error("Error handling auth redirect:", error)
     throw error
   }
 }

@@ -7,6 +7,9 @@ import { getAuth, Auth } from "firebase/auth"
 import { getFirestore, Firestore } from "firebase/firestore"
 import { getAnalytics, Analytics } from "firebase/analytics"
 
+// Development mode check - logs only appear in development
+const isDev = process.env.NODE_ENV === 'development'
+
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
@@ -39,11 +42,13 @@ function validateFirebaseConfig() {
 
   if (missingFields.length > 0) {
     const errorMessage = `Missing required Firebase environment variables: ${missingFields.join(', ')}`
-    console.error('❌ Firebase Configuration Error:', errorMessage)
-    console.error('Please ensure all required environment variables are set in your .env.local file')
-    
+    if (isDev) {
+      console.error('Firebase Configuration Error:', errorMessage)
+      console.error('Please ensure all required environment variables are set in your .env.local file')
+    }
+
     // In development, throw error to prevent silent failures
-    if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+    if (typeof window !== "undefined" && isDev) {
       throw new Error(errorMessage)
     }
   }
@@ -52,35 +57,39 @@ function validateFirebaseConfig() {
 // Validate config before initialization
 validateFirebaseConfig()
 
-// Log Firebase config (without sensitive values)
-console.log('Initializing Firebase with config:', {
-  projectId: firebaseConfig.projectId,
-  authDomain: firebaseConfig.authDomain,
-  storageBucket: firebaseConfig.storageBucket,
-  hasApiKey: !!firebaseConfig.apiKey,
-  hasAppId: !!firebaseConfig.appId
-})
+// Log Firebase config (without sensitive values) - dev only
+if (isDev) {
+  console.log('Initializing Firebase with config:', {
+    projectId: firebaseConfig.projectId,
+    authDomain: firebaseConfig.authDomain,
+    storageBucket: firebaseConfig.storageBucket,
+    hasApiKey: !!firebaseConfig.apiKey,
+    hasAppId: !!firebaseConfig.appId
+  })
+}
 
 // Initialize Firebase (only if not already initialized)
 let app: FirebaseApp
 try {
   if (getApps().length === 0) {
-    console.log('Initializing new Firebase app instance')
+    if (isDev) console.log('Initializing new Firebase app instance')
     app = initializeApp(firebaseConfig)
   } else {
-    console.log('Using existing Firebase app instance')
+    if (isDev) console.log('Using existing Firebase app instance')
     app = getApps()[0]
   }
 } catch (error: any) {
-  console.error('❌ Firebase initialization error:', error)
-  console.error('Error code:', error.code)
-  console.error('Error message:', error.message)
-  
+  if (isDev) {
+    console.error('Firebase initialization error:', error)
+    console.error('Error code:', error.code)
+    console.error('Error message:', error.message)
+  }
+
   // Provide helpful error messages
   if (error.code === 'app/invalid-app-credentials') {
     throw new Error('Invalid Firebase configuration. Please check your environment variables.')
   } else if (error.code === 'app/duplicate-app') {
-    console.warn('Firebase app already initialized, using existing instance')
+    if (isDev) console.warn('Firebase app already initialized, using existing instance')
     app = getApps()[0]
   } else {
     throw error
@@ -88,18 +97,18 @@ try {
 }
 
 // Initialize Firebase services
-console.log('Initializing Firebase Auth and Firestore')
+if (isDev) console.log('Initializing Firebase Auth and Firestore')
 let authInstance: Auth
 let dbInstance: Firestore
 
 try {
   authInstance = getAuth(app)
-  console.log('Firebase Auth initialized')
-  
+  if (isDev) console.log('Firebase Auth initialized')
+
   dbInstance = getFirestore(app)
-  console.log('Firestore initialized')
+  if (isDev) console.log('Firestore initialized')
 } catch (error: any) {
-  console.error('❌ Firebase service initialization error:', error)
+  if (isDev) console.error('Firebase service initialization error:', error)
   throw new Error(`Failed to initialize Firebase services: ${error.message}`)
 }
 
