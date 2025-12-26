@@ -7,11 +7,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuth } from 'firebase-admin/auth'
-import { getFirebaseAdmin } from '@/lib/firebase-admin'
+import '@/lib/firebase-admin' // Initialize Firebase Admin
 import { trackVoiceUsage, DEEPGRAM_COSTS } from '@/lib/usage-tracking'
-
-// Initialize Firebase Admin
-getFirebaseAdmin()
 
 export async function POST(req: NextRequest) {
   try {
