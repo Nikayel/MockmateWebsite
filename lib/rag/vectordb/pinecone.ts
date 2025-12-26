@@ -139,16 +139,47 @@ export class PineconeVectorDB implements VectorDB {
         const namespace = `${NAMESPACE_PREFIX}${docType}`
 
         // Prepare vectors for Pinecone
-        const vectors = documents.map(doc => ({
-            id: doc.id,
-            values: doc.vector,
-            metadata: {
+        const vectors = documents.map(doc => {
+            // Flatten metadata - Pinecone doesn't support nested objects
+            const flatMetadata: Record<string, any> = {
                 ...doc.metadata,
                 text: doc.text || '',
-                // Flatten any nested objects (Pinecone doesn't support nested)
-                ...(doc.metadata?.tags ? { tags: doc.metadata.tags.join(',') } : {}),
-            },
-        }))
+            }
+            
+            // Flatten tags array to comma-separated string
+            if (doc.metadata?.tags && Array.isArray(doc.metadata.tags)) {
+                flatMetadata.tags = doc.metadata.tags.join(',')
+            }
+            
+            // Flatten topPatterns array to comma-separated string
+            if (doc.metadata?.topPatterns && Array.isArray(doc.metadata.topPatterns)) {
+                flatMetadata.topPatterns = doc.metadata.topPatterns.join(',')
+            }
+            
+            // Flatten difficultyDistribution object to string
+            if (doc.metadata?.difficultyDistribution && typeof doc.metadata.difficultyDistribution === 'object') {
+                const dist = doc.metadata.difficultyDistribution as Record<string, any>
+                flatMetadata.difficultyDistribution = `easy:${dist.easy || 0},medium:${dist.medium || 0},hard:${dist.hard || 0}`
+            }
+            
+            // Remove any remaining nested objects/arrays
+            Object.keys(flatMetadata).forEach(key => {
+                const value = flatMetadata[key]
+                if (value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+                    // Convert nested object to JSON string
+                    flatMetadata[key] = JSON.stringify(value)
+                } else if (Array.isArray(value) && value.length > 0 && typeof value[0] !== 'string') {
+                    // Convert array of non-strings to comma-separated string
+                    flatMetadata[key] = value.join(',')
+                }
+            })
+            
+            return {
+                id: doc.id,
+                values: doc.vector,
+                metadata: flatMetadata,
+            }
+        })
 
         // Batch upsert (Pinecone recommends batches of 100)
         const batchSize = 100
@@ -204,18 +235,48 @@ export class PineconeVectorDB implements VectorDB {
             // Limit to requested topK after exclusions
             results = results.slice(0, topK)
 
-            return results.map(match => ({
-                id: match.id,
-                score: match.score || 0,
-                metadata: match.metadata ? {
-                    ...match.metadata,
-                    // Restore tags from comma-separated string
-                    tags: typeof match.metadata.tags === 'string'
-                        ? match.metadata.tags.split(',').filter(Boolean)
-                        : match.metadata.tags,
-                } : undefined,
-                vector: includeValues ? match.values : undefined,
-            }))
+            return results.map(match => {
+                if (!match.metadata) {
+                    return {
+                        id: match.id,
+                        score: match.score || 0,
+                        metadata: undefined,
+                        vector: includeValues ? match.values : undefined,
+                    }
+                }
+
+                const restored: Record<string, any> = { ...match.metadata }
+
+                // Restore tags from comma-separated string
+                if (typeof restored.tags === 'string') {
+                    restored.tags = restored.tags.split(',').filter(Boolean)
+                }
+
+                // Restore topPatterns from comma-separated string
+                if (typeof restored.topPatterns === 'string') {
+                    restored.topPatterns = restored.topPatterns.split(',').filter(Boolean)
+                }
+
+                // Restore difficultyDistribution from string format
+                if (typeof restored.difficultyDistribution === 'string') {
+                    const distStr = restored.difficultyDistribution
+                    const dist: Record<string, number> = {}
+                    distStr.split(',').forEach(part => {
+                        const [key, value] = part.split(':')
+                        if (key && value) {
+                            dist[key.trim()] = parseFloat(value.trim()) || 0
+                        }
+                    })
+                    restored.difficultyDistribution = dist
+                }
+
+                return {
+                    id: match.id,
+                    score: match.score || 0,
+                    metadata: restored,
+                    vector: includeValues ? match.values : undefined,
+                }
+            })
         } catch (error: any) {
             // Handle namespace not found gracefully
             if (error.message?.includes('Namespace not found')) {
