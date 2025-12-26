@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Work_Sans, Open_Sans } from "next/font/google"
 import { Toaster } from "sonner"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import { AuthProvider } from "@/lib/auth-context"
 import { ErrorBoundaryProvider } from "@/components/providers/error-boundary-provider"
 import { CookieConsent } from "@/components/CookieConsent"
@@ -72,9 +73,11 @@ html {
         <PerformancePolyfill />
         <ErrorBoundaryProvider>
           <AuthProvider>
+            <SpeedInsights />
             {children}
             <Toaster position="top-right" richColors />
             <CookieConsent />
+            <SpeedInsights />
           </AuthProvider>
         </ErrorBoundaryProvider>
       </body>
