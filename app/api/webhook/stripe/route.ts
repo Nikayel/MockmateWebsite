@@ -25,7 +25,7 @@ if (!process.env.STRIPE_WEBHOOK_SECRET) {
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2024-11-20.acacia",
+  apiVersion: "2025-10-29.clover",
 })
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
@@ -56,18 +56,15 @@ async function updateQuotaForSubscriptionTierAdmin(
     .get()
 
   // Find current period quota
-  let currentQuotaDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null
-  quotaSnapshot.docs.forEach(doc => {
+  const currentQuotaDoc = quotaSnapshot.docs.find(doc => {
     const data = doc.data()
     const quotaStart = new Date(data.period_start)
-    if (quotaStart >= periodStart && quotaStart <= periodEnd) {
-      currentQuotaDoc = doc
-    }
+    return quotaStart >= periodStart && quotaStart <= periodEnd
   })
 
   if (currentQuotaDoc) {
     const currentData = currentQuotaDoc.data()
-    const updateData: Record<string, any> = {
+    const updateData: Record<string, unknown> = {
       sessions_limit: sessionsLimit,
       updated_at: new Date().toISOString(),
     }
@@ -77,7 +74,7 @@ async function updateQuotaForSubscriptionTierAdmin(
       updateData.sessions_used = 0
       updateData.free_opens_remaining = 0
       paymentLogger.info("Resetting usage for new billing period", { userId, sessionsLimit })
-    } else if (currentData.sessions_used > sessionsLimit) {
+    } else if ((currentData.sessions_used as number) > sessionsLimit) {
       // If user has used more than new limit (e.g., downgrade from pro to free), cap it
       // This ensures display shows correct "X/Y" where X <= Y
       updateData.sessions_used = sessionsLimit
@@ -233,8 +230,9 @@ export async function POST(request: NextRequest) {
               subscriptionStartDate = subscription.created
                 ? new Date(subscription.created * 1000).toISOString()
                 : undefined
-              currentPeriodEnd = subscription.current_period_end
-                ? new Date(subscription.current_period_end * 1000).toISOString()
+              const periodEnd = subscription.items?.data?.[0]?.current_period_end
+              currentPeriodEnd = periodEnd
+                ? new Date(periodEnd * 1000).toISOString()
                 : undefined
               paymentLogger.info("Retrieved subscription details", {
                 subscriptionId: subscription.id,
@@ -642,13 +640,17 @@ export async function POST(request: NextRequest) {
           const profileRef = adminDb.collection("profiles").doc(userId)
 
           // Record payment in history
+          const invoiceSubscription = invoice.parent?.subscription_details?.subscription
+          const subscriptionId = typeof invoiceSubscription === 'string'
+            ? invoiceSubscription
+            : invoiceSubscription?.id
           await recordPaymentHistory(userId, {
             type: "subscription",
             amount: invoice.amount_paid || 0,
             currency: invoice.currency || "usd",
             status: "succeeded",
             stripe_invoice_id: invoice.id,
-            stripe_subscription_id: invoice.subscription as string,
+            stripe_subscription_id: subscriptionId,
             description: invoice.billing_reason === "subscription_cycle"
               ? "Monthly subscription renewal"
               : invoice.billing_reason === "subscription_create"
@@ -786,8 +788,9 @@ export async function POST(request: NextRequest) {
         const userId = profileDoc.id
         const profileRef = adminDb.collection("profiles").doc(userId)
 
-        const currentPeriodEnd = subscription.current_period_end
-          ? new Date(subscription.current_period_end * 1000).toISOString()
+        const periodEnd = subscription.items?.data?.[0]?.current_period_end
+        const currentPeriodEnd = periodEnd
+          ? new Date(periodEnd * 1000).toISOString()
           : undefined
 
         // GRACE PERIOD: Check if subscription is set to cancel at period end

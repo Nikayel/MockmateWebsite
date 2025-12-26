@@ -9,13 +9,14 @@ import Stripe from "stripe"
 import { adminDb } from "@/lib/firebase-admin"
 import { PRICING_CONFIG } from "@/lib/config"
 import { getUserIdFromRequest } from "@/lib/auth-server"
+import { logger } from "@/lib/logger"
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY environment variable is required")
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2024-11-20.acacia", // Use latest Stripe API version
+  apiVersion: "2025-10-29.clover",
 })
 
 export async function POST(request: NextRequest) {
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
         }, { status: 400 })
       }
     } catch (profileError) {
-      console.error("Error fetching user profile:", profileError)
+      logger.error("Error fetching user profile", { error: profileError })
       return NextResponse.json({ error: "Failed to validate user profile" }, { status: 500 })
     }
 
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
       url: session.url,
     })
   } catch (error) {
-    console.error("Stripe checkout error:", error)
+    logger.error("Stripe checkout error", { error })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create checkout session" },
       { status: 500 }
