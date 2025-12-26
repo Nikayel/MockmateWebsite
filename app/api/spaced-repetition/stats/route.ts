@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth-helpers';
 import { getUserMasteryStats, getDailyGoalProgress } from '@/lib/spaced-repetition';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
       problems_today: dailyProgress.problems_today,
     });
   } catch (error) {
-    console.error('Error getting mastery stats:', error);
+    logger.error('Error getting mastery stats', { error });
     return NextResponse.json(
       {
         error: 'Internal Server Error',
@@ -71,7 +72,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error updating stats:', error);
+    logger.error('Error updating stats', { error });
     return NextResponse.json(
       {
         error: 'Internal Server Error',

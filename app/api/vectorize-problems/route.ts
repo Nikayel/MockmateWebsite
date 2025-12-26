@@ -7,16 +7,24 @@ import {
 } from '@/lib/rag/problem-vectorization'
 import { getScenarioById } from '@/lib/scenarios/index'
 import type { DSAScenario } from '@/lib/scenarios/types'
+import { getUserIdFromRequest } from '@/lib/auth-server'
+
+// Admin user IDs - add your admin user IDs here
+const ADMIN_USER_IDS = process.env.ADMIN_USER_IDS?.split(",").filter(Boolean) || []
+
+async function isAdmin(userId: string): Promise<boolean> {
+  // SECURITY: Only trust hardcoded admin list from environment variables
+  // Never read admin status from user-writable Firestore fields
+  return ADMIN_USER_IDS.includes(userId)
+}
 
 /**
  * Problem Vectorization API
  *
  * Endpoints for vectorizing DSA problems and company questions.
  *
- * SECURITY: POST requires ADMIN_API_KEY authentication
- *
- * GET: Check vectorization status (public - read-only)
- * POST: Trigger vectorization (requires auth)
+ * GET: Check vectorization status (public)
+ * POST: Trigger vectorization (ADMIN ONLY)
  *   - action: 'vectorize-all' | 'vectorize-single' | 'status'
  */
 
@@ -74,6 +82,30 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // Check for API key first (for scripts/automation)
+    const apiKey = request.headers.get('x-api-key') || request.headers.get('authorization')?.replace('Bearer ', '')
+    const VECTORIZE_API_KEY = process.env.VECTORIZE_API_KEY
+
+    let isAuthorized = false
+
+    if (VECTORIZE_API_KEY && apiKey === VECTORIZE_API_KEY) {
+      // API key authentication
+      isAuthorized = true
+    } else {
+      // Firebase auth + admin check
+      const userId = await getUserIdFromRequest(request)
+      if (userId && isAdmin(userId)) {
+        isAuthorized = true
+      }
+    }
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { error: "Authentication required. Provide Firebase ID token or API key via x-api-key header." },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
     const { action = 'vectorize-all', scenarioId } = body
 

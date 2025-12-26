@@ -9,11 +9,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { adminAuth, adminDb } from "@/lib/firebase-admin"
 import Stripe from "stripe"
 import { Pinecone } from "@pinecone-database/pinecone"
+import { logger } from "@/lib/logger"
 
 export const dynamic = "force-dynamic"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-01-27.acacia",
+  apiVersion: "2025-10-29.clover",
 })
 
 export async function DELETE(request: NextRequest) {
@@ -35,14 +36,14 @@ export async function DELETE(request: NextRequest) {
       const decodedToken = await adminAuth.verifyIdToken(idToken)
       userId = decodedToken.uid
     } catch (error) {
-      console.error("Token verification failed:", error)
+      logger.error("Token verification failed", { error })
       return NextResponse.json(
         { success: false, error: "Invalid authentication token" },
         { status: 401 }
       )
     }
 
-    console.log(`Starting account deletion for user: ${userId}`)
+    logger.info("Starting account deletion", { userId })
 
     // 1. Get user profile to check for Stripe subscription
     const profileDoc = await adminDb.collection("profiles").doc(userId).get()
@@ -52,10 +53,8 @@ export async function DELETE(request: NextRequest) {
     if (profileData?.stripe_subscription_id) {
       try {
         await stripe.subscriptions.cancel(profileData.stripe_subscription_id)
-        console.log(`Cancelled Stripe subscription: ${profileData.stripe_subscription_id}`)
       } catch (stripeError) {
-        console.error("Failed to cancel Stripe subscription:", stripeError)
-        // Continue with deletion even if Stripe cancellation fails
+        logger.error("Failed to cancel Stripe subscription", { error: stripeError, subscriptionId: profileData.stripe_subscription_id })
       }
     }
 
@@ -97,14 +96,12 @@ export async function DELETE(request: NextRequest) {
           })
         }
       } catch (colError) {
-        console.error(`Error deleting from ${col.name}:`, colError)
-        // Continue with other collections
+        logger.error("Error deleting from collection", { collection: col.name, error: colError })
       }
     }
 
     // Commit the batch delete
     await batch.commit()
-    console.log(`Deleted ${deletedDocCount} documents for user: ${userId}`)
 
     // 4. Delete user vectors from Pinecone (GDPR compliance)
     if (process.env.PINECONE_API_KEY) {
@@ -135,25 +132,18 @@ export async function DELETE(request: NextRequest) {
             })
           } catch (nsError) {
             // Namespace might not exist, continue
-            console.log(`Namespace ${namespace} cleanup skipped:`, nsError)
           }
         }
-
-        console.log(`Deleted Pinecone vectors for user: ${userId}`)
       } catch (pineconeError) {
-        console.error("Failed to delete Pinecone vectors:", pineconeError)
-        // Continue with deletion even if Pinecone cleanup fails
-        // Log this for manual cleanup if needed
+        logger.error("Failed to delete Pinecone vectors", { error: pineconeError, userId })
       }
     }
 
     // 5. Delete the Firebase Auth user account
     try {
       await adminAuth.deleteUser(userId)
-      console.log(`Deleted Firebase Auth user: ${userId}`)
     } catch (authDeleteError) {
-      console.error("Failed to delete Firebase Auth user:", authDeleteError)
-      // Data is already deleted, so consider this a success
+      logger.error("Failed to delete Firebase Auth user", { error: authDeleteError, userId })
     }
 
     return NextResponse.json({
@@ -162,7 +152,7 @@ export async function DELETE(request: NextRequest) {
       deletedDocuments: deletedDocCount,
     })
   } catch (error) {
-    console.error("Delete account error:", error)
+    logger.error("Delete account error", { error })
     return NextResponse.json(
       {
         success: false,

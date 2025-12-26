@@ -171,6 +171,10 @@ async function loadDSAByPattern(pattern: DSAPattern): Promise<DSAScenario[]> {
       const triesModule = await import('./dsa/tries')
       scenarios = triesModule.triesScenarios
       break
+    case 'binary-search-tree':
+      const bstModule = await import('./dsa/binary-search-tree')
+      scenarios = bstModule.binarySearchTreeScenarios
+      break
     default:
       // For any other patterns, try to load from misc
       const miscModule = await import('./dsa/misc')
@@ -260,6 +264,10 @@ export async function getScenariosByType(type: ScenarioType): Promise<Scenario[]
         'binary-search',
         'backtracking',
         'greedy',
+        'tries',
+        'bit-manipulation',
+        'math-geometry',
+        'binary-search-tree',
       ]
       const dsaResults = await Promise.all(patterns.map(loadDSAByPattern))
       return dsaResults.flat()
