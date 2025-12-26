@@ -1,7 +1,7 @@
 /**
  * Brevo (Sendinblue) Email Service
  *
- * Handles all transactional email sending for Mockmate.
+ * Handles all transactional email sending for Skillon.
  * Based on Brevo's Node.js SDK: @getbrevo/brevo
  */
 
@@ -34,8 +34,8 @@ function getContactsApi(): ContactsApi {
 
 // Email sender configuration
 const DEFAULT_SENDER = {
-  name: "Mockmate",
-  email: "hello@mockmate.dev"
+  name: "Skillon",
+  email: "hello@skillon.dev"
 };
 
 // Types

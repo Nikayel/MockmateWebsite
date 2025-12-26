@@ -55,10 +55,6 @@ import {
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://mockmate.dev";
 
-// ============================================
-// WELCOME EMAIL
-// ============================================
-
 export async function sendWelcomeEmail(
   userId: string,
   email: string,
@@ -87,10 +83,6 @@ export async function sendWelcomeEmail(
   });
 }
 
-// ============================================
-// INACTIVITY REMINDER
-// ============================================
-
 export async function sendInactivityEmail(
   email: string,
   data: Omit<InactivityEmailData, "appUrl">
@@ -109,9 +101,7 @@ export async function sendInactivityEmail(
   });
 }
 
-// ============================================
 // SPACED REPETITION REMINDER
-// ============================================
 
 export async function sendSpacedRepetitionEmail(
   email: string,
@@ -131,9 +121,7 @@ export async function sendSpacedRepetitionEmail(
   });
 }
 
-// ============================================
 // MILESTONE CELEBRATION
-// ============================================
 
 export async function sendMilestoneEmail(
   email: string,
@@ -152,9 +140,7 @@ export async function sendMilestoneEmail(
   });
 }
 
-// ============================================
 // ROADMAP: DAILY PRACTICE REMINDER
-// ============================================
 
 export async function sendDailyRoadmapEmail(
   email: string,
@@ -174,9 +160,7 @@ export async function sendDailyRoadmapEmail(
   });
 }
 
-// ============================================
 // ROADMAP: INTERVIEW COUNTDOWN
-// ============================================
 
 export async function sendInterviewCountdownEmail(
   email: string,
@@ -195,9 +179,7 @@ export async function sendInterviewCountdownEmail(
   });
 }
 
-// ============================================
 // ROADMAP: BEHIND SCHEDULE ALERT
-// ============================================
 
 export async function sendBehindScheduleEmail(
   email: string,
@@ -216,9 +198,7 @@ export async function sendBehindScheduleEmail(
   });
 }
 
-// ============================================
 // PAYMENT FAILURE NOTIFICATION
-// ============================================
 
 export async function sendPaymentFailedEmail(
   email: string,
@@ -238,9 +218,7 @@ export async function sendPaymentFailedEmail(
   });
 }
 
-// ============================================
 // SUBSCRIPTION CONFIRMATION
-// ============================================
 
 export async function sendSubscriptionConfirmationEmail(
   email: string,
@@ -260,9 +238,7 @@ export async function sendSubscriptionConfirmationEmail(
   });
 }
 
-// ============================================
 // SUBSCRIPTION CANCELLATION CONFIRMATION
-// ============================================
 
 export async function sendSubscriptionCancellationEmail(
   email: string,
@@ -282,9 +258,7 @@ export async function sendSubscriptionCancellationEmail(
   });
 }
 
-// ============================================
 // TRIAL ENDING NOTIFICATION
-// ============================================
 
 export async function sendTrialEndingEmail(
   email: string,
@@ -304,9 +278,7 @@ export async function sendTrialEndingEmail(
   });
 }
 
-// ============================================
 // NOTIFICATION PREFERENCES
-// ============================================
 
 export interface NotificationPreferences {
   email_notifications_enabled: boolean;
@@ -331,9 +303,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   preferred_hours: [9, 10, 11, 14, 15, 19, 20],
 };
 
-// ============================================
 // EMAIL RATE LIMITING
-// ============================================
 
 export interface EmailRateLimits {
   max_per_day: number;
@@ -377,9 +347,7 @@ export function canSendEmail(
   return { allowed: true };
 }
 
-// ============================================
 // LEARNING STATE TRACKING
-// ============================================
 
 export interface UserLearningState {
   user_id: string;

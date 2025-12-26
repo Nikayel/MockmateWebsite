@@ -1,7 +1,7 @@
 /**
  * Email Notification Service
  *
- * Main entry point for all email operations in Mockmate.
+ * Main entry point for all email operations in Skillon.
  * Combines Brevo API with templates and notification logic.
  */
 
