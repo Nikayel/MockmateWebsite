@@ -3,50 +3,32 @@ import {
   vectorizeAllProblems,
   getVectorizationStatus,
   vectorizeSingleProblem,
-  type VectorizationResult,
 } from '@/lib/rag/problem-vectorization'
 import { getScenarioById } from '@/lib/scenarios/index'
 import type { DSAScenario } from '@/lib/scenarios/types'
 import { getUserIdFromRequest } from '@/lib/auth-server'
-
-// Admin user IDs - add your admin user IDs here
-const ADMIN_USER_IDS = process.env.ADMIN_USER_IDS?.split(",").filter(Boolean) || []
-
-async function isAdmin(userId: string): Promise<boolean> {
-  // SECURITY: Only trust hardcoded admin list from environment variables
-  // Never read admin status from user-writable Firestore fields
-  return ADMIN_USER_IDS.includes(userId)
-}
 
 /**
  * Problem Vectorization API
  *
  * Endpoints for vectorizing DSA problems and company questions.
  *
- * GET: Check vectorization status (public)
- * POST: Trigger vectorization (ADMIN ONLY)
+ * SECURITY: POST requires admin authentication via ADMIN_USER_IDS
+ *
+ * GET: Check vectorization status (public - read-only)
+ * POST: Trigger vectorization (ADMIN ONLY - requires Firebase login + admin user ID)
  *   - action: 'vectorize-all' | 'vectorize-single' | 'status'
  */
 
+// Admin user IDs from environment (same pattern as seed-vectors)
+const ADMIN_USER_IDS = process.env.ADMIN_USER_IDS?.split(',').filter(Boolean) || []
+
 /**
- * Validate admin API key
+ * Check if user is admin
+ * SECURITY: Only trust hardcoded admin list from environment variables
  */
-function validateAdminAuth(request: NextRequest): boolean {
-  const adminKey = process.env.ADMIN_API_KEY
-  if (!adminKey) {
-    console.warn('[Vectorize API] ADMIN_API_KEY not configured')
-    return false
-  }
-
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader) return false
-
-  // Support both "Bearer <key>" and just "<key>"
-  const providedKey = authHeader.startsWith('Bearer ')
-    ? authHeader.slice(7)
-    : authHeader
-
-  return providedKey === adminKey
+function isAdmin(userId: string): boolean {
+  return ADMIN_USER_IDS.includes(userId)
 }
 
 export async function GET() {
@@ -70,39 +52,21 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  // Require admin authentication for write operations
-  if (!validateAdminAuth(request)) {
-    return NextResponse.json(
-      {
-        error: 'Unauthorized',
-        message: 'Valid ADMIN_API_KEY required. Use Authorization header: "Bearer <your-key>"'
-      },
-      { status: 401 }
-    )
-  }
-
   try {
-    // Check for API key first (for scripts/automation)
-    const apiKey = request.headers.get('x-api-key') || request.headers.get('authorization')?.replace('Bearer ', '')
-    const VECTORIZE_API_KEY = process.env.VECTORIZE_API_KEY
-
-    let isAuthorized = false
-
-    if (VECTORIZE_API_KEY && apiKey === VECTORIZE_API_KEY) {
-      // API key authentication
-      isAuthorized = true
-    } else {
-      // Firebase auth + admin check
-      const userId = await getUserIdFromRequest(request)
-      if (userId && isAdmin(userId)) {
-        isAuthorized = true
-      }
+    // Require Firebase authentication
+    const userId = await getUserIdFromRequest(request)
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authentication required. Please log in.' },
+        { status: 401 }
+      )
     }
 
-    if (!isAuthorized) {
+    // Require admin role
+    if (!isAdmin(userId)) {
       return NextResponse.json(
-        { error: "Authentication required. Provide Firebase ID token or API key via x-api-key header." },
-        { status: 401 }
+        { error: 'Admin access required. Your user ID is not in ADMIN_USER_IDS.' },
+        { status: 403 }
       )
     }
 
