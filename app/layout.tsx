@@ -22,15 +22,16 @@ const openSans = Open_Sans({
 })
 
 export const metadata: Metadata = {
-  title: "Skillon - AI-Powered Technical Interview Practice",
+  title: "Skillon - Ace Your Tech Interview with AI Mock Practice",
   description:
-    "Master coding interviews with AI-powered realistic practice sessions. Get real-time feedback from an intelligent interviewer and land your dream tech job.",
+    "Practice coding interviews with an AI interviewer available 24/7. Talk through problems, get instant feedback, and master DSA patterns. Built by a CS student, for CS students.",
   generator: "v0.app",
   icons: {
     icon: "/icon.svg",
     shortcut: "/icon.svg",
     apple: "/icon.svg",
   },
+  keywords: ["coding interview prep", "mock interview", "AI interviewer", "DSA practice", "LeetCode alternative", "tech interview", "software engineering interview"],
 }
 
 export default function RootLayout({

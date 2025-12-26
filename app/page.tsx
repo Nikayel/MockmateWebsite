@@ -8,7 +8,6 @@ import { HeroSection } from "@/components/hero-section"
 import { ProblemTeaser } from "@/components/problem-teaser"
 import { FeaturesSection } from "@/components/features-section"
 import { AIAssistedSection } from "@/components/ai-assisted-section"
-import { PricingSection } from "@/components/pricing-section"
 import { Footer } from "@/components/footer"
 import { useAuth } from "@/lib/auth-context"
 import { getUserProfile, checkUsageLimit } from "@/lib/firestore-helpers"
@@ -282,7 +281,6 @@ export default function HomePage() {
       <ProblemTeaser />
       <AIAssistedSection />
       <FeaturesSection />
-      <PricingSection />
       <Footer />
     </main>
   )
