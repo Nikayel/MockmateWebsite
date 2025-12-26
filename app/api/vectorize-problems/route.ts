@@ -13,10 +13,33 @@ import type { DSAScenario } from '@/lib/scenarios/types'
  *
  * Endpoints for vectorizing DSA problems and company questions.
  *
- * GET: Check vectorization status
- * POST: Trigger vectorization
+ * SECURITY: POST requires ADMIN_API_KEY authentication
+ *
+ * GET: Check vectorization status (public - read-only)
+ * POST: Trigger vectorization (requires auth)
  *   - action: 'vectorize-all' | 'vectorize-single' | 'status'
  */
+
+/**
+ * Validate admin API key
+ */
+function validateAdminAuth(request: NextRequest): boolean {
+  const adminKey = process.env.ADMIN_API_KEY
+  if (!adminKey) {
+    console.warn('[Vectorize API] ADMIN_API_KEY not configured')
+    return false
+  }
+
+  const authHeader = request.headers.get('authorization')
+  if (!authHeader) return false
+
+  // Support both "Bearer <key>" and just "<key>"
+  const providedKey = authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : authHeader
+
+  return providedKey === adminKey
+}
 
 export async function GET() {
   try {
@@ -39,6 +62,17 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  // Require admin authentication for write operations
+  if (!validateAdminAuth(request)) {
+    return NextResponse.json(
+      {
+        error: 'Unauthorized',
+        message: 'Valid ADMIN_API_KEY required. Use Authorization header: "Bearer <your-key>"'
+      },
+      { status: 401 }
+    )
+  }
+
   try {
     const body = await request.json()
     const { action = 'vectorize-all', scenarioId } = body
