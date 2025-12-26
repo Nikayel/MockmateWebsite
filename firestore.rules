@@ -58,7 +58,7 @@ service cloud.firestore {
       allow create: if isAuthenticated()
                     && request.auth.uid == userId
                     && request.resource.data.id == userId
-                    && hasRequiredFields(['id', 'email', 'createdAt']);
+                    && hasRequiredFields(['id', 'email', 'created_at']);
 
       // Users can update their own profile (but not change id)
       allow update: if isOwner(userId)

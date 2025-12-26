@@ -253,7 +253,7 @@ function CodeMirrorEditorComponent({
     // Check if calm class is on document
     const checkCalmMode = () => {
       const hasCalmClass = document.documentElement.classList.contains('calm') ||
-                          document.body.classList.contains('calm')
+        document.body.classList.contains('calm')
       setIsCalm(calmMode || hasCalmClass)
     }
 
@@ -318,6 +318,7 @@ function CodeMirrorEditorComponent({
         ref={editorRef}
         value={value}
         height="100%"
+        theme={isDarkTheme ? "dark" : "light"}
         extensions={extensions}
         onChange={handleChange}
         readOnly={readOnly}
