@@ -24,6 +24,7 @@ export interface Profile {
   stripe_subscription_id?: string
   subscription_start_date?: string // ISO date string when subscription started
   subscription_current_period_end?: string // ISO date string when current period ends
+  last_quota_reset?: string // ISO date string when quota was last reset (for yearly subscriptions)
   created_at: string
   updated_at: string
   // Onboarding fields
@@ -102,6 +103,25 @@ export interface ErrorState {
   message: string
   code?: string
   details?: string
+}
+
+/**
+ * Payment history record for subscription and one-time payments
+ */
+export interface PaymentHistory {
+  id: string
+  user_id: string
+  type: "subscription" | "one_time"
+  amount: number // Amount in cents
+  currency: string
+  status: "succeeded" | "failed" | "refunded"
+  stripe_payment_intent_id?: string
+  stripe_invoice_id?: string
+  stripe_subscription_id?: string
+  description?: string
+  period_start?: string // ISO date string
+  period_end?: string // ISO date string
+  created_at: string
 }
 
 /**

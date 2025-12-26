@@ -664,7 +664,7 @@ export default function RoadmapPage() {
                 <AlertTriangle className="h-5 w-5 text-yellow-500" />
                 End This Roadmap?
               </DialogTitle>
-              <DialogDescription className="text-left pt-2">
+              <div className="text-sm text-muted-foreground text-left pt-2">
                 Are you sure you want to end your {roadmap?.companyName} roadmap early?
                 <ul className="mt-3 space-y-2 text-sm">
                   <li className="flex items-start gap-2">
@@ -680,7 +680,7 @@ export default function RoadmapPage() {
                     <span>You can create a new roadmap for a different company</span>
                   </li>
                 </ul>
-              </DialogDescription>
+              </div>
             </DialogHeader>
             <DialogFooter className="flex-row gap-2 sm:justify-end">
               <button

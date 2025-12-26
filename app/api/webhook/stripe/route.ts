@@ -26,8 +26,13 @@ const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
 
 /**
  * Update user quota for subscription tier using Admin SDK
+ * @param resetUsage - If true, reset sessions_used to 0 (for new billing periods or tier changes)
  */
-async function updateQuotaForSubscriptionTierAdmin(userId: string, subscriptionTier: "free" | "pro" | "enterprise"): Promise<void> {
+async function updateQuotaForSubscriptionTierAdmin(
+  userId: string,
+  subscriptionTier: "free" | "pro" | "enterprise",
+  resetUsage: boolean = false
+): Promise<void> {
   const now = new Date()
   const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
@@ -52,22 +57,70 @@ async function updateQuotaForSubscriptionTierAdmin(userId: string, subscriptionT
   })
 
   if (currentQuotaDoc) {
-    // Update existing quota
-    await currentQuotaDoc.ref.update({
+    const currentData = currentQuotaDoc.data()
+    const updateData: Record<string, any> = {
       sessions_limit: sessionsLimit,
       updated_at: new Date().toISOString(),
-    })
+    }
+
+    // Reset usage if explicitly requested (new billing period) or if downgrading and usage exceeds new limit
+    if (resetUsage) {
+      updateData.sessions_used = 0
+      updateData.free_opens_remaining = 0
+      console.log(`[Quota] Resetting usage to 0 for user ${userId} (new billing period or tier change)`)
+    } else if (currentData.sessions_used > sessionsLimit) {
+      // If user has used more than new limit (e.g., downgrade from pro to free), cap it
+      // This ensures display shows correct "X/Y" where X <= Y
+      updateData.sessions_used = sessionsLimit
+      console.log(`[Quota] Capping sessions_used to ${sessionsLimit} for user ${userId} (was ${currentData.sessions_used})`)
+    }
+
+    await currentQuotaDoc.ref.update(updateData)
   } else {
-    // Create new quota
+    // Create new quota for this period
     await adminDb.collection("profile_quota").add({
       user_id: userId,
       sessions_used: 0,
       sessions_limit: sessionsLimit,
+      free_opens_remaining: 0,
       period_start: periodStart.toISOString(),
       period_end: periodEnd.toISOString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
+  }
+}
+
+/**
+ * Record payment to payment_history collection
+ */
+async function recordPaymentHistory(
+  userId: string,
+  data: {
+    type: "subscription" | "one_time"
+    amount: number
+    currency: string
+    status: "succeeded" | "failed" | "refunded"
+    stripe_payment_intent_id?: string
+    stripe_invoice_id?: string
+    stripe_subscription_id?: string
+    description?: string
+    period_start?: string
+    period_end?: string
+  }
+): Promise<void> {
+  try {
+    const paymentRef = adminDb.collection("payment_history").doc()
+    await paymentRef.set({
+      id: paymentRef.id,
+      user_id: userId,
+      ...data,
+      created_at: new Date().toISOString(),
+    })
+    console.log(`[Payment] Recorded payment history for user ${userId}: ${data.type}, $${(data.amount / 100).toFixed(2)}`)
+  } catch (error) {
+    console.error(`[Payment] Failed to record payment history:`, error)
+    // Don't throw - payment recording is not critical
   }
 }
 
@@ -205,8 +258,20 @@ export async function POST(request: NextRequest) {
             console.log(`   WARNING: Profile may be incomplete - email: ${existingData.email || session.customer_email || "MISSING"}`)
           }
 
-          // Update quota to reflect Pro subscription (35 sessions)
-          await updateQuotaForSubscriptionTierAdmin(userId, "pro")
+          // Update quota to reflect Pro subscription (35 sessions) - reset usage for new subscription
+          await updateQuotaForSubscriptionTierAdmin(userId, "pro", true)
+
+          // Record payment in history
+          await recordPaymentHistory(userId, {
+            type: "subscription",
+            amount: session.amount_total || 0,
+            currency: session.currency || "usd",
+            status: "succeeded",
+            stripe_subscription_id: session.subscription as string,
+            description: "Pro subscription (monthly)",
+            period_start: subscriptionStartDate,
+            period_end: currentPeriodEnd,
+          })
 
           console.log(`✅ User ${userId} upgraded to Pro via Stripe webhook`)
           console.log(`   Payment Status: ${session.payment_status}`)
@@ -268,6 +333,7 @@ export async function POST(request: NextRequest) {
             subscription_start_date: now.toISOString(),
             subscription_current_period_end: oneYearFromNow.toISOString(),
             subscription_type: "yearly",
+            last_quota_reset: now.toISOString(), // Track when quota was last reset for monthly resets
             updated_at: new Date().toISOString(),
           }
 
@@ -278,8 +344,19 @@ export async function POST(request: NextRequest) {
           await profileRef.update(updateData)
           console.log(`✅ Updated profile for yearly plan - Pro access until ${oneYearFromNow.toISOString()}`)
 
-          // Update quota to Pro limit
-          await updateQuotaForSubscriptionTierAdmin(userId, "pro")
+          // Update quota to Pro limit - reset usage for new subscription
+          await updateQuotaForSubscriptionTierAdmin(userId, "pro", true)
+
+          // Record payment in history
+          await recordPaymentHistory(userId, {
+            type: "one_time",
+            amount: session.amount_total || 0,
+            currency: session.currency || "usd",
+            status: "succeeded",
+            description: "Pro subscription (yearly)",
+            period_start: now.toISOString(),
+            period_end: oneYearFromNow.toISOString(),
+          })
 
           console.log(`✅ User ${userId} upgraded to Pro (yearly) via Stripe webhook`)
           console.log(`   Payment Status: ${session.payment_status}`)
@@ -391,47 +468,84 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Handle successful payment after past_due (subscription recovered)
+  // Handle successful payment - subscription renewal or recovery
   if (event.type === "invoice.paid") {
     const invoice = event.data.object as Stripe.Invoice
 
-    // Only handle if this was a recovery from past_due
-    if (invoice.billing_reason === "subscription_cycle" || invoice.billing_reason === "subscription_update") {
-      try {
-        const customerId = invoice.customer as string
-        if (customerId) {
-          const profilesQuery = await adminDb.collection("profiles")
-            .where("stripe_customer_id", "==", customerId)
-            .get()
+    console.log(`💵 Invoice paid: ${invoice.id}, billing_reason: ${invoice.billing_reason}, amount: ${invoice.amount_paid}`)
 
-          if (!profilesQuery.empty) {
-            const profileDoc = profilesQuery.docs[0]
-            const profile = profileDoc.data()
+    try {
+      const customerId = invoice.customer as string
+      if (customerId) {
+        const profilesQuery = await adminDb.collection("profiles")
+          .where("stripe_customer_id", "==", customerId)
+          .get()
 
-            // Only update if subscription was past_due
-            if (profile?.subscription_status === "past_due") {
-              const userId = profileDoc.id
-              const profileRef = adminDb.collection("profiles").doc(userId)
+        if (!profilesQuery.empty) {
+          const profileDoc = profilesQuery.docs[0]
+          const profile = profileDoc.data()
+          const userId = profileDoc.id
+          const profileRef = adminDb.collection("profiles").doc(userId)
 
-              await profileRef.set({
-                subscription_status: "active",
-                subscription_tier: "pro", // Restore Pro access
-                payment_failed_at: null, // Clear failure timestamp
-                payment_failure_reason: null, // Clear failure reason
-                payment_recovered_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              }, { merge: true })
+          // Record payment in history
+          await recordPaymentHistory(userId, {
+            type: "subscription",
+            amount: invoice.amount_paid || 0,
+            currency: invoice.currency || "usd",
+            status: "succeeded",
+            stripe_invoice_id: invoice.id,
+            stripe_subscription_id: invoice.subscription as string,
+            description: invoice.billing_reason === "subscription_cycle"
+              ? "Monthly subscription renewal"
+              : invoice.billing_reason === "subscription_create"
+                ? "Initial subscription payment"
+                : `Subscription payment (${invoice.billing_reason})`,
+            period_start: invoice.period_start
+              ? new Date(invoice.period_start * 1000).toISOString()
+              : undefined,
+            period_end: invoice.period_end
+              ? new Date(invoice.period_end * 1000).toISOString()
+              : undefined,
+          })
 
-              // Restore Pro quota
-              await updateQuotaForSubscriptionTierAdmin(userId, "pro")
+          // Handle subscription cycle - new billing period = reset usage
+          if (invoice.billing_reason === "subscription_cycle") {
+            console.log(`🔄 New billing period for user ${userId} - resetting usage`)
 
-              console.log(`✅ User ${userId} subscription recovered - payment successful`)
-            }
+            // Update profile with new period end date
+            await profileRef.set({
+              subscription_status: "active",
+              subscription_current_period_end: invoice.period_end
+                ? new Date(invoice.period_end * 1000).toISOString()
+                : undefined,
+              updated_at: new Date().toISOString(),
+            }, { merge: true })
+
+            // Reset usage for new billing period
+            await updateQuotaForSubscriptionTierAdmin(userId, "pro", true) // true = reset usage
+
+            console.log(`✅ User ${userId} subscription renewed - usage reset to 0/35`)
+          }
+          // Handle recovery from past_due
+          else if (profile?.subscription_status === "past_due") {
+            await profileRef.set({
+              subscription_status: "active",
+              subscription_tier: "pro",
+              payment_failed_at: null,
+              payment_failure_reason: null,
+              payment_recovered_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }, { merge: true })
+
+            // Restore Pro quota (don't reset usage - they're catching up)
+            await updateQuotaForSubscriptionTierAdmin(userId, "pro", false)
+
+            console.log(`✅ User ${userId} subscription recovered - payment successful`)
           }
         }
-      } catch (error) {
-        console.error("Error handling payment recovery:", error)
       }
+    } catch (error) {
+      console.error("Error handling invoice.paid:", error)
     }
   }
 

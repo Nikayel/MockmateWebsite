@@ -162,6 +162,7 @@ export async function getUserProfile(userId: string, syncStripe: boolean = true)
 
 /**
  * Initialize user quota for the current month
+ * For yearly subscribers, this also handles monthly quota resets
  */
 export async function initializeUserQuota(userId: string, subscriptionTier: "free" | "pro" | "enterprise" = "free"): Promise<ProfileQuota> {
   const now = new Date()
@@ -193,8 +194,27 @@ export async function initializeUserQuota(userId: string, subscriptionTier: "fre
         ? PRICING_CONFIG.pro.sessionsPerMonth
         : PRICING_CONFIG.free.sessionsPerMonth
 
+      // Check if we need to update anything
+      let needsUpdate = false
+      const updateData: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      }
+
       // If limit changed, update it
       if (currentPeriodQuota.sessions_limit !== sessionsLimit) {
+        updateData.sessions_limit = sessionsLimit
+        currentPeriodQuota.sessions_limit = sessionsLimit
+        needsUpdate = true
+      }
+
+      // Cap sessions_used if it exceeds the limit (e.g., after downgrade)
+      if (currentPeriodQuota.sessions_used > sessionsLimit) {
+        updateData.sessions_used = sessionsLimit
+        currentPeriodQuota.sessions_used = sessionsLimit
+        needsUpdate = true
+      }
+
+      if (needsUpdate) {
         const quotaRef = quotaSnap.docs.find(doc => {
           const quota = doc.data() as ProfileQuota
           const quotaStart = new Date(quota.period_start)
@@ -202,11 +222,7 @@ export async function initializeUserQuota(userId: string, subscriptionTier: "fre
         })?.ref
 
         if (quotaRef) {
-          await setDoc(quotaRef, {
-            sessions_limit: sessionsLimit,
-            updated_at: new Date().toISOString(),
-          }, { merge: true })
-          currentPeriodQuota.sessions_limit = sessionsLimit
+          await setDoc(quotaRef, updateData, { merge: true })
         }
       }
 
@@ -214,7 +230,8 @@ export async function initializeUserQuota(userId: string, subscriptionTier: "fre
     }
   }
 
-  // Create new quota
+  // Create new quota for this period
+  // This automatically resets usage when a new month starts
   const sessionsLimit = subscriptionTier === "pro"
     ? PRICING_CONFIG.pro.sessionsPerMonth
     : PRICING_CONFIG.free.sessionsPerMonth
@@ -224,6 +241,7 @@ export async function initializeUserQuota(userId: string, subscriptionTier: "fre
     user_id: userId,
     sessions_used: 0,
     sessions_limit: sessionsLimit,
+    free_opens_remaining: 0,
     period_start: periodStart.toISOString(),
     period_end: periodEnd.toISOString(),
     created_at: new Date().toISOString(),
