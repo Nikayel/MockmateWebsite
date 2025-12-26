@@ -39,6 +39,18 @@ import {
   getPaymentFailedEmailHtml,
   getPaymentFailedEmailText,
   PaymentFailedEmailData,
+  getSubscriptionConfirmationEmailSubject,
+  getSubscriptionConfirmationEmailHtml,
+  getSubscriptionConfirmationEmailText,
+  SubscriptionConfirmationEmailData,
+  getSubscriptionCancellationEmailSubject,
+  getSubscriptionCancellationEmailHtml,
+  getSubscriptionCancellationEmailText,
+  SubscriptionCancellationEmailData,
+  getTrialEndingEmailSubject,
+  getTrialEndingEmailHtml,
+  getTrialEndingEmailText,
+  TrialEndingEmailData,
 } from "./templates";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://mockmate.dev";
@@ -223,6 +235,72 @@ export async function sendPaymentFailedEmail(
     htmlContent: getPaymentFailedEmailHtml(emailData),
     textContent: getPaymentFailedEmailText(emailData),
     tags: ["payment", "payment-failed"],
+  });
+}
+
+// ============================================
+// SUBSCRIPTION CONFIRMATION
+// ============================================
+
+export async function sendSubscriptionConfirmationEmail(
+  email: string,
+  data: Omit<SubscriptionConfirmationEmailData, "appUrl">
+): Promise<EmailResult> {
+  const emailData: SubscriptionConfirmationEmailData = {
+    ...data,
+    appUrl: APP_URL,
+  };
+
+  return sendEmail({
+    to: [{ email, name: data.userName }],
+    subject: getSubscriptionConfirmationEmailSubject(),
+    htmlContent: getSubscriptionConfirmationEmailHtml(emailData),
+    textContent: getSubscriptionConfirmationEmailText(emailData),
+    tags: ["subscription", "subscription-confirmation"],
+  });
+}
+
+// ============================================
+// SUBSCRIPTION CANCELLATION CONFIRMATION
+// ============================================
+
+export async function sendSubscriptionCancellationEmail(
+  email: string,
+  data: Omit<SubscriptionCancellationEmailData, "appUrl">
+): Promise<EmailResult> {
+  const emailData: SubscriptionCancellationEmailData = {
+    ...data,
+    appUrl: APP_URL,
+  };
+
+  return sendEmail({
+    to: [{ email, name: data.userName }],
+    subject: getSubscriptionCancellationEmailSubject(data.isImmediate),
+    htmlContent: getSubscriptionCancellationEmailHtml(emailData),
+    textContent: getSubscriptionCancellationEmailText(emailData),
+    tags: ["subscription", "subscription-cancellation"],
+  });
+}
+
+// ============================================
+// TRIAL ENDING NOTIFICATION
+// ============================================
+
+export async function sendTrialEndingEmail(
+  email: string,
+  data: Omit<TrialEndingEmailData, "appUrl">
+): Promise<EmailResult> {
+  const emailData: TrialEndingEmailData = {
+    ...data,
+    appUrl: APP_URL,
+  };
+
+  return sendEmail({
+    to: [{ email, name: data.userName }],
+    subject: getTrialEndingEmailSubject(),
+    htmlContent: getTrialEndingEmailHtml(emailData),
+    textContent: getTrialEndingEmailText(emailData),
+    tags: ["subscription", "trial-ending"],
   });
 }
 

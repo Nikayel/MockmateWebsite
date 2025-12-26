@@ -854,3 +854,334 @@ Need help? Contact us at support@skillon.ai
 Unsubscribe: ${data.appUrl}/settings/notifications
   `.trim();
 }
+
+// ============================================
+// SUBSCRIPTION CONFIRMATION
+// ============================================
+
+export interface SubscriptionConfirmationEmailData {
+  userName: string;
+  userEmail: string;
+  planName: string;
+  amount: number;
+  currency: string;
+  nextBillingDate?: string;
+  appUrl: string;
+}
+
+export function getSubscriptionConfirmationEmailSubject(): string {
+  return "Welcome to Mockmate Pro - Your subscription is active!";
+}
+
+export function getSubscriptionConfirmationEmailHtml(data: SubscriptionConfirmationEmailData): string {
+  const formattedDate = data.nextBillingDate
+    ? new Date(data.nextBillingDate).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : 'N/A';
+
+  const content = `
+    <h1>Welcome to Mockmate Pro, ${data.userName || 'there'}!</h1>
+
+    <p>Thank you for upgrading to <strong class="highlight">Pro</strong>! Your subscription is now active.</p>
+
+    <div class="stat-card" style="text-align: center; margin: 24px 0;">
+      <div class="stat-value">${data.planName}</div>
+      <div class="stat-label">Your Plan</div>
+    </div>
+
+    <div class="tip-box">
+      <p><strong>Subscription Details:</strong></p>
+      <ul style="margin: 8px 0; padding-left: 20px;">
+        <li>Plan: ${data.planName}</li>
+        <li>Amount: ${data.currency} ${data.amount.toFixed(2)}</li>
+        <li>Next billing date: ${formattedDate}</li>
+      </ul>
+    </div>
+
+    <p style="margin-top: 24px;">With Pro, you now have access to:</p>
+    <ul style="color: #9ca3af; padding-left: 20px;">
+      <li><strong style="color: #e5e7eb;">35 interview sessions per month</strong></li>
+      <li><strong style="color: #e5e7eb;">Unlimited code execution</strong></li>
+      <li><strong style="color: #e5e7eb;">Advanced AI feedback</strong></li>
+      <li><strong style="color: #e5e7eb;">Priority support</strong></li>
+    </ul>
+
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="${data.appUrl}/dashboard" class="cta-button">Start Practicing</a>
+    </div>
+
+    <p style="color: #9ca3af; font-size: 14px;">
+      Manage your subscription anytime at <a href="${data.appUrl}/settings/billing" style="color: #00d9ff;">${data.appUrl}/settings/billing</a>
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
+
+export function getSubscriptionConfirmationEmailText(data: SubscriptionConfirmationEmailData): string {
+  const formattedDate = data.nextBillingDate
+    ? new Date(data.nextBillingDate).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : 'N/A';
+
+  return `
+Welcome to Mockmate Pro, ${data.userName || 'there'}!
+
+Thank you for upgrading to Pro! Your subscription is now active.
+
+Subscription Details:
+- Plan: ${data.planName}
+- Amount: ${data.currency} ${data.amount.toFixed(2)}
+- Next billing date: ${formattedDate}
+
+With Pro, you now have access to:
+- 35 interview sessions per month
+- Unlimited code execution
+- Advanced AI feedback
+- Priority support
+
+Start practicing: ${data.appUrl}/dashboard
+
+Manage your subscription: ${data.appUrl}/settings/billing
+
+- The Mockmate Team
+
+---
+Unsubscribe: ${data.appUrl}/settings/notifications
+  `.trim();
+}
+
+// ============================================
+// SUBSCRIPTION CANCELLATION CONFIRMATION
+// ============================================
+
+export interface SubscriptionCancellationEmailData {
+  userName: string;
+  userEmail: string;
+  accessUntil?: string;
+  isImmediate: boolean;
+  appUrl: string;
+}
+
+export function getSubscriptionCancellationEmailSubject(isImmediate: boolean): string {
+  return isImmediate
+    ? "Your Mockmate Pro subscription has ended"
+    : "Your Mockmate Pro cancellation is confirmed";
+}
+
+export function getSubscriptionCancellationEmailHtml(data: SubscriptionCancellationEmailData): string {
+  const formattedDate = data.accessUntil
+    ? new Date(data.accessUntil).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : 'today';
+
+  const content = data.isImmediate
+    ? `
+      <h1>Your subscription has ended</h1>
+
+      <p>Hey ${data.userName || 'there'},</p>
+
+      <p>Your Mockmate Pro subscription has ended. You've been moved to our Free plan.</p>
+
+      <div class="tip-box" style="background: rgba(251, 191, 36, 0.1); border-left-color: #fbbf24;">
+        <p style="color: #fbbf24; margin: 0;">
+          <strong>Your account has been downgraded to Free.</strong>
+          You now have access to 5 interview sessions per month.
+        </p>
+      </div>
+
+      <p style="margin-top: 24px;">We're sorry to see you go! If you ever want to come back, your progress and history will be waiting for you.</p>
+
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${data.appUrl}/pricing" class="cta-button">Resubscribe to Pro</a>
+      </div>
+
+      <div class="science-note">
+        <p><strong>We'd love to hear from you!</strong> If there's anything we could have done better, please reply to this email and let us know.</p>
+      </div>
+    `
+    : `
+      <h1>Your cancellation is confirmed</h1>
+
+      <p>Hey ${data.userName || 'there'},</p>
+
+      <p>We've received your cancellation request. Your Pro subscription has been set to cancel at the end of your billing period.</p>
+
+      <div class="stat-card" style="text-align: center; margin: 24px 0;">
+        <div class="stat-value">${formattedDate}</div>
+        <div class="stat-label">Pro Access Until</div>
+      </div>
+
+      <div class="tip-box">
+        <p><strong>Good news!</strong> You'll keep full Pro access until ${formattedDate}. Make the most of it!</p>
+      </div>
+
+      <p style="margin-top: 24px;">Changed your mind? You can reactivate your subscription anytime before it expires:</p>
+
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${data.appUrl}/settings/billing" class="cta-button">Reactivate Subscription</a>
+      </div>
+
+      <div class="science-note">
+        <p><strong>We'd love to hear from you!</strong> If there's anything we could have done better, please reply to this email and let us know.</p>
+      </div>
+    `;
+
+  return emailWrapper(content);
+}
+
+export function getSubscriptionCancellationEmailText(data: SubscriptionCancellationEmailData): string {
+  const formattedDate = data.accessUntil
+    ? new Date(data.accessUntil).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : 'today';
+
+  if (data.isImmediate) {
+    return `
+Your subscription has ended
+
+Hey ${data.userName || 'there'},
+
+Your Mockmate Pro subscription has ended. You've been moved to our Free plan.
+
+You now have access to 5 interview sessions per month.
+
+We're sorry to see you go! If you ever want to come back, your progress and history will be waiting for you.
+
+Resubscribe to Pro: ${data.appUrl}/pricing
+
+- The Mockmate Team
+
+---
+Unsubscribe: ${data.appUrl}/settings/notifications
+    `.trim();
+  }
+
+  return `
+Your cancellation is confirmed
+
+Hey ${data.userName || 'there'},
+
+We've received your cancellation request. Your Pro subscription has been set to cancel at the end of your billing period.
+
+Pro Access Until: ${formattedDate}
+
+Good news! You'll keep full Pro access until ${formattedDate}. Make the most of it!
+
+Changed your mind? Reactivate your subscription:
+${data.appUrl}/settings/billing
+
+- The Mockmate Team
+
+---
+Unsubscribe: ${data.appUrl}/settings/notifications
+  `.trim();
+}
+
+// ============================================
+// TRIAL ENDING NOTIFICATION
+// ============================================
+
+export interface TrialEndingEmailData {
+  userName: string;
+  userEmail: string;
+  trialEndDate?: string;
+  appUrl: string;
+}
+
+export function getTrialEndingEmailSubject(): string {
+  return "Your Mockmate Pro trial ends in 3 days";
+}
+
+export function getTrialEndingEmailHtml(data: TrialEndingEmailData): string {
+  const formattedDate = data.trialEndDate
+    ? new Date(data.trialEndDate).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : 'soon';
+
+  const content = `
+    <h1>Your Pro trial ends soon!</h1>
+
+    <p>Hey ${data.userName || 'there'},</p>
+
+    <p>Your Mockmate Pro trial is ending on <strong class="highlight">${formattedDate}</strong>.</p>
+
+    <div class="stat-card" style="text-align: center; margin: 24px 0;">
+      <div class="stat-value">3</div>
+      <div class="stat-label">Days Remaining</div>
+    </div>
+
+    <div class="tip-box">
+      <p><strong>What happens next?</strong> After your trial ends, your payment method will be charged automatically. If you don't want to continue, you can cancel before ${formattedDate}.</p>
+    </div>
+
+    <p style="margin-top: 24px;">With Pro, you get:</p>
+    <ul style="color: #9ca3af; padding-left: 20px;">
+      <li><strong style="color: #e5e7eb;">35 interview sessions per month</strong></li>
+      <li><strong style="color: #e5e7eb;">Unlimited code execution</strong></li>
+      <li><strong style="color: #e5e7eb;">Advanced AI feedback</strong></li>
+      <li><strong style="color: #e5e7eb;">Priority support</strong></li>
+    </ul>
+
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="${data.appUrl}/settings/billing" class="cta-button">Manage Subscription</a>
+    </div>
+
+    <p style="color: #9ca3af; font-size: 14px;">
+      Have questions? Reply to this email and we'll be happy to help!
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
+
+export function getTrialEndingEmailText(data: TrialEndingEmailData): string {
+  const formattedDate = data.trialEndDate
+    ? new Date(data.trialEndDate).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : 'soon';
+
+  return `
+Your Pro trial ends soon!
+
+Hey ${data.userName || 'there'},
+
+Your Mockmate Pro trial is ending on ${formattedDate}.
+
+What happens next?
+After your trial ends, your payment method will be charged automatically. If you don't want to continue, you can cancel before ${formattedDate}.
+
+With Pro, you get:
+- 35 interview sessions per month
+- Unlimited code execution
+- Advanced AI feedback
+- Priority support
+
+Manage your subscription: ${data.appUrl}/settings/billing
+
+Have questions? Reply to this email and we'll be happy to help!
+
+- The Mockmate Team
+
+---
+Unsubscribe: ${data.appUrl}/settings/notifications
+  `.trim();
+}

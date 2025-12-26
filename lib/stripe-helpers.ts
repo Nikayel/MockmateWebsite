@@ -11,6 +11,10 @@ import Stripe from "stripe"
 import { adminDb } from "./firebase-admin"
 import { Profile } from "./types"
 import { PRICING_CONFIG } from "./config"
+import { logger } from "./logger"
+
+// Create a child logger for subscription operations
+const subscriptionLogger = logger.child({ service: "stripe-helpers" })
 
 // Initialize Stripe only if secret key is available
 let stripe: Stripe | null = null
@@ -22,7 +26,7 @@ try {
     })
   }
 } catch (error) {
-  console.error("Failed to initialize Stripe:", error)
+  subscriptionLogger.error("Failed to initialize Stripe", { error })
 }
 
 /**
@@ -58,7 +62,7 @@ async function updateQuotaForSubscriptionTierAdmin(userId: string, subscriptionT
       sessions_limit: sessionsLimit,
       updated_at: new Date().toISOString(),
     })
-    console.log(`Updated quota for user ${userId}: ${sessionsLimit} sessions`)
+    subscriptionLogger.info("Updated quota", { userId, sessionsLimit })
   } else {
     // Create new quota
     await adminDb.collection("profile_quota").add({
@@ -70,7 +74,7 @@ async function updateQuotaForSubscriptionTierAdmin(userId: string, subscriptionT
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-    console.log(`Created quota for user ${userId}: ${sessionsLimit} sessions`)
+    subscriptionLogger.info("Created quota", { userId, sessionsLimit })
   }
 }
 
@@ -88,7 +92,7 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
   try {
     // Check if Stripe is initialized
     if (!stripe) {
-      console.warn("Stripe not initialized - cannot sync subscription")
+      subscriptionLogger.warn("Stripe not initialized - cannot sync subscription")
       const profileRef = adminDb.collection("profiles").doc(userId)
       const profileSnap = await profileRef.get()
       return profileSnap.exists ? (profileSnap.data() as Profile) : null
@@ -99,7 +103,7 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
     const profileSnap = await profileRef.get()
 
     if (!profileSnap.exists) {
-      console.error(`Profile not found for user ${userId}`)
+      subscriptionLogger.error("Profile not found", { userId })
       return null
     }
 
@@ -108,10 +112,11 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
     const stripeCustomerId = profile.stripe_customer_id as string | undefined
     const userEmail = profile.email
 
-    console.log(`Syncing subscription for user ${userId}`)
-    console.log(`  - Has stripe_subscription_id: ${!!stripeSubscriptionId}`)
-    console.log(`  - Has stripe_customer_id: ${!!stripeCustomerId}`)
-    console.log(`  - User email: ${userEmail}`)
+    subscriptionLogger.info("Syncing subscription", {
+      userId,
+      hasSubscriptionId: !!stripeSubscriptionId,
+      hasCustomerId: !!stripeCustomerId,
+    })
 
     let subscription: Stripe.Subscription | null = null
     let customerId: string | null = stripeCustomerId || null
@@ -121,9 +126,9 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
       try {
         subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId)
         customerId = subscription.customer as string
-        console.log(`Found subscription by ID: ${stripeSubscriptionId}`)
+        subscriptionLogger.info("Found subscription by ID", { subscriptionId: stripeSubscriptionId })
       } catch (error) {
-        console.error(`Error retrieving subscription ${stripeSubscriptionId}:`, error)
+        subscriptionLogger.error("Error retrieving subscription", { subscriptionId: stripeSubscriptionId, error })
       }
     }
 
@@ -138,17 +143,17 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
 
         if (subscriptions.data.length > 0) {
           subscription = subscriptions.data[0]
-          console.log(`Found subscription via customer ID: ${stripeCustomerId}`)
+          subscriptionLogger.info("Found subscription via customer ID", { customerId: stripeCustomerId })
         }
       } catch (error) {
-        console.error(`Error listing subscriptions for customer ${stripeCustomerId}:`, error)
+        subscriptionLogger.error("Error listing subscriptions for customer", { customerId: stripeCustomerId, error })
       }
     }
 
     // Step 3: If STILL no subscription found, search by user's email
     // This is critical for NEW subscribers who just completed checkout
     if (!subscription && userEmail) {
-      console.log(`Searching for Stripe customer by email: ${userEmail}`)
+      subscriptionLogger.info("Searching for Stripe customer by email", { email: userEmail })
       try {
         // Search for customers with this email
         const customers = await stripe.customers.list({
@@ -156,7 +161,7 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
           limit: 10, // Get multiple in case of duplicates
         })
 
-        console.log(`Found ${customers.data.length} customers with email ${userEmail}`)
+        subscriptionLogger.info("Found customers", { email: userEmail, count: customers.data.length })
 
         // Check each customer for an active subscription
         for (const customer of customers.data) {
@@ -169,7 +174,7 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
           if (subscriptions.data.length > 0) {
             subscription = subscriptions.data[0]
             customerId = customer.id
-            console.log(`Found active subscription for customer ${customer.id}`)
+            subscriptionLogger.info("Found active subscription", { customerId: customer.id })
             break
           }
 
@@ -183,18 +188,21 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
           if (trialingSubscriptions.data.length > 0) {
             subscription = trialingSubscriptions.data[0]
             customerId = customer.id
-            console.log(`Found trialing subscription for customer ${customer.id}`)
+            subscriptionLogger.info("Found trialing subscription", { customerId: customer.id })
             break
           }
         }
       } catch (error) {
-        console.error(`Error searching customers by email ${userEmail}:`, error)
+        subscriptionLogger.error("Error searching customers by email", { email: userEmail, error })
       }
     }
 
     // Now process the subscription (or lack thereof)
     if (subscription) {
-      console.log(`Processing subscription: ${subscription.id}, status: ${subscription.status}`)
+      subscriptionLogger.info("Processing subscription", {
+        subscriptionId: subscription.id,
+        status: subscription.status,
+      })
 
       // Check if subscription is active
       if (subscription.status === "active" || subscription.status === "trialing") {
@@ -220,7 +228,7 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
         // Update quota to Pro limit
         await updateQuotaForSubscriptionTierAdmin(userId, "pro")
 
-        console.log(`✅ Synced user ${userId} to Pro from Stripe subscription ${subscription.id}`)
+        logger.payment("Synced user to Pro", { userId, subscriptionId: subscription.id })
       } else {
         // Subscription is canceled, past_due, etc. - downgrade to free
         await profileRef.set({
@@ -234,10 +242,10 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
         // Update quota to free limit
         await updateQuotaForSubscriptionTierAdmin(userId, "free")
 
-        console.log(`Synced user ${userId} to Free - subscription status: ${subscription.status}`)
+        subscriptionLogger.info("Synced user to Free", { userId, status: subscription.status })
       }
     } else {
-      console.log(`No subscription found for user ${userId}`)
+      subscriptionLogger.info("No subscription found", { userId })
 
       // Check if user has a yearly plan (one-time payment) that may have expired
       if (profile.subscription_tier === "pro" && profile.subscription_type === "yearly") {
@@ -245,7 +253,7 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
         if (periodEnd) {
           const periodEndDate = new Date(periodEnd)
           const now = new Date()
-          
+
           if (now > periodEndDate) {
             // Yearly plan has expired - downgrade to free
             await profileRef.set({
@@ -256,10 +264,16 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
 
             await updateQuotaForSubscriptionTierAdmin(userId, "free")
 
-            console.log(`Synced user ${userId} to Free - yearly plan expired on ${periodEndDate.toISOString()}`)
+            subscriptionLogger.info("Yearly plan expired - downgraded to Free", {
+              userId,
+              expiredAt: periodEndDate.toISOString(),
+            })
           } else {
             // Yearly plan is still active
-            console.log(`User ${userId} has active yearly plan until ${periodEndDate.toISOString()}`)
+            subscriptionLogger.info("Yearly plan still active", {
+              userId,
+              expiresAt: periodEndDate.toISOString(),
+            })
           }
         } else {
           // No period end date - treat as expired
@@ -271,7 +285,7 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
 
           await updateQuotaForSubscriptionTierAdmin(userId, "free")
 
-          console.log(`Synced user ${userId} to Free - yearly plan missing period end date`)
+          subscriptionLogger.warn("Yearly plan missing period end - downgraded to Free", { userId })
         }
       } else if (profile.subscription_tier === "pro") {
         // Pro user with no subscription and not yearly - downgrade
@@ -283,7 +297,7 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
 
         await updateQuotaForSubscriptionTierAdmin(userId, "free")
 
-        console.log(`Synced user ${userId} to Free - no active subscription found`)
+        subscriptionLogger.info("No active subscription - downgraded to Free", { userId })
       }
     }
 
@@ -291,7 +305,7 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
     const updatedProfileSnap = await profileRef.get()
     return updatedProfileSnap.exists ? (updatedProfileSnap.data() as Profile) : null
   } catch (error) {
-    console.error(`Error syncing subscription for user ${userId}:`, error)
+    subscriptionLogger.error("Error syncing subscription", { userId, error })
     throw error
   }
 }

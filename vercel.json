@@ -6,6 +6,24 @@
     "app/api/**/*.ts": {
       "memory": 1024,
       "maxDuration": 30
+    },
+    "app/api/execute/route.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "app/api/chat/route.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "app/api/cron/email-notifications/route.ts": {
+      "memory": 512,
+      "maxDuration": 300
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/email-notifications",
+      "schedule": "0 * * * *"
+    }
+  ]
 }
