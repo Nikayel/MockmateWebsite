@@ -97,7 +97,7 @@ export function useCodeExecution({
         body: JSON.stringify({
           code,
           language,
-          testCases: scenario.testCases,
+          testCases: 'testCases' in scenario ? scenario.testCases : [],
           scenarioId: scenario.id,
           scenarioType: scenario.type,
           sessionId,

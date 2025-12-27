@@ -142,7 +142,7 @@ export function PricingSection() {
                   variant="outline"
                   glowColor="none"
                   className="w-full justify-center text-sm"
-                  size="default"
+                  size="md"
                   strength={0.3}
                 >
                   {PRICING_CONFIG.free.buttonText}
@@ -225,7 +225,7 @@ export function PricingSection() {
                   variant="primary"
                   glowColor="accent"
                   className="w-full justify-center group text-sm"
-                  size="default"
+                  size="md"
                   strength={0.3}
                 >
                   Get Pro
@@ -278,7 +278,7 @@ export function PricingSection() {
                   variant="outline"
                   glowColor="none"
                   className="w-full justify-center text-sm"
-                  size="default"
+                  size="md"
                   strength={0.3}
                 >
                   {PRICING_CONFIG.enterprise.buttonText}
