@@ -5,13 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Shield, FileText, Eye, Lock, Globe, Bell, Cookie, Scale, Users, Database, AlertTriangle } from "lucide-react"
 
 export const metadata = {
-  title: "Legal & Privacy - Skillon",
-  description: "Privacy Policy, Terms of Service, and legal information for Skillon AI-powered interview practice platform.",
+  title: "Legal & Privacy - CodeSparring",
+  description: "Privacy Policy, Terms of Service, and legal information for CodeSparring AI-powered interview practice platform.",
 }
 
 export default function LegalPage() {
-  const lastUpdated = "December 2024"
-  const effectiveDate = "December 26, 2024"
+  const lastUpdated = "December 2025"
+  const effectiveDate = "December 27, 2025"
 
   return (
     <main className="min-h-screen bg-black">

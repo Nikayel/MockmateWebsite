@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next'
-import { blogPosts } from '@/lib/blog'
+import { getAllBlogPosts } from '@/lib/mdx'
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://codesparring.com'
 
@@ -44,8 +44,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
   ]
 
-  // Individual blog posts
-  const blogPostPages: MetadataRoute.Sitemap = blogPosts.map((post) => ({
+  // Individual blog posts from MDX files
+  const blogPostPages: MetadataRoute.Sitemap = getAllBlogPosts().map((post) => ({
     url: `${BASE_URL}/blog/${post.slug}`,
     lastModified: post.date,
     changeFrequency: 'monthly' as const,

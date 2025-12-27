@@ -1,7 +1,7 @@
 import { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { blogPosts, getBlogPost, categoryLabels, categoryColors } from "@/lib/blog"
-import { BlogPostContent } from "@/components/blog/BlogPostContent"
+import { getBlogPostBySlug, getBlogSlugs } from "@/lib/mdx"
+import { BlogPostLayout } from "@/components/blog/BlogPostLayout"
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -9,12 +9,10 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const post = getBlogPost(slug)
+  const post = getBlogPostBySlug(slug)
 
   if (!post) {
-    return {
-      title: "Post Not Found",
-    }
+    return { title: "Post Not Found" }
   }
 
   return {
@@ -34,27 +32,49 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       authors: [post.author],
       tags: post.tags,
     },
-    twitter: {
-      title: post.title,
-      description: post.description,
-      card: "summary_large_image",
-    },
   }
 }
 
 export async function generateStaticParams() {
-  return blogPosts.map((post) => ({
-    slug: post.slug,
-  }))
+  const slugs = getBlogSlugs()
+  return slugs.map((slug) => ({ slug }))
+}
+
+function ArticleJsonLd({ post }: { post: { title: string; description: string; date: string; author: string; slug: string } }) {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: post.title,
+    description: post.description,
+    author: { "@type": "Person", name: post.author },
+    datePublished: post.date,
+    publisher: {
+      "@type": "Organization",
+      name: "CodeSparring",
+      logo: { "@type": "ImageObject", url: "https://codesparring.com/icon-codesparring.svg" },
+    },
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
 }
 
 export default async function BlogPostPage({ params }: Props) {
   const { slug } = await params
-  const post = getBlogPost(slug)
+  const post = getBlogPostBySlug(slug)
 
   if (!post) {
     notFound()
   }
 
-  return <BlogPostContent post={post} />
+  return (
+    <main>
+      <ArticleJsonLd post={post} />
+      <BlogPostLayout post={post} />
+    </main>
+  )
 }

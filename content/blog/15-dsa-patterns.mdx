@@ -1,0 +1,146 @@
+---
+title: "15 DSA Patterns Every Developer Should Master"
+description: "The essential algorithm patterns that appear in 90% of coding interviews. Master these and you'll handle any problem thrown at you."
+date: "2025-12-27"
+author: "CodeSparring Team"
+category: "dsa"
+tags: ["patterns", "algorithms", "data-structures", "interview-prep"]
+featured: true
+---
+
+Stop memorizing 1,000 problems. Master these 15 patterns and you'll recognize solutions instantly. This is the mental framework that separates prepared candidates from everyone else.
+
+## The Pattern-Based Approach
+
+Interviewers don't expect you to have seen their exact question. They expect you to recognize patterns and adapt. Here are the 15 patterns that cover 90% of coding interview questions.
+
+## 01. Sliding Window
+
+**When to use:** Contiguous sequences, subarrays, substrings
+
+**Examples:** Maximum sum subarray of size K, Longest substring without repeating characters
+
+```typescript
+function maxSumSubarray(arr: number[], k: number): number {
+  let maxSum = 0, windowSum = 0;
+
+  for (let i = 0; i < arr.length; i++) {
+    windowSum += arr[i];
+    if (i >= k - 1) {
+      maxSum = Math.max(maxSum, windowSum);
+      windowSum -= arr[i - k + 1];
+    }
+  }
+
+  return maxSum;
+}
+```
+
+## 02. Two Pointers
+
+**When to use:** Sorted arrays, finding pairs, palindromes
+
+**Examples:** Two Sum II, Container with Most Water, Valid Palindrome
+
+## 03. Fast & Slow Pointers
+
+**When to use:** Cycle detection, finding middle of linked list
+
+**Examples:** Linked List Cycle, Happy Number, Find Middle Node
+
+## 04. Merge Intervals
+
+**When to use:** Overlapping intervals, scheduling problems
+
+**Examples:** Merge Intervals, Insert Interval, Meeting Rooms
+
+## 05. Cyclic Sort
+
+**When to use:** Numbers in range 1 to N, finding missing/duplicate numbers
+
+**Examples:** Find Missing Number, Find All Duplicates
+
+## 06. In-place Linked List Reversal
+
+**When to use:** Reversing parts of linked list without extra space
+
+**Examples:** Reverse Linked List, Reverse Sublist, Reverse in K-Groups
+
+## 07. Tree BFS (Breadth-First Search)
+
+**When to use:** Level-by-level traversal, shortest path in unweighted graph
+
+**Examples:** Level Order Traversal, Zigzag Traversal, Minimum Depth
+
+## 08. Tree DFS (Depth-First Search)
+
+**When to use:** Path finding, tree depth, leaf-to-root problems
+
+**Examples:** Path Sum, Max Depth, Diameter of Binary Tree
+
+## 09. Two Heaps
+
+**When to use:** Finding median in a stream, top/bottom elements
+
+**Examples:** Find Median from Data Stream, Sliding Window Median
+
+## 10. Subsets / Backtracking
+
+**When to use:** Permutations, combinations, generating all possibilities
+
+**Examples:** Subsets, Permutations, Letter Case Permutation, N-Queens
+
+## 11. Modified Binary Search
+
+**When to use:** Sorted or rotated arrays, finding boundaries
+
+**Examples:** Search in Rotated Array, Find Peak Element, Search Range
+
+## 12. Top K Elements
+
+**When to use:** Finding K largest/smallest/frequent elements
+
+**Examples:** Top K Frequent, Kth Largest Element, K Closest Points
+
+## 13. K-way Merge
+
+**When to use:** Merging K sorted lists/arrays
+
+**Examples:** Merge K Sorted Lists, Smallest Range Covering K Lists
+
+## 14. Topological Sort
+
+**When to use:** Ordering with dependencies, detecting cycles in DAG
+
+**Examples:** Course Schedule, Alien Dictionary, Task Scheduling
+
+## 15. 0/1 Knapsack (Dynamic Programming)
+
+**When to use:** Subset with constraints, optimization problems
+
+**Examples:** Partition Equal Subset Sum, Target Sum, Coin Change
+
+## How to Study These Patterns
+
+1. **Learn one pattern at a time.** Spend 2-3 days on each before moving on.
+
+2. **Solve 3-5 problems per pattern.** Start easy, progress to medium.
+
+3. **Review using spaced repetition.** Return to patterns before you forget them.
+
+4. **Practice pattern recognition.** Before coding, identify which pattern applies.
+
+## The Recognition Skill
+
+The real skill isn't memorizing solutions—it's recognizing which pattern applies to a new problem. When you see:
+
+- "Find all..." → Think Subsets/Backtracking
+- "Top/Kth..." → Think Heap
+- "Contiguous subarray..." → Think Sliding Window
+- "Sorted array..." → Think Binary Search or Two Pointers
+
+## Let AI Guide Your Pattern Mastery
+
+CodeSparring's spaced repetition algorithm schedules pattern reviews at the optimal time. It knows when you're about to forget and brings the pattern back just in time.
+
+[Start practicing patterns →](/interview)
