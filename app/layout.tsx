@@ -23,10 +23,10 @@ const openSans = Open_Sans({
 })
 
 const siteConfig = {
-  name: "Skillon",
+  name: "CodeSparring",
   tagline: "Ace Your Tech Interview with AI Mock Practice",
   description: "Practice coding interviews with an AI interviewer available 24/7. Talk through problems out loud, get instant feedback, and master DSA patterns. Better than grinding LeetCode alone.",
-  url: process.env.NEXT_PUBLIC_SITE_URL || "https://skillon.dev",
+  url: process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.com",
   ogImage: "/og-image.png",
 }
 
@@ -60,9 +60,9 @@ export const metadata: Metadata = {
 
   // Favicon and icons
   icons: {
-    icon: "/icon.svg",
-    shortcut: "/icon.svg",
-    apple: "/icon.svg",
+    icon: "/icon-codesparring.svg",
+    shortcut: "/icon-codesparring.svg",
+    apple: "/icon-codesparring.svg",
   },
 
   // Canonical URL
@@ -95,7 +95,7 @@ export const metadata: Metadata = {
     title: `${siteConfig.name} - ${siteConfig.tagline}`,
     description: siteConfig.description,
     images: [siteConfig.ogImage],
-    creator: "@skillon_dev",
+    creator: "@codesparring",
   },
 
   // Robots

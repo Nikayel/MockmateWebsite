@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
+import { blogPosts } from '@/lib/blog'
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://skillon.dev'
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://codesparring.com'
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const currentDate = new Date().toISOString()
@@ -32,6 +33,24 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
   ]
+
+  // Blog pages - high SEO value
+  const blogListPage: MetadataRoute.Sitemap = [
+    {
+      url: `${BASE_URL}/blog`,
+      lastModified: currentDate,
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
+  ]
+
+  // Individual blog posts
+  const blogPostPages: MetadataRoute.Sitemap = blogPosts.map((post) => ({
+    url: `${BASE_URL}/blog/${post.slug}`,
+    lastModified: post.date,
+    changeFrequency: 'monthly' as const,
+    priority: 0.8,
+  }))
 
   // Sample feedback pages - showcase content
   const samplePages: MetadataRoute.Sitemap = [
@@ -77,5 +96,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
   ]
 
-  return [...marketingPages, ...samplePages, ...secondaryPages]
+  return [
+    ...marketingPages,
+    ...blogListPage,
+    ...blogPostPages,
+    ...samplePages,
+    ...secondaryPages,
+  ]
 }

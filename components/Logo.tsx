@@ -1,9 +1,11 @@
+import { cn } from "@/lib/utils"
+
 interface LogoProps {
-  className?: string;
-  size?: number;
+  className?: string
+  size?: number
 }
 
-export function Logo({ className = '', size = 32 }: LogoProps) {
+export function Logo({ className = "", size = 32 }: LogoProps) {
   return (
     <svg
       width={size}
@@ -13,31 +15,62 @@ export function Logo({ className = '', size = 32 }: LogoProps) {
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
-      {/* Stylized "S" made of connected nodes - represents skill paths */}
+      {/* CodeSparring Logo: Two brackets facing off with lightning spark */}
+
+      {/* Left bracket < - cyan */}
       <path
-        d="M22 8C22 8 18 8 16 10C14 12 14 14 16 16C18 18 18 20 16 22C14 24 10 24 10 24"
-        stroke="currentColor"
+        d="M11 8L4 16L11 24"
+        stroke="#00d9ff"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      {/* Right bracket > - green */}
+      <path
+        d="M21 8L28 16L21 24"
+        stroke="#00ff88"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      {/* Lightning spark in center */}
+      <path
+        d="M17.5 10L15 15.5H17.5L15 22"
+        stroke="url(#logo-gradient)"
         strokeWidth="2.5"
         strokeLinecap="round"
-        fill="none"
+        strokeLinejoin="round"
       />
-      {/* Top node */}
-      <circle cx="22" cy="8" r="3" fill="currentColor" />
-      {/* Middle node */}
-      <circle cx="16" cy="16" r="2.5" fill="#00ff88" />
-      {/* Bottom node */}
-      <circle cx="10" cy="24" r="3" fill="currentColor" />
+
+      <defs>
+        <linearGradient
+          id="logo-gradient"
+          x1="15"
+          y1="10"
+          x2="17.5"
+          y2="22"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop stopColor="#00d9ff" />
+          <stop offset="1" stopColor="#00ff88" />
+        </linearGradient>
+      </defs>
     </svg>
-  );
+  )
 }
 
-export function LogoWithText({ className = '', size = 32 }: LogoProps) {
+export function LogoWithText({ className = "", size = 32 }: LogoProps) {
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
+    <div className={cn("flex items-center gap-2", className)}>
       <Logo size={size} />
-      <span className="text-xl font-heading font-bold text-white">Skillon</span>
+      <span className="text-xl font-heading font-bold tracking-tight">
+        <span className="text-white">Code</span>
+        <span className="text-accent">Sparring</span>
+      </span>
     </div>
-  );
+  )
 }
 
-export default Logo;
+export default Logo

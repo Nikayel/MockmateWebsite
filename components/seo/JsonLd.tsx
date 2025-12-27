@@ -1,25 +1,24 @@
 // JSON-LD Structured Data Components for SEO Rich Snippets
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://skillon.dev"
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.com"
 
 // Organization Schema - for brand recognition in search
 export function OrganizationJsonLd() {
   const schema = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    name: "Skillon",
-    alternateName: "CodeSparring",
+    name: "CodeSparring",
     url: SITE_URL,
-    logo: `${SITE_URL}/icon.svg`,
+    logo: `${SITE_URL}/icon-codesparring.svg`,
     description: "AI-powered coding interview practice platform with voice-enabled mock interviews and spaced repetition learning.",
     foundingDate: "2024",
     sameAs: [
-      "https://twitter.com/skillon_dev",
-      "https://linkedin.com/company/skillon",
+      "https://twitter.com/codesparring",
+      "https://linkedin.com/company/codesparring",
     ],
     contactPoint: {
       "@type": "ContactPoint",
-      email: "nikayel@skillon.dev",
+      email: "hello@codesparring.com",
       contactType: "customer support",
     },
   }
@@ -37,7 +36,7 @@ export function SoftwareApplicationJsonLd() {
   const schema = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    name: "Skillon",
+    name: "CodeSparring",
     applicationCategory: "EducationalApplication",
     operatingSystem: "Web",
     description: "AI mock interview platform for coding interviews. Practice DSA problems with voice-enabled AI feedback and spaced repetition learning.",
@@ -132,7 +131,7 @@ export function WebPageJsonLd({
     url: `${SITE_URL}${url}`,
     isPartOf: {
       "@type": "WebSite",
-      name: "Skillon",
+      name: "CodeSparring",
       url: SITE_URL,
     },
   }
@@ -150,7 +149,7 @@ export function HowToJsonLd() {
   const schema = {
     "@context": "https://schema.org",
     "@type": "HowTo",
-    name: "How to Prepare for Coding Interviews with Skillon",
+    name: "How to Prepare for Coding Interviews with CodeSparring",
     description: "A science-backed approach to acing coding interviews using spaced repetition and AI-powered practice.",
     step: [
       {

@@ -1,4 +1,4 @@
-# robots.txt for CodeSparring (formerly Skillon)
+# robots.txt for CodeSparring
 # https://codesparring.com
 
 User-agent: *
@@ -11,6 +11,7 @@ Allow: /docs
 Allow: /samples
 Allow: /careers
 Allow: /legal
+Allow: /blog
 
 # Disallow authenticated/private routes
 Disallow: /dashboard
@@ -28,4 +29,4 @@ Disallow: /login
 Disallow: /roadmap
 
 # Sitemap location
-Sitemap: https://skillon.dev/sitemap.xml
+Sitemap: https://codesparring.com/sitemap.xml
