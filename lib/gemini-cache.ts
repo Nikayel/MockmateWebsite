@@ -86,7 +86,7 @@ export async function getCachedModel(
  * @param cacheKey Key to clear
  */
 export function clearCache(cacheKey: string): void {
-  cacheStore.delete(cacheKey)
+  modelCache.delete(cacheKey)
   console.log(`[Gemini Cache] Cleared cache for key: ${cacheKey}`)
 }
 
@@ -94,7 +94,7 @@ export function clearCache(cacheKey: string): void {
  * Clear all cached content
  */
 export function clearAllCaches(): void {
-  cacheStore.clear()
+  modelCache.clear()
   console.log(`[Gemini Cache] Cleared all caches`)
 }
 
@@ -102,12 +102,13 @@ export function clearAllCaches(): void {
  * Get cache statistics
  */
 export function getCacheStats() {
+  const now = new Date()
   const stats = {
-    totalCached: cacheStore.size,
-    caches: Array.from(cacheStore.entries()).map(([key, value]) => ({
+    totalCached: modelCache.size,
+    caches: Array.from(modelCache.entries()).map(([key, value]) => ({
       key,
-      expiresAt: value.expiresAt.toISOString(),
-      isExpired: value.expiresAt <= new Date(),
+      createdAt: value.createdAt.toISOString(),
+      isExpired: (now.getTime() - value.createdAt.getTime()) >= CACHE_TTL_MS,
     })),
   }
   return stats
@@ -120,9 +121,9 @@ export function cleanupExpiredCaches(): void {
   const now = new Date()
   let removed = 0
 
-  for (const [key, value] of cacheStore.entries()) {
-    if (value.expiresAt <= now) {
-      cacheStore.delete(key)
+  for (const [key, value] of modelCache.entries()) {
+    if ((now.getTime() - value.createdAt.getTime()) >= CACHE_TTL_MS) {
+      modelCache.delete(key)
       removed++
     }
   }
