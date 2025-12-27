@@ -98,11 +98,9 @@ async function sendToExternalService(
       // Dynamic import to avoid bundling if not used
       // Webpack ignore comment prevents build-time resolution errors
       try {
-        // @ts-expect-error - Optional dependency, may not be installed
-        const Sentry = await import(
-          /* webpackIgnore: true */
-          '@sentry/nextjs'
-        ).catch(() => null)
+        // Optional dependency - may not be installed
+        // @ts-ignore - Sentry is optional
+        const Sentry = await import('@sentry/nextjs').catch(() => null)
         if (Sentry) {
           if (context?.error instanceof Error) {
             Sentry.captureException(context.error, {
