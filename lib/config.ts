@@ -137,8 +137,8 @@ export const APP_CONFIG = {
 } as const
 
 // Helper function to get pricing based on platform
-export function getProPricing(platform: 'website' | 'vscode' = 'website') {
-  return PRICING_CONFIG.pro[platform]
+export function getProPricing(platform: 'website' | 'vscode' = 'website'): typeof PRICING_CONFIG.pro.website {
+  return PRICING_CONFIG.pro[platform] as typeof PRICING_CONFIG.pro.website
 }
 
 export type SubscriptionTier = "free" | "pro" | "enterprise"
