@@ -10,7 +10,10 @@ export function Footer() {
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
               <Logo size={24} className="text-[#00d9ff]" />
-              <span className="text-xl font-heading font-bold text-white">Skillon</span>
+              <span className="text-xl font-heading font-bold tracking-tight">
+                <span className="text-white">Code</span>
+                <span className="text-accent">Sparring</span>
+              </span>
             </div>
             <p className="text-gray-400 text-sm">
               AI-powered platform for coding interview practice. Master technical interviews with realistic
@@ -40,6 +43,11 @@ export function Footer() {
               <li>
                 <a href="/samples" className="text-gray-400 hover:text-white transition-colors">
                   Sample Reports
+                </a>
+              </li>
+              <li>
+                <a href="/blog" className="text-gray-400 hover:text-white transition-colors">
+                  Blog
                 </a>
               </li>
               <li>
@@ -75,7 +83,7 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="mailto:security@skillon.dev" className="text-gray-400 hover:text-white transition-colors">
+                <a href="mailto:security@codesparring.com" className="text-gray-400 hover:text-white transition-colors">
                   Security
                 </a>
               </li>
@@ -92,13 +100,13 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="mailto:support@skillon.dev" className="text-gray-400 hover:text-white transition-colors">
+                <a href="mailto:support@codesparring.com" className="text-gray-400 hover:text-white transition-colors">
                   Contact Support
                 </a>
               </li>
               <li>
                 <a
-                  href="https://github.com/nikayel/skillon/issues"
+                  href="https://github.com/nikayel/codesparring/issues"
                   className="text-gray-400 hover:text-white transition-colors"
                 >
                   Report Issues
@@ -114,7 +122,7 @@ export function Footer() {
         </div>
 
         <div className="border-t border-gray-800 mt-8 pt-8 text-center">
-          <p className="text-gray-400 text-sm">© 2025 Skillon. All rights reserved. Made with care for developers.</p>
+          <p className="text-gray-400 text-sm">© 2025 CodeSparring. All rights reserved. Made with care for developers.</p>
         </div>
       </div>
     </footer>

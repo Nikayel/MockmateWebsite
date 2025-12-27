@@ -1,0 +1,32 @@
+# robots.txt for CodeSparring
+# https://codesparring.com
+
+User-agent: *
+Allow: /
+
+# Allow important marketing pages
+Allow: /pricing
+Allow: /why-skillon
+Allow: /docs
+Allow: /samples
+Allow: /careers
+Allow: /legal
+Allow: /blog
+
+# Disallow authenticated/private routes
+Disallow: /dashboard
+Disallow: /account
+Disallow: /profile
+Disallow: /sessions
+Disallow: /practice
+Disallow: /upgrade
+Disallow: /limit-reached
+Disallow: /install
+Disallow: /admin
+Disallow: /api/
+Disallow: /auth
+Disallow: /login
+Disallow: /roadmap
+
+# Sitemap location
+Sitemap: https://codesparring.com/sitemap.xml

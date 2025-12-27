@@ -41,8 +41,9 @@ export function Header() {
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center space-x-2 group">
             <Logo size={32} className="text-accent group-hover:scale-105 transition-transform" />
-            <span className="text-2xl font-heading font-bold text-white">
-              Skillon
+            <span className="text-2xl font-heading font-bold tracking-tight">
+              <span className="text-white">Code</span>
+              <span className="text-accent">Sparring</span>
             </span>
           </Link>
 
@@ -100,6 +101,9 @@ export function Header() {
                 <a href="/#features" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
                   Features
                 </a>
+                <Link href="/blog" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
+                  Blog
+                </Link>
                 <Link href="/docs" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
                   Docs
                 </Link>
@@ -210,6 +214,13 @@ export function Header() {
                   >
                     Features
                   </a>
+                  <Link
+                    href="/blog"
+                    className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Blog
+                  </Link>
                   <Link
                     href="/docs"
                     className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
