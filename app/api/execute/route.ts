@@ -192,8 +192,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Scenario not found" }, { status: 404 })
     }
 
-    // Get test cases from scenario
-    const testCases = scenario.testCases || []
+    // Get test cases from scenario (only DSA and some other types have testCases)
+    const testCases = 'testCases' in scenario ? (scenario.testCases || []) : []
 
     if (testCases.length === 0) {
       return NextResponse.json({ error: "No test cases defined for this scenario" }, { status: 400 })
