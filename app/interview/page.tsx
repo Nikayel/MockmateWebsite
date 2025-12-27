@@ -2813,7 +2813,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                 Review the problem on the left, then start your interview when ready. The timer will begin once you start.
                               </p>
                               <Button
-                                onClick={startInterview}
+                                onClick={() => startInterview()}
                                 className="bg-accent hover:bg-accent/80 text-accent-foreground font-semibold px-8 py-3 text-base"
                               >
                                 <PlayCircle className="mr-2 h-5 w-5" />
