@@ -1,0 +1,116 @@
+---
+title: "Two Sum: 5 Solutions from Brute Force to Optimal"
+description: "Master the classic Two Sum problem with 5 different approaches. Learn when to use each solution and ace your coding interview."
+date: "2025-12-27"
+author: "CodeSparring Team"
+category: "dsa"
+tags: ["arrays", "hash-map", "two-pointers", "leetcode", "interview-prep"]
+featured: true
+---
+
+The Two Sum problem is the first problem most developers encounter on LeetCode—and for good reason. It teaches fundamental concepts that appear in countless interview questions. Let's explore 5 different solutions, from brute force to optimal.
+
+## The Problem
+
+Given an array of integers `nums` and an integer `target`, return indices of the two numbers that add up to target.
+
+```
+Input: nums = [2,7,11,15], target = 9
+Output: [0,1]
+Explanation: nums[0] + nums[1] = 2 + 7 = 9
+```
+
+## Solution 1: Brute Force
+
+The most intuitive approach—check every pair of numbers.
+
+```typescript
+function twoSum(nums: number[], target: number): number[] {
+  for (let i = 0; i < nums.length; i++) {
+    for (let j = i + 1; j < nums.length; j++) {
+      if (nums[i] + nums[j] === target) {
+        return [i, j];
+      }
+    }
+  }
+  return [];
+}
+```
+
+**Time Complexity:** O(n²)
+**Space Complexity:** O(1)
+
+## Solution 2: Hash Map (One Pass) - OPTIMAL
+
+The optimal solution. Trade space for time by storing complements in a hash map.
+
+```typescript
+function twoSum(nums: number[], target: number): number[] {
+  const map = new Map<number, number>();
+
+  for (let i = 0; i < nums.length; i++) {
+    const complement = target - nums[i];
+
+    if (map.has(complement)) {
+      return [map.get(complement)!, i];
+    }
+
+    map.set(nums[i], i);
+  }
+
+  return [];
+}
+```
+
+**Time Complexity:** O(n)
+**Space Complexity:** O(n)
+
+## Solution 3: Two Pointers (Sorted Array)
+
+If the array is sorted (or you can sort it), use two pointers. Note: This returns values, not indices.
+
+```typescript
+function twoSumSorted(nums: number[], target: number): number[] {
+  let left = 0;
+  let right = nums.length - 1;
+
+  while (left < right) {
+    const sum = nums[left] + nums[right];
+
+    if (sum === target) {
+      return [left, right];
+    } else if (sum < target) {
+      left++;
+    } else {
+      right--;
+    }
+  }
+
+  return [];
+}
+```
+
+**Time Complexity:** O(n)
+**Space Complexity:** O(1)
+
+## When to Use Each Solution
+
+| Approach | Best When | Time | Space |
+|----------|-----------|------|-------|
+| Brute Force | Never (just for understanding) | O(n²) | O(1) |
+| Hash Map | Need original indices | O(n) | O(n) |
+| Two Pointers | Array is sorted | O(n) | O(1) |
+
+## Key Takeaways
+
+1. **Hash maps trade space for time**—a fundamental pattern in algorithm optimization.
+
+2. **The "complement" pattern** appears in many problems (3Sum, 4Sum, subarray sum).
+
+3. **Two pointers on sorted arrays** is a powerful O(1) space technique.
+
+## Practice This Pattern
+
+Two Sum is the gateway to understanding hash-based solutions. Master it, and you'll recognize the pattern in dozens of other problems.
+
+Ready to practice? [Start a mock interview](/interview) and get AI feedback on your solution.

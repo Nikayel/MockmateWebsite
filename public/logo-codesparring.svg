@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- CodeSparring Logo: Two angle brackets facing each other like sparring partners -->
+  <!-- with a lightning bolt/spark in the middle representing energy and practice -->
+
+  <!-- Left bracket < -->
+  <path
+    d="M16 12L6 24L16 36"
+    stroke="#00d9ff"
+    stroke-width="4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Right bracket > -->
+  <path
+    d="M32 12L42 24L32 36"
+    stroke="#00ff88"
+    stroke-width="4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Lightning bolt in center - the "spark" -->
+  <path
+    d="M26 14L22 23H26L22 34"
+    stroke="url(#spark-gradient)"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+
+  <defs>
+    <linearGradient id="spark-gradient" x1="22" y1="14" x2="26" y2="34" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00d9ff"/>
+      <stop offset="1" stop-color="#00ff88"/>
+    </linearGradient>
+  </defs>
+</svg>
