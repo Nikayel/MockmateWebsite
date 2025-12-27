@@ -322,7 +322,7 @@ export const COMPANY_INTERVIEW_KNOWLEDGE: CompanyInterviewKnowledge[] = [
       { pattern: 'string', frequency: 80, tips: ['Parsing and validation', 'Format conversion', 'API response handling'] },
       { pattern: 'graphs', frequency: 65, tips: ['Dependency resolution', 'Transaction graphs', 'Cycle detection'] },
       { pattern: 'dp-1d', frequency: 60, tips: ['Optimization problems', 'Resource allocation', 'Practical applications'] },
-      { pattern: 'interval', frequency: 55, tips: ['Time-based problems', 'Scheduling', 'Rate limiting'] },
+      { pattern: 'intervals', frequency: 55, tips: ['Time-based problems', 'Scheduling', 'Rate limiting'] },
     ],
     interviewProcess: [
       'Recruiter call',

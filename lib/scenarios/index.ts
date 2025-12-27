@@ -133,9 +133,11 @@ async function loadDSAByPattern(pattern: DSAPattern): Promise<DSAScenario[]> {
       const graphsModule = await import('./dsa/graphs')
       scenarios = graphsModule.graphsScenarios
       break
-    case 'dynamic-programming':
-    case '1d-dp':
-    case '2d-dp':
+    case 'dp-1d':
+    case 'dp-2d':
+    case 'dp-knapsack':
+    case 'dp-lcs':
+    case 'dp-tree':
       const dpModule = await import('./dsa/dynamic-programming')
       scenarios = dpModule.dpScenarios.filter((s) => s.pattern === pattern)
       break
@@ -167,7 +169,7 @@ async function loadDSAByPattern(pattern: DSAPattern): Promise<DSAScenario[]> {
       const mathModule = await import('./dsa/math-geometry')
       scenarios = mathModule.mathGeometryScenarios
       break
-    case 'tries':
+    case 'trie':
       const triesModule = await import('./dsa/tries')
       scenarios = triesModule.triesScenarios
       break
@@ -258,13 +260,14 @@ export async function getScenariosByType(type: ScenarioType): Promise<Scenario[]
         'linked-list',
         'trees',
         'graphs',
-        'dynamic-programming',
+        'dp-1d',
+        'dp-2d',
         'heap',
         'intervals',
         'binary-search',
         'backtracking',
         'greedy',
-        'tries',
+        'trie',
         'bit-manipulation',
         'math-geometry',
         'binary-search-tree',

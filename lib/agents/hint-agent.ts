@@ -498,10 +498,12 @@ export async function generateHints(request: HintGenerationRequest): Promise<Hin
       }
 
       // If user has strong related patterns, leverage that
-      if (profile.strengths.length > 0) {
-        const relatedStrength = profile.strengths.find(s =>
-          getPatternKnowledge(s)?.relatedPatterns?.includes(request.problemPattern || '')
-        )
+      if (profile.strengths.length > 0 && request.problemPattern) {
+        const problemPattern = request.problemPattern
+        const relatedStrength = profile.strengths.find(s => {
+          const knowledge = getPatternKnowledge(s)
+          return knowledge?.relatedPatterns?.includes(problemPattern)
+        })
 
         if (relatedStrength) {
           hints.push({

@@ -154,7 +154,7 @@ export class UserPerformanceRAG {
       const sessions = sessionsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-      }))
+      })) as Array<{ id: string; status?: string; feedback?: unknown; [key: string]: unknown }>
 
       // Analyze sessions
       const analyses = sessions

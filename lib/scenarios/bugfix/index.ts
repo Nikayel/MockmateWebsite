@@ -2449,6 +2449,7 @@ public class SearchHandler {
       {
         input: 'Quick succession: "a", "ab", "abc"',
         expected: 'Only shows results for "abc", ignores earlier results',
+        description: 'Race condition handling for rapid input changes',
       },
     ],
     codebaseFiles: {
@@ -2898,6 +2899,7 @@ public class UserSettingsManager {
       {
         input: '{name: "John", preferences: {theme: "light"}}, "dark"',
         expected: 'Original user.preferences.theme stays "light"',
+        description: 'Deep copy should prevent mutation of nested objects',
       },
     ],
     codebaseFiles: {
@@ -3497,10 +3499,12 @@ public class InvoiceCalculator {
       {
         input: '[0.1, 0.2]',
         expected: '0.3 (or 0.30)',
+        description: 'Simple floating point precision issue',
       },
       {
         input: '[10.15, 5.99, 2.50]',
         expected: '18.64',
+        description: 'Multiple price calculations with precision',
       },
     ],
     codebaseFiles: {
@@ -4228,6 +4232,7 @@ public class CountdownTimer {
       {
         input: '5',
         expected: 'Prints 5, 4, 3, 2, 1, 0 and stops',
+        description: 'Countdown timer should decrement correctly',
       },
     ],
     codebaseFiles: {
@@ -5084,6 +5089,7 @@ public class TodoListManager {
       {
         input: 'Add todo "Buy milk"',
         expected: 'UI updates to show new todo',
+        description: 'Adding todo should trigger re-render',
       },
     ],
     codebaseFiles: {
@@ -5980,10 +5986,12 @@ public class UserDataLoader {
       {
         input: 'Valid userId',
         expected: 'Returns user data',
+        description: 'Successful API response handling',
       },
       {
         input: 'Invalid userId (404 response)',
         expected: 'Throws/returns error without crashing',
+        description: 'Error handling for invalid user',
       },
     ],
     codebaseFiles: {
@@ -7205,10 +7213,12 @@ public class RaceConditionTest {
       {
         input: 'Rapidly switch between different userIds',
         expected: 'Only data for the current userId is displayed',
+        description: 'Race condition prevention for rapid user switching',
       },
       {
         input: 'Load user with slow API response',
         expected: 'Loading state until both API calls complete',
+        description: 'Slow API response handling',
       },
     ],
   },
@@ -7735,10 +7745,12 @@ public class MemoryLeakTest {
       {
         input: 'Add and remove 100 items repeatedly',
         expected: 'Memory usage stays relatively constant',
+        description: 'Memory leak prevention with item operations',
       },
       {
         input: 'Navigate away from page',
         expected: 'All intervals and event listeners are cleaned up',
+        description: 'Proper cleanup on page navigation',
       },
     ],
   },
@@ -8243,14 +8255,17 @@ public class ErrorHandlingTest {
       {
         input: 'Request non-existent user',
         expected: '404 status with consistent error format',
+        description: 'User not found error handling',
       },
       {
         input: 'Create user with duplicate email',
         expected: '409 Conflict with appropriate error message',
+        description: 'Duplicate email conflict handling',
       },
       {
         input: 'Database connection failure',
         expected: '500 error without exposing internal details',
+        description: 'Database error handling without exposing internals',
       },
     ],
   },
@@ -8384,10 +8399,12 @@ function App() {
       {
         input: 'userId changes from 1 to 2',
         expected: 'Component fetches and displays user 2 data',
+        description: 'Effect should re-run on prop change',
       },
       {
         input: 'Rapid userId changes',
         expected: 'Only the latest user data is displayed (no race conditions)',
+        description: 'Race condition handling with rapid changes',
       },
     ],
   },
@@ -8581,10 +8598,12 @@ def get_user(user_id):
       {
         input: 'Malicious category: \' OR \'1\'=\'1',
         expected: 'Query safely escapes input, no injection occurs',
+        description: 'SQL injection prevention',
       },
       {
         input: 'Search with special chars: O\'Reilly',
         expected: 'Query handles apostrophes safely',
+        description: 'Special character handling in queries',
       },
     ],
   },
@@ -8775,10 +8794,12 @@ class Post(models.Model):
       {
         input: '100 blog posts',
         expected: '2-3 queries total instead of 101 queries',
+        description: 'N+1 query optimization',
       },
       {
         input: 'Posts with comments and authors',
         expected: 'Use nested eager loading to minimize queries',
+        description: 'Nested eager loading for complex relations',
       },
     ],
   },

@@ -21,15 +21,14 @@ export const PATTERN_CLUSTERS: Record<string, DSAPattern[]> = {
     'arrays-hashing',
     'two-pointers',
     'sliding-window',
-    'prefix-sum',
   ],
 
   // Linear data structures
   'linear-structures': [
     'linked-list',
     'stack',
-    'queue',
     'monotonic-stack',
+    'monotonic-queue',
   ],
 
   // Tree traversals and operations
@@ -70,7 +69,6 @@ export const PATTERN_CLUSTERS: Record<string, DSAPattern[]> = {
   'search-backtrack': [
     'backtracking',
     'dfs',
-    'recursion',
   ],
 
   // String algorithms
@@ -84,7 +82,7 @@ export const PATTERN_CLUSTERS: Record<string, DSAPattern[]> = {
   'advanced-structures': [
     'heap',
     'trie',
-    'segment-tree',
+    'priority-queue',
   ],
 
   // Math and bit operations

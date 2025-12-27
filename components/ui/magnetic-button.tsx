@@ -39,6 +39,12 @@ export function MagneticButton({
   ripple = true,
   disabled,
   onClick,
+  onDrag: _onDrag, // Destructure to exclude from motion.button spread
+  onDragStart: _onDragStart,
+  onDragEnd: _onDragEnd,
+  onAnimationStart: _onAnimationStart, // Exclude - conflicts with framer-motion
+  onAnimationEnd: _onAnimationEnd,
+  onAnimationIteration: _onAnimationIteration,
   ...props
 }: MagneticButtonProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);

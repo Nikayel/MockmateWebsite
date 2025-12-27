@@ -108,6 +108,36 @@ export interface PatternMetadata {
 }
 
 export const PATTERN_METADATA: Record<DSAPattern, PatternMetadata> = {
+  'heap-priority-queue': {
+    id: 'heap-priority-queue',
+    name: 'Heap / Priority Queue',
+    description: 'Combined heap and priority queue problems',
+    keyTechniques: ['Min Heap', 'Max Heap', 'Priority Queue', 'Top-K'],
+    commonQuestions: ['Kth Largest Element', 'Merge K Sorted Lists', 'Top K Frequent'],
+    timeComplexityHints: ['O(log n) per operation', 'O(n log k) for top-k'],
+    spaceComplexityHints: ['O(k) for size-limited heap'],
+    interviewerFollowUps: [
+      'Why use a heap instead of sorting?',
+      'Min or max heap here?',
+      'What is the time complexity of heapify?',
+    ],
+  },
+
+  'math-geometry': {
+    id: 'math-geometry',
+    name: 'Math & Geometry',
+    description: 'Combined math and geometry problems',
+    keyTechniques: ['Modular Arithmetic', 'GCD/LCM', 'Distance Calculations', 'Line Intersection'],
+    commonQuestions: ['Pow(x, n)', 'Sqrt(x)', 'K Closest Points to Origin'],
+    timeComplexityHints: ['Varies by algorithm'],
+    spaceComplexityHints: ['O(1) typically'],
+    interviewerFollowUps: [
+      'How do you handle overflow?',
+      'What about floating point precision?',
+      'What edge cases exist?',
+    ],
+  },
+
   'arrays-hashing': {
     id: 'arrays-hashing',
     name: 'Arrays & Hashing',

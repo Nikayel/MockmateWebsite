@@ -14,6 +14,7 @@ import { isOpenAIAvailable } from './embeddings/openai-provider'
 import { vectorDB, getVectorDBProvider } from './vectordb'
 import { isKnowledgeBaseSeeded } from './knowledge-base/seeder'
 import { adminDb } from '@/lib/firebase-admin'
+import { FieldValue } from 'firebase-admin/firestore'
 import { Timestamp } from 'firebase-admin/firestore'
 
 /**
@@ -513,7 +514,7 @@ export class RAGMonitor {
     try {
       await adminDb.collection('rag_analytics').doc('usage').set({
         features: {
-          [feature]: adminDb.FieldValue.increment(1),
+          [feature]: FieldValue.increment(1),
         },
         lastUpdated: Timestamp.now(),
       }, { merge: true })
