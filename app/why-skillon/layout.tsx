@@ -1,0 +1,37 @@
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "How It Works - Science-Backed Interview Prep",
+  description: "Learn how Skillon uses spaced repetition, the testing effect, and 40 years of cognitive science research to help you retain DSA patterns and ace coding interviews.",
+  keywords: [
+    "spaced repetition coding",
+    "interview prep science",
+    "forgetting curve learning",
+    "DSA pattern retention",
+    "cognitive science interview prep",
+    "smart practice algorithm",
+    "testing effect learning",
+    "interleaving practice coding",
+  ],
+  alternates: {
+    canonical: "/why-skillon",
+  },
+  openGraph: {
+    title: "How It Works - Science-Backed Interview Prep | Skillon",
+    description: "Stop guessing how much to practice. Our algorithm calculates exactly when and how often to review each problem.",
+    url: "/why-skillon",
+    type: "website",
+  },
+  twitter: {
+    title: "How It Works - Science-Backed Interview Prep | Skillon",
+    description: "Stop guessing how much to practice. Our algorithm calculates exactly when and how often to review each problem.",
+  },
+}
+
+export default function WhySkilonLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return children
+}

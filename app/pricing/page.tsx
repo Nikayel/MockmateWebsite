@@ -11,6 +11,7 @@ import { PRICING_CONFIG, getProPricing } from "@/lib/config"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
+import { FAQPageJsonLd } from "@/components/seo/JsonLd"
 
 // FAQ data
 const faqs = [
@@ -51,6 +52,7 @@ export default function PricingPage() {
 
   return (
     <main className="min-h-screen bg-background">
+      <FAQPageJsonLd faqs={faqs} />
       <Header />
 
       {/* Hero Section */}

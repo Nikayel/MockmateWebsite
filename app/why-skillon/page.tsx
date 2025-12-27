@@ -36,6 +36,7 @@ import {
   GraduationCap,
   Repeat
 } from "lucide-react"
+import { HowToJsonLd } from "@/components/seo/JsonLd"
 
 // Learning science data with proper research citations
 const sciencePrinciples = [
@@ -110,6 +111,7 @@ const comparisonFeatures = [
 export default function WhySkilonPage() {
   return (
     <main className="min-h-screen bg-background">
+      <HowToJsonLd />
       <Header />
 
       {/* Hero Section - Organic, less boxy */}
