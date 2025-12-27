@@ -882,7 +882,7 @@ ${patternKnowledge.commonMistakes.slice(0, 3).map(m => `- ${m}`).join('\n')}
 ### Expected Complexity
 - Optimal Time: ${patternKnowledge.timeComplexity.typical}
 - Optimal Space: ${patternKnowledge.spaceComplexity.typical}
-- Better Than Brute Force: ${patternKnowledge.timeComplexity.bruteForce || 'N/A'}
+- Better Than Brute Force: ${(patternKnowledge.timeComplexity as any).bruteForce || 'N/A'}
 `)
       }
     }
@@ -912,13 +912,12 @@ ${doc.text.substring(0, 300)}${doc.text.length > 300 ? '...' : ''}
       const userProfile = await getUserPerformanceProfile(options.userId)
       if (userProfile) {
         const patternStrength = options.scenarioPattern
-          ? userProfile.patternProficiency[options.scenarioPattern as DSAPattern]
+          ? (userProfile.patternProficiency as any)[options.scenarioPattern as DSAPattern]
           : null
 
         ragParts.push(`
 ## User Performance Context
 
-- Overall Level: ${userProfile.overallLevel}
 - Average Score: ${Math.round(userProfile.averageScore)}%
 - Sessions Completed: ${userProfile.totalSessions}
 - Trend: ${userProfile.recentTrend}
@@ -936,7 +935,7 @@ ${userProfile.weaknesses.slice(0, 2).map(w => `- ${w}`).join('\n')}
         if (recommendations && recommendations.length > 0) {
           ragParts.push(`
 ### Personalized Recommendations
-${recommendations.slice(0, 2).map((rec, i) => `${i + 1}. ${rec.reason || rec.scenario?.title || 'Practice similar problems'}`).join('\n')}
+${recommendations.slice(0, 2).map((rec, i) => `${i + 1}. ${rec.reason || (rec as any).scenario?.title || 'Practice similar problems'}`).join('\n')}
 `)
         }
       }
@@ -1448,7 +1447,6 @@ IMPORTANT: Use the PRE-CALCULATED SCORES above exactly. Focus on generating help
           passed: scores.overall >= 70,
           score: scores.overall,
           problemType: scenarioType || 'dsa',
-          patterns: efficiencyMetrics?.problemPattern ? [efficiencyMetrics.problemPattern] : [],
         })
       } catch (err) {
         // Non-blocking - don't fail feedback if RAG storage fails

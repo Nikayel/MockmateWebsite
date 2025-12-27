@@ -3,7 +3,7 @@ import { adminDb } from '@/lib/firebase-admin'
 import { verifyAuth } from '@/lib/auth-helpers'
 import { generatePersonalizedRoadmap } from '@/lib/roadmap/prioritization-algorithm'
 import { generateRAGEnhancedRoadmap, type RAGEnhancedRoadmap } from '@/lib/rag/roadmap-rag'
-import { scenarios } from '@/lib/scenarios'
+import { scenarios, type DSAScenario } from '@/lib/scenarios'
 import { UserRoadmapAssessment, PersonalizedRoadmap } from '@/lib/data/company-questions/types'
 
 const COLLECTION = 'user_roadmaps'
@@ -278,7 +278,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get DSA scenarios
-    const dsaScenarios = scenarios.filter(s => s.type === 'dsa')
+    const dsaScenarios = scenarios.filter(s => s.type === 'dsa') as DSAScenario[]
 
     // Generate roadmap - use RAG-enhanced version if enabled
     let roadmap: PersonalizedRoadmap | RAGEnhancedRoadmap | null

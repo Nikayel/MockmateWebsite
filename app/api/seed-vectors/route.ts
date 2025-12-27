@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       try {
         // Build full problem text for embedding
         const problemText = buildProblemText(scenario)
-        const vector = generateTextEmbedding(problemText)
+        const vector = await generateTextEmbedding(problemText)
 
         // Store problem embedding
         const problemEmbedding: TextEmbedding = {
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
               await embedAndStoreHint(
                 scenario.id,
                 hint,
-                i + 1, // Hint level (1, 2, 3...)
+                (i + 1) as 1 | 2 | 3 | 4, // Hint level (1, 2, 3...)
                 {
                   problemTitle: scenario.title,
                   problemType: scenario.type,

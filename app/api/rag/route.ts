@@ -140,7 +140,7 @@ async function handleGetHints(params: {
       if (patternKnowledge) {
         patternInsights = {
           pattern: patternKnowledge.displayName,
-          keyTechniques: patternKnowledge.keyTechniques,
+          keyTechniques: patternKnowledge.keyInsights,
           commonMistakes: patternKnowledge.commonMistakes.slice(0, 3),
         }
 
