@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       }
 
       const profile = profileSnap.data()
-      if (!profile.email || profile.email.trim() === "") {
+      if (!profile || !profile.email || profile.email.trim() === "") {
         return NextResponse.json({
           error: "Email address is required for subscription. Please update your profile with a valid email address."
         }, { status: 400 })
