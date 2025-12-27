@@ -11,7 +11,7 @@ export function OrganizationJsonLd() {
     url: SITE_URL,
     logo: `${SITE_URL}/icon-codesparring.svg`,
     description: "AI-powered coding interview practice platform with voice-enabled mock interviews and spaced repetition learning.",
-    foundingDate: "2024",
+    foundingDate: "2025",
     sameAs: [
       "https://twitter.com/codesparring",
       "https://linkedin.com/company/codesparring",
