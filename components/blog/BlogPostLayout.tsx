@@ -7,7 +7,7 @@ import { Footer } from "@/components/footer"
 import { MDXContent } from "@/components/blog/MDXContent"
 import { Calendar, Clock, ArrowLeft, ArrowRight, User } from "lucide-react"
 import Link from "next/link"
-import { categoryLabels, type BlogPost } from "@/lib/mdx"
+import { categoryLabels, type BlogPost } from "@/lib/blog-types"
 import "@/app/blog/blog.css"
 
 const categoryBadgeColors: Record<string, { light: string; dark: string }> = {
