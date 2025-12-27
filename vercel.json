@@ -20,10 +20,5 @@
       "maxDuration": 300
     }
   },
-  "crons": [
-    {
-      "path": "/api/cron/email-notifications",
-      "schedule": "0 * * * *"
-    }
-  ]
+  "crons": []
 }
