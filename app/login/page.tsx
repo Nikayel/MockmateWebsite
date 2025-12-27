@@ -207,12 +207,9 @@ function LoginPageContent() {
 
                 {/* Progress Steps */}
                 <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
-                  <div className={`flex items-center space-x-2 sm:space-x-3 ${authStatus !== "idle" ? "opacity-100" : "opacity-50"}`}>
-                    <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center ${authStatus === "authenticating" || authStatus === "creating-profile" || authStatus === "complete"
-                        ? "bg-[#00d9ff] text-white"
-                        : "bg-gray-700 text-gray-400"
-                      }`}>
-                      {authStatus !== "idle" && <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />}
+                  <div className="flex items-center space-x-2 sm:space-x-3 opacity-100">
+                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center bg-[#00d9ff] text-white">
+                      <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                     </div>
                     <span className="text-xs sm:text-sm text-gray-300">Authentication</span>
                   </div>
