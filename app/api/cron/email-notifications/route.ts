@@ -26,7 +26,7 @@ import {
   canSendEmail,
   calculateRetention,
 } from "@/lib/email";
-import type { Profile, UserLearningState } from "@/lib/types";
+import type { Profile, UserLearningState, ProblemMasteryRecord } from "@/lib/types";
 
 const db = adminDb;
 
@@ -232,7 +232,7 @@ async function processSpacedRepetitionReminders(
 
       // Calculate problems due with days overdue
       const problemsDue = problemsSnap.docs.map((doc) => {
-        const problem = doc.data();
+        const problem = doc.data() as ProblemMasteryRecord;
         const nextReviewAt = new Date(problem.next_review_at);
         const daysOverdue = Math.floor(
           (now.getTime() - nextReviewAt.getTime()) / (1000 * 60 * 60 * 24)
