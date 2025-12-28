@@ -160,13 +160,22 @@ export async function POST(request: NextRequest) {
       },
       // Enable promotion code input in Stripe Checkout UI
       allow_promotion_codes: true,
-      // Default to 'if_required' - will skip payment method if total is $0
-      payment_method_collection: 'if_required',
       // Enable automatic tax calculation based on customer location
       // Requires Stripe Tax to be enabled in your Stripe Dashboard
       automatic_tax: {
         enabled: true,
       },
+      // Automatically save the billing address entered in Checkout to the Customer
+      // This is required for automatic tax calculation when the customer doesn't have an address yet
+      customer_update: {
+        address: 'auto',
+      },
+    }
+
+    // Only set payment_method_collection for subscriptions (recurring payments)
+    // This parameter is not allowed for one-time payments (yearly plans)
+    if (planType === 'monthly') {
+      sessionParams.payment_method_collection = 'if_required'
     }
 
     // Attach pre-created customer if we have one
