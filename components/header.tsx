@@ -107,10 +107,13 @@ export function Header() {
                 <Link href="/docs" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
                   Docs
                 </Link>
+                <Link href="/login" className="text-white/70 hover:text-white transition-colors duration-300 cursor-pointer">
+                  Join Us
+                </Link>
                 <Link href="/login">
                   <Button
-                    variant="outline"
-                    className="border-accent/50 text-accent hover:bg-accent hover:text-black transition-all duration-300 bg-transparent"
+                    size="sm"
+                    className="bg-accent/10 hover:bg-accent/20 text-accent border-0 transition-all duration-300"
                   >
                     Login
                   </Button>
@@ -228,10 +231,17 @@ export function Header() {
                   >
                     Docs
                   </Link>
+                  <Link
+                    href="/login"
+                    className="text-white/70 hover:text-white transition-colors duration-300 cursor-pointer"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Join Us
+                  </Link>
                   <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
                     <Button
-                      variant="outline"
-                      className="border-accent/50 text-accent hover:bg-accent hover:text-black transition-all duration-300 w-fit bg-transparent"
+                      size="sm"
+                      className="bg-accent/10 hover:bg-accent/20 text-accent border-0 transition-all duration-300 w-fit"
                     >
                       Login
                     </Button>
