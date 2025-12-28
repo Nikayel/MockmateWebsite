@@ -77,15 +77,20 @@ function BlogCard({ post, isLight }: { post: BlogPostMeta; isLight: boolean }) {
   )
 }
 
-export function BlogPageClient({ 
-  allPosts, 
-  featuredPosts 
-}: { 
+export function BlogPageClient({
+  allPosts,
+  featuredPosts
+}: {
   allPosts: BlogPostMeta[]
   featuredPosts: BlogPostMeta[]
 }) {
   const { resolvedTheme } = useBlogTheme()
   const isLight = resolvedTheme === "light"
+
+  // Limit featured to 3 and exclude them from "All Articles" to avoid duplication
+  const displayedFeatured = featuredPosts.slice(0, 3)
+  const featuredSlugs = new Set(displayedFeatured.map(p => p.slug))
+  const regularPosts = allPosts.filter(post => !featuredSlugs.has(post.slug))
 
   return (
     <div className="blog-container">
@@ -115,15 +120,15 @@ export function BlogPageClient({
         </div>
       </section>
 
-      {/* Featured Posts */}
-      {featuredPosts.length > 0 && (
+      {/* Featured Posts - Limited to 3 */}
+      {displayedFeatured.length > 0 && (
         <section className={`py-16 ${isLight ? "bg-white" : "bg-black"}`}>
           <div className="container mx-auto px-4">
             <h2 className={`text-2xl font-semibold mb-8 ${isLight ? "text-gray-900" : "text-white"}`}>
               Featured Articles
             </h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {featuredPosts.map((post) => (
+              {displayedFeatured.map((post) => (
                 <BlogCard key={post.slug} post={post} isLight={isLight} />
               ))}
             </div>
@@ -131,21 +136,21 @@ export function BlogPageClient({
         </section>
       )}
 
-      {/* All Posts */}
+      {/* All Posts - Excludes featured posts */}
       <section className={`py-16 border-t ${isLight ? "bg-gray-50 border-gray-200" : "bg-gray-950 border-gray-800"}`}>
         <div className="container mx-auto px-4">
           <h2 className={`text-2xl font-semibold mb-8 ${isLight ? "text-gray-900" : "text-white"}`}>
-            All Articles
+            More Articles
           </h2>
-          {allPosts.length > 0 ? (
+          {regularPosts.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {allPosts.map((post) => (
+              {regularPosts.map((post) => (
                 <BlogCard key={post.slug} post={post} isLight={isLight} />
               ))}
             </div>
           ) : (
             <p className={`text-center py-12 ${isLight ? "text-gray-500" : "text-gray-400"}`}>
-              No articles yet. Check back soon!
+              More articles coming soon!
             </p>
           )}
         </div>
