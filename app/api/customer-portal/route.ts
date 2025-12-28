@@ -78,6 +78,55 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Validate customer ID exists in Stripe before using it
+    if (stripeCustomerId) {
+      try {
+        // Verify customer exists in Stripe
+        await stripe.customers.retrieve(stripeCustomerId)
+      } catch (stripeError: any) {
+        // Customer doesn't exist - clear it from profile
+        if (stripeError?.code === 'resource_missing') {
+          logger.warn("Customer portal: Invalid customer ID, clearing from profile", {
+            userId,
+            invalidCustomerId: stripeCustomerId
+          })
+          
+          // Clear invalid customer ID
+          await profileRef.update({
+            stripe_customer_id: null,
+            updated_at: new Date().toISOString()
+          })
+          
+          stripeCustomerId = undefined
+          
+          // Try to recover from subscription ID if available
+          if (profile.stripe_subscription_id) {
+            try {
+              const subscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id)
+              const validCustomerId = subscription.customer as string
+              
+              // Verify this customer exists
+              await stripe.customers.retrieve(validCustomerId)
+              
+              // Update with valid customer ID
+              await profileRef.update({
+                stripe_customer_id: validCustomerId,
+                updated_at: new Date().toISOString()
+              })
+              
+              stripeCustomerId = validCustomerId
+              logger.info("Customer portal: Recovered valid customer ID from subscription", { userId })
+            } catch (recoveryError) {
+              logger.error("Customer portal: Failed to recover customer ID", { error: recoveryError })
+            }
+          }
+        } else {
+          // Re-throw non-resource_missing errors
+          throw stripeError
+        }
+      }
+    }
+
     if (!stripeCustomerId) {
       logger.warn("Customer portal: No Stripe customer ID for user", {
         userId,

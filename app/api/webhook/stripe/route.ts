@@ -367,6 +367,21 @@ export async function POST(request: NextRequest) {
           const oneYearFromNow = new Date(now)
           oneYearFromNow.setFullYear(now.getFullYear() + 1)
 
+          // For one-time payments, ensure we have a customer ID
+          // Stripe creates a customer for checkout sessions, but it might not always be in session.customer
+          let customerId = session.customer as string | undefined
+          
+          // If no customer in session, try to get it from payment intent
+          if (!customerId && session.payment_intent) {
+            try {
+              const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent as string)
+              customerId = paymentIntent.customer as string | undefined
+              paymentLogger.info("Retrieved customer ID from payment intent", { customerId })
+            } catch (piError) {
+              paymentLogger.warn("Failed to retrieve customer from payment intent", { error: piError })
+            }
+          }
+
           // Update profile with Pro access for 1 year
           const updateData: Record<string, unknown> = {
             subscription_tier: "pro",
@@ -379,8 +394,14 @@ export async function POST(request: NextRequest) {
             updated_at: new Date().toISOString(),
           }
 
-          if (session.customer) {
-            updateData.stripe_customer_id = session.customer as string
+          if (customerId) {
+            updateData.stripe_customer_id = customerId
+          } else {
+            paymentLogger.warn("Yearly plan: No customer ID found in session or payment intent", {
+              userId,
+              sessionId: session.id,
+              hasPaymentIntent: !!session.payment_intent
+            })
           }
 
           await profileRef.update(updateData)
@@ -879,6 +900,103 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       paymentLogger.error("Error handling subscription update/deletion", { error })
       return NextResponse.json({ error: "Failed to process subscription event" }, { status: 500 })
+    }
+  }
+
+  // Handle customer deletion in Stripe
+  if (event.type === "customer.deleted") {
+    const customer = event.data.object as Stripe.Customer
+
+    logger.payment("Customer deleted in Stripe", { customerId: customer.id })
+
+    try {
+      // Find all profiles with this customer ID
+      const profilesQuery = await adminDb.collection("profiles")
+        .where("stripe_customer_id", "==", customer.id)
+        .get()
+
+      if (!profilesQuery.empty) {
+        for (const profileDoc of profilesQuery.docs) {
+          const userId = profileDoc.id
+          const profile = profileDoc.data()
+
+          // Clear customer ID but keep subscription info if subscription still exists
+          // This handles the case where customer is deleted but subscription might still be active
+          const updateData: Record<string, unknown> = {
+            stripe_customer_id: null,
+            updated_at: new Date().toISOString(),
+          }
+
+          // If subscription ID exists, verify it's still valid
+          if (profile?.stripe_subscription_id) {
+            try {
+              const subscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id)
+              // Subscription still exists - keep it
+              paymentLogger.info("Customer deleted but subscription still exists", {
+                userId,
+                subscriptionId: subscription.id,
+              })
+            } catch (subError) {
+              // Subscription doesn't exist - clear it too
+              updateData.stripe_subscription_id = null
+              updateData.subscription_tier = "free"
+              updateData.subscription_status = "deleted"
+              paymentLogger.warn("Customer and subscription deleted", { userId })
+            }
+          } else {
+            // No subscription ID - downgrade to free
+            updateData.subscription_tier = "free"
+            updateData.subscription_status = "deleted"
+          }
+
+          await adminDb.collection("profiles").doc(userId).set(updateData, { merge: true })
+          paymentLogger.info("Cleared customer ID from profile", { userId })
+        }
+      }
+    } catch (error) {
+      paymentLogger.error("Error handling customer deletion", { error })
+    }
+  }
+
+  // Handle subscription created (for subscriptions created via API, not checkout)
+  // Note: checkout.session.completed already handles most subscription creations
+  if (event.type === "customer.subscription.created") {
+    const subscription = event.data.object as Stripe.Subscription
+
+    logger.payment("Subscription created", {
+      subscriptionId: subscription.id,
+      customerId: subscription.customer,
+      status: subscription.status,
+    })
+
+    // This is mainly for logging - checkout.session.completed handles the actual profile update
+    // But we can use this to catch subscriptions created outside of checkout flow
+    try {
+      const customerId = subscription.customer as string
+      if (customerId) {
+        const profilesQuery = await adminDb.collection("profiles")
+          .where("stripe_customer_id", "==", customerId)
+          .get()
+
+        if (!profilesQuery.empty) {
+          const profileDoc = profilesQuery.docs[0]
+          const userId = profileDoc.id
+          const profile = profileDoc.data()
+
+          // Only update if profile doesn't already have this subscription
+          // This prevents overwriting data from checkout.session.completed
+          if (profile?.stripe_subscription_id !== subscription.id) {
+            paymentLogger.info("Subscription created outside checkout flow", {
+              userId,
+              subscriptionId: subscription.id,
+            })
+            // Could sync subscription here, but checkout.session.completed should handle it
+            // Leaving this as informational for now
+          }
+        }
+      }
+    } catch (error) {
+      paymentLogger.error("Error handling subscription created", { error })
     }
   }
 
