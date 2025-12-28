@@ -106,15 +106,83 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
 
     const profile = profileSnap.data() as Profile
     const stripeSubscriptionId = profile.stripe_subscription_id as string | undefined
-    const stripeCustomerId = profile.stripe_customer_id as string | undefined
+    let stripeCustomerId = profile.stripe_customer_id as string | undefined
     const userEmail = profile.email
+    const subscriptionType = profile.subscription_type as string | undefined
 
     subscriptionLogger.info("Syncing subscription", {
       userId,
       hasSubscriptionId: !!stripeSubscriptionId,
       hasCustomerId: !!stripeCustomerId,
+      subscriptionType,
     })
 
+    // SPECIAL HANDLING FOR YEARLY PLANS
+    // Yearly plans are one-time payments, NOT Stripe subscriptions
+    // We should NOT try to find a Stripe subscription for them
+    if (subscriptionType === "yearly") {
+      subscriptionLogger.info("Yearly plan detected - checking validity", { userId })
+
+      const periodEnd = profile.subscription_current_period_end
+      if (periodEnd) {
+        const periodEndDate = new Date(periodEnd)
+        const now = new Date()
+
+        if (now > periodEndDate) {
+          // Yearly plan has expired - downgrade to free
+          await profileRef.set({
+            subscription_tier: "free",
+            subscription_status: "expired",
+            updated_at: new Date().toISOString(),
+          }, { merge: true })
+
+          await updateQuotaForSubscriptionTierAdmin(userId, "free")
+
+          subscriptionLogger.info("Yearly plan expired - downgraded to Free", {
+            userId,
+            expiredAt: periodEndDate.toISOString(),
+          })
+        } else {
+          // Yearly plan is still valid
+          subscriptionLogger.info("Yearly plan still active", {
+            userId,
+            expiresAt: periodEndDate.toISOString(),
+          })
+
+          // Try to ensure customer ID exists for billing portal access
+          if (!stripeCustomerId && userEmail) {
+            try {
+              const customers = await stripe.customers.list({
+                email: userEmail,
+                limit: 1,
+              })
+
+              if (customers.data.length > 0) {
+                stripeCustomerId = customers.data[0].id
+                await profileRef.set({
+                  stripe_customer_id: stripeCustomerId,
+                  updated_at: new Date().toISOString(),
+                }, { merge: true })
+                subscriptionLogger.info("Found and linked customer ID for yearly plan", { userId, customerId: stripeCustomerId })
+              }
+            } catch (error) {
+              subscriptionLogger.warn("Failed to find customer for yearly plan", { userId, error })
+            }
+          }
+        }
+      } else {
+        // No period end date - check if Pro, if so treat as issue
+        if (profile.subscription_tier === "pro") {
+          subscriptionLogger.warn("Yearly plan missing period end date", { userId })
+        }
+      }
+
+      // Return updated profile
+      const updatedProfileSnap = await profileRef.get()
+      return updatedProfileSnap.exists ? (updatedProfileSnap.data() as Profile) : null
+    }
+
+    // MONTHLY PLANS - Search for Stripe subscription
     let subscription: Stripe.Subscription | null = null
     let customerId: string | null = stripeCustomerId || null
 

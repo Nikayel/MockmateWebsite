@@ -152,19 +152,24 @@ function UpgradePageContent() {
       return
     }
 
-    if (!user) {
+    if (!user || !firebaseUser) {
       window.location.href = "/login?redirect=upgrade"
       return
     }
 
     setLoading(planType)
     try {
+      // Get Firebase ID token for authentication
+      const idToken = await firebaseUser.getIdToken()
+
       // Create Stripe checkout session
       const response = await fetch("/api/create-checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
         body: JSON.stringify({
-          userId: user.id,
           platform: "website",
           planType: planType,
         }),

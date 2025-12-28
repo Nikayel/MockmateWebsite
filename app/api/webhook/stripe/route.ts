@@ -373,7 +373,7 @@ export async function POST(request: NextRequest) {
           // For one-time payments, ensure we have a customer ID
           // Stripe creates a customer for checkout sessions, but it might not always be in session.customer
           let customerId = session.customer as string | undefined
-          
+
           // If no customer in session, try to get it from payment intent
           if (!customerId && session.payment_intent) {
             try {
@@ -382,6 +382,37 @@ export async function POST(request: NextRequest) {
               paymentLogger.info("Retrieved customer ID from payment intent", { customerId })
             } catch (piError) {
               paymentLogger.warn("Failed to retrieve customer from payment intent", { error: piError })
+            }
+          }
+
+          // If still no customer, try to find/create by email
+          if (!customerId && (profile?.email || session.customer_email)) {
+            const userEmail = profile?.email || session.customer_email
+            try {
+              // Search for existing customer by email
+              const existingCustomers = await stripe.customers.list({
+                email: userEmail,
+                limit: 1,
+              })
+
+              if (existingCustomers.data.length > 0) {
+                customerId = existingCustomers.data[0].id
+                paymentLogger.info("Found existing customer by email", { customerId, email: userEmail })
+              } else {
+                // Create a new customer for future billing portal access
+                const newCustomer = await stripe.customers.create({
+                  email: userEmail,
+                  metadata: {
+                    userId: userId,
+                    plan: "yearly",
+                    source: "checkout_recovery",
+                  }
+                })
+                customerId = newCustomer.id
+                paymentLogger.info("Created new customer for yearly plan", { customerId, email: userEmail })
+              }
+            } catch (customerError) {
+              paymentLogger.error("Failed to find/create customer by email", { error: customerError, email: userEmail })
             }
           }
 
@@ -400,10 +431,11 @@ export async function POST(request: NextRequest) {
           if (customerId) {
             updateData.stripe_customer_id = customerId
           } else {
-            paymentLogger.warn("Yearly plan: No customer ID found in session or payment intent", {
+            paymentLogger.error("Yearly plan: CRITICAL - No customer ID found after all recovery attempts", {
               userId,
               sessionId: session.id,
-              hasPaymentIntent: !!session.payment_intent
+              hasPaymentIntent: !!session.payment_intent,
+              email: profile?.email || session.customer_email
             })
           }
 
