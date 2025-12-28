@@ -24,6 +24,11 @@ export type Company =
   | 'Notion'
   | 'Figma'
   | 'Discord'
+  | 'LinkedIn'
+  | 'Bloomberg'
+  | 'Cloudflare'
+  | 'Algolia'
+  | 'Elasticsearch'
 
 export interface BaseScenario {
   id: string

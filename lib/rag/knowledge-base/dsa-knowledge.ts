@@ -43,7 +43,7 @@ export const DSA_PATTERN_KNOWLEDGE: DSAPatternKnowledge[] = [
       typical: 'O(n)',
       notes: 'Hash maps require additional space proportional to unique elements',
     },
-    relatedPatterns: ['two-pointers', 'sliding-window', 'prefix-sum'],
+    relatedPatterns: ['two-pointers', 'sliding-window'],
     prerequisites: [],
     codeTemplate: `def solve(nums):
     seen = {}  # or set() for existence checks
@@ -566,7 +566,7 @@ export const DSA_PATTERN_KNOWLEDGE: DSAPatternKnowledge[] = [
       typical: 'O(1) to O(n)',
       notes: 'Depends on whether input is modified',
     },
-    relatedPatterns: ['dp-1d', 'heap', 'interval'],
+    relatedPatterns: ['dp-1d', 'heap', 'intervals'],
     prerequisites: ['arrays-hashing'],
     codeTemplate: `def greedy_solution(intervals):
     # Sort by end time (or start time, depending on problem)
@@ -820,7 +820,7 @@ n & ~(1 << k)    # Clear k-th bit
     ],
   },
   {
-    pattern: 'interval',
+    pattern: 'intervals',
     displayName: 'Intervals',
     description: 'Problems involving ranges of numbers. Often require sorting and merging/finding overlaps.',
     whenToUse: [
@@ -1054,7 +1054,7 @@ n & ~(1 << k)    # Clear k-th bit
     ],
   },
   {
-    pattern: 'prefix-sum',
+    pattern: 'arrays-hashing',
     displayName: 'Prefix Sum',
     description: 'Precompute cumulative sums for O(1) range queries. Useful for subarray sum problems.',
     whenToUse: [

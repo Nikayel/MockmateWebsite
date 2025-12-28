@@ -212,7 +212,7 @@ export const useRoadmapStore = create<RoadmapState>()(
                   'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({
-                  roadmapId: state.activeRoadmap.id,
+                  roadmapId: state.activeRoadmap!.id,
                   scenarioId,
                   status: 'completed',
                   score,
@@ -269,7 +269,7 @@ export const useRoadmapStore = create<RoadmapState>()(
                   'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({
-                  roadmapId: state.activeRoadmap.id,
+                  roadmapId: state.activeRoadmap!.id,
                   scenarioId,
                   status: 'skipped',
                 }),

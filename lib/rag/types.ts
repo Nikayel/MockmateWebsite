@@ -5,7 +5,7 @@
 export interface TextEmbedding {
     id?: string
     text: string
-    type: 'problem' | 'solution' | 'hint' | 'feedback' | 'onboarding'
+    type: 'problem' | 'solution' | 'hint' | 'feedback' | 'onboarding' | 'knowledge'
     vector: number[]
     metadata: {
         problemId?: string
@@ -16,6 +16,12 @@ export interface TextEmbedding {
         timestamp: string
         role?: string
         goal?: string
+        // Hint-specific metadata
+        problemTitle?: string
+        hintLevel?: 1 | 2 | 3 | 4
+        category?: 'approach' | 'conceptual' | 'implementation' | 'optimization' | 'debugging'
+        pattern?: string
+        problemType?: string
     }
 }
 
@@ -165,7 +171,7 @@ export interface VectorDB {
 export interface QueryOptions {
     topK?: number
     filter?: {
-        type?: 'problem' | 'solution' | 'hint' | 'feedback' | 'onboarding'
+        type?: 'problem' | 'solution' | 'hint' | 'feedback' | 'onboarding' | 'knowledge'
         userId?: string
         problemType?: string
         excludeIds?: string[]
@@ -189,7 +195,7 @@ export interface SimilaritySearchOptions {
     excludeIds?: string[]
     userId?: string
     problemType?: string
-    type?: 'problem' | 'solution' | 'hint' | 'feedback' | 'onboarding'
+    type?: 'problem' | 'solution' | 'hint' | 'feedback' | 'onboarding' | 'knowledge'
 }
 
 export interface RerankerOptions {

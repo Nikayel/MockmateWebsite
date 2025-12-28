@@ -424,9 +424,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({ onStartInterview,
                         ? "BUG FIX"
                         : scenario.type === "add-functionality"
                         ? "ADD FEATURE"
-                        : scenario.type === "system-design"
-                        ? "SYSTEM DESIGN"
-                        : (scenario.type as string).toUpperCase().replace("-", " ")}
+                        : "SYSTEM DESIGN"}
                     </Badge>
                     <Badge className={`${getDifficultyColor(scenario.difficulty)} text-xs`}>
                       {scenario.difficulty.toUpperCase()}
@@ -471,7 +469,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({ onStartInterview,
                           e.stopPropagation()
                           onStartInterview(scenario)
                         }}
-                        disabled={usageLimit && usageLimit.allowed === false && scenario.type !== "dsa"}
+                        disabled={!!(usageLimit && usageLimit.allowed === false && scenario.type !== "dsa")}
                         className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white disabled:opacity-50 disabled:cursor-not-allowed h-12 text-lg font-semibold shadow-lg"
                       >
                         <Play className="mr-2 h-5 w-5" />

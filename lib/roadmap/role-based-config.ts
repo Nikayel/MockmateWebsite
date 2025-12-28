@@ -74,7 +74,6 @@ export const INTERN_AVOID_PATTERNS: DSAPattern[] = [
   'topological-sort',
   'union-find',
   'trie',
-  'segment-tree',
   'bit-manipulation',
 ];
 
@@ -442,7 +441,7 @@ export function getDeprioritizedPatterns(experienceLevel: ExperienceLevel): DSAP
     return INTERN_AVOID_PATTERNS;
   }
   if (experienceLevel === 'beginner') {
-    return ['dijkstra', 'topological-sort', 'segment-tree', 'bit-manipulation'];
+    return ['dijkstra', 'topological-sort', 'bit-manipulation'];
   }
   return [];
 }

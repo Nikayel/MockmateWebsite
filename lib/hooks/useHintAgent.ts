@@ -82,7 +82,7 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
   });
 
   const userCodeRef = useRef<string>('');
-  const testResultsRef = useRef<{ passed: number; total: number; failingTests?: string[] } | undefined>();
+  const testResultsRef = useRef<{ passed: number; total: number; failingTests?: string[] } | undefined>(undefined);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Timer for elapsed time

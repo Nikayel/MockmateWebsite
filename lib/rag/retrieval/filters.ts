@@ -7,7 +7,7 @@
 import type { SimilaritySearchOptions } from '../types'
 
 export interface FilterCriteria {
-  type?: 'problem' | 'solution' | 'hint' | 'feedback' | 'onboarding'
+  type?: 'problem' | 'solution' | 'hint' | 'feedback' | 'onboarding' | 'knowledge'
   userId?: string
   problemId?: string
   problemType?: string

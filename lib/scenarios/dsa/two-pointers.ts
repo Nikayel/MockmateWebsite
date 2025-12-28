@@ -63,8 +63,7 @@ Notice that the solution set must not contain duplicate triplets.`,
       {
         input: { nums: [-1, 0, 1, 2, -1, -4] },
         expected: [[-1, -1, 2], [-1, 0, 1]],
-        description: 'Multiple triplets',
-        orderMatters: false,
+        description: 'Multiple triplets (order does not matter)',
       },
       {
         input: { nums: [0, 1, 1] },
@@ -79,8 +78,7 @@ Notice that the solution set must not contain duplicate triplets.`,
       {
         input: { nums: [-2, 0, 1, 1, 2] },
         expected: [[-2, 0, 2], [-2, 1, 1]],
-        description: 'Multiple solutions with duplicates',
-        orderMatters: false,
+        description: 'Multiple solutions with duplicates (order does not matter)',
       },
       {
         input: { nums: [1, 2, -2, -1] },
