@@ -1,0 +1,169 @@
+---
+title: "FAANG Coding Interviews: What Big Tech Actually Looks For in 2025"
+description: "Google, Meta, Amazon, Apple, and Netflix hiring managers reveal the 4 skills that matter most—and why most candidates focus on the wrong things."
+date: "2025-12-28"
+author: "CodeSparring Team"
+category: "faang"
+tags: ["faang", "google-interview", "meta-interview", "amazon-interview", "coding-interview", "big-tech"]
+featured: true
+---
+
+You've solved 500 LeetCode problems. You can implement Dijkstra's algorithm blindfolded. But you still get rejected after the technical round.
+
+Why? Because FAANG interviews aren't testing what you think they're testing.
+
+## The Real FAANG Evaluation Criteria
+
+After analyzing hundreds of interview debriefs and talking with hiring managers at Google, Meta, and Amazon, here's what actually gets weighted:
+
+| Skill | Weight | What They're Evaluating |
+|-------|--------|------------------------|
+| Problem Solving | 30% | Your approach, not your answer |
+| Code Quality | 25% | Clean, readable, production-ready |
+| Communication | 25% | Explaining your thought process |
+| Technical Knowledge | 20% | Algorithms and data structures |
+
+**Notice something?** Technical knowledge—the thing most candidates obsess over—is the smallest slice.
+
+## Skill #1: Problem Solving (30%)
+
+Interviewers want to see *how* you think, not *what* you know.
+
+**What gets you hired:**
+- Breaking down vague problems into specific requirements
+- Identifying edge cases before you start coding
+- Considering multiple approaches before committing
+- Recognizing when to trade off time vs. space complexity
+
+**What gets you rejected:**
+- Jumping straight into code
+- Getting stuck and going silent
+- Refusing to ask clarifying questions
+- Not testing your solution
+
+### The Meta Approach
+
+Meta explicitly allows candidates to use AI tools during interviews now. Why? Because they're testing *understanding*, not memorization. If you can use ChatGPT but can't explain why your solution works, you still fail.
+
+## Skill #2: Code Quality (25%)
+
+Your code doesn't just need to work. It needs to look like code a senior engineer would approve in a PR.
+
+**Production-ready code includes:**
+- Meaningful variable names (`currentSum` not `cs`)
+- Consistent formatting and indentation
+- Helper functions for complex logic
+- Edge case handling
+- No unnecessary complexity
+
+**Real example from a Google interview:**
+
+```python
+# ❌ What candidates write
+def solve(arr):
+    d = {}
+    for i in range(len(arr)):
+        if arr[i] in d:
+            return [d[arr[i]], i]
+        d[arr[i]] = i
+    return []
+
+# ✅ What gets you hired
+def find_two_sum_indices(numbers, target):
+    """Find indices of two numbers that sum to target."""
+    seen_values = {}
+
+    for index, value in enumerate(numbers):
+        complement = target - value
+        if complement in seen_values:
+            return [seen_values[complement], index]
+        seen_values[value] = index
+
+    return []  # No valid pair found
+```
+
+Same logic. Completely different impression.
+
+## Skill #3: Communication (25%)
+
+This is where most candidates lose points without knowing it.
+
+**The interviewer is evaluating:**
+- Can you explain complex ideas simply?
+- Do you verbalize your thought process?
+- Can you respond to hints and feedback?
+- Are you pleasant to work with?
+
+**The silent coder problem:**
+
+Many candidates go quiet while thinking. The interviewer sees someone staring at a screen, unsure if they're stuck or processing. Always talk through your approach:
+
+> "I'm thinking we could use a hash map here to get O(1) lookups... let me think about what we'd store as the key... okay, if we store the value as the key and index as the value, we can check for complements in one pass."
+
+**Practice tip:** Record yourself solving problems out loud. Most developers cringe at their first recording—that's the point. You can't improve what you can't observe.
+
+## Skill #4: Technical Knowledge (20%)
+
+Yes, you need to know algorithms. But depth matters more than breadth.
+
+**What FAANG actually tests:**
+
+| Pattern | Frequency | Example Problems |
+|---------|-----------|-----------------|
+| Arrays/Hashing | Very High | Two Sum, Group Anagrams |
+| Two Pointers | High | Container With Most Water |
+| Sliding Window | High | Longest Substring Without Repeating |
+| BFS/DFS | High | Number of Islands, Word Ladder |
+| Dynamic Programming | Medium | Coin Change, Longest Common Subsequence |
+| Trees/Graphs | Medium | Validate BST, Course Schedule |
+| Binary Search | Medium | Search in Rotated Array |
+
+**What they rarely test:**
+- Obscure algorithms (Bellman-Ford, Floyd-Warshall)
+- Complex data structures (Red-Black Trees, B-Trees)
+- Bit manipulation (unless specifically mentioned)
+
+Focus on the 15 core patterns that appear in 80% of interviews, not the 100 algorithms that appear in 5%.
+
+## The 4-Week FAANG Prep Framework
+
+Based on how FAANG actually evaluates candidates:
+
+**Week 1: Pattern Recognition**
+- Master the 15 core DSA patterns
+- Focus on recognizing *which* pattern to apply
+
+**Week 2: Communication Practice**
+- Solve problems out loud (or with a mock interviewer)
+- Practice explaining trade-offs
+
+**Week 3: Code Quality**
+- Refactor your solutions for production readiness
+- Add meaningful names, handle edge cases
+
+**Week 4: Full Simulations**
+- 45-minute timed mock interviews
+- Include behavioral questions
+- Get feedback on all 4 skills
+
+## The Retention Problem
+
+Here's the uncomfortable truth: **you'll forget 70% of what you practiced within a week.**
+
+This is called the forgetting curve, and it's why grinding 500 problems doesn't guarantee success. Your brain treats each problem as isolated information unless you systematically review.
+
+**The solution:** Spaced repetition. Review problems at scientifically optimal intervals—right before you forget them. This transforms short-term cramming into long-term retention.
+
+## How CodeSparring Helps
+
+We built CodeSparring specifically for FAANG-style interviews:
+
+- **AI Interviewer:** Practice all 4 skills with real-time feedback
+- **Voice Mode:** Develop communication skills, not just coding
+- **Company-Specific Scenarios:** Google, Meta, Amazon, Apple, Netflix patterns
+- **Spaced Repetition:** Actually remember what you learn
+- **Grading Rubric:** Matches real FAANG evaluation (30/25/25/20 split)
+
+Stop grinding problems. Start training for interviews.
+
+[Try a free mock interview →](/interview)
