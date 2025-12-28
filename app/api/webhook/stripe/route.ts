@@ -385,21 +385,26 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // If still no customer, try to find/create by email
+          // If still no customer, try to find by email (with userId verification) or create new
           if (!customerId && (profile?.email || session.customer_email)) {
             const userEmail = profile?.email || session.customer_email
             try {
-              // Search for existing customer by email
+              // Search for existing customer by email that belongs to THIS user
               const existingCustomers = await stripe.customers.list({
                 email: userEmail,
-                limit: 1,
+                limit: 10, // Check multiple in case of duplicates
               })
 
-              if (existingCustomers.data.length > 0) {
-                customerId = existingCustomers.data[0].id
-                paymentLogger.info("Found existing customer by email", { customerId, email: userEmail })
-              } else {
-                // Create a new customer for future billing portal access
+              // Find a customer that matches this userId in metadata
+              const matchingCustomer = existingCustomers.data.find(
+                c => c.metadata?.userId === userId
+              )
+
+              if (matchingCustomer) {
+                customerId = matchingCustomer.id
+                paymentLogger.info("Found existing customer by email with matching userId", { customerId, email: userEmail })
+              } else if (existingCustomers.data.length === 0) {
+                // No customers with this email - safe to create new one
                 const newCustomer = await stripe.customers.create({
                   email: userEmail,
                   metadata: {
@@ -410,6 +415,23 @@ export async function POST(request: NextRequest) {
                 })
                 customerId = newCustomer.id
                 paymentLogger.info("Created new customer for yearly plan", { customerId, email: userEmail })
+              } else {
+                // Customers exist but none match this userId - create new to avoid conflict
+                paymentLogger.warn("Found customers with email but none match userId - creating new", {
+                  email: userEmail,
+                  userId,
+                  existingCustomerCount: existingCustomers.data.length
+                })
+                const newCustomer = await stripe.customers.create({
+                  email: userEmail,
+                  metadata: {
+                    userId: userId,
+                    plan: "yearly",
+                    source: "checkout_new_user",
+                  }
+                })
+                customerId = newCustomer.id
+                paymentLogger.info("Created separate customer to avoid email conflict", { customerId, email: userEmail })
               }
             } catch (customerError) {
               paymentLogger.error("Failed to find/create customer by email", { error: customerError, email: userEmail })
