@@ -83,7 +83,7 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="mailto:security@codesparring.com" className="text-gray-400 hover:text-white transition-colors">
+                <a href="mailto:security@codesparring.dev" className="text-gray-400 hover:text-white transition-colors">
                   Security
                 </a>
               </li>
@@ -100,7 +100,7 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="mailto:support@codesparring.com" className="text-gray-400 hover:text-white transition-colors">
+                <a href="mailto:support@codesparring.dev" className="text-gray-400 hover:text-white transition-colors">
                   Contact Support
                 </a>
               </li>

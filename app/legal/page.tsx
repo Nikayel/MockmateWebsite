@@ -411,7 +411,7 @@ export default function LegalPage() {
                   <h5 className="text-white font-medium mt-4 mb-2">Refund Policy</h5>
                   <p className="text-sm">
                     We offer refunds on a case-by-case basis within 7 days of your initial purchase if you have
-                    not used more than 3 practice sessions. Contact support@skillon.dev for refund requests.
+                    not used more than 3 practice sessions. Contact support@codesparring.dev for refund requests.
                   </p>
                 </div>
 
@@ -640,7 +640,7 @@ export default function LegalPage() {
                     <li><strong className="text-white">Delete Account:</strong> Go to Account Settings &rarr; &quot;Delete My Account&quot;</li>
                     <li><strong className="text-white">Update Information:</strong> Edit your profile in Account Settings</li>
                     <li><strong className="text-white">Email Preferences:</strong> Manage notifications in Account Settings</li>
-                    <li><strong className="text-white">Contact Us:</strong> Email privacy@skillon.dev for any privacy request</li>
+                    <li><strong className="text-white">Contact Us:</strong> Email privacy@codesparring.dev for any privacy request</li>
                   </ul>
                   <p className="text-sm mt-3">
                     We respond to all verified requests within <strong className="text-white">72 hours</strong> (typically within 24 hours).
@@ -652,7 +652,7 @@ export default function LegalPage() {
                   <h4 className="text-white font-semibold mt-6 mb-3">Data Processing Agreement (Enterprise)</h4>
                   <p className="text-sm">
                     For enterprise customers requiring a Data Processing Agreement (DPA) or Business Associate
-                    Agreement (BAA), please contact us at legal@skillon.dev. We provide custom agreements
+                    Agreement (BAA), please contact us at legal@codesparring.dev. We provide custom agreements
                     that meet your organization&apos;s compliance requirements.
                   </p>
                 </div>
@@ -691,7 +691,7 @@ export default function LegalPage() {
                   <h4 className="text-white font-semibold mt-4 mb-3">Report a Security Concern</h4>
                   <p className="text-sm">
                     If you discover a security vulnerability or suspect unauthorized access to your account,
-                    please report it immediately to <strong className="text-[#00d9ff]">security@skillon.dev</strong>.
+                    please report it immediately to <strong className="text-[#00d9ff]">security@codesparring.dev</strong>.
                     We take all reports seriously and will investigate promptly.
                   </p>
                 </div>
@@ -714,21 +714,21 @@ export default function LegalPage() {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="bg-gray-800/50 p-4 rounded-lg">
                     <h5 className="text-white font-medium mb-2">General Legal Inquiries</h5>
-                    <p className="text-sm text-[#00d9ff]">legal@skillon.dev</p>
+                    <p className="text-sm text-[#00d9ff]">legal@codesparring.dev</p>
                   </div>
                   <div className="bg-gray-800/50 p-4 rounded-lg">
                     <h5 className="text-white font-medium mb-2">Privacy & Data Requests</h5>
-                    <p className="text-sm text-[#00d9ff]">privacy@skillon.dev</p>
+                    <p className="text-sm text-[#00d9ff]">privacy@codesparring.dev</p>
                     <p className="text-xs text-gray-400 mt-1">Response within 72 hours</p>
                   </div>
                   <div className="bg-gray-800/50 p-4 rounded-lg">
                     <h5 className="text-white font-medium mb-2">Security Concerns</h5>
-                    <p className="text-sm text-[#00d9ff]">security@skillon.dev</p>
+                    <p className="text-sm text-[#00d9ff]">security@codesparring.dev</p>
                     <p className="text-xs text-gray-400 mt-1">For vulnerability reports</p>
                   </div>
                   <div className="bg-gray-800/50 p-4 rounded-lg">
                     <h5 className="text-white font-medium mb-2">Customer Support</h5>
-                    <p className="text-sm text-[#00d9ff]">support@skillon.dev</p>
+                    <p className="text-sm text-[#00d9ff]">support@codesparring.dev</p>
                   </div>
                 </div>
 
