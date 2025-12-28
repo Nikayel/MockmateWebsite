@@ -163,6 +163,21 @@ service cloud.firestore {
     }
 
     // ============================================================================
+    // PAYMENT HISTORY (Read-only from client)
+    // ============================================================================
+
+    match /payment_history/{paymentId} {
+      // Users can read their own payment history
+      allow read: if isAuthenticated()
+                  && documentExists()
+                  && resource.data.user_id == request.auth.uid;
+
+      // Only server can write payment history (via Admin SDK from Stripe webhooks)
+      // Client cannot create, update, or delete payment records
+      allow write: if false;
+    }
+
+    // ============================================================================
     // ANALYTICS & METRICS (Write-only from client)
     // ============================================================================
 
