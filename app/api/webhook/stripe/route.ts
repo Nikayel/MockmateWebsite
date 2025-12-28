@@ -20,15 +20,18 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY environment variable is required")
 }
 
-if (!process.env.STRIPE_WEBHOOK_SECRET) {
-  throw new Error("STRIPE_WEBHOOK_SECRET environment variable is required")
+// Support both production webhook secret and local Stripe CLI secret
+// For local testing: use STRIPE_WEBHOOK_SECRET_LOCAL (from `stripe listen`)
+// For production: use STRIPE_WEBHOOK_SECRET (from Stripe Dashboard)
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET_LOCAL || process.env.STRIPE_WEBHOOK_SECRET
+
+if (!webhookSecret) {
+  throw new Error("STRIPE_WEBHOOK_SECRET or STRIPE_WEBHOOK_SECRET_LOCAL environment variable is required")
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-10-29.clover",
 })
-
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
 
 // Create a child logger for payment events
 const paymentLogger = logger.child({ service: "stripe-webhook" })

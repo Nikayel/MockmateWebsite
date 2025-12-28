@@ -10,6 +10,7 @@ import { adminDb } from "@/lib/firebase-admin"
 import { Profile } from "@/lib/types"
 import Stripe from "stripe"
 import { logger } from "@/lib/logger"
+import { syncSubscriptionFromStripe } from "@/lib/stripe-helpers"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-10-29.clover",
@@ -134,17 +135,67 @@ export async function POST(request: NextRequest) {
         hasSubscriptionId: !!profile.stripe_subscription_id
       })
 
-      // If user is Pro but missing customer ID, suggest syncing
+      // If user is Pro but missing customer ID, try to sync subscription automatically
       if (profile.subscription_tier === "pro") {
+        logger.info("Customer portal: Attempting automatic sync for Pro user", { userId })
+        
+        try {
+          // Attempt to sync subscription from Stripe
+          const syncedProfile = await syncSubscriptionFromStripe(userId)
+          
+          if (syncedProfile?.stripe_customer_id) {
+            // Sync successful - validate the customer ID before using it
+            try {
+              await stripe.customers.retrieve(syncedProfile.stripe_customer_id)
+              stripeCustomerId = syncedProfile.stripe_customer_id
+              logger.info("Customer portal: Sync successful, validated customer ID", { 
+                userId, 
+                customerId: stripeCustomerId 
+              })
+            } catch (validationError) {
+              logger.error("Customer portal: Synced customer ID is invalid", { 
+                userId, 
+                customerId: syncedProfile.stripe_customer_id,
+                error: validationError 
+              })
+              // Fall through to error response
+            }
+          }
+          
+          if (!stripeCustomerId) {
+            // Sync didn't find customer ID
+            return NextResponse.json(
+              {
+                error: "Subscription data incomplete",
+                message: "Your subscription information is incomplete. Please use 'Sync Subscription Status' button to update your account, or contact support if the issue persists."
+              },
+              { status: 400 }
+            )
+          }
+        } catch (syncError) {
+          logger.error("Customer portal: Automatic sync failed", { userId, error: syncError })
+          return NextResponse.json(
+            {
+              error: "Subscription data incomplete",
+              message: "Unable to sync subscription automatically. Please use 'Sync Subscription Status' button to update your account."
+            },
+            { status: 400 }
+          )
+        }
+      } else {
+        // Not Pro user - no subscription to manage
         return NextResponse.json(
           {
-            error: "Subscription data incomplete",
-            message: "Your subscription information is incomplete. Please use 'Sync Subscription Status' button to update your account."
+            error: "No active subscription found",
+            message: "You don't have an active subscription to manage."
           },
           { status: 400 }
         )
       }
+    }
 
+    // Final check - if we still don't have a customer ID after sync attempt
+    if (!stripeCustomerId) {
       return NextResponse.json(
         {
           error: "No active subscription found",
