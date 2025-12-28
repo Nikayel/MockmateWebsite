@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo, memo } from "react"
+import { useState, useEffect, useRef, useMemo, memo, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import nextDynamic from "next/dynamic"
@@ -156,7 +156,7 @@ interface TestResult {
   error: string | null
 }
 
-export default function InterviewPage() {
+function InterviewPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
@@ -3447,6 +3447,27 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
       {!isInterviewMode && <Footer />}
     </main>
+  )
+}
+
+// Loading fallback for Suspense boundary
+function InterviewPageLoading() {
+  return (
+    <main className="flex-1 flex items-center justify-center min-h-screen bg-gradient-to-b from-gray-900 via-black to-gray-900">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff] mx-auto mb-4"></div>
+        <p className="text-gray-400">Loading interview...</p>
+      </div>
+    </main>
+  )
+}
+
+// Wrapper component with Suspense boundary for useSearchParams
+export default function InterviewPage() {
+  return (
+    <Suspense fallback={<InterviewPageLoading />}>
+      <InterviewPageContent />
+    </Suspense>
   )
 }
 
