@@ -138,20 +138,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // STEP 3: If still no customer ID, try to find by email
+    // STEP 3: If still no customer ID, try to find by email (with userId verification)
     if (!stripeCustomerId && userEmail) {
       logger.info("Customer portal: Searching for customer by email", { userId, email: userEmail })
       try {
         const customers = await stripe.customers.list({
           email: userEmail,
-          limit: 5,
+          limit: 10,
         })
 
-        for (const customer of customers.data) {
+        // First, look for a customer with matching userId in metadata (safest)
+        const matchingCustomer = customers.data.find(c => c.metadata?.userId === userId)
+
+        if (matchingCustomer) {
           // Verify customer is valid
           try {
-            await stripe.customers.retrieve(customer.id)
-            stripeCustomerId = customer.id
+            await stripe.customers.retrieve(matchingCustomer.id)
+            stripeCustomerId = matchingCustomer.id
 
             // Update profile with found customer ID
             await profileRef.update({
@@ -159,11 +162,35 @@ export async function POST(request: NextRequest) {
               updated_at: new Date().toISOString()
             })
 
-            logger.info("Customer portal: Found and linked customer by email", { userId, customerId: stripeCustomerId })
-            break
+            logger.info("Customer portal: Found customer with matching userId metadata", { userId, customerId: stripeCustomerId })
           } catch {
-            continue
+            logger.warn("Customer portal: Matching customer is invalid", { customerId: matchingCustomer.id })
           }
+        } else if (customers.data.length === 1) {
+          // Only ONE customer with this email - likely safe to use
+          // But only if the user has no other stripe IDs that conflict
+          const singleCustomer = customers.data[0]
+          try {
+            await stripe.customers.retrieve(singleCustomer.id)
+            stripeCustomerId = singleCustomer.id
+
+            // Update profile with found customer ID
+            await profileRef.update({
+              stripe_customer_id: stripeCustomerId,
+              updated_at: new Date().toISOString()
+            })
+
+            logger.info("Customer portal: Found single customer by email (no metadata match)", { userId, customerId: stripeCustomerId })
+          } catch {
+            logger.warn("Customer portal: Single customer is invalid", { customerId: singleCustomer.id })
+          }
+        } else if (customers.data.length > 1) {
+          // Multiple customers with same email but no userId match - can't safely determine which
+          logger.warn("Customer portal: Multiple customers with email, none match userId - cannot auto-link", {
+            userId,
+            email: userEmail,
+            customerCount: customers.data.length
+          })
         }
       } catch (emailSearchError) {
         logger.error("Customer portal: Email search failed", { error: emailSearchError })

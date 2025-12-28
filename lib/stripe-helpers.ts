@@ -154,16 +154,34 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
             try {
               const customers = await stripe.customers.list({
                 email: userEmail,
-                limit: 1,
+                limit: 10,
               })
 
-              if (customers.data.length > 0) {
+              // First, look for a customer with matching userId in metadata
+              const matchingCustomer = customers.data.find(c => c.metadata?.userId === userId)
+
+              if (matchingCustomer) {
+                stripeCustomerId = matchingCustomer.id
+                await profileRef.set({
+                  stripe_customer_id: stripeCustomerId,
+                  updated_at: new Date().toISOString(),
+                }, { merge: true })
+                subscriptionLogger.info("Found customer with matching userId for yearly plan", { userId, customerId: stripeCustomerId })
+              } else if (customers.data.length === 1) {
+                // Single customer with this email - safe to link
                 stripeCustomerId = customers.data[0].id
                 await profileRef.set({
                   stripe_customer_id: stripeCustomerId,
                   updated_at: new Date().toISOString(),
                 }, { merge: true })
-                subscriptionLogger.info("Found and linked customer ID for yearly plan", { userId, customerId: stripeCustomerId })
+                subscriptionLogger.info("Found single customer by email for yearly plan", { userId, customerId: stripeCustomerId })
+              } else if (customers.data.length > 1) {
+                // Multiple customers - don't auto-link to avoid conflicts
+                subscriptionLogger.warn("Multiple customers with email, none match userId - skipping auto-link", {
+                  userId,
+                  email: userEmail,
+                  customerCount: customers.data.length
+                })
               }
             } catch (error) {
               subscriptionLogger.warn("Failed to find customer for yearly plan", { userId, error })

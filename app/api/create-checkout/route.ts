@@ -69,9 +69,74 @@ export async function POST(request: NextRequest) {
     }
 
     if (!priceId) {
-      return NextResponse.json({ 
-        error: `Price ID not configured for ${planType} plan. Please set STRIPE_PRICE_ID_WEBSITE${planType === 'yearly' ? '_YEARLY' : ''} environment variable.` 
+      return NextResponse.json({
+        error: `Price ID not configured for ${planType} plan. Please set STRIPE_PRICE_ID_WEBSITE${planType === 'yearly' ? '_YEARLY' : ''} environment variable.`
       }, { status: 500 })
+    }
+
+    const profile = profileSnap.data()
+    const userEmail = profile?.email
+
+    // Find or create a Stripe customer with userId in metadata
+    // This prevents conflicts when multiple users share the same email
+    let stripeCustomerId: string | undefined
+
+    // Check if user already has a customer ID
+    if (profile?.stripe_customer_id) {
+      try {
+        await stripe.customers.retrieve(profile.stripe_customer_id)
+        stripeCustomerId = profile.stripe_customer_id
+        logger.info("Using existing customer for checkout", { userId, customerId: stripeCustomerId })
+      } catch {
+        // Customer doesn't exist, will create new one
+        logger.warn("Existing customer ID invalid, will create new", { userId, invalidId: profile.stripe_customer_id })
+      }
+    }
+
+    // If no existing customer, look for one with matching userId metadata
+    if (!stripeCustomerId && userEmail) {
+      try {
+        const existingCustomers = await stripe.customers.list({
+          email: userEmail,
+          limit: 10,
+        })
+
+        const matchingCustomer = existingCustomers.data.find(c => c.metadata?.userId === userId)
+        if (matchingCustomer) {
+          stripeCustomerId = matchingCustomer.id
+          // Update profile with the found customer ID
+          await adminDb.collection("profiles").doc(userId).update({
+            stripe_customer_id: stripeCustomerId,
+            updated_at: new Date().toISOString()
+          })
+          logger.info("Found existing customer with matching userId", { userId, customerId: stripeCustomerId })
+        }
+      } catch (searchError) {
+        logger.warn("Error searching for existing customer", { error: searchError })
+      }
+    }
+
+    // If still no customer, create one with userId metadata
+    if (!stripeCustomerId && userEmail) {
+      try {
+        const newCustomer = await stripe.customers.create({
+          email: userEmail,
+          metadata: {
+            userId: userId,
+            source: "checkout_creation",
+          }
+        })
+        stripeCustomerId = newCustomer.id
+        // Update profile with new customer ID
+        await adminDb.collection("profiles").doc(userId).update({
+          stripe_customer_id: stripeCustomerId,
+          updated_at: new Date().toISOString()
+        })
+        logger.info("Created new customer for checkout", { userId, customerId: stripeCustomerId })
+      } catch (createError) {
+        logger.error("Error creating customer", { error: createError })
+        // Continue without customer - Stripe will create one during checkout
+      }
     }
 
     // Create checkout session
@@ -104,6 +169,13 @@ export async function POST(request: NextRequest) {
       },
     }
 
+    // Attach pre-created customer if we have one
+    if (stripeCustomerId) {
+      sessionParams.customer = stripeCustomerId
+    } else if (userEmail) {
+      // Fallback: Let Stripe create customer but pre-fill email
+      sessionParams.customer_email = userEmail
+    }
 
     const session = await stripe.checkout.sessions.create(sessionParams)
 

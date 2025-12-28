@@ -65,10 +65,17 @@ export async function DELETE(request: NextRequest) {
       { name: "sessions", field: "userId" },
       { name: "interview_sessions", field: "user_id" },
       { name: "profile_quota", field: "user_id" },
+      { name: "payment_history", field: "user_id" },
+      { name: "email_notifications", field: "user_id" },
       { name: "session_vectors", field: "userId" },
       { name: "performance_profiles", field: "userId" },
       { name: "promo_code_usage", field: "userId" },
       { name: "analytics", field: "userId" },
+      { name: "user_learning_state", field: null, docId: userId }, // Doc ID is userId
+      { name: "problem_mastery", field: "userId" },
+      { name: "user_roadmaps", field: "userId" },
+      { name: "analytics_events", field: "userId" },
+      { name: "webhook_events", field: null }, // No user reference, skip
     ]
 
     let deletedDocCount = 0
