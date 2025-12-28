@@ -335,7 +335,7 @@ function UpgradePageContent() {
                 Manage subscription
               </Button>
               <p className="text-gray-400 text-sm">
-                Need help? Contact support@skillon.dev
+                Need help? Contact support@codesparring.dev
               </p>
             </div>
           )}

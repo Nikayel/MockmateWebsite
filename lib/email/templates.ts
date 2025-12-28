@@ -808,7 +808,7 @@ export function getPaymentFailedEmailHtml(data: PaymentFailedEmailData): string 
     </div>
 
     <p style="color: #9ca3af; font-size: 14px;">
-      Need help? Reply to this email or contact us at support@skillon.ai
+      Need help? Reply to this email or contact us at support@codesparring.dev
     </p>
   `;
 
@@ -830,7 +830,7 @@ What happens next:
 - We'll attempt to charge your card again automatically
 - If payment continues to fail, your account will be downgraded to Free
 
-Need help? Contact us at support@skillon.ai
+Need help? Contact us at support@codesparring.dev
 
 - The CodeSparring Team
 

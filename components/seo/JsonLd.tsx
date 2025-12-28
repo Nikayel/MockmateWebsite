@@ -1,6 +1,6 @@
 // JSON-LD Structured Data Components for SEO Rich Snippets
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.com"
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.dev"
 
 // Organization Schema - for brand recognition in search
 export function OrganizationJsonLd() {
@@ -18,7 +18,7 @@ export function OrganizationJsonLd() {
     ],
     contactPoint: {
       "@type": "ContactPoint",
-      email: "hello@codesparring.com",
+      email: "hello@codesparring.dev",
       contactType: "customer support",
     },
   }
