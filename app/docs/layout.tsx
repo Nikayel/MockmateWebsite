@@ -2,9 +2,9 @@ import type { Metadata } from "next"
 
 export const metadata: Metadata = {
   title: "Documentation - Getting Started Guide",
-  description: "Complete guide to using Skillon for AI-powered coding interview practice. Learn keyboard shortcuts, features, and how to get the most out of your mock interviews.",
+  description: "Complete guide to using CodeSparring for AI-powered coding interview practice. Learn keyboard shortcuts, features, and how to get the most out of your mock interviews.",
   keywords: [
-    "Skillon documentation",
+    "CodeSparring documentation",
     "coding interview tutorial",
     "mock interview guide",
     "AI interview help",
@@ -15,13 +15,13 @@ export const metadata: Metadata = {
     canonical: "/docs",
   },
   openGraph: {
-    title: "Documentation - Getting Started Guide | Skillon",
+    title: "Documentation - Getting Started Guide | CodeSparring",
     description: "Everything you need to master coding interviews with AI-powered practice.",
     url: "/docs",
     type: "website",
   },
   twitter: {
-    title: "Documentation - Getting Started Guide | Skillon",
+    title: "Documentation - Getting Started Guide | CodeSparring",
     description: "Everything you need to master coding interviews with AI-powered practice.",
   },
 }

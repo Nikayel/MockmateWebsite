@@ -346,7 +346,7 @@ export default function WhySkilonPage() {
                   </div>
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-6 h-0.5 bg-neural rounded-full" />
-                    <span className="text-gray-500">With Skillon</span>
+                    <span className="text-gray-500">With CodeSparring</span>
                   </div>
                 </div>
               </div>
@@ -451,7 +451,7 @@ export default function WhySkilonPage() {
               {/* Header */}
               <div className="grid grid-cols-[1fr_70px_70px] sm:grid-cols-[1fr_100px_100px] gap-2 sm:gap-4 pb-4 border-b border-gray-800 mb-2">
                 <div className="text-gray-500 text-xs sm:text-sm font-medium">Feature</div>
-                <div className="text-center text-accent font-bold text-xs sm:text-base">Skillon</div>
+                <div className="text-center text-accent font-bold text-xs sm:text-base">CodeSparring</div>
                 <div className="text-center text-gray-500 font-medium text-xs sm:text-base">LeetCode</div>
               </div>
 

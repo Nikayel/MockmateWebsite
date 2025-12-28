@@ -76,7 +76,7 @@ export default function DocsPage() {
               </span>
             </h1>
             <p className="text-xl text-gray-400 max-w-xl leading-relaxed">
-              Everything you need to master coding interviews with Skillon.
+              Everything you need to master coding interviews with CodeSparring.
             </p>
           </motion.div>
         </div>

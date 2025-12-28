@@ -165,7 +165,7 @@ export function FeaturesSection() {
             actually work
           </h2>
           <p className="text-lg text-white/60 max-w-2xl">
-            Modern tech interviews let you use AI tools. They test real-world coding, not memorization. Skillon simulates exactly that.
+            Modern tech interviews let you use AI tools. They test real-world coding, not memorization. CodeSparring simulates exactly that.
           </p>
         </motion.div>
 

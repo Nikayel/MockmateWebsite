@@ -15,13 +15,13 @@ export const metadata: Metadata = {
     canonical: "/pricing",
   },
   openGraph: {
-    title: "Pricing - AI Mock Interview Plans | Skillon",
+    title: "Pricing - AI Mock Interview Plans | CodeSparring",
     description: "Start free or go Pro for unlimited AI mock interviews. 29% cheaper than LeetCode Premium.",
     url: "/pricing",
     type: "website",
   },
   twitter: {
-    title: "Pricing - AI Mock Interview Plans | Skillon",
+    title: "Pricing - AI Mock Interview Plans | CodeSparring",
     description: "Start free or go Pro for unlimited AI mock interviews. 29% cheaper than LeetCode Premium.",
   },
 }

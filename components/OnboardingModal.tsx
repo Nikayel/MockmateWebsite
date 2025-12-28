@@ -164,11 +164,11 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
 
   // Step titles for ARIA labels
   const stepTitles = [
-    "Welcome to Skillon",
+    "Welcome to CodeSparring",
     "Select your experience level",
     "Choose your goal",
     "Set your daily practice goal",
-    "How Skillon works for you"
+    "How CodeSparring works for you"
   ]
 
   const handleComplete = async (takeTour: boolean) => {
@@ -303,7 +303,7 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
                     <Sparkles className="h-8 w-8 text-black" />
                   </div>
                   <h2 id="onboarding-title" className="text-2xl font-bold text-white mb-2">
-                    {userName ? `Welcome, ${userName}!` : "Welcome to Skillon!"}
+                    {userName ? `Welcome, ${userName}!` : "Welcome to CodeSparring!"}
                   </h2>
                   <p id="onboarding-description" className="text-gray-400">
                     Let's set up your personalized practice experience in 4 quick steps.
@@ -569,7 +569,7 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
               >
                 <div className="mb-6">
                   <p className="text-sm text-[#00d9ff] font-medium mb-1">Step 4 of 4</p>
-                  <h2 className="text-xl font-bold text-white">How Skillon works for you</h2>
+                  <h2 className="text-xl font-bold text-white">How CodeSparring works for you</h2>
                   <p className="text-sm text-gray-400 mt-1">Here's what to expect from your practice.</p>
                 </div>
 

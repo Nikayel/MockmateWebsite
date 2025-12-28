@@ -1,7 +1,7 @@
 /**
  * Email Notification Service
  *
- * Main entry point for all email operations in Skillon.
+ * Main entry point for all email operations in CodeSparring.
  * Combines Brevo API with templates and notification logic.
  */
 

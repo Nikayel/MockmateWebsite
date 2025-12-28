@@ -53,7 +53,7 @@ export default function SamplesPage() {
               <span className="text-gradient"> Feedback Examples</span>
             </h1>
             <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
-              Explore detailed feedback reports from actual Skillon interview sessions. See how our AI analyzes
+              Explore detailed feedback reports from actual CodeSparring interview sessions. See how our AI analyzes
               performance, identifies improvement areas, and provides actionable insights.
             </p>
           </div>
@@ -126,7 +126,7 @@ export default function SamplesPage() {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-heading font-bold text-white mb-6">Ready to Get Your Own Detailed Feedback?</h2>
           <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Start practicing with Skillon and receive comprehensive performance analytics for your coding interviews.
+            Start practicing with CodeSparring and receive comprehensive performance analytics for your coding interviews.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/interview">

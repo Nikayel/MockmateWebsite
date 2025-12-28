@@ -3096,7 +3096,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           <Brain className="h-4 w-4 text-accent animate-neural-pulse" />
                           <div className="absolute inset-0 bg-accent rounded-full blur-md opacity-30"></div>
                         </div>
-                        <span className="bg-gradient-to-r from-accent to-neural bg-clip-text text-transparent font-bold">Skillon AI</span>
+                        <span className="bg-gradient-to-r from-accent to-neural bg-clip-text text-transparent font-bold">CodeSparring AI</span>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="flex flex-col flex-1 min-h-0 overflow-hidden p-3">
@@ -3124,7 +3124,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                       <Brain className="h-3 w-3 text-accent animate-neural-pulse" />
                                     )}
                                     <span className="text-xs opacity-75">
-                                      {msg.type === "user" ? "You" : "Skillon AI"}
+                                      {msg.type === "user" ? "You" : "CodeSparring AI"}
                                     </span>
                                   </div>
                                   <p className="text-xs whitespace-pre-wrap leading-relaxed">{msg.message}</p>
@@ -3291,7 +3291,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                   <Brain className="h-4 w-4 text-accent animate-neural-pulse" />
                                 )}
                                 <span className="text-sm font-medium">
-                                  {msg.type === "user" ? "You" : "Skillon AI"}
+                                  {msg.type === "user" ? "You" : "CodeSparring AI"}
                                 </span>
                               </div>
                               <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.message}</p>

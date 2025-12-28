@@ -72,7 +72,7 @@ export default function InstallPage() {
               <span className="text-gradient block mt-2">Coming Soon</span>
             </h1>
             <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-              We're building a native VS Code extension to bring Skillon directly into your development environment.
+              We're building a native VS Code extension to bring CodeSparring directly into your development environment.
               Get notified when it launches!
             </p>
 
@@ -150,7 +150,7 @@ export default function InstallPage() {
               Why Start with the Web?
             </h2>
             <p className="text-gray-400 text-center mb-12 max-w-2xl mx-auto">
-              Our web platform gives you the full Skillon experience right now, with no installation required.
+              Our web platform gives you the full CodeSparring experience right now, with no installation required.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
