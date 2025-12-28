@@ -234,7 +234,7 @@ function LoginPageContent() {
       )}
 
       {/* Single focused section - Apple style */}
-      <section className="min-h-screen flex items-center justify-center pt-20 pb-16">
+      <section className="min-h-screen flex items-center justify-center pt-20 pb-16 relative z-10">
         <motion.div
           className="container mx-auto px-4"
           variants={staggerContainer}
@@ -243,14 +243,20 @@ function LoginPageContent() {
         >
           <div className="max-w-md mx-auto">
 
-            {/* Headline */}
+            {/* Headline - personal touch */}
             <motion.div variants={staggerItem} className="text-center mb-10">
               <h1 className="text-4xl sm:text-5xl font-bold text-foreground mb-4 tracking-tight">
-                Welcome back
+                Let's get you in
               </h1>
-              <p className="text-lg text-muted-foreground">
-                Sign in to continue practicing
+              <p className="text-lg text-muted-foreground mb-6">
+                Ready to crush that next interview?
               </p>
+
+              {/* Personal note - adds character */}
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/5 border border-accent/10 text-sm text-muted-foreground">
+                <span className="text-accent">~2 min</span>
+                <span>daily practice goes a long way</span>
+              </div>
             </motion.div>
 
             {/* Login buttons - clean and spacious */}
