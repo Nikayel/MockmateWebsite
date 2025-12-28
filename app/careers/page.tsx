@@ -143,11 +143,11 @@ export default function CareersPage() {
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <a
-                href="mailto:nikayel@skillon.dev"
-                className="inline-flex items-center justify-center gap-2 h-12 px-6 text-foreground border border-border rounded-xl hover:bg-secondary/50 transition-all"
+                href="mailto:nikayel_ali@codesparring.dev"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 text-white border border-gray-800 rounded-full hover:border-gray-600 transition-colors"
               >
                 <Mail className="h-4 w-4" />
-                nikayel@skillon.dev
+                nikayel_ali@codesparring.dev
               </a>
               <a
                 href="https://linkedin.com/in/nikayel-ali"

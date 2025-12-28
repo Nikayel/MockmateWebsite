@@ -194,38 +194,42 @@ export interface WelcomeEmailData {
 }
 
 export function getWelcomeEmailSubject(): string {
-  return "Welcome to CodeSparring - Let's ace your next interview";
+  return "hey! welcome to the crew 🤝";
 }
 
 export function getWelcomeEmailHtml(data: WelcomeEmailData): string {
   const content = `
-    <h1>Welcome to CodeSparring, ${data.userName || "there"}!</h1>
+    <h1>hey ${data.userName || "there"}! 👋</h1>
 
-    <p>You're one step closer to acing your next technical interview.</p>
+    <p>i'm nikayel - a senior at sac state who built codesparring because i was literally in your shoes not too long ago.</p>
 
-    <p>CodeSparring is your AI-powered interview partner that helps you practice:</p>
+    <p>real talk: i used to bomb interviews. like, embarrassingly bad. i'd grind leetcode for hours, feel prepared, then completely blank when the interviewer asked me to explain my approach. sound familiar?</p>
 
+    <p>turns out i was studying wrong. cramming doesn't work - your brain literally forgets 70% of what you learned within 24 hours (there's actual science behind this called the "forgetting curve"). what does work is spaced practice - short, consistent sessions spread out over time.</p>
+
+    <p>so i built this for myself, and honestly it changed everything. now i want to share it with you.</p>
+
+    <p style="margin-top: 24px;"><strong style="color: #e5e7eb;">here's what you can practice:</strong></p>
     <ul style="color: #9ca3af; padding-left: 20px;">
-      <li><strong style="color: #e5e7eb;">Data Structures & Algorithms</strong> - From Two Pointers to Dynamic Programming</li>
-      <li><strong style="color: #e5e7eb;">System Design</strong> - Design scalable systems like the pros</li>
-      <li><strong style="color: #e5e7eb;">Bug Fixing</strong> - Debug code under pressure</li>
+      <li><strong style="color: #e5e7eb;">DSA stuff</strong> - two pointers, sliding window, trees, dp... all of it</li>
+      <li><strong style="color: #e5e7eb;">system design</strong> - because faang loves asking about scale</li>
+      <li><strong style="color: #e5e7eb;">debugging</strong> - find bugs under pressure like a real interview</li>
     </ul>
 
     <div style="text-align: center; margin: 32px 0;">
-      <a href="${data.appUrl}/dashboard" class="cta-button">Start Your First Practice</a>
+      <a href="${data.appUrl}/dashboard" class="cta-button">jump in and try it</a>
     </div>
 
     <div class="tip-box">
-      <p><strong>Pro tip:</strong> 15 minutes of daily practice beats 2-hour cramming sessions. Consistency is the key to interview success.</p>
+      <p><strong>honest advice:</strong> 15 mins a day beats 2 hour cram sessions every time. i tried both. trust me on this one.</p>
     </div>
 
-    <div class="science-note">
-      <p><strong>The Science:</strong> Research shows spaced practice improves retention by 200%. We'll send you smart reminders to help you remember what you've learned.</p>
-    </div>
+    <p>if you ever get stuck or have questions, just reply to this email - it actually goes to me. seriously, i read everything.</p>
 
-    <p>Ready to level up your interview skills?</p>
+    <p>let's get you that offer 🙌</p>
 
-    <p style="color: #e5e7eb;">- The CodeSparring Team</p>
+    <p style="color: #e5e7eb;">- nikayel<br/>
+    <span style="color: #9ca3af; font-size: 14px;">cs senior @ sac state | founder of codesparring</span></p>
   `;
 
   return emailWrapper(content);
@@ -233,20 +237,31 @@ export function getWelcomeEmailHtml(data: WelcomeEmailData): string {
 
 export function getWelcomeEmailText(data: WelcomeEmailData): string {
   return `
-Welcome to CodeSparring, ${data.userName || "there"}!
+hey ${data.userName || "there"}!
 
-You're one step closer to acing your next technical interview.
+i'm nikayel - a senior at sac state who built codesparring because i was literally in your shoes not too long ago.
 
-CodeSparring is your AI-powered interview partner that helps you practice:
-- Data Structures & Algorithms
-- System Design
-- Bug Fixing
+real talk: i used to bomb interviews. like, embarrassingly bad. i'd grind leetcode for hours, feel prepared, then completely blank when the interviewer asked me to explain my approach. sound familiar?
 
-Start your first practice: ${data.appUrl}/dashboard
+turns out i was studying wrong. cramming doesn't work - your brain literally forgets 70% of what you learned within 24 hours (there's actual science behind this called the "forgetting curve"). what does work is spaced practice - short, consistent sessions spread out over time.
 
-Pro tip: 15 minutes of daily practice beats 2-hour cramming sessions.
+so i built this for myself, and honestly it changed everything. now i want to share it with you.
 
-- The CodeSparring Team
+here's what you can practice:
+- DSA stuff - two pointers, sliding window, trees, dp... all of it
+- system design - because faang loves asking about scale
+- debugging - find bugs under pressure like a real interview
+
+jump in and try it: ${data.appUrl}/dashboard
+
+honest advice: 15 mins a day beats 2 hour cram sessions every time. i tried both. trust me on this one.
+
+if you ever get stuck or have questions, just reply to this email - it actually goes to me. seriously, i read everything.
+
+let's get you that offer!
+
+- nikayel
+cs senior @ sac state | founder of codesparring
 
 ---
 Unsubscribe: ${data.appUrl}/settings/notifications
@@ -808,7 +823,7 @@ export function getPaymentFailedEmailHtml(data: PaymentFailedEmailData): string 
     </div>
 
     <p style="color: #9ca3af; font-size: 14px;">
-      Need help? Reply to this email or contact us at support@skillon.ai
+      Need help? Reply to this email or contact us at support@codesparring.dev
     </p>
   `;
 
@@ -830,7 +845,7 @@ What happens next:
 - We'll attempt to charge your card again automatically
 - If payment continues to fail, your account will be downgraded to Free
 
-Need help? Contact us at support@skillon.ai
+Need help? Contact us at support@codesparring.dev
 
 - The CodeSparring Team
 
