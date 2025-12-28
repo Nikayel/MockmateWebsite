@@ -59,17 +59,13 @@ export function Header() {
                   <LayoutDashboard className="h-4 w-4" />
                   <span>Dashboard</span>
                 </Link>
-                <Link href="/account" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
-                  <User className="h-4 w-4" />
-                  <span>Account</span>
+                <Link href="/interview" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
+                  <Terminal className="h-4 w-4" />
+                  <span>Interview</span>
                 </Link>
                 <Link href="/sessions" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
                   <Clock className="h-4 w-4" />
                   <span>Sessions</span>
-                </Link>
-                <Link href="/interview" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
-                  <Terminal className="h-4 w-4" />
-                  <span>Practice</span>
                 </Link>
                 <Link href="/roadmap" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
                   <Map className="h-4 w-4" />
@@ -78,6 +74,10 @@ export function Header() {
                 <Link href="/practice" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
                   <Brain className="h-4 w-4" />
                   <span>Review</span>
+                </Link>
+                <Link href="/account" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
+                  <User className="h-4 w-4" />
+                  <span>Account</span>
                 </Link>
                 <div className="flex items-center space-x-3 pl-4 border-l border-white/10">
                   <NotificationBell />
@@ -106,6 +106,9 @@ export function Header() {
                 </Link>
                 <Link href="/docs" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
                   Docs
+                </Link>
+                <Link href="/careers" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
+                  Join Us
                 </Link>
                 <Link href="/login">
                   <Button
@@ -144,12 +147,12 @@ export function Header() {
                     <span>Dashboard</span>
                   </Link>
                   <Link
-                    href="/account"
+                    href="/interview"
                     className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-2"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    <User className="h-4 w-4" />
-                    <span>Account</span>
+                    <Terminal className="h-4 w-4" />
+                    <span>Interview</span>
                   </Link>
                   <Link
                     href="/sessions"
@@ -158,14 +161,6 @@ export function Header() {
                   >
                     <Clock className="h-4 w-4" />
                     <span>Sessions</span>
-                  </Link>
-                  <Link
-                    href="/interview"
-                    className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-2"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <Terminal className="h-4 w-4" />
-                    <span>Practice</span>
                   </Link>
                   <Link
                     href="/roadmap"
@@ -182,6 +177,14 @@ export function Header() {
                   >
                     <Brain className="h-4 w-4" />
                     <span>Review</span>
+                  </Link>
+                  <Link
+                    href="/account"
+                    className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-2"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <User className="h-4 w-4" />
+                    <span>Account</span>
                   </Link>
                   <div className="pt-4 border-t border-white/10">
                     <p className="text-sm text-gray-400 mb-2">{user.user_metadata?.full_name || user.email}</p>
@@ -227,6 +230,13 @@ export function Header() {
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Docs
+                  </Link>
+                  <Link
+                    href="/careers"
+                    className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Join Us
                   </Link>
                   <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
                     <Button
