@@ -29,7 +29,7 @@ interface ProductTourProps {
 const tourSteps = [
   {
     id: "welcome",
-    title: "Welcome to Skillon!",
+    title: "Welcome to CodeSparring!",
     description: "Let's take a quick tour of how to master coding interviews with AI-powered practice.",
     icon: Sparkles,
     color: "from-[#00d9ff] to-[#00ff88]",
@@ -228,7 +228,7 @@ export function ProductTour({ isOpen, userId, userName, onComplete, onSkip }: Pr
                 </div>
                 <h2 className="text-2xl font-heading font-bold text-white mb-2">
                   {step.id === "welcome" && userName
-                    ? `Welcome to Skillon, ${userName}!`
+                    ? `Welcome to CodeSparring, ${userName}!`
                     : step.title}
                 </h2>
                 <p className="text-white/90 max-w-md">

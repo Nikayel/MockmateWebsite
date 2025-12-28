@@ -1,5 +1,5 @@
 /**
- * Email Templates for Skillon
+ * Email Templates for CodeSparring
  *
  * Science-backed email templates for:
  * - Welcome emails (63.9% open rate - highest engagement)
@@ -162,23 +162,23 @@ const emailWrapper = (content: string) => `
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Skillon</title>
+  <title>CodeSparring</title>
   <style>${baseStyles}</style>
 </head>
 <body>
   <div class="container">
     <div class="card">
       <div class="logo">
-        <span class="logo-text">Skillon</span>
+        <span class="logo-text">CodeSparring</span>
       </div>
       ${content}
     </div>
     <div class="footer">
       <p>
         <a href="{{unsubscribeUrl}}">Unsubscribe</a> |
-        <a href="https://skillon.dev/account">Email Preferences</a>
+        <a href="https://codesparring.dev/account">Email Preferences</a>
       </p>
-      <p>Skillon - AI-Powered Interview Practice</p>
+      <p>CodeSparring - AI-Powered Interview Practice</p>
     </div>
   </div>
 </body>
@@ -194,16 +194,16 @@ export interface WelcomeEmailData {
 }
 
 export function getWelcomeEmailSubject(): string {
-  return "Welcome to Skillon - Let's ace your next interview";
+  return "Welcome to CodeSparring - Let's ace your next interview";
 }
 
 export function getWelcomeEmailHtml(data: WelcomeEmailData): string {
   const content = `
-    <h1>Welcome to Skillon, ${data.userName || "there"}!</h1>
+    <h1>Welcome to CodeSparring, ${data.userName || "there"}!</h1>
 
     <p>You're one step closer to acing your next technical interview.</p>
 
-    <p>Skillon is your AI-powered interview partner that helps you practice:</p>
+    <p>CodeSparring is your AI-powered interview partner that helps you practice:</p>
 
     <ul style="color: #9ca3af; padding-left: 20px;">
       <li><strong style="color: #e5e7eb;">Data Structures & Algorithms</strong> - From Two Pointers to Dynamic Programming</li>
@@ -225,7 +225,7 @@ export function getWelcomeEmailHtml(data: WelcomeEmailData): string {
 
     <p>Ready to level up your interview skills?</p>
 
-    <p style="color: #e5e7eb;">- The Skillon Team</p>
+    <p style="color: #e5e7eb;">- The CodeSparring Team</p>
   `;
 
   return emailWrapper(content);
@@ -233,11 +233,11 @@ export function getWelcomeEmailHtml(data: WelcomeEmailData): string {
 
 export function getWelcomeEmailText(data: WelcomeEmailData): string {
   return `
-Welcome to Skillon, ${data.userName || "there"}!
+Welcome to CodeSparring, ${data.userName || "there"}!
 
 You're one step closer to acing your next technical interview.
 
-Skillon is your AI-powered interview partner that helps you practice:
+CodeSparring is your AI-powered interview partner that helps you practice:
 - Data Structures & Algorithms
 - System Design
 - Bug Fixing
@@ -246,7 +246,7 @@ Start your first practice: ${data.appUrl}/dashboard
 
 Pro tip: 15 minutes of daily practice beats 2-hour cramming sessions.
 
-- The Skillon Team
+- The CodeSparring Team
 
 ---
 Unsubscribe: ${data.appUrl}/settings/notifications
@@ -340,7 +340,7 @@ Even 5 minutes can reset your learning curve.
 
 Start a quick practice: ${data.appUrl}/dashboard
 
-- The Skillon Team
+- The CodeSparring Team
 
 ---
 Unsubscribe: ${data.appUrl}/settings/notifications
@@ -433,7 +433,7 @@ Reviewing now will double how long you remember this material.
 
 Review now: ${data.appUrl}/dashboard
 
-- The Skillon Team
+- The CodeSparring Team
 
 ---
 Unsubscribe: ${data.appUrl}/settings/notifications
@@ -627,7 +627,7 @@ Progress: ${data.questionsCompleted}/${data.totalQuestions} questions (${Math.ro
 
 Start practicing: ${data.appUrl}/roadmap
 
-- The Skillon Team
+- The CodeSparring Team
 
 ---
 Unsubscribe: ${data.appUrl}/settings/notifications
@@ -778,7 +778,7 @@ export interface PaymentFailedEmailData {
 }
 
 export function getPaymentFailedEmailSubject(): string {
-  return "Action required: Your Skillon payment failed";
+  return "Action required: Your CodeSparring payment failed";
 }
 
 export function getPaymentFailedEmailHtml(data: PaymentFailedEmailData): string {
@@ -787,7 +787,7 @@ export function getPaymentFailedEmailHtml(data: PaymentFailedEmailData): string 
 
     <div class="tip-box" style="background: rgba(239, 68, 68, 0.1); border-left-color: #ef4444;">
       <p style="color: #ef4444; margin: 0;">
-        Your recent payment for Skillon Pro could not be processed.
+        Your recent payment for CodeSparring Pro could not be processed.
         ${data.failureReason ? `<br/><strong>Reason:</strong> ${data.failureReason}` : ''}
       </p>
     </div>
@@ -819,7 +819,7 @@ export function getPaymentFailedEmailText(data: PaymentFailedEmailData): string 
   return `
 Hey ${data.userName || 'there'},
 
-We had trouble processing your payment for Skillon Pro.
+We had trouble processing your payment for CodeSparring Pro.
 ${data.failureReason ? `Reason: ${data.failureReason}` : ''}
 
 To keep your Pro access, please update your payment method:
@@ -832,7 +832,7 @@ What happens next:
 
 Need help? Contact us at support@skillon.ai
 
-- The Skillon Team
+- The CodeSparring Team
 
 ---
 Unsubscribe: ${data.appUrl}/settings/notifications
@@ -852,7 +852,7 @@ export interface SubscriptionConfirmationEmailData {
 }
 
 export function getSubscriptionConfirmationEmailSubject(): string {
-  return "Welcome to Skillon Pro - Your subscription is active!";
+  return "Welcome to CodeSparring Pro - Your subscription is active!";
 }
 
 export function getSubscriptionConfirmationEmailHtml(data: SubscriptionConfirmationEmailData): string {
@@ -865,7 +865,7 @@ export function getSubscriptionConfirmationEmailHtml(data: SubscriptionConfirmat
     : 'N/A';
 
   const content = `
-    <h1>Welcome to Skillon Pro, ${data.userName || 'there'}!</h1>
+    <h1>Welcome to CodeSparring Pro, ${data.userName || 'there'}!</h1>
 
     <p>Thank you for upgrading to <strong class="highlight">Pro</strong>! Your subscription is now active.</p>
 
@@ -913,7 +913,7 @@ export function getSubscriptionConfirmationEmailText(data: SubscriptionConfirmat
     : 'N/A';
 
   return `
-Welcome to Skillon Pro, ${data.userName || 'there'}!
+Welcome to CodeSparring Pro, ${data.userName || 'there'}!
 
 Thank you for upgrading to Pro! Your subscription is now active.
 
@@ -932,7 +932,7 @@ Start practicing: ${data.appUrl}/dashboard
 
 Manage your subscription: ${data.appUrl}/settings/billing
 
-- The Skillon Team
+- The CodeSparring Team
 
 ---
 Unsubscribe: ${data.appUrl}/settings/notifications
@@ -951,8 +951,8 @@ export interface SubscriptionCancellationEmailData {
 
 export function getSubscriptionCancellationEmailSubject(isImmediate: boolean): string {
   return isImmediate
-    ? "Your Skillon Pro subscription has ended"
-    : "Your Skillon Pro cancellation is confirmed";
+    ? "Your CodeSparring Pro subscription has ended"
+    : "Your CodeSparring Pro cancellation is confirmed";
 }
 
 export function getSubscriptionCancellationEmailHtml(data: SubscriptionCancellationEmailData): string {
@@ -970,7 +970,7 @@ export function getSubscriptionCancellationEmailHtml(data: SubscriptionCancellat
 
       <p>Hey ${data.userName || 'there'},</p>
 
-      <p>Your Skillon Pro subscription has ended. You've been moved to our Free plan.</p>
+      <p>Your CodeSparring Pro subscription has ended. You've been moved to our Free plan.</p>
 
       <div class="tip-box" style="background: rgba(251, 191, 36, 0.1); border-left-color: #fbbf24;">
         <p style="color: #fbbf24; margin: 0;">
@@ -1034,7 +1034,7 @@ Your subscription has ended
 
 Hey ${data.userName || 'there'},
 
-Your Skillon Pro subscription has ended. You've been moved to our Free plan.
+Your CodeSparring Pro subscription has ended. You've been moved to our Free plan.
 
 You now have access to 5 interview sessions per month.
 
@@ -1042,7 +1042,7 @@ We're sorry to see you go! If you ever want to come back, your progress and hist
 
 Resubscribe to Pro: ${data.appUrl}/pricing
 
-- The Skillon Team
+- The CodeSparring Team
 
 ---
 Unsubscribe: ${data.appUrl}/settings/notifications
@@ -1063,7 +1063,7 @@ Good news! You'll keep full Pro access until ${formattedDate}. Make the most of 
 Changed your mind? Reactivate your subscription:
 ${data.appUrl}/settings/billing
 
-- The Skillon Team
+- The CodeSparring Team
 
 ---
 Unsubscribe: ${data.appUrl}/settings/notifications
@@ -1080,7 +1080,7 @@ export interface TrialEndingEmailData {
 }
 
 export function getTrialEndingEmailSubject(): string {
-  return "Your Skillon Pro trial ends in 3 days";
+  return "Your CodeSparring Pro trial ends in 3 days";
 }
 
 export function getTrialEndingEmailHtml(data: TrialEndingEmailData): string {
@@ -1097,7 +1097,7 @@ export function getTrialEndingEmailHtml(data: TrialEndingEmailData): string {
 
     <p>Hey ${data.userName || 'there'},</p>
 
-    <p>Your Skillon Pro trial is ending on <strong class="highlight">${formattedDate}</strong>.</p>
+    <p>Your CodeSparring Pro trial is ending on <strong class="highlight">${formattedDate}</strong>.</p>
 
     <div class="stat-card" style="text-align: center; margin: 24px 0;">
       <div class="stat-value">3</div>
@@ -1142,7 +1142,7 @@ Your Pro trial ends soon!
 
 Hey ${data.userName || 'there'},
 
-Your Skillon Pro trial is ending on ${formattedDate}.
+Your CodeSparring Pro trial is ending on ${formattedDate}.
 
 What happens next?
 After your trial ends, your payment method will be charged automatically. If you don't want to continue, you can cancel before ${formattedDate}.
@@ -1157,7 +1157,7 @@ Manage your subscription: ${data.appUrl}/settings/billing
 
 Have questions? Reply to this email and we'll be happy to help!
 
-- The Skillon Team
+- The CodeSparring Team
 
 ---
 Unsubscribe: ${data.appUrl}/settings/notifications

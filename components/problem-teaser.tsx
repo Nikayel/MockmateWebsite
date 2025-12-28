@@ -189,7 +189,7 @@ export function ProblemTeaser() {
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-0.5 bg-neural rounded-full" />
-                    <span className="text-gray-500">With Skillon</span>
+                    <span className="text-gray-500">With CodeSparring</span>
                   </div>
                 </div>
               </div>

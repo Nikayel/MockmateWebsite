@@ -11,7 +11,7 @@ const roles = [
   {
     icon: Rocket,
     title: "Growth",
-    description: "Help us get Skillon in front of more developers. You'll figure out what works, run experiments, and grow our user base. No fluff, just results.",
+    description: "Help us get CodeSparring in front of more developers. You'll figure out what works, run experiments, and grow our user base. No fluff, just results.",
     color: "#00d9ff",
   },
   {

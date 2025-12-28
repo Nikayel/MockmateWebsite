@@ -78,7 +78,7 @@ export default function LegalPage() {
                 </div>
 
                 <p>
-                  Skillon (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) respects your privacy and is committed to protecting your personal data.
+                  CodeSparring (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) respects your privacy and is committed to protecting your personal data.
                   This privacy policy explains how we collect, use, store, and protect your information when you use our
                   AI-powered technical interview practice platform.
                 </p>
@@ -316,7 +316,7 @@ export default function LegalPage() {
                 </p>
 
                 <p>
-                  By accessing or using Skillon (&quot;the Service&quot;), you agree to be bound by these Terms of Service.
+                  By accessing or using CodeSparring (&quot;the Service&quot;), you agree to be bound by these Terms of Service.
                   If you do not agree to these terms, please do not use our Service.
                 </p>
 
@@ -327,7 +327,7 @@ export default function LegalPage() {
                     Age Requirement
                   </h4>
                   <p className="text-sm">
-                    <strong>You must be at least 16 years old to use Skillon.</strong> By creating an account,
+                    <strong>You must be at least 16 years old to use CodeSparring.</strong> By creating an account,
                     you confirm that you are at least 16 years of age. If you are under 18, you confirm that
                     you have your parent or guardian&apos;s permission to use this Service.
                   </p>
@@ -373,7 +373,7 @@ export default function LegalPage() {
                     you write during practice sessions. We do not claim any intellectual property rights over your code.
                   </p>
                   <p className="text-sm mb-3">
-                    <strong className="text-white">Our Service:</strong> Skillon, including our platform, AI systems,
+                    <strong className="text-white">Our Service:</strong> CodeSparring, including our platform, AI systems,
                     problem sets, and content, is protected by intellectual property laws. You may not copy, modify,
                     or distribute our materials without permission.
                   </p>
@@ -447,7 +447,7 @@ export default function LegalPage() {
                 <div>
                   <h4 className="text-white font-semibold mt-6 mb-3">Indemnification</h4>
                   <p className="text-sm">
-                    You agree to indemnify and hold harmless Skillon, its officers, directors, employees, and
+                    You agree to indemnify and hold harmless CodeSparring, its officers, directors, employees, and
                     agents from any claims, damages, losses, or expenses (including reasonable attorney fees)
                     arising from your use of the Service, your violation of these Terms, or your violation of
                     any rights of a third party.
@@ -459,7 +459,7 @@ export default function LegalPage() {
                   <h4 className="text-white font-semibold mt-6 mb-3">Dispute Resolution</h4>
                   <p className="text-sm mb-3">
                     <strong className="text-white">Informal Resolution:</strong> Before filing any legal claim,
-                    you agree to contact us at legal@skillon.dev and attempt to resolve the dispute informally
+                    you agree to contact us at legal@codesparring.dev and attempt to resolve the dispute informally
                     for at least 30 days.
                   </p>
                   <p className="text-sm mb-3">
@@ -519,7 +519,7 @@ export default function LegalPage() {
                 </p>
 
                 <p>
-                  This Cookie Policy explains how Skillon uses cookies and similar technologies to recognize
+                  This Cookie Policy explains how CodeSparring uses cookies and similar technologies to recognize
                   you when you visit our platform.
                 </p>
 
@@ -742,8 +742,8 @@ export default function LegalPage() {
 
                 <div className="mt-4">
                   <p className="text-xs text-gray-500">
-                    Skillon is operated in the United States. For EU users, our representative can be
-                    contacted at privacy@skillon.dev.
+                    CodeSparring is operated in the United States. For EU users, our representative can be
+                    contacted at privacy@codesparring.dev.
                   </p>
                 </div>
 

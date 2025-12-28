@@ -359,7 +359,7 @@ export default function PracticeFeedback({
 
     doc.setFontSize(20)
     doc.setFont("helvetica", "bold")
-    doc.text("Skillon - Interview Feedback", margin, y)
+    doc.text("CodeSparring - Interview Feedback", margin, y)
     y += 12
 
     doc.setFontSize(10)

@@ -1,10 +1,10 @@
-# Skillon
+# CodeSparring
 
-The web platform and user dashboard for Skillon - an AI-powered coding interview practice platform.
+The web platform and user dashboard for CodeSparring - an AI-powered coding interview practice platform.
 
-## What is Skillon?
+## What is CodeSparring?
 
-Skillon helps developers prepare for technical interviews by simulating realistic coding interviews with an AI interviewer. Practice in your browser with real-time feedback and comprehensive performance analytics.
+CodeSparring helps developers prepare for technical interviews by simulating realistic coding interviews with an AI interviewer. Practice in your browser with real-time feedback and comprehensive performance analytics.
 
 **VS Code Extension coming soon** - Sign up on the website to get notified when it launches!
 
@@ -41,8 +41,8 @@ Skillon helps developers prepare for technical interviews by simulating realisti
 
 1. Clone the repo:
 ```bash
-git clone https://github.com/Nikayel/skillon-website.git
-cd skillon-website
+git clone https://github.com/Nikayel/codesparring-website.git
+cd codesparring-website
 ```
 
 2. Install dependencies:
@@ -170,4 +170,4 @@ All API endpoints implement rate limiting for security and stability.
 
 ## Support
 
-For issues or questions, open an issue on GitHub or email support@skillon.dev
+For issues or questions, open an issue on GitHub or email support@codesparring.dev

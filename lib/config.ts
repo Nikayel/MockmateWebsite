@@ -9,7 +9,7 @@ export const PRICING_CONFIG = {
     price: 0,
     priceDisplay: "$0",
     period: "",
-    description: "Try Skillon and see if it's right for you",
+    description: "Try CodeSparring and see if it's right for you",
     sessionsPerMonth: 2,
     sessionsDisplay: "2 interview scenarios per month",
     features: [
@@ -129,11 +129,11 @@ export const PRICING_CONFIG = {
 } as const
 
 export const APP_CONFIG = {
-  name: "Skillon",
-  extensionId: "nikayel.skillon", // Coming soon
+  name: "CodeSparring",
+  extensionId: "nikayel.codesparring", // Coming soon
   extensionComingSoon: true,
-  supportEmail: "support@skillon.dev",
-  githubUrl: "https://github.com/nikayel/skillon",
+  supportEmail: "support@codesparring.dev",
+  githubUrl: "https://github.com/nikayel/codesparring",
 } as const
 
 // Helper function to get pricing based on platform

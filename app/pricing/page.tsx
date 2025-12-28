@@ -142,7 +142,7 @@ export default function PricingPage() {
                   <div className="flex items-baseline gap-2 mb-2">
                     <span className="text-5xl font-black text-white">$0</span>
                   </div>
-                  <p className="text-gray-400">Try Skillon and see if it's right for you</p>
+                  <p className="text-gray-400">Try CodeSparring and see if it's right for you</p>
                 </div>
 
                 <ul className="space-y-4 mb-8">

@@ -16,13 +16,13 @@ export const metadata: Metadata = {
     canonical: "/samples",
   },
   openGraph: {
-    title: "Sample Interview Feedback Reports | Skillon",
+    title: "Sample Interview Feedback Reports | CodeSparring",
     description: "See what detailed AI-powered interview feedback looks like. From A+ performances to areas needing improvement.",
     url: "/samples",
     type: "website",
   },
   twitter: {
-    title: "Sample Interview Feedback Reports | Skillon",
+    title: "Sample Interview Feedback Reports | CodeSparring",
     description: "See what detailed AI-powered interview feedback looks like.",
   },
 }

@@ -325,7 +325,7 @@ function UpgradePageContent() {
             <div className="text-center space-y-4 mb-12">
               <div className="inline-flex items-center rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-emerald-200">
                 <CheckCircle className="mr-2 h-5 w-5 text-emerald-400" />
-                You're already enjoying Skillon Pro!
+                You're already enjoying CodeSparring Pro!
               </div>
               <Button
                 onClick={() => router.push("/account")}

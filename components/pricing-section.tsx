@@ -273,7 +273,7 @@ export function PricingSection() {
               </ul>
 
               {/* CTA Button */}
-              <Link href="mailto:enterprise@skillon.dev?subject=Skillon Enterprise Inquiry" className="block mt-auto">
+              <Link href="mailto:enterprise@codesparring.dev?subject=CodeSparring Enterprise Inquiry" className="block mt-auto">
                 <MagneticButton
                   variant="outline"
                   glowColor="none"

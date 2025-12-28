@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 
 export const metadata: Metadata = {
   title: "How It Works - Science-Backed Interview Prep",
-  description: "Learn how Skillon uses spaced repetition, the testing effect, and 40 years of cognitive science research to help you retain DSA patterns and ace coding interviews.",
+  description: "Learn how CodeSparring uses spaced repetition, the testing effect, and 40 years of cognitive science research to help you retain DSA patterns and ace coding interviews.",
   keywords: [
     "spaced repetition coding",
     "interview prep science",
@@ -17,13 +17,13 @@ export const metadata: Metadata = {
     canonical: "/why-skillon",
   },
   openGraph: {
-    title: "How It Works - Science-Backed Interview Prep | Skillon",
+    title: "How It Works - Science-Backed Interview Prep | CodeSparring",
     description: "Stop guessing how much to practice. Our algorithm calculates exactly when and how often to review each problem.",
     url: "/why-skillon",
     type: "website",
   },
   twitter: {
-    title: "How It Works - Science-Backed Interview Prep | Skillon",
+    title: "How It Works - Science-Backed Interview Prep | CodeSparring",
     description: "Stop guessing how much to practice. Our algorithm calculates exactly when and how often to review each problem.",
   },
 }
