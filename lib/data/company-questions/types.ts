@@ -193,7 +193,7 @@ export interface PersonalizedRoadmap {
   // Optional RAG enhancements
   ragEnhancements?: {
     enabled: boolean
-    patternInsights?: Array<{
+    patternInsights: Array<{
       pattern: DSAPattern
       importance: number
       companyFrequency: number
@@ -204,13 +204,13 @@ export interface PersonalizedRoadmap {
     }>
     companyTips: string[]
     personalizedAdvice: string[]
-    adaptiveAdjustments?: Array<{
+    adaptiveAdjustments: Array<{
       type: 'difficulty' | 'pattern-focus' | 'time-allocation' | 'review-schedule'
       description: string
       reason: string
       impact: 'high' | 'medium' | 'low'
     }>
-    studyStrategies?: Array<{
+    studyStrategies: Array<{
       name: string
       description: string
       applicablePatterns: DSAPattern[]
