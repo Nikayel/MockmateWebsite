@@ -189,4 +189,33 @@ export interface PersonalizedRoadmap {
   status: 'active' | 'completed' | 'abandoned'
   isOnTrack: boolean
   daysAhead: number  // Positive = ahead, negative = behind
+
+  // Optional RAG enhancements
+  ragEnhancements?: {
+    enabled: boolean
+    patternInsights?: Array<{
+      pattern: DSAPattern
+      importance: number
+      companyFrequency: number
+      suggestedApproach: string
+      tips: string[]
+      estimatedPracticeTime: number
+      prerequisitesMet: boolean
+    }>
+    companyTips: string[]
+    personalizedAdvice: string[]
+    adaptiveAdjustments?: Array<{
+      type: 'difficulty' | 'pattern-focus' | 'time-allocation' | 'review-schedule'
+      description: string
+      reason: string
+      impact: 'high' | 'medium' | 'low'
+    }>
+    studyStrategies?: Array<{
+      name: string
+      description: string
+      applicablePatterns: DSAPattern[]
+      estimatedBenefit: string
+      priority: number
+    }>
+  }
 }
