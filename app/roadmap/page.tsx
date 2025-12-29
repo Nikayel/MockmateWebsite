@@ -501,7 +501,7 @@ export default function RoadmapPage() {
                     >
                       <span className="flex items-center gap-2">
                         <Zap className="h-3 w-3 text-primary" />
-                        {roadmap.ragEnhancements?.companyTips?.length > 0
+                        {(roadmap.ragEnhancements?.companyTips?.length ?? 0) > 0
                           ? `${roadmap.companyName} interview tips & study strategies`
                           : 'Study tips available'}
                       </span>
