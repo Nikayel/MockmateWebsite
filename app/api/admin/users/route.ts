@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
       return {
         id: doc.id,
         email: data.email || "",
-        full_name: data.full_name || data.display_name || "",
+        full_name: data.full_name || "",
         subscription_tier: data.subscription_tier || "free",
         subscription_status: data.subscription_status || "none",
         created_at: data.created_at || "",
