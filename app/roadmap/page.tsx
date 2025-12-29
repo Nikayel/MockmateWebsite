@@ -493,7 +493,7 @@ export default function RoadmapPage() {
                 </div>
 
                 {/* Company Tips & Study Tips Toggle */}
-                {(roadmap.ragEnhancements?.companyTips?.length > 0 || recommendations.length > 0) && (
+                {((roadmap.ragEnhancements?.companyTips?.length ?? 0) > 0 || recommendations.length > 0) && (
                   <div className="border-t border-border">
                     <button
                       onClick={() => setShowTips(!showTips)}
