@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
     if (profileSnap.exists) {
       const profile = profileSnap.data();
       if (profile?.welcome_email_sent) {
+        console.log("[Welcome Email API] Welcome email already sent for user:", userId);
         return NextResponse.json({
           success: true,
           message: "Welcome email already sent",
@@ -112,9 +113,13 @@ export async function POST(request: NextRequest) {
       error: result.error,
     });
   } catch (error: any) {
-    console.error("[Welcome Email] Error:", error);
+    console.error("[Welcome Email API] Unexpected error:", error);
+    console.error("[Welcome Email API] Error stack:", error?.stack);
     return NextResponse.json(
-      { error: error.message || "Failed to send welcome email" },
+      { 
+        success: false,
+        error: error.message || "Failed to send welcome email" 
+      },
       { status: 500 }
     );
   }
