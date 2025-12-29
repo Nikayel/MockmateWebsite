@@ -62,7 +62,15 @@ export interface EmailResult {
 }
 
 /**
- * Send a transactional email via Brevo
+ * Helper to wait for a specified time
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Send a transactional email via Brevo with retry logic
+ * Retries up to 3 times with exponential backoff for transient failures
  */
 export async function sendEmail(options: SendEmailOptions): Promise<EmailResult> {
   // Check if API key is configured
@@ -71,43 +79,71 @@ export async function sendEmail(options: SendEmailOptions): Promise<EmailResult>
     return { success: false, error: "BREVO_API_KEY not configured" };
   }
 
-  try {
-    const api = getEmailApi();
+  const MAX_RETRIES = 3;
+  const INITIAL_DELAY_MS = 1000;
+  let lastError: any;
 
-    const message = new SendSmtpEmail();
-    message.subject = options.subject;
-    message.htmlContent = options.htmlContent;
-    message.textContent = options.textContent;
-    message.sender = options.sender || DEFAULT_SENDER;
-    message.to = options.to.map(r => ({ email: r.email, name: r.name }));
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const api = getEmailApi();
 
-    if (options.replyTo) {
-      message.replyTo = options.replyTo;
+      const message = new SendSmtpEmail();
+      message.subject = options.subject;
+      message.htmlContent = options.htmlContent;
+      message.textContent = options.textContent;
+      message.sender = options.sender || DEFAULT_SENDER;
+      message.to = options.to.map(r => ({ email: r.email, name: r.name }));
+
+      if (options.replyTo) {
+        message.replyTo = options.replyTo;
+      }
+
+      if (options.tags) {
+        message.tags = options.tags;
+      }
+
+      if (options.params) {
+        message.params = options.params;
+      }
+
+      const result = await api.sendTransacEmail(message);
+
+      console.log(`[Brevo] Email sent successfully to ${options.to.map(r => r.email).join(", ")}`);
+
+      return {
+        success: true,
+        messageId: (result.body as any)?.messageId || "sent"
+      };
+    } catch (error: any) {
+      lastError = error;
+      const statusCode = error?.statusCode || error?.response?.statusCode;
+
+      // Only retry on transient errors (5xx, network issues, rate limits)
+      const isRetryable =
+        statusCode >= 500 ||
+        statusCode === 429 ||
+        error?.code === 'ECONNRESET' ||
+        error?.code === 'ETIMEDOUT' ||
+        error?.code === 'ENOTFOUND';
+
+      if (isRetryable && attempt < MAX_RETRIES - 1) {
+        const delayMs = INITIAL_DELAY_MS * Math.pow(2, attempt);
+        console.warn(`[Brevo] Transient error, retrying in ${delayMs}ms (attempt ${attempt + 1}/${MAX_RETRIES}):`,
+          error?.body?.message || error?.message);
+        await sleep(delayMs);
+        continue;
+      }
+
+      // Non-retryable error or max retries reached
+      break;
     }
-
-    if (options.tags) {
-      message.tags = options.tags;
-    }
-
-    if (options.params) {
-      message.params = options.params;
-    }
-
-    const result = await api.sendTransacEmail(message);
-
-    console.log(`[Brevo] Email sent successfully to ${options.to.map(r => r.email).join(", ")}`);
-
-    return {
-      success: true,
-      messageId: (result.body as any)?.messageId || "sent"
-    };
-  } catch (error: any) {
-    console.error("[Brevo] Failed to send email:", error?.body || error?.message || error);
-    return {
-      success: false,
-      error: error?.body?.message || error?.message || "Unknown error"
-    };
   }
+
+  console.error("[Brevo] Failed to send email after retries:", lastError?.body || lastError?.message || lastError);
+  return {
+    success: false,
+    error: lastError?.body?.message || lastError?.message || "Unknown error"
+  };
 }
 
 /**

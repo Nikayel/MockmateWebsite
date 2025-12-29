@@ -3,16 +3,39 @@
  *
  * Sends welcome email to new users.
  * Called after user signup/first login.
+ * Requires authentication to prevent spam abuse.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
+import { adminDb, adminAuth } from "@/lib/firebase-admin";
 import { sendWelcomeEmail } from "@/lib/email";
 
 const db = adminDb;
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify Firebase ID token for authentication
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.substring(7);
+    let authenticatedUserId: string;
+
+    try {
+      const decodedToken = await adminAuth.verifyIdToken(token);
+      authenticatedUserId = decodedToken.uid;
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid authentication token" },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { userId, email, displayName } = body;
 
@@ -20,6 +43,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "userId and email are required" },
         { status: 400 }
+      );
+    }
+
+    // Security: Only allow users to send welcome emails to themselves
+    if (userId !== authenticatedUserId) {
+      return NextResponse.json(
+        { error: "Cannot send welcome email for another user" },
+        { status: 403 }
       );
     }
 

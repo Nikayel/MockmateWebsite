@@ -95,6 +95,10 @@ export async function createOrUpdateProfile(
     if (existingProfile.goal !== undefined) {
       profileDataForFirestore.goal = existingProfile.goal
     }
+    // Preserve email notification data
+    if (existingProfile.welcome_email_sent !== undefined) {
+      profileDataForFirestore.welcome_email_sent = existingProfile.welcome_email_sent
+    }
   }
 
   // Build the Profile object for return (can have undefined optional fields)
@@ -112,6 +116,7 @@ export async function createOrUpdateProfile(
     subscription_platform: existingProfile?.subscription_platform,
     created_at: existingProfile?.created_at || new Date().toISOString(),
     updated_at: new Date().toISOString(),
+    welcome_email_sent: existingProfile?.welcome_email_sent,
   }
 
   try {

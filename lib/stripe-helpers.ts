@@ -235,6 +235,7 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
 
     // Step 3: If STILL no subscription found, search by user's email
     // This is critical for NEW subscribers who just completed checkout
+    // IMPORTANT: Prioritize customers with matching userId metadata to avoid conflicts
     if (!subscription && userEmail) {
       subscriptionLogger.info("Searching for Stripe customer by email", { email: userEmail })
       try {
@@ -246,8 +247,12 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
 
         subscriptionLogger.info("Found customers", { email: userEmail, count: customers.data.length })
 
-        // Check each customer for an active subscription
-        for (const customer of customers.data) {
+        // First pass: Only check customers with matching userId metadata (safest)
+        const matchingCustomers = customers.data.filter(c => c.metadata?.userId === userId)
+        const otherCustomers = customers.data.filter(c => c.metadata?.userId !== userId)
+
+        // Check matching customers first
+        for (const customer of matchingCustomers) {
           const subscriptions = await stripe.subscriptions.list({
             customer: customer.id,
             status: "active",
@@ -257,7 +262,7 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
           if (subscriptions.data.length > 0) {
             subscription = subscriptions.data[0]
             customerId = customer.id
-            subscriptionLogger.info("Found active subscription", { customerId: customer.id })
+            subscriptionLogger.info("Found active subscription with matching userId", { customerId: customer.id })
             break
           }
 
@@ -271,9 +276,45 @@ export async function syncSubscriptionFromStripe(userId: string): Promise<Profil
           if (trialingSubscriptions.data.length > 0) {
             subscription = trialingSubscriptions.data[0]
             customerId = customer.id
-            subscriptionLogger.info("Found trialing subscription", { customerId: customer.id })
+            subscriptionLogger.info("Found trialing subscription with matching userId", { customerId: customer.id })
             break
           }
+        }
+
+        // Only check other customers if no matching userId found AND there's only one customer
+        // This prevents accidentally linking to wrong user's subscription
+        if (!subscription && matchingCustomers.length === 0 && otherCustomers.length === 1) {
+          const customer = otherCustomers[0]
+          const subscriptions = await stripe.subscriptions.list({
+            customer: customer.id,
+            status: "active",
+            limit: 1,
+          })
+
+          if (subscriptions.data.length > 0) {
+            subscription = subscriptions.data[0]
+            customerId = customer.id
+            subscriptionLogger.info("Found active subscription (single customer by email)", { customerId: customer.id })
+          } else {
+            const trialingSubscriptions = await stripe.subscriptions.list({
+              customer: customer.id,
+              status: "trialing",
+              limit: 1,
+            })
+
+            if (trialingSubscriptions.data.length > 0) {
+              subscription = trialingSubscriptions.data[0]
+              customerId = customer.id
+              subscriptionLogger.info("Found trialing subscription (single customer by email)", { customerId: customer.id })
+            }
+          }
+        } else if (!subscription && otherCustomers.length > 1) {
+          // Multiple customers with same email but none match userId - don't auto-link
+          subscriptionLogger.warn("Multiple customers with email, none match userId - skipping auto-link", {
+            userId,
+            email: userEmail,
+            customerCount: otherCustomers.length
+          })
         }
       } catch (error) {
         subscriptionLogger.error("Error searching customers by email", { email: userEmail, error })

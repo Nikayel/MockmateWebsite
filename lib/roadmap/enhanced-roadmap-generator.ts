@@ -708,16 +708,28 @@ export function generateEnhancedRoadmap(
   // Create milestones
   const milestones = createEnhancedMilestones(dailyPlans, assessment, companyData);
 
-  // Calculate pattern coverage
-  const patternCoverage = new Map<DSAPattern, { total: number; completed: number }>();
-  for (const q of prioritizedQuestions) {
-    const existing = patternCoverage.get(q.pattern) || { total: 0, completed: 0 };
-    existing.total++;
-    patternCoverage.set(q.pattern, existing);
+  // Count ONLY questions that are actually scheduled in daily plans
+  // This ensures we don't show unrealistic counts like "71 problems in 7 days"
+  const scheduledQuestionIds = new Set<string>();
+  for (const plan of dailyPlans) {
+    for (const q of plan.questions) {
+      scheduledQuestionIds.add(q.scenarioId);
+    }
   }
 
-  // Calculate total hours
-  const totalMinutes = prioritizedQuestions.reduce((sum, q) => sum + q.estimatedMinutes, 0);
+  // Calculate pattern coverage from scheduled questions only
+  const patternCoverage = new Map<DSAPattern, { total: number; completed: number }>();
+  for (const q of prioritizedQuestions) {
+    if (scheduledQuestionIds.has(q.scenarioId)) {
+      const existing = patternCoverage.get(q.pattern) || { total: 0, completed: 0 };
+      existing.total++;
+      patternCoverage.set(q.pattern, existing);
+    }
+  }
+
+  // Calculate total hours from scheduled questions only
+  const scheduledQuestions = prioritizedQuestions.filter(q => scheduledQuestionIds.has(q.scenarioId));
+  const totalMinutes = scheduledQuestions.reduce((sum, q) => sum + q.estimatedMinutes, 0);
 
   const roadmap: PersonalizedRoadmap = {
     id: `roadmap-${userId}-${Date.now()}`,
@@ -728,7 +740,7 @@ export function generateEnhancedRoadmap(
     createdAt: new Date(),
     updatedAt: new Date(),
     assessment,
-    totalQuestions: prioritizedQuestions.length,
+    totalQuestions: scheduledQuestionIds.size, // Only count actually scheduled questions
     totalEstimatedHours: Math.round((totalMinutes / 60) * 10) / 10,
     questionsCompleted: 0,
     questionsSkipped: 0,

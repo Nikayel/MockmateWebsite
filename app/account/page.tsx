@@ -529,8 +529,12 @@ export default function AccountPage() {
                     <Progress value={usagePercentage} className="h-2" />
                   </div>
 
+                  <p className="text-xs text-gray-500 mt-2">
+                    Resets {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+                  </p>
+
                   {!isPro && usagePercentage > 80 && (
-                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 mt-2">
                       <p className="text-yellow-400 text-sm">
                         You're running low on sessions. Upgrade to Pro for unlimited access!
                       </p>
