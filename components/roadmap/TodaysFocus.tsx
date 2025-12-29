@@ -26,18 +26,10 @@ import {
   Building2,
   TrendingUp
 } from 'lucide-react'
-import { DailyPlan } from '@/lib/data/company-questions/types'
+import { DailyPlan, PersonalizedRoadmap } from '@/lib/data/company-questions/types'
 import { cn } from '@/lib/utils'
-import type { PatternInsight } from '@/lib/rag/roadmap-rag'
 
-interface RAGEnhancements {
-  enabled: boolean
-  patternInsights: PatternInsight[]
-  companyTips: string[]
-  personalizedAdvice: string[]
-  adaptiveAdjustments: { type: string; description: string; reason: string; impact: string }[]
-  studyStrategies: { name: string; description: string; priority: number }[]
-}
+type RAGEnhancements = NonNullable<PersonalizedRoadmap['ragEnhancements']>
 
 interface TodaysFocusProps {
   plan: DailyPlan
@@ -359,14 +351,14 @@ export function TodaysFocus({
               {/* Modal Content */}
               <div className="p-4 space-y-4">
                 {/* Company-Specific Tips */}
-                {ragEnhancements.companyTips.length > 0 && (
+                {(ragEnhancements.companyTips?.length ?? 0) > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <Building2 className="h-4 w-4 text-blue-500" />
                       {companyName ? `${companyName} Interview Tips` : 'Company Interview Tips'}
                     </div>
                     <ul className="space-y-1.5 pl-6">
-                      {ragEnhancements.companyTips.slice(0, 4).map((tip, i) => (
+                      {(ragEnhancements.companyTips?.slice(0, 4) || []).map((tip, i) => (
                         <li key={i} className="text-sm text-muted-foreground list-disc">
                           {tip}
                         </li>
@@ -376,14 +368,14 @@ export function TodaysFocus({
                 )}
 
                 {/* Pattern Insights */}
-                {ragEnhancements.patternInsights.length > 0 && (
+                {(ragEnhancements.patternInsights?.length ?? 0) > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <TrendingUp className="h-4 w-4 text-green-500" />
                       Pattern Focus for Today
                     </div>
                     <div className="space-y-2">
-                      {ragEnhancements.patternInsights.slice(0, 3).map((insight, i) => (
+                      {(ragEnhancements.patternInsights?.slice(0, 3) || []).map((insight, i) => (
                         <div key={i} className="p-3 bg-muted/50 rounded-lg">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-sm font-medium text-foreground capitalize">
@@ -413,14 +405,14 @@ export function TodaysFocus({
                 )}
 
                 {/* Personalized Advice */}
-                {ragEnhancements.personalizedAdvice.length > 0 && (
+                {(ragEnhancements.personalizedAdvice?.length ?? 0) > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <Zap className="h-4 w-4 text-yellow-500" />
                       Personalized for You
                     </div>
                     <ul className="space-y-1.5 pl-6">
-                      {ragEnhancements.personalizedAdvice.slice(0, 3).map((advice, i) => (
+                      {(ragEnhancements.personalizedAdvice?.slice(0, 3) || []).map((advice, i) => (
                         <li key={i} className="text-sm text-muted-foreground list-disc">
                           {advice}
                         </li>
@@ -430,14 +422,14 @@ export function TodaysFocus({
                 )}
 
                 {/* Study Strategies */}
-                {ragEnhancements.studyStrategies.length > 0 && (
+                {(ragEnhancements.studyStrategies?.length ?? 0) > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <Target className="h-4 w-4 text-purple-500" />
                       Recommended Strategies
                     </div>
                     <div className="space-y-2">
-                      {ragEnhancements.studyStrategies.slice(0, 2).map((strategy, i) => (
+                      {(ragEnhancements.studyStrategies?.slice(0, 2) || []).map((strategy, i) => (
                         <div key={i} className="p-3 bg-purple-500/5 border border-purple-500/20 rounded-lg">
                           <p className="text-sm font-medium text-foreground">{strategy.name}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">{strategy.description}</p>
@@ -448,15 +440,15 @@ export function TodaysFocus({
                 )}
 
                 {/* Adaptive Adjustments */}
-                {ragEnhancements.adaptiveAdjustments.length > 0 && (
+                {(ragEnhancements.adaptiveAdjustments?.length ?? 0) > 0 && (
                   <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
                     <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">
                       📊 Adaptive Adjustments Made
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {ragEnhancements.adaptiveAdjustments[0].description}
-                      {ragEnhancements.adaptiveAdjustments[0].reason && (
-                        <span className="italic"> — {ragEnhancements.adaptiveAdjustments[0].reason}</span>
+                      {ragEnhancements.adaptiveAdjustments?.[0]?.description}
+                      {ragEnhancements.adaptiveAdjustments?.[0]?.reason && (
+                        <span className="italic"> — {ragEnhancements.adaptiveAdjustments[0]?.reason}</span>
                       )}
                     </p>
                   </div>
