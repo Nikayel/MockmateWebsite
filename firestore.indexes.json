@@ -165,6 +165,24 @@
         { "fieldPath": "userId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "profiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "subscription_tier", "order": "ASCENDING" },
+        { "fieldPath": "subscription_type", "order": "ASCENDING" },
+        { "fieldPath": "subscription_current_period_end", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "profiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "subscription_type", "order": "ASCENDING" },
+        { "fieldPath": "subscription_tier", "order": "ASCENDING" },
+        { "fieldPath": "subscription_current_period_end", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
