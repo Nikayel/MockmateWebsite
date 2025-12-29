@@ -40,7 +40,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [usage, setUsage] = useState<{ used: number; limit: number; allowed: boolean } | null>(null)
+  const [usage, setUsage] = useState<{ used: number; limit: number; allowed: boolean; periodEnd?: string } | null>(null)
   const [sessions, setSessions] = useState<InterviewSession[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
@@ -248,7 +248,9 @@ export default function DashboardPage() {
                   {usage?.allowed ? `${usage.limit - (usage.used || 0)} sessions remaining` : "Limit reached"}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Resets {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  Resets {usage?.periodEnd
+                    ? new Date(usage.periodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    : 'next month'}
                 </p>
               </CardContent>
             </Card>
