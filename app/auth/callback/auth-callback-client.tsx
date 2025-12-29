@@ -43,8 +43,17 @@ export function AuthCallbackClient() {
           }
 
           // Send welcome email for new users (non-blocking, authenticated)
+          // Note: If this fails, cron job will retry within 24h
           if (shouldSendWelcome && firebaseUser.email) {
-            console.log("[Auth] Attempting to send welcome email for:", firebaseUser.email)
+            const logMessage = `[Auth] Attempting to send welcome email for: ${firebaseUser.email}`
+            console.log(logMessage)
+            // Store in localStorage for debugging even after redirect
+            try {
+              const existingLogs = JSON.parse(localStorage.getItem("auth_logs") || "[]")
+              existingLogs.push({ time: new Date().toISOString(), message: logMessage })
+              localStorage.setItem("auth_logs", JSON.stringify(existingLogs.slice(-10))) // Keep last 10
+            } catch {}
+            
             const idToken = await firebaseUser.getIdToken()
             fetch("/api/email/welcome", {
               method: "POST",
@@ -61,20 +70,44 @@ export function AuthCallbackClient() {
               .then(async (res) => {
                 if (!res.ok) {
                   const errorText = await res.text()
-                  console.error("[Auth] Welcome email HTTP error:", res.status, errorText)
+                  const errorMsg = `[Auth] Welcome email HTTP error: ${res.status} ${errorText}`
+                  console.error(errorMsg)
+                  try {
+                    const existingLogs = JSON.parse(localStorage.getItem("auth_logs") || "[]")
+                    existingLogs.push({ time: new Date().toISOString(), message: errorMsg, error: true })
+                    localStorage.setItem("auth_logs", JSON.stringify(existingLogs.slice(-10)))
+                  } catch {}
                   return { success: false, error: `HTTP ${res.status}: ${errorText}` }
                 }
                 return res.json()
               })
               .then((data) => {
                 if (data?.success) {
-                  console.log("[Auth] Welcome email sent successfully", data)
+                  const successMsg = `[Auth] Welcome email sent successfully: ${JSON.stringify(data)}`
+                  console.log(successMsg)
+                  try {
+                    const existingLogs = JSON.parse(localStorage.getItem("auth_logs") || "[]")
+                    existingLogs.push({ time: new Date().toISOString(), message: successMsg })
+                    localStorage.setItem("auth_logs", JSON.stringify(existingLogs.slice(-10)))
+                  } catch {}
                 } else {
-                  console.error("[Auth] Welcome email failed:", data?.error || data)
+                  const errorMsg = `[Auth] Welcome email failed: ${data?.error || JSON.stringify(data)}`
+                  console.error(errorMsg)
+                  try {
+                    const existingLogs = JSON.parse(localStorage.getItem("auth_logs") || "[]")
+                    existingLogs.push({ time: new Date().toISOString(), message: errorMsg, error: true })
+                    localStorage.setItem("auth_logs", JSON.stringify(existingLogs.slice(-10)))
+                  } catch {}
                 }
               })
               .catch((err) => {
-                console.error("[Auth] Welcome email request failed:", err)
+                const errorMsg = `[Auth] Welcome email request failed: ${err.message || err}`
+                console.error(errorMsg)
+                try {
+                  const existingLogs = JSON.parse(localStorage.getItem("auth_logs") || "[]")
+                  existingLogs.push({ time: new Date().toISOString(), message: errorMsg, error: true })
+                  localStorage.setItem("auth_logs", JSON.stringify(existingLogs.slice(-10)))
+                } catch {}
               })
           } else {
             if (!shouldSendWelcome) {

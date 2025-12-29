@@ -23,6 +23,7 @@ import {
   sendDailyRoadmapEmail,
   sendInterviewCountdownEmail,
   sendBehindScheduleEmail,
+  sendWelcomeEmail,
   canSendEmail,
   calculateRetention,
 } from "@/lib/email";
@@ -46,6 +47,7 @@ export async function GET(request: NextRequest) {
     }
 
     const results = {
+      welcomeEmails: { sent: 0, skipped: 0, failed: 0 },
       inactivityEmails: { sent: 0, skipped: 0, failed: 0 },
       spacedRepetitionEmails: { sent: 0, skipped: 0, failed: 0 },
       roadmapEmails: { sent: 0, skipped: 0, failed: 0 },
@@ -69,17 +71,22 @@ export async function GET(request: NextRequest) {
     }
 
     // ============================================
-    // 1. INACTIVITY REMINDERS
+    // 1. WELCOME EMAILS (for users who signed up but didn't receive email)
+    // ============================================
+    await processWelcomeEmails(now, results);
+
+    // ============================================
+    // 2. INACTIVITY REMINDERS
     // ============================================
     await processInactivityReminders(now, results);
 
     // ============================================
-    // 2. SPACED REPETITION REMINDERS
+    // 3. SPACED REPETITION REMINDERS
     // ============================================
     await processSpacedRepetitionReminders(now, results);
 
     // ============================================
-    // 3. ROADMAP-BASED REMINDERS
+    // 4. ROADMAP-BASED REMINDERS
     // ============================================
     await processRoadmapReminders(now, results);
 
@@ -94,6 +101,98 @@ export async function GET(request: NextRequest) {
       { error: error.message || "Cron job failed" },
       { status: 500 }
     );
+  }
+}
+
+async function processWelcomeEmails(
+  now: Date,
+  results: any
+): Promise<void> {
+  // Find users who signed up in the last 24 hours but haven't received welcome email
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  
+  try {
+    // Query profiles without welcome_email_sent (or where it's false)
+    // Filter by created_at in memory to avoid composite index requirement
+    const profilesSnap = await db
+      .collection("profiles")
+      .limit(100)
+      .get();
+    
+    // Filter in memory for profiles created in last 24h without welcome email
+    const eligibleProfiles = profilesSnap.docs.filter((doc) => {
+      const profile = doc.data();
+      // Skip if welcome email already sent
+      if (profile.welcome_email_sent) return false;
+      // Check if created within last 24h
+      const createdAt = profile.created_at;
+      if (!createdAt) return false;
+      const createdDate = new Date(createdAt);
+      return createdDate >= twentyFourHoursAgo;
+    }).slice(0, 50); // Limit to 50
+
+    for (const doc of eligibleProfiles) {
+      const profile = doc.data() as Profile;
+      const userId = doc.id;
+
+      // Skip if welcome email already sent
+      if (profile.welcome_email_sent) {
+        results.welcomeEmails.skipped++;
+        continue;
+      }
+
+      // Skip if no email
+      if (!profile.email) {
+        results.welcomeEmails.skipped++;
+        continue;
+      }
+
+      try {
+        // Send welcome email
+        console.log(`[Cron Email] Sending welcome email to ${profile.email} (user: ${userId})`);
+        const result = await sendWelcomeEmail(
+          userId,
+          profile.email,
+          profile.full_name || profile.display_name
+        );
+
+        if (result.success) {
+          results.welcomeEmails.sent++;
+
+          // Mark welcome email as sent
+          await db.collection("profiles").doc(userId).update({
+            welcome_email_sent: true,
+            last_email_sent_at: now.toISOString(),
+            emails_sent_today: (profile.emails_sent_today || 0) + 1,
+            notification_preferences: {
+              ...profile.notification_preferences,
+              email_notifications_enabled: true,
+              welcome_email: true,
+            },
+          });
+
+          // Log the notification
+          await db.collection("email_notifications").add({
+            user_id: userId,
+            email_type: "welcome",
+            status: "sent",
+            scheduled_at: now.toISOString(),
+            sent_at: now.toISOString(),
+            created_at: now.toISOString(),
+            source: "cron",
+          });
+        } else {
+          results.welcomeEmails.failed++;
+          results.errors.push(`Welcome email failed for ${userId}: ${result.error}`);
+        }
+      } catch (error: any) {
+        results.welcomeEmails.failed++;
+        results.errors.push(`Error sending welcome email to ${userId}: ${error.message}`);
+      }
+    }
+  } catch (error: any) {
+    console.error("[Cron Email] Error processing welcome emails:", error);
+    results.errors.push(`Welcome email processing failed: ${error.message}`);
   }
 }
 
