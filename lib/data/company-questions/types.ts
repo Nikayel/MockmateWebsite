@@ -190,7 +190,32 @@ export interface PersonalizedRoadmap {
   isOnTrack: boolean
   daysAhead: number  // Positive = ahead, negative = behind
 
-  // RAG-enhanced content (optional, from AI)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ragEnhancements?: any
+  // Optional RAG enhancements
+  ragEnhancements?: {
+    enabled: boolean
+    patternInsights: Array<{
+      pattern: DSAPattern
+      importance: number
+      companyFrequency: number
+      suggestedApproach: string
+      tips: string[]
+      estimatedPracticeTime: number
+      prerequisitesMet: boolean
+    }>
+    companyTips: string[]
+    personalizedAdvice: string[]
+    adaptiveAdjustments: Array<{
+      type: 'difficulty' | 'pattern-focus' | 'time-allocation' | 'review-schedule'
+      description: string
+      reason: string
+      impact: 'high' | 'medium' | 'low'
+    }>
+    studyStrategies: Array<{
+      name: string
+      description: string
+      applicablePatterns: DSAPattern[]
+      estimatedBenefit: string
+      priority: number
+    }>
+  }
 }

@@ -493,7 +493,7 @@ export default function RoadmapPage() {
                 </div>
 
                 {/* Company Tips & Study Tips Toggle */}
-                {(roadmap.ragEnhancements?.companyTips?.length > 0 || recommendations.length > 0) && (
+                {((roadmap.ragEnhancements?.companyTips?.length ?? 0) > 0 || recommendations.length > 0) && (
                   <div className="border-t border-border">
                     <button
                       onClick={() => setShowTips(!showTips)}
@@ -501,7 +501,7 @@ export default function RoadmapPage() {
                     >
                       <span className="flex items-center gap-2">
                         <Zap className="h-3 w-3 text-primary" />
-                        {roadmap.ragEnhancements?.companyTips?.length > 0
+                        {(roadmap.ragEnhancements?.companyTips?.length ?? 0) > 0
                           ? `${roadmap.companyName} interview tips & study strategies`
                           : 'Study tips available'}
                       </span>
@@ -517,25 +517,25 @@ export default function RoadmapPage() {
                         >
                           <div className="px-5 pb-4 space-y-3">
                             {/* Company-Specific Tips from RAG */}
-                            {roadmap.ragEnhancements?.companyTips?.length > 0 && (
+                            {(roadmap.ragEnhancements?.companyTips?.length ?? 0) > 0 && (
                               <div className="space-y-1.5">
                                 <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
                                   <Target className="h-3 w-3 text-blue-500" />
                                   {roadmap.companyName} Focus Areas
                                 </p>
-                                {roadmap.ragEnhancements.companyTips.slice(0, 3).map((tip: string, i: number) => (
+                                {(roadmap.ragEnhancements?.companyTips?.slice(0, 3) || []).map((tip: string, i: number) => (
                                   <p key={i} className="text-xs text-muted-foreground pl-4">• {tip}</p>
                                 ))}
                               </div>
                             )}
                             {/* Personalized Advice from RAG */}
-                            {roadmap.ragEnhancements?.personalizedAdvice?.length > 0 && (
+                            {(roadmap.ragEnhancements?.personalizedAdvice?.length ?? 0) > 0 && (
                               <div className="space-y-1.5">
                                 <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
                                   <Sparkles className="h-3 w-3 text-yellow-500" />
                                   Personalized for You
                                 </p>
-                                {roadmap.ragEnhancements.personalizedAdvice.slice(0, 2).map((advice: string, i: number) => (
+                                {(roadmap.ragEnhancements?.personalizedAdvice?.slice(0, 2) || []).map((advice: string, i: number) => (
                                   <p key={i} className="text-xs text-muted-foreground pl-4">• {advice}</p>
                                 ))}
                               </div>
