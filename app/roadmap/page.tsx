@@ -535,7 +535,7 @@ export default function RoadmapPage() {
                                   <Sparkles className="h-3 w-3 text-yellow-500" />
                                   Personalized for You
                                 </p>
-                                {roadmap.ragEnhancements.personalizedAdvice.slice(0, 2).map((advice: string, i: number) => (
+                                {roadmap.ragEnhancements?.personalizedAdvice?.slice(0, 2).map((advice: string, i: number) => (
                                   <p key={i} className="text-xs text-muted-foreground pl-4">• {advice}</p>
                                 ))}
                               </div>
