@@ -91,13 +91,38 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Estimate page views (typically 3-5x signups for B2B SaaS)
-    // In production, replace with actual GA4 data
-    const estimatedPageViews = Math.max(signups * 4, totalProfiles * 2)
+    // Try to get real page view data from Firebase Analytics if available
+    // Otherwise, use an estimate based on signup conversion rates
+    let pageViews: number
+    let pageViewsEstimated = false
+
+    try {
+      // Import and call Firebase Analytics if configured
+      const { getFirebaseAnalyticsOverview } = await import("@/lib/firebase-analytics-admin")
+      const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : timeRange === "90d" ? 90 : 365
+      const analyticsData = await getFirebaseAnalyticsOverview(days)
+
+      if (analyticsData?.pageViews && analyticsData.pageViews > 0) {
+        pageViews = analyticsData.pageViews
+      } else {
+        // Fallback to estimate: B2B SaaS typically sees 15-25% signup rate from visitors
+        // Using 20% as baseline, so page views = signups / 0.20 = signups * 5
+        pageViews = Math.max(signups * 5, totalProfiles * 3)
+        pageViewsEstimated = true
+      }
+    } catch {
+      // Firebase Analytics not configured or errored
+      pageViews = Math.max(signups * 5, totalProfiles * 3)
+      pageViewsEstimated = true
+    }
 
     // Build funnel stages
     const stages: FunnelStage[] = [
-      { name: "Page Views", value: estimatedPageViews, color: "#00d9ff" },
+      {
+        name: pageViewsEstimated ? "Page Views (est.)" : "Page Views",
+        value: pageViews,
+        color: "#00d9ff",
+      },
       { name: "Sign Ups", value: signups || totalProfiles, color: "#00ff88" },
       { name: "Started Session", value: totalSessions, color: "#FBBF24" },
       { name: "Completed Session", value: completedSessions, color: "#F97316" },
@@ -125,6 +150,7 @@ export async function GET(request: NextRequest) {
         stages,
         conversionRates,
         trend: funnelTrend,
+        pageViewsEstimated, // Flag indicating if page views are estimated
       },
     })
   } catch (error) {
