@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import dynamic from "next/dynamic"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
@@ -30,6 +31,11 @@ import Link from "next/link"
 import { toast } from "sonner"
 import { UsageWidget } from "@/components/dashboard/usage-widget"
 
+// Dynamically import onboarding modal to reduce initial bundle size
+const OnboardingModal = dynamic(() => import("@/components/OnboardingModal").then(mod => mod.OnboardingModal), {
+  ssr: false
+})
+
 export default function DashboardPage() {
   const router = useRouter()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
@@ -38,6 +44,7 @@ export default function DashboardPage() {
   const [sessions, setSessions] = useState<InterviewSession[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   // Separate effect to handle auth check with delay to prevent race condition on refresh
   useEffect(() => {
@@ -83,6 +90,11 @@ export default function DashboardPage() {
 
         setProfile(userProfile)
         setUsage(usageData)
+
+        // Check if onboarding is needed for new users
+        if (userProfile && !userProfile.onboarding_completed) {
+          setShowOnboarding(true)
+        }
 
         // Process sessions if loaded
         if (sessionsSnap && !sessionsSnap.empty) {
@@ -179,8 +191,32 @@ export default function DashboardPage() {
     ? Math.round(completedSessions.reduce((sum, s) => sum + (s.performance_score || 0), 0) / completedSessions.length)
     : null
 
+  // Get user's first name for welcome message
+  const userName = user?.user_metadata?.full_name?.split(' ')[0] || firebaseUser?.displayName?.split(' ')[0]
+
   return (
     <main className="min-h-screen bg-black">
+      {/* Onboarding modal for first-time users */}
+      <OnboardingModal
+        isOpen={showOnboarding}
+        userId={firebaseUser?.uid || ""}
+        userName={userName}
+        onComplete={async () => {
+          setShowOnboarding(false)
+          // Reload profile to get updated onboarding status
+          if (firebaseUser) {
+            try {
+              const updatedProfile = await getUserProfile(firebaseUser.uid)
+              if (updatedProfile) {
+                setProfile(updatedProfile)
+              }
+            } catch (error) {
+              console.error("Error reloading profile after onboarding:", error)
+            }
+          }
+        }}
+      />
+
       <Header />
 
       <div className="pt-24 pb-16">
@@ -210,6 +246,9 @@ export default function DashboardPage() {
                 <Progress value={usagePercentage} className="h-2 mb-2" />
                 <p className="text-xs text-gray-400">
                   {usage?.allowed ? `${usage.limit - (usage.used || 0)} sessions remaining` : "Limit reached"}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Resets {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </p>
               </CardContent>
             </Card>

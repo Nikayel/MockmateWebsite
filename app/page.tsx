@@ -177,6 +177,9 @@ export default function HomePage() {
                         : "Limit reached - upgrade for more"}
                     </p>
                   )}
+                  <p className="text-xs text-gray-500 mt-1">
+                    Resets {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </p>
                 </CardContent>
               </Card>
 

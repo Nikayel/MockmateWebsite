@@ -4,6 +4,7 @@
  * Runs daily to:
  * 1. Check yearly plans that have expired and downgrade to free
  * 2. Send reminder emails 7 days and 1 day before expiry
+ * 3. Reset monthly quotas for yearly subscribers
  *
  * Schedule: Daily at 9 AM UTC
  * Crontab: 0 9 * * *
@@ -44,6 +45,54 @@ async function updateQuotaToFree(userId: string): Promise<void> {
   }
 }
 
+// Reset quota for yearly subscriber (new month)
+async function resetYearlySubscriberQuota(userId: string): Promise<boolean> {
+  const now = new Date();
+  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+  const quotaSnapshot = await adminDb
+    .collection("profile_quota")
+    .where("user_id", "==", userId)
+    .get();
+
+  const proLimit = PRICING_CONFIG.pro.sessionsPerMonth;
+
+  // Find quota for current month
+  const currentQuotaDoc = quotaSnapshot.docs.find((doc) => {
+    const data = doc.data();
+    const quotaStart = new Date(data.period_start);
+    return quotaStart >= periodStart && quotaStart <= periodEnd;
+  });
+
+  if (currentQuotaDoc) {
+    // Quota already exists for this month - just ensure limit is correct
+    const currentData = currentQuotaDoc.data();
+    if (currentData.sessions_limit !== proLimit) {
+      await currentQuotaDoc.ref.update({
+        sessions_limit: proLimit,
+        updated_at: now.toISOString(),
+      });
+      return true;
+    }
+    return false; // Already reset for this month
+  }
+
+  // Create new quota for this month (resets usage to 0)
+  await adminDb.collection("profile_quota").add({
+    user_id: userId,
+    sessions_used: 0,
+    sessions_limit: proLimit,
+    free_opens_remaining: 0,
+    period_start: periodStart.toISOString(),
+    period_end: periodEnd.toISOString(),
+    created_at: now.toISOString(),
+    updated_at: now.toISOString(),
+  });
+
+  return true; // New quota created = reset happened
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Verify authorization
@@ -63,6 +112,7 @@ export async function GET(request: NextRequest) {
     const results = {
       expired: { processed: 0, downgraded: 0, failed: 0 },
       reminders: { sent7Day: 0, sent1Day: 0, failed: 0 },
+      quotaResets: { processed: 0, reset: 0, failed: 0 },
     };
 
     // 1. Find and downgrade expired yearly subscriptions
@@ -203,6 +253,40 @@ export async function GET(request: NextRequest) {
           results.reminders.failed++;
           console.error(`[Cron Expiry] Failed to send 1-day reminder to ${userId}:`, error);
         }
+      }
+    }
+
+    // 4. Reset monthly quotas for active yearly subscribers
+    // This ensures yearly plan users get their 35 sessions reset each month
+    console.log("[Cron Expiry] Checking yearly subscribers for monthly quota reset...");
+
+    const activeYearlyQuery = await adminDb
+      .collection("profiles")
+      .where("subscription_type", "==", "yearly")
+      .where("subscription_tier", "==", "pro")
+      .where("subscription_current_period_end", ">", now.toISOString())
+      .limit(500) // Process up to 500 yearly subscribers per run
+      .get();
+
+    for (const doc of activeYearlyQuery.docs) {
+      results.quotaResets.processed++;
+      const userId = doc.id;
+
+      try {
+        const wasReset = await resetYearlySubscriberQuota(userId);
+        if (wasReset) {
+          results.quotaResets.reset++;
+          console.log(`[Cron Expiry] Reset monthly quota for yearly subscriber ${userId}`);
+
+          // Update last_quota_reset on profile
+          await adminDb.collection("profiles").doc(userId).update({
+            last_quota_reset: now.toISOString(),
+            updated_at: now.toISOString(),
+          });
+        }
+      } catch (error) {
+        results.quotaResets.failed++;
+        console.error(`[Cron Expiry] Failed to reset quota for ${userId}:`, error);
       }
     }
 
