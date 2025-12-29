@@ -14,9 +14,11 @@ const db = adminDb;
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("[Welcome Email API] Request received");
     // Verify Firebase ID token for authentication
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      console.error("[Welcome Email API] Missing authorization header");
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
@@ -70,7 +72,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Send welcome email
+    console.log("[Welcome Email API] Sending welcome email to:", email);
     const result = await sendWelcomeEmail(userId, email, displayName);
+    console.log("[Welcome Email API] Email send result:", result.success, result.error || "success");
 
     if (result.success) {
       // Mark welcome email as sent
