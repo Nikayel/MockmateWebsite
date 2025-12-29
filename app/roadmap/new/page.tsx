@@ -101,10 +101,13 @@ export default function NewRoadmapPage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Failed to create roadmap' }))
-        // Handle Pro-only feature restriction
+        // Handle Pro-only feature restriction - stay on generating step and show upgrade prompt
         if (errorData.code === 'PRO_REQUIRED') {
+          // Brief delay so user sees the generation started
+          await new Promise(resolve => setTimeout(resolve, 1500))
           setError('PRO_REQUIRED')
-          setStep('assessment')
+          setIsGenerating(false)
+          // Stay on generating step - don't go back to assessment
           return
         }
         throw new Error(errorData.error || 'Failed to create roadmap')
@@ -161,8 +164,8 @@ export default function NewRoadmapPage() {
           <StepIndicator label="Generate" active={step === 'generating'} completed={false} />
         </div>
 
-        {/* Pro Upgrade Prompt */}
-        {isProRequired && (
+        {/* Pro Upgrade Prompt - only show when NOT on generating step (generating step has its own UI) */}
+        {isProRequired && step !== 'generating' && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -299,14 +302,66 @@ export default function NewRoadmapPage() {
                 animate={{ opacity: 1, scale: 1 }}
                 className="text-center py-16"
               >
-                <Loader2 className="h-12 w-12 mx-auto text-primary animate-spin mb-6" />
-                <h2 className="text-2xl font-bold text-foreground mb-2">
-                  Creating Your Personalized Roadmap
-                </h2>
-                <p className="text-muted-foreground max-w-md mx-auto">
-                  We're analyzing {companyData?.name || 'company'} interview patterns
-                  and building a study plan tailored to your timeline and skill level...
-                </p>
+                {isProRequired ? (
+                  // Show Pro upgrade prompt on generating step
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="max-w-lg mx-auto"
+                  >
+                    <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
+                      <Crown className="h-10 w-10 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-foreground mb-3">
+                      Unlock Your Personalized Roadmap
+                    </h2>
+                    <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                      We've analyzed {companyData?.name || 'your target company'}'s interview patterns and prepared a custom study plan.
+                      Upgrade to Pro to access your personalized roadmap with:
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left max-w-md mx-auto mb-8">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span className="text-green-500">✓</span> Company-specific questions
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span className="text-green-500">✓</span> Daily practice schedules
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span className="text-green-500">✓</span> Spaced repetition tracking
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span className="text-green-500">✓</span> Pattern mastery insights
+                      </div>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                      <Link
+                        href="/upgrade"
+                        className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg font-semibold hover:from-yellow-400 hover:to-orange-400 transition-all shadow-lg"
+                      >
+                        Upgrade to Pro
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                      <Link
+                        href="/dashboard"
+                        className="inline-flex items-center justify-center px-6 py-3 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Continue with Free
+                      </Link>
+                    </div>
+                  </motion.div>
+                ) : (
+                  // Show loading state
+                  <>
+                    <Loader2 className="h-12 w-12 mx-auto text-primary animate-spin mb-6" />
+                    <h2 className="text-2xl font-bold text-foreground mb-2">
+                      Creating Your Personalized Roadmap
+                    </h2>
+                    <p className="text-muted-foreground max-w-md mx-auto">
+                      We're analyzing {companyData?.name || 'company'} interview patterns
+                      and building a study plan tailored to your timeline and skill level...
+                    </p>
+                  </>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
