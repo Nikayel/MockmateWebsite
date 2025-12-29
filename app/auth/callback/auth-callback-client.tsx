@@ -44,6 +44,7 @@ export function AuthCallbackClient() {
 
           // Send welcome email for new users (non-blocking, authenticated)
           if (shouldSendWelcome && firebaseUser.email) {
+            console.log("[Auth] Attempting to send welcome email for:", firebaseUser.email)
             const idToken = await firebaseUser.getIdToken()
             fetch("/api/email/welcome", {
               method: "POST",
@@ -57,17 +58,31 @@ export function AuthCallbackClient() {
                 displayName: firebaseUser.displayName,
               }),
             })
-              .then(res => res.json())
-              .then(data => {
-                if (data.success) {
-                  console.log("[Auth] Welcome email sent successfully")
+              .then(async (res) => {
+                if (!res.ok) {
+                  const errorText = await res.text()
+                  console.error("[Auth] Welcome email HTTP error:", res.status, errorText)
+                  return { success: false, error: `HTTP ${res.status}: ${errorText}` }
+                }
+                return res.json()
+              })
+              .then((data) => {
+                if (data?.success) {
+                  console.log("[Auth] Welcome email sent successfully", data)
                 } else {
-                  console.error("[Auth] Welcome email failed:", data.error)
+                  console.error("[Auth] Welcome email failed:", data?.error || data)
                 }
               })
               .catch((err) => {
                 console.error("[Auth] Welcome email request failed:", err)
               })
+          } else {
+            if (!shouldSendWelcome) {
+              console.log("[Auth] Welcome email already sent, skipping")
+            }
+            if (!firebaseUser.email) {
+              console.log("[Auth] No email address, skipping welcome email")
+            }
           }
           
           // Get ID token for VS Code deep link
