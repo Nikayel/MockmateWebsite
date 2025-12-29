@@ -56,9 +56,18 @@ export function AuthCallbackClient() {
                 email: firebaseUser.email,
                 displayName: firebaseUser.displayName,
               }),
-            }).catch(() => {
-              // Non-blocking - welcome email is not critical
             })
+              .then(res => res.json())
+              .then(data => {
+                if (data.success) {
+                  console.log("[Auth] Welcome email sent successfully")
+                } else {
+                  console.error("[Auth] Welcome email failed:", data.error)
+                }
+              })
+              .catch((err) => {
+                console.error("[Auth] Welcome email request failed:", err)
+              })
           }
           
           // Get ID token for VS Code deep link
