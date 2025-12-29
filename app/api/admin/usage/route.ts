@@ -2,11 +2,11 @@
  * Admin Usage API
  *
  * Endpoints for viewing and managing user usage data.
- * Requires admin authentication via Firebase ID token.
+ * Requires admin authentication via Firebase ID token with RBAC.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { adminDb, adminAuth } from '@/lib/firebase-admin'
+import { adminDb } from '@/lib/firebase-admin'
 import {
   getAdminUsageStats,
   getUserUsageSummary,
@@ -18,44 +18,16 @@ import {
   PROVIDER_COSTS,
 } from '@/lib/usage-tracking'
 import { getCacheStats } from '@/lib/ai-cache'
-
-// Admin user IDs - requires proper env configuration
-const ADMIN_USER_IDS = [
-  process.env.ADMIN_USER_ID,
-].filter((id): id is string => Boolean(id))
-
-/**
- * Verify admin access using Firebase Auth token verification
- */
-async function verifyAdmin(request: NextRequest): Promise<{ authorized: boolean; userId?: string }> {
-  try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return { authorized: false }
-    }
-
-    const token = authHeader.replace('Bearer ', '')
-
-    // Verify the Firebase ID token properly
-    if (!adminAuth) {
-      return { authorized: false }
-    }
-
-    const decodedToken = await adminAuth.verifyIdToken(token)
-    const userId = decodedToken.uid
-
-    // SECURITY: Only trust hardcoded admin list from environment variables
-    // Never read admin status from user-writable Firestore fields
-    if (ADMIN_USER_IDS.includes(userId)) {
-      return { authorized: true, userId }
-    }
-
-    return { authorized: false }
-  } catch (error) {
-    // Token verification failed - don't expose error details
-    return { authorized: false }
-  }
-}
+import {
+  verifyAdminAccess,
+  requirePermission,
+  successResponse,
+  errorResponse,
+  unauthorizedResponse,
+  type AdminContext,
+} from '@/lib/admin/middleware'
+import { PERMISSIONS } from '@/lib/admin/rbac'
+import { logAdminAction } from '@/lib/admin/audit'
 
 /**
  * GET /api/admin/usage
@@ -67,11 +39,13 @@ async function verifyAdmin(request: NextRequest): Promise<{ authorized: boolean;
  * - userId: string (required if view=user)
  */
 export async function GET(request: NextRequest) {
-  // Always require authentication - no dev bypass
-  const auth = await verifyAdmin(request)
-  if (!auth.authorized) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Verify admin access with VIEW_AI_USAGE permission
+  const authResult = await requirePermission(request, PERMISSIONS.VIEW_AI_USAGE)
+  if (!authResult.authorized) {
+    return unauthorizedResponse(authResult.error!, authResult.status || 403)
   }
+
+  const adminContext = authResult.context!
 
   const { searchParams } = new URL(request.url)
   const view = searchParams.get('view') || 'overview'
@@ -160,19 +134,20 @@ export async function GET(request: NextRequest) {
       }
 
       default:
-        return NextResponse.json(
-          { error: `Unknown view: ${view}` },
-          { status: 400 }
-        )
+        return errorResponse(`Unknown view: ${view}`, 400)
     }
   } catch (error) {
-    console.error('[Admin API] Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch usage data' },
-      { status: 500 }
+    console.error('[Admin Usage API] Error fetching usage data:', error)
+    return errorResponse(
+      error instanceof Error ? error.message : 'Failed to fetch usage data',
+      500
     )
   }
 }
+
+// Budget validation constants
+const MIN_BUDGET = 0
+const MAX_BUDGET = 10000 // $10,000 max budget cap
 
 /**
  * POST /api/admin/usage
@@ -185,11 +160,13 @@ export async function GET(request: NextRequest) {
  * - budget: number (for set_budget)
  */
 export async function POST(request: NextRequest) {
-  // Always require authentication - no dev bypass
-  const auth = await verifyAdmin(request)
-  if (!auth.authorized) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Verify admin access with MANAGE_BUDGETS permission
+  const authResult = await requirePermission(request, PERMISSIONS.MANAGE_BUDGETS)
+  if (!authResult.authorized) {
+    return unauthorizedResponse(authResult.error!, authResult.status || 403)
   }
+
+  const adminContext = authResult.context!
 
   try {
     const body = await request.json()
@@ -197,47 +174,79 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'set_budget': {
-        if (!userId || budget === undefined) {
-          return NextResponse.json(
-            { error: 'userId and budget are required' },
-            { status: 400 }
+        // Validate required fields
+        if (!userId || typeof userId !== 'string') {
+          return errorResponse('userId is required and must be a string', 400)
+        }
+
+        if (budget === undefined || budget === null) {
+          return errorResponse('budget is required', 400)
+        }
+
+        // Validate budget is a number
+        const budgetNum = Number(budget)
+        if (isNaN(budgetNum)) {
+          return errorResponse('budget must be a valid number', 400)
+        }
+
+        // Validate budget range
+        if (budgetNum < MIN_BUDGET || budgetNum > MAX_BUDGET) {
+          return errorResponse(
+            `budget must be between $${MIN_BUDGET} and $${MAX_BUDGET}`,
+            400
           )
         }
 
+        // Verify user exists
+        const userDoc = await adminDb.collection('profiles').doc(userId).get()
+        if (!userDoc.exists) {
+          return errorResponse('User not found', 404)
+        }
+
         // Update user's custom budget
-        await adminDb.collection('users').doc(userId).update({
-          custom_budget_cap: budget,
+        await adminDb.collection('profiles').doc(userId).update({
+          custom_budget_cap: budgetNum,
           updated_at: new Date().toISOString(),
         })
 
-        return NextResponse.json({
-          success: true,
-          message: `Budget set to $${budget} for user ${userId}`,
+        // Log admin action
+        await logAdminAction(adminContext.userId, 'set_user_budget', {
+          targetUserId: userId,
+          previousBudget: userDoc.data()?.custom_budget_cap,
+          newBudget: budgetNum,
+        })
+
+        return successResponse({
+          message: `Budget set to $${budgetNum} for user ${userId}`,
+          userId,
+          budget: budgetNum,
         })
       }
 
       case 'clear_cache': {
         // Import clearCache dynamically to avoid circular deps
         const { clearCache } = await import('@/lib/ai-cache')
-        await clearCache()
+        const cleared = await clearCache()
 
-        return NextResponse.json({
-          success: true,
-          message: 'Cache cleared',
+        // Log admin action
+        await logAdminAction(adminContext.userId, 'clear_cache', {
+          timestamp: new Date().toISOString(),
+        })
+
+        return successResponse({
+          message: 'AI cache cleared successfully',
+          cleared,
         })
       }
 
       default:
-        return NextResponse.json(
-          { error: `Unknown action: ${action}` },
-          { status: 400 }
-        )
+        return errorResponse(`Unknown action: ${action}`, 400)
     }
   } catch (error) {
-    console.error('[Admin API] Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to perform action' },
-      { status: 500 }
+    console.error('[Admin Usage API] Error performing action:', error)
+    return errorResponse(
+      error instanceof Error ? error.message : 'Failed to perform action',
+      500
     )
   }
 }

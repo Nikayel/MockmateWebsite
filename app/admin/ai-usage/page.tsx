@@ -2,11 +2,22 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useAuth } from "@/lib/auth-context"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { MetricCard } from "@/components/admin/charts"
-import { Cpu, DollarSign, Zap, Database, RefreshCw, Users, Mic, Code, MessageSquare } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Cpu, DollarSign, Zap, Database, RefreshCw, Users, Mic, Code, MessageSquare, Trash2, Settings, CheckCircle, AlertCircle } from "lucide-react"
 import { getProviderCostInfo, AI_BUDGET_CAPS } from "@/lib/pricing"
 
 interface AIUsageData {
@@ -41,6 +52,15 @@ export default function AIUsagePage() {
   const { firebaseUser } = useAuth()
   const [aiUsage, setAiUsage] = useState<AIUsageData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [clearingCache, setClearingCache] = useState(false)
+  const [cacheCleared, setCacheCleared] = useState(false)
+  const [clearCacheDialogOpen, setClearCacheDialogOpen] = useState(false)
+  const [budgetDialogOpen, setBudgetDialogOpen] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<{ userId: string; email: string; currentBudget?: number } | null>(null)
+  const [newBudget, setNewBudget] = useState("")
+  const [settingBudget, setSettingBudget] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null)
 
   const providerCosts = getProviderCostInfo()
 
@@ -70,6 +90,94 @@ export default function AIUsagePage() {
     loadData()
   }, [loadData])
 
+  const handleClearCache = async () => {
+    if (!firebaseUser) return
+
+    setClearingCache(true)
+    setActionError(null)
+
+    try {
+      const token = await firebaseUser.getIdToken()
+      const response = await fetch("/api/admin/usage", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "clear_cache" }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setCacheCleared(true)
+        setActionSuccess("AI cache cleared successfully")
+        // Reload data to show updated cache stats
+        await loadData()
+        setTimeout(() => {
+          setCacheCleared(false)
+          setActionSuccess(null)
+        }, 3000)
+      } else {
+        setActionError(data.error || "Failed to clear cache")
+      }
+    } catch (error) {
+      console.error("Error clearing cache:", error)
+      setActionError("Failed to clear cache")
+    } finally {
+      setClearingCache(false)
+      setClearCacheDialogOpen(false)
+    }
+  }
+
+  const handleSetBudget = async () => {
+    if (!firebaseUser || !selectedUser) return
+
+    const budgetNum = parseFloat(newBudget)
+    if (isNaN(budgetNum) || budgetNum < 0 || budgetNum > 10000) {
+      setActionError("Budget must be between $0 and $10,000")
+      return
+    }
+
+    setSettingBudget(true)
+    setActionError(null)
+
+    try {
+      const token = await firebaseUser.getIdToken()
+      const response = await fetch("/api/admin/usage", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "set_budget",
+          userId: selectedUser.userId,
+          budget: budgetNum,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setActionSuccess(`Budget set to $${budgetNum} for ${selectedUser.email}`)
+        setBudgetDialogOpen(false)
+        setSelectedUser(null)
+        setNewBudget("")
+        // Reload data
+        await loadData()
+        setTimeout(() => setActionSuccess(null), 3000)
+      } else {
+        setActionError(data.error || "Failed to set budget")
+      }
+    } catch (error) {
+      console.error("Error setting budget:", error)
+      setActionError("Failed to set budget")
+    } finally {
+      setSettingBudget(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -87,16 +195,50 @@ export default function AIUsagePage() {
           <p className="text-gray-400 mt-1">AI API costs and usage tracking</p>
         </div>
 
-        <Button
-          onClick={loadData}
-          variant="outline"
-          size="sm"
-          className="border-gray-700 text-gray-400 hover:text-white"
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={() => setClearCacheDialogOpen(true)}
+            variant="outline"
+            size="sm"
+            className="border-red-700 text-red-400 hover:text-red-300 hover:bg-red-900/20"
+            disabled={clearingCache}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Clear Cache
+          </Button>
+          <Button
+            onClick={loadData}
+            variant="outline"
+            size="sm"
+            className="border-gray-700 text-gray-400 hover:text-white"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
+
+      {/* Success/Error Messages */}
+      {actionSuccess && (
+        <div className="flex items-center gap-2 p-4 bg-green-900/20 border border-green-500/30 rounded-lg">
+          <CheckCircle className="h-5 w-5 text-green-400" />
+          <span className="text-green-300">{actionSuccess}</span>
+        </div>
+      )}
+      {actionError && (
+        <div className="flex items-center gap-2 p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
+          <AlertCircle className="h-5 w-5 text-red-400" />
+          <span className="text-red-300">{actionError}</span>
+          <Button
+            onClick={() => setActionError(null)}
+            variant="ghost"
+            size="sm"
+            className="ml-auto text-red-400 hover:text-red-300"
+          >
+            Dismiss
+          </Button>
+        </div>
+      )}
 
       {/* Key Metrics */}
       {aiUsage && (
@@ -240,6 +382,9 @@ export default function AIUsagePage() {
                   <Users className="h-5 w-5 text-[#00d9ff]" />
                   Top Users by AI Cost
                 </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Click the settings icon to set a custom budget for a user
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -281,6 +426,21 @@ export default function AIUsagePage() {
                         <span className="text-gray-500 text-xs w-12">
                           {user.budgetUsedPercent.toFixed(0)}%
                         </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedUser({
+                              userId: user.userId,
+                              email: user.email,
+                            })
+                            setNewBudget("")
+                            setBudgetDialogOpen(true)
+                          }}
+                          className="text-gray-400 hover:text-white hover:bg-gray-700 p-1 h-7 w-7"
+                        >
+                          <Settings className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -315,6 +475,87 @@ export default function AIUsagePage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Clear Cache Dialog */}
+      <AlertDialog open={clearCacheDialogOpen} onOpenChange={setClearCacheDialogOpen}>
+        <AlertDialogContent className="bg-gray-900 border-gray-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Clear AI Cache</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-400">
+              This will clear all cached AI responses. This action is useful when:
+              <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                <li>AI responses seem stale or outdated</li>
+                <li>You've updated prompts or system instructions</li>
+                <li>You want to force fresh responses for testing</li>
+              </ul>
+              <br />
+              <span className="text-yellow-400">Note: This may temporarily increase API costs as the cache rebuilds.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleClearCache}
+              disabled={clearingCache}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {clearingCache ? "Clearing..." : "Clear Cache"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Set Budget Dialog */}
+      <AlertDialog open={budgetDialogOpen} onOpenChange={setBudgetDialogOpen}>
+        <AlertDialogContent className="bg-gray-900 border-gray-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Set Custom Budget</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-400">
+              Set a custom monthly AI budget cap for <strong className="text-white">{selectedUser?.email}</strong>.
+              <br /><br />
+              This overrides the default tier-based budget cap. Enter a value between $0 and $10,000.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <div className="flex items-center gap-2">
+              <span className="text-white">$</span>
+              <Input
+                type="number"
+                placeholder="e.g., 50.00"
+                value={newBudget}
+                onChange={(e) => setNewBudget(e.target.value)}
+                className="bg-gray-800 border-gray-700 text-white"
+                min={0}
+                max={10000}
+                step={0.01}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Default tier budgets: Free $0.50 | Pro $25 | Enterprise $100
+            </p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700"
+              onClick={() => {
+                setSelectedUser(null)
+                setNewBudget("")
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleSetBudget}
+              disabled={settingBudget || !newBudget}
+              className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+            >
+              {settingBudget ? "Setting..." : "Set Budget"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

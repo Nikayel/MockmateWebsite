@@ -8,6 +8,7 @@ import {
 } from "@/lib/firebase-analytics-admin"
 import { verifyAdminAccess, parseAdminQueryParams } from "@/lib/admin/middleware"
 import { calculateMRR, calculateARR, getMonthlyPrice } from "@/lib/pricing"
+import { adminCache, getCacheKey, CACHE_TTL } from "@/lib/admin/cache"
 import { format, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfDay, startOfWeek, startOfMonth, parseISO } from "date-fns"
 
 /**
@@ -189,6 +190,16 @@ export async function GET(request: NextRequest) {
 
     // Parse query params using middleware helper
     const { timeRange, startDate } = parseAdminQueryParams(request)
+
+    // Check cache first
+    const cacheKey = getCacheKey('analytics', { timeRange })
+    const cachedResponse = adminCache.get<any>(cacheKey)
+    if (cachedResponse) {
+      return NextResponse.json({
+        ...cachedResponse,
+        cached: true,
+      })
+    }
 
     // Fetch all users
     let profilesSnapshot
@@ -383,7 +394,7 @@ export async function GET(request: NextRequest) {
     const firebaseAcquisition = await getFirebaseAnalyticsAcquisition(days)
     const firebaseConversions = await getFirebaseAnalyticsConversions(days)
 
-    return NextResponse.json({
+    const responseData = {
       success: true,
       timeRange,
       metrics: {
@@ -432,7 +443,12 @@ export async function GET(request: NextRequest) {
         // Time-series data for charts
         timeSeries,
       },
-    })
+    }
+
+    // Cache the response for 30 seconds
+    adminCache.set(cacheKey, responseData, CACHE_TTL.ANALYTICS)
+
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error("Admin analytics API error:", error)
     const errorMessage = error instanceof Error ? error.message : "Failed to fetch analytics"

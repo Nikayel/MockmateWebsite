@@ -1,13 +1,15 @@
 /**
  * Admin Users API
- * 
+ *
  * GET: List all users with pagination
- * DELETE: Delete a user and all their data
+ * DELETE: Delete a user and all their data (with rate limiting and idempotency)
  */
 
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb, adminAuth } from "@/lib/firebase-admin"
-import { verifyAdminAccess, successResponse, unauthorizedResponse, errorResponse } from "@/lib/admin/middleware"
+import { verifyAdminAccess, requirePermission, successResponse, unauthorizedResponse, errorResponse } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
+import { logAdminAction } from "@/lib/admin/audit"
 import Stripe from "stripe"
 import { Pinecone } from "@pinecone-database/pinecone"
 import { logger } from "@/lib/logger"
@@ -15,6 +17,34 @@ import { logger } from "@/lib/logger"
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-10-29.clover",
 })
+
+// Rate limiting: Track recent deletions to prevent abuse
+const deletionRateLimit = new Map<string, { count: number; resetAt: number }>()
+const RATE_LIMIT_WINDOW = 60 * 1000 // 1 minute
+const RATE_LIMIT_MAX_DELETIONS = 5 // Max 5 deletions per minute per admin
+
+// Protected emails that cannot be deleted via API
+const PROTECTED_EMAILS = [
+  "alinikayeljamal@gmail.com",
+  "nikayeeljamaljan@gmail.com",
+]
+
+function checkRateLimit(adminId: string): { allowed: boolean; retryAfter?: number } {
+  const now = Date.now()
+  const record = deletionRateLimit.get(adminId)
+
+  if (!record || now >= record.resetAt) {
+    deletionRateLimit.set(adminId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW })
+    return { allowed: true }
+  }
+
+  if (record.count >= RATE_LIMIT_MAX_DELETIONS) {
+    return { allowed: false, retryAfter: Math.ceil((record.resetAt - now) / 1000) }
+  }
+
+  record.count++
+  return { allowed: true }
+}
 
 // Collections to delete when removing a user
 const collectionsToDelete = [
@@ -111,26 +141,68 @@ export async function GET(request: NextRequest) {
 /**
  * DELETE /api/admin/users
  * Delete a user and all their data
+ *
+ * Features:
+ * - Rate limiting (max 5 deletions per minute per admin)
+ * - Idempotency (returns success if user already deleted)
+ * - Protected emails (cannot delete certain accounts)
+ * - Full audit logging
  */
 export async function DELETE(request: NextRequest) {
-  const authResult = await verifyAdminAccess(request)
+  // Require MANAGE_USERS permission
+  const authResult = await requirePermission(request, PERMISSIONS.MANAGE_USERS)
   if (!authResult.authorized) {
     return unauthorizedResponse(authResult.error!, authResult.status || 401)
   }
+
+  const adminId = authResult.context!.userId
 
   try {
     const body = await request.json()
     const { userId } = body
 
-    if (!userId) {
-      return errorResponse("userId is required", 400)
+    if (!userId || typeof userId !== 'string') {
+      return errorResponse("userId is required and must be a string", 400)
     }
 
-    logger.info("Admin deleting user", { userId, adminId: authResult.context?.userId })
+    // Rate limiting check
+    const rateCheck = checkRateLimit(adminId)
+    if (!rateCheck.allowed) {
+      logger.warn("Rate limit exceeded for user deletion", { adminId, userId })
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Rate limit exceeded. Too many deletion requests.",
+          retryAfter: rateCheck.retryAfter,
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rateCheck.retryAfter) },
+        }
+      )
+    }
 
-    // 1. Get user profile to check for Stripe subscription
+    // 1. Get user profile to check existence and protected status
     const profileDoc = await adminDb.collection("profiles").doc(userId).get()
     const profileData = profileDoc.data()
+
+    // Idempotency check: If user doesn't exist, return success (already deleted)
+    if (!profileDoc.exists) {
+      logger.info("User already deleted (idempotent)", { userId, adminId })
+      return successResponse({
+        message: "User not found or already deleted",
+        userId,
+        alreadyDeleted: true,
+      })
+    }
+
+    // Protected email check
+    if (profileData?.email && PROTECTED_EMAILS.includes(profileData.email.toLowerCase())) {
+      logger.warn("Attempted to delete protected user", { userId, email: profileData.email, adminId })
+      return errorResponse("This user account is protected and cannot be deleted", 403)
+    }
+
+    logger.info("Admin deleting user", { userId, email: profileData?.email, adminId })
 
     // 2. Cancel any active Stripe subscription
     if (profileData?.stripe_subscription_id) {
@@ -211,20 +283,39 @@ export async function DELETE(request: NextRequest) {
     }
 
     // 5. Delete the Firebase Auth user account
+    let authDeleted = false
     try {
       await adminAuth.deleteUser(userId)
+      authDeleted = true
       logger.info("Deleted Firebase Auth user", { userId })
-    } catch (authDeleteError) {
-      logger.error("Failed to delete Firebase Auth user", { error: authDeleteError, userId })
+    } catch (authDeleteError: any) {
+      // User might already be deleted from Auth
+      if (authDeleteError.code === 'auth/user-not-found') {
+        authDeleted = true
+        logger.info("Firebase Auth user already deleted", { userId })
+      } else {
+        logger.error("Failed to delete Firebase Auth user", { error: authDeleteError, userId })
+      }
     }
+
+    // 6. Log the admin action for audit trail
+    await logAdminAction(adminId, 'delete_user', {
+      targetUserId: userId,
+      targetEmail: profileData?.email,
+      targetTier: profileData?.subscription_tier,
+      deletedDocuments: deletedDocCount,
+      stripeSubscriptionCancelled: !!profileData?.stripe_subscription_id,
+      authDeleted,
+    })
 
     return successResponse({
       message: "User and all associated data have been permanently deleted",
       deletedDocuments: deletedDocCount,
       userId,
+      email: profileData?.email,
     })
   } catch (error: any) {
-    logger.error("Error deleting user", { error })
+    logger.error("Error deleting user", { error, adminId })
     return errorResponse(error.message || "Failed to delete user", 500)
   }
 }
