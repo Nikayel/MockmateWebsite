@@ -1136,33 +1136,30 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
     )
   }
 
-  // Free user - show upgrade prompt
+  // Free user - show preview and let them start the wizard
+  // They'll see the upgrade prompt at the generation step
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <div className="flex items-center justify-center min-h-[calc(100vh-80px)] pt-24">
         <div className="text-center max-w-md mx-auto px-4">
-          <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
-            <BookOpen className="h-10 w-10 text-white" />
-          </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 rounded-full text-xs font-semibold mb-4">
-            <Crown className="h-3.5 w-3.5" />
-            Pro Feature
+          <div className="w-20 h-20 bg-gradient-to-br from-primary to-primary/60 rounded-full flex items-center justify-center mx-auto mb-6">
+            <BookOpen className="h-10 w-10 text-primary-foreground" />
           </div>
           <h1 className="text-2xl font-bold text-foreground mb-2">
-            Personalized Interview Roadmaps
+            Create Your Interview Roadmap
           </h1>
           <p className="text-muted-foreground mb-8">
-            Get AI-powered study plans tailored to your target company, interview date, and skill gaps.
+            Get a personalized AI-powered study plan tailored to your target company, interview date, and skill gaps.
             Includes spaced repetition scheduling and pattern mastery tracking.
           </p>
-          <Link
-            href="/upgrade"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-yellow-500 text-black rounded-lg font-semibold hover:bg-yellow-400 transition-colors"
+          <button
+            onClick={onCreateNew}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-primary/90 transition-colors"
           >
-            <Crown className="h-5 w-5" />
-            Upgrade to Pro
-          </Link>
+            <Plus className="h-5 w-5" />
+            Create Roadmap
+          </button>
 
           <div className="mt-12 grid grid-cols-3 gap-4 text-center">
             <div>
@@ -1179,23 +1176,23 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
             </div>
           </div>
 
-          <div className="mt-8 p-4 bg-muted/50 rounded-xl text-left">
-            <h3 className="font-semibold text-foreground text-sm mb-2">What you'll get with Pro:</h3>
+          <div className="mt-8 p-4 bg-primary/5 border border-primary/20 rounded-xl text-left">
+            <h3 className="font-semibold text-foreground text-sm mb-2">Your roadmap will include:</h3>
             <ul className="text-xs text-muted-foreground space-y-1.5">
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
                 Custom study plan for your interview date
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
                 Spaced repetition for long-term retention
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
                 Pattern mastery tracking across 15 DSA patterns
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
                 Company-specific interview tips
               </li>
             </ul>

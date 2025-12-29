@@ -189,4 +189,8 @@ export interface PersonalizedRoadmap {
   status: 'active' | 'completed' | 'abandoned'
   isOnTrack: boolean
   daysAhead: number  // Positive = ahead, negative = behind
+
+  // RAG-enhanced content (optional, from AI)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ragEnhancements?: any
 }
