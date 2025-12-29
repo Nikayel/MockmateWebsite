@@ -27,7 +27,7 @@ export function AuthCallbackClient() {
           
           // Create/update profile in Firestore immediately
           // This MUST complete before redirecting to ensure profile is saved
-          let isNewUser = false
+          let shouldSendWelcome = false
           try {
             const profile = await createOrUpdateProfile(
               firebaseUser.uid,
@@ -35,21 +35,22 @@ export function AuthCallbackClient() {
               firebaseUser.displayName,
               firebaseUser.photoURL
             )
-            // Check if this is a new user (created just now)
-            const createdAt = new Date(profile.created_at)
-            const now = new Date()
-            const diffMs = now.getTime() - createdAt.getTime()
-            isNewUser = diffMs < 60000 // Created within last minute
+            // Check if welcome email was already sent (more reliable than time-based check)
+            shouldSendWelcome = !profile.welcome_email_sent
           } catch {
             // Profile creation failed - don't block the flow
             // User can still use the app, profile sync will retry on next auth
           }
 
-          // Send welcome email for new users (non-blocking)
-          if (isNewUser && firebaseUser.email) {
+          // Send welcome email for new users (non-blocking, authenticated)
+          if (shouldSendWelcome && firebaseUser.email) {
+            const idToken = await firebaseUser.getIdToken()
             fetch("/api/email/welcome", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${idToken}`,
+              },
               body: JSON.stringify({
                 userId: firebaseUser.uid,
                 email: firebaseUser.email,

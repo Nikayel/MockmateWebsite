@@ -371,15 +371,36 @@ export async function POST(request: NextRequest) {
           oneYearFromNow.setFullYear(now.getFullYear() + 1)
 
           // For one-time payments, ensure we have a customer ID
-          // Stripe creates a customer for checkout sessions, but it might not always be in session.customer
-          let customerId = session.customer as string | undefined
+          // Priority: 1. existing profile customer, 2. session customer, 3. payment intent, 4. search/create
+          let customerId = profile?.stripe_customer_id as string | undefined
+
+          // Verify existing customer ID is still valid in Stripe
+          if (customerId) {
+            try {
+              await stripe.customers.retrieve(customerId)
+              paymentLogger.info("Using existing valid customer from profile", { customerId })
+            } catch {
+              paymentLogger.warn("Existing customer ID invalid, will find/create new", { invalidId: customerId })
+              customerId = undefined
+            }
+          }
+
+          // If no valid profile customer, try session customer
+          if (!customerId) {
+            customerId = session.customer as string | undefined
+            if (customerId) {
+              paymentLogger.info("Using customer from session", { customerId })
+            }
+          }
 
           // If no customer in session, try to get it from payment intent
           if (!customerId && session.payment_intent) {
             try {
               const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent as string)
               customerId = paymentIntent.customer as string | undefined
-              paymentLogger.info("Retrieved customer ID from payment intent", { customerId })
+              if (customerId) {
+                paymentLogger.info("Retrieved customer ID from payment intent", { customerId })
+              }
             } catch (piError) {
               paymentLogger.warn("Failed to retrieve customer from payment intent", { error: piError })
             }

@@ -105,15 +105,30 @@ async function processInactivityReminders(
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const seventyTwoHoursAgo = new Date(now.getTime() - 72 * 60 * 60 * 1000);
 
-  // Get all learning states where last_session_at is between 24h and 72h ago
-  const learningStatesSnap = await db
-    .collection("user_learning_state")
-    .where("last_session_at", "<=", twentyFourHoursAgo.toISOString())
-    .where("last_session_at", ">=", seventyTwoHoursAgo.toISOString())
-    .limit(50) // Process in batches
-    .get();
+  // Get learning states where last_session_at is before 24h ago
+  // Filter for 72h in memory to avoid composite index requirement
+  let learningStatesSnap;
+  try {
+    learningStatesSnap = await db
+      .collection("user_learning_state")
+      .where("last_session_at", "<=", twentyFourHoursAgo.toISOString())
+      .limit(100)
+      .get();
+  } catch (queryError: any) {
+    console.error("[Cron Email] Firestore query failed:", queryError.message);
+    results.errors.push(`Firestore query failed: ${queryError.message}`);
+    return;
+  }
 
-  for (const doc of learningStatesSnap.docs) {
+  // Filter in memory to only include sessions within 72h (not too old)
+  const filteredDocs = learningStatesSnap.docs.filter((doc) => {
+    const data = doc.data();
+    const lastSession = data.last_session_at;
+    if (!lastSession) return false;
+    return lastSession >= seventyTwoHoursAgo.toISOString();
+  }).slice(0, 50);
+
+  for (const doc of filteredDocs) {
     const learningState = doc.data() as UserLearningState;
     const userId = learningState.user_id;
 
@@ -479,8 +494,27 @@ async function processRoadmapReminders(
         continue;
       }
 
-      // Calculate days until interview
-      const interviewDate = roadmap.interviewDate?.toDate?.() || new Date(roadmap.interviewDate);
+      // Calculate days until interview - handle various date formats safely
+      let interviewDate: Date;
+      try {
+        if (roadmap.interviewDate?.toDate) {
+          interviewDate = roadmap.interviewDate.toDate();
+        } else if (roadmap.interviewDate) {
+          interviewDate = new Date(roadmap.interviewDate);
+        } else {
+          // No interview date - skip this roadmap
+          continue;
+        }
+        // Validate the date is valid
+        if (isNaN(interviewDate.getTime())) {
+          console.warn(`[Cron Email] Invalid interviewDate for user ${userId}`);
+          continue;
+        }
+      } catch {
+        console.warn(`[Cron Email] Failed to parse interviewDate for user ${userId}`);
+        continue;
+      }
+
       const daysUntilInterview = Math.ceil(
         (interviewDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
       );
@@ -502,7 +536,21 @@ async function processRoadmapReminders(
       todayEnd.setHours(23, 59, 59, 999);
 
       for (const plan of roadmap.dailyPlans || []) {
-        const planDate = plan.date?.toDate?.() || new Date(plan.date);
+        // Safely parse plan date
+        let planDate: Date;
+        try {
+          if (plan.date?.toDate) {
+            planDate = plan.date.toDate();
+          } else if (plan.date) {
+            planDate = new Date(plan.date);
+          } else {
+            continue;
+          }
+          if (isNaN(planDate.getTime())) continue;
+        } catch {
+          continue;
+        }
+
         if (planDate >= todayStart && planDate <= todayEnd) {
           for (const q of plan.questions || []) {
             if (q.status !== "completed") {
