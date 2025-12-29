@@ -141,8 +141,10 @@ export async function POST(request: NextRequest) {
 
     // Create checkout session
     // Yearly plans use one-time payment, monthly uses subscription
+    const isSubscription = planType === 'monthly'
+
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
-      mode: planType === 'yearly' ? "payment" : "subscription",
+      mode: isSubscription ? "subscription" : "payment",
       payment_method_types: ["card"],
       line_items: [
         {
@@ -175,6 +177,12 @@ export async function POST(request: NextRequest) {
     // Only set payment_method_collection for subscriptions (recurring payments)
     // This parameter is not allowed for one-time payments (yearly plans)
     if (planType === 'monthly') {
+      sessionParams.payment_method_collection = 'if_required'
+    }
+
+    // payment_method_collection only works with subscriptions, not one-time payments
+    // This allows $0 subscriptions (100% discount) to proceed without payment method
+    if (isSubscription) {
       sessionParams.payment_method_collection = 'if_required'
     }
 
