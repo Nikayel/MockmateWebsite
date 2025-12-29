@@ -517,7 +517,7 @@ export default function RoadmapPage() {
                         >
                           <div className="px-5 pb-4 space-y-3">
                             {/* Company-Specific Tips from RAG */}
-                            {roadmap.ragEnhancements?.companyTips?.length > 0 && (
+                            {(roadmap.ragEnhancements?.companyTips?.length ?? 0) > 0 && (
                               <div className="space-y-1.5">
                                 <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
                                   <Target className="h-3 w-3 text-blue-500" />
@@ -529,7 +529,7 @@ export default function RoadmapPage() {
                               </div>
                             )}
                             {/* Personalized Advice from RAG */}
-                            {roadmap.ragEnhancements?.personalizedAdvice?.length > 0 && (
+                            {(roadmap.ragEnhancements?.personalizedAdvice?.length ?? 0) > 0 && (
                               <div className="space-y-1.5">
                                 <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
                                   <Sparkles className="h-3 w-3 text-yellow-500" />
