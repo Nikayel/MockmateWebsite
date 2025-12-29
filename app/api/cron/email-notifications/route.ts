@@ -153,7 +153,7 @@ async function processWelcomeEmails(
         const result = await sendWelcomeEmail(
           userId,
           profile.email,
-          profile.full_name || profile.display_name
+          profile.full_name
         );
 
         if (result.success) {
