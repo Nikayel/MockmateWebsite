@@ -492,8 +492,8 @@ export default function RoadmapPage() {
                   )}
                 </div>
 
-                {/* Tips Toggle - Collapsed by default */}
-                {recommendations.length > 0 && (
+                {/* Company Tips & Study Tips Toggle */}
+                {(roadmap.ragEnhancements?.companyTips?.length > 0 || recommendations.length > 0) && (
                   <div className="border-t border-border">
                     <button
                       onClick={() => setShowTips(!showTips)}
@@ -501,7 +501,9 @@ export default function RoadmapPage() {
                     >
                       <span className="flex items-center gap-2">
                         <Zap className="h-3 w-3 text-primary" />
-                        Study tips available
+                        {roadmap.ragEnhancements?.companyTips?.length > 0
+                          ? `${roadmap.companyName} interview tips & study strategies`
+                          : 'Study tips available'}
                       </span>
                       {showTips ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                     </button>
@@ -513,10 +515,39 @@ export default function RoadmapPage() {
                           exit={{ height: 0, opacity: 0 }}
                           className="overflow-hidden"
                         >
-                          <div className="px-5 pb-4 text-xs text-muted-foreground space-y-1">
-                            {recommendations.slice(0, 2).map((rec, i) => (
-                              <p key={i}>• {rec}</p>
-                            ))}
+                          <div className="px-5 pb-4 space-y-3">
+                            {/* Company-Specific Tips from RAG */}
+                            {roadmap.ragEnhancements?.companyTips?.length > 0 && (
+                              <div className="space-y-1.5">
+                                <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                                  <Target className="h-3 w-3 text-blue-500" />
+                                  {roadmap.companyName} Focus Areas
+                                </p>
+                                {roadmap.ragEnhancements.companyTips.slice(0, 3).map((tip: string, i: number) => (
+                                  <p key={i} className="text-xs text-muted-foreground pl-4">• {tip}</p>
+                                ))}
+                              </div>
+                            )}
+                            {/* Personalized Advice from RAG */}
+                            {roadmap.ragEnhancements?.personalizedAdvice?.length > 0 && (
+                              <div className="space-y-1.5">
+                                <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                                  <Sparkles className="h-3 w-3 text-yellow-500" />
+                                  Personalized for You
+                                </p>
+                                {roadmap.ragEnhancements.personalizedAdvice.slice(0, 2).map((advice: string, i: number) => (
+                                  <p key={i} className="text-xs text-muted-foreground pl-4">• {advice}</p>
+                                ))}
+                              </div>
+                            )}
+                            {/* General Study Recommendations */}
+                            {recommendations.length > 0 && (
+                              <div className="space-y-1 pt-1 border-t border-border/50">
+                                {recommendations.slice(0, 2).map((rec, i) => (
+                                  <p key={i} className="text-xs text-muted-foreground">• {rec}</p>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </motion.div>
                       )}
@@ -578,6 +609,8 @@ export default function RoadmapPage() {
                     onStartQuestion={handleStartQuestion}
                     onSkipQuestion={handleSkipQuestion}
                     onMarkComplete={handleMarkComplete}
+                    ragEnhancements={roadmap.ragEnhancements}
+                    companyName={roadmap.companyName}
                   />
                 )}
 
