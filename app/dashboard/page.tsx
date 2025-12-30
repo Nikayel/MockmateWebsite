@@ -31,8 +31,11 @@ import Link from "next/link"
 import { toast } from "sonner"
 import { UsageWidget } from "@/components/dashboard/usage-widget"
 
-// Dynamically import onboarding modal to reduce initial bundle size
+// Dynamically import modals to reduce initial bundle size
 const OnboardingModal = dynamic(() => import("@/components/OnboardingModal").then(mod => mod.OnboardingModal), {
+  ssr: false
+})
+const ProductTour = dynamic(() => import("@/components/ProductTour").then(mod => mod.ProductTour), {
   ssr: false
 })
 
@@ -45,6 +48,7 @@ export default function DashboardPage() {
   const [dataLoading, setDataLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [showTour, setShowTour] = useState(false)
 
   // Separate effect to handle auth check with delay to prevent race condition on refresh
   useEffect(() => {
@@ -201,8 +205,12 @@ export default function DashboardPage() {
         isOpen={showOnboarding}
         userId={firebaseUser?.uid || ""}
         userName={userName}
-        onComplete={async () => {
+        onComplete={async (takeTour: boolean) => {
           setShowOnboarding(false)
+          // Show tour if user chose to take it
+          if (takeTour) {
+            setShowTour(true)
+          }
           // Reload profile to get updated onboarding status
           if (firebaseUser) {
             try {
@@ -216,6 +224,22 @@ export default function DashboardPage() {
           }
         }}
       />
+
+      {/* Product tour for new users */}
+      {firebaseUser && (
+        <ProductTour
+          isOpen={showTour}
+          userId={firebaseUser.uid}
+          userName={userName}
+          onComplete={() => {
+            setShowTour(false)
+            router.push('/interview')
+          }}
+          onSkip={() => {
+            setShowTour(false)
+          }}
+        />
+      )}
 
       <Header />
 
