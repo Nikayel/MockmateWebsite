@@ -145,20 +145,6 @@
       ]
     },
     {
-      "collectionGroup": "user_learning_state",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "last_session_at", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "user_roadmaps",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "in_app_notifications",
       "queryScope": "COLLECTION",
       "fields": [
@@ -201,46 +187,11 @@
       ]
     },
     {
-      "collectionGroup": "algorithm_research_events",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "timestamp", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "daily",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "date", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "daily",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "date", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "summary",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "total_reviews", "order": "DESCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "summary",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
         { "fieldPath": "algorithm", "order": "ASCENDING" },
         { "fieldPath": "total_reviews", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "problems",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "next_review_at", "order": "ASCENDING" }
       ]
     },
     {
