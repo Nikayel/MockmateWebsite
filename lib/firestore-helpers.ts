@@ -99,6 +99,21 @@ export async function createOrUpdateProfile(
     if (existingProfile.welcome_email_sent !== undefined) {
       profileDataForFirestore.welcome_email_sent = existingProfile.welcome_email_sent
     }
+    // Preserve notification preferences
+    if (existingProfile.notification_preferences !== undefined) {
+      profileDataForFirestore.notification_preferences = existingProfile.notification_preferences
+    }
+  }
+
+  // Set default notification preferences for new profiles (required for email cron to work)
+  if (isNewProfile && !profileDataForFirestore.notification_preferences) {
+    profileDataForFirestore.notification_preferences = {
+      email_notifications_enabled: true,
+      inactivity_reminders: true,
+      spaced_repetition_reminders: true,
+      milestone_celebrations: true,
+      marketing_emails: false,
+    }
   }
 
   // Build the Profile object for return (can have undefined optional fields)

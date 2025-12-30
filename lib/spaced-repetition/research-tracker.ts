@@ -453,25 +453,46 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
   const thirtyDaysAgo = new Date(now)
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-  // Get all user summaries
-  const summariesSnap = await adminDb
-    .collectionGroup('summary')
-    .where('total_reviews', '>', 0)
-    .get()
+  // Query each algorithm separately to match available index:
+  // (algorithm ASC, total_reviews DESC)
+  let sm2Users: AlgorithmResearchSummary[] = []
+  let fsrsUsers: AlgorithmResearchSummary[] = []
 
-  const sm2Users: AlgorithmResearchSummary[] = []
-  const fsrsUsers: AlgorithmResearchSummary[] = []
+  try {
+    // Query SM-2 users
+    const sm2Snap = await adminDb
+      .collectionGroup('summary')
+      .where('algorithm', '==', 'sm2')
+      .where('total_reviews', '>', 0)
+      .get()
 
-  summariesSnap.docs.forEach((doc) => {
-    const data = doc.data() as AlgorithmResearchSummary
-    if (data.algorithm_user_overridden) return // Exclude overridden users
+    sm2Snap.docs.forEach((doc) => {
+      const data = doc.data() as AlgorithmResearchSummary
+      if (!data.algorithm_user_overridden) {
+        sm2Users.push(data)
+      }
+    })
+  } catch (error) {
+    console.warn('[ResearchTracker] Failed to query SM-2 summaries:', error)
+  }
 
-    if (data.algorithm === 'sm2') {
-      sm2Users.push(data)
-    } else {
-      fsrsUsers.push(data)
-    }
-  })
+  try {
+    // Query FSRS users
+    const fsrsSnap = await adminDb
+      .collectionGroup('summary')
+      .where('algorithm', '==', 'fsrs')
+      .where('total_reviews', '>', 0)
+      .get()
+
+    fsrsSnap.docs.forEach((doc) => {
+      const data = doc.data() as AlgorithmResearchSummary
+      if (!data.algorithm_user_overridden) {
+        fsrsUsers.push(data)
+      }
+    })
+  } catch (error) {
+    console.warn('[ResearchTracker] Failed to query FSRS summaries:', error)
+  }
 
   // Calculate cohort stats
   const sm2Stats = calculateCohortStats('sm2', sm2Users, thirtyDaysAgo)
