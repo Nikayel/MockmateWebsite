@@ -151,6 +151,39 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      case 'migrate-notification-preferences': {
+        // Backfill notification preferences for existing users
+        const profiles = await adminDb.collection('profiles').get()
+        let migrated = 0
+        const batch = adminDb.batch()
+
+        profiles.docs.forEach((doc) => {
+          const data = doc.data()
+          if (!data.notification_preferences) {
+            batch.update(doc.ref, {
+              notification_preferences: {
+                email_notifications_enabled: true,
+                inactivity_reminders: true,
+                spaced_repetition_reminders: true,
+                milestone_celebrations: true,
+                marketing_emails: false,
+              },
+            })
+            migrated++
+          }
+        })
+
+        if (migrated > 0) {
+          await batch.commit()
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: `Added notification preferences to ${migrated} users`,
+          data: { migrated },
+        })
+      }
+
       default:
         return NextResponse.json(
           { success: false, error: `Unknown action: ${action}` },
