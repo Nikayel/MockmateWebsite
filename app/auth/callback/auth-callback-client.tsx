@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { generateVSCodeDeepLink, getStoredRedirectPath } from "@/lib/auth"
 import { createOrUpdateProfile } from "@/lib/firestore-helpers"
+import { createInAppNotification } from "@/lib/notification-helpers"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle, ExternalLink, Download } from "lucide-react"
@@ -40,6 +41,24 @@ export function AuthCallbackClient() {
           } catch {
             // Profile creation failed - don't block the flow
             // User can still use the app, profile sync will retry on next auth
+          }
+
+          // Create welcome in-app notification for new users
+          if (shouldSendWelcome) {
+            try {
+              await createInAppNotification({
+                userId: firebaseUser.uid,
+                type: 'welcome',
+                title: 'Welcome to CodeSparring! 🎉',
+                body: `Hey${firebaseUser.displayName ? ` ${firebaseUser.displayName.split(' ')[0]}` : ''}! Ready to ace your next tech interview? Start with a practice problem to see how it works.`,
+                read: false,
+                link: '/interview',
+              })
+              console.log('[Auth] Welcome in-app notification created')
+            } catch (notifError) {
+              console.error('[Auth] Failed to create welcome notification:', notifError)
+              // Non-blocking - continue with the flow
+            }
           }
 
           // Send welcome email for new users (non-blocking, authenticated)

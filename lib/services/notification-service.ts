@@ -68,6 +68,7 @@ export function generateNotificationMessage(
 
   // Generate title based on type
   const titles: Record<NotificationType, string> = {
+    welcome: 'Welcome to CodeSparring!',
     spaced_repetition_review: 'Time to Review',
     pattern_decay_alert: 'Pattern Needs Attention',
     daily_practice_reminder: 'Daily Practice',
