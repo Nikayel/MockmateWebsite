@@ -8,12 +8,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuth } from '@/lib/auth-helpers'
 import {
-  getInAppNotifications,
-  getUnreadInAppNotifications,
-  markInAppNotificationRead,
-  markAllInAppNotificationsRead,
-  getNotificationAnalytics,
-} from '@/lib/notification-helpers'
+  getInAppNotificationsServer,
+  getUnreadInAppNotificationsServer,
+  markInAppNotificationReadServer,
+  markAllInAppNotificationsReadServer,
+  getNotificationAnalyticsServer,
+} from '@/lib/notification-helpers-server'
 import {
   processUserNotifications,
   sendNotification,
@@ -40,16 +40,16 @@ export async function GET(request: NextRequest) {
     const limitParam = parseInt(searchParams.get('limit') || '20', 10)
 
     const notifications = unreadOnly
-      ? await getUnreadInAppNotifications(userId, limitParam)
-      : await getInAppNotifications(userId, limitParam)
+      ? await getUnreadInAppNotificationsServer(userId, limitParam)
+      : await getInAppNotificationsServer(userId, limitParam)
 
     // Get unread count
     const unreadCount = unreadOnly
       ? notifications.length
-      : (await getUnreadInAppNotifications(userId, 100)).length
+      : (await getUnreadInAppNotificationsServer(userId, 100)).length
 
     // Get analytics summary
-    const analytics = await getNotificationAnalytics(userId)
+    const analytics = await getNotificationAnalyticsServer(userId)
 
     return NextResponse.json({
       notifications,
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Verify user owns the notification before marking as read
-        const marked = await markInAppNotificationRead(body.notificationId, userId)
+        const marked = await markInAppNotificationReadServer(body.notificationId, userId)
         if (!marked) {
           return NextResponse.json(
             { error: 'Notification not found or access denied' },
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'readAll': {
-        await markAllInAppNotificationsRead(userId)
+        await markAllInAppNotificationsReadServer(userId)
 
         return NextResponse.json({ success: true })
       }

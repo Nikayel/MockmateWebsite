@@ -49,6 +49,7 @@ async function initializeNotificationPreferences(userId: string): Promise<void> 
       await prefsRef.set({
         userId,
         enabled: true,
+        timezone: "UTC", // Default timezone, user can update later
         channels: {
           email: true,
           in_app: true,
@@ -205,6 +206,8 @@ export async function POST(request: NextRequest) {
       await profileRef.set(
         {
           welcome_notification_sent: true,
+          welcome_email_failed: true,
+          welcome_email_error: result.error,
           notification_preferences: {
             email_notifications_enabled: true,
             welcome_email: true,
@@ -216,6 +219,18 @@ export async function POST(request: NextRequest) {
         },
         { merge: true }
       );
+
+      // Log the failed email notification for debugging
+      await db.collection("email_notifications").add({
+        user_id: userId,
+        email_type: "welcome",
+        status: "failed",
+        error: result.error || "Unknown error",
+        scheduled_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        source: "api",
+      });
+      console.error("[Welcome API] Email failed, logged to email_notifications:", result.error);
     }
 
     return NextResponse.json({
