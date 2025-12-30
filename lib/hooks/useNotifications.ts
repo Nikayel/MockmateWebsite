@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useAuth } from '@/lib/auth-context'
 import type { InAppNotification, NotificationPreferences } from '@/lib/types/notifications'
 import type { NotificationType } from '@/lib/rag/knowledge-base/notification-knowledge'
 
@@ -53,6 +54,7 @@ export function useNotifications(
   options: UseNotificationsOptions = {}
 ): UseNotificationsReturn {
   const { pollInterval = 60000, fetchOnMount = true } = options
+  const { firebaseUser, initialized } = useAuth()
 
   const [notifications, setNotifications] = useState<InAppNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -62,13 +64,41 @@ export function useNotifications(
 
   const pollRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Helper to get auth headers
+  const getAuthHeaders = useCallback(async (): Promise<HeadersInit | null> => {
+    if (!firebaseUser) return null
+    try {
+      const token = await firebaseUser.getIdToken()
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      }
+    } catch (error) {
+      console.error('[useNotifications] Failed to get auth token:', error)
+      return null
+    }
+  }, [firebaseUser])
+
   // Fetch notifications
   const refresh = useCallback(async () => {
+    // Don't fetch if not authenticated
+    if (!firebaseUser) {
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
 
-      const response = await fetch('/api/notifications')
+      const headers = await getAuthHeaders()
+      if (!headers) {
+        // Not authenticated
+        return
+      }
+
+      const response = await fetch('/api/notifications', {
+        headers,
+      })
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -83,16 +113,24 @@ export function useNotifications(
       setNotifications(data.notifications || [])
       setUnreadCount(data.unreadCount || 0)
     } catch (err: any) {
+      console.error('[useNotifications] Error fetching notifications:', err)
       setError(err.message || 'Failed to fetch notifications')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [firebaseUser, getAuthHeaders])
 
   // Fetch preferences
   const fetchPreferences = useCallback(async () => {
+    if (!firebaseUser) return
+
     try {
-      const response = await fetch('/api/notifications/preferences')
+      const headers = await getAuthHeaders()
+      if (!headers) return
+
+      const response = await fetch('/api/notifications/preferences', {
+        headers,
+      })
 
       if (!response.ok) {
         if (response.status === 401) return
@@ -104,14 +142,17 @@ export function useNotifications(
     } catch (err: any) {
       console.error('Error fetching notification preferences:', err)
     }
-  }, [])
+  }, [firebaseUser, getAuthHeaders])
 
   // Mark single notification as read
   const markRead = useCallback(async (notificationId: string) => {
     try {
+      const headers = await getAuthHeaders()
+      if (!headers) return
+
       const response = await fetch('/api/notifications', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ action: 'read', notificationId }),
       })
 
@@ -129,14 +170,17 @@ export function useNotifications(
     } catch (err: any) {
       setError(err.message)
     }
-  }, [])
+  }, [getAuthHeaders])
 
   // Mark all notifications as read
   const markAllRead = useCallback(async () => {
     try {
+      const headers = await getAuthHeaders()
+      if (!headers) return
+
       const response = await fetch('/api/notifications', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ action: 'readAll' }),
       })
 
@@ -150,15 +194,18 @@ export function useNotifications(
     } catch (err: any) {
       setError(err.message)
     }
-  }, [])
+  }, [getAuthHeaders])
 
   // Update preferences (generic)
   const updatePreferences = useCallback(
     async (updates: Partial<NotificationPreferences>) => {
       try {
+        const headers = await getAuthHeaders()
+        if (!headers) return
+
         const response = await fetch('/api/notifications/preferences', {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ preferences: updates }),
         })
 
@@ -175,16 +222,19 @@ export function useNotifications(
         throw err
       }
     },
-    []
+    [getAuthHeaders]
   )
 
   // Toggle notification type
   const toggleType = useCallback(
     async (type: NotificationType, enabled: boolean) => {
       try {
+        const headers = await getAuthHeaders()
+        if (!headers) return
+
         const response = await fetch('/api/notifications/preferences', {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ toggleType: type, enabled }),
         })
 
@@ -211,15 +261,18 @@ export function useNotifications(
         setError(err.message)
       }
     },
-    []
+    [getAuthHeaders]
   )
 
   // Toggle global notifications
   const toggleGlobal = useCallback(async (enabled: boolean) => {
     try {
+      const headers = await getAuthHeaders()
+      if (!headers) return
+
       const response = await fetch('/api/notifications/preferences', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ enabled }),
       })
 
@@ -232,15 +285,18 @@ export function useNotifications(
     } catch (err: any) {
       setError(err.message)
     }
-  }, [])
+  }, [getAuthHeaders])
 
   // Update quiet hours
   const updateQuietHours = useCallback(
     async (start: number, end: number, enabled: boolean) => {
       try {
+        const headers = await getAuthHeaders()
+        if (!headers) return
+
         const response = await fetch('/api/notifications/preferences', {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ quietHours: { start, end, enabled } }),
         })
 
@@ -256,22 +312,22 @@ export function useNotifications(
         setError(err.message)
       }
     },
-    []
+    [getAuthHeaders]
   )
 
   // Track if initial fetch has been done
   const initialFetchDone = useRef(false)
 
-  // Initial fetch - only runs once when fetchOnMount becomes true
+  // Initial fetch - only runs once when fetchOnMount becomes true AND user is authenticated
   useEffect(() => {
-    if (fetchOnMount && !initialFetchDone.current) {
+    if (fetchOnMount && initialized && firebaseUser && !initialFetchDone.current) {
       initialFetchDone.current = true
       refresh()
       fetchPreferences()
     }
-  }, [fetchOnMount, refresh, fetchPreferences])
+  }, [fetchOnMount, initialized, firebaseUser, refresh, fetchPreferences])
 
-  // Polling - only active when pollInterval > 0
+  // Polling - only active when pollInterval > 0 and user is authenticated
   useEffect(() => {
     // Clear any existing interval
     if (pollRef.current) {
@@ -279,8 +335,8 @@ export function useNotifications(
       pollRef.current = null
     }
 
-    // Only start polling if interval is positive
-    if (pollInterval > 0) {
+    // Only start polling if interval is positive and user is authenticated
+    if (pollInterval > 0 && firebaseUser) {
       pollRef.current = setInterval(refresh, pollInterval)
     }
 
@@ -290,7 +346,7 @@ export function useNotifications(
         pollRef.current = null
       }
     }
-  }, [pollInterval, refresh])
+  }, [pollInterval, firebaseUser, refresh])
 
   return {
     notifications,

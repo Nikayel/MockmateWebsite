@@ -5,29 +5,45 @@
  * Based on Brevo's Node.js SDK: @getbrevo/brevo
  */
 
-import { TransactionalEmailsApi, SendSmtpEmail, ContactsApi, CreateContact } from "@getbrevo/brevo";
+import {
+  TransactionalEmailsApi,
+  TransactionalEmailsApiApiKeys,
+  ContactsApi,
+  ContactsApiApiKeys,
+  SendSmtpEmail,
+  CreateContact,
+} from "@getbrevo/brevo";
 
-// Initialize Brevo API clients
+// Lazy-initialized API instances with API key configured
 let emailApi: TransactionalEmailsApi | null = null;
 let contactsApi: ContactsApi | null = null;
 
 function getEmailApi(): TransactionalEmailsApi {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) {
+    throw new Error("BREVO_API_KEY not configured");
+  }
+
   if (!emailApi) {
     emailApi = new TransactionalEmailsApi();
-    // Set API key using the authentication object
-    (emailApi as any).authentications = {
-      apiKey: { apiKey: process.env.BREVO_API_KEY || "" }
-    };
+    // Set API key using the SDK's setApiKey method
+    emailApi.setApiKey(TransactionalEmailsApiApiKeys.apiKey, apiKey);
+    console.log("[Brevo] Email API initialized successfully");
   }
   return emailApi;
 }
 
 function getContactsApi(): ContactsApi {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) {
+    throw new Error("BREVO_API_KEY not configured");
+  }
+
   if (!contactsApi) {
     contactsApi = new ContactsApi();
-    (contactsApi as any).authentications = {
-      apiKey: { apiKey: process.env.BREVO_API_KEY || "" }
-    };
+    // Set API key using the SDK's setApiKey method
+    contactsApi.setApiKey(ContactsApiApiKeys.apiKey, apiKey);
+    console.log("[Brevo] Contacts API initialized successfully");
   }
   return contactsApi;
 }
@@ -83,10 +99,17 @@ export async function sendEmail(options: SendEmailOptions): Promise<EmailResult>
   const INITIAL_DELAY_MS = 1000;
   let lastError: any;
 
+  // Get API instance - this will configure authentication
+  let api: TransactionalEmailsApi;
+  try {
+    api = getEmailApi();
+  } catch (error: any) {
+    console.error("[Brevo] Failed to initialize API:", error?.message || error);
+    return { success: false, error: error?.message || "Failed to initialize email API" };
+  }
+
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const api = getEmailApi();
-
       const message = new SendSmtpEmail();
       message.subject = options.subject;
       message.htmlContent = options.htmlContent;
