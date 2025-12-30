@@ -84,16 +84,17 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: Omit<NotificationPreferences, 'us
     end: 8,    // 8 AM
   },
   typePreferences: {
-    spaced_repetition_review: { enabled: true, channels: ['push', 'in_app'] },
-    pattern_decay_alert: { enabled: true, channels: ['push', 'email', 'in_app'] },
-    daily_practice_reminder: { enabled: true, channels: ['push', 'in_app'] },
-    streak_maintenance: { enabled: true, channels: ['push', 'in_app'] },
-    interview_countdown: { enabled: true, channels: ['push', 'email', 'in_app'] },
-    milestone_celebration: { enabled: true, channels: ['push', 'in_app'] },
-    weak_pattern_focus: { enabled: true, channels: ['push', 'in_app'] },
-    roadmap_behind: { enabled: true, channels: ['push', 'email', 'in_app'] },
+    welcome: { enabled: true, channels: ['email', 'in_app'] },
+    spaced_repetition_review: { enabled: true, channels: ['in_app'] },
+    pattern_decay_alert: { enabled: true, channels: ['email', 'in_app'] },
+    daily_practice_reminder: { enabled: true, channels: ['in_app'] },
+    streak_maintenance: { enabled: true, channels: ['in_app'] },
+    interview_countdown: { enabled: true, channels: ['email', 'in_app'] },
+    milestone_celebration: { enabled: true, channels: ['in_app'] },
+    weak_pattern_focus: { enabled: true, channels: ['in_app'] },
+    roadmap_behind: { enabled: true, channels: ['email', 'in_app'] },
     optimal_review_time: { enabled: true, channels: ['in_app'] },
-    rest_reminder: { enabled: true, channels: ['push', 'in_app'] },
+    rest_reminder: { enabled: true, channels: ['in_app'] },
   },
 }
 

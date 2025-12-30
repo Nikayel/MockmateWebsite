@@ -42,6 +42,7 @@ export interface NotificationKnowledge {
 }
 
 export type NotificationType =
+  | 'welcome'                        // Welcome notification for new users
   | 'spaced_repetition_review'      // Time to review a problem you solved before
   | 'pattern_decay_alert'           // Pattern proficiency is declining
   | 'daily_practice_reminder'       // Daily practice nudge
