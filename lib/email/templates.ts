@@ -1,38 +1,81 @@
 /**
  * Email Templates for CodeSparring
  *
- * DELIVERABILITY OPTIMIZED: These templates are designed to land in Primary inbox,
- * not Promotions. Key principles:
- * - Minimal HTML styling (looks like a regular email)
+ * DELIVERABILITY OPTIMIZED: These templates are designed to land in Primary inbox.
+ *
+ * Strategy:
  * - Personal tone (from Nikayel, not "the team")
- * - Simple subject lines (no emoji, no exclamation marks)
- * - One clear CTA per email
- * - High text-to-HTML ratio
+ * - Clean, minimal styling (not marketing-heavy)
+ * - Single CTA per email
+ * - Different footer strategies based on email type:
+ *   - Transactional (welcome, payment, subscription): No unsubscribe needed
+ *   - Reminder emails: Subtle preferences link
  */
 
 import { calculateRetention } from "./brevo";
 
-// Simple email wrapper - minimal styling to avoid Promotions folder
-const simpleEmailWrapper = (content: string, includeUnsubscribe = true) => `
+// Email type determines footer behavior
+type EmailType = 'transactional' | 'reminder' | 'marketing';
+
+// Clean email wrapper with tasteful styling
+const emailWrapper = (content: string, emailType: EmailType = 'transactional') => {
+  // Footer varies by email type
+  const footer = emailType === 'reminder'
+    ? `<p style="margin-top: 32px; font-size: 13px; color: #888;">
+        <a href="https://codesparring.dev/account" style="color: #888;">change email preferences</a>
+       </p>`
+    : emailType === 'marketing'
+    ? `<p style="margin-top: 32px; font-size: 13px; color: #888;">
+        You signed up for CodeSparring updates.<br>
+        <a href="https://codesparring.dev/account" style="color: #888;">unsubscribe</a>
+       </p>`
+    : ''; // transactional emails don't need unsubscribe
+
+  return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  ${content}
-  ${includeUnsubscribe ? `
-  <p style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #999;">
-    You're receiving this because you signed up for CodeSparring.<br>
-    <a href="https://codesparring.dev/account" style="color: #666;">Manage email preferences</a>
-  </p>
-  ` : ''}
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.7; color: #1a1a1a; max-width: 560px; margin: 0 auto; padding: 32px 20px; background-color: #ffffff;">
+
+  <!-- Subtle brand header -->
+  <div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #f0f0f0;">
+    <span style="font-size: 15px; font-weight: 600; color: #333;">CodeSparring</span>
+  </div>
+
+  <!-- Email content -->
+  <div style="font-size: 15px;">
+    ${content}
+  </div>
+
+  ${footer}
 </body>
 </html>
 `;
+};
 
-// WELCOME EMAIL
+// Styled CTA button - looks good but not overly promotional
+const ctaButton = (text: string, url: string) => `
+  <p style="margin: 24px 0;">
+    <a href="${url}" style="display: inline-block; background-color: #0066cc; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 500; font-size: 14px;">${text}</a>
+  </p>
+`;
+
+// Simple text link (less promotional)
+const ctaLink = (text: string, url: string) => `
+  <a href="${url}" style="color: #0066cc; text-decoration: none;">${text}</a>
+`;
+
+// Signature block
+const signature = (includeTitle = true) => `
+  <p style="margin-top: 24px; color: #333;">
+    – nikayel${includeTitle ? `<br><span style="color: #666; font-size: 14px;">founder, codesparring</span>` : ''}
+  </p>
+`;
+
+// WELCOME EMAIL (Transactional - no unsubscribe needed)
 
 export interface WelcomeEmailData {
   userName: string;
@@ -50,31 +93,31 @@ export function getWelcomeEmailHtml(data: WelcomeEmailData): string {
   const content = `
     <p>hey ${firstName},</p>
 
-    <p>i'm nikayel - a cs senior at sac state who built codesparring because i kept bombing interviews even after grinding leetcode for months.</p>
+    <p>i'm nikayel – a cs senior at sac state who built codesparring because i kept bombing interviews even after grinding leetcode for months.</p>
 
     <p>turns out i was studying wrong. cramming doesn't work because your brain forgets 70% of what you learned within 24 hours. what works is short, spaced-out practice sessions.</p>
 
     <p>so i built this thing for myself, and it actually helped. now i want to share it.</p>
 
     <p><strong>here's what you can practice:</strong></p>
-    <ul>
-      <li>dsa stuff (two pointers, sliding window, trees, dp, all of it)</li>
-      <li>system design for when companies ask about scale</li>
-      <li>debugging under pressure like a real interview</li>
+    <ul style="padding-left: 20px; color: #333;">
+      <li style="margin-bottom: 6px;">dsa patterns (two pointers, sliding window, trees, dp)</li>
+      <li style="margin-bottom: 6px;">system design for scale questions</li>
+      <li style="margin-bottom: 6px;">debugging under pressure like a real interview</li>
     </ul>
 
-    <p><a href="${data.appUrl}/dashboard" style="color: #0066cc;">jump in and try it</a></p>
+    ${ctaButton('start practicing', `${data.appUrl}/dashboard`)}
 
-    <p>one thing i learned: 15 mins a day beats 2 hour cram sessions. tried both. trust me.</p>
+    <p style="color: #666; font-size: 14px; margin-top: 20px;">
+      <strong>tip:</strong> 15 mins a day beats 2-hour cram sessions. tried both. trust me.
+    </p>
 
-    <p>if you have questions, just reply to this email - it goes straight to me.</p>
+    <p>if you have questions, just reply – it goes straight to me.</p>
 
-    <p>good luck with your prep,<br>
-    nikayel<br>
-    <span style="color: #666; font-size: 14px;">cs senior @ sac state</span></p>
+    ${signature(true)}
   `;
 
-  return simpleEmailWrapper(content);
+  return emailWrapper(content, 'transactional');
 }
 
 export function getWelcomeEmailText(data: WelcomeEmailData): string {
@@ -83,30 +126,29 @@ export function getWelcomeEmailText(data: WelcomeEmailData): string {
   return `
 hey ${firstName},
 
-i'm nikayel - a cs senior at sac state who built codesparring because i kept bombing interviews even after grinding leetcode for months.
+i'm nikayel – a cs senior at sac state who built codesparring because i kept bombing interviews even after grinding leetcode for months.
 
 turns out i was studying wrong. cramming doesn't work because your brain forgets 70% of what you learned within 24 hours. what works is short, spaced-out practice sessions.
 
 so i built this thing for myself, and it actually helped. now i want to share it.
 
 here's what you can practice:
-- dsa stuff (two pointers, sliding window, trees, dp, all of it)
-- system design for when companies ask about scale
+- dsa patterns (two pointers, sliding window, trees, dp)
+- system design for scale questions
 - debugging under pressure like a real interview
 
-jump in and try it: ${data.appUrl}/dashboard
+start practicing: ${data.appUrl}/dashboard
 
-one thing i learned: 15 mins a day beats 2 hour cram sessions. tried both. trust me.
+tip: 15 mins a day beats 2-hour cram sessions. tried both. trust me.
 
-if you have questions, just reply to this email - it goes straight to me.
+if you have questions, just reply – it goes straight to me.
 
-good luck with your prep,
-nikayel
-cs senior @ sac state
+– nikayel
+founder, codesparring
   `.trim();
 }
 
-// INACTIVITY REMINDER (24h+)
+// INACTIVITY REMINDER (Reminder - needs preferences link)
 
 export interface InactivityEmailData {
   userName: string;
@@ -123,7 +165,7 @@ export function getInactivityEmailSubject(hours: number): string {
   } else if (hours < 72) {
     return "been a few days";
   } else {
-    return "just wanted to follow up";
+    return "following up";
   }
 }
 
@@ -137,20 +179,20 @@ export function getInactivityEmailHtml(data: InactivityEmailData): string {
 
     <p>noticed it's been ${days} day${days !== 1 ? 's' : ''} since your last practice session.</p>
 
-    <p>not trying to be annoying here, but there's actual science behind this - we forget about ${100 - retentionEstimate}% of what we learned after ${days} days without review. it's called the forgetting curve.</p>
+    <p>not trying to nag, but there's science here – we forget about ${100 - retentionEstimate}% of what we learned after ${days} days without review. it's called the forgetting curve.</p>
 
-    ${data.lastTopic ? `<p>you were working on <strong>${data.lastTopic}</strong> last time. might be worth a quick 5-min review to keep it fresh.</p>` : ''}
+    ${data.lastTopic ? `<p>you were working on <strong>${data.lastTopic}</strong>. might be worth a quick 5-min review.</p>` : ''}
 
-    ${data.streakDays && data.streakDays > 0 ? `<p>also, you had a ${data.streakDays}-day streak going. just saying.</p>` : ''}
+    ${data.streakDays && data.streakDays > 0 ? `<p>also, you had a <strong>${data.streakDays}-day streak</strong> going. just saying.</p>` : ''}
 
-    <p><a href="${data.appUrl}/dashboard" style="color: #0066cc;">do a quick session</a></p>
+    ${ctaButton('do a quick session', `${data.appUrl}/dashboard`)}
 
-    <p>even 5 minutes helps more than you'd think.</p>
+    <p style="color: #666; font-size: 14px;">even 5 minutes helps more than you'd think.</p>
 
-    <p>- nikayel</p>
+    ${signature(false)}
   `;
 
-  return simpleEmailWrapper(content);
+  return emailWrapper(content, 'reminder');
 }
 
 export function getInactivityEmailText(data: InactivityEmailData): string {
@@ -163,9 +205,9 @@ hey ${firstName},
 
 noticed it's been ${days} day${days !== 1 ? 's' : ''} since your last practice session.
 
-not trying to be annoying here, but there's actual science behind this - we forget about ${100 - retentionEstimate}% of what we learned after ${days} days without review. it's called the forgetting curve.
+not trying to nag, but there's science here – we forget about ${100 - retentionEstimate}% of what we learned after ${days} days without review. it's called the forgetting curve.
 
-${data.lastTopic ? `you were working on ${data.lastTopic} last time. might be worth a quick 5-min review to keep it fresh.` : ''}
+${data.lastTopic ? `you were working on ${data.lastTopic}. might be worth a quick 5-min review.` : ''}
 
 ${data.streakDays && data.streakDays > 0 ? `also, you had a ${data.streakDays}-day streak going. just saying.` : ''}
 
@@ -173,11 +215,14 @@ do a quick session: ${data.appUrl}/dashboard
 
 even 5 minutes helps more than you'd think.
 
-- nikayel
+– nikayel
+
+---
+change email preferences: ${data.appUrl}/account
   `.trim();
 }
 
-// SPACED REPETITION REMINDER (3+ days)
+// SPACED REPETITION REMINDER (Reminder)
 
 export interface SpacedRepetitionEmailData {
   userName: string;
@@ -207,18 +252,18 @@ export function getSpacedRepetitionEmailHtml(data: SpacedRepetitionEmailData): s
 
     <p>you practiced <strong>${data.topic}</strong> ${data.daysSinceReview} days ago${data.lastScore ? ` and scored ${data.lastScore}%` : ''}.</p>
 
-    <p>based on the forgetting curve, your retention is probably around ${retentionEstimate}% right now. this is actually the optimal time to review - challenging enough to strengthen the memory, but not so late that you've forgotten everything.</p>
+    <p>based on the forgetting curve, your retention is around <strong>${retentionEstimate}%</strong> right now. this is actually the optimal time to review – challenging enough to strengthen the memory, but not so late that you've forgotten everything.</p>
 
-    ${data.pattern ? `<p>pattern: ${data.pattern}</p>` : ''}
+    ${data.pattern ? `<p style="color: #666;">pattern: ${data.pattern}</p>` : ''}
 
-    <p><a href="${reviewUrl}" style="color: #0066cc;">review ${data.topic}</a></p>
+    ${ctaButton(`review ${data.topic}`, reviewUrl)}
 
-    <p>a quick review now will lock this in for way longer. each review roughly doubles how long you remember it.</p>
+    <p style="color: #666; font-size: 14px;">each review roughly doubles how long you remember it.</p>
 
-    <p>- nikayel</p>
+    ${signature(false)}
   `;
 
-  return simpleEmailWrapper(content);
+  return emailWrapper(content, 'reminder');
 }
 
 export function getSpacedRepetitionEmailText(data: SpacedRepetitionEmailData): string {
@@ -230,17 +275,20 @@ hey ${firstName},
 
 you practiced ${data.topic} ${data.daysSinceReview} days ago${data.lastScore ? ` and scored ${data.lastScore}%` : ''}.
 
-based on the forgetting curve, your retention is probably around ${retentionEstimate}% right now. this is actually the optimal time to review.
+based on the forgetting curve, your retention is around ${retentionEstimate}% right now. this is the optimal time to review.
 
 review now: ${data.appUrl}/dashboard
 
 each review roughly doubles how long you remember it.
 
-- nikayel
+– nikayel
+
+---
+change email preferences: ${data.appUrl}/account
   `.trim();
 }
 
-// MILESTONE CELEBRATION
+// MILESTONE CELEBRATION (Transactional - triggered by their action)
 
 export interface MilestoneEmailData {
   userName: string;
@@ -280,7 +328,7 @@ export function getMilestoneEmailHtml(data: MilestoneEmailData): string {
       milestoneContent = `<p>looks like you've got <strong>${data.milestoneValue}</strong> pretty locked in. that pattern should stick with you.</p>`;
       break;
     case "first_session":
-      milestoneContent = `<p>you finished your first practice session. the hardest part is starting - you got that done.</p>`;
+      milestoneContent = `<p>you finished your first practice session. the hardest part is starting – you got that done.</p>`;
       break;
   }
 
@@ -291,15 +339,15 @@ export function getMilestoneEmailHtml(data: MilestoneEmailData): string {
 
     <p>keep it up. you're building real skills here.</p>
 
-    <p><a href="${data.appUrl}/dashboard" style="color: #0066cc;">keep practicing</a></p>
+    ${ctaButton('keep practicing', `${data.appUrl}/dashboard`)}
 
-    <p>- nikayel</p>
+    ${signature(false)}
   `;
 
-  return simpleEmailWrapper(content);
+  return emailWrapper(content, 'transactional');
 }
 
-// ROADMAP: DAILY PRACTICE REMINDER
+// ROADMAP: DAILY PRACTICE REMINDER (Reminder)
 
 export interface DailyRoadmapEmailData {
   userName: string;
@@ -320,7 +368,7 @@ export interface DailyRoadmapEmailData {
 
 export function getDailyRoadmapEmailSubject(data: DailyRoadmapEmailData): string {
   if (data.daysUntilInterview <= 3) {
-    return `${data.daysUntilInterview} days left - today's prep`;
+    return `${data.daysUntilInterview} days left – today's prep`;
   }
   return `today's ${data.targetCompany} prep`;
 }
@@ -329,16 +377,16 @@ export function getDailyRoadmapEmailHtml(data: DailyRoadmapEmailData): string {
   const firstName = data.userName?.split(' ')[0] || 'there';
   const progressPercent = Math.round((data.questionsCompleted / data.totalQuestions) * 100);
 
-  const questionsHtml = data.todaysQuestions.map((q, i) =>
-    `<li><strong>${q.title}</strong> - ${q.pattern}, ${q.difficulty}</li>`
+  const questionsHtml = data.todaysQuestions.map((q) =>
+    `<li style="margin-bottom: 8px;"><strong>${q.title}</strong><br><span style="color: #666; font-size: 13px;">${q.pattern} · ${q.difficulty}</span></li>`
   ).join('\n');
 
   const urgencyNote = data.daysUntilInterview <= 7
-    ? `<p style="color: #c00;"><strong>${data.daysUntilInterview} day${data.daysUntilInterview !== 1 ? 's' : ''} until your ${data.targetCompany} interview.</strong></p>`
+    ? `<p style="color: #c00; font-weight: 500;">${data.daysUntilInterview} day${data.daysUntilInterview !== 1 ? 's' : ''} until your ${data.targetCompany} interview.</p>`
     : '';
 
   const onTrackNote = !data.isOnTrack
-    ? `<p>heads up: you're a bit behind schedule. try to knock out today's questions to catch up.</p>`
+    ? `<p style="color: #996600; font-size: 14px;">heads up: you're a bit behind schedule. try to knock these out today.</p>`
     : '';
 
   const content = `
@@ -346,22 +394,22 @@ export function getDailyRoadmapEmailHtml(data: DailyRoadmapEmailData): string {
 
     ${urgencyNote}
 
-    <p>here's today's practice for your ${data.targetCompany} roadmap:</p>
+    <p>here's today's practice for your <strong>${data.targetCompany}</strong> roadmap:</p>
 
-    <ul>
+    <ul style="padding-left: 20px; margin: 16px 0;">
       ${questionsHtml}
     </ul>
 
-    <p>progress: ${data.questionsCompleted}/${data.totalQuestions} (${progressPercent}%)</p>
+    <p style="color: #666; font-size: 14px;">progress: ${data.questionsCompleted}/${data.totalQuestions} (${progressPercent}%)</p>
 
     ${onTrackNote}
 
-    <p><a href="${data.appUrl}/roadmap" style="color: #0066cc;">start today's practice</a></p>
+    ${ctaButton("start today's practice", `${data.appUrl}/roadmap`)}
 
-    <p>- nikayel</p>
+    ${signature(false)}
   `;
 
-  return simpleEmailWrapper(content);
+  return emailWrapper(content, 'reminder');
 }
 
 export function getDailyRoadmapEmailText(data: DailyRoadmapEmailData): string {
@@ -383,11 +431,14 @@ progress: ${data.questionsCompleted}/${data.totalQuestions}
 
 start practicing: ${data.appUrl}/roadmap
 
-- nikayel
+– nikayel
+
+---
+change email preferences: ${data.appUrl}/account
   `.trim();
 }
 
-// ROADMAP: INTERVIEW COUNTDOWN
+// ROADMAP: INTERVIEW COUNTDOWN (Reminder)
 
 export interface InterviewCountdownEmailData {
   userName: string;
@@ -412,40 +463,42 @@ export function getInterviewCountdownEmailHtml(data: InterviewCountdownEmailData
   const progressPercent = Math.round((data.questionsCompleted / data.totalQuestions) * 100);
 
   const focusPatterns = data.patternsToFocus.length > 0
-    ? `<p>focus areas for the final stretch:</p><ul>${data.patternsToFocus.map(p => `<li>${p}</li>`).join('')}</ul>`
+    ? `<p><strong>focus areas:</strong></p><ul style="padding-left: 20px;">${data.patternsToFocus.map(p => `<li>${p}</li>`).join('')}</ul>`
     : '';
 
   const finalTips = data.daysUntilInterview <= 3 ? `
-    <p><strong>final day tips:</strong></p>
-    <ul>
-      <li>review patterns you've already solved - don't learn new ones now</li>
-      <li>get good sleep - it consolidates memory</li>
-      <li>practice explaining your approach out loud</li>
-    </ul>
+    <div style="background-color: #f8f8f8; padding: 16px; border-radius: 6px; margin: 16px 0;">
+      <p style="margin: 0 0 8px 0; font-weight: 500;">final stretch tips:</p>
+      <ul style="padding-left: 20px; margin: 0; color: #666; font-size: 14px;">
+        <li>review patterns you've solved – don't learn new ones now</li>
+        <li>get good sleep – it consolidates memory</li>
+        <li>practice explaining your approach out loud</li>
+      </ul>
+    </div>
   ` : '';
 
   const content = `
     <p>hey ${firstName},</p>
 
-    <p>your ${data.targetCompany} interview is ${data.daysUntilInterview === 1 ? 'tomorrow' : `in ${data.daysUntilInterview} days`}.</p>
+    <p>your <strong>${data.targetCompany}</strong> interview is ${data.daysUntilInterview === 1 ? 'tomorrow' : `in ${data.daysUntilInterview} days`}.</p>
 
-    <p>you've completed ${data.questionsCompleted}/${data.totalQuestions} (${progressPercent}%) of your roadmap.</p>
+    <p>you've completed <strong>${progressPercent}%</strong> of your roadmap (${data.questionsCompleted}/${data.totalQuestions}).</p>
 
     ${focusPatterns}
 
     ${finalTips}
 
-    <p><a href="${data.appUrl}/roadmap" style="color: #0066cc;">continue preparing</a></p>
+    ${ctaButton('continue preparing', `${data.appUrl}/roadmap`)}
 
-    <p>you've put in the work. trust your prep.</p>
+    <p style="color: #666; font-size: 14px;">you've put in the work. trust your prep.</p>
 
-    <p>- nikayel</p>
+    ${signature(false)}
   `;
 
-  return simpleEmailWrapper(content);
+  return emailWrapper(content, 'reminder');
 }
 
-// ROADMAP: BEHIND SCHEDULE ALERT
+// ROADMAP: BEHIND SCHEDULE ALERT (Reminder)
 
 export interface BehindScheduleEmailData {
   userName: string;
@@ -467,23 +520,23 @@ export function getBehindScheduleEmailHtml(data: BehindScheduleEmailData): strin
   const content = `
     <p>hey ${firstName},</p>
 
-    <p>you're ${data.questionsBehind} questions behind on your ${data.targetCompany} roadmap with ${data.daysUntilInterview} days left.</p>
+    <p>you're <strong>${data.questionsBehind} questions behind</strong> on your ${data.targetCompany} roadmap with ${data.daysUntilInterview} days left.</p>
 
-    <p>no stress - here's how to catch up: aim for ${data.suggestedDailyQuestions} questions per day from here on out.</p>
+    <p>no stress – here's how to catch up: aim for <strong>${data.suggestedDailyQuestions} questions per day</strong> from here on out.</p>
 
-    <p>don't try to do it all at once though. consistent daily practice (even just 1-2 problems) beats cramming.</p>
+    <p style="color: #666; font-size: 14px;">don't try to do it all at once. consistent daily practice (even 1-2 problems) beats cramming.</p>
 
-    <p><a href="${data.appUrl}/roadmap" style="color: #0066cc;">start catching up</a></p>
+    ${ctaButton('start catching up', `${data.appUrl}/roadmap`)}
 
-    <p>every problem you solve increases your odds. progress over perfection.</p>
+    <p style="color: #666; font-size: 14px;">every problem you solve increases your odds. progress over perfection.</p>
 
-    <p>- nikayel</p>
+    ${signature(false)}
   `;
 
-  return simpleEmailWrapper(content);
+  return emailWrapper(content, 'reminder');
 }
 
-// PAYMENT FAILURE NOTIFICATION
+// PAYMENT FAILURE (Transactional)
 
 export interface PaymentFailedEmailData {
   userName: string;
@@ -502,20 +555,20 @@ export function getPaymentFailedEmailHtml(data: PaymentFailedEmailData): string 
   const content = `
     <p>hey ${firstName},</p>
 
-    <p>heads up - we had trouble processing your payment for CodeSparring Pro.${data.failureReason ? ` (${data.failureReason})` : ''}</p>
+    <p>heads up – we had trouble processing your payment for CodeSparring Pro.${data.failureReason ? ` (${data.failureReason})` : ''}</p>
 
     <p>to keep your Pro access, you'll need to update your payment method.</p>
 
-    <p><a href="${data.appUrl}/account" style="color: #0066cc;">update payment method</a></p>
+    ${ctaButton('update payment method', `${data.appUrl}/account`)}
 
-    <p>we'll try again automatically in a few days. if the payment still fails, your account will be moved to the free plan.</p>
+    <p style="color: #666; font-size: 14px;">we'll retry automatically in a few days. if it still fails, your account will move to the free plan.</p>
 
-    <p>if you have any questions, just reply to this email.</p>
+    <p>questions? just reply to this email.</p>
 
-    <p>- nikayel</p>
+    ${signature(false)}
   `;
 
-  return simpleEmailWrapper(content);
+  return emailWrapper(content, 'transactional');
 }
 
 export function getPaymentFailedEmailText(data: PaymentFailedEmailData): string {
@@ -524,20 +577,20 @@ export function getPaymentFailedEmailText(data: PaymentFailedEmailData): string 
   return `
 hey ${firstName},
 
-heads up - we had trouble processing your payment for CodeSparring Pro.${data.failureReason ? ` (${data.failureReason})` : ''}
+heads up – we had trouble processing your payment for CodeSparring Pro.${data.failureReason ? ` (${data.failureReason})` : ''}
 
-to keep your Pro access, you'll need to update your payment method:
+to keep your Pro access, update your payment method:
 ${data.appUrl}/account
 
-we'll try again automatically in a few days. if the payment still fails, your account will be moved to the free plan.
+we'll retry automatically in a few days. if it still fails, your account will move to the free plan.
 
-if you have any questions, just reply to this email.
+questions? just reply to this email.
 
-- nikayel
+– nikayel
   `.trim();
 }
 
-// SUBSCRIPTION CONFIRMATION
+// SUBSCRIPTION CONFIRMATION (Transactional)
 
 export interface SubscriptionConfirmationEmailData {
   userName: string;
@@ -568,29 +621,29 @@ export function getSubscriptionConfirmationEmailHtml(data: SubscriptionConfirmat
 
     <p>thanks for upgrading to Pro. your subscription is now active.</p>
 
-    <p><strong>details:</strong></p>
-    <ul>
-      <li>plan: ${data.planName}</li>
-      <li>amount: ${data.currency} ${data.amount.toFixed(2)}</li>
-      <li>next billing: ${formattedDate}</li>
-    </ul>
+    <div style="background-color: #f8f8f8; padding: 16px; border-radius: 6px; margin: 16px 0;">
+      <p style="margin: 0 0 8px 0; font-weight: 500;">subscription details</p>
+      <p style="margin: 0; color: #666; font-size: 14px;">
+        plan: ${data.planName}<br>
+        amount: ${data.currency} ${data.amount.toFixed(2)}<br>
+        next billing: ${formattedDate}
+      </p>
+    </div>
 
-    <p>with Pro you get:</p>
-    <ul>
+    <p><strong>with Pro you get:</strong></p>
+    <ul style="padding-left: 20px; color: #333;">
       <li>35 interview sessions per month</li>
       <li>unlimited code execution</li>
       <li>advanced AI feedback</li>
       <li>priority support (just reply to any email)</li>
     </ul>
 
-    <p><a href="${data.appUrl}/dashboard" style="color: #0066cc;">start practicing</a></p>
+    ${ctaButton('start practicing', `${data.appUrl}/dashboard`)}
 
-    <p>let me know if you have any questions.</p>
-
-    <p>- nikayel</p>
+    ${signature(false)}
   `;
 
-  return simpleEmailWrapper(content);
+  return emailWrapper(content, 'transactional');
 }
 
 export function getSubscriptionConfirmationEmailText(data: SubscriptionConfirmationEmailData): string {
@@ -608,7 +661,7 @@ hey ${firstName},
 
 thanks for upgrading to Pro. your subscription is now active.
 
-details:
+subscription details:
 - plan: ${data.planName}
 - amount: ${data.currency} ${data.amount.toFixed(2)}
 - next billing: ${formattedDate}
@@ -621,13 +674,11 @@ with Pro you get:
 
 start practicing: ${data.appUrl}/dashboard
 
-let me know if you have any questions.
-
-- nikayel
+– nikayel
   `.trim();
 }
 
-// SUBSCRIPTION CANCELLATION CONFIRMATION
+// SUBSCRIPTION CANCELLATION (Transactional)
 
 export interface SubscriptionCancellationEmailData {
   userName: string;
@@ -654,36 +705,36 @@ export function getSubscriptionCancellationEmailHtml(data: SubscriptionCancellat
     : 'today';
 
   if (data.isImmediate) {
-    return simpleEmailWrapper(`
+    return emailWrapper(`
       <p>hey ${firstName},</p>
 
       <p>your CodeSparring Pro subscription has ended. you're now on the free plan (5 sessions per month).</p>
 
-      <p>if you ever want to come back, your progress and history will be here waiting.</p>
+      <p>your progress and history are still here if you want to come back.</p>
 
-      <p><a href="${data.appUrl}/pricing" style="color: #0066cc;">resubscribe anytime</a></p>
+      ${ctaButton('resubscribe anytime', `${data.appUrl}/pricing`)}
 
-      <p>if there's anything we could've done better, i'd genuinely love to hear it - just reply to this email.</p>
+      <p>if there's anything we could've done better, i'd genuinely love to hear it – just reply.</p>
 
-      <p>- nikayel</p>
-    `);
+      ${signature(false)}
+    `, 'transactional');
   }
 
-  return simpleEmailWrapper(`
+  return emailWrapper(`
     <p>hey ${firstName},</p>
 
-    <p>got your cancellation request. your Pro subscription is set to end on ${formattedDate}.</p>
+    <p>got your cancellation request. your Pro subscription is set to end on <strong>${formattedDate}</strong>.</p>
 
     <p>you'll have full Pro access until then, so make the most of it.</p>
 
-    <p>changed your mind? you can reactivate anytime before it expires:</p>
+    <p>changed your mind?</p>
 
-    <p><a href="${data.appUrl}/account" style="color: #0066cc;">reactivate subscription</a></p>
+    ${ctaButton('reactivate subscription', `${data.appUrl}/account`)}
 
-    <p>if there's anything we could've done better, i'd genuinely love to hear it - just reply to this email.</p>
+    <p>if there's anything we could've done better, i'd genuinely love to hear it – just reply.</p>
 
-    <p>- nikayel</p>
-  `);
+    ${signature(false)}
+  `, 'transactional');
 }
 
 export function getSubscriptionCancellationEmailText(data: SubscriptionCancellationEmailData): string {
@@ -702,13 +753,13 @@ hey ${firstName},
 
 your CodeSparring Pro subscription has ended. you're now on the free plan (5 sessions per month).
 
-if you ever want to come back, your progress and history will be here waiting.
+your progress and history are still here if you want to come back.
 
 resubscribe anytime: ${data.appUrl}/pricing
 
-if there's anything we could've done better, i'd genuinely love to hear it - just reply to this email.
+if there's anything we could've done better, i'd genuinely love to hear it – just reply.
 
-- nikayel
+– nikayel
     `.trim();
   }
 
@@ -719,15 +770,15 @@ got your cancellation request. your Pro subscription is set to end on ${formatte
 
 you'll have full Pro access until then, so make the most of it.
 
-changed your mind? reactivate anytime: ${data.appUrl}/account
+changed your mind? reactivate: ${data.appUrl}/account
 
-if there's anything we could've done better, i'd genuinely love to hear it - just reply to this email.
+if there's anything we could've done better, i'd genuinely love to hear it – just reply.
 
-- nikayel
+– nikayel
   `.trim();
 }
 
-// TRIAL ENDING NOTIFICATION
+// TRIAL ENDING (Transactional - billing notification)
 
 export interface TrialEndingEmailData {
   userName: string;
@@ -753,25 +804,25 @@ export function getTrialEndingEmailHtml(data: TrialEndingEmailData): string {
   const content = `
     <p>hey ${firstName},</p>
 
-    <p>heads up - your Pro trial ends on ${formattedDate}.</p>
+    <p>heads up – your Pro trial ends on <strong>${formattedDate}</strong>.</p>
 
     <p>after that, your payment method will be charged automatically. if you don't want to continue, you can cancel before then.</p>
 
-    <p>with Pro you get:</p>
-    <ul>
+    <p><strong>with Pro you get:</strong></p>
+    <ul style="padding-left: 20px; color: #333;">
       <li>35 interview sessions per month</li>
       <li>unlimited code execution</li>
       <li>advanced AI feedback</li>
     </ul>
 
-    <p><a href="${data.appUrl}/account" style="color: #0066cc;">manage subscription</a></p>
+    ${ctaButton('manage subscription', `${data.appUrl}/account`)}
 
-    <p>have questions? just reply to this email.</p>
+    <p>have questions? just reply.</p>
 
-    <p>- nikayel</p>
+    ${signature(false)}
   `;
 
-  return simpleEmailWrapper(content);
+  return emailWrapper(content, 'transactional');
 }
 
 export function getTrialEndingEmailText(data: TrialEndingEmailData): string {
@@ -787,7 +838,7 @@ export function getTrialEndingEmailText(data: TrialEndingEmailData): string {
   return `
 hey ${firstName},
 
-heads up - your Pro trial ends on ${formattedDate}.
+heads up – your Pro trial ends on ${formattedDate}.
 
 after that, your payment method will be charged automatically. if you don't want to continue, you can cancel before then.
 
@@ -798,8 +849,8 @@ with Pro you get:
 
 manage subscription: ${data.appUrl}/account
 
-have questions? just reply to this email.
+have questions? just reply.
 
-- nikayel
+– nikayel
   `.trim();
 }
