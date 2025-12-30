@@ -162,6 +162,7 @@ async function processWelcomeEmails(
           // Mark welcome email as sent
           await db.collection("profiles").doc(userId).update({
             welcome_email_sent: true,
+            welcome_notification_sent: true,
             last_email_sent_at: now.toISOString(),
             emails_sent_today: (profile.emails_sent_today || 0) + 1,
             notification_preferences: {
@@ -170,6 +171,25 @@ async function processWelcomeEmails(
               welcome_email: true,
             },
           });
+
+          // Create in-app welcome notification
+          try {
+            const notificationRef = db.collection("in_app_notifications").doc();
+            await notificationRef.set({
+              id: notificationRef.id,
+              userId,
+              type: "welcome",
+              title: "Welcome to CodeSparring! 🎉",
+              body: profile.full_name
+                ? `Hey ${profile.full_name.split(" ")[0]}, you're all set! Start your first practice session to begin crushing those interviews.`
+                : "You're all set! Start your first practice session to begin crushing those interviews.",
+              link: "/practice",
+              read: false,
+              createdAt: now.toISOString(),
+            });
+          } catch (notifError) {
+            console.warn(`[Cron Email] Failed to create in-app notification for ${userId}:`, notifError);
+          }
 
           // Log the notification
           await db.collection("email_notifications").add({

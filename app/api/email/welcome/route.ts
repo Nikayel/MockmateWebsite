@@ -1,7 +1,7 @@
 /**
  * Welcome Email API Route
  *
- * Sends welcome email to new users.
+ * Sends welcome email to new users and creates in-app welcome notification.
  * Called after user signup/first login.
  * Requires authentication to prevent spam abuse.
  */
@@ -11,6 +11,72 @@ import { adminDb, adminAuth } from "@/lib/firebase-admin";
 import { sendWelcomeEmail } from "@/lib/email";
 
 const db = adminDb;
+
+/**
+ * Create an in-app welcome notification for the user
+ */
+async function createWelcomeNotification(userId: string, displayName?: string): Promise<void> {
+  try {
+    const notificationRef = db.collection("in_app_notifications").doc();
+    await notificationRef.set({
+      id: notificationRef.id,
+      userId,
+      type: "welcome",
+      title: "Welcome to CodeSparring! 🎉",
+      body: displayName
+        ? `Hey ${displayName.split(" ")[0]}, you're all set! Start your first practice session to begin crushing those interviews.`
+        : "You're all set! Start your first practice session to begin crushing those interviews.",
+      link: "/practice",
+      read: false,
+      createdAt: new Date().toISOString(),
+    });
+    console.log("[Welcome API] Created in-app welcome notification for user:", userId);
+  } catch (error) {
+    console.error("[Welcome API] Failed to create in-app notification:", error);
+    // Non-blocking - email is more important
+  }
+}
+
+/**
+ * Initialize comprehensive notification preferences for new users
+ */
+async function initializeNotificationPreferences(userId: string): Promise<void> {
+  try {
+    const prefsRef = db.collection("notification_preferences").doc(userId);
+    const prefsSnap = await prefsRef.get();
+
+    if (!prefsSnap.exists) {
+      await prefsRef.set({
+        userId,
+        enabled: true,
+        channels: {
+          email: true,
+          in_app: true,
+          push: false,
+        },
+        typePreferences: {
+          welcome: { enabled: true, channels: ["email", "in_app"] },
+          spaced_repetition_review: { enabled: true, channels: ["email", "in_app"] },
+          daily_practice_reminder: { enabled: true, channels: ["email", "in_app"] },
+          streak_maintenance: { enabled: true, channels: ["in_app"] },
+          milestone_celebration: { enabled: true, channels: ["email", "in_app"] },
+          interview_countdown: { enabled: true, channels: ["email", "in_app"] },
+          roadmap_behind: { enabled: true, channels: ["email", "in_app"] },
+        },
+        quietHours: {
+          enabled: false,
+          start: 22,
+          end: 8,
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      console.log("[Welcome API] Initialized notification preferences for user:", userId);
+    }
+  } catch (error) {
+    console.error("[Welcome API] Failed to initialize notification preferences:", error);
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -77,11 +143,18 @@ export async function POST(request: NextRequest) {
     const result = await sendWelcomeEmail(userId, email, displayName);
     console.log("[Welcome Email API] Email send result:", result.success, result.error || "success");
 
+    // Always create in-app notification and initialize preferences, even if email fails
+    await Promise.all([
+      createWelcomeNotification(userId, displayName),
+      initializeNotificationPreferences(userId),
+    ]);
+
     if (result.success) {
       // Mark welcome email as sent
       await profileRef.set(
         {
           welcome_email_sent: true,
+          welcome_notification_sent: true,
           last_email_sent_at: new Date().toISOString(),
           emails_sent_today: 1,
           notification_preferences: {
@@ -104,13 +177,52 @@ export async function POST(request: NextRequest) {
         scheduled_at: new Date().toISOString(),
         sent_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
+        source: "api",
       });
+
+      // Record analytics for notification
+      try {
+        const analyticsRef = db.collection("notification_analytics").doc(userId);
+        await analyticsRef.set(
+          {
+            userId,
+            totalSent: 1,
+            totalOpened: 0,
+            totalDismissed: 0,
+            byType: {
+              welcome: { sent: 1, lastSentAt: new Date().toISOString() },
+            },
+            openRate: 0,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      } catch (analyticsError) {
+        console.warn("[Welcome API] Failed to update analytics:", analyticsError);
+      }
+    } else {
+      // Even if email failed, mark that we tried and created in-app notification
+      await profileRef.set(
+        {
+          welcome_notification_sent: true,
+          notification_preferences: {
+            email_notifications_enabled: true,
+            welcome_email: true,
+            inactivity_reminders: true,
+            spaced_repetition_reminders: true,
+            milestone_celebrations: true,
+            marketing_emails: false,
+          },
+        },
+        { merge: true }
+      );
     }
 
     return NextResponse.json({
       success: result.success,
       messageId: result.messageId,
       error: result.error,
+      inAppNotificationCreated: true,
     });
   } catch (error: any) {
     console.error("[Welcome Email API] Unexpected error:", error);

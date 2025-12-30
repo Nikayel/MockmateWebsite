@@ -63,6 +63,9 @@ function LoginPageContent() {
         try {
           console.log("Creating/updating profile for user:", firebaseUser.uid)
 
+          // Check if this is a new user (first time login)
+          const isNewUser = firebaseUser.metadata.creationTime === firebaseUser.metadata.lastSignInTime
+
           await createOrUpdateProfile(
             firebaseUser.uid,
             firebaseUser.email || "",
@@ -71,6 +74,36 @@ function LoginPageContent() {
           )
 
           console.log("Profile created/updated successfully for:", firebaseUser.uid)
+
+          // Send welcome email and create in-app notification for new users
+          if (isNewUser && firebaseUser.email) {
+            try {
+              console.log("Sending welcome notification for new user:", firebaseUser.uid)
+              const token = await firebaseUser.getIdToken()
+              const welcomeResponse = await fetch("/api/email/welcome", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  userId: firebaseUser.uid,
+                  email: firebaseUser.email,
+                  displayName: firebaseUser.displayName,
+                }),
+              })
+
+              if (welcomeResponse.ok) {
+                const result = await welcomeResponse.json()
+                console.log("Welcome notification sent:", result)
+              } else {
+                console.warn("Welcome notification failed:", await welcomeResponse.text())
+              }
+            } catch (welcomeError) {
+              // Non-blocking - user can still use the app
+              console.warn("Failed to send welcome notification:", welcomeError)
+            }
+          }
 
           // Mark as complete
           setAuthStatus("complete")
