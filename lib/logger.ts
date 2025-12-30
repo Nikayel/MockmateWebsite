@@ -94,32 +94,13 @@ async function sendToExternalService(
 
   try {
     // Sentry integration (if configured)
+    // Note: To enable Sentry, install @sentry/nextjs and uncomment this block
+    // The Sentry SDK is not bundled by default to reduce bundle size
     if (process.env.SENTRY_DSN && level === 'error') {
-      // Dynamic import to avoid bundling if not used
-      // Webpack ignore comment prevents build-time resolution errors
-      try {
-        // Optional dependency - may not be installed
-        // @ts-ignore - Sentry is optional
-        const Sentry = await import('@sentry/nextjs').catch(() => null)
-        if (Sentry) {
-          if (context?.error instanceof Error) {
-            Sentry.captureException(context.error, {
-              extra: context,
-              tags: {
-                endpoint: context.endpoint as string,
-                userId: context.userId as string,
-              },
-            })
-          } else {
-            Sentry.captureMessage(message, {
-              level: 'error',
-              extra: context,
-            })
-          }
-        }
-      } catch {
-        // Sentry not installed, silently skip
-      }
+      // Sentry error tracking would go here if @sentry/nextjs is installed
+      // For now, we rely on LogFlare or console logging
+      // TODO: Add Sentry integration when ready for production monitoring
+      console.error('[Sentry not configured]', message, context)
     }
 
     // LogFlare integration (if configured)

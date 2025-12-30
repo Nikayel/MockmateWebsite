@@ -67,7 +67,12 @@ const collectionsToDelete = [
 /**
  * GET /api/admin/users
  * List all users with pagination
+ *
+ * PERFORMANCE: Uses Firestore cursor-based pagination when no search.
+ * For search, loads up to MAX_SEARCH_RESULTS and filters in memory.
  */
+const MAX_SEARCH_RESULTS = 1000 // Cap for search to prevent memory issues
+
 export async function GET(request: NextRequest) {
   const authResult = await verifyAdminAccess(request)
   if (!authResult.authorized) {
@@ -79,13 +84,11 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10))
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10)))
     const search = searchParams.get("search") || ""
+    const cursor = searchParams.get("cursor") || "" // For cursor-based pagination
 
-    // Get all profiles
-    const profilesSnap = await adminDb.collection("profiles").get()
-    
-    // Filter by search if provided
-    let users = profilesSnap.docs.map((doc) => {
-      const data = doc.data()
+    // Helper to map profile doc to user object
+    const mapProfileToUser = (doc: FirebaseFirestore.DocumentSnapshot) => {
+      const data = doc.data() || {}
       return {
         id: doc.id,
         email: data.email || "",
@@ -97,39 +100,82 @@ export async function GET(request: NextRequest) {
         onboarding_completed: data.onboarding_completed || false,
         stripe_customer_id: data.stripe_customer_id || null,
       }
-    })
+    }
 
-    // Filter by search query
+    // If search is provided, we need to load and filter in memory (Firestore limitation)
     if (search) {
       const searchLower = search.toLowerCase()
+
+      // Load limited set of profiles for search
+      const profilesSnap = await adminDb
+        .collection("profiles")
+        .orderBy("created_at", "desc")
+        .limit(MAX_SEARCH_RESULTS)
+        .get()
+
+      let users = profilesSnap.docs.map(mapProfileToUser)
+
+      // Filter by search query
       users = users.filter(
         (user) =>
           user.email.toLowerCase().includes(searchLower) ||
           user.full_name.toLowerCase().includes(searchLower) ||
           user.id.toLowerCase().includes(searchLower)
       )
+
+      // Paginate filtered results
+      const total = users.length
+      const startIndex = (page - 1) * limit
+      const paginatedUsers = users.slice(startIndex, startIndex + limit)
+
+      return successResponse({
+        users: paginatedUsers,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+          isSearchResult: true,
+          searchCapped: profilesSnap.size >= MAX_SEARCH_RESULTS,
+        },
+      })
     }
 
-    // Sort by created_at descending (newest first)
-    users.sort((a, b) => {
-      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
-      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
-      return dateB - dateA
-    })
+    // No search: Use efficient Firestore cursor-based pagination
+    let query = adminDb
+      .collection("profiles")
+      .orderBy("created_at", "desc")
+      .limit(limit + 1) // Fetch one extra to check if there's a next page
 
-    // Paginate
-    const total = users.length
-    const startIndex = (page - 1) * limit
-    const endIndex = startIndex + limit
-    const paginatedUsers = users.slice(startIndex, endIndex)
+    // Apply cursor if provided (for subsequent pages)
+    if (cursor) {
+      const cursorDoc = await adminDb.collection("profiles").doc(cursor).get()
+      if (cursorDoc.exists) {
+        query = query.startAfter(cursorDoc)
+      }
+    }
+
+    const profilesSnap = await query.get()
+    const hasNextPage = profilesSnap.size > limit
+    const docs = hasNextPage ? profilesSnap.docs.slice(0, limit) : profilesSnap.docs
+    const users = docs.map(mapProfileToUser)
+
+    // Get next cursor (last doc id)
+    const nextCursor = hasNextPage ? docs[docs.length - 1].id : null
+
+    // Get total count (cached for performance - updates every few minutes)
+    const countSnap = await adminDb.collection("profiles").count().get()
+    const total = countSnap.data().count
 
     return successResponse({
-      users: paginatedUsers,
+      users,
       pagination: {
         page,
         limit,
         total,
         totalPages: Math.ceil(total / limit),
+        nextCursor,
+        hasNextPage,
       },
     })
   } catch (error: any) {

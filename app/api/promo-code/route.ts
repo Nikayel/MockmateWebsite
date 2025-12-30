@@ -37,56 +37,72 @@ export async function POST(request: NextRequest) {
       }, { status: 200 })
     }
 
-    // Check if user already used this code using Admin SDK
-    const promoUsageRef = adminDb.collection("promo_code_usage").doc(`${userId}_${normalizedCode}`)
-    const promoUsageSnap = await promoUsageRef.get()
-
-    if (promoUsageSnap.exists) {
-      return NextResponse.json({
-        valid: false,
-        error: "This promo code has already been used"
-      }, { status: 200 })
-    }
-
     // Apply promo code using Admin SDK - actually upgrade the user
     if (promoCode.type === "free") {
       const now = new Date()
       const oneYearFromNow = new Date(now)
       oneYearFromNow.setFullYear(now.getFullYear() + 1)
 
-      // Update profile to Pro using Admin SDK (bypasses security rules)
       const profileRef = adminDb.collection("profiles").doc(userId)
-      const profileSnap = await profileRef.get()
+      const promoUsageRef = adminDb.collection("promo_code_usage").doc(`${userId}_${normalizedCode}`)
 
-      if (!profileSnap.exists) {
-        return NextResponse.json({
-          valid: false,
-          error: "User profile not found"
-        }, { status: 404 })
+      // Use a transaction to atomically check usage, update profile, and record usage
+      // This prevents race conditions where two requests could both pass the check
+      try {
+        await adminDb.runTransaction(async (transaction) => {
+          // Read operations must come before writes in Firestore transactions
+          const [profileSnap, promoUsageSnap] = await Promise.all([
+            transaction.get(profileRef),
+            transaction.get(promoUsageRef),
+          ])
+
+          // Check if promo code was already used (inside transaction for atomicity)
+          if (promoUsageSnap.exists) {
+            throw new Error("PROMO_ALREADY_USED")
+          }
+
+          // Check if profile exists
+          if (!profileSnap.exists) {
+            throw new Error("PROFILE_NOT_FOUND")
+          }
+
+          // Update profile to Pro
+          transaction.update(profileRef, {
+            subscription_tier: "pro",
+            subscription_status: "active",
+            subscription_type: "promo",
+            subscription_start_date: now.toISOString(),
+            subscription_current_period_end: oneYearFromNow.toISOString(),
+            promo_code_used: normalizedCode,
+            updated_at: now.toISOString(),
+          })
+
+          // Record promo code usage (prevents reuse)
+          transaction.set(promoUsageRef, {
+            user_id: userId,
+            code: normalizedCode,
+            applied_at: now.toISOString(),
+            discount_type: promoCode.type,
+            discount_amount: promoCode.discount,
+          })
+        })
+      } catch (error) {
+        if (error instanceof Error) {
+          if (error.message === "PROMO_ALREADY_USED") {
+            return NextResponse.json({
+              valid: false,
+              error: "This promo code has already been used"
+            }, { status: 200 })
+          }
+          if (error.message === "PROFILE_NOT_FOUND") {
+            return NextResponse.json({
+              valid: false,
+              error: "User profile not found"
+            }, { status: 404 })
+          }
+        }
+        throw error // Re-throw other errors
       }
-
-      // Use a transaction to atomically update profile and record usage
-      await adminDb.runTransaction(async (transaction) => {
-        // Update profile to Pro
-        transaction.update(profileRef, {
-          subscription_tier: "pro",
-          subscription_status: "active",
-          subscription_type: "promo",
-          subscription_start_date: now.toISOString(),
-          subscription_current_period_end: oneYearFromNow.toISOString(),
-          promo_code_used: normalizedCode,
-          updated_at: now.toISOString(),
-        })
-
-        // Record promo code usage (prevents reuse)
-        transaction.set(promoUsageRef, {
-          user_id: userId,
-          code: normalizedCode,
-          applied_at: now.toISOString(),
-          discount_type: promoCode.type,
-          discount_amount: promoCode.discount,
-        })
-      })
 
       // Update quota to Pro limits
       const quotaQuery = await adminDb.collection("profile_quota")
