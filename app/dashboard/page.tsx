@@ -29,13 +29,12 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { UsageWidget } from "@/components/dashboard/usage-widget"
 
 // Dynamically import modals to reduce initial bundle size
 const OnboardingModal = dynamic(() => import("@/components/OnboardingModal").then(mod => mod.OnboardingModal), {
   ssr: false
 })
-const ProductTour = dynamic(() => import("@/components/ProductTour").then(mod => mod.ProductTour), {
+const InteractiveTour = dynamic(() => import("@/components/InteractiveTour").then(mod => mod.InteractiveTour), {
   ssr: false
 })
 
@@ -225,9 +224,9 @@ export default function DashboardPage() {
         }}
       />
 
-      {/* Product tour for new users */}
+      {/* Interactive tour for new users */}
       {firebaseUser && (
-        <ProductTour
+        <InteractiveTour
           isOpen={showTour}
           userId={firebaseUser.uid}
           userName={userName}
@@ -246,7 +245,7 @@ export default function DashboardPage() {
       <div className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-7xl">
           {/* Welcome Section */}
-          <div className="mb-8">
+          <div className="mb-8" data-tour="welcome">
             <h1 className="text-4xl font-heading font-bold text-white mb-2">
               Welcome back, {user.user_metadata?.full_name || "Developer"}!
             </h1>
@@ -254,9 +253,9 @@ export default function DashboardPage() {
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {/* Usage Card */}
-            <Card className="bg-gray-900/50 border-gray-700">
+            <Card className="bg-gray-900/50 border-gray-700" data-tour="sessions-card">
               <CardHeader className="pb-3">
                 <CardTitle className="text-white text-sm font-medium flex items-center">
                   <BarChart3 className="h-4 w-4 mr-2" />
@@ -279,11 +278,8 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            {/* AI Token Usage */}
-            <UsageWidget />
-
             {/* Plan Card */}
-            <Card className="bg-gray-900/50 border-gray-700">
+            <Card className="bg-gray-900/50 border-gray-700" data-tour="subscription-card">
               <CardHeader className="pb-3">
                 <CardTitle className="text-white text-sm font-medium flex items-center">
                   <Crown className="h-4 w-4 mr-2" />
@@ -305,7 +301,7 @@ export default function DashboardPage() {
             </Card>
 
             {/* Quick Start Card */}
-            <Card className="bg-gray-900/50 border-gray-700">
+            <Card className="bg-gray-900/50 border-gray-700" data-tour="quick-start">
               <CardHeader className="pb-3">
                 <CardTitle className="text-white text-sm font-medium flex items-center">
                   <Terminal className="h-4 w-4 mr-2" />
@@ -314,7 +310,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <Link href="/interview">
-                  <Button className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
+                  <Button className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white" data-tour="start-practice-btn">
                     Start Practice
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
@@ -347,7 +343,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Recent Activity */}
-          <Card className="bg-gray-900/50 border-gray-700">
+          <Card className="bg-gray-900/50 border-gray-700" data-tour="recent-activity">
             <CardHeader>
               <CardTitle className="text-white flex items-center justify-between">
                 <span className="flex items-center">
