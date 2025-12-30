@@ -49,9 +49,11 @@ function getContactsApi(): ContactsApi {
 }
 
 // Email sender configuration
+// Using personal name improves inbox placement (Primary vs Promotions)
+// Research shows emails from "Name from Company" land in Primary more often
 const DEFAULT_SENDER = {
-  name: "CodeSparring",
-  email: "hello@codesparring.dev"
+  name: "Nikayel from CodeSparring",
+  email: "nikayel@codesparring.dev"
 };
 
 // Types

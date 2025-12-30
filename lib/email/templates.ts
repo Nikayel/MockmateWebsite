@@ -1,186 +1,33 @@
 /**
  * Email Templates for CodeSparring
  *
- * Science-backed email templates for:
- * - Welcome emails (63.9% open rate - highest engagement)
- * - Inactivity reminders (loss aversion psychology)
- * - Spaced repetition reminders (Ebbinghaus forgetting curve)
+ * DELIVERABILITY OPTIMIZED: These templates are designed to land in Primary inbox,
+ * not Promotions. Key principles:
+ * - Minimal HTML styling (looks like a regular email)
+ * - Personal tone (from Nikayel, not "the team")
+ * - Simple subject lines (no emoji, no exclamation marks)
+ * - One clear CTA per email
+ * - High text-to-HTML ratio
  */
 
 import { calculateRetention } from "./brevo";
 
-// Base styles for all emails
-const baseStyles = `
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    line-height: 1.6;
-    color: #e5e7eb;
-    background-color: #0a0a0a;
-    margin: 0;
-    padding: 0;
-  }
-  .container {
-    max-width: 600px;
-    margin: 0 auto;
-    padding: 40px 20px;
-  }
-  .card {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    border-radius: 16px;
-    padding: 32px;
-    border: 1px solid #374151;
-  }
-  .logo {
-    text-align: center;
-    margin-bottom: 24px;
-  }
-  .logo-text {
-    font-size: 28px;
-    font-weight: bold;
-    color: #00d9ff;
-  }
-  h1 {
-    color: #ffffff;
-    font-size: 24px;
-    margin: 0 0 16px 0;
-  }
-  h2 {
-    color: #ffffff;
-    font-size: 20px;
-    margin: 0 0 12px 0;
-  }
-  p {
-    color: #9ca3af;
-    margin: 0 0 16px 0;
-  }
-  .highlight {
-    color: #00d9ff;
-    font-weight: 600;
-  }
-  .cta-button {
-    display: inline-block;
-    background: linear-gradient(135deg, #00d9ff 0%, #00a8cc 100%);
-    color: #000000 !important;
-    text-decoration: none;
-    padding: 14px 32px;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 16px;
-    margin: 16px 0;
-  }
-  .cta-button:hover {
-    opacity: 0.9;
-  }
-  .secondary-button {
-    display: inline-block;
-    background: transparent;
-    color: #00d9ff !important;
-    text-decoration: none;
-    padding: 12px 24px;
-    border-radius: 8px;
-    font-weight: 500;
-    border: 1px solid #00d9ff;
-    margin: 8px 0;
-  }
-  .tip-box {
-    background: rgba(0, 217, 255, 0.1);
-    border-left: 4px solid #00d9ff;
-    padding: 16px;
-    border-radius: 0 8px 8px 0;
-    margin: 24px 0;
-  }
-  .tip-box p {
-    color: #e5e7eb;
-    margin: 0;
-  }
-  .retention-bar {
-    background: #374151;
-    border-radius: 8px;
-    height: 24px;
-    overflow: hidden;
-    margin: 16px 0;
-  }
-  .retention-fill {
-    background: linear-gradient(90deg, #ef4444 0%, #f59e0b 50%, #10b981 100%);
-    height: 100%;
-    border-radius: 8px;
-    transition: width 0.3s ease;
-  }
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
-    margin: 24px 0;
-  }
-  .stat-card {
-    background: rgba(255, 255, 255, 0.05);
-    padding: 16px;
-    border-radius: 8px;
-    text-align: center;
-  }
-  .stat-value {
-    font-size: 28px;
-    font-weight: bold;
-    color: #00d9ff;
-  }
-  .stat-label {
-    font-size: 12px;
-    color: #9ca3af;
-    text-transform: uppercase;
-  }
-  .footer {
-    text-align: center;
-    padding-top: 32px;
-    border-top: 1px solid #374151;
-    margin-top: 32px;
-  }
-  .footer p {
-    font-size: 12px;
-    color: #6b7280;
-  }
-  .footer a {
-    color: #00d9ff;
-    text-decoration: none;
-  }
-  .science-note {
-    background: rgba(139, 92, 246, 0.1);
-    border-left: 4px solid #8b5cf6;
-    padding: 12px 16px;
-    border-radius: 0 8px 8px 0;
-    margin: 16px 0;
-    font-size: 14px;
-  }
-  .science-note p {
-    color: #c4b5fd;
-    margin: 0;
-  }
-`;
-
-const emailWrapper = (content: string) => `
+// Simple email wrapper - minimal styling to avoid Promotions folder
+const simpleEmailWrapper = (content: string, includeUnsubscribe = true) => `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CodeSparring</title>
-  <style>${baseStyles}</style>
 </head>
-<body>
-  <div class="container">
-    <div class="card">
-      <div class="logo">
-        <span class="logo-text">CodeSparring</span>
-      </div>
-      ${content}
-    </div>
-    <div class="footer">
-      <p>
-        <a href="{{unsubscribeUrl}}">Unsubscribe</a> |
-        <a href="https://codesparring.dev/account">Email Preferences</a>
-      </p>
-      <p>CodeSparring - AI-Powered Interview Practice</p>
-    </div>
-  </div>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  ${content}
+  ${includeUnsubscribe ? `
+  <p style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #999;">
+    You're receiving this because you signed up for CodeSparring.<br>
+    <a href="https://codesparring.dev/account" style="color: #666;">Manage email preferences</a>
+  </p>
+  ` : ''}
 </body>
 </html>
 `;
@@ -194,77 +41,68 @@ export interface WelcomeEmailData {
 }
 
 export function getWelcomeEmailSubject(): string {
-  return "hey! welcome to the crew 🤝";
+  return "quick hello from nikayel";
 }
 
 export function getWelcomeEmailHtml(data: WelcomeEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
+
   const content = `
-    <h1>hey ${data.userName || "there"}! 👋</h1>
+    <p>hey ${firstName},</p>
 
-    <p>i'm nikayel - a senior at sac state who built codesparring because i was literally in your shoes not too long ago.</p>
+    <p>i'm nikayel - a cs senior at sac state who built codesparring because i kept bombing interviews even after grinding leetcode for months.</p>
 
-    <p>real talk: i used to bomb interviews. like, embarrassingly bad. i'd grind leetcode for hours, feel prepared, then completely blank when the interviewer asked me to explain my approach. sound familiar?</p>
+    <p>turns out i was studying wrong. cramming doesn't work because your brain forgets 70% of what you learned within 24 hours. what works is short, spaced-out practice sessions.</p>
 
-    <p>turns out i was studying wrong. cramming doesn't work - your brain literally forgets 70% of what you learned within 24 hours (there's actual science behind this called the "forgetting curve"). what does work is spaced practice - short, consistent sessions spread out over time.</p>
+    <p>so i built this thing for myself, and it actually helped. now i want to share it.</p>
 
-    <p>so i built this for myself, and honestly it changed everything. now i want to share it with you.</p>
-
-    <p style="margin-top: 24px;"><strong style="color: #e5e7eb;">here's what you can practice:</strong></p>
-    <ul style="color: #9ca3af; padding-left: 20px;">
-      <li><strong style="color: #e5e7eb;">DSA stuff</strong> - two pointers, sliding window, trees, dp... all of it</li>
-      <li><strong style="color: #e5e7eb;">system design</strong> - because faang loves asking about scale</li>
-      <li><strong style="color: #e5e7eb;">debugging</strong> - find bugs under pressure like a real interview</li>
+    <p><strong>here's what you can practice:</strong></p>
+    <ul>
+      <li>dsa stuff (two pointers, sliding window, trees, dp, all of it)</li>
+      <li>system design for when companies ask about scale</li>
+      <li>debugging under pressure like a real interview</li>
     </ul>
 
-    <div style="text-align: center; margin: 32px 0;">
-      <a href="${data.appUrl}/dashboard" class="cta-button">jump in and try it</a>
-    </div>
+    <p><a href="${data.appUrl}/dashboard" style="color: #0066cc;">jump in and try it</a></p>
 
-    <div class="tip-box">
-      <p><strong>honest advice:</strong> 15 mins a day beats 2 hour cram sessions every time. i tried both. trust me on this one.</p>
-    </div>
+    <p>one thing i learned: 15 mins a day beats 2 hour cram sessions. tried both. trust me.</p>
 
-    <p>if you ever get stuck or have questions, just reply to this email - it actually goes to me. seriously, i read everything.</p>
+    <p>if you have questions, just reply to this email - it goes straight to me.</p>
 
-    <p>let's get you that offer 🙌</p>
-
-    <p style="color: #e5e7eb;">- nikayel<br/>
-    <span style="color: #9ca3af; font-size: 14px;">cs senior @ sac state | founder of codesparring</span></p>
+    <p>good luck with your prep,<br>
+    nikayel<br>
+    <span style="color: #666; font-size: 14px;">cs senior @ sac state</span></p>
   `;
 
-  return emailWrapper(content);
+  return simpleEmailWrapper(content);
 }
 
 export function getWelcomeEmailText(data: WelcomeEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
+
   return `
-hey ${data.userName || "there"}!
+hey ${firstName},
 
-i'm nikayel - a senior at sac state who built codesparring because i was literally in your shoes not too long ago.
+i'm nikayel - a cs senior at sac state who built codesparring because i kept bombing interviews even after grinding leetcode for months.
 
-real talk: i used to bomb interviews. like, embarrassingly bad. i'd grind leetcode for hours, feel prepared, then completely blank when the interviewer asked me to explain my approach. sound familiar?
+turns out i was studying wrong. cramming doesn't work because your brain forgets 70% of what you learned within 24 hours. what works is short, spaced-out practice sessions.
 
-turns out i was studying wrong. cramming doesn't work - your brain literally forgets 70% of what you learned within 24 hours (there's actual science behind this called the "forgetting curve"). what does work is spaced practice - short, consistent sessions spread out over time.
-
-so i built this for myself, and honestly it changed everything. now i want to share it with you.
+so i built this thing for myself, and it actually helped. now i want to share it.
 
 here's what you can practice:
-- DSA stuff - two pointers, sliding window, trees, dp... all of it
-- system design - because faang loves asking about scale
-- debugging - find bugs under pressure like a real interview
+- dsa stuff (two pointers, sliding window, trees, dp, all of it)
+- system design for when companies ask about scale
+- debugging under pressure like a real interview
 
 jump in and try it: ${data.appUrl}/dashboard
 
-honest advice: 15 mins a day beats 2 hour cram sessions every time. i tried both. trust me on this one.
+one thing i learned: 15 mins a day beats 2 hour cram sessions. tried both. trust me.
 
-if you ever get stuck or have questions, just reply to this email - it actually goes to me. seriously, i read everything.
+if you have questions, just reply to this email - it goes straight to me.
 
-let's get you that offer!
-
-- nikayel
-cs senior @ sac state | founder of codesparring
-
----
-Unsubscribe: ${data.appUrl}/settings/notifications
+good luck with your prep,
+nikayel
+cs senior @ sac state
   `.trim();
 }
 
@@ -281,84 +119,61 @@ export interface InactivityEmailData {
 
 export function getInactivityEmailSubject(hours: number): string {
   if (hours < 48) {
-    return "Your interview skills are fading - here's the science";
+    return "quick check in";
   } else if (hours < 72) {
-    return "We miss you! Your progress is slipping away";
+    return "been a few days";
   } else {
-    return "Don't lose your hard work - quick 5-minute practice?";
+    return "just wanted to follow up";
   }
 }
 
 export function getInactivityEmailHtml(data: InactivityEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
   const days = Math.floor(data.hoursSinceLastSession / 24);
   const retentionEstimate = calculateRetention(days, 70);
 
-  const urgencyMessage = data.hoursSinceLastSession < 48
-    ? "Research shows we forget <strong class='highlight'>33% of new skills</strong> within 24 hours without reinforcement."
-    : data.hoursSinceLastSession < 72
-    ? "It's been over 2 days. Your interview skills are <strong class='highlight'>rapidly declining</strong>."
-    : "Don't let all your hard work go to waste. A quick session can bring it all back.";
-
   const content = `
-    <h1>Hey ${data.userName || "there"}, your skills are fading</h1>
+    <p>hey ${firstName},</p>
 
-    <p>It's been <strong class="highlight">${days} day${days !== 1 ? "s" : ""}</strong> since your last practice session.</p>
+    <p>noticed it's been ${days} day${days !== 1 ? 's' : ''} since your last practice session.</p>
 
-    <p>${urgencyMessage}</p>
+    <p>not trying to be annoying here, but there's actual science behind this - we forget about ${100 - retentionEstimate}% of what we learned after ${days} days without review. it's called the forgetting curve.</p>
 
-    <div class="retention-bar">
-      <div class="retention-fill" style="width: ${retentionEstimate}%;"></div>
-    </div>
-    <p style="text-align: center; font-size: 14px;">
-      Estimated skill retention: <strong class="highlight">${retentionEstimate}%</strong>
-    </p>
+    ${data.lastTopic ? `<p>you were working on <strong>${data.lastTopic}</strong> last time. might be worth a quick 5-min review to keep it fresh.</p>` : ''}
 
-    ${data.lastTopic ? `<p>You were working on <strong class="highlight">${data.lastTopic}</strong> - don't let that knowledge slip away.</p>` : ""}
+    ${data.streakDays && data.streakDays > 0 ? `<p>also, you had a ${data.streakDays}-day streak going. just saying.</p>` : ''}
 
-    ${data.streakDays && data.streakDays > 0 ? `
-    <div class="stat-card" style="text-align: center; margin: 24px 0;">
-      <div class="stat-value">${data.streakDays}</div>
-      <div class="stat-label">Day Streak at Risk!</div>
-    </div>
-    ` : ""}
+    <p><a href="${data.appUrl}/dashboard" style="color: #0066cc;">do a quick session</a></p>
 
-    <div style="text-align: center; margin: 32px 0;">
-      <a href="${data.appUrl}/dashboard" class="cta-button">5-Minute Quick Practice</a>
-    </div>
+    <p>even 5 minutes helps more than you'd think.</p>
 
-    <div class="science-note">
-      <p><strong>Ebbinghaus Forgetting Curve:</strong> Even a 5-minute review resets your memory curve and doubles retention time. The best time to review is right before you forget!</p>
-    </div>
-
-    <p style="font-size: 14px; color: #6b7280;">Even 5 minutes can reset your learning curve. Your future self will thank you.</p>
+    <p>- nikayel</p>
   `;
 
-  return emailWrapper(content);
+  return simpleEmailWrapper(content);
 }
 
 export function getInactivityEmailText(data: InactivityEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
   const days = Math.floor(data.hoursSinceLastSession / 24);
   const retentionEstimate = calculateRetention(days, 70);
 
   return `
-Hey ${data.userName || "there"},
+hey ${firstName},
 
-It's been ${days} day${days !== 1 ? "s" : ""} since your last practice session.
+noticed it's been ${days} day${days !== 1 ? 's' : ''} since your last practice session.
 
-Research shows we forget 33% of new skills within 24 hours without reinforcement.
+not trying to be annoying here, but there's actual science behind this - we forget about ${100 - retentionEstimate}% of what we learned after ${days} days without review. it's called the forgetting curve.
 
-Estimated skill retention: ${retentionEstimate}%
+${data.lastTopic ? `you were working on ${data.lastTopic} last time. might be worth a quick 5-min review to keep it fresh.` : ''}
 
-${data.lastTopic ? `You were working on ${data.lastTopic} - don't let that knowledge slip away.` : ""}
+${data.streakDays && data.streakDays > 0 ? `also, you had a ${data.streakDays}-day streak going. just saying.` : ''}
 
-Even 5 minutes can reset your learning curve.
+do a quick session: ${data.appUrl}/dashboard
 
-Start a quick practice: ${data.appUrl}/dashboard
+even 5 minutes helps more than you'd think.
 
-- The CodeSparring Team
-
----
-Unsubscribe: ${data.appUrl}/settings/notifications
+- nikayel
   `.trim();
 }
 
@@ -377,81 +192,51 @@ export interface SpacedRepetitionEmailData {
 }
 
 export function getSpacedRepetitionEmailSubject(data: SpacedRepetitionEmailData): string {
-  const retentionEstimate = calculateRetention(data.daysSinceReview, data.lastScore || 70);
-  return `Time to review ${data.topic} (your memory is at ${retentionEstimate}%)`;
+  return `good time to review ${data.topic}`;
 }
 
 export function getSpacedRepetitionEmailHtml(data: SpacedRepetitionEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
   const retentionEstimate = calculateRetention(data.daysSinceReview, data.lastScore || 70);
-
-  // Calculate next interval based on SM-2 algorithm
-  const intervals = [1, 3, 7, 14, 30, 60];
-  const nextIntervalIndex = Math.min((data.reviewCount || 0), intervals.length - 1);
-  const nextInterval = intervals[nextIntervalIndex];
-
   const reviewUrl = data.scenarioId
     ? `${data.appUrl}/interview/${data.scenarioId}`
     : `${data.appUrl}/dashboard`;
 
   const content = `
-    <h1>Time to review: ${data.topic}</h1>
+    <p>hey ${firstName},</p>
 
-    <p>You practiced <strong class="highlight">${data.topic}</strong> ${data.daysSinceReview} days ago
-    ${data.lastScore ? `and scored <strong class="highlight">${data.lastScore}%</strong>` : ""}.
-    Based on the forgetting curve, your retention is now around <strong class="highlight">${retentionEstimate}%</strong>.</p>
+    <p>you practiced <strong>${data.topic}</strong> ${data.daysSinceReview} days ago${data.lastScore ? ` and scored ${data.lastScore}%` : ''}.</p>
 
-    <div class="retention-bar">
-      <div class="retention-fill" style="width: ${retentionEstimate}%;"></div>
-    </div>
-    <p style="text-align: center; font-size: 14px;">
-      Memory retention: <strong class="highlight">${retentionEstimate}%</strong>
-    </p>
+    <p>based on the forgetting curve, your retention is probably around ${retentionEstimate}% right now. this is actually the optimal time to review - challenging enough to strengthen the memory, but not so late that you've forgotten everything.</p>
 
-    ${data.pattern ? `<p>Pattern: <strong>${data.pattern}</strong></p>` : ""}
+    ${data.pattern ? `<p>pattern: ${data.pattern}</p>` : ''}
 
-    <div style="text-align: center; margin: 32px 0;">
-      <a href="${reviewUrl}" class="cta-button">Review ${data.topic} Now</a>
-    </div>
+    <p><a href="${reviewUrl}" style="color: #0066cc;">review ${data.topic}</a></p>
 
-    <div class="science-note">
-      <p><strong>Why now?</strong> Reviewing at ~${retentionEstimate}% retention is optimal. It's challenging enough to strengthen the memory, but not so late that you've forgotten everything. This review will lock in your knowledge for ${nextInterval}+ more days!</p>
-    </div>
+    <p>a quick review now will lock this in for way longer. each review roughly doubles how long you remember it.</p>
 
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-value">${data.reviewCount || 1}</div>
-        <div class="stat-label">Reviews</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">${nextInterval}d</div>
-        <div class="stat-label">Next Interval</div>
-      </div>
-    </div>
-
-    <p style="font-size: 14px; color: #6b7280;">Each review doubles how long you remember. You're building lasting knowledge!</p>
+    <p>- nikayel</p>
   `;
 
-  return emailWrapper(content);
+  return simpleEmailWrapper(content);
 }
 
 export function getSpacedRepetitionEmailText(data: SpacedRepetitionEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
   const retentionEstimate = calculateRetention(data.daysSinceReview, data.lastScore || 70);
 
   return `
-Time to review: ${data.topic}
+hey ${firstName},
 
-You practiced ${data.topic} ${data.daysSinceReview} days ago${data.lastScore ? ` and scored ${data.lastScore}%` : ""}.
+you practiced ${data.topic} ${data.daysSinceReview} days ago${data.lastScore ? ` and scored ${data.lastScore}%` : ''}.
 
-Based on the forgetting curve, your retention is now around ${retentionEstimate}%.
+based on the forgetting curve, your retention is probably around ${retentionEstimate}% right now. this is actually the optimal time to review.
 
-Reviewing now will double how long you remember this material.
+review now: ${data.appUrl}/dashboard
 
-Review now: ${data.appUrl}/dashboard
+each review roughly doubles how long you remember it.
 
-- The CodeSparring Team
-
----
-Unsubscribe: ${data.appUrl}/settings/notifications
+- nikayel
   `.trim();
 }
 
@@ -468,70 +253,50 @@ export interface MilestoneEmailData {
 export function getMilestoneEmailSubject(data: MilestoneEmailData): string {
   switch (data.milestoneType) {
     case "problems_solved":
-      return `Congrats! You've solved ${data.milestoneValue} problems!`;
+      return `you hit ${data.milestoneValue} problems`;
     case "streak":
-      return `${data.milestoneValue}-day streak! You're on fire!`;
+      return `${data.milestoneValue} days in a row`;
     case "pattern_mastered":
-      return `You've mastered ${data.milestoneValue}!`;
+      return `you got ${data.milestoneValue} down`;
     case "first_session":
-      return "You completed your first practice session!";
+      return "first one done";
     default:
-      return "Congratulations on your achievement!";
+      return "nice progress";
   }
 }
 
 export function getMilestoneEmailHtml(data: MilestoneEmailData): string {
-  let celebrationContent = "";
+  const firstName = data.userName?.split(' ')[0] || 'there';
+  let milestoneContent = "";
 
   switch (data.milestoneType) {
     case "problems_solved":
-      celebrationContent = `
-        <h1>Amazing! ${data.milestoneValue} Problems Solved!</h1>
-        <p>You've solved <strong class="highlight">${data.milestoneValue}</strong> interview problems. That's incredible dedication!</p>
-        <div class="stat-card" style="text-align: center; margin: 24px auto; max-width: 200px;">
-          <div class="stat-value">${data.milestoneValue}</div>
-          <div class="stat-label">Problems Solved</div>
-        </div>
-      `;
+      milestoneContent = `<p>just noticed you hit <strong>${data.milestoneValue} problems solved</strong>. that's solid progress.</p>`;
       break;
     case "streak":
-      celebrationContent = `
-        <h1>${data.milestoneValue}-Day Streak!</h1>
-        <p>You've practiced for <strong class="highlight">${data.milestoneValue} days in a row</strong>. Consistency is the key to mastery!</p>
-        <div class="stat-card" style="text-align: center; margin: 24px auto; max-width: 200px;">
-          <div class="stat-value">${data.milestoneValue}</div>
-          <div class="stat-label">Day Streak</div>
-        </div>
-      `;
+      milestoneContent = `<p>you've been at it for <strong>${data.milestoneValue} days straight</strong>. consistency like that is what actually moves the needle.</p>`;
       break;
     case "pattern_mastered":
-      celebrationContent = `
-        <h1>Pattern Mastered: ${data.milestoneValue}!</h1>
-        <p>You've achieved mastery in <strong class="highlight">${data.milestoneValue}</strong>. This pattern is now locked in your long-term memory!</p>
-      `;
+      milestoneContent = `<p>looks like you've got <strong>${data.milestoneValue}</strong> pretty locked in. that pattern should stick with you.</p>`;
       break;
     case "first_session":
-      celebrationContent = `
-        <h1>Your Journey Begins!</h1>
-        <p>Congratulations on completing your <strong class="highlight">first practice session</strong>! You've taken the most important step.</p>
-        <p>The best interviewers aren't born - they're made through consistent practice.</p>
-      `;
+      milestoneContent = `<p>you finished your first practice session. the hardest part is starting - you got that done.</p>`;
       break;
   }
 
   const content = `
-    ${celebrationContent}
+    <p>hey ${firstName},</p>
 
-    <div style="text-align: center; margin: 32px 0;">
-      <a href="${data.appUrl}/dashboard" class="cta-button">Keep the Momentum Going</a>
-    </div>
+    ${milestoneContent}
 
-    <div class="tip-box">
-      <p><strong>Keep it up!</strong> Your consistency is building neural pathways that will serve you well in real interviews.</p>
-    </div>
+    <p>keep it up. you're building real skills here.</p>
+
+    <p><a href="${data.appUrl}/dashboard" style="color: #0066cc;">keep practicing</a></p>
+
+    <p>- nikayel</p>
   `;
 
-  return emailWrapper(content);
+  return simpleEmailWrapper(content);
 }
 
 // ROADMAP: DAILY PRACTICE REMINDER
@@ -555,97 +320,70 @@ export interface DailyRoadmapEmailData {
 
 export function getDailyRoadmapEmailSubject(data: DailyRoadmapEmailData): string {
   if (data.daysUntilInterview <= 3) {
-    return `${data.daysUntilInterview} days until ${data.targetCompany}! Here's today's prep`;
+    return `${data.daysUntilInterview} days left - today's prep`;
   }
-  return `Your ${data.targetCompany} prep for today (${data.todaysQuestions.length} questions)`;
+  return `today's ${data.targetCompany} prep`;
 }
 
 export function getDailyRoadmapEmailHtml(data: DailyRoadmapEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
   const progressPercent = Math.round((data.questionsCompleted / data.totalQuestions) * 100);
 
-  const urgencyBanner = data.daysUntilInterview <= 7 ? `
-    <div class="tip-box" style="background: rgba(239, 68, 68, 0.1); border-left-color: #ef4444;">
-      <p style="color: #ef4444; margin: 0;">
-        <strong>${data.daysUntilInterview} day${data.daysUntilInterview !== 1 ? 's' : ''} until your ${data.targetCompany} interview!</strong>
-        Every practice session counts now.
-      </p>
-    </div>
-  ` : '';
+  const questionsHtml = data.todaysQuestions.map((q, i) =>
+    `<li><strong>${q.title}</strong> - ${q.pattern}, ${q.difficulty}</li>`
+  ).join('\n');
 
-  const questionsHtml = data.todaysQuestions.map((q, i) => `
-    <div style="background: rgba(255,255,255,0.05); padding: 12px 16px; border-radius: 8px; margin-bottom: 8px;">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <strong style="color: #fff;">${i + 1}. ${q.title}</strong>
-          <div style="font-size: 12px; color: #9ca3af; margin-top: 4px;">
-            ${q.pattern} • ${q.difficulty}
-          </div>
-        </div>
-      </div>
-    </div>
-  `).join('');
+  const urgencyNote = data.daysUntilInterview <= 7
+    ? `<p style="color: #c00;"><strong>${data.daysUntilInterview} day${data.daysUntilInterview !== 1 ? 's' : ''} until your ${data.targetCompany} interview.</strong></p>`
+    : '';
+
+  const onTrackNote = !data.isOnTrack
+    ? `<p>heads up: you're a bit behind schedule. try to knock out today's questions to catch up.</p>`
+    : '';
 
   const content = `
-    <h1>Good morning, ${data.userName || 'there'}!</h1>
+    <p>hey ${firstName},</p>
 
-    ${urgencyBanner}
+    ${urgencyNote}
 
-    <p>Here's your personalized practice plan for today based on your
-    <strong class="highlight">${data.targetCompany}</strong> roadmap:</p>
+    <p>here's today's practice for your ${data.targetCompany} roadmap:</p>
 
-    <h2 style="margin-top: 24px;">Today's Questions (${data.todaysQuestions.length})</h2>
-    ${questionsHtml}
+    <ul>
+      ${questionsHtml}
+    </ul>
 
-    <div style="text-align: center; margin: 32px 0;">
-      <a href="${data.appUrl}/roadmap" class="cta-button">Start Today's Practice</a>
-    </div>
+    <p>progress: ${data.questionsCompleted}/${data.totalQuestions} (${progressPercent}%)</p>
 
-    <div class="retention-bar" style="margin-top: 24px;">
-      <div class="retention-fill" style="width: ${progressPercent}%; background: linear-gradient(90deg, #00d9ff 0%, #10b981 100%);"></div>
-    </div>
-    <p style="text-align: center; font-size: 14px;">
-      Roadmap progress: <strong class="highlight">${progressPercent}%</strong>
-      (${data.questionsCompleted}/${data.totalQuestions} questions)
-    </p>
+    ${onTrackNote}
 
-    ${!data.isOnTrack ? `
-    <div class="tip-box" style="background: rgba(251, 191, 36, 0.1); border-left-color: #fbbf24;">
-      <p style="color: #fbbf24; margin: 0;">
-        <strong>You're slightly behind schedule.</strong> Try to complete today's questions to get back on track!
-      </p>
-    </div>
-    ` : `
-    <div class="tip-box">
-      <p><strong>You're on track!</strong> Keep up the great work. Consistency beats intensity.</p>
-    </div>
-    `}
+    <p><a href="${data.appUrl}/roadmap" style="color: #0066cc;">start today's practice</a></p>
+
+    <p>- nikayel</p>
   `;
 
-  return emailWrapper(content);
+  return simpleEmailWrapper(content);
 }
 
 export function getDailyRoadmapEmailText(data: DailyRoadmapEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
   const questionsText = data.todaysQuestions.map((q, i) =>
     `${i + 1}. ${q.title} (${q.pattern}, ${q.difficulty})`
   ).join('\n');
 
   return `
-Good morning, ${data.userName || 'there'}!
+hey ${firstName},
 
-${data.daysUntilInterview <= 7 ? `${data.daysUntilInterview} days until your ${data.targetCompany} interview!` : ''}
+${data.daysUntilInterview <= 7 ? `${data.daysUntilInterview} days until your ${data.targetCompany} interview.` : ''}
 
-Here's your practice plan for today:
+here's today's practice:
 
 ${questionsText}
 
-Progress: ${data.questionsCompleted}/${data.totalQuestions} questions (${Math.round((data.questionsCompleted / data.totalQuestions) * 100)}%)
+progress: ${data.questionsCompleted}/${data.totalQuestions}
 
-Start practicing: ${data.appUrl}/roadmap
+start practicing: ${data.appUrl}/roadmap
 
-- The CodeSparring Team
-
----
-Unsubscribe: ${data.appUrl}/settings/notifications
+- nikayel
   `.trim();
 }
 
@@ -664,73 +402,47 @@ export interface InterviewCountdownEmailData {
 
 export function getInterviewCountdownEmailSubject(data: InterviewCountdownEmailData): string {
   if (data.daysUntilInterview === 1) {
-    return `Tomorrow is your ${data.targetCompany} interview! Final prep tips`;
+    return `${data.targetCompany} is tomorrow`;
   }
-  return `${data.daysUntilInterview} days until ${data.targetCompany} - Here's your focus`;
+  return `${data.daysUntilInterview} days until ${data.targetCompany}`;
 }
 
 export function getInterviewCountdownEmailHtml(data: InterviewCountdownEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
   const progressPercent = Math.round((data.questionsCompleted / data.totalQuestions) * 100);
 
   const focusPatterns = data.patternsToFocus.length > 0
-    ? data.patternsToFocus.map(p => `<li>${p}</li>`).join('')
-    : '<li>Review your completed problems</li>';
+    ? `<p>focus areas for the final stretch:</p><ul>${data.patternsToFocus.map(p => `<li>${p}</li>`).join('')}</ul>`
+    : '';
 
-  const dayLabel = data.daysUntilInterview === 1 ? 'TOMORROW' :
-                   data.daysUntilInterview === 7 ? '1 WEEK' :
-                   `${data.daysUntilInterview} DAYS`;
+  const finalTips = data.daysUntilInterview <= 3 ? `
+    <p><strong>final day tips:</strong></p>
+    <ul>
+      <li>review patterns you've already solved - don't learn new ones now</li>
+      <li>get good sleep - it consolidates memory</li>
+      <li>practice explaining your approach out loud</li>
+    </ul>
+  ` : '';
 
   const content = `
-    <div style="text-align: center; margin-bottom: 24px;">
-      <div style="display: inline-block; background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); padding: 16px 32px; border-radius: 12px;">
-        <div style="font-size: 14px; color: rgba(255,255,255,0.8); text-transform: uppercase;">Interview In</div>
-        <div style="font-size: 36px; font-weight: bold; color: #fff;">${dayLabel}</div>
-        <div style="font-size: 14px; color: rgba(255,255,255,0.8);">${data.targetCompany}</div>
-      </div>
-    </div>
+    <p>hey ${firstName},</p>
 
-    <h1>Hey ${data.userName || 'there'}, you've got this!</h1>
+    <p>your ${data.targetCompany} interview is ${data.daysUntilInterview === 1 ? 'tomorrow' : `in ${data.daysUntilInterview} days`}.</p>
 
-    <p>Your ${data.targetCompany} interview is ${data.daysUntilInterview === 1 ? 'tomorrow' : `in ${data.daysUntilInterview} days`}.
-    Here's where you stand:</p>
+    <p>you've completed ${data.questionsCompleted}/${data.totalQuestions} (${progressPercent}%) of your roadmap.</p>
 
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-value">${progressPercent}%</div>
-        <div class="stat-label">Roadmap Complete</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">${data.questionsCompleted}</div>
-        <div class="stat-label">Problems Solved</div>
-      </div>
-    </div>
+    ${focusPatterns}
 
-    <h2 style="margin-top: 24px;">Focus Areas for Final Days:</h2>
-    <ul style="color: #9ca3af; padding-left: 20px;">
-      ${focusPatterns}
-    </ul>
+    ${finalTips}
 
-    ${data.daysUntilInterview <= 3 ? `
-    <div class="science-note">
-      <p><strong>Final day tips:</strong></p>
-      <ul style="margin: 8px 0; padding-left: 20px;">
-        <li>Review patterns you've already solved - don't learn new ones</li>
-        <li>Get good sleep - it consolidates memory</li>
-        <li>Practice explaining your thought process out loud</li>
-      </ul>
-    </div>
-    ` : ''}
+    <p><a href="${data.appUrl}/roadmap" style="color: #0066cc;">continue preparing</a></p>
 
-    <div style="text-align: center; margin: 32px 0;">
-      <a href="${data.appUrl}/roadmap" class="cta-button">Continue Preparing</a>
-    </div>
+    <p>you've put in the work. trust your prep.</p>
 
-    <p style="text-align: center; color: #9ca3af; font-size: 14px;">
-      You've put in the work. Trust your preparation!
-    </p>
+    <p>- nikayel</p>
   `;
 
-  return emailWrapper(content);
+  return simpleEmailWrapper(content);
 }
 
 // ROADMAP: BEHIND SCHEDULE ALERT
@@ -746,41 +458,29 @@ export interface BehindScheduleEmailData {
 }
 
 export function getBehindScheduleEmailSubject(data: BehindScheduleEmailData): string {
-  return `You're ${data.questionsBehind} questions behind on your ${data.targetCompany} prep`;
+  return `catching up on ${data.targetCompany} prep`;
 }
 
 export function getBehindScheduleEmailHtml(data: BehindScheduleEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
+
   const content = `
-    <h1>Hey ${data.userName || 'there'}, let's get you back on track!</h1>
+    <p>hey ${firstName},</p>
 
-    <div class="tip-box" style="background: rgba(251, 191, 36, 0.1); border-left-color: #fbbf24;">
-      <p style="color: #fbbf24; margin: 0;">
-        You're <strong>${data.questionsBehind} questions behind</strong> on your ${data.targetCompany} roadmap
-        with <strong>${data.daysUntilInterview} days</strong> until your interview.
-      </p>
-    </div>
+    <p>you're ${data.questionsBehind} questions behind on your ${data.targetCompany} roadmap with ${data.daysUntilInterview} days left.</p>
 
-    <p style="margin-top: 24px;">Don't worry - you can catch up! Here's the plan:</p>
+    <p>no stress - here's how to catch up: aim for ${data.suggestedDailyQuestions} questions per day from here on out.</p>
 
-    <div class="stat-card" style="text-align: center; margin: 24px 0;">
-      <div class="stat-value">${data.suggestedDailyQuestions}</div>
-      <div class="stat-label">Questions per Day to Catch Up</div>
-    </div>
+    <p>don't try to do it all at once though. consistent daily practice (even just 1-2 problems) beats cramming.</p>
 
-    <div class="science-note">
-      <p><strong>Psychology tip:</strong> Don't try to do it all at once. Consistent daily practice (even 1-2 problems) is more effective than cramming. Start with today's quota.</p>
-    </div>
+    <p><a href="${data.appUrl}/roadmap" style="color: #0066cc;">start catching up</a></p>
 
-    <div style="text-align: center; margin: 32px 0;">
-      <a href="${data.appUrl}/roadmap" class="cta-button">Start Catching Up</a>
-    </div>
+    <p>every problem you solve increases your odds. progress over perfection.</p>
 
-    <p style="color: #9ca3af; font-size: 14px;">
-      Remember: Every problem you solve increases your chances. Progress over perfection!
-    </p>
+    <p>- nikayel</p>
   `;
 
-  return emailWrapper(content);
+  return simpleEmailWrapper(content);
 }
 
 // PAYMENT FAILURE NOTIFICATION
@@ -793,64 +493,47 @@ export interface PaymentFailedEmailData {
 }
 
 export function getPaymentFailedEmailSubject(): string {
-  return "Action required: Your CodeSparring payment failed";
+  return "issue with your payment";
 }
 
 export function getPaymentFailedEmailHtml(data: PaymentFailedEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
+
   const content = `
-    <h1>Hey ${data.userName || 'there'}, we had trouble processing your payment</h1>
+    <p>hey ${firstName},</p>
 
-    <div class="tip-box" style="background: rgba(239, 68, 68, 0.1); border-left-color: #ef4444;">
-      <p style="color: #ef4444; margin: 0;">
-        Your recent payment for CodeSparring Pro could not be processed.
-        ${data.failureReason ? `<br/><strong>Reason:</strong> ${data.failureReason}` : ''}
-      </p>
-    </div>
+    <p>heads up - we had trouble processing your payment for CodeSparring Pro.${data.failureReason ? ` (${data.failureReason})` : ''}</p>
 
-    <p style="margin-top: 24px;">To keep your Pro access and continue your interview preparation without interruption, please update your payment method.</p>
+    <p>to keep your Pro access, you'll need to update your payment method.</p>
 
-    <div style="text-align: center; margin: 32px 0;">
-      <a href="${data.appUrl}/settings/billing" class="cta-button">Update Payment Method</a>
-    </div>
+    <p><a href="${data.appUrl}/account" style="color: #0066cc;">update payment method</a></p>
 
-    <div class="science-note">
-      <p><strong>What happens next?</strong></p>
-      <ul style="margin: 8px 0; padding-left: 20px;">
-        <li>Your Pro access will remain active for a few more days while we retry</li>
-        <li>We'll attempt to charge your card again automatically</li>
-        <li>If payment continues to fail, your account will be downgraded to Free</li>
-      </ul>
-    </div>
+    <p>we'll try again automatically in a few days. if the payment still fails, your account will be moved to the free plan.</p>
 
-    <p style="color: #9ca3af; font-size: 14px;">
-      Need help? Reply to this email or contact us at support@codesparring.dev
-    </p>
+    <p>if you have any questions, just reply to this email.</p>
+
+    <p>- nikayel</p>
   `;
 
-  return emailWrapper(content);
+  return simpleEmailWrapper(content);
 }
 
 export function getPaymentFailedEmailText(data: PaymentFailedEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
+
   return `
-Hey ${data.userName || 'there'},
+hey ${firstName},
 
-We had trouble processing your payment for CodeSparring Pro.
-${data.failureReason ? `Reason: ${data.failureReason}` : ''}
+heads up - we had trouble processing your payment for CodeSparring Pro.${data.failureReason ? ` (${data.failureReason})` : ''}
 
-To keep your Pro access, please update your payment method:
-${data.appUrl}/settings/billing
+to keep your Pro access, you'll need to update your payment method:
+${data.appUrl}/account
 
-What happens next:
-- Your Pro access will remain active for a few more days while we retry
-- We'll attempt to charge your card again automatically
-- If payment continues to fail, your account will be downgraded to Free
+we'll try again automatically in a few days. if the payment still fails, your account will be moved to the free plan.
 
-Need help? Contact us at support@codesparring.dev
+if you have any questions, just reply to this email.
 
-- The CodeSparring Team
-
----
-Unsubscribe: ${data.appUrl}/settings/notifications
+- nikayel
   `.trim();
 }
 
@@ -867,10 +550,11 @@ export interface SubscriptionConfirmationEmailData {
 }
 
 export function getSubscriptionConfirmationEmailSubject(): string {
-  return "Welcome to CodeSparring Pro - Your subscription is active!";
+  return "you're all set with Pro";
 }
 
 export function getSubscriptionConfirmationEmailHtml(data: SubscriptionConfirmationEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
   const formattedDate = data.nextBillingDate
     ? new Date(data.nextBillingDate).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -880,45 +564,37 @@ export function getSubscriptionConfirmationEmailHtml(data: SubscriptionConfirmat
     : 'N/A';
 
   const content = `
-    <h1>Welcome to CodeSparring Pro, ${data.userName || 'there'}!</h1>
+    <p>hey ${firstName},</p>
 
-    <p>Thank you for upgrading to <strong class="highlight">Pro</strong>! Your subscription is now active.</p>
+    <p>thanks for upgrading to Pro. your subscription is now active.</p>
 
-    <div class="stat-card" style="text-align: center; margin: 24px 0;">
-      <div class="stat-value">${data.planName}</div>
-      <div class="stat-label">Your Plan</div>
-    </div>
-
-    <div class="tip-box">
-      <p><strong>Subscription Details:</strong></p>
-      <ul style="margin: 8px 0; padding-left: 20px;">
-        <li>Plan: ${data.planName}</li>
-        <li>Amount: ${data.currency} ${data.amount.toFixed(2)}</li>
-        <li>Next billing date: ${formattedDate}</li>
-      </ul>
-    </div>
-
-    <p style="margin-top: 24px;">With Pro, you now have access to:</p>
-    <ul style="color: #9ca3af; padding-left: 20px;">
-      <li><strong style="color: #e5e7eb;">35 interview sessions per month</strong></li>
-      <li><strong style="color: #e5e7eb;">Unlimited code execution</strong></li>
-      <li><strong style="color: #e5e7eb;">Advanced AI feedback</strong></li>
-      <li><strong style="color: #e5e7eb;">Priority support</strong></li>
+    <p><strong>details:</strong></p>
+    <ul>
+      <li>plan: ${data.planName}</li>
+      <li>amount: ${data.currency} ${data.amount.toFixed(2)}</li>
+      <li>next billing: ${formattedDate}</li>
     </ul>
 
-    <div style="text-align: center; margin: 32px 0;">
-      <a href="${data.appUrl}/dashboard" class="cta-button">Start Practicing</a>
-    </div>
+    <p>with Pro you get:</p>
+    <ul>
+      <li>35 interview sessions per month</li>
+      <li>unlimited code execution</li>
+      <li>advanced AI feedback</li>
+      <li>priority support (just reply to any email)</li>
+    </ul>
 
-    <p style="color: #9ca3af; font-size: 14px;">
-      Manage your subscription anytime at <a href="${data.appUrl}/settings/billing" style="color: #00d9ff;">${data.appUrl}/settings/billing</a>
-    </p>
+    <p><a href="${data.appUrl}/dashboard" style="color: #0066cc;">start practicing</a></p>
+
+    <p>let me know if you have any questions.</p>
+
+    <p>- nikayel</p>
   `;
 
-  return emailWrapper(content);
+  return simpleEmailWrapper(content);
 }
 
 export function getSubscriptionConfirmationEmailText(data: SubscriptionConfirmationEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
   const formattedDate = data.nextBillingDate
     ? new Date(data.nextBillingDate).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -928,29 +604,26 @@ export function getSubscriptionConfirmationEmailText(data: SubscriptionConfirmat
     : 'N/A';
 
   return `
-Welcome to CodeSparring Pro, ${data.userName || 'there'}!
+hey ${firstName},
 
-Thank you for upgrading to Pro! Your subscription is now active.
+thanks for upgrading to Pro. your subscription is now active.
 
-Subscription Details:
-- Plan: ${data.planName}
-- Amount: ${data.currency} ${data.amount.toFixed(2)}
-- Next billing date: ${formattedDate}
+details:
+- plan: ${data.planName}
+- amount: ${data.currency} ${data.amount.toFixed(2)}
+- next billing: ${formattedDate}
 
-With Pro, you now have access to:
+with Pro you get:
 - 35 interview sessions per month
-- Unlimited code execution
-- Advanced AI feedback
-- Priority support
+- unlimited code execution
+- advanced AI feedback
+- priority support
 
-Start practicing: ${data.appUrl}/dashboard
+start practicing: ${data.appUrl}/dashboard
 
-Manage your subscription: ${data.appUrl}/settings/billing
+let me know if you have any questions.
 
-- The CodeSparring Team
-
----
-Unsubscribe: ${data.appUrl}/settings/notifications
+- nikayel
   `.trim();
 }
 
@@ -966,11 +639,12 @@ export interface SubscriptionCancellationEmailData {
 
 export function getSubscriptionCancellationEmailSubject(isImmediate: boolean): string {
   return isImmediate
-    ? "Your CodeSparring Pro subscription has ended"
-    : "Your CodeSparring Pro cancellation is confirmed";
+    ? "your Pro access has ended"
+    : "confirming your cancellation";
 }
 
 export function getSubscriptionCancellationEmailHtml(data: SubscriptionCancellationEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
   const formattedDate = data.accessUntil
     ? new Date(data.accessUntil).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -979,62 +653,41 @@ export function getSubscriptionCancellationEmailHtml(data: SubscriptionCancellat
       })
     : 'today';
 
-  const content = data.isImmediate
-    ? `
-      <h1>Your subscription has ended</h1>
+  if (data.isImmediate) {
+    return simpleEmailWrapper(`
+      <p>hey ${firstName},</p>
 
-      <p>Hey ${data.userName || 'there'},</p>
+      <p>your CodeSparring Pro subscription has ended. you're now on the free plan (5 sessions per month).</p>
 
-      <p>Your CodeSparring Pro subscription has ended. You've been moved to our Free plan.</p>
+      <p>if you ever want to come back, your progress and history will be here waiting.</p>
 
-      <div class="tip-box" style="background: rgba(251, 191, 36, 0.1); border-left-color: #fbbf24;">
-        <p style="color: #fbbf24; margin: 0;">
-          <strong>Your account has been downgraded to Free.</strong>
-          You now have access to 5 interview sessions per month.
-        </p>
-      </div>
+      <p><a href="${data.appUrl}/pricing" style="color: #0066cc;">resubscribe anytime</a></p>
 
-      <p style="margin-top: 24px;">We're sorry to see you go! If you ever want to come back, your progress and history will be waiting for you.</p>
+      <p>if there's anything we could've done better, i'd genuinely love to hear it - just reply to this email.</p>
 
-      <div style="text-align: center; margin: 32px 0;">
-        <a href="${data.appUrl}/pricing" class="cta-button">Resubscribe to Pro</a>
-      </div>
+      <p>- nikayel</p>
+    `);
+  }
 
-      <div class="science-note">
-        <p><strong>We'd love to hear from you!</strong> If there's anything we could have done better, please reply to this email and let us know.</p>
-      </div>
-    `
-    : `
-      <h1>Your cancellation is confirmed</h1>
+  return simpleEmailWrapper(`
+    <p>hey ${firstName},</p>
 
-      <p>Hey ${data.userName || 'there'},</p>
+    <p>got your cancellation request. your Pro subscription is set to end on ${formattedDate}.</p>
 
-      <p>We've received your cancellation request. Your Pro subscription has been set to cancel at the end of your billing period.</p>
+    <p>you'll have full Pro access until then, so make the most of it.</p>
 
-      <div class="stat-card" style="text-align: center; margin: 24px 0;">
-        <div class="stat-value">${formattedDate}</div>
-        <div class="stat-label">Pro Access Until</div>
-      </div>
+    <p>changed your mind? you can reactivate anytime before it expires:</p>
 
-      <div class="tip-box">
-        <p><strong>Good news!</strong> You'll keep full Pro access until ${formattedDate}. Make the most of it!</p>
-      </div>
+    <p><a href="${data.appUrl}/account" style="color: #0066cc;">reactivate subscription</a></p>
 
-      <p style="margin-top: 24px;">Changed your mind? You can reactivate your subscription anytime before it expires:</p>
+    <p>if there's anything we could've done better, i'd genuinely love to hear it - just reply to this email.</p>
 
-      <div style="text-align: center; margin: 32px 0;">
-        <a href="${data.appUrl}/settings/billing" class="cta-button">Reactivate Subscription</a>
-      </div>
-
-      <div class="science-note">
-        <p><strong>We'd love to hear from you!</strong> If there's anything we could have done better, please reply to this email and let us know.</p>
-      </div>
-    `;
-
-  return emailWrapper(content);
+    <p>- nikayel</p>
+  `);
 }
 
 export function getSubscriptionCancellationEmailText(data: SubscriptionCancellationEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
   const formattedDate = data.accessUntil
     ? new Date(data.accessUntil).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -1045,43 +698,32 @@ export function getSubscriptionCancellationEmailText(data: SubscriptionCancellat
 
   if (data.isImmediate) {
     return `
-Your subscription has ended
+hey ${firstName},
 
-Hey ${data.userName || 'there'},
+your CodeSparring Pro subscription has ended. you're now on the free plan (5 sessions per month).
 
-Your CodeSparring Pro subscription has ended. You've been moved to our Free plan.
+if you ever want to come back, your progress and history will be here waiting.
 
-You now have access to 5 interview sessions per month.
+resubscribe anytime: ${data.appUrl}/pricing
 
-We're sorry to see you go! If you ever want to come back, your progress and history will be waiting for you.
+if there's anything we could've done better, i'd genuinely love to hear it - just reply to this email.
 
-Resubscribe to Pro: ${data.appUrl}/pricing
-
-- The CodeSparring Team
-
----
-Unsubscribe: ${data.appUrl}/settings/notifications
+- nikayel
     `.trim();
   }
 
   return `
-Your cancellation is confirmed
+hey ${firstName},
 
-Hey ${data.userName || 'there'},
+got your cancellation request. your Pro subscription is set to end on ${formattedDate}.
 
-We've received your cancellation request. Your Pro subscription has been set to cancel at the end of your billing period.
+you'll have full Pro access until then, so make the most of it.
 
-Pro Access Until: ${formattedDate}
+changed your mind? reactivate anytime: ${data.appUrl}/account
 
-Good news! You'll keep full Pro access until ${formattedDate}. Make the most of it!
+if there's anything we could've done better, i'd genuinely love to hear it - just reply to this email.
 
-Changed your mind? Reactivate your subscription:
-${data.appUrl}/settings/billing
-
-- The CodeSparring Team
-
----
-Unsubscribe: ${data.appUrl}/settings/notifications
+- nikayel
   `.trim();
 }
 
@@ -1095,10 +737,11 @@ export interface TrialEndingEmailData {
 }
 
 export function getTrialEndingEmailSubject(): string {
-  return "Your CodeSparring Pro trial ends in 3 days";
+  return "your trial ends in 3 days";
 }
 
 export function getTrialEndingEmailHtml(data: TrialEndingEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
   const formattedDate = data.trialEndDate
     ? new Date(data.trialEndDate).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -1108,42 +751,31 @@ export function getTrialEndingEmailHtml(data: TrialEndingEmailData): string {
     : 'soon';
 
   const content = `
-    <h1>Your Pro trial ends soon!</h1>
+    <p>hey ${firstName},</p>
 
-    <p>Hey ${data.userName || 'there'},</p>
+    <p>heads up - your Pro trial ends on ${formattedDate}.</p>
 
-    <p>Your CodeSparring Pro trial is ending on <strong class="highlight">${formattedDate}</strong>.</p>
+    <p>after that, your payment method will be charged automatically. if you don't want to continue, you can cancel before then.</p>
 
-    <div class="stat-card" style="text-align: center; margin: 24px 0;">
-      <div class="stat-value">3</div>
-      <div class="stat-label">Days Remaining</div>
-    </div>
-
-    <div class="tip-box">
-      <p><strong>What happens next?</strong> After your trial ends, your payment method will be charged automatically. If you don't want to continue, you can cancel before ${formattedDate}.</p>
-    </div>
-
-    <p style="margin-top: 24px;">With Pro, you get:</p>
-    <ul style="color: #9ca3af; padding-left: 20px;">
-      <li><strong style="color: #e5e7eb;">35 interview sessions per month</strong></li>
-      <li><strong style="color: #e5e7eb;">Unlimited code execution</strong></li>
-      <li><strong style="color: #e5e7eb;">Advanced AI feedback</strong></li>
-      <li><strong style="color: #e5e7eb;">Priority support</strong></li>
+    <p>with Pro you get:</p>
+    <ul>
+      <li>35 interview sessions per month</li>
+      <li>unlimited code execution</li>
+      <li>advanced AI feedback</li>
     </ul>
 
-    <div style="text-align: center; margin: 32px 0;">
-      <a href="${data.appUrl}/settings/billing" class="cta-button">Manage Subscription</a>
-    </div>
+    <p><a href="${data.appUrl}/account" style="color: #0066cc;">manage subscription</a></p>
 
-    <p style="color: #9ca3af; font-size: 14px;">
-      Have questions? Reply to this email and we'll be happy to help!
-    </p>
+    <p>have questions? just reply to this email.</p>
+
+    <p>- nikayel</p>
   `;
 
-  return emailWrapper(content);
+  return simpleEmailWrapper(content);
 }
 
 export function getTrialEndingEmailText(data: TrialEndingEmailData): string {
+  const firstName = data.userName?.split(' ')[0] || 'there';
   const formattedDate = data.trialEndDate
     ? new Date(data.trialEndDate).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -1153,28 +785,21 @@ export function getTrialEndingEmailText(data: TrialEndingEmailData): string {
     : 'soon';
 
   return `
-Your Pro trial ends soon!
+hey ${firstName},
 
-Hey ${data.userName || 'there'},
+heads up - your Pro trial ends on ${formattedDate}.
 
-Your CodeSparring Pro trial is ending on ${formattedDate}.
+after that, your payment method will be charged automatically. if you don't want to continue, you can cancel before then.
 
-What happens next?
-After your trial ends, your payment method will be charged automatically. If you don't want to continue, you can cancel before ${formattedDate}.
-
-With Pro, you get:
+with Pro you get:
 - 35 interview sessions per month
-- Unlimited code execution
-- Advanced AI feedback
-- Priority support
+- unlimited code execution
+- advanced AI feedback
 
-Manage your subscription: ${data.appUrl}/settings/billing
+manage subscription: ${data.appUrl}/account
 
-Have questions? Reply to this email and we'll be happy to help!
+have questions? just reply to this email.
 
-- The CodeSparring Team
-
----
-Unsubscribe: ${data.appUrl}/settings/notifications
+- nikayel
   `.trim();
 }

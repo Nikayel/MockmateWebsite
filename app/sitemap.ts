@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { getAllBlogPosts } from '@/lib/mdx'
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://codesparring.com'
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://codesparring.dev'
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const currentDate = new Date().toISOString()
