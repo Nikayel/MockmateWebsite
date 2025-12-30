@@ -111,10 +111,13 @@ export const metadata: Metadata = {
     },
   },
 
-  // Verification (add your IDs when ready)
-  // verification: {
-  //   google: "your-google-verification-code",
-  // },
+  // Search Engine Verification
+  // TODO: Add your verification codes from Google Search Console and Bing Webmaster Tools
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
+    // yandex: "your-yandex-verification-code",
+    // bing: "your-bing-verification-code",
+  },
 }
 
 export default function RootLayout({

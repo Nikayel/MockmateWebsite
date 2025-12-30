@@ -1,6 +1,7 @@
 // JSON-LD Structured Data Components for SEO Rich Snippets
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.dev"
+// Use consistent URL - codesparring.com is the canonical domain
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.com"
 
 // Organization Schema - for brand recognition in search
 export function OrganizationJsonLd() {
@@ -12,13 +13,18 @@ export function OrganizationJsonLd() {
     logo: `${SITE_URL}/icon-codesparring.svg`,
     description: "AI-powered coding interview practice platform with voice-enabled mock interviews and spaced repetition learning.",
     foundingDate: "2025",
+    founder: {
+      "@type": "Person",
+      name: "Nikayel",
+      jobTitle: "Founder",
+    },
     sameAs: [
       "https://twitter.com/codesparring",
       "https://linkedin.com/company/codesparring",
     ],
     contactPoint: {
       "@type": "ContactPoint",
-      email: "hello@codesparring.dev",
+      email: "nikayel@codesparring.dev",
       contactType: "customer support",
     },
   }
@@ -39,6 +45,7 @@ export function SoftwareApplicationJsonLd() {
     name: "CodeSparring",
     applicationCategory: "EducationalApplication",
     operatingSystem: "Web",
+    url: SITE_URL,
     description: "AI mock interview platform for coding interviews. Practice DSA problems with voice-enabled AI feedback and spaced repetition learning.",
     offers: [
       {
@@ -172,6 +179,120 @@ export function HowToJsonLd() {
       },
     ],
     totalTime: "P30D",
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}
+
+// Article Schema - for blog posts (improves SERP appearance)
+export function ArticleJsonLd({
+  title,
+  description,
+  url,
+  datePublished,
+  dateModified,
+  author,
+  image,
+}: {
+  title: string
+  description: string
+  url: string
+  datePublished: string
+  dateModified?: string
+  author?: string
+  image?: string
+}) {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: title,
+    description: description,
+    url: `${SITE_URL}${url}`,
+    datePublished: datePublished,
+    dateModified: dateModified || datePublished,
+    author: {
+      "@type": "Person",
+      name: author || "Nikayel",
+      url: SITE_URL,
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "CodeSparring",
+      logo: {
+        "@type": "ImageObject",
+        url: `${SITE_URL}/icon-codesparring.svg`,
+      },
+    },
+    image: image ? `${SITE_URL}${image}` : `${SITE_URL}/og-image.png`,
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": `${SITE_URL}${url}`,
+    },
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}
+
+// BreadcrumbList Schema - for navigation trail in SERP
+export function BreadcrumbJsonLd({
+  items,
+}: {
+  items: Array<{ name: string; url: string }>
+}) {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: `${SITE_URL}${item.url}`,
+    })),
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}
+
+// Course Schema - for educational content (DSA patterns, interview prep)
+export function CourseJsonLd({
+  name,
+  description,
+  provider,
+}: {
+  name: string
+  description: string
+  provider?: string
+}) {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "Course",
+    name: name,
+    description: description,
+    provider: {
+      "@type": "Organization",
+      name: provider || "CodeSparring",
+      url: SITE_URL,
+    },
+    hasCourseInstance: {
+      "@type": "CourseInstance",
+      courseMode: "online",
+      courseWorkload: "PT30M", // 30 minutes average per session
+    },
   }
 
   return (

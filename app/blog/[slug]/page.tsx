@@ -2,6 +2,7 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { getBlogPostBySlug, getBlogSlugs } from "@/lib/mdx"
 import { BlogPostLayout } from "@/components/blog/BlogPostLayout"
+import { ArticleJsonLd, BreadcrumbJsonLd } from "@/components/seo/JsonLd"
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -32,35 +33,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       authors: [post.author],
       tags: post.tags,
     },
+    twitter: {
+      card: "summary_large_image",
+      title: post.title,
+      description: post.description,
+    },
   }
 }
 
 export async function generateStaticParams() {
   const slugs = getBlogSlugs()
   return slugs.map((slug) => ({ slug }))
-}
-
-function ArticleJsonLd({ post }: { post: { title: string; description: string; date: string; author: string; slug: string } }) {
-  const schema = {
-    "@context": "https://schema.org",
-    "@type": "Article",
-    headline: post.title,
-    description: post.description,
-    author: { "@type": "Person", name: post.author },
-    datePublished: post.date,
-    publisher: {
-      "@type": "Organization",
-      name: "CodeSparring",
-      logo: { "@type": "ImageObject", url: "https://codesparring.com/icon-codesparring.svg" },
-    },
-  }
-
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
-    />
-  )
 }
 
 export default async function BlogPostPage({ params }: Props) {
@@ -73,7 +56,22 @@ export default async function BlogPostPage({ params }: Props) {
 
   return (
     <main>
-      <ArticleJsonLd post={post} />
+      {/* Structured data for better SERP appearance */}
+      <ArticleJsonLd
+        title={post.title}
+        description={post.description}
+        url={`/blog/${post.slug}`}
+        datePublished={post.date}
+        author={post.author}
+        image={post.image}
+      />
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", url: "/" },
+          { name: "Blog", url: "/blog" },
+          { name: post.title, url: `/blog/${post.slug}` },
+        ]}
+      />
       <BlogPostLayout post={post} />
     </main>
   )
