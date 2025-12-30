@@ -19,6 +19,7 @@ import {
   ChevronRight,
   LogOut,
   Shield,
+  FlaskConical,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -36,6 +37,7 @@ const navigation: NavItem[] = [
   { name: "Sessions", href: "/admin/sessions", icon: Activity },
   { name: "Funnel", href: "/admin/funnel", icon: TrendingUp },
   { name: "AI Usage", href: "/admin/ai-usage", icon: Cpu },
+  { name: "Research", href: "/admin/research", icon: FlaskConical, badge: "A/B" },
   { name: "Errors", href: "/admin/errors", icon: AlertCircle },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ]

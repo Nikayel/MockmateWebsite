@@ -16,16 +16,24 @@ import { verifyAuth } from '@/lib/auth-helpers';
 import { getScenarioById } from '@/lib/scenarios';
 import { logger } from '@/lib/logger';
 import {
-  calculateNextInterval,
   updateProblemMastery,
   initializeProblemMasteryFromSession,
   getAllUserProblems,
   updateUserLearningStateSummary,
   getDailyGoalProgress,
+  // Algorithm Router (A/B Testing)
+  getUserAlgorithm,
+  calculateNextReview,
+  reconstructState,
+  prepareStateForStorage,
+  estimateRetentionForAlgorithm,
+  // Research Tracking
+  recordReviewEvent,
 } from '@/lib/spaced-repetition';
 import { updateLearningStateAfterSession } from '@/lib/learning-state';
 import type { DSAPattern } from '@/lib/types/dsa-patterns';
 import type { Difficulty } from '@/lib/spaced-repetition';
+import type { SpacedRepetitionMasteryLevel } from '@/lib/types';
 
 interface CompleteRequestBody {
   problem_id: string;
@@ -94,8 +102,11 @@ export async function POST(request: NextRequest) {
 
     let updatedMastery;
 
+    // Get user's assigned algorithm (SM-2 or FSRS)
+    const userAlgorithm = await getUserAlgorithm(userId);
+
     if (existingMastery) {
-      // Calculate next interval using SM-2
+      // Calculate next interval using user's assigned algorithm
       const now = new Date();
       const lastReviewAt = new Date(existingMastery.last_reviewed_at);
       const daysSinceReview = Math.floor(
@@ -114,35 +125,91 @@ export async function POST(request: NextRequest) {
       const learningState = learningStateDoc.data();
       const streakDays = learningState?.streak_days || 0;
 
-      const sm2Result = calculateNextInterval({
-        previousInterval: existingMastery.interval_days,
-        previousEaseFactor: existingMastery.ease_factor,
-        performanceScore: performance_score,
-        reviewCount: existingMastery.review_count,
-        lastReviewDate: lastReviewAt,
-        problemDifficulty: difficulty,
-        streakDays,
-        scoresHistory: existingMastery.scores_history,
-        isEarlyReview,
-        daysOverdue,
+      // Reconstruct algorithm state from stored data
+      const currentState = reconstructState(userAlgorithm, {
+        interval_days: existingMastery.interval_days,
+        next_review_at: existingMastery.next_review_at,
+        review_count: existingMastery.review_count,
+        mastery_level: existingMastery.mastery_level as SpacedRepetitionMasteryLevel,
+        confidence: existingMastery.confidence,
+        ease_factor: existingMastery.ease_factor,
+        last_reviewed_at: existingMastery.last_reviewed_at,
       });
 
-      // Calculate next review date
-      const nextReview = new Date(now);
-      nextReview.setDate(nextReview.getDate() + sm2Result.nextInterval);
+      // Estimate pre-review retention
+      const predictedRetention = estimateRetentionForAlgorithm(
+        userAlgorithm,
+        currentState,
+        daysSinceReview
+      );
+
+      // Calculate next review using algorithm router (A/B testing)
+      const reviewResult = await calculateNextReview(userId, currentState, {
+        performance_score,
+        time_spent_minutes,
+        hints_used,
+        problem_difficulty: difficulty,
+        is_early_review: isEarlyReview,
+        days_overdue: daysOverdue,
+        streak_days: streakDays,
+      });
+
+      // Prepare storage data
+      const storageData = prepareStateForStorage({
+        algorithm: reviewResult.algorithm,
+        interval_days: reviewResult.next_interval_days,
+        next_review_at: reviewResult.next_review_at,
+        review_count: existingMastery.review_count + 1,
+        mastery_level: reviewResult.mastery_level,
+        confidence: reviewResult.confidence,
+        ease_factor: reviewResult.ease_factor,
+        fsrs_state: reviewResult.fsrs_state,
+      });
 
       // Update problem mastery
       updatedMastery = await updateProblemMastery(userId, problem_id, {
         performance_score,
         time_spent_minutes,
         hints_used,
-        ease_factor: sm2Result.newEaseFactor,
-        interval_days: sm2Result.nextInterval,
+        ...storageData,
         review_count: existingMastery.review_count + 1,
-        next_review_at: nextReview.toISOString(),
-        mastery_level: sm2Result.masteryLevel,
-        confidence: sm2Result.confidence,
       });
+
+      // Record research event for A/B testing analysis
+      try {
+        await recordReviewEvent({
+          userId,
+          problemId: problem_id,
+          scenarioId: scenario_id,
+          pattern,
+          difficulty,
+          score: performance_score,
+          qualityRating: reviewResult.quality_rating,
+          timeSpentMinutes: time_spent_minutes,
+          hintsUsed: hints_used,
+          preReviewState: {
+            intervalDays: existingMastery.interval_days,
+            daysSinceLastReview: daysSinceReview,
+            daysOverdue,
+            easeFactor: existingMastery.ease_factor,
+            stability: currentState.fsrs_state?.stability,
+            predictedRetention,
+            masteryLevel: existingMastery.mastery_level as SpacedRepetitionMasteryLevel,
+          },
+          postReviewState: {
+            newIntervalDays: reviewResult.next_interval_days,
+            newEaseFactor: reviewResult.ease_factor,
+            newStability: reviewResult.fsrs_state?.stability,
+            masteryLevel: reviewResult.mastery_level,
+          },
+          isEarlyReview,
+          isFirstReview: false,
+          sessionNumber: existingMastery.review_count + 1,
+        });
+      } catch (researchError) {
+        // Don't fail the request if research tracking fails
+        logger.error('Failed to record research event', { error: researchError });
+      }
     } else {
       // Initialize new problem mastery
       updatedMastery = await initializeProblemMasteryFromSession(userId, {
@@ -154,6 +221,43 @@ export async function POST(request: NextRequest) {
         time_spent_minutes,
         hints_used,
       });
+
+      // Record research event for first review
+      try {
+        // Map score to quality for research tracking
+        const qualityRating = userAlgorithm === 'fsrs'
+          ? (performance_score >= 85 ? 4 : performance_score >= 60 ? 3 : performance_score >= 40 ? 2 : 1)
+          : Math.min(5, Math.max(0, Math.floor(performance_score / 20)));
+
+        await recordReviewEvent({
+          userId,
+          problemId: problem_id,
+          scenarioId: scenario_id,
+          pattern,
+          difficulty,
+          score: performance_score,
+          qualityRating,
+          timeSpentMinutes: time_spent_minutes,
+          hintsUsed: hints_used,
+          preReviewState: {
+            intervalDays: 0,
+            daysSinceLastReview: 0,
+            daysOverdue: 0,
+            predictedRetention: 0,
+            masteryLevel: 'new',
+          },
+          postReviewState: {
+            newIntervalDays: updatedMastery.interval_days,
+            newEaseFactor: updatedMastery.ease_factor,
+            masteryLevel: updatedMastery.mastery_level as SpacedRepetitionMasteryLevel,
+          },
+          isEarlyReview: false,
+          isFirstReview: true,
+          sessionNumber: 1,
+        });
+      } catch (researchError) {
+        logger.error('Failed to record research event for new problem', { error: researchError });
+      }
     }
 
     // Update legacy learning state for backwards compatibility

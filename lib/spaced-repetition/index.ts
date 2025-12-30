@@ -4,8 +4,25 @@
  * Production-ready spaced repetition with:
  * - FSRS algorithm (recommended - 20-30% more efficient than SM-2)
  * - Legacy SM-2 for backward compatibility
+ * - Algorithm A/B testing infrastructure
  * - RAG integration for personalized recommendations
  */
+
+// Algorithm Router (A/B Testing) - Use this for new implementations
+export {
+  getUserAlgorithm,
+  setUserAlgorithm,
+  calculateNextReview,
+  createInitialState,
+  reconstructState,
+  prepareStateForStorage,
+  estimateRetention as estimateRetentionForAlgorithm,
+  getAlgorithmDistribution,
+  migrateExistingUsers,
+  type AlgorithmState,
+  type ReviewInput,
+  type ReviewOutput,
+} from './algorithm-router';
 
 // FSRS Algorithm (Recommended - Modern, ML-optimized)
 export {
@@ -86,3 +103,14 @@ export {
   type SmartRecommendation,
   type RecommendationType,
 } from './rag-integration';
+
+// Research Tracker (A/B Testing Analytics)
+export {
+  recordReviewEvent,
+  recordSkippedReview,
+  generateAggregateComparison,
+  getAggregateComparison,
+  getUserResearchSummary,
+  getUserDailyMetrics,
+  getRecentEvents,
+} from './research-tracker';
