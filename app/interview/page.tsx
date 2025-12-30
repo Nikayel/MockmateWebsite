@@ -1405,6 +1405,10 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           })
         } catch (error) {
           console.error("Error updating session on completion:", error)
+          // Non-critical error - session state saved to cloud but local UI continues
+          toast.warning("Session progress may not be fully saved", {
+            description: "Your feedback is still available, but progress tracking may be incomplete.",
+          })
         }
       }
     } catch (error) {
@@ -2317,14 +2321,13 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           playSound('fail')
         }
 
-        if (data.success) {
-          // Start post-interview discussion phase instead of immediately showing feedback
-          setIsRunningTests(false)
-          setShowPostInterviewDiscussion(true)
+        // Always start post-interview discussion after running tests, regardless of pass rate
+        // This ensures sessions are marked as complete even if not all tests pass
+        setIsRunningTests(false)
+        setShowPostInterviewDiscussion(true)
 
-          // Trigger interviewer to analyze the solution
-          triggerPostInterviewDiscussion(data.results, data.summary)
-        }
+        // Trigger interviewer to analyze the solution
+        triggerPostInterviewDiscussion(data.results, data.summary)
       }
     } catch (error) {
       console.error("Code execution error:", error)
