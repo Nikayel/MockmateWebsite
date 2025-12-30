@@ -25,7 +25,7 @@ const simpleEmailWrapper = (content: string, includeUnsubscribe = true) => `
   ${includeUnsubscribe ? `
   <p style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #999;">
     You're receiving this because you signed up for CodeSparring.<br>
-    <a href="https://codesparring.com/account" style="color: #666;">Manage email preferences</a>
+    <a href="https://codesparring.dev/account" style="color: #666;">Manage email preferences</a>
   </p>
   ` : ''}
 </body>

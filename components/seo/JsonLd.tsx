@@ -1,7 +1,7 @@
 // JSON-LD Structured Data Components for SEO Rich Snippets
 
-// Use consistent URL - codesparring.com is the canonical domain
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.com"
+// Use consistent URL - codesparring.dev is the canonical domain
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.dev"
 
 // Organization Schema - for brand recognition in search
 export function OrganizationJsonLd() {

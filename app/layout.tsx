@@ -26,7 +26,7 @@ const siteConfig = {
   name: "CodeSparring",
   tagline: "Ace Your Tech Interview with AI Mock Practice",
   description: "Practice coding interviews with an AI interviewer available 24/7. Talk through problems out loud, get instant feedback, and master DSA patterns. Better than grinding LeetCode alone.",
-  url: process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.com",
+  url: process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.dev",
   ogImage: "/og-image.png",
 }
 

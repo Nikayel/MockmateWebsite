@@ -293,9 +293,9 @@ Nikayel
 ## 9. Local SEO (Future)
 
 If expanding to location-specific landing pages:
-- codesparring.com/interview-prep/san-francisco
-- codesparring.com/interview-prep/new-york
-- codesparring.com/interview-prep/seattle
+- codesparring.dev/interview-prep/san-francisco
+- codesparring.dev/interview-prep/new-york
+- codesparring.dev/interview-prep/seattle
 
 Target: "[City] coding bootcamp graduates" and university-adjacent searches.
 
