@@ -77,17 +77,17 @@ export async function GET(request: NextRequest) {
         distribution,
         comparison,
         recentEvents: recentEvents.map((event) => ({
-          id: event.id,
-          algorithm: event.algorithm,
-          score: event.score,
-          quality_rating: event.quality_rating,
-          pattern: event.pattern,
-          difficulty: event.difficulty,
-          pre_retention: event.pre_review.predicted_retention,
-          actual_retention: event.actual_retention,
-          retention_as_predicted: event.retention_as_predicted,
-          interval_days: event.post_review.new_interval_days,
-          timestamp: event.timestamp,
+          id: event.id || '',
+          algorithm: event.algorithm || 'sm2',
+          score: event.score ?? 0,
+          quality_rating: event.quality_rating ?? 0,
+          pattern: event.pattern || 'Unknown',
+          difficulty: event.difficulty || 'medium',
+          pre_retention: event.pre_review?.predicted_retention ?? 0,
+          actual_retention: event.actual_retention ?? false,
+          retention_as_predicted: event.retention_as_predicted ?? false,
+          interval_days: event.post_review?.new_interval_days ?? 0,
+          timestamp: event.timestamp || new Date().toISOString(),
         })),
         insights,
         lastUpdated: comparison?.last_updated || new Date().toISOString(),
@@ -241,8 +241,10 @@ function calculateInsights(comparison: AlgorithmComparisonAggregate | null) {
   if (Math.abs(comp.retention_rate_difference) >= 5) {
     const winner = comp.retention_rate_difference > 0 ? 'FSRS' : 'SM-2'
     const diff = Math.abs(comp.retention_rate_difference)
+    const winnerRate = winner === 'FSRS' ? fsrs.average_retention_rate : sm2.average_retention_rate
+    const loserRate = winner === 'FSRS' ? sm2.average_retention_rate : fsrs.average_retention_rate
     keyFindings.push(
-      `${winner} shows ${diff}% higher retention rate (${winner === 'FSRS' ? fsrs : sm2}.average_retention_rate% vs ${winner === 'FSRS' ? sm2 : fsrs}.average_retention_rate%)`
+      `${winner} shows ${diff}% higher retention rate (${winnerRate}% vs ${loserRate}%)`
     )
   }
 
