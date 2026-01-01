@@ -33,7 +33,7 @@ const nextConfig = {
           },
           {
             key: 'Strict-Transport-Security',
-            value: 'max-age=31536000; includeSubDomains'
+            value: 'max-age=31536000; includeSubDomains; preload'
           },
           {
             key: 'X-Frame-Options',
@@ -59,7 +59,11 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com https://cdn.jsdelivr.net https://apis.google.com https://*.googleapis.com https://www.gstatic.com https://accounts.google.com",
+              // SECURITY FIX: Removed 'unsafe-eval' and 'unsafe-inline' - these allow XSS attacks
+              // Using strict CSP with allowed trusted sources only
+              "script-src 'self' https://js.stripe.com https://www.googletagmanager.com https://cdn.jsdelivr.net https://apis.google.com https://*.googleapis.com https://www.gstatic.com https://accounts.google.com 'wasm-unsafe-eval'",
+              // Note: 'unsafe-inline' for styles is still needed for Next.js/React inline styles
+              // TODO: Implement nonce-based CSP for even stricter security
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data: https://fonts.gstatic.com",

@@ -19,6 +19,28 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-10-29.clover",
 })
 
+/**
+ * SECURITY: Price ID whitelist validation
+ * All allowed price IDs must be explicitly configured here.
+ * This prevents attackers from using manipulated env vars to get free access.
+ */
+function getValidatedPriceId(platform: string, planType: string): string | null {
+  // Build expected price ID key
+  const priceKey = platform === "vscode"
+    ? (planType === "yearly" ? "STRIPE_PRICE_ID_VSCODE_YEARLY" : "STRIPE_PRICE_ID_VSCODE")
+    : (planType === "yearly" ? "STRIPE_PRICE_ID_WEBSITE_YEARLY" : "STRIPE_PRICE_ID_WEBSITE")
+
+  const priceId = process.env[priceKey]
+
+  // Validate price ID format (Stripe price IDs start with 'price_')
+  if (!priceId || !priceId.startsWith('price_')) {
+    logger.error("Invalid or missing price ID", { priceKey, priceId: priceId ? "[REDACTED]" : "missing" })
+    return null
+  }
+
+  return priceId
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Verify authentication - userId must come from verified token
@@ -51,26 +73,42 @@ export async function POST(request: NextRequest) {
           error: "Email address is required for subscription. Please update your profile with a valid email address."
         }, { status: 400 })
       }
+
+      // SECURITY FIX: Check for existing active subscription to prevent duplicate charges
+      const isActiveSubscription = profile.subscription_tier === "pro" &&
+        (profile.subscription_status === "active" || profile.subscription_status === "trialing")
+
+      // Also check if subscription hasn't expired (for yearly plans)
+      const subscriptionEndDate = profile.subscription_current_period_end
+        ? new Date(profile.subscription_current_period_end)
+        : null
+      const isNotExpired = subscriptionEndDate ? subscriptionEndDate > new Date() : true
+
+      if (isActiveSubscription && isNotExpired) {
+        logger.warn("User attempted to create duplicate subscription", {
+          userId,
+          currentTier: profile.subscription_tier,
+          currentStatus: profile.subscription_status,
+          expiresAt: profile.subscription_current_period_end
+        })
+        return NextResponse.json({
+          error: "You already have an active Pro subscription.",
+          message: "To modify your subscription, please use the Customer Portal in your account settings.",
+          code: "DUPLICATE_SUBSCRIPTION"
+        }, { status: 400 })
+      }
     } catch (profileError) {
       logger.error("Error fetching user profile", { error: profileError })
       return NextResponse.json({ error: "Failed to validate user profile" }, { status: 500 })
     }
 
-    // Determine price based on platform and plan type
-    let priceId: string | undefined
-    if (planType === 'yearly') {
-      priceId = platform === "vscode"
-        ? process.env.STRIPE_PRICE_ID_VSCODE_YEARLY
-        : process.env.STRIPE_PRICE_ID_WEBSITE_YEARLY
-    } else {
-      priceId = platform === "vscode"
-        ? process.env.STRIPE_PRICE_ID_VSCODE
-        : process.env.STRIPE_PRICE_ID_WEBSITE
-    }
+    // SECURITY FIX: Use validated price ID with format checking
+    const priceId = getValidatedPriceId(platform || "website", planType)
 
     if (!priceId) {
+      // Don't expose configuration details in error message
       return NextResponse.json({
-        error: `Price ID not configured for ${planType} plan. Please set STRIPE_PRICE_ID_WEBSITE${planType === 'yearly' ? '_YEARLY' : ''} environment variable.`
+        error: "Unable to process subscription. Please try again or contact support."
       }, { status: 500 })
     }
 

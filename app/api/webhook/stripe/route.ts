@@ -212,16 +212,9 @@ export async function POST(request: NextRequest) {
       if (userId) {
         paymentLogger.info("Processing subscription upgrade", { userId })
         try {
-          // First, check if profile exists
           const profileRef = adminDb.collection("profiles").doc(userId)
-          const profileSnap = await profileRef.get()
 
-          if (!profileSnap.exists) {
-            paymentLogger.error("Profile does not exist for subscription upgrade", { userId })
-            // Don't return error - webhook will be retried, and profile might be created later
-          }
-
-          // Fetch subscription details to get dates
+          // Fetch subscription details to get dates (outside transaction for Stripe API call)
           let subscriptionStartDate: string | undefined
           let currentPeriodEnd: string | undefined
 
@@ -247,42 +240,49 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // Use Admin SDK to update profile (bypasses security rules)
-          const updateData: Record<string, unknown> = {
-            subscription_tier: "pro",
-            subscription_platform: session.metadata?.platform || "website",
-            stripe_customer_id: session.customer as string,
-            stripe_subscription_id: session.subscription as string,
-            subscription_status: "active",
-            updated_at: new Date().toISOString(),
-          }
+          // SECURITY FIX: Use Firestore transaction to prevent race conditions
+          // This ensures atomic read-modify-write for profile updates
+          const profile = await adminDb.runTransaction(async (transaction) => {
+            const profileSnap = await transaction.get(profileRef)
 
-          if (subscriptionStartDate) {
-            updateData.subscription_start_date = subscriptionStartDate
-          }
-          if (currentPeriodEnd) {
-            updateData.subscription_current_period_end = currentPeriodEnd
-          }
+            // Prepare update data
+            const updateData: Record<string, unknown> = {
+              subscription_tier: "pro",
+              subscription_platform: session.metadata?.platform || "website",
+              stripe_customer_id: session.customer as string,
+              stripe_subscription_id: session.subscription as string,
+              subscription_status: "active",
+              updated_at: new Date().toISOString(),
+            }
 
-          const profile = profileSnap.data()
-          if (profileSnap.exists) {
-            // Document exists - use update to preserve other fields
-            await profileRef.update(updateData)
-            paymentLogger.info("Updated existing profile for subscription", { userId })
-          } else {
-            // Document doesn't exist - use set with merge
-            const existingData = profileSnap.data() || {}
-            await profileRef.set({
-              id: userId,
-              email: existingData.email || session.customer_email || "",
-              ...updateData,
-              created_at: existingData.created_at || new Date().toISOString(),
-            }, { merge: true })
-            paymentLogger.warn("Profile did not exist - created with subscription data", {
-              userId,
-              email: existingData.email || session.customer_email || "MISSING",
-            })
-          }
+            if (subscriptionStartDate) {
+              updateData.subscription_start_date = subscriptionStartDate
+            }
+            if (currentPeriodEnd) {
+              updateData.subscription_current_period_end = currentPeriodEnd
+            }
+
+            if (profileSnap.exists) {
+              // Document exists - update to preserve other fields
+              transaction.update(profileRef, updateData)
+              paymentLogger.info("Updated existing profile for subscription (transactional)", { userId })
+              return profileSnap.data() as Record<string, unknown> | undefined
+            } else {
+              // Document doesn't exist - create with subscription data
+              const newProfileData = {
+                id: userId,
+                email: session.customer_email || "",
+                ...updateData,
+                created_at: new Date().toISOString(),
+              }
+              transaction.set(profileRef, newProfileData)
+              paymentLogger.warn("Profile did not exist - created with subscription data (transactional)", {
+                userId,
+                email: session.customer_email || "MISSING",
+              })
+              return newProfileData as Record<string, unknown>
+            }
+          })
 
           // Update quota to reflect Pro subscription (35 sessions) - reset usage for new subscription
           await updateQuotaForSubscriptionTierAdmin(userId, "pro", true)
@@ -306,11 +306,11 @@ export async function POST(request: NextRequest) {
           })
 
           // Send subscription confirmation email
-          const userEmail = profile?.email || session.customer_email
+          const userEmail = (profile?.email as string) || session.customer_email
           if (userEmail) {
             try {
               await sendSubscriptionConfirmationEmail(userEmail, {
-                userName: profile?.full_name || "",
+                userName: (profile?.full_name as string) || "",
                 userEmail,
                 planName: "Pro (Monthly)",
                 amount: (session.amount_total || 0) / 100,
