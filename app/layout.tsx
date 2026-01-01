@@ -27,7 +27,7 @@ const siteConfig = {
   tagline: "Ace Your Tech Interview with AI Mock Practice",
   description: "Practice coding interviews with an AI interviewer available 24/7. Talk through problems out loud, get instant feedback, and master DSA patterns. Better than grinding LeetCode alone.",
   url: process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.dev",
-  ogImage: "/og-image.png",
+  // OG images are now dynamically generated via app/opengraph-image.tsx
 }
 
 export const metadata: Metadata = {
@@ -58,11 +58,16 @@ export const metadata: Metadata = {
   creator: siteConfig.name,
   publisher: siteConfig.name,
 
-  // Favicon and icons
+  // Favicon and icons - dynamically generated via app/icon.tsx and app/apple-icon.tsx
+  // Keep SVG as fallback for browsers that support it
   icons: {
-    icon: "/icon-codesparring.svg",
+    icon: [
+      { url: "/icon-codesparring.svg", type: "image/svg+xml" },
+    ],
     shortcut: "/icon-codesparring.svg",
-    apple: "/icon-codesparring.svg",
+    apple: [
+      { url: "/icon-codesparring.svg", type: "image/svg+xml" },
+    ],
   },
 
   // Canonical URL
@@ -72,6 +77,7 @@ export const metadata: Metadata = {
   },
 
   // Open Graph - for social sharing
+  // Images are auto-generated via app/opengraph-image.tsx
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -79,22 +85,14 @@ export const metadata: Metadata = {
     siteName: siteConfig.name,
     title: `${siteConfig.name} - ${siteConfig.tagline}`,
     description: siteConfig.description,
-    images: [
-      {
-        url: siteConfig.ogImage,
-        width: 1200,
-        height: 630,
-        alt: `${siteConfig.name} - AI Mock Interview Platform`,
-      },
-    ],
   },
 
   // Twitter Card
+  // Images are auto-generated via app/twitter-image.tsx
   twitter: {
     card: "summary_large_image",
     title: `${siteConfig.name} - ${siteConfig.tagline}`,
     description: siteConfig.description,
-    images: [siteConfig.ogImage],
     creator: "@codesparring",
   },
 
