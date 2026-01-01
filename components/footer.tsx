@@ -121,8 +121,20 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-gray-800 mt-8 pt-8 text-center">
-          <p className="text-gray-400 text-sm">© 2025 CodeSparring. All rights reserved. Made with care for developers.</p>
+        <div className="border-t border-gray-800 mt-8 pt-8 text-center space-y-2">
+          <p className="text-gray-400 text-sm">© 2025 CodeSparring. All rights reserved.</p>
+          <p className="text-gray-500 text-xs">
+            Built by{" "}
+            <a
+              href="https://linkedin.com/in/nikayel-ali"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-400 hover:text-white transition-colors"
+            >
+              Nikayel Ali Jamal
+            </a>
+            {" "}· Sacramento State CS
+          </p>
         </div>
       </div>
     </footer>

@@ -21,8 +21,17 @@ export function OrganizationJsonLd() {
     foundingDate: "2025",
     founder: {
       "@type": "Person",
-      name: "Nikayel",
-      jobTitle: "Founder",
+      name: "Nikayel Ali Jamal",
+      // alternateName helps Google understand name variations people might search
+      alternateName: ["Nikayel Jamal", "Nikayel Ali", "Nikayeel Jamal"],
+      jobTitle: "Founder & CEO",
+      description: "Computer Science student at Sacramento State building AI-powered interview prep tools",
+      url: "https://linkedin.com/in/nikayel-ali",
+      sameAs: [
+        "https://linkedin.com/in/nikayel-ali",
+        "https://github.com/nikayel",
+        "https://twitter.com/codesparring",
+      ],
     },
     sameAs: [
       "https://twitter.com/codesparring",
@@ -226,8 +235,9 @@ export function ArticleJsonLd({
     dateModified: dateModified || datePublished,
     author: {
       "@type": "Person",
-      name: author || "Nikayel",
-      url: SITE_URL,
+      name: author || "Nikayel Ali Jamal",
+      url: "https://linkedin.com/in/nikayel-ali",
+      sameAs: ["https://linkedin.com/in/nikayel-ali", "https://github.com/nikayel"],
     },
     publisher: {
       "@type": "Organization",
