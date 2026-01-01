@@ -345,52 +345,56 @@ export async function updateProblemMastery(
     .collection('problems')
     .doc(problemId);
 
-  const doc = await masteryRef.get();
+  // Use a transaction to prevent race conditions when multiple tabs
+  // complete the same session simultaneously
+  return await adminDb.runTransaction(async (transaction) => {
+    const doc = await transaction.get(masteryRef);
 
-  if (!doc.exists) {
-    throw new Error(`Problem mastery not found: ${problemId}`);
-  }
+    if (!doc.exists) {
+      throw new Error(`Problem mastery not found: ${problemId}`);
+    }
 
-  const current = doc.data() as ProblemMastery;
-  const now = new Date().toISOString();
+    const current = doc.data() as ProblemMastery;
+    const now = new Date().toISOString();
 
-  // Update scores history (keep last 10)
-  const newScoresHistory = [...current.scores_history, update.performance_score].slice(-10);
+    // Update scores history (keep last 10)
+    const newScoresHistory = [...current.scores_history, update.performance_score].slice(-10);
 
-  // Calculate new average
-  const newAverage =
-    newScoresHistory.reduce((a, b) => a + b, 0) / newScoresHistory.length;
+    // Calculate new average
+    const newAverage =
+      newScoresHistory.reduce((a, b) => a + b, 0) / newScoresHistory.length;
 
-  // Calculate new best
-  const newBest = Math.max(current.best_score, update.performance_score);
+    // Calculate new best
+    const newBest = Math.max(current.best_score, update.performance_score);
 
-  // Always correct difficulty to canonical value (fixes any previously incorrect data)
-  // Pass title as fallback for old data that has wrong scenario_id
-  const canonicalDifficulty = getCanonicalDifficulty(current.scenario_id, current.difficulty, current.title);
+    // Always correct difficulty to canonical value (fixes any previously incorrect data)
+    // Pass title as fallback for old data that has wrong scenario_id
+    const canonicalDifficulty = getCanonicalDifficulty(current.scenario_id, current.difficulty, current.title);
 
-  // Also fix scenario_id if it doesn't match a known scenario
-  const correctScenarioId = getScenarioIdByTitle(current.title) || current.scenario_id;
+    // Also fix scenario_id if it doesn't match a known scenario
+    const correctScenarioId = getScenarioIdByTitle(current.title) || current.scenario_id;
 
-  const updateData: Partial<ProblemMastery> = {
-    ...update,
-    scenario_id: correctScenarioId, // Fix old data with wrong scenario_id
-    difficulty: canonicalDifficulty,
-    last_score: update.performance_score,
-    average_score: Math.round(newAverage),
-    best_score: newBest,
-    scores_history: newScoresHistory,
-    last_reviewed_at: now,
-    time_spent_minutes:
-      current.time_spent_minutes + (update.time_spent_minutes || 0),
-    hints_used_total: current.hints_used_total + (update.hints_used || 0),
-  };
+    const updateData: Partial<ProblemMastery> = {
+      ...update,
+      scenario_id: correctScenarioId, // Fix old data with wrong scenario_id
+      difficulty: canonicalDifficulty,
+      last_score: update.performance_score,
+      average_score: Math.round(newAverage),
+      best_score: newBest,
+      scores_history: newScoresHistory,
+      last_reviewed_at: now,
+      time_spent_minutes:
+        current.time_spent_minutes + (update.time_spent_minutes || 0),
+      hints_used_total: current.hints_used_total + (update.hints_used || 0),
+    };
 
-  await masteryRef.update(updateData);
+    transaction.update(masteryRef, updateData);
 
-  return {
-    ...current,
-    ...updateData,
-  } as ProblemMastery;
+    return {
+      ...current,
+      ...updateData,
+    } as ProblemMastery;
+  });
 }
 
 /**
