@@ -521,6 +521,203 @@ You must write an algorithm that runs in O(n) time.`,
       },
     ],
   },
+  {
+    id: 'dsa-valid-anagram',
+    title: 'Valid Anagram',
+    type: 'dsa',
+    pattern: 'arrays-hashing',
+    difficulty: 'easy',
+    companies: ['Amazon', 'Google', 'Meta', 'Microsoft'],
+    description: 'Determine if two strings are anagrams of each other',
+    tags: ['string', 'hash-table', 'sorting'],
+    estimatedTime: 15,
+    problemStatement: `Given two strings s and t, return true if t is an anagram of s, and false otherwise.
+
+An Anagram is a word or phrase formed by rearranging the letters of a different word or phrase, typically using all the original letters exactly once.`,
+    examples: [
+      { input: 's = "anagram", t = "nagaram"', output: 'true' },
+      { input: 's = "rat", t = "car"', output: 'false' },
+    ],
+    constraints: [
+      '1 <= s.length, t.length <= 5 * 10^4',
+      's and t consist of lowercase English letters',
+    ],
+    hints: [
+      'Count character frequencies in both strings',
+      'Compare the frequency maps',
+      'Alternative: Sort both strings and compare',
+    ],
+    starterCode: {
+      javascript: `function isAnagram(s, t) {\n  // Write your solution here\n\n}`,
+      typescript: `function isAnagram(s: string, t: string): boolean {\n  // Write your solution here\n\n}`,
+      python: `def isAnagram(s, t):\n    # Write your solution here\n    pass`,
+    },
+    optimalComplexity: { time: 'O(n)', space: 'O(1)' },
+    testCases: [
+      { input: { s: "anagram", t: "nagaram" }, expected: true, description: 'Valid anagram' },
+      { input: { s: "rat", t: "car" }, expected: false, description: 'Not anagram' },
+      { input: { s: "a", t: "a" }, expected: true, description: 'Single char' },
+      { input: { s: "ab", t: "a" }, expected: false, description: 'Different lengths' },
+    ],
+  },
+  {
+    id: 'dsa-top-k-frequent-elements',
+    title: 'Top K Frequent Elements',
+    type: 'dsa',
+    pattern: 'arrays-hashing',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Meta', 'Google', 'Apple'],
+    description: 'Find k most frequent elements in an array',
+    tags: ['array', 'hash-table', 'heap', 'bucket-sort'],
+    estimatedTime: 25,
+    problemStatement: `Given an integer array nums and an integer k, return the k most frequent elements. You may return the answer in any order.`,
+    examples: [
+      { input: 'nums = [1,1,1,2,2,3], k = 2', output: '[1,2]' },
+      { input: 'nums = [1], k = 1', output: '[1]' },
+    ],
+    constraints: [
+      '1 <= nums.length <= 10^5',
+      '-10^4 <= nums[i] <= 10^4',
+      'k is in the range [1, the number of unique elements]',
+      'The answer is guaranteed to be unique',
+    ],
+    hints: [
+      'Count frequencies with a HashMap',
+      'Use bucket sort: index = frequency, value = list of nums',
+      'Alternative: min-heap of size k for O(n log k)',
+    ],
+    starterCode: {
+      javascript: `function topKFrequent(nums, k) {\n  // Write your solution here\n\n}`,
+      typescript: `function topKFrequent(nums: number[], k: number): number[] {\n  // Write your solution here\n\n}`,
+      python: `def topKFrequent(nums, k):\n    # Write your solution here\n    pass`,
+    },
+    optimalComplexity: { time: 'O(n)', space: 'O(n)' },
+    testCases: [
+      { input: { nums: [1,1,1,2,2,3], k: 2 }, expected: [1,2], description: 'Top 2 frequent' },
+      { input: { nums: [1], k: 1 }, expected: [1], description: 'Single element' },
+      { input: { nums: [1,2], k: 2 }, expected: [1,2], description: 'All unique, same frequency' },
+    ],
+  },
+  {
+    id: 'dsa-encode-decode-strings',
+    title: 'Encode and Decode Strings',
+    type: 'dsa',
+    pattern: 'arrays-hashing',
+    difficulty: 'medium',
+    companies: ['Google', 'Meta', 'Amazon', 'Apple'],
+    description: 'Design an algorithm to encode and decode a list of strings',
+    tags: ['string', 'design', 'array'],
+    estimatedTime: 25,
+    problemStatement: `Design an algorithm to encode a list of strings to a single string. The encoded string is then decoded back to the original list of strings.
+
+Implement encode and decode functions.`,
+    examples: [
+      { input: 'strs = ["lint","code","love","you"]', output: '["lint","code","love","you"]', explanation: 'Encode to a single string, then decode back to original list' },
+      { input: 'strs = ["we","say",":","yes"]', output: '["we","say",":","yes"]' },
+    ],
+    constraints: [
+      '0 <= strs.length <= 200',
+      '0 <= strs[i].length <= 200',
+      'strs[i] contains any possible characters out of 256 valid ASCII characters',
+    ],
+    hints: [
+      'Use length prefix: store length + delimiter + string',
+      'Example: "4#lint5#code" encodes ["lint", "code"]',
+      'The delimiter must not conflict with the length number',
+    ],
+    starterCode: {
+      javascript: `function encode(strs) {\n  // Encode list of strings to single string\n\n}\n\nfunction decode(s) {\n  // Decode single string back to list of strings\n\n}`,
+      typescript: `function encode(strs: string[]): string {\n  // Encode list of strings to single string\n\n}\n\nfunction decode(s: string): string[] {\n  // Decode single string back to list of strings\n\n}`,
+      python: `def encode(strs):\n    # Encode list of strings to single string\n    pass\n\ndef decode(s):\n    # Decode single string back to list of strings\n    pass`,
+    },
+    optimalComplexity: { time: 'O(n)', space: 'O(1)' },
+    testCases: [
+      { input: { strs: ["lint","code","love","you"] }, expected: ["lint","code","love","you"], description: 'Standard case' },
+      { input: { strs: ["we","say",":","yes"] }, expected: ["we","say",":","yes"], description: 'With special chars' },
+      { input: { strs: [""] }, expected: [""], description: 'Empty string in list' },
+      { input: { strs: [] }, expected: [], description: 'Empty list' },
+    ],
+  },
+  {
+    id: 'dsa-subarray-sum-equals-k',
+    title: 'Subarray Sum Equals K',
+    type: 'dsa',
+    pattern: 'arrays-hashing',
+    difficulty: 'medium',
+    companies: ['Meta', 'Google', 'Amazon', 'Microsoft'],
+    description: 'Count subarrays with sum equal to k using prefix sum',
+    tags: ['array', 'hash-table', 'prefix-sum'],
+    estimatedTime: 25,
+    problemStatement: `Given an array of integers nums and an integer k, return the total number of subarrays whose sum equals to k.
+
+A subarray is a contiguous non-empty sequence of elements within an array.`,
+    examples: [
+      { input: 'nums = [1,1,1], k = 2', output: '2', explanation: 'Subarrays [1,1] at index 0-1 and 1-2' },
+      { input: 'nums = [1,2,3], k = 3', output: '2', explanation: 'Subarrays [1,2] and [3]' },
+    ],
+    constraints: [
+      '1 <= nums.length <= 2 * 10^4',
+      '-1000 <= nums[i] <= 1000',
+      '-10^7 <= k <= 10^7',
+    ],
+    hints: [
+      'Use prefix sum: if prefixSum[j] - prefixSum[i] = k, subarray (i,j] sums to k',
+      'Store prefix sums in HashMap with their counts',
+      'For each position, check if (currentSum - k) exists in map',
+    ],
+    starterCode: {
+      javascript: `function subarraySum(nums, k) {\n  // Write your solution here\n\n}`,
+      typescript: `function subarraySum(nums: number[], k: number): number {\n  // Write your solution here\n\n}`,
+      python: `def subarraySum(nums, k):\n    # Write your solution here\n    pass`,
+    },
+    optimalComplexity: { time: 'O(n)', space: 'O(n)' },
+    testCases: [
+      { input: { nums: [1,1,1], k: 2 }, expected: 2, description: 'Multiple subarrays' },
+      { input: { nums: [1,2,3], k: 3 }, expected: 2, description: 'Non-overlapping subarrays' },
+      { input: { nums: [1,-1,0], k: 0 }, expected: 3, description: 'With negatives and zero' },
+    ],
+  },
+  {
+    id: 'dsa-find-all-duplicates',
+    title: 'Find All Duplicates in an Array',
+    type: 'dsa',
+    pattern: 'arrays-hashing',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Google', 'Meta'],
+    description: 'Find all duplicates in O(n) time and O(1) extra space',
+    tags: ['array', 'hash-table'],
+    estimatedTime: 20,
+    problemStatement: `Given an integer array nums of length n where all the integers of nums are in the range [1, n] and each integer appears once or twice, return an array of all the integers that appear twice.
+
+You must write an algorithm that runs in O(n) time and uses only constant extra space.`,
+    examples: [
+      { input: 'nums = [4,3,2,7,8,2,3,1]', output: '[2,3]' },
+      { input: 'nums = [1,1,2]', output: '[1]' },
+      { input: 'nums = [1]', output: '[]' },
+    ],
+    constraints: [
+      'n == nums.length',
+      '1 <= n <= 10^5',
+      '1 <= nums[i] <= n',
+      'Each element in nums appears once or twice',
+    ],
+    hints: [
+      'Use the array itself as a hash table',
+      'For each num, mark nums[abs(num)-1] as negative',
+      'If already negative, it is a duplicate',
+    ],
+    starterCode: {
+      javascript: `function findDuplicates(nums) {\n  // Write your solution here\n\n}`,
+      typescript: `function findDuplicates(nums: number[]): number[] {\n  // Write your solution here\n\n}`,
+      python: `def findDuplicates(nums):\n    # Write your solution here\n    pass`,
+    },
+    optimalComplexity: { time: 'O(n)', space: 'O(1)' },
+    testCases: [
+      { input: { nums: [4,3,2,7,8,2,3,1] }, expected: [2,3], description: 'Multiple duplicates' },
+      { input: { nums: [1,1,2] }, expected: [1], description: 'Single duplicate' },
+      { input: { nums: [1] }, expected: [], description: 'No duplicates' },
+    ],
+  },
 ]
 
 // Re-export for convenience

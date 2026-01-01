@@ -708,6 +708,171 @@ Return a list of integers representing the size of these parts.`,
       { input: { s: "eccbbbbdec" }, expected: [10], description: 'Single partition' },
     ],
   },
+  {
+    id: 'dsa-two-sum-ii-sorted',
+    title: 'Two Sum II - Input Array Is Sorted',
+    type: 'dsa',
+    pattern: 'two-pointers',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Google', 'Meta', 'Microsoft'],
+    description: 'Find two numbers in sorted array that add up to target',
+    tags: ['array', 'two-pointers', 'binary-search'],
+    estimatedTime: 15,
+    problemStatement: `Given a 1-indexed array of integers numbers that is already sorted in non-decreasing order, find two numbers such that they add up to a specific target number. Let these two numbers be numbers[index1] and numbers[index2] where 1 <= index1 < index2 <= numbers.length.
+
+Return the indices of the two numbers, index1 and index2, added by one as an integer array [index1, index2] of length 2.
+
+The tests are generated such that there is exactly one solution. You may not use the same element twice.
+
+Your solution must use only constant extra space.`,
+    examples: [
+      { input: 'numbers = [2,7,11,15], target = 9', output: '[1,2]', explanation: 'The sum of 2 and 7 is 9. Therefore, index1 = 1, index2 = 2.' },
+      { input: 'numbers = [2,3,4], target = 6', output: '[1,3]' },
+      { input: 'numbers = [-1,0], target = -1', output: '[1,2]' },
+    ],
+    constraints: [
+      '2 <= numbers.length <= 3 * 10^4',
+      '-1000 <= numbers[i] <= 1000',
+      'numbers is sorted in non-decreasing order',
+      '-1000 <= target <= 1000',
+      'The tests are generated such that there is exactly one solution',
+    ],
+    hints: [
+      'Use two pointers: one at start, one at end',
+      'If sum > target, move right pointer left',
+      'If sum < target, move left pointer right',
+    ],
+    starterCode: {
+      javascript: `function twoSum(numbers, target) {\n  // Write your solution here\n\n}`,
+      typescript: `function twoSum(numbers: number[], target: number): number[] {\n  // Write your solution here\n\n}`,
+      python: `def twoSum(numbers, target):\n    # Write your solution here\n    pass`,
+    },
+    optimalComplexity: { time: 'O(n)', space: 'O(1)' },
+    testCases: [
+      { input: { numbers: [2,7,11,15], target: 9 }, expected: [1,2], description: 'Basic case' },
+      { input: { numbers: [2,3,4], target: 6 }, expected: [1,3], description: 'Sum at ends' },
+      { input: { numbers: [-1,0], target: -1 }, expected: [1,2], description: 'Negative numbers' },
+    ],
+  },
+  {
+    id: 'dsa-4sum',
+    title: '4Sum',
+    type: 'dsa',
+    pattern: 'two-pointers',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Meta', 'Google', 'Apple'],
+    description: 'Find all unique quadruplets that sum to target',
+    tags: ['array', 'two-pointers', 'sorting'],
+    estimatedTime: 35,
+    problemStatement: `Given an array nums of n integers, return an array of all the unique quadruplets [nums[a], nums[b], nums[c], nums[d]] such that:
+
+- 0 <= a, b, c, d < n
+- a, b, c, d are distinct
+- nums[a] + nums[b] + nums[c] + nums[d] == target
+
+You may return the answer in any order.`,
+    examples: [
+      { input: 'nums = [1,0,-1,0,-2,2], target = 0', output: '[[-2,-1,1,2],[-2,0,0,2],[-1,0,0,1]]' },
+      { input: 'nums = [2,2,2,2,2], target = 8', output: '[[2,2,2,2]]' },
+    ],
+    constraints: [
+      '1 <= nums.length <= 200',
+      '-10^9 <= nums[i] <= 10^9',
+      '-10^9 <= target <= 10^9',
+    ],
+    hints: [
+      'Sort the array first',
+      'Use two nested loops for first two numbers',
+      'Use two-pointer technique for remaining two numbers',
+      'Skip duplicates at each level to avoid duplicate quadruplets',
+    ],
+    starterCode: {
+      javascript: `function fourSum(nums, target) {\n  // Write your solution here\n\n}`,
+      typescript: `function fourSum(nums: number[], target: number): number[][] {\n  // Write your solution here\n\n}`,
+      python: `def fourSum(nums, target):\n    # Write your solution here\n    pass`,
+    },
+    optimalComplexity: { time: 'O(n³)', space: 'O(1)' },
+    testCases: [
+      { input: { nums: [1,0,-1,0,-2,2], target: 0 }, expected: [[-2,-1,1,2],[-2,0,0,2],[-1,0,0,1]], description: 'Multiple quadruplets' },
+      { input: { nums: [2,2,2,2,2], target: 8 }, expected: [[2,2,2,2]], description: 'All same elements' },
+    ],
+  },
+  {
+    id: 'dsa-squares-sorted-array',
+    title: 'Squares of a Sorted Array',
+    type: 'dsa',
+    pattern: 'two-pointers',
+    difficulty: 'easy',
+    companies: ['Amazon', 'Meta', 'Google', 'Microsoft'],
+    description: 'Return squares of sorted array in sorted order',
+    tags: ['array', 'two-pointers', 'sorting'],
+    estimatedTime: 15,
+    problemStatement: `Given an integer array nums sorted in non-decreasing order, return an array of the squares of each number sorted in non-decreasing order.`,
+    examples: [
+      { input: 'nums = [-4,-1,0,3,10]', output: '[0,1,9,16,100]', explanation: 'After squaring: [16,1,0,9,100]. After sorting: [0,1,9,16,100].' },
+      { input: 'nums = [-7,-3,2,3,11]', output: '[4,9,9,49,121]' },
+    ],
+    constraints: [
+      '1 <= nums.length <= 10^4',
+      '-10^4 <= nums[i] <= 10^4',
+      'nums is sorted in non-decreasing order',
+    ],
+    hints: [
+      'Negative numbers become positive when squared',
+      'Use two pointers at both ends',
+      'Compare absolute values and fill result from the end',
+    ],
+    starterCode: {
+      javascript: `function sortedSquares(nums) {\n  // Write your solution here\n\n}`,
+      typescript: `function sortedSquares(nums: number[]): number[] {\n  // Write your solution here\n\n}`,
+      python: `def sortedSquares(nums):\n    # Write your solution here\n    pass`,
+    },
+    optimalComplexity: { time: 'O(n)', space: 'O(n)' },
+    testCases: [
+      { input: { nums: [-4,-1,0,3,10] }, expected: [0,1,9,16,100], description: 'Mixed positive and negative' },
+      { input: { nums: [-7,-3,2,3,11] }, expected: [4,9,9,49,121], description: 'More negatives' },
+      { input: { nums: [1,2,3,4,5] }, expected: [1,4,9,16,25], description: 'All positive' },
+    ],
+  },
+  {
+    id: 'dsa-boats-save-people',
+    title: 'Boats to Save People',
+    type: 'dsa',
+    pattern: 'two-pointers',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Google', 'Meta'],
+    description: 'Find minimum boats to carry all people with weight limit',
+    tags: ['array', 'two-pointers', 'greedy', 'sorting'],
+    estimatedTime: 20,
+    problemStatement: `You are given an array people where people[i] is the weight of the ith person, and an infinite number of boats where each boat can carry a maximum weight of limit. Each boat carries at most two people at the same time, provided the sum of the weight of those people is at most limit.
+
+Return the minimum number of boats to carry every given person.`,
+    examples: [
+      { input: 'people = [1,2], limit = 3', output: '1', explanation: '1 boat (1, 2)' },
+      { input: 'people = [3,2,2,1], limit = 3', output: '3', explanation: '3 boats: (1, 2), (2), (3)' },
+      { input: 'people = [3,5,3,4], limit = 5', output: '4' },
+    ],
+    constraints: [
+      '1 <= people.length <= 5 * 10^4',
+      '1 <= people[i] <= limit <= 3 * 10^4',
+    ],
+    hints: [
+      'Sort people by weight',
+      'Use two pointers: lightest and heaviest person',
+      'If both can fit, pair them; otherwise heaviest goes alone',
+    ],
+    starterCode: {
+      javascript: `function numRescueBoats(people, limit) {\n  // Write your solution here\n\n}`,
+      typescript: `function numRescueBoats(people: number[], limit: number): number {\n  // Write your solution here\n\n}`,
+      python: `def numRescueBoats(people, limit):\n    # Write your solution here\n    pass`,
+    },
+    optimalComplexity: { time: 'O(n log n)', space: 'O(1)' },
+    testCases: [
+      { input: { people: [1,2], limit: 3 }, expected: 1, description: 'Both fit in one boat' },
+      { input: { people: [3,2,2,1], limit: 3 }, expected: 3, description: 'Some pairing possible' },
+      { input: { people: [3,5,3,4], limit: 5 }, expected: 4, description: 'No pairing possible' },
+    ],
+  },
 ]
 
 export default twoPointersScenarios

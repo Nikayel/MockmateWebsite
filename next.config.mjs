@@ -52,6 +52,11 @@ const nextConfig = {
             value: 'strict-origin-when-cross-origin'
           },
           {
+            // Allow Firebase OAuth popups to communicate with opener
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin-allow-popups'
+          },
+          {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(self), geolocation=()'
           },
