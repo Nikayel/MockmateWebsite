@@ -7,7 +7,7 @@ import { ErrorBoundaryProvider } from "@/components/providers/error-boundary-pro
 import { CookieConsent } from "@/components/CookieConsent"
 import { ConsentAnalytics } from "@/components/ConsentAnalytics"
 import { PerformancePolyfill } from "@/components/performance-polyfill"
-import { OrganizationJsonLd, SoftwareApplicationJsonLd, WebSiteJsonLd } from "@/components/seo/JsonLd"
+import { OrganizationJsonLd, SoftwareApplicationJsonLd, WebSiteJsonLd, FounderPersonJsonLd } from "@/components/seo/JsonLd"
 import "./globals.css"
 
 const workSans = Work_Sans({
@@ -38,23 +38,38 @@ export const metadata: Metadata = {
   },
   description: siteConfig.description,
   keywords: [
+    // Primary keywords
     "coding interview prep",
     "mock interview",
     "AI interviewer",
     "DSA practice",
     "LeetCode alternative",
+    // Long-tail keywords
     "tech interview preparation",
     "software engineering interview",
     "FAANG interview prep",
+    "Google interview prep",
+    "Amazon interview questions",
+    "Meta coding interview",
+    // Algorithm keywords
     "algorithm practice",
     "data structures practice",
     "coding interview questions",
-    "behavioral interview prep",
-    "system design interview",
+    "two pointers leetcode",
+    "dynamic programming practice",
+    "binary search problems",
+    // Feature keywords
     "voice mock interview",
     "AI coding tutor",
+    "spaced repetition coding",
+    "interview practice app",
+    // Related searches
+    "how to pass coding interview",
+    "coding interview tips",
+    "technical interview practice",
+    "software engineer interview questions",
   ],
-  authors: [{ name: siteConfig.name }],
+  authors: [{ name: "Nikayel Ali Jamal" }],
   creator: siteConfig.name,
   publisher: siteConfig.name,
 
@@ -130,6 +145,7 @@ export default function RootLayout({
         <WebSiteJsonLd />
         <OrganizationJsonLd />
         <SoftwareApplicationJsonLd />
+        <FounderPersonJsonLd />
         <style>{`
 html {
   font-family: ${openSans.style.fontFamily};

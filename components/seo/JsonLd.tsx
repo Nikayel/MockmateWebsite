@@ -324,6 +324,72 @@ export function BreadcrumbJsonLd({
   )
 }
 
+// Person Schema - for founder name SEO (helps your name show up in searches)
+// This is a standalone Person schema separate from Organization.founder
+export function FounderPersonJsonLd() {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "@id": "https://linkedin.com/in/nikayel-ali#person",
+    name: "Nikayel Ali Jamal",
+    // Multiple alternate names for different search variations
+    alternateName: [
+      "Nikayel Jamal",
+      "Nikayel Ali",
+      "Nikayeel Jamal",
+      "Nikayeel Ali",
+      "Nikayel",
+    ],
+    givenName: "Nikayel",
+    familyName: "Jamal",
+    additionalName: "Ali",
+    jobTitle: "Founder & Software Engineer",
+    description: "Computer Science student at Sacramento State University. Founder of CodeSparring, an AI-powered coding interview preparation platform. Passionate about helping developers ace technical interviews through spaced repetition and AI mock interviews.",
+    url: "https://linkedin.com/in/nikayel-ali",
+    image: `${SITE_URL}/api/logo.png`,
+    // Educational background
+    alumniOf: {
+      "@type": "CollegeOrUniversity",
+      name: "Sacramento State University",
+      alternateName: ["Sac State", "CSUS", "California State University Sacramento"],
+    },
+    // Professional affiliations
+    worksFor: {
+      "@type": "Organization",
+      name: "CodeSparring",
+      url: SITE_URL,
+    },
+    // Knowledge areas (helps with topical authority)
+    knowsAbout: [
+      "Software Engineering",
+      "Data Structures and Algorithms",
+      "Coding Interviews",
+      "Technical Interview Preparation",
+      "AI/Machine Learning",
+      "Spaced Repetition Learning",
+      "EdTech",
+      "Web Development",
+      "React",
+      "Next.js",
+      "TypeScript",
+    ],
+    // Social profiles
+    sameAs: [
+      "https://linkedin.com/in/nikayel-ali",
+      "https://github.com/nikayel",
+      "https://twitter.com/codesparring",
+      SITE_URL,
+    ],
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}
+
 // Course Schema - for educational content (DSA patterns, interview prep)
 export function CourseJsonLd({
   name,
