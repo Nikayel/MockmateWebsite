@@ -3,6 +3,40 @@
 // Use consistent URL - codesparring.dev is the canonical domain
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.dev"
 
+// WebSite Schema - enables sitelinks search box in Google SERPs
+// This is a powerful SEO feature that shows a search box directly in search results
+export function WebSiteJsonLd() {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "CodeSparring",
+    alternateName: ["Code Sparring", "CodeSparring.dev"],
+    url: SITE_URL,
+    description: "AI-powered coding interview practice platform",
+    // potentialAction enables the sitelinks search box
+    potentialAction: {
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: `${SITE_URL}/blog?q={search_term_string}`,
+      },
+      "query-input": "required name=search_term_string",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "CodeSparring",
+      url: SITE_URL,
+    },
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}
+
 // Organization Schema - for brand recognition in search
 export function OrganizationJsonLd() {
   const schema = {
@@ -21,8 +55,17 @@ export function OrganizationJsonLd() {
     foundingDate: "2025",
     founder: {
       "@type": "Person",
-      name: "Nikayel",
-      jobTitle: "Founder",
+      name: "Nikayel Ali Jamal",
+      // alternateName helps Google understand name variations people might search
+      alternateName: ["Nikayel Jamal", "Nikayel Ali", "Nikayeel Jamal"],
+      jobTitle: "Founder & CEO",
+      description: "Computer Science student at Sacramento State building AI-powered interview prep tools",
+      url: "https://linkedin.com/in/nikayel-ali",
+      sameAs: [
+        "https://linkedin.com/in/nikayel-ali",
+        "https://github.com/nikayel",
+        "https://twitter.com/codesparring",
+      ],
     },
     sameAs: [
       "https://twitter.com/codesparring",
@@ -226,8 +269,9 @@ export function ArticleJsonLd({
     dateModified: dateModified || datePublished,
     author: {
       "@type": "Person",
-      name: author || "Nikayel",
-      url: SITE_URL,
+      name: author || "Nikayel Ali Jamal",
+      url: "https://linkedin.com/in/nikayel-ali",
+      sameAs: ["https://linkedin.com/in/nikayel-ali", "https://github.com/nikayel"],
     },
     publisher: {
       "@type": "Organization",
@@ -270,6 +314,72 @@ export function BreadcrumbJsonLd({
       name: item.name,
       item: `${SITE_URL}${item.url}`,
     })),
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}
+
+// Person Schema - for founder name SEO (helps your name show up in searches)
+// This is a standalone Person schema separate from Organization.founder
+export function FounderPersonJsonLd() {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "@id": "https://linkedin.com/in/nikayel-ali#person",
+    name: "Nikayel Ali Jamal",
+    // Multiple alternate names for different search variations
+    alternateName: [
+      "Nikayel Jamal",
+      "Nikayel Ali",
+      "Nikayeel Jamal",
+      "Nikayeel Ali",
+      "Nikayel",
+    ],
+    givenName: "Nikayel",
+    familyName: "Jamal",
+    additionalName: "Ali",
+    jobTitle: "Founder & Software Engineer",
+    description: "Computer Science student at Sacramento State University. Founder of CodeSparring, an AI-powered coding interview preparation platform. Passionate about helping developers ace technical interviews through spaced repetition and AI mock interviews.",
+    url: "https://linkedin.com/in/nikayel-ali",
+    image: `${SITE_URL}/api/logo.png`,
+    // Educational background
+    alumniOf: {
+      "@type": "CollegeOrUniversity",
+      name: "Sacramento State University",
+      alternateName: ["Sac State", "CSUS", "California State University Sacramento"],
+    },
+    // Professional affiliations
+    worksFor: {
+      "@type": "Organization",
+      name: "CodeSparring",
+      url: SITE_URL,
+    },
+    // Knowledge areas (helps with topical authority)
+    knowsAbout: [
+      "Software Engineering",
+      "Data Structures and Algorithms",
+      "Coding Interviews",
+      "Technical Interview Preparation",
+      "AI/Machine Learning",
+      "Spaced Repetition Learning",
+      "EdTech",
+      "Web Development",
+      "React",
+      "Next.js",
+      "TypeScript",
+    ],
+    // Social profiles
+    sameAs: [
+      "https://linkedin.com/in/nikayel-ali",
+      "https://github.com/nikayel",
+      "https://twitter.com/codesparring",
+      SITE_URL,
+    ],
   }
 
   return (
