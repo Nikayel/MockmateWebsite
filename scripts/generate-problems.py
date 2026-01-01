@@ -189,7 +189,7 @@ PROBLEM_TEMPLATES = {
             "complexity": {"time": "O(n)", "space": "O(n)"}
         },
         {
-            "id": "dsa-lowest-common-ancestor",
+            "id": "dsa-lowest-common-ancestor-binary-tree",
             "title": "Lowest Common Ancestor of Binary Tree",
             "difficulty": "medium",
             "companies": ["Amazon", "Google", "Meta", "Microsoft"],

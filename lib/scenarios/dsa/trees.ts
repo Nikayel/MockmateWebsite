@@ -144,7 +144,7 @@ export const treesScenarios: DSAScenario[] = [
   },
 
   {
-    id: 'dsa-lowest-common-ancestor',
+    id: 'dsa-lowest-common-ancestor-binary-tree',
     title: 'Lowest Common Ancestor of a Binary Tree',
     type: 'dsa',
     pattern: 'trees',

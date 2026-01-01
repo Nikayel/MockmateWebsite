@@ -88,7 +88,7 @@ A valid BST is defined as follows:
     ],
   },
   {
-    id: 'dsa-lowest-common-ancestor',
+    id: 'dsa-lowest-common-ancestor-bst',
     title: 'Lowest Common Ancestor of BST',
     type: 'dsa',
     pattern: 'binary-search-tree',
