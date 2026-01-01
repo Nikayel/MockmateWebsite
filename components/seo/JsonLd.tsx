@@ -10,7 +10,13 @@ export function OrganizationJsonLd() {
     "@type": "Organization",
     name: "CodeSparring",
     url: SITE_URL,
-    logo: `${SITE_URL}/icon-codesparring.svg`,
+    // Use PNG for better Google search result display (dynamically generated at /api/logo.png)
+    logo: {
+      "@type": "ImageObject",
+      url: `${SITE_URL}/api/logo.png`,
+      width: 512,
+      height: 512,
+    },
     description: "AI-powered coding interview practice platform with voice-enabled mock interviews and spaced repetition learning.",
     foundingDate: "2025",
     founder: {
@@ -72,13 +78,16 @@ export function SoftwareApplicationJsonLd() {
         description: "35 scenarios/month, save 25% with annual billing",
       },
     ],
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: "4.8",
-      ratingCount: "127",
-      bestRating: "5",
-      worstRating: "1",
-    },
+    // NOTE: aggregateRating removed - only add back when you have real user reviews
+    // Google may penalize fake/manufactured ratings. Once you have real reviews,
+    // uncomment and connect to your actual review data:
+    // aggregateRating: {
+    //   "@type": "AggregateRating",
+    //   ratingValue: "4.8",
+    //   ratingCount: "127",
+    //   bestRating: "5",
+    //   worstRating: "1",
+    // },
     featureList: [
       "AI-powered mock interviews",
       "Voice-enabled practice",
@@ -225,10 +234,13 @@ export function ArticleJsonLd({
       name: "CodeSparring",
       logo: {
         "@type": "ImageObject",
-        url: `${SITE_URL}/icon-codesparring.svg`,
+        url: `${SITE_URL}/api/logo.png`,
+        width: 512,
+        height: 512,
       },
     },
-    image: image ? `${SITE_URL}${image}` : `${SITE_URL}/og-image.png`,
+    // Use dynamically generated OG image (Next.js serves opengraph-image.tsx at /opengraph-image)
+    image: image ? `${SITE_URL}${image}` : `${SITE_URL}/opengraph-image`,
     mainEntityOfPage: {
       "@type": "WebPage",
       "@id": `${SITE_URL}${url}`,
