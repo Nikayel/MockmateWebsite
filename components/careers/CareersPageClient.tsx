@@ -157,7 +157,7 @@ export function CareersPageClient({ roles }: CareersPageClientProps) {
             </div>
 
             <p className="mt-8 text-sm text-muted-foreground/60">
-              <span className="font-medium text-muted-foreground/80">Nikayel Ali Jamal</span> · Sacramento State senior · Building this because I needed it myself
+              Sacramento State senior · Building this because I needed it myself
             </p>
           </motion.div>
         </div>
