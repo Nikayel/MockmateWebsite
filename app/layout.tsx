@@ -125,9 +125,8 @@ export const metadata: Metadata = {
   },
 
   // Search Engine Verification
-  // TODO: Add your verification codes from Google Search Console and Bing Webmaster Tools
   verification: {
-    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
     // yandex: "your-yandex-verification-code",
     // bing: "your-bing-verification-code",
   },
