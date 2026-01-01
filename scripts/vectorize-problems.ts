@@ -1,9 +1,9 @@
-#!/usr/bin/env npx ts-node
+#!/usr/bin/env npx tsx
 /**
  * Vectorize Problems Script
  *
  * Run this script to vectorize all DSA problems, company questions, and pattern knowledge:
- *   npx ts-node scripts/vectorize-problems.ts
+ *   npx tsx scripts/vectorize-problems.ts
  *
  * Prerequisites:
  *   - PINECONE_API_KEY in .env.local or environment (if using Pinecone)
@@ -24,24 +24,63 @@ try {
     console.log('Note: dotenv not found, using existing environment variables')
 }
 
-// Check required environment variables
-if (!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) {
-    console.error('❌ NEXT_PUBLIC_FIREBASE_PROJECT_ID is required')
-    console.error('   Please set it in your .env.local file')
-    process.exit(1)
+// Initialize Firebase Admin directly (before any imports that use it)
+import admin from 'firebase-admin'
+
+// Initialize Firebase Admin
+if (!admin.apps.length) {
+    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
+    let projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+
+    if (serviceAccount) {
+        try {
+            const serviceAccountJson = JSON.parse(serviceAccount)
+            // Extract project ID from service account if not set
+            if (!projectId && serviceAccountJson.project_id) {
+                projectId = serviceAccountJson.project_id
+            }
+
+            if (!projectId) {
+                console.error('❌ Project ID is required. Set NEXT_PUBLIC_FIREBASE_PROJECT_ID or include project_id in service account')
+                process.exit(1)
+            }
+
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccountJson),
+                projectId: projectId,
+            })
+            console.log('✅ Firebase Admin initialized with service account')
+        } catch (parseError) {
+            console.error('❌ Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY')
+            console.error('   Make sure it is valid JSON')
+            process.exit(1)
+        }
+    } else {
+        if (!projectId) {
+            console.error('❌ NEXT_PUBLIC_FIREBASE_PROJECT_ID is required')
+            console.error('   Or set FIREBASE_SERVICE_ACCOUNT_KEY with project_id')
+            process.exit(1)
+        }
+        // Try to use application default credentials
+        try {
+            admin.initializeApp({
+                projectId: projectId,
+            })
+            console.log('✅ Firebase Admin initialized with default credentials')
+        } catch (error) {
+            console.error('❌ Failed to initialize Firebase Admin')
+            console.error('   Error:', error instanceof Error ? error.message : 'Unknown error')
+            console.error('   Make sure GOOGLE_APPLICATION_CREDENTIALS is set or provide FIREBASE_SERVICE_ACCOUNT_KEY')
+            process.exit(1)
+        }
+    }
 }
 
-// Initialize Firebase Admin first (this must happen before any imports that use it)
-// Import with side effects to trigger initialization
-import '../lib/firebase-admin'
-import admin from '../lib/firebase-admin'
-
-import { vectorizeAllProblems, getVectorizationStatus } from '../lib/rag/problem-vectorization'
-import { isPineconeEnabled, getVectorDBProvider } from '../lib/rag/vectordb'
-
 async function main() {
-    // Wait a moment for Firebase to initialize, then verify
-    await new Promise(resolve => setTimeout(resolve, 100))
+    // Import modules that depend on Firebase Admin AFTER initialization
+    const { vectorizeAllProblems, getVectorizationStatus } = await import('../lib/rag/problem-vectorization')
+    const { isPineconeEnabled, getVectorDBProvider } = await import('../lib/rag/vectordb')
+    // Verify Firebase Admin is initialized
     if (!admin.apps.length) {
         console.error('❌ Firebase Admin failed to initialize')
         console.error('   Please check your FIREBASE_SERVICE_ACCOUNT_KEY or GOOGLE_APPLICATION_CREDENTIALS')
@@ -53,7 +92,7 @@ async function main() {
     // Check vector DB provider
     const provider = getVectorDBProvider()
     const usingPinecone = isPineconeEnabled()
-    
+
     console.log(`📦 Vector DB: ${provider.toUpperCase()}`)
     if (usingPinecone) {
         console.log('   ✅ Using Pinecone for vector storage')
@@ -68,7 +107,7 @@ async function main() {
         console.log(`   Problems: ${status.problemCount}`)
         console.log(`   Companies: ${status.companyCount}`)
         console.log(`   Pattern Knowledge: ${status.patternCount}`)
-        
+
         if (status.hasProblems && status.hasCompanies && status.hasPatternKnowledge) {
             console.log('\n⚠️  Vectors already exist. This will update/overwrite existing vectors.')
         }
@@ -103,7 +142,7 @@ async function main() {
     console.log(`   Companies: ${result.vectorizedCompanies}/${result.totalCompanies}`)
     console.log(`   Pattern Knowledge: ${result.vectorizedPatternKnowledge}/${result.totalPatternKnowledge}`)
     console.log(`   Duration: ${durationMinutes}m ${remainingSeconds}s`)
-    
+
     if (result.errors.length > 0) {
         console.log(`\n⚠️  Errors: ${result.errors.length}`)
         console.log('   First 5 errors:')
