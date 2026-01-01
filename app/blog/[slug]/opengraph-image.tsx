@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og'
 import { getBlogPostBySlug } from '@/lib/mdx'
 
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 
 export const alt = 'CodeSparring Blog'
 export const size = {
