@@ -7,7 +7,7 @@ import { ErrorBoundaryProvider } from "@/components/providers/error-boundary-pro
 import { CookieConsent } from "@/components/CookieConsent"
 import { ConsentAnalytics } from "@/components/ConsentAnalytics"
 import { PerformancePolyfill } from "@/components/performance-polyfill"
-import { OrganizationJsonLd, SoftwareApplicationJsonLd } from "@/components/seo/JsonLd"
+import { OrganizationJsonLd, SoftwareApplicationJsonLd, WebSiteJsonLd } from "@/components/seo/JsonLd"
 import "./globals.css"
 
 const workSans = Work_Sans({
@@ -127,6 +127,7 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <head>
         {/* JSON-LD Structured Data for SEO */}
+        <WebSiteJsonLd />
         <OrganizationJsonLd />
         <SoftwareApplicationJsonLd />
         <style>{`

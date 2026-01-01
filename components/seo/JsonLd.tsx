@@ -3,6 +3,40 @@
 // Use consistent URL - codesparring.dev is the canonical domain
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.dev"
 
+// WebSite Schema - enables sitelinks search box in Google SERPs
+// This is a powerful SEO feature that shows a search box directly in search results
+export function WebSiteJsonLd() {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "CodeSparring",
+    alternateName: ["Code Sparring", "CodeSparring.dev"],
+    url: SITE_URL,
+    description: "AI-powered coding interview practice platform",
+    // potentialAction enables the sitelinks search box
+    potentialAction: {
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: `${SITE_URL}/blog?q={search_term_string}`,
+      },
+      "query-input": "required name=search_term_string",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "CodeSparring",
+      url: SITE_URL,
+    },
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}
+
 // Organization Schema - for brand recognition in search
 export function OrganizationJsonLd() {
   const schema = {
