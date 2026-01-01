@@ -264,7 +264,7 @@ export async function POST(request: NextRequest) {
 
             if (profileSnap.exists) {
               // Document exists - update to preserve other fields
-              transaction.update(profileRef, updateData)
+              transaction.update(profileRef, updateData as Record<string, any>)
               paymentLogger.info("Updated existing profile for subscription (transactional)", { userId })
               return profileSnap.data() as Record<string, unknown> | undefined
             } else {
