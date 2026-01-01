@@ -31,7 +31,7 @@ interface InteractiveTourProps {
 
 interface TourStep {
   id: string
-  icon: React.ElementType
+  icon: React.ComponentType<{ className?: string }>
   title: string
   description: string
   details?: string[]
