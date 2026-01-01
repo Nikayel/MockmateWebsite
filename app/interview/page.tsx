@@ -2543,7 +2543,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 <div
                   className={`grid gap-1.5 sm:gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${focusMode
                       ? 'grid-cols-1' // Focus mode: editor only
-                      : 'grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)_220px] xl:grid-cols-[260px_minmax(0,1fr)_260px] 2xl:grid-cols-[300px_minmax(0,1fr)_300px]'
+                      : 'grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_260px] xl:grid-cols-[320px_minmax(0,1fr)_300px] 2xl:grid-cols-[380px_minmax(0,1fr)_340px]'
                     }`}
                 >
                   {/* Left: Problem Description / File Upload
@@ -2552,41 +2552,81 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   */}
                   <Card className={`bg-gray-900/50 border-gray-700 glass-effect flex-col h-full overflow-hidden order-1 ${focusMode ? 'hidden' : '' // Hide in focus mode
                     } ${activePanel === 'problem' ? 'flex' : 'hidden lg:flex'}`}>
-                    <CardHeader className="pb-2 flex-shrink-0">
-                      <CardTitle className="text-white flex items-center space-x-2 text-sm">
-                        <Target className="h-4 w-4 text-accent" />
-                        <span>Problem</span>
+                    {/* IMPROVED: Enhanced header with title and difficulty badge */}
+                    <CardHeader className="pb-3 flex-shrink-0 border-b border-gray-700/50">
+                      <CardTitle className="text-white flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Target className="h-5 w-5 text-accent flex-shrink-0" />
+                          <span className="text-base font-semibold truncate">{selectedScenario?.title || 'Problem'}</span>
+                        </div>
+                        {selectedScenario && (
+                          <Badge className={`text-xs flex-shrink-0 ml-2 ${
+                            selectedScenario.difficulty === 'easy' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+                            selectedScenario.difficulty === 'medium' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
+                            'bg-red-500/20 text-red-400 border-red-500/30'
+                          }`}>
+                            {selectedScenario.difficulty}
+                          </Badge>
+                        )}
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="flex-1 min-h-0 overflow-y-auto text-xs sm:text-sm leading-relaxed space-y-4 pr-1">
+                    {/* IMPROVED: Better spacing and typography for readability */}
+                    <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-5 p-4">
                       {selectedScenario && (
                         <>
-                          <div>
-                            <h3 className="text-white font-semibold mb-1">Description</h3>
-                            <p className="text-gray-300 leading-relaxed">{selectedScenario.problemStatement}</p>
+                          {/* IMPROVED: Description with larger font and visual hierarchy */}
+                          <div className="space-y-2">
+                            <h3 className="text-accent font-semibold text-sm uppercase tracking-wide flex items-center gap-2">
+                              <span className="w-1 h-4 bg-accent rounded-full"></span>
+                              Description
+                            </h3>
+                            <p className="text-gray-200 leading-relaxed text-[15px]">{selectedScenario.problemStatement}</p>
                           </div>
 
+                          {/* IMPROVED: Examples with better visual hierarchy */}
                           {selectedScenario.type === 'dsa' && selectedScenario.examples && selectedScenario.examples.length > 0 && (
-                            <div>
-                              <h3 className="text-white font-semibold mb-1">Examples</h3>
-                              <div className="space-y-2">
+                            <div className="space-y-2">
+                              <h3 className="text-accent font-semibold text-sm uppercase tracking-wide flex items-center gap-2">
+                                <span className="w-1 h-4 bg-accent rounded-full"></span>
+                                Examples
+                              </h3>
+                              <div className="space-y-3">
                                 {selectedScenario.examples.slice(0, 2).map((ex, i) => (
-                                  <div key={i} className="bg-gray-800/50 p-2 rounded text-xs">
-                                    <div className="text-gray-400">Input: <span className="text-green-400">{ex.input}</span></div>
-                                    <div className="text-gray-400">Output: <span className="text-blue-400">{ex.output}</span></div>
-                                    {ex.explanation && <div className="text-gray-500 mt-1 text-xs">{ex.explanation}</div>}
+                                  <div key={i} className="bg-gray-800/70 p-3 rounded-lg border border-gray-700/50">
+                                    <div className="font-mono text-sm space-y-1.5">
+                                      <div className="flex items-start gap-2">
+                                        <span className="text-gray-500 font-medium min-w-[55px]">Input:</span>
+                                        <code className="text-green-400 break-all">{ex.input}</code>
+                                      </div>
+                                      <div className="flex items-start gap-2">
+                                        <span className="text-gray-500 font-medium min-w-[55px]">Output:</span>
+                                        <code className="text-blue-400 break-all">{ex.output}</code>
+                                      </div>
+                                    </div>
+                                    {ex.explanation && (
+                                      <div className="text-gray-400 mt-2 pt-2 border-t border-gray-700/50 text-sm italic">
+                                        {ex.explanation}
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
                               </div>
                             </div>
                           )}
 
+                          {/* IMPROVED: Constraints with better styling */}
                           {selectedScenario.type === 'dsa' && selectedScenario.constraints && selectedScenario.constraints.length > 0 && (
-                            <div>
-                              <h3 className="text-white font-semibold mb-1">Constraints</h3>
-                              <ul className="text-gray-300 space-y-1 list-disc list-inside">
-                                {selectedScenario.constraints.slice(0, 3).map((c, i) => (
-                                  <li key={i} className="text-xs">{c}</li>
+                            <div className="space-y-2">
+                              <h3 className="text-accent font-semibold text-sm uppercase tracking-wide flex items-center gap-2">
+                                <span className="w-1 h-4 bg-accent rounded-full"></span>
+                                Constraints
+                              </h3>
+                              <ul className="text-gray-300 space-y-1.5">
+                                {selectedScenario.constraints.slice(0, 4).map((c, i) => (
+                                  <li key={i} className="text-sm flex items-start gap-2">
+                                    <span className="text-accent mt-0.5">•</span>
+                                    <code className="font-mono text-gray-300">{c}</code>
+                                  </li>
                                 ))}
                               </ul>
                             </div>

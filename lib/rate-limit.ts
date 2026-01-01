@@ -522,6 +522,15 @@ export const feedbackRateLimit = rateLimit({
   prefix: 'rl:feedback'
 })
 
+// Extremely strict for sensitive operations like account deletion
+// 2 requests per hour to prevent abuse
+export const sensitiveOperationRateLimit = rateLimit({
+  interval: 60 * 60 * 1000, // 1 hour
+  uniqueTokenPerInterval: 100,
+  maxRequests: 2,
+  prefix: 'rl:sensitive'
+})
+
 // Export types and utilities for testing
 export type { RateLimitConfig, RateLimitEntry, RateLimitResult, RateLimitStore }
 export { InMemoryRateLimitStore, getClientIdentifier }

@@ -139,34 +139,56 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
 
   return (
     <Card className="bg-gray-900/50 border-gray-700 glass-effect flex flex-col h-full overflow-hidden">
-      <CardHeader className="pb-2 flex-shrink-0">
-        <CardTitle className="text-white flex items-center space-x-2 text-sm">
-          <Target className="h-4 w-4 text-[#00d9ff]" />
-          <span>Problem</span>
+      {/* Enhanced Header with Title and Difficulty */}
+      <CardHeader className="pb-3 flex-shrink-0 border-b border-gray-700/50">
+        <CardTitle className="text-white flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Target className="h-5 w-5 text-[#00d9ff]" />
+            <span className="text-base font-semibold truncate">{scenario.title}</span>
+          </div>
+          <Badge className={`text-xs flex-shrink-0 ${
+            scenario.difficulty === 'easy' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+            scenario.difficulty === 'medium' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
+            'bg-red-500/20 text-red-400 border-red-500/30'
+          }`}>
+            {scenario.difficulty}
+          </Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 overflow-y-auto text-xs sm:text-sm leading-relaxed space-y-4 pr-1">
-        {/* Problem Description */}
-        <div>
-          <h3 className="text-white font-semibold mb-1">Description</h3>
-          <p className="text-gray-300 leading-relaxed">{scenario.problemStatement}</p>
+      <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-5 p-4">
+        {/* Problem Description - IMPROVED: Larger font, better spacing */}
+        <div className="space-y-2">
+          <h3 className="text-[#00d9ff] font-semibold text-sm uppercase tracking-wide flex items-center gap-2">
+            <span className="w-1 h-4 bg-[#00d9ff] rounded-full"></span>
+            Description
+          </h3>
+          <p className="text-gray-200 leading-relaxed text-[15px]">{scenario.problemStatement}</p>
         </div>
 
-        {/* Examples (DSA only) */}
+        {/* Examples (DSA only) - IMPROVED: Better visual hierarchy */}
         {scenario.type === "dsa" && scenario.examples && scenario.examples.length > 0 && (
-          <div>
-            <h3 className="text-white font-semibold mb-1">Examples</h3>
-            <div className="space-y-2">
+          <div className="space-y-2">
+            <h3 className="text-[#00d9ff] font-semibold text-sm uppercase tracking-wide flex items-center gap-2">
+              <span className="w-1 h-4 bg-[#00d9ff] rounded-full"></span>
+              Examples
+            </h3>
+            <div className="space-y-3">
               {scenario.examples.slice(0, 2).map((ex, i) => (
-                <div key={i} className="bg-gray-800/50 p-2 rounded text-xs">
-                  <div className="text-gray-400">
-                    Input: <span className="text-green-400">{ex.input}</span>
-                  </div>
-                  <div className="text-gray-400">
-                    Output: <span className="text-blue-400">{ex.output}</span>
+                <div key={i} className="bg-gray-800/70 p-3 rounded-lg border border-gray-700/50">
+                  <div className="font-mono text-sm space-y-1.5">
+                    <div className="flex items-start gap-2">
+                      <span className="text-gray-500 font-medium min-w-[60px]">Input:</span>
+                      <code className="text-green-400 break-all">{ex.input}</code>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-gray-500 font-medium min-w-[60px]">Output:</span>
+                      <code className="text-blue-400 break-all">{ex.output}</code>
+                    </div>
                   </div>
                   {ex.explanation && (
-                    <div className="text-gray-500 mt-1 text-xs">{ex.explanation}</div>
+                    <div className="text-gray-400 mt-2 pt-2 border-t border-gray-700/50 text-sm italic">
+                      {ex.explanation}
+                    </div>
                   )}
                 </div>
               ))}
@@ -174,14 +196,18 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
           </div>
         )}
 
-        {/* Constraints (DSA only) */}
+        {/* Constraints (DSA only) - IMPROVED: Better styling */}
         {scenario.type === "dsa" && scenario.constraints && scenario.constraints.length > 0 && (
-          <div>
-            <h3 className="text-white font-semibold mb-1">Constraints</h3>
-            <ul className="text-gray-300 space-y-1 list-disc list-inside">
-              {scenario.constraints.slice(0, 3).map((c, i) => (
-                <li key={i} className="text-xs">
-                  {c}
+          <div className="space-y-2">
+            <h3 className="text-[#00d9ff] font-semibold text-sm uppercase tracking-wide flex items-center gap-2">
+              <span className="w-1 h-4 bg-[#00d9ff] rounded-full"></span>
+              Constraints
+            </h3>
+            <ul className="text-gray-300 space-y-1.5">
+              {scenario.constraints.slice(0, 4).map((c, i) => (
+                <li key={i} className="text-sm flex items-start gap-2">
+                  <span className="text-[#00d9ff] mt-0.5">•</span>
+                  <code className="font-mono text-gray-300">{c}</code>
                 </li>
               ))}
             </ul>

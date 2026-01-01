@@ -10,6 +10,7 @@ import { adminAuth, adminDb } from "@/lib/firebase-admin"
 import Stripe from "stripe"
 import { Pinecone } from "@pinecone-database/pinecone"
 import { logger } from "@/lib/logger"
+import { sensitiveOperationRateLimit } from "@/lib/rate-limit"
 
 export const dynamic = "force-dynamic"
 
@@ -19,6 +20,15 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 export async function DELETE(request: NextRequest) {
   try {
+    // SECURITY FIX: Apply strict rate limiting to prevent abuse
+    const rateLimitResponse = await sensitiveOperationRateLimit(request)
+    if (rateLimitResponse) {
+      logger.warn("Delete account rate limit exceeded", {
+        ip: request.headers.get("x-forwarded-for") || "unknown"
+      })
+      return rateLimitResponse
+    }
+
     // Get authorization token
     const authHeader = request.headers.get("Authorization")
     if (!authHeader?.startsWith("Bearer ")) {

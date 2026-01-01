@@ -17,6 +17,95 @@ interface LogContext {
   [key: string]: unknown
 }
 
+// ============================================
+// PII Redaction
+// ============================================
+
+const PII_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
+  // Email addresses
+  { pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, replacement: '[EMAIL]' },
+  // Phone numbers (various formats)
+  { pattern: /(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, replacement: '[PHONE]' },
+  // Credit card numbers (basic pattern)
+  { pattern: /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g, replacement: '[CARD]' },
+  // SSN
+  { pattern: /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g, replacement: '[SSN]' },
+  // IP addresses
+  { pattern: /\b(?:\d{1,3}\.){3}\d{1,3}\b/g, replacement: '[IP]' },
+  // JWT tokens (base64 encoded)
+  { pattern: /eyJ[a-zA-Z0-9_-]*\.eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*/g, replacement: '[JWT]' },
+  // API keys and tokens (common patterns)
+  { pattern: /\b(sk_live_|sk_test_|pk_live_|pk_test_)[a-zA-Z0-9]+\b/g, replacement: '[STRIPE_KEY]' },
+  { pattern: /\b(api_key|apikey|api-key)["']?\s*[:=]\s*["']?[a-zA-Z0-9_-]{16,}/gi, replacement: '[API_KEY]' },
+]
+
+// Fields that should always be redacted
+const SENSITIVE_FIELDS = new Set([
+  'password', 'passwd', 'secret', 'token', 'apiKey', 'api_key',
+  'accessToken', 'access_token', 'refreshToken', 'refresh_token',
+  'authorization', 'auth', 'credential', 'credentials',
+  'ssn', 'socialSecurityNumber', 'creditCard', 'cardNumber',
+  'cvv', 'cvc', 'pin', 'bankAccount', 'routingNumber',
+])
+
+/**
+ * Redact PII from a string value
+ */
+function redactPIIFromString(value: string): string {
+  let redacted = value
+  for (const { pattern, replacement } of PII_PATTERNS) {
+    redacted = redacted.replace(pattern, replacement)
+  }
+  return redacted
+}
+
+/**
+ * Recursively redact PII from an object
+ */
+function redactPII(obj: unknown, depth = 0): unknown {
+  // Prevent infinite recursion
+  if (depth > 10) return '[MAX_DEPTH]'
+
+  if (obj === null || obj === undefined) {
+    return obj
+  }
+
+  if (typeof obj === 'string') {
+    return redactPIIFromString(obj)
+  }
+
+  if (typeof obj === 'number' || typeof obj === 'boolean') {
+    return obj
+  }
+
+  if (obj instanceof Error) {
+    return {
+      name: obj.name,
+      message: redactPIIFromString(obj.message),
+      stack: obj.stack ? redactPIIFromString(obj.stack) : undefined,
+    }
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => redactPII(item, depth + 1))
+  }
+
+  if (typeof obj === 'object') {
+    const redacted: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(obj)) {
+      // Check if this is a sensitive field name
+      if (SENSITIVE_FIELDS.has(key.toLowerCase())) {
+        redacted[key] = '[REDACTED]'
+      } else {
+        redacted[key] = redactPII(value, depth + 1)
+      }
+    }
+    return redacted
+  }
+
+  return obj
+}
+
 interface ErrorContext extends LogContext {
   error?: Error | unknown
   userId?: string
@@ -67,8 +156,11 @@ function shouldLogFullDetails(fingerprint: string): boolean {
 
 function formatMessage(level: LogLevel, message: string, context?: LogContext): string {
   const timestamp = new Date().toISOString()
-  const contextStr = context ? ` ${JSON.stringify(context)}` : ''
-  return `[${timestamp}] [${level.toUpperCase()}] ${message}${contextStr}`
+  // Always redact PII from context before logging
+  const safeContext = context ? redactPII(context) : undefined
+  const safeMessage = redactPIIFromString(message)
+  const contextStr = safeContext ? ` ${JSON.stringify(safeContext)}` : ''
+  return `[${timestamp}] [${level.toUpperCase()}] ${safeMessage}${contextStr}`
 }
 
 function shouldLog(level: LogLevel): boolean {
