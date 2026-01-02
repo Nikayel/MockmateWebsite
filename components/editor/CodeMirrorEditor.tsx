@@ -9,8 +9,10 @@ import { cpp } from "@codemirror/lang-cpp"
 import { rust } from "@codemirror/lang-rust"
 import { go } from "@codemirror/lang-go"
 import { oneDark } from "@codemirror/theme-one-dark"
-import { EditorView } from "@codemirror/view"
+import { EditorView, keymap } from "@codemirror/view"
 import { Extension } from "@codemirror/state"
+import { indentUnit } from "@codemirror/language"
+import { insertNewlineAndIndent, indentMore, indentLess } from "@codemirror/commands"
 
 export interface CodeMirrorEditorProps {
   value: string
@@ -25,29 +27,41 @@ export interface CodeMirrorEditorProps {
   calmMode?: boolean
 }
 
-// Language extension mapping
-const getLanguageExtension = (language: string): Extension | null => {
-  const languageMap: Record<string, () => Extension> = {
-    javascript: () => javascript({ jsx: true, typescript: false }),
-    typescript: () => javascript({ jsx: true, typescript: true }),
-    python: () => python(),
-    java: () => java(),
-    cpp: () => cpp(),
-    c: () => cpp(),
-    csharp: () => java(), // Use Java for C# (similar syntax highlighting)
-    rust: () => rust(),
-    go: () => go(),
-    // File extension mappings
-    js: () => javascript({ jsx: true, typescript: false }),
-    jsx: () => javascript({ jsx: true, typescript: false }),
-    ts: () => javascript({ jsx: true, typescript: true }),
-    tsx: () => javascript({ jsx: true, typescript: true }),
-    py: () => python(),
-    rs: () => rust(),
+// Language extension mapping with proper indentation settings
+interface LanguageConfig {
+  extension: () => Extension
+  indentSize: number
+}
+
+const getLanguageConfig = (language: string): LanguageConfig | null => {
+  const languageMap: Record<string, LanguageConfig> = {
+    // Python uses 4 spaces per PEP 8
+    python: { extension: () => python(), indentSize: 4 },
+    py: { extension: () => python(), indentSize: 4 },
+    // JavaScript/TypeScript use 2 spaces
+    javascript: { extension: () => javascript({ jsx: true, typescript: false }), indentSize: 2 },
+    typescript: { extension: () => javascript({ jsx: true, typescript: true }), indentSize: 2 },
+    js: { extension: () => javascript({ jsx: true, typescript: false }), indentSize: 2 },
+    jsx: { extension: () => javascript({ jsx: true, typescript: false }), indentSize: 2 },
+    ts: { extension: () => javascript({ jsx: true, typescript: true }), indentSize: 2 },
+    tsx: { extension: () => javascript({ jsx: true, typescript: true }), indentSize: 2 },
+    // Other languages
+    java: { extension: () => java(), indentSize: 4 },
+    cpp: { extension: () => cpp(), indentSize: 4 },
+    c: { extension: () => cpp(), indentSize: 4 },
+    csharp: { extension: () => java(), indentSize: 4 }, // Use Java for C# (similar syntax highlighting)
+    rust: { extension: () => rust(), indentSize: 4 },
+    go: { extension: () => go(), indentSize: 4 },
+    rs: { extension: () => rust(), indentSize: 4 },
   }
 
-  const factory = languageMap[language.toLowerCase()]
-  return factory ? factory() : null
+  return languageMap[language.toLowerCase()] || null
+}
+
+// Legacy function for backward compatibility
+const getLanguageExtension = (language: string): Extension | null => {
+  const config = getLanguageConfig(language)
+  return config ? config.extension() : null
 }
 
 /*
@@ -270,15 +284,32 @@ function CodeMirrorEditorComponent({
   // Normalize theme to dark/light
   const isDarkTheme = theme === "dark" || theme === "vs-dark" || theme === "hc-black" || !theme
 
+  // Get language-specific config for indentation
+  const langConfig = useMemo(() => getLanguageConfig(language), [language])
+  const indentSize = langConfig?.indentSize ?? 2
+
   // Memoize extensions to prevent unnecessary re-renders
   const extensions = useMemo(() => {
     const exts: Extension[] = [...baseExtensions]
 
-    // Add language extension
-    const langExt = getLanguageExtension(language)
-    if (langExt) {
-      exts.push(langExt)
+    // Add language extension with proper indentation
+    if (langConfig) {
+      exts.push(langConfig.extension())
     }
+
+    // Add indentUnit extension for proper auto-indentation
+    // This creates the correct number of spaces when pressing Enter
+    exts.push(indentUnit.of(" ".repeat(indentSize)))
+
+    // Add keymap for better indentation handling
+    exts.push(keymap.of([
+      // Enter key: insert newline with proper indentation
+      { key: "Enter", run: insertNewlineAndIndent },
+      // Tab: indent more
+      { key: "Tab", run: indentMore },
+      // Shift-Tab: indent less
+      { key: "Shift-Tab", run: indentLess },
+    ]))
 
     // Add appropriate theme based on mode
     if (isDarkTheme) {
@@ -294,7 +325,7 @@ function CodeMirrorEditorComponent({
     }
 
     return exts
-  }, [language, isDarkTheme, isCalm])
+  }, [langConfig, indentSize, isDarkTheme, isCalm])
 
   // Handle value changes
   const handleChange = useCallback((val: string) => {
@@ -342,7 +373,8 @@ function CodeMirrorEditorComponent({
           foldKeymap: false,
           completionKeymap: false,
           lintKeymap: false,
-          tabSize: 2,
+          // Use language-aware tabSize (Python=4, JS/TS=2, etc.)
+          tabSize: indentSize,
         }}
       />
     </div>
