@@ -126,8 +126,16 @@ export async function POST(request: NextRequest) {
         stripeCustomerId = profile.stripe_customer_id
         logger.info("Using existing customer for checkout", { userId, customerId: stripeCustomerId })
       } catch {
-        // Customer doesn't exist, will create new one
-        logger.warn("Existing customer ID invalid, will create new", { userId, invalidId: profile.stripe_customer_id })
+        // Customer doesn't exist in Stripe - clear the invalid ID from Firebase
+        logger.warn("Existing customer ID invalid, clearing from profile", { userId, invalidId: profile.stripe_customer_id })
+        try {
+          await adminDb.collection("profiles").doc(userId).update({
+            stripe_customer_id: null,
+            updated_at: new Date().toISOString()
+          })
+        } catch (clearError) {
+          logger.error("Failed to clear invalid customer ID", { error: clearError })
+        }
       }
     }
 
