@@ -204,6 +204,7 @@ export async function POST(request: NextRequest) {
 
     const results = []
     let allPassed = true
+    let allConsoleLogs: any[] = []
 
     // Execute each test case using Piston (secure sandbox)
     for (const testCase of testCases) {
@@ -223,8 +224,14 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Parse the output
-        const actualResult = parseExecutionOutput(executionResult.output || '')
+        // Parse the output (now returns { result, consoleLogs })
+        const parsed = parseExecutionOutput(executionResult.output || '')
+        const actualResult = parsed.result
+
+        // Collect console logs from all test runs
+        if (parsed.consoleLogs && parsed.consoleLogs.length > 0) {
+          allConsoleLogs = [...allConsoleLogs, ...parsed.consoleLogs]
+        }
 
         // Validate result
         const passed = validateResult(actualResult, testCase.expected, testCase, scenario.type)
@@ -276,6 +283,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: allPassed,
       results,
+      consoleLogs: allConsoleLogs, // Include captured console.log outputs
       summary: {
         total: totalCount,
         passed: passedCount,
