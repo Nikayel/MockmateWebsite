@@ -2312,11 +2312,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         setTestResults(data.results)
         setTestSummary(data.summary)
 
-        // Check for syntax/compilation errors - show prominently so user can fix
+        // Check for syntax/compilation errors - keep user in editing mode so they can fix
         const errorResults = data.results.filter((r: TestResult) => r.error)
         const allFailed = data.summary.passRate === 0
 
-        // If all tests failed and there's a common error, it's likely a syntax/compilation error
+        // If all tests failed due to code errors, keep user in editing mode
         if (allFailed && errorResults.length > 0) {
           const firstError = errorResults[0].error
 
@@ -2331,29 +2331,15 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             firstError.includes('invalid syntax')
           )
 
-          if (isSyntaxError) {
-            // Show syntax error prominently - user needs to fix this before logic can be tested
-            toast.error("Syntax Error in Your Code", {
-              description: firstError.length > 150 ? firstError.substring(0, 150) + '...' : firstError,
-              duration: 10000, // Show longer so user can read it
-            })
-          } else if (firstError) {
-            // Runtime error - still show it but less alarming
-            toast.warning("Code Error", {
-              description: firstError.length > 150 ? firstError.substring(0, 150) + '...' : firstError,
-              duration: 8000,
-            })
-          }
-
           // Keep user in editing mode so they can fix the error
-          // Don't start post-interview discussion until code at least runs
+          // Console panel will show the error - no need for toast
           playSound('fail')
           setIsRunningTests(false)
 
           // Add a helpful message from the interviewer about the error
           setInterviewerMessages(prev => [...prev, {
             type: 'ai',
-            message: `I see there's ${isSyntaxError ? 'a syntax error' : 'an error'} in your code. Take a look at the error message in the test results - it should help you identify what needs to be fixed. Let me know if you'd like me to explain it.`
+            message: `I see there's ${isSyntaxError ? 'a syntax error' : 'an error'} in your code. Check the console below the editor - it shows exactly what went wrong. Let me know if you'd like help understanding the error.`
           }])
 
           return // Don't proceed to post-interview discussion
@@ -2916,8 +2902,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         )}
                       </div>
 
-                      {/* Terminal/Console Output - Enhanced (hidden for system design) */}
-                      {testResults.length > 0 && selectedScenario?.type !== 'system-design' && (
+                      {/* Terminal/Console Output - Always visible during interview (hidden for system design) */}
+                      {isInterviewStarted && selectedScenario?.type !== 'system-design' && (
                         <div className="flex-shrink-0 bg-black border border-gray-700 rounded flex flex-col max-h-48 min-h-[120px]">
                           {/* Terminal Header */}
                           <div className="flex items-center justify-between px-3 py-1.5 bg-gray-800 border-b border-gray-700 flex-shrink-0">
@@ -2927,22 +2913,31 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                 <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
                                 <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
                               </div>
-                              <span className="text-gray-400 text-xs font-mono">Terminal</span>
+                              <span className="text-gray-400 text-xs font-mono">Console</span>
                             </div>
                             <div className="flex items-center space-x-2">
-                              <Badge
-                                className={`${testSummary.passRate === 100 ? "bg-[#00d9ff]" :
-                                  testSummary.passRate >= 60 ? "bg-[#00d9ff]/70" : "bg-gray-600"
-                                  } text-xs h-5 text-black`}
-                              >
-                                {testSummary.passed}/{testSummary.total} passed
-                              </Badge>
-                              {efficiencyMetrics && (
-                                <Badge className={`${efficiencyMetrics.efficiencyScore >= 80 ? "bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]" :
-                                  efficiencyMetrics.efficiencyScore >= 60 ? "bg-[#00d9ff]/10 text-[#00d9ff]/70 border-[#00d9ff]/50" :
-                                    "bg-gray-600/20 text-gray-400 border-gray-600"
-                                  } text-xs h-5 border`}>
-                                  {efficiencyMetrics.efficiencyScore}% efficient
+                              {testResults.length > 0 && (
+                                <>
+                                  <Badge
+                                    className={`${testSummary.passRate === 100 ? "bg-[#00d9ff]" :
+                                      testSummary.passRate >= 60 ? "bg-[#00d9ff]/70" : "bg-gray-600"
+                                      } text-xs h-5 text-black`}
+                                  >
+                                    {testSummary.passed}/{testSummary.total} passed
+                                  </Badge>
+                                  {efficiencyMetrics && (
+                                    <Badge className={`${efficiencyMetrics.efficiencyScore >= 80 ? "bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]" :
+                                      efficiencyMetrics.efficiencyScore >= 60 ? "bg-[#00d9ff]/10 text-[#00d9ff]/70 border-[#00d9ff]/50" :
+                                        "bg-gray-600/20 text-gray-400 border-gray-600"
+                                      } text-xs h-5 border`}>
+                                      {efficiencyMetrics.efficiencyScore}% efficient
+                                    </Badge>
+                                  )}
+                                </>
+                              )}
+                              {isRunningTests && (
+                                <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-xs h-5 animate-pulse">
+                                  Running...
                                 </Badge>
                               )}
                             </div>
@@ -2950,77 +2945,127 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
                           {/* Terminal Content */}
                           <div className="flex-1 overflow-y-auto p-2 space-y-1 font-mono text-xs">
-                            {/* Summary */}
-                            <div className="text-gray-400 mb-2">
-                              <span className="text-accent">$</span> Running tests...
-                            </div>
+                            {/* Empty state - waiting for tests */}
+                            {testResults.length === 0 && !isRunningTests && (
+                              <div className="text-gray-500 flex items-center gap-2">
+                                <span className="text-gray-600">$</span>
+                                <span>Click "Run Tests" to execute your code...</span>
+                              </div>
+                            )}
 
-                            {/* Individual Test Results */}
-                            {testResults.map((result, index) => (
-                              <div key={index} className="mb-2">
-                                <div className={`flex items-center space-x-2 ${result.passed ? 'text-neural' : 'text-muted-foreground'}`}>
-                                  {result.passed ? (
-                                    <CheckCircle className="h-3 w-3 flex-shrink-0" />
-                                  ) : (
-                                    <XCircle className="h-3 w-3 flex-shrink-0" />
-                                  )}
-                                  <span className="font-semibold">{result.description}</span>
+                            {/* Running state */}
+                            {isRunningTests && (
+                              <div className="text-gray-400 flex items-center gap-2">
+                                <span className="text-accent">$</span>
+                                <span>Executing code</span>
+                                <span className="animate-pulse">...</span>
+                              </div>
+                            )}
+
+                            {/* Test Results */}
+                            {testResults.length > 0 && !isRunningTests && (
+                              <>
+                                {/* Check for syntax/compilation errors first */}
+                                {(() => {
+                                  const errorResults = testResults.filter((r: TestResult) => r.error);
+                                  const hasCodeError = errorResults.length > 0 && testSummary.passed === 0;
+                                  const firstError = errorResults[0]?.error || null;
+                                  const isSyntaxError = firstError && (
+                                    firstError.includes('SyntaxError') ||
+                                    firstError.includes('Compilation error') ||
+                                    firstError.includes('Unexpected token') ||
+                                    firstError.includes('Parse error') ||
+                                    firstError.includes('IndentationError') ||
+                                    firstError.includes('invalid syntax')
+                                  );
+
+                                  if (hasCodeError && firstError) {
+                                    return (
+                                      <div className={`p-2 rounded border mb-2 ${isSyntaxError ? 'bg-red-500/10 border-red-500/30' : 'bg-orange-500/10 border-orange-500/30'}`}>
+                                        <div className={`flex items-start gap-2 ${isSyntaxError ? 'text-red-400' : 'text-orange-400'}`}>
+                                          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                          <div className="flex-1">
+                                            <div className="font-semibold mb-1">
+                                              {isSyntaxError ? 'Syntax Error' : 'Runtime Error'}
+                                            </div>
+                                            <div className="text-xs break-all whitespace-pre-wrap">
+                                              {firstError}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+
+                                {/* Summary */}
+                                <div className="text-gray-400 mb-2">
+                                  <span className="text-accent">$</span> Test results:
                                 </div>
 
-                                {!result.passed && (
-                                  <div className="ml-5 mt-1 space-y-0.5 text-gray-300">
-                                    <div className="flex items-start space-x-2">
-                                      <span className="text-gray-500">Input:</span>
-                                      <span className="text-blue-300">{JSON.stringify(result.input)}</span>
+                                {/* Individual Test Results */}
+                                {testResults.map((result, index) => (
+                                  <div key={index} className="mb-2">
+                                    <div className={`flex items-center space-x-2 ${result.passed ? 'text-neural' : 'text-muted-foreground'}`}>
+                                      {result.passed ? (
+                                        <CheckCircle className="h-3 w-3 flex-shrink-0" />
+                                      ) : (
+                                        <XCircle className="h-3 w-3 flex-shrink-0" />
+                                      )}
+                                      <span className="font-semibold">{result.description}</span>
                                     </div>
-                                    <div className="flex items-start space-x-2">
-                                      <span className="text-gray-500">Expected:</span>
-                                      <span className="text-green-300">{JSON.stringify(result.expected)}</span>
-                                    </div>
-                                    <div className="flex items-start space-x-2">
-                                      <span className="text-gray-500">Got:</span>
-                                      <span className="text-red-300">{JSON.stringify(result.actual)}</span>
-                                    </div>
-                                    {result.error && (
-                                      <div className="flex items-start space-x-2 mt-1">
-                                        <AlertCircle className="h-3 w-3 flex-shrink-0 text-red-400 mt-0.5" />
-                                        <span className="text-red-300 break-all">{result.error}</span>
+
+                                    {!result.passed && !result.error && (
+                                      <div className="ml-5 mt-1 space-y-0.5 text-gray-300">
+                                        <div className="flex items-start space-x-2">
+                                          <span className="text-gray-500">Input:</span>
+                                          <span className="text-blue-300">{JSON.stringify(result.input)}</span>
+                                        </div>
+                                        <div className="flex items-start space-x-2">
+                                          <span className="text-gray-500">Expected:</span>
+                                          <span className="text-green-300">{JSON.stringify(result.expected)}</span>
+                                        </div>
+                                        <div className="flex items-start space-x-2">
+                                          <span className="text-gray-500">Got:</span>
+                                          <span className="text-red-300">{JSON.stringify(result.actual)}</span>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
-                                )}
-                              </div>
-                            ))}
+                                ))}
 
-                            {/* Efficiency Metrics */}
-                            {efficiencyMetrics && (
-                              <div className="border-t border-gray-800 pt-2 mt-2 space-y-1">
-                                <div className="text-gray-400">Complexity Analysis:</div>
-                                <div className="ml-2 space-y-0.5 text-gray-300">
-                                  <div>
-                                    <span className="text-gray-500">Time:</span>
-                                    <span className={`ml-2 ${efficiencyMetrics.estimatedTimeComplexity === efficiencyMetrics.optimalTimeComplexity ? 'text-green-400' : 'text-yellow-400'}`}>
-                                      {efficiencyMetrics.estimatedTimeComplexity}
-                                    </span>
-                                    {efficiencyMetrics.optimalTimeComplexity !== "N/A" && (
-                                      <span className="text-gray-500 ml-1">(optimal: {efficiencyMetrics.optimalTimeComplexity})</span>
-                                    )}
+                                {/* Efficiency Metrics */}
+                                {efficiencyMetrics && testSummary.passRate > 0 && (
+                                  <div className="border-t border-gray-800 pt-2 mt-2 space-y-1">
+                                    <div className="text-gray-400">Complexity Analysis:</div>
+                                    <div className="ml-2 space-y-0.5 text-gray-300">
+                                      <div>
+                                        <span className="text-gray-500">Time:</span>
+                                        <span className={`ml-2 ${efficiencyMetrics.estimatedTimeComplexity === efficiencyMetrics.optimalTimeComplexity ? 'text-green-400' : 'text-yellow-400'}`}>
+                                          {efficiencyMetrics.estimatedTimeComplexity}
+                                        </span>
+                                        {efficiencyMetrics.optimalTimeComplexity !== "N/A" && (
+                                          <span className="text-gray-500 ml-1">(optimal: {efficiencyMetrics.optimalTimeComplexity})</span>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <span className="text-gray-500">Space:</span>
+                                        <span className={`ml-2 ${efficiencyMetrics.estimatedSpaceComplexity === efficiencyMetrics.optimalSpaceComplexity ? 'text-green-400' : 'text-yellow-400'}`}>
+                                          {efficiencyMetrics.estimatedSpaceComplexity}
+                                        </span>
+                                        {efficiencyMetrics.optimalSpaceComplexity !== "N/A" && (
+                                          <span className="text-gray-500 ml-1">(optimal: {efficiencyMetrics.optimalSpaceComplexity})</span>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <span className="text-gray-500">Code Quality:</span>
+                                        <span className="ml-2 text-gray-300">{efficiencyMetrics.complexity} complexity, {efficiencyMetrics.linesOfCode} LOC</span>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <div>
-                                    <span className="text-gray-500">Space:</span>
-                                    <span className={`ml-2 ${efficiencyMetrics.estimatedSpaceComplexity === efficiencyMetrics.optimalSpaceComplexity ? 'text-green-400' : 'text-yellow-400'}`}>
-                                      {efficiencyMetrics.estimatedSpaceComplexity}
-                                    </span>
-                                    {efficiencyMetrics.optimalSpaceComplexity !== "N/A" && (
-                                      <span className="text-gray-500 ml-1">(optimal: {efficiencyMetrics.optimalSpaceComplexity})</span>
-                                    )}
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-500">Code Quality:</span>
-                                    <span className="ml-2 text-gray-300">{efficiencyMetrics.complexity} complexity, {efficiencyMetrics.linesOfCode} LOC</span>
-                                  </div>
-                                </div>
-                              </div>
+                                )}
+                              </>
                             )}
                           </div>
                         </div>
