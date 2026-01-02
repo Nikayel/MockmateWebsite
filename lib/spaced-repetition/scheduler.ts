@@ -7,6 +7,7 @@
 
 import { adminDb } from '../firebase-admin';
 import type { DSAPattern } from '../types/dsa-patterns';
+import type { SpacedRepetitionAlgorithm, SpacedRepetitionMasteryLevel } from '../types';
 import { getScenarioById, scenarios } from '../scenarios';
 import {
   calculateReviewPriority,
@@ -14,6 +15,12 @@ import {
   type Difficulty,
   type MasteryLevel,
 } from './sm2-algorithm';
+import {
+  getUserAlgorithm,
+  calculateNextReview,
+  createInitialState,
+  prepareStateForStorage,
+} from './algorithm-router';
 
 /**
  * Validate and return the canonical difficulty for a scenario.
@@ -465,6 +472,7 @@ export async function getProblemsByPattern(
 
 /**
  * Initialize problem mastery from a completed session
+ * Uses the algorithm router (SM-2 or FSRS) based on user's assigned algorithm
  */
 export async function initializeProblemMasteryFromSession(
   userId: string,
@@ -496,19 +504,46 @@ export async function initializeProblemMasteryFromSession(
     });
   }
 
-  // Create new record with initial review data
+  // Get user's assigned algorithm (SM-2 or FSRS)
+  const userAlgorithm = await getUserAlgorithm(userId);
+
+  // Create initial state for the algorithm
+  const initialState = createInitialState(userAlgorithm, sessionData.difficulty);
+
+  // Calculate the next review using the algorithm router
+  // This respects the user's assigned algorithm and the performance score
+  const reviewResult = await calculateNextReview(userId, initialState, {
+    performance_score: sessionData.performance_score,
+    time_spent_minutes: sessionData.time_spent_minutes || 0,
+    hints_used: sessionData.hints_used || 0,
+    problem_difficulty: sessionData.difficulty,
+    is_early_review: false,
+    days_overdue: 0,
+  });
+
+  // Prepare storage data from algorithm result
+  const storageData = prepareStateForStorage({
+    algorithm: reviewResult.algorithm,
+    interval_days: reviewResult.next_interval_days,
+    next_review_at: reviewResult.next_review_at,
+    review_count: 1,
+    mastery_level: reviewResult.mastery_level,
+    confidence: reviewResult.confidence,
+    ease_factor: reviewResult.ease_factor,
+    fsrs_state: reviewResult.fsrs_state,
+  });
+
+  // Create new record with algorithm-calculated review data
   const newMastery: ProblemMastery = {
     problem_id: sessionData.scenario_id,
     scenario_id: sessionData.scenario_id,
     title: sessionData.title,
     pattern: sessionData.pattern,
     difficulty: sessionData.difficulty,
-    ease_factor: 2.5,
-    interval_days: 1, // First interval after seeing a problem
+    ease_factor: (storageData.ease_factor as number) || 2.5,
+    interval_days: storageData.interval_days as number,
     review_count: 1,
-    next_review_at: new Date(
-      now.getTime() + 24 * 60 * 60 * 1000
-    ).toISOString(), // Tomorrow
+    next_review_at: storageData.next_review_at as string,
     last_score: sessionData.performance_score,
     average_score: sessionData.performance_score,
     best_score: sessionData.performance_score,
@@ -517,8 +552,8 @@ export async function initializeProblemMasteryFromSession(
     last_reviewed_at: now.toISOString(),
     time_spent_minutes: sessionData.time_spent_minutes || 0,
     hints_used_total: sessionData.hints_used || 0,
-    mastery_level: sessionData.performance_score >= 56 ? 'learning' : 'new',
-    confidence: sessionData.performance_score >= 56 ? 30 : 10,
+    mastery_level: reviewResult.mastery_level as MasteryLevel,
+    confidence: reviewResult.confidence,
   };
 
   await masteryRef.set(newMastery);
