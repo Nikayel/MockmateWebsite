@@ -50,6 +50,29 @@ export function TestResultsPanel({
   const failed = results.length - passed;
   const passRate = results.length > 0 ? Math.round((passed / results.length) * 100) : 0;
 
+  // Detect if there's a code error (syntax/runtime) - all tests fail with same error
+  const errorResults = results.filter(r => r.error);
+  const hasCodeError = errorResults.length > 0 && passed === 0;
+  const firstError = errorResults[0]?.error || null;
+  const isSyntaxError = firstError && (
+    firstError.includes('SyntaxError') ||
+    firstError.includes('Compilation error') ||
+    firstError.includes('Unexpected token') ||
+    firstError.includes('Parse error') ||
+    firstError.includes('IndentationError') ||
+    firstError.includes('invalid syntax')
+  );
+
+  // Auto-expand first failed test with error
+  React.useEffect(() => {
+    if (hasCodeError && errorResults.length > 0) {
+      const firstFailedIndex = results.findIndex(r => r.error);
+      if (firstFailedIndex >= 0) {
+        setExpandedTests(new Set([firstFailedIndex]));
+      }
+    }
+  }, [results, hasCodeError, errorResults.length]);
+
   if (results.length === 0 && !isRunning) {
     return (
       <div className={cn('text-center py-4 text-gray-500 text-sm', className)}>
@@ -61,6 +84,37 @@ export function TestResultsPanel({
 
   return (
     <div className={cn('space-y-2', className)}>
+      {/* Code Error Banner - shown prominently when code has syntax/runtime errors */}
+      {hasCodeError && firstError && (
+        <div className={cn(
+          'p-3 rounded-lg border',
+          isSyntaxError
+            ? 'bg-red-500/20 border-red-500/40'
+            : 'bg-orange-500/20 border-orange-500/40'
+        )}>
+          <div className="flex items-start gap-2">
+            <AlertCircle className={cn(
+              'h-4 w-4 mt-0.5 flex-shrink-0',
+              isSyntaxError ? 'text-red-400' : 'text-orange-400'
+            )} />
+            <div className="flex-1 min-w-0">
+              <div className={cn(
+                'text-xs font-medium mb-1',
+                isSyntaxError ? 'text-red-300' : 'text-orange-300'
+              )}>
+                {isSyntaxError ? 'Syntax Error - Fix to Continue' : 'Code Error'}
+              </div>
+              <div className={cn(
+                'text-xs font-mono break-all',
+                isSyntaxError ? 'text-red-200' : 'text-orange-200'
+              )}>
+                {firstError}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Summary */}
       <div className="flex items-center justify-between px-2 py-1.5 bg-gray-800/50 rounded">
         <div className="flex items-center gap-2">

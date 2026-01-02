@@ -2312,6 +2312,53 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         setTestResults(data.results)
         setTestSummary(data.summary)
 
+        // Check for syntax/compilation errors - show prominently so user can fix
+        const errorResults = data.results.filter((r: TestResult) => r.error)
+        const allFailed = data.summary.passRate === 0
+
+        // If all tests failed and there's a common error, it's likely a syntax/compilation error
+        if (allFailed && errorResults.length > 0) {
+          const firstError = errorResults[0].error
+
+          // Check if it's a syntax or compilation error
+          const isSyntaxError = firstError && (
+            firstError.includes('SyntaxError') ||
+            firstError.includes('Compilation error') ||
+            firstError.includes('Unexpected token') ||
+            firstError.includes('unexpected token') ||
+            firstError.includes('Parse error') ||
+            firstError.includes('IndentationError') ||
+            firstError.includes('invalid syntax')
+          )
+
+          if (isSyntaxError) {
+            // Show syntax error prominently - user needs to fix this before logic can be tested
+            toast.error("Syntax Error in Your Code", {
+              description: firstError.length > 150 ? firstError.substring(0, 150) + '...' : firstError,
+              duration: 10000, // Show longer so user can read it
+            })
+          } else if (firstError) {
+            // Runtime error - still show it but less alarming
+            toast.warning("Code Error", {
+              description: firstError.length > 150 ? firstError.substring(0, 150) + '...' : firstError,
+              duration: 8000,
+            })
+          }
+
+          // Keep user in editing mode so they can fix the error
+          // Don't start post-interview discussion until code at least runs
+          playSound('fail')
+          setIsRunningTests(false)
+
+          // Add a helpful message from the interviewer about the error
+          setInterviewerMessages(prev => [...prev, {
+            type: 'ai',
+            message: `I see there's ${isSyntaxError ? 'a syntax error' : 'an error'} in your code. Take a look at the error message in the test results - it should help you identify what needs to be fixed. Let me know if you'd like me to explain it.`
+          }])
+
+          return // Don't proceed to post-interview discussion
+        }
+
         // Play sound based on results
         if (data.summary.passRate === 100) {
           playSound('success')
@@ -2321,8 +2368,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           playSound('fail')
         }
 
-        // Always start post-interview discussion after running tests, regardless of pass rate
-        // This ensures sessions are marked as complete even if not all tests pass
+        // Start post-interview discussion after running tests (when code at least runs)
         setIsRunningTests(false)
         setShowPostInterviewDiscussion(true)
 
@@ -3222,7 +3268,22 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   <div className="text-center mb-6">
                     <CheckCircle className="h-12 w-12 text-accent mx-auto mb-3" />
                     <h2 className="text-2xl font-heading font-bold text-white mb-2">Solution Complete!</h2>
-                    <p className="text-gray-300 mb-4">All tests passed! Let's discuss your solution with the interviewer.</p>
+                    <p className="text-gray-300 mb-4">
+                      {testSummary.passRate === 100
+                        ? "All tests passed! Let's discuss your solution with the interviewer."
+                        : `${testSummary.passed}/${testSummary.total} tests passed. Let's discuss your solution.`}
+                    </p>
+                    {/* Continue Editing button - allows users to go back and fix their code */}
+                    {testSummary.passRate < 100 && (
+                      <Button
+                        onClick={() => setShowPostInterviewDiscussion(false)}
+                        variant="outline"
+                        className="border-accent text-accent hover:bg-accent/10 mb-4"
+                      >
+                        <Code className="h-4 w-4 mr-2" />
+                        Continue Editing
+                      </Button>
+                    )}
                     {testSummary.total > 0 && (
                       <div className="flex items-center justify-center gap-4 mb-4">
                         <Badge className="bg-[#00d9ff] text-black">
