@@ -59,11 +59,13 @@ export function ProblemTeaser() {
               <div className="absolute inset-0 bg-gradient-to-r from-accent/5 via-transparent to-neural/5 rounded-2xl blur-2xl" />
 
               <div className="relative bg-gray-950/60 backdrop-blur-sm rounded-2xl border border-gray-800/40 p-6 md:p-8">
-                {/* SVG Visualization */}
+                {/* SVG Visualization - responsive with proper aspect ratio */}
                 <svg
-                  viewBox="0 0 400 160"
-                  className="w-full h-32 md:h-40"
+                  viewBox="0 0 420 160"
+                  className="w-full h-auto"
+                  preserveAspectRatio="xMidYMid meet"
                   aria-label="Forgetting curve comparison"
+                  style={{ maxHeight: '180px', minHeight: '120px' }}
                 >
                   <defs>
                     {/* Gradient for the forgetting curve */}
@@ -152,10 +154,10 @@ export function ProblemTeaser() {
 
                   {/* "20%" label at end of forgetting curve */}
                   <motion.text
-                    x="385"
+                    x="390"
                     y="125"
                     fill="#ff6b6b"
-                    fontSize="11"
+                    fontSize="12"
                     fontWeight="600"
                     initial={{ opacity: 0 }}
                     whileInView={{ opacity: 1 }}
@@ -167,10 +169,10 @@ export function ProblemTeaser() {
 
                   {/* "90%" label at end of retention curve */}
                   <motion.text
-                    x="385"
+                    x="390"
                     y="50"
                     fill="#00ff88"
-                    fontSize="11"
+                    fontSize="12"
                     fontWeight="600"
                     initial={{ opacity: 0 }}
                     whileInView={{ opacity: 1 }}
@@ -181,8 +183,8 @@ export function ProblemTeaser() {
                   </motion.text>
                 </svg>
 
-                {/* Legend - minimal */}
-                <div className="flex justify-center gap-8 mt-4 text-xs">
+                {/* Legend - responsive stacking on mobile */}
+                <div className="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-8 mt-4 text-xs">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-0.5 bg-gradient-to-r from-accent to-red-400 rounded-full" />
                     <span className="text-gray-500">Random practice</span>

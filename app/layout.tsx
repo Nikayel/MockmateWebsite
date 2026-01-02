@@ -1,5 +1,5 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Work_Sans, Open_Sans } from "next/font/google"
 import { Toaster } from "sonner"
 import { AuthProvider } from "@/lib/auth-context"
@@ -28,6 +28,18 @@ const siteConfig = {
   description: "Practice coding interviews with an AI interviewer available 24/7. Talk through problems out loud, get instant feedback, and master DSA patterns. Better than grinding LeetCode alone.",
   url: process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.dev",
   // OG images are now dynamically generated via app/opengraph-image.tsx
+}
+
+// Viewport configuration for mobile responsiveness
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#1c1c1e" },
+  ],
 }
 
 export const metadata: Metadata = {
@@ -174,10 +186,19 @@ html {
         />
       </head>
       <body className={`${workSans.variable} ${openSans.variable} antialiased`}>
+        {/* Skip link for keyboard accessibility - hidden until focused */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-accent focus:text-accent-foreground focus:rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          Skip to main content
+        </a>
         <PerformancePolyfill />
         <ErrorBoundaryProvider>
           <AuthProvider>
-            {children}
+            <div id="main-content">
+              {children}
+            </div>
             <Toaster position="top-right" richColors />
             <CookieConsent />
             <ConsentAnalytics />

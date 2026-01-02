@@ -15,6 +15,7 @@ import {
   sendTrialEndingEmail,
 } from "@/lib/email"
 import { logger } from "@/lib/logger"
+import { trackEventServer } from "@/lib/analytics-server"
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY environment variable is required")
@@ -305,6 +306,18 @@ export async function POST(request: NextRequest) {
             customerId: session.customer,
           })
 
+          // Track purchase for analytics and attribution
+          await trackEventServer("purchase", {
+            userId,
+            plan: "pro_monthly",
+            amount: (session.amount_total || 0) / 100,
+            currency: session.currency || "usd",
+            promoCode: session.metadata?.promoCode || null,
+            source: session.metadata?.source || "direct",
+            subscriptionId: session.subscription,
+            customerId: session.customer,
+          })
+
           // Send subscription confirmation email
           const userEmail = (profile?.email as string) || session.customer_email
           if (userEmail) {
@@ -504,6 +517,17 @@ export async function POST(request: NextRequest) {
 
           logger.payment("User upgraded to Pro (yearly)", {
             userId,
+            customerId: session.customer,
+          })
+
+          // Track purchase for analytics and attribution
+          await trackEventServer("purchase", {
+            userId,
+            plan: "pro_yearly",
+            amount: (session.amount_total || 0) / 100,
+            currency: session.currency || "usd",
+            promoCode: session.metadata?.promoCode || null,
+            source: session.metadata?.source || "direct",
             customerId: session.customer,
           })
 

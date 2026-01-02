@@ -3,6 +3,7 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Github, Terminal, CheckCircle } from "lucide-react"
 import { signInWithGitHub, signInWithGoogle } from "@/lib/auth"
 import { createOrUpdateProfile } from "@/lib/firestore-helpers"
@@ -13,11 +14,13 @@ import { useAuth } from "@/lib/auth-context"
 import { motion } from "framer-motion"
 import { GridBackground } from "@/components/GridBackground"
 import { staggerContainer, staggerItem } from "@/lib/motion"
+import Link from "next/link"
 
 function LoginPageContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [authStatus, setAuthStatus] = useState<"idle" | "authenticating" | "creating-profile" | "complete">("idle")
   const [authProvider, setAuthProvider] = useState<"github" | "google" | null>(null)
+  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false)
   const searchParams = useSearchParams()
   const router = useRouter()
   const redirect = searchParams.get("redirect")
@@ -292,14 +295,38 @@ function LoginPageContent() {
               </div>
             </motion.div>
 
+            {/* Terms + Age Acceptance */}
+            <motion.div variants={staggerItem} className="mb-6">
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <Checkbox
+                  id="terms-acceptance"
+                  checked={hasAcceptedTerms}
+                  onCheckedChange={(checked) => setHasAcceptedTerms(checked === true)}
+                  className="mt-0.5 data-[state=checked]:bg-accent data-[state=checked]:border-accent"
+                  aria-describedby="terms-description"
+                />
+                <span id="terms-description" className="text-sm text-muted-foreground leading-relaxed">
+                  I confirm I am at least <strong className="text-foreground">16 years old</strong> and agree to the{" "}
+                  <Link href="/legal#terms-of-service" className="text-accent hover:underline" target="_blank">
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
+                  <Link href="/legal#privacy-policy" className="text-accent hover:underline" target="_blank">
+                    Privacy Policy
+                  </Link>
+                </span>
+              </label>
+            </motion.div>
+
             {/* Login buttons - clean and spacious */}
             <motion.div variants={staggerItem} className="space-y-4">
 
               {/* GitHub */}
               <Button
                 onClick={handleGitHubLogin}
-                disabled={isLoading}
-                className="w-full h-14 bg-foreground hover:bg-foreground/90 text-background text-base font-medium rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                disabled={isLoading || !hasAcceptedTerms}
+                className="w-full h-14 bg-foreground hover:bg-foreground/90 text-background text-base font-medium rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                aria-label="Continue with GitHub"
               >
                 {isLoading && authProvider === "github" ? (
                   <div className="h-5 w-5 border-2 border-background/30 border-t-background rounded-full animate-spin" />
@@ -314,15 +341,16 @@ function LoginPageContent() {
               {/* Google */}
               <Button
                 onClick={handleGoogleLogin}
-                disabled={isLoading}
+                disabled={isLoading || !hasAcceptedTerms}
                 variant="outline"
-                className="w-full h-14 bg-transparent hover:bg-secondary/50 text-foreground text-base font-medium rounded-xl border-border hover:border-border/80 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                className="w-full h-14 bg-transparent hover:bg-secondary/50 text-foreground text-base font-medium rounded-xl border-border hover:border-border/80 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                aria-label="Continue with Google"
               >
                 {isLoading && authProvider === "google" ? (
                   <div className="h-5 w-5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
                 ) : (
                   <>
-                    <svg className="h-5 w-5 mr-3" viewBox="0 0 24 24">
+                    <svg className="h-5 w-5 mr-3" viewBox="0 0 24 24" aria-hidden="true">
                       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                       <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.69-2.23 1.1-3.71 1.1-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
                       <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />

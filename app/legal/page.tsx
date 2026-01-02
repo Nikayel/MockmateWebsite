@@ -410,8 +410,9 @@ export default function LegalPage() {
 
                   <h5 className="text-white font-medium mt-4 mb-2">Refund Policy</h5>
                   <p className="text-sm">
-                    We offer refunds on a case-by-case basis within 7 days of your initial purchase if you have
-                    not used more than 3 practice sessions. Contact support@codesparring.dev for refund requests.
+                    We offer a <strong className="text-white">30-day money-back guarantee</strong> on all new subscriptions.
+                    If you&apos;re not satisfied with CodeSparring within the first 30 days of your initial purchase,
+                    contact support@codesparring.dev for a full refund—no questions asked.
                   </p>
                 </div>
 
