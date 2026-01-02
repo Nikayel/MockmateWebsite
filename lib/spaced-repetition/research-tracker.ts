@@ -499,7 +499,18 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
   const fsrsStats = calculateCohortStats('fsrs', fsrsUsers, thirtyDaysAgo)
 
   // Calculate comparison
-  const comparison = {
+  const comparison: {
+    retention_rate_difference: number
+    average_score_difference: number
+    time_to_mastery_difference_days: number
+    engagement_difference: number
+    interval_efficiency_difference: number
+    sufficient_sample_size: boolean
+    overall_winner: SpacedRepetitionAlgorithm | null
+    confidence_level: number | null
+    fsrs_wins_count: number
+    sm2_wins_count: number
+  } = {
     retention_rate_difference: fsrsStats.average_retention_rate - sm2Stats.average_retention_rate,
     average_score_difference: fsrsStats.average_score - sm2Stats.average_score,
     time_to_mastery_difference_days:
@@ -507,27 +518,37 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
     engagement_difference: fsrsStats.average_daily_reviews - sm2Stats.average_daily_reviews,
     interval_efficiency_difference: fsrsStats.interval_accuracy - sm2Stats.interval_accuracy,
     sufficient_sample_size: sm2Users.length >= 30 && fsrsUsers.length >= 30,
-    overall_winner: undefined as SpacedRepetitionAlgorithm | undefined,
-    confidence_level: undefined as number | undefined,
+    overall_winner: null, // Use null instead of undefined for Firestore compatibility
+    confidence_level: null,
+    fsrs_wins_count: 0,
+    sm2_wins_count: 0,
   }
+
+  // Count wins for each algorithm across metrics
+  const metricComparisons = [
+    { name: 'retention', fsrsBetter: comparison.retention_rate_difference > 0 },
+    { name: 'score', fsrsBetter: comparison.average_score_difference > 0 },
+    { name: 'time_to_mastery', fsrsBetter: comparison.time_to_mastery_difference_days > 0 },
+    { name: 'engagement', fsrsBetter: comparison.engagement_difference > 0 },
+    { name: 'interval_efficiency', fsrsBetter: comparison.interval_efficiency_difference > 0 },
+  ]
+
+  const fsrsWins = metricComparisons.filter(m => m.fsrsBetter).length
+  const sm2Wins = 5 - fsrsWins
+
+  comparison.fsrs_wins_count = fsrsWins
+  comparison.sm2_wins_count = sm2Wins
 
   // Determine winner if sample size is sufficient
   if (comparison.sufficient_sample_size) {
-    const fsrsWins = [
-      comparison.retention_rate_difference > 0,
-      comparison.average_score_difference > 0,
-      comparison.time_to_mastery_difference_days > 0,
-      comparison.engagement_difference > 0,
-      comparison.interval_efficiency_difference > 0,
-    ].filter(Boolean).length
-
     if (fsrsWins >= 4) {
       comparison.overall_winner = 'fsrs'
       comparison.confidence_level = Math.min(95, 60 + fsrsWins * 7)
     } else if (fsrsWins <= 1) {
       comparison.overall_winner = 'sm2'
-      comparison.confidence_level = Math.min(95, 60 + (5 - fsrsWins) * 7)
+      comparison.confidence_level = Math.min(95, 60 + sm2Wins * 7)
     }
+    // If 2-3 wins each, no clear winner - leave as null
   }
 
   const aggregate: AlgorithmComparisonAggregate = {

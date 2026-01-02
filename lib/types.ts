@@ -460,8 +460,10 @@ export interface AlgorithmComparisonAggregate {
     sufficient_sample_size: boolean
 
     // Winner determination
-    overall_winner?: SpacedRepetitionAlgorithm
-    confidence_level?: number  // 0-100%
+    overall_winner: SpacedRepetitionAlgorithm | null  // null if no clear winner
+    confidence_level: number | null  // 0-100%, null if insufficient data
+    fsrs_wins_count: number  // Count of metrics where FSRS is better
+    sm2_wins_count: number   // Count of metrics where SM-2 is better
   }
 }
 
