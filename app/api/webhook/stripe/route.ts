@@ -22,12 +22,16 @@ if (!process.env.STRIPE_SECRET_KEY) {
 }
 
 // Support both production webhook secret and local Stripe CLI secret
-// For local testing: use STRIPE_WEBHOOK_SECRET_LOCAL (from `stripe listen`)
-// For production: use STRIPE_WEBHOOK_SECRET (from Stripe Dashboard)
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET_LOCAL || process.env.STRIPE_WEBHOOK_SECRET
+// IMPORTANT: In production, ONLY use STRIPE_WEBHOOK_SECRET
+// STRIPE_WEBHOOK_SECRET_LOCAL should ONLY be set in development (from `stripe listen`)
+// If both are set, prefer production secret unless explicitly in development
+const isDevelopment = process.env.NODE_ENV === 'development'
+const webhookSecret = isDevelopment
+  ? (process.env.STRIPE_WEBHOOK_SECRET_LOCAL || process.env.STRIPE_WEBHOOK_SECRET)
+  : process.env.STRIPE_WEBHOOK_SECRET
 
 if (!webhookSecret) {
-  throw new Error("STRIPE_WEBHOOK_SECRET or STRIPE_WEBHOOK_SECRET_LOCAL environment variable is required")
+  throw new Error("STRIPE_WEBHOOK_SECRET environment variable is required")
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
@@ -145,6 +149,7 @@ export async function POST(request: NextRequest) {
   const signature = request.headers.get("stripe-signature")
 
   if (!signature) {
+    paymentLogger.error("Webhook request missing signature header")
     return NextResponse.json({ error: "No signature" }, { status: 400 })
   }
 
@@ -153,7 +158,15 @@ export async function POST(request: NextRequest) {
   try {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret!)
   } catch (err) {
-    paymentLogger.error("Webhook signature verification failed", { error: err })
+    // Enhanced logging to help debug signature mismatches
+    paymentLogger.error("Webhook signature verification failed", {
+      error: err instanceof Error ? err.message : String(err),
+      signaturePrefix: signature.substring(0, 20) + "...",
+      secretPrefix: webhookSecret ? webhookSecret.substring(0, 10) + "..." : "NOT_SET",
+      bodyLength: body.length,
+      isDevelopment,
+      hint: "Check that STRIPE_WEBHOOK_SECRET matches the webhook endpoint in Stripe Dashboard"
+    })
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
   }
 
@@ -371,12 +384,17 @@ export async function POST(request: NextRequest) {
           const profileRef = adminDb.collection("profiles").doc(userId)
           const profileSnap = await profileRef.get()
 
-          if (!profileSnap.exists) {
-            paymentLogger.error("Profile does not exist for yearly plan", { userId })
-            return NextResponse.json({ error: "Profile not found" }, { status: 404 })
-          }
+          // Get existing profile data or prepare to create new
+          let profile = profileSnap.exists ? profileSnap.data() : null
 
-          const profile = profileSnap.data()
+          if (!profileSnap.exists) {
+            // Profile doesn't exist - create it with subscription data
+            // This handles edge cases where profile creation failed but payment succeeded
+            paymentLogger.warn("Profile does not exist for yearly plan - will create", {
+              userId,
+              email: session.customer_email
+            })
+          }
 
           // Calculate subscription end date (1 year from now)
           const now = new Date()
@@ -495,8 +513,16 @@ export async function POST(request: NextRequest) {
             })
           }
 
-          await profileRef.update(updateData)
-          paymentLogger.info("Updated profile for yearly plan", {
+          // Use set with merge to handle both update and create cases
+          // This ensures profile is created if it doesn't exist
+          if (!profileSnap.exists) {
+            // Add required fields for new profile
+            updateData.id = userId
+            updateData.email = session.customer_email || ""
+            updateData.created_at = new Date().toISOString()
+          }
+          await profileRef.set(updateData, { merge: true })
+          paymentLogger.info(profileSnap.exists ? "Updated profile for yearly plan" : "Created profile for yearly plan", {
             userId,
             expiresAt: oneYearFromNow.toISOString(),
           })
