@@ -636,11 +636,33 @@ async function handleGetSmartRecommendations(userId: string, params: {
 }) {
   const recommendationService = getSmartRecommendationService()
 
-  // If problems not provided, we'd normally fetch from the database
-  // For now, return an error if not provided
-  if (!params.problems || params.problems.length === 0) {
+  // Auto-fetch problems from scenarios if not provided
+  let problems = params.problems
+  if (!problems || problems.length === 0) {
+    try {
+      const { getScenariosByType } = await import('@/lib/scenarios/index')
+      const dsaScenarios = await getScenariosByType('dsa')
+
+      problems = dsaScenarios.map(scenario => ({
+        id: scenario.id,
+        title: scenario.title,
+        pattern: (scenario as any).pattern as DSAPattern,
+        difficulty: scenario.difficulty as 'easy' | 'medium' | 'hard',
+        company: scenario.companies[0]?.toLowerCase() as CompanyId | undefined,
+        frequency: 1, // Default frequency
+      }))
+    } catch (error) {
+      console.error('[RAG API] Failed to auto-fetch scenarios:', error)
+      return NextResponse.json(
+        { error: 'Failed to fetch problem pool' },
+        { status: 500 }
+      )
+    }
+  }
+
+  if (problems.length === 0) {
     return NextResponse.json(
-      { error: 'Problems array is required for smart recommendations' },
+      { error: 'No problems available for recommendations' },
       { status: 400 }
     )
   }
@@ -654,7 +676,7 @@ async function handleGetSmartRecommendations(userId: string, params: {
       excludeIds: params.excludeIds,
       limit: params.limit,
     },
-    params.problems
+    problems
   )
 
   return NextResponse.json(response)

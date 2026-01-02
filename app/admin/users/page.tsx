@@ -17,7 +17,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { MetricCard, TimeSeriesChart, DistributionChart } from "@/components/admin/charts"
-import { Users, UserPlus, Crown, Search, RefreshCw, Trash2, X } from "lucide-react"
+import { UserProfileDrawer } from "@/components/admin/UserProfileDrawer"
+import { Users, UserPlus, Crown, Search, RefreshCw, Trash2, X, Eye } from "lucide-react"
 
 interface UserProfile {
   id: string
@@ -44,6 +45,9 @@ export default function UsersPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [profileDrawerOpen, setProfileDrawerOpen] = useState(false)
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [authToken, setAuthToken] = useState<string | null>(null)
 
   // Protected emails - these users cannot be deleted
   const PROTECTED_EMAILS = [
@@ -56,6 +60,7 @@ export default function UsersPage() {
 
     try {
       const token = await firebaseUser.getIdToken()
+      setAuthToken(token) // Store token for profile drawer
       const response = await fetch(`/api/admin/analytics?timeRange=${timeRange}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -407,21 +412,35 @@ export default function UsersPage() {
                           )}
                         </td>
                         <td className="py-3 px-4 text-right">
-                          {protectedUser ? (
-                            <span className="text-gray-500 text-sm">Cannot delete</span>
-                          ) : (
+                          <div className="flex items-center justify-end gap-1">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => {
-                                setUserToDelete(user)
-                                setDeleteDialogOpen(true)
+                                setSelectedUserId(user.id)
+                                setProfileDrawerOpen(true)
                               }}
-                              className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                              className="text-[#00d9ff] hover:text-[#00d9ff]/80 hover:bg-[#00d9ff]/10"
+                              title="View Profile"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Eye className="h-4 w-4" />
                             </Button>
-                          )}
+                            {protectedUser ? (
+                              <span className="text-gray-500 text-sm ml-2">Protected</span>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setUserToDelete(user)
+                                  setDeleteDialogOpen(true)
+                                }}
+                                className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     )
@@ -498,6 +517,17 @@ export default function UsersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* User Profile Drawer */}
+      <UserProfileDrawer
+        isOpen={profileDrawerOpen}
+        onClose={() => {
+          setProfileDrawerOpen(false)
+          setSelectedUserId(null)
+        }}
+        userId={selectedUserId}
+        token={authToken}
+      />
     </div>
   )
 }
