@@ -9,7 +9,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { verifyAdminAccess, successResponse, unauthorizedResponse, errorResponse } from "@/lib/admin/middleware"
 import { logAdminAction } from "@/lib/admin/audit"
 import { getEnhancedUserProfile, getUserInsights, getInterviewReadiness } from "@/lib/rag/enhanced-user-profile"
-import { getMisconceptionTracker } from "@/lib/rag/misconception-detection"
 import { adminDb } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
 
@@ -85,8 +84,23 @@ export async function GET(request: NextRequest) {
  */
 async function getMisconceptionsSummary(userId: string) {
   try {
-    const tracker = getMisconceptionTracker(userId)
-    const allMisconceptions = await tracker.getAll()
+    // Query all misconceptions for the user (both active and resolved)
+    const misconceptionsSnapshot = await adminDb
+      .collection('user_misconceptions')
+      .where('userId', '==', userId)
+      .get()
+
+    const allMisconceptions = misconceptionsSnapshot.docs.map(doc => {
+      const data = doc.data()
+      return {
+        type: data.misconceptionType || data.type,
+        pattern: data.pattern,
+        occurrences: data.frequency || data.occurrences || 1,
+        resolved: data.status === 'resolved',
+        firstSeen: data.createdAt?.toDate?.() || data.firstSeen?.toDate?.() || data.firstSeen,
+        lastSeen: data.lastSeen?.toDate?.() || data.lastSeen,
+      }
+    })
 
     // Calculate summary stats
     const byPattern: Record<string, number> = {}

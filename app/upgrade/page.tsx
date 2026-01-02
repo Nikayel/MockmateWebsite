@@ -227,40 +227,7 @@ function UpgradePageContent() {
 
           {/* Pricing Cards - Ultra Compact */}
           {!isProUser && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 max-w-2xl mx-auto">
-
-              {/* Free Plan */}
-              <div className="rounded-xl p-5 border bg-white/[0.02] border-white/10">
-                <h3 className="text-base font-semibold text-white mb-3">Free</h3>
-
-                <div className="text-4xl font-bold text-white mb-2">Free</div>
-
-                <Link href="/interview">
-                  <Button
-                    variant="outline"
-                    className="w-full border-white/20 text-white hover:bg-white/10 mb-4"
-                  >
-                    Get Started
-                  </Button>
-                </Link>
-
-                <p className="text-gray-400 text-xs mb-2">Try before you commit.</p>
-
-                <ul className="space-y-1.5 text-sm text-gray-400">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-gray-500" />
-                    2 interview scenarios/month
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-gray-500" />
-                    All 200+ DSA problems
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-3.5 h-3.5 text-gray-500" />
-                    AI interviewer feedback
-                  </li>
-                </ul>
-              </div>
+            <div className="grid grid-cols-1 gap-4 mb-4 max-w-xl mx-auto">
 
               {/* Pro Plan */}
               <div className="rounded-xl p-5 border-2 bg-gradient-to-br from-accent/5 to-transparent border-accent/50">
@@ -268,9 +235,13 @@ function UpgradePageContent() {
 
                 <div className="flex items-baseline gap-1 mb-2">
                   <span className="text-4xl font-bold text-accent">
-                    {currentPrice.priceDisplay}
+                    {billingPeriod === 'yearly' && currentPrice.totalDisplay 
+                      ? currentPrice.totalDisplay 
+                      : currentPrice.priceDisplay}
                   </span>
-                  <span className="text-gray-400 text-sm">{currentPrice.period}</span>
+                  <span className="text-gray-400 text-sm">
+                    {billingPeriod === 'yearly' ? '/year' : currentPrice.period}
+                  </span>
                 </div>
 
                 <Button
