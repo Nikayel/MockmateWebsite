@@ -17,10 +17,17 @@ const LANGUAGE_CONFIG: Record<string, { language: string; version: string }> = {
   python: { language: 'python', version: '3.10.0' },
 }
 
+export interface ConsoleLog {
+  type: 'log' | 'error' | 'warn' | 'info';
+  message: string;
+  timestamp: number;
+}
+
 export interface PistonExecuteResult {
   success: boolean
   output: string | null
   error: string | null
+  consoleLogs?: ConsoleLog[]
   executionTime?: number
 }
 
@@ -125,6 +132,7 @@ export async function executeWithPiston(
 
 /**
  * Wrap user code to execute with test inputs and capture output
+ * Also captures console.log/warn/error calls for display in the console panel
  */
 function wrapCodeForExecution(code: string, language: string, testInput: any): string {
   const inputValues = Object.values(testInput)
@@ -135,8 +143,23 @@ function wrapCodeForExecution(code: string, language: string, testInput: any): s
     const funcMatch = code.match(/def\s+(\w+)\s*\(/)
     const funcName = funcMatch ? funcMatch[1] : 'solution'
 
+    // Python wrapper with print capture
     return `
 import json
+import sys
+import time
+
+# Capture print statements
+_console_logs = []
+_original_print = print
+
+def _capture_print(*args, **kwargs):
+    msg = ' '.join(str(a) for a in args)
+    _console_logs.append({"type": "log", "message": msg, "timestamp": int(time.time() * 1000)})
+    _original_print(*args, **kwargs)
+
+# Override print
+print = _capture_print
 
 ${code}
 
@@ -144,10 +167,16 @@ ${code}
 try:
     _input = json.loads('${inputJson.replace(/'/g, "\\'")}')
     _result = ${funcName}(*_input)
-    print(json.dumps(_result))
+    # Output format: LOGS|||RESULT
+    print = _original_print  # Restore for final output
+    print("__LOGS__:" + json.dumps(_console_logs))
+    print("__RESULT__:" + json.dumps(_result))
 except Exception as e:
-    import sys
-    print(f"ERROR: {str(e)}", file=sys.stderr)
+    import traceback
+    tb = traceback.format_exc()
+    print = _original_print
+    print("__LOGS__:" + json.dumps(_console_logs))
+    print(f"ERROR: {str(e)}\\n{tb}", file=sys.stderr)
     sys.exit(1)
 `
   }
@@ -157,7 +186,32 @@ except Exception as e:
   const funcMatch = code.match(/(?:function\s+(\w+)|const\s+(\w+)\s*=|let\s+(\w+)\s*=|var\s+(\w+)\s*=)/)
   const funcName = funcMatch ? (funcMatch[1] || funcMatch[2] || funcMatch[3] || funcMatch[4]) : null
 
+  // JavaScript wrapper with console capture
   return `
+// Capture console methods
+const _consoleLogs = [];
+const _originalLog = console.log;
+const _originalWarn = console.warn;
+const _originalError = console.error;
+const _originalInfo = console.info;
+
+console.log = (...args) => {
+  _consoleLogs.push({ type: 'log', message: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), timestamp: Date.now() });
+  _originalLog.apply(console, args);
+};
+console.warn = (...args) => {
+  _consoleLogs.push({ type: 'warn', message: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), timestamp: Date.now() });
+  _originalWarn.apply(console, args);
+};
+console.error = (...args) => {
+  _consoleLogs.push({ type: 'error', message: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), timestamp: Date.now() });
+  _originalError.apply(console, args);
+};
+console.info = (...args) => {
+  _consoleLogs.push({ type: 'info', message: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '), timestamp: Date.now() });
+  _originalInfo.apply(console, args);
+};
+
 ${code}
 
 // Execute with test input
@@ -170,6 +224,7 @@ try {
   if (!_func && typeof solution === 'function') _func = solution;
   if (!_func && typeof twoSum === 'function') _func = twoSum;
   if (!_func && typeof main === 'function') _func = main;
+  if (!_func && typeof isSameTree === 'function') _func = isSameTree;
 
   // For bugfix scenarios - look for common function names
   if (!_func && typeof processAdjacentPairs === 'function') _func = processAdjacentPairs;
@@ -182,14 +237,22 @@ try {
   }
 
   if (typeof _func !== 'function') {
+    console.log = _originalLog;
+    console.log('__LOGS__:' + JSON.stringify(_consoleLogs));
     console.error('ERROR: No callable function found');
     process.exit(1);
   }
 
   const _result = _func(..._input);
-  console.log(JSON.stringify(_result));
+
+  // Restore and output
+  console.log = _originalLog;
+  console.log('__LOGS__:' + JSON.stringify(_consoleLogs));
+  console.log('__RESULT__:' + JSON.stringify(_result));
 } catch (e) {
-  console.error('ERROR: ' + e.message);
+  console.log = _originalLog;
+  console.log('__LOGS__:' + JSON.stringify(_consoleLogs));
+  console.error('ERROR: ' + e.message + (e.stack ? '\\n' + e.stack : ''));
   process.exit(1);
 }
 `
@@ -197,12 +260,38 @@ try {
 
 /**
  * Parse the output from Piston execution
+ * Handles the new format with __LOGS__ and __RESULT__ prefixes
  */
-export function parseExecutionOutput(output: string): any {
-  try {
-    return JSON.parse(output)
-  } catch {
-    // If not valid JSON, return as-is
-    return output
+export function parseExecutionOutput(output: string): { result: any; consoleLogs: ConsoleLog[] } {
+  const lines = output.trim().split('\n')
+  let consoleLogs: ConsoleLog[] = []
+  let result: any = null
+
+  for (const line of lines) {
+    if (line.startsWith('__LOGS__:')) {
+      try {
+        consoleLogs = JSON.parse(line.substring('__LOGS__:'.length))
+      } catch {
+        // Ignore parse errors for logs
+      }
+    } else if (line.startsWith('__RESULT__:')) {
+      try {
+        result = JSON.parse(line.substring('__RESULT__:'.length))
+      } catch {
+        result = line.substring('__RESULT__:'.length)
+      }
+    }
   }
+
+  // Fallback for old format (just JSON result)
+  if (result === null && lines.length > 0) {
+    const lastLine = lines[lines.length - 1]
+    try {
+      result = JSON.parse(lastLine)
+    } catch {
+      result = lastLine
+    }
+  }
+
+  return { result, consoleLogs }
 }

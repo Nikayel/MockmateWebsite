@@ -86,6 +86,11 @@ const GradingCriteriaTooltip = nextDynamic(
   { ssr: false }
 )
 
+const CodeConsole = nextDynamic(
+  () => import("@/components/interview/CodeConsole").then(mod => ({ default: mod.CodeConsole })),
+  { ssr: false }
+)
+
 // Inline error fallback for components that fail to load
 function ComponentErrorFallback({ componentName }: { componentName: string }) {
   return (
@@ -253,6 +258,7 @@ function InterviewPageContent() {
 
   // Test states
   const [testResults, setTestResults] = useState<TestResult[]>([])
+  const [consoleLogs, setConsoleLogs] = useState<Array<{ type: string; message: string; timestamp: number }>>([])
   const [isRunningTests, setIsRunningTests] = useState(false)
   const [testSummary, setTestSummary] = useState({ total: 0, passed: 0, failed: 0, passRate: 0 })
   const [efficiencyMetrics, setEfficiencyMetrics] = useState<{
@@ -2290,6 +2296,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
     setIsRunningTests(true)
     setTestResults([])
+    setConsoleLogs([]) // Clear previous console logs
 
     // Analyze code efficiency
     const metrics = analyzeCodeEfficiency(code)
@@ -2312,6 +2319,44 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         setTestResults(data.results)
         setTestSummary(data.summary)
 
+        // Store console logs from execution
+        if (data.consoleLogs && data.consoleLogs.length > 0) {
+          setConsoleLogs(data.consoleLogs)
+        }
+
+        // Check for syntax/compilation errors - keep user in editing mode so they can fix
+        const errorResults = data.results.filter((r: TestResult) => r.error)
+        const allFailed = data.summary.passRate === 0
+
+        // If all tests failed due to code errors, keep user in editing mode
+        if (allFailed && errorResults.length > 0) {
+          const firstError = errorResults[0].error
+
+          // Check if it's a syntax or compilation error
+          const isSyntaxError = firstError && (
+            firstError.includes('SyntaxError') ||
+            firstError.includes('Compilation error') ||
+            firstError.includes('Unexpected token') ||
+            firstError.includes('unexpected token') ||
+            firstError.includes('Parse error') ||
+            firstError.includes('IndentationError') ||
+            firstError.includes('invalid syntax')
+          )
+
+          // Keep user in editing mode so they can fix the error
+          // Console panel will show the error - no need for toast
+          playSound('fail')
+          setIsRunningTests(false)
+
+          // Add a helpful message from the interviewer about the error
+          setInterviewerMessages(prev => [...prev, {
+            type: 'ai',
+            message: `I see there's ${isSyntaxError ? 'a syntax error' : 'an error'} in your code. Check the console below the editor - it shows exactly what went wrong. Let me know if you'd like help understanding the error.`
+          }])
+
+          return // Don't proceed to post-interview discussion
+        }
+
         // Play sound based on results
         if (data.summary.passRate === 100) {
           playSound('success')
@@ -2321,8 +2366,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           playSound('fail')
         }
 
-        // Always start post-interview discussion after running tests, regardless of pass rate
-        // This ensures sessions are marked as complete even if not all tests pass
+        // Start post-interview discussion after running tests (when code at least runs)
         setIsRunningTests(false)
         setShowPostInterviewDiscussion(true)
 
@@ -2870,114 +2914,24 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         )}
                       </div>
 
-                      {/* Terminal/Console Output - Enhanced (hidden for system design) */}
-                      {testResults.length > 0 && selectedScenario?.type !== 'system-design' && (
-                        <div className="flex-shrink-0 bg-black border border-gray-700 rounded flex flex-col max-h-48 min-h-[120px]">
-                          {/* Terminal Header */}
-                          <div className="flex items-center justify-between px-3 py-1.5 bg-gray-800 border-b border-gray-700 flex-shrink-0">
-                            <div className="flex items-center space-x-2">
-                              <div className="flex space-x-1.5">
-                                <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
-                                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
-                                <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
-                              </div>
-                              <span className="text-gray-400 text-xs font-mono">Terminal</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Badge
-                                className={`${testSummary.passRate === 100 ? "bg-[#00d9ff]" :
-                                  testSummary.passRate >= 60 ? "bg-[#00d9ff]/70" : "bg-gray-600"
-                                  } text-xs h-5 text-black`}
-                              >
-                                {testSummary.passed}/{testSummary.total} passed
-                              </Badge>
-                              {efficiencyMetrics && (
-                                <Badge className={`${efficiencyMetrics.efficiencyScore >= 80 ? "bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]" :
-                                  efficiencyMetrics.efficiencyScore >= 60 ? "bg-[#00d9ff]/10 text-[#00d9ff]/70 border-[#00d9ff]/50" :
-                                    "bg-gray-600/20 text-gray-400 border-gray-600"
-                                  } text-xs h-5 border`}>
-                                  {efficiencyMetrics.efficiencyScore}% efficient
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Terminal Content */}
-                          <div className="flex-1 overflow-y-auto p-2 space-y-1 font-mono text-xs">
-                            {/* Summary */}
-                            <div className="text-gray-400 mb-2">
-                              <span className="text-accent">$</span> Running tests...
-                            </div>
-
-                            {/* Individual Test Results */}
-                            {testResults.map((result, index) => (
-                              <div key={index} className="mb-2">
-                                <div className={`flex items-center space-x-2 ${result.passed ? 'text-neural' : 'text-muted-foreground'}`}>
-                                  {result.passed ? (
-                                    <CheckCircle className="h-3 w-3 flex-shrink-0" />
-                                  ) : (
-                                    <XCircle className="h-3 w-3 flex-shrink-0" />
-                                  )}
-                                  <span className="font-semibold">{result.description}</span>
-                                </div>
-
-                                {!result.passed && (
-                                  <div className="ml-5 mt-1 space-y-0.5 text-gray-300">
-                                    <div className="flex items-start space-x-2">
-                                      <span className="text-gray-500">Input:</span>
-                                      <span className="text-blue-300">{JSON.stringify(result.input)}</span>
-                                    </div>
-                                    <div className="flex items-start space-x-2">
-                                      <span className="text-gray-500">Expected:</span>
-                                      <span className="text-green-300">{JSON.stringify(result.expected)}</span>
-                                    </div>
-                                    <div className="flex items-start space-x-2">
-                                      <span className="text-gray-500">Got:</span>
-                                      <span className="text-red-300">{JSON.stringify(result.actual)}</span>
-                                    </div>
-                                    {result.error && (
-                                      <div className="flex items-start space-x-2 mt-1">
-                                        <AlertCircle className="h-3 w-3 flex-shrink-0 text-red-400 mt-0.5" />
-                                        <span className="text-red-300 break-all">{result.error}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-
-                            {/* Efficiency Metrics */}
-                            {efficiencyMetrics && (
-                              <div className="border-t border-gray-800 pt-2 mt-2 space-y-1">
-                                <div className="text-gray-400">Complexity Analysis:</div>
-                                <div className="ml-2 space-y-0.5 text-gray-300">
-                                  <div>
-                                    <span className="text-gray-500">Time:</span>
-                                    <span className={`ml-2 ${efficiencyMetrics.estimatedTimeComplexity === efficiencyMetrics.optimalTimeComplexity ? 'text-green-400' : 'text-yellow-400'}`}>
-                                      {efficiencyMetrics.estimatedTimeComplexity}
-                                    </span>
-                                    {efficiencyMetrics.optimalTimeComplexity !== "N/A" && (
-                                      <span className="text-gray-500 ml-1">(optimal: {efficiencyMetrics.optimalTimeComplexity})</span>
-                                    )}
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-500">Space:</span>
-                                    <span className={`ml-2 ${efficiencyMetrics.estimatedSpaceComplexity === efficiencyMetrics.optimalSpaceComplexity ? 'text-green-400' : 'text-yellow-400'}`}>
-                                      {efficiencyMetrics.estimatedSpaceComplexity}
-                                    </span>
-                                    {efficiencyMetrics.optimalSpaceComplexity !== "N/A" && (
-                                      <span className="text-gray-500 ml-1">(optimal: {efficiencyMetrics.optimalSpaceComplexity})</span>
-                                    )}
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-500">Code Quality:</span>
-                                    <span className="ml-2 text-gray-300">{efficiencyMetrics.complexity} complexity, {efficiencyMetrics.linesOfCode} LOC</span>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                      {/* Console Panel - IDE-like output display (hidden for system design) */}
+                      {isInterviewStarted && selectedScenario?.type !== 'system-design' && (
+                        <CodeConsole
+                          outputs={consoleLogs.map(log => ({
+                            type: log.type as 'log' | 'error' | 'warn' | 'info',
+                            message: log.message,
+                            timestamp: log.timestamp
+                          }))}
+                          testResults={testResults}
+                          testSummary={testSummary}
+                          isRunning={isRunningTests}
+                          className="max-h-48 min-h-[120px]"
+                          onClear={() => {
+                            setConsoleLogs([])
+                            setTestResults([])
+                            setTestSummary({ total: 0, passed: 0, failed: 0, passRate: 0 })
+                          }}
+                        />
                       )}
 
                       {/* Controls */}
@@ -3222,7 +3176,22 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   <div className="text-center mb-6">
                     <CheckCircle className="h-12 w-12 text-accent mx-auto mb-3" />
                     <h2 className="text-2xl font-heading font-bold text-white mb-2">Solution Complete!</h2>
-                    <p className="text-gray-300 mb-4">All tests passed! Let's discuss your solution with the interviewer.</p>
+                    <p className="text-gray-300 mb-4">
+                      {testSummary.passRate === 100
+                        ? "All tests passed! Let's discuss your solution with the interviewer."
+                        : `${testSummary.passed}/${testSummary.total} tests passed. Let's discuss your solution.`}
+                    </p>
+                    {/* Continue Editing button - allows users to go back and fix their code */}
+                    {testSummary.passRate < 100 && (
+                      <Button
+                        onClick={() => setShowPostInterviewDiscussion(false)}
+                        variant="outline"
+                        className="border-accent text-accent hover:bg-accent/10 mb-4"
+                      >
+                        <Code className="h-4 w-4 mr-2" />
+                        Continue Editing
+                      </Button>
+                    )}
                     {testSummary.total > 0 && (
                       <div className="flex items-center justify-center gap-4 mb-4">
                         <Badge className="bg-[#00d9ff] text-black">
