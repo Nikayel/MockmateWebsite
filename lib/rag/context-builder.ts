@@ -12,6 +12,8 @@
 import { getAdvancedRetriever, type EnhancedRetrievalResult } from './retrieval/advanced-retrieval'
 import { getPatternKnowledge, patternKnowledgeToDocument } from './knowledge-base/dsa-knowledge'
 import { getCompanyInterviewKnowledge, companyKnowledgeToDocument } from './knowledge-base/company-knowledge'
+import { getEnhancedProfileService, type EnhancedUserProfile, type UserInsight } from './enhanced-user-profile'
+import { getMisconceptionTracker } from './misconception-detection'
 import type { DSAPattern } from '@/lib/types/dsa-patterns'
 import type { CompanyId } from '@/lib/data/company-questions/types'
 
@@ -491,6 +493,213 @@ ${d.text}
       },
     }
   }
+
+  /**
+   * Build enhanced context with full user profile insights
+   * This is the most comprehensive context for personalized AI interactions
+   */
+  async buildEnhancedContext(options: {
+    userId: string
+    problemText?: string
+    problemPattern?: DSAPattern
+    userCode?: string
+    contextType: ContextType
+  }): Promise<BuiltContext & { enhancedProfile: EnhancedUserProfile }> {
+    const startTime = Date.now()
+    const retrievedDocs: EnhancedRetrievalResult[] = []
+
+    // Get enhanced user profile
+    const profileService = getEnhancedProfileService()
+    const enhancedProfile = await profileService.getEnhancedProfile(options.userId)
+
+    // Get misconceptions if relevant
+    const misconceptionTracker = getMisconceptionTracker()
+    const activeMisconceptions = options.problemPattern
+      ? await misconceptionTracker.getPatternMisconceptionSummary(options.userId, options.problemPattern)
+      : null
+
+    // Build cognitive profile context
+    const cognitiveContext = this.buildCognitiveContext(enhancedProfile)
+
+    // Build knowledge gap context
+    const knowledgeGapContext = this.buildKnowledgeGapContext(enhancedProfile)
+
+    // Build misconception context
+    const misconceptionContext = activeMisconceptions && activeMisconceptions.count > 0
+      ? `
+## Known Misconceptions for ${options.problemPattern}
+- Common error type: ${activeMisconceptions.mostCommon || 'various'}
+- Occurrences: ${activeMisconceptions.count}
+- Focus: ${activeMisconceptions.suggestedFocus}
+`
+      : ''
+
+    // Build temporal context (decay, review needs)
+    const temporalContext = this.buildTemporalContext(enhancedProfile, options.problemPattern)
+
+    // Get pattern knowledge if applicable
+    let patternContext = ''
+    if (options.problemPattern) {
+      const knowledge = getPatternKnowledge(options.problemPattern)
+      if (knowledge) {
+        patternContext = patternKnowledgeToDocument(knowledge)
+      }
+    }
+
+    // Retrieve relevant documents
+    if (options.problemText) {
+      const { results: docs } = await this.retriever.retrieve({
+        query: options.problemText,
+        limit: 5,
+        patterns: options.problemPattern ? [options.problemPattern] : undefined,
+        enableQueryExpansion: true,
+      })
+      retrievedDocs.push(...docs)
+    }
+
+    const systemContext = `
+# Enhanced RAG Context with User Profile
+
+## User Profile Summary
+- Level: ${enhancedProfile.interviewReadiness.overall >= 70 ? 'Advanced' : enhancedProfile.interviewReadiness.overall >= 40 ? 'Intermediate' : 'Beginner'}
+- Interview Readiness: ${enhancedProfile.interviewReadiness.overall}%
+- Learning Pace: ${enhancedProfile.cognitive.patternRecognition.speed}
+- Problem-Solving Style: ${enhancedProfile.cognitive.problemSolvingApproach.style}
+
+${cognitiveContext}
+
+${knowledgeGapContext}
+
+${misconceptionContext}
+
+${temporalContext}
+
+## Pattern Knowledge
+${patternContext || 'No specific pattern context'}
+
+## Active Insights
+${enhancedProfile.insights.slice(0, 3).map(i => `- ${i.icon} ${i.title}: ${i.description}`).join('\n')}
+
+## Retrieved Context
+${retrievedDocs.map(d => d.text).join('\n\n---\n\n')}
+`.trim()
+
+    const userContext = `
+User is ${enhancedProfile.interviewReadiness.overall >= 70 ? 'well-prepared' : 'still learning'}.
+${options.problemPattern ? `Working on ${options.problemPattern} problem.` : ''}
+${enhancedProfile.insights.length > 0 ? `Key insight: ${enhancedProfile.insights[0].description}` : ''}
+`.trim()
+
+    return {
+      type: options.contextType,
+      systemContext,
+      userContext,
+      retrievedDocs,
+      metadata: {
+        patternsIncluded: options.problemPattern ? [options.problemPattern] : [],
+        companiesIncluded: [],
+        docCount: retrievedDocs.length,
+        buildTimeMs: Date.now() - startTime,
+      },
+      enhancedProfile,
+    }
+  }
+
+  /**
+   * Build cognitive profile context for AI
+   */
+  private buildCognitiveContext(profile: EnhancedUserProfile): string {
+    const cog = profile.cognitive
+    return `
+## Cognitive Profile
+- Learning Style: ${cog.learningStyle.primary} (${cog.learningStyle.confidence}% confidence)
+- Problem-Solving: ${cog.problemSolvingApproach.style} approach, ${cog.problemSolvingApproach.planningTendency} tendency
+- Pattern Recognition: ${cog.patternRecognition.speed} speed, ${cog.patternRecognition.accuracy}% accuracy
+- Transfer Ability: ${cog.patternRecognition.transferAbility}% (applying patterns to new contexts)
+- Complexity Tolerance: ${cog.workingMemory.complexityTolerance}
+
+### Personalization Notes
+${cog.learningStyle.primary === 'example-based' ? '- Provide code examples to illustrate concepts' : ''}
+${cog.learningStyle.primary === 'visual' ? '- Use diagrams and visual explanations when possible' : ''}
+${cog.problemSolvingApproach.planningTendency === 'improviser' ? '- Encourage pseudocode before implementation' : ''}
+${cog.patternRecognition.speed === 'slow' ? '- Give more time for pattern recognition, break down steps' : ''}
+${cog.workingMemory.complexityTolerance === 'low' ? '- Break complex problems into smaller steps' : ''}
+`.trim()
+  }
+
+  /**
+   * Build knowledge gap context for AI
+   */
+  private buildKnowledgeGapContext(profile: EnhancedUserProfile): string {
+    const kg = profile.knowledgeGraph
+
+    if (kg.gaps.length === 0 && kg.misconceptions.length === 0) {
+      return '## Knowledge Status\nNo significant gaps or misconceptions detected.'
+    }
+
+    let context = '## Knowledge Gaps & Misconceptions\n'
+
+    if (kg.gaps.length > 0) {
+      context += '\n### Prerequisite Gaps\n'
+      for (const gap of kg.gaps.slice(0, 3)) {
+        context += `- **${gap.pattern}**: Missing ${gap.missingPrerequisites.map(p => p.concept).join(', ')} (${gap.impact})\n`
+      }
+    }
+
+    if (kg.misconceptions.length > 0) {
+      context += '\n### Active Misconceptions\n'
+      for (const m of kg.misconceptions.filter(m => m.status === 'active').slice(0, 3)) {
+        context += `- **${m.pattern}**: ${m.description} (seen ${m.frequency}x)\n`
+        context += `  Fix: ${m.suggestedFix}\n`
+      }
+    }
+
+    return context.trim()
+  }
+
+  /**
+   * Build temporal context (decay, scheduling) for AI
+   */
+  private buildTemporalContext(profile: EnhancedUserProfile, pattern?: DSAPattern): string {
+    const temporal = profile.temporal
+
+    let context = '## Temporal Insights\n'
+
+    // Growth trajectory
+    context += `\n### Growth Trajectory\n`
+    context += `- Current velocity: ${temporal.growth.currentVelocity > 0 ? '+' : ''}${temporal.growth.currentVelocity.toFixed(1)} points/week\n`
+    context += `- Trend: ${temporal.growth.accelerating ? 'Accelerating' : 'Steady'}\n`
+    context += `- Projected level: ${temporal.growth.projectedLevel}\n`
+
+    // Decay warnings
+    const urgentDecay = temporal.skillDecay.filter(sd => sd.urgency !== 'none')
+    if (urgentDecay.length > 0) {
+      context += `\n### Skills Needing Review\n`
+      for (const sd of urgentDecay.slice(0, 3)) {
+        const isCurrentPattern = pattern && sd.pattern === pattern
+        context += `- ${sd.pattern}: ${sd.daysSincePractice} days, ~${Math.round(sd.estimatedDecay)}% decay${isCurrentPattern ? ' (CURRENT)' : ''}\n`
+      }
+    }
+
+    // Specific pattern context
+    if (pattern) {
+      const patternDecay = temporal.skillDecay.find(sd => sd.pattern === pattern)
+      const patternReview = temporal.reviewSchedule.find(r => r.pattern === pattern)
+
+      if (patternDecay || patternReview) {
+        context += `\n### Current Pattern (${pattern})\n`
+        if (patternDecay) {
+          context += `- Days since practice: ${patternDecay.daysSincePractice}\n`
+          context += `- Estimated decay: ${Math.round(patternDecay.estimatedDecay)}%\n`
+        }
+        if (patternReview) {
+          context += `- Review priority: ${patternReview.priority}\n`
+        }
+      }
+    }
+
+    return context.trim()
+  }
 }
 
 /**
@@ -528,4 +737,14 @@ export async function buildFeedbackContext(options: {
   difficulty?: 'easy' | 'medium' | 'hard'
 }): Promise<BuiltContext> {
   return getContextBuilder().buildFeedbackContext(options)
+}
+
+export async function buildEnhancedContext(options: {
+  userId: string
+  problemText?: string
+  problemPattern?: DSAPattern
+  userCode?: string
+  contextType: ContextType
+}): Promise<BuiltContext & { enhancedProfile: EnhancedUserProfile }> {
+  return getContextBuilder().buildEnhancedContext(options)
 }

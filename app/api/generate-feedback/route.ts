@@ -8,6 +8,7 @@ import { getPatternKnowledge, patternKnowledgeToDocument } from "@/lib/rag/knowl
 import { getUserPerformanceProfile, getUserRecommendations } from "@/lib/rag/user-performance-rag"
 import { embedAndStoreSolution } from "@/lib/rag"
 import { updateLearningStateAfterSession, completeSessionWithMastery } from "@/lib/learning-state"
+import { analyzeAndTrackMisconceptions } from "@/lib/rag/misconception-detection"
 import { logger } from "@/lib/logger"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 
@@ -1451,6 +1452,25 @@ IMPORTANT: Use the PRE-CALCULATED SCORES above exactly. Focus on generating help
       } catch (err) {
         // Non-blocking - don't fail feedback if RAG storage fails
         logger.error("RAG solution storage error", { error: err })
+      }
+    }
+
+    // Analyze code for misconceptions and track them (non-blocking)
+    // Only analyze DSA problems where we can detect pattern-specific errors
+    if (userId && code && scenarioType === 'dsa' && (scenarioPattern || efficiencyMetrics?.problemPattern)) {
+      try {
+        const pattern = (scenarioPattern || efficiencyMetrics?.problemPattern) as DSAPattern
+        await analyzeAndTrackMisconceptions(userId, code, pattern, {
+          passed: testsPassed,
+          total: testsTotal,
+          failingTests: testResults
+            ?.filter((t: any) => !t.passed)
+            ?.slice(0, 5)
+            ?.map((t: any) => `${t.description}: expected ${JSON.stringify(t.expected)}, got ${JSON.stringify(t.actual)}`) || [],
+        })
+      } catch (err) {
+        // Non-blocking - don't fail feedback if misconception analysis fails
+        logger.error("Misconception analysis error", { error: err })
       }
     }
 

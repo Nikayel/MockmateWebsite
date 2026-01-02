@@ -15,6 +15,9 @@ import { verifyAuth } from '@/lib/auth-helpers'
 import { getAdvancedRetriever, type AdvancedRetrievalOptions } from '@/lib/rag/retrieval/advanced-retrieval'
 import { getContextBuilder } from '@/lib/rag/context-builder'
 import { getUserPerformanceRAG } from '@/lib/rag/user-performance-rag'
+import { getEnhancedProfileService } from '@/lib/rag/enhanced-user-profile'
+import { getSmartRecommendationService } from '@/lib/rag/smart-recommendations'
+import { getMisconceptionTracker, analyzeCode } from '@/lib/rag/misconception-detection'
 import { getHybridProvider } from '@/lib/rag/embeddings/hybrid-provider'
 import { seedKnowledgeBase, isKnowledgeBaseSeeded, getKnowledgeBaseSeeder } from '@/lib/rag/knowledge-base/seeder'
 import { getPatternKnowledge, patternKnowledgeToDocument } from '@/lib/rag/knowledge-base/dsa-knowledge'
@@ -52,6 +55,10 @@ const embeddingRateLimit = rateLimit({
  *   - get-company-knowledge: Get company interview knowledge
  *   - get-user-performance: Get user performance profile
  *   - get-recommendations: Get personalized recommendations
+ *   - get-enhanced-profile: Get comprehensive user profile (cognitive, behavioral, knowledge graph)
+ *   - get-smart-recommendations: Get recommendations with rich explanations and symbols
+ *   - get-skill-insights: Get dashboard-ready skill insights
+ *   - analyze-code: Analyze code for misconceptions and errors
  *   - generate-embedding: Generate embedding for text
  *   - seed-knowledge-base: Seed the knowledge base (admin)
  *   - health: Check RAG system health
@@ -79,6 +86,10 @@ export async function POST(request: NextRequest) {
     const authRequired = [
       'get-user-performance',
       'get-recommendations',
+      'get-enhanced-profile',
+      'get-smart-recommendations',
+      'get-skill-insights',
+      'analyze-code',
       'build-context',
       'seed-knowledge-base',
     ]
@@ -111,6 +122,18 @@ export async function POST(request: NextRequest) {
 
       case 'get-recommendations':
         return handleGetRecommendations(userId!)
+
+      case 'get-enhanced-profile':
+        return handleGetEnhancedProfile(userId!)
+
+      case 'get-smart-recommendations':
+        return handleGetSmartRecommendations(userId!, params)
+
+      case 'get-skill-insights':
+        return handleGetSkillInsights(userId!)
+
+      case 'analyze-code':
+        return handleAnalyzeCode(userId!, params)
 
       case 'generate-embedding':
         return handleGenerateEmbedding(params)
@@ -568,6 +591,261 @@ async function handleHealthCheck() {
       responseTimeMs: Date.now() - startTime,
     }, { status: 500 })
   }
+}
+
+/**
+ * Handle get enhanced profile
+ */
+async function handleGetEnhancedProfile(userId: string) {
+  const profileService = getEnhancedProfileService()
+  const profile = await profileService.getEnhancedProfile(userId)
+
+  return NextResponse.json({
+    profile,
+    summary: {
+      level: profile.interviewReadiness.overall >= 70 ? 'advanced' :
+        profile.interviewReadiness.overall >= 40 ? 'intermediate' : 'beginner',
+      interviewReadiness: profile.interviewReadiness.overall,
+      topStrengths: profile.interviewReadiness.strongestAreas.slice(0, 3),
+      criticalGaps: profile.interviewReadiness.criticalGaps.slice(0, 3),
+      activeInsights: profile.insights.filter(i => i.priority === 'high').length,
+      learningStyle: profile.cognitive.learningStyle.primary,
+      trend: profile.temporal.growth.accelerating ? 'accelerating' :
+        profile.temporal.growth.currentVelocity > 0 ? 'improving' : 'stable',
+    },
+  })
+}
+
+/**
+ * Handle get smart recommendations with rich explanations
+ */
+async function handleGetSmartRecommendations(userId: string, params: {
+  targetCompany?: CompanyId
+  availableMinutes?: number
+  sessionGoal?: 'warmup' | 'practice' | 'challenge' | 'review' | 'interview-prep'
+  excludeIds?: string[]
+  limit?: number
+  problems?: Array<{
+    id: string
+    title: string
+    pattern: DSAPattern
+    difficulty: 'easy' | 'medium' | 'hard'
+    company?: CompanyId
+    frequency?: number
+  }>
+}) {
+  const recommendationService = getSmartRecommendationService()
+
+  // Auto-fetch problems from scenarios if not provided
+  let problems = params.problems
+  if (!problems || problems.length === 0) {
+    try {
+      const { getScenariosByType } = await import('@/lib/scenarios/index')
+      const dsaScenarios = await getScenariosByType('dsa')
+
+      problems = dsaScenarios.map(scenario => ({
+        id: scenario.id,
+        title: scenario.title,
+        pattern: (scenario as any).pattern as DSAPattern,
+        difficulty: scenario.difficulty as 'easy' | 'medium' | 'hard',
+        company: scenario.companies[0]?.toLowerCase() as CompanyId | undefined,
+        frequency: 1, // Default frequency
+      }))
+    } catch (error) {
+      console.error('[RAG API] Failed to auto-fetch scenarios:', error)
+      return NextResponse.json(
+        { error: 'Failed to fetch problem pool' },
+        { status: 500 }
+      )
+    }
+  }
+
+  if (problems.length === 0) {
+    return NextResponse.json(
+      { error: 'No problems available for recommendations' },
+      { status: 400 }
+    )
+  }
+
+  const response = await recommendationService.getRecommendations(
+    {
+      userId,
+      targetCompany: params.targetCompany,
+      availableMinutes: params.availableMinutes,
+      sessionGoal: params.sessionGoal,
+      excludeIds: params.excludeIds,
+      limit: params.limit,
+    },
+    problems
+  )
+
+  return NextResponse.json(response)
+}
+
+/**
+ * Handle get skill insights for dashboard
+ */
+async function handleGetSkillInsights(userId: string) {
+  const profileService = getEnhancedProfileService()
+  const profile = await profileService.getEnhancedProfile(userId)
+  const misconceptionTracker = getMisconceptionTracker()
+  const misconceptions = await misconceptionTracker.getActiveMisconceptions(userId)
+
+  // Build dashboard-ready insights
+  const skillInsights = {
+    // Overall stats
+    overview: {
+      interviewReadiness: profile.interviewReadiness.overall,
+      totalConcepts: profile.knowledgeGraph.concepts.length,
+      masteredConcepts: profile.knowledgeGraph.concepts.filter(c => c.predictedMastery >= 70).length,
+      learningConcepts: profile.knowledgeGraph.concepts.filter(c => c.predictedMastery >= 40 && c.predictedMastery < 70).length,
+      needsWorkConcepts: profile.knowledgeGraph.concepts.filter(c => c.predictedMastery < 40).length,
+    },
+
+    // Cognitive insights
+    cognitive: {
+      learningStyle: profile.cognitive.learningStyle,
+      problemSolvingApproach: profile.cognitive.problemSolvingApproach.style,
+      patternRecognitionSpeed: profile.cognitive.patternRecognition.speed,
+      complexityTolerance: profile.cognitive.workingMemory.complexityTolerance,
+    },
+
+    // Behavioral insights
+    behavioral: {
+      motivationType: profile.behavioral.motivation.type,
+      consistency: profile.behavioral.motivation.consistency,
+      averageSessionMinutes: Math.round(profile.behavioral.engagement.averageSessionLength),
+      sessionsPerWeek: profile.behavioral.engagement.sessionsPerWeek.toFixed(1),
+      fatigueLevel: profile.behavioral.fatigue.currentLevel,
+      recommendedBreak: profile.behavioral.fatigue.recommendedBreak,
+    },
+
+    // Pattern mastery (for radar chart)
+    patternMastery: profile.knowledgeGraph.concepts
+      .reduce((acc, c) => {
+        if (!acc.find(x => x.pattern === c.parentPattern)) {
+          const patternConcepts = profile.knowledgeGraph.concepts.filter(
+            x => x.parentPattern === c.parentPattern
+          )
+          const avgMastery = patternConcepts.reduce((sum, x) => sum + x.predictedMastery, 0) / patternConcepts.length
+          acc.push({
+            pattern: c.parentPattern,
+            mastery: Math.round(avgMastery),
+            practiceCount: patternConcepts.reduce((sum, x) => sum + x.practiceCount, 0),
+          })
+        }
+        return acc
+      }, [] as { pattern: DSAPattern; mastery: number; practiceCount: number }[])
+      .sort((a, b) => b.mastery - a.mastery),
+
+    // Skills needing review
+    skillDecay: profile.temporal.skillDecay
+      .filter(sd => sd.urgency !== 'none')
+      .map(sd => ({
+        pattern: sd.pattern,
+        daysSincePractice: sd.daysSincePractice,
+        decayPercent: Math.round(sd.estimatedDecay),
+        urgency: sd.urgency,
+      })),
+
+    // Active misconceptions
+    misconceptions: misconceptions.map(m => ({
+      id: m.id,
+      pattern: m.pattern,
+      type: m.misconceptionType,
+      description: m.description,
+      frequency: m.frequency,
+      suggestedFix: m.suggestedFix,
+    })),
+
+    // Knowledge gaps
+    gaps: profile.knowledgeGraph.gaps.map(g => ({
+      pattern: g.pattern,
+      missingPrereqs: g.missingPrerequisites.map(p => p.concept),
+      impact: g.impact,
+    })),
+
+    // Growth trajectory
+    growth: {
+      velocity: profile.temporal.growth.currentVelocity,
+      accelerating: profile.temporal.growth.accelerating,
+      projectedLevel: profile.temporal.growth.projectedLevel,
+      projectedDaysToGoal: profile.temporal.growth.projectedTimeToGoal,
+    },
+
+    // Retention stats
+    retention: profile.temporal.retention,
+
+    // Active insights (actionable items)
+    insights: profile.insights.map(i => ({
+      id: i.id,
+      type: i.type,
+      icon: i.icon,
+      title: i.title,
+      description: i.description,
+      action: i.action,
+      priority: i.priority,
+    })),
+
+    // Interview readiness breakdown
+    interviewReadiness: {
+      overall: profile.interviewReadiness.overall,
+      strongestAreas: profile.interviewReadiness.strongestAreas,
+      criticalGaps: profile.interviewReadiness.criticalGaps,
+      estimatedPrepDays: profile.interviewReadiness.estimatedPrepDays,
+    },
+  }
+
+  return NextResponse.json(skillInsights)
+}
+
+/**
+ * Handle code analysis for misconceptions
+ */
+async function handleAnalyzeCode(userId: string, params: {
+  code: string
+  pattern: DSAPattern
+  testResults?: {
+    passed: number
+    total: number
+    failingTests?: string[]
+  }
+}) {
+  const { code, pattern, testResults } = params
+
+  if (!code || !pattern) {
+    return NextResponse.json(
+      { error: 'Code and pattern are required' },
+      { status: 400 }
+    )
+  }
+
+  // Analyze code for misconceptions
+  const analysis = analyzeCode(code, pattern, testResults)
+
+  // Track misconceptions
+  const tracker = getMisconceptionTracker()
+  for (const misconception of analysis.misconceptions) {
+    await tracker.trackMisconception(userId, misconception)
+  }
+
+  // Check for resolutions if tests passed
+  let resolvedMisconceptions: string[] = []
+  if (testResults && testResults.passed === testResults.total) {
+    resolvedMisconceptions = await tracker.checkForResolution(userId, pattern, testResults)
+  }
+
+  return NextResponse.json({
+    analysis,
+    tracked: analysis.misconceptions.length,
+    resolved: resolvedMisconceptions.length,
+    summary: {
+      hasMisconceptions: analysis.misconceptions.length > 0,
+      hasQualityIssues: analysis.codeQualityIssues.length > 0,
+      hasPatternMisuse: analysis.patternMisuse.length > 0,
+      overallConfidence: analysis.overallConfidence,
+    },
+  })
 }
 
 /**
