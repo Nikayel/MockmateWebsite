@@ -416,6 +416,28 @@ const ERROR_SIGNATURES: Record<DSAPattern | 'general', ErrorSignature[]> = {
 
   'trie': [],
   'union-find': [],
+  'binary-tree': [],
+  'binary-search-tree': [],
+  'priority-queue': [],
+  'heap-priority-queue': [],
+  'bfs': [],
+  'dfs': [],
+  'topological-sort': [],
+  'dijkstra': [],
+  'dp-knapsack': [],
+  'dp-lcs': [],
+  'dp-tree': [],
+  'math': [],
+  'geometry': [],
+  'math-geometry': [],
+  'sorting': [],
+  'merge-sort': [],
+  'quick-sort': [],
+  'string': [],
+  'string-matching': [],
+  'matrix': [],
+  'monotonic-stack': [],
+  'monotonic-queue': [],
 }
 
 // ============================================================================

@@ -22,7 +22,7 @@ try {
   const secretKey = process.env.STRIPE_SECRET_KEY
   if (secretKey) {
     stripe = new Stripe(secretKey, {
-      apiVersion: "2025-10-29.clover",
+      apiVersion: "2025-12-15.clover",
     })
   }
 } catch (error) {
