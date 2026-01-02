@@ -11,11 +11,10 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/auth-context"
 import { getUserProfile } from "@/lib/firestore-helpers"
-import { Check, Crown, Zap, ArrowRight, CheckCircle, Shield, Sparkles, X } from "lucide-react"
-import { PRICING_CONFIG, getProPricing } from "@/lib/config"
+import { Check, CheckCircle } from "lucide-react"
+import { getProPricing } from "@/lib/config"
 import { Profile } from "@/lib/types"
 import { toast } from "sonner"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -185,190 +184,133 @@ function UpgradePageContent() {
     }
   }
 
-  // Compact features for display
-  const freeFeatures = [
-    "2 scenarios/month",
-    "All 200+ problems",
-    "AI interviewer",
-  ]
-
-  const freeLimitations = [
-    "No spaced repetition",
-    "No personalized roadmap",
-  ]
-
-  const proFeatures = [
-    "35 scenarios/month",
-    "Unlimited practice",
-    "Spaced repetition",
-    "Personalized roadmap",
-    "System design prep",
-    "Priority support",
-  ]
-
   return (
     <main className="min-h-screen bg-black">
       <Header />
 
-      <div className="pt-16 pb-8 md:pt-20 md:pb-12">
-        <div className="container mx-auto px-4 max-w-5xl">
+      <div className="pt-20 pb-6">
+        <div className="container mx-auto px-4 max-w-4xl">
 
-          {/* Compact Header */}
-          <div className="text-center mb-6">
-            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
+          {/* Minimal Header */}
+          <div className="text-center mb-4">
+            <h1 className="text-2xl md:text-3xl font-bold text-white">
               Choose Your Plan
             </h1>
-            <p className="text-gray-400 text-sm md:text-base">
-              Start free, upgrade when you're ready
-            </p>
           </div>
 
-          {/* Billing Toggle - Compact */}
+          {/* Billing Toggle - Inline */}
           {!isProUser && (
-            <div className="flex justify-center mb-6">
-              <div className="inline-flex items-center gap-2 p-1 rounded-full bg-white/5 border border-white/10">
+            <div className="flex justify-center mb-5">
+              <div className="inline-flex items-center gap-1 text-sm">
                 <button
                   onClick={() => setBillingPeriod('monthly')}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                    billingPeriod === 'monthly' ? "text-black bg-white" : "text-gray-400 hover:text-white"
+                  className={`px-3 py-1 rounded-full transition-all ${
+                    billingPeriod === 'monthly' ? "text-white bg-white/10" : "text-gray-500 hover:text-white"
                   }`}
                 >
                   Monthly
                 </button>
                 <button
                   onClick={() => setBillingPeriod('yearly')}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                    billingPeriod === 'yearly' ? "text-black bg-white" : "text-gray-400 hover:text-white"
+                  className={`px-3 py-1 rounded-full transition-all ${
+                    billingPeriod === 'yearly' ? "text-white bg-white/10" : "text-gray-500 hover:text-white"
                   }`}
                 >
-                  Yearly
+                  Annually
                 </button>
                 {billingPeriod === 'yearly' && (
-                  <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs font-semibold border border-green-500/30 ml-1">
-                    -25%
-                  </span>
+                  <span className="text-green-400 text-xs ml-1">Save 25%</span>
                 )}
               </div>
             </div>
           )}
 
-          {/* Pricing Cards - Side by Side */}
+          {/* Pricing Cards - Ultra Compact */}
           {!isProUser && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 max-w-2xl mx-auto">
 
               {/* Free Plan */}
-              <div className="rounded-2xl p-5 md:p-6 border bg-white/[0.02] border-white/10 hover:border-white/20 transition-colors">
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="w-5 h-5 text-gray-400" />
-                  <h3 className="text-lg font-bold text-white">Free</h3>
-                </div>
+              <div className="rounded-xl p-5 border bg-white/[0.02] border-white/10">
+                <h3 className="text-base font-semibold text-white mb-3">Free</h3>
 
-                <div className="mb-1">
-                  <span className="text-3xl font-bold text-white">$0</span>
-                </div>
-                <p className="text-gray-500 text-xs mb-4">Best for trying it out</p>
-
-                <ul className="space-y-2 mb-5">
-                  {freeFeatures.map((feature, idx) => (
-                    <li key={idx} className="flex items-center gap-2 text-sm">
-                      <Check className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                      <span className="text-gray-300">{feature}</span>
-                    </li>
-                  ))}
-                  {freeLimitations.map((limitation, idx) => (
-                    <li key={`limit-${idx}`} className="flex items-center gap-2 text-sm">
-                      <X className="w-4 h-4 text-gray-700 flex-shrink-0" />
-                      <span className="text-gray-600">{limitation}</span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="text-4xl font-bold text-white mb-2">Free</div>
 
                 <Link href="/interview">
                   <Button
                     variant="outline"
-                    className="w-full border-white/20 text-white hover:bg-white/10"
+                    className="w-full border-white/20 text-white hover:bg-white/10 mb-4"
                   >
-                    Start Free
+                    Get Started
                   </Button>
                 </Link>
+
+                <p className="text-gray-400 text-xs mb-2">Try before you commit.</p>
+
+                <ul className="space-y-1.5 text-sm text-gray-400">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-gray-500" />
+                    2 interview scenarios/month
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-gray-500" />
+                    All 200+ DSA problems
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-gray-500" />
+                    AI interviewer feedback
+                  </li>
+                </ul>
               </div>
 
               {/* Pro Plan */}
-              <div className="relative rounded-2xl p-5 md:p-6 border-2 bg-gradient-to-br from-accent/5 to-transparent border-accent/50 hover:border-accent transition-colors">
-                {/* Badge */}
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="bg-accent text-black text-xs font-semibold px-3 py-0.5">
-                    Most Popular
-                  </Badge>
-                </div>
+              <div className="rounded-xl p-5 border-2 bg-gradient-to-br from-accent/5 to-transparent border-accent/50">
+                <h3 className="text-base font-semibold text-white mb-3">Pro</h3>
 
-                <div className="flex items-center gap-2 mb-3 mt-1">
-                  <Crown className="w-5 h-5 text-accent" />
-                  <h3 className="text-lg font-bold text-white">Pro</h3>
-                </div>
-
-                <div className="flex items-baseline gap-2 mb-1">
-                  <span className="text-3xl font-bold text-accent">
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className="text-4xl font-bold text-accent">
                     {currentPrice.priceDisplay}
                   </span>
                   <span className="text-gray-400 text-sm">{currentPrice.period}</span>
-                  {billingPeriod === 'yearly' && (
-                    <span className="text-gray-600 text-sm line-through">$25/mo</span>
-                  )}
                 </div>
-                <p className="text-gray-500 text-xs mb-1">
-                  Best for landing your dream job
-                </p>
-                {billingPeriod === 'yearly' && (
-                  <p className="text-green-400 text-xs font-medium mb-3">
-                    Save ${proPricing.yearly.savings}/year (3 months free)
-                  </p>
-                )}
-                {billingPeriod === 'monthly' && <div className="mb-3" />}
-
-                <ul className="space-y-2 mb-5">
-                  {proFeatures.map((feature, idx) => (
-                    <li key={idx} className="flex items-center gap-2 text-sm">
-                      <Check className="w-4 h-4 text-accent flex-shrink-0" />
-                      <span className="text-gray-200">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
 
                 <Button
                   onClick={() => handleUpgrade(billingPeriod)}
                   disabled={loading === billingPeriod}
-                  className="w-full bg-accent hover:bg-accent/90 text-black font-semibold"
+                  className="w-full bg-accent hover:bg-accent/90 text-black font-semibold mb-4"
                 >
-                  {loading === billingPeriod ? (
-                    "Processing..."
-                  ) : (
-                    <>
-                      <Zap className="mr-1.5 h-4 w-4" />
-                      {billingPeriod === 'yearly' ? `Get Pro — ${proPricing.yearly.totalDisplay}/yr` : 'Get Pro — $25/mo'}
-                      <ArrowRight className="ml-1.5 h-4 w-4" />
-                    </>
-                  )}
+                  {loading === billingPeriod ? "Processing..." : "Subscribe"}
                 </Button>
 
-                {/* Trust signal */}
-                <div className="mt-3 flex items-center justify-center gap-1.5 text-xs text-gray-500">
-                  <Shield className="w-3 h-3 text-green-500" />
-                  <span>30-day money-back guarantee</span>
-                </div>
+                <p className="text-gray-400 text-xs mb-2">Everything you need to get hired.</p>
+
+                <p className="text-xs text-gray-500 mb-2">Everything in Free, plus...</p>
+                <ul className="space-y-1.5 text-sm text-gray-300">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-accent" />
+                    35 scenarios/month
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-accent" />
+                    Spaced repetition scheduling
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-accent" />
+                    Personalized study roadmap
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-accent" />
+                    Priority support
+                  </li>
+                </ul>
               </div>
             </div>
           )}
 
-          {/* Trust Bar - Compact */}
+          {/* Trust - Single line */}
           {!isProUser && (
-            <div className="flex items-center justify-center gap-4 text-xs text-gray-500 flex-wrap">
-              <span>Cancel anytime</span>
-              <span className="text-gray-700">•</span>
-              <span>No hidden fees</span>
-              <span className="text-gray-700">•</span>
-              <span>Used by engineers at Google, Meta, Amazon</span>
-            </div>
+            <p className="text-center text-xs text-gray-600">
+              30-day money-back guarantee · Cancel anytime · Used by engineers at Google, Meta, Amazon
+            </p>
           )}
 
           {/* Already Pro Message */}
