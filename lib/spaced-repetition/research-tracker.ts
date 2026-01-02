@@ -445,6 +445,39 @@ export async function recordSkippedReview(userId: string): Promise<void> {
 // ============================================
 
 /**
+ * Internal helper to get algorithm distribution from profiles
+ */
+async function getDistributionFromProfiles(): Promise<{
+  sm2: { total: number; active_7d: number }
+  fsrs: { total: number; active_7d: number }
+}> {
+  const profiles = await adminDb.collection('profiles').get()
+  const stats = {
+    sm2: { total: 0, active_7d: 0 },
+    fsrs: { total: 0, active_7d: 0 },
+  }
+
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+  profiles.docs.forEach((doc) => {
+    const data = doc.data()
+    const algorithm = (data.spaced_repetition_algorithm as SpacedRepetitionAlgorithm) || 'sm2'
+    const lastActive = data.updated_at ? new Date(data.updated_at) : null
+
+    // Only count non-overridden users for research
+    if (!data.algorithm_user_overridden) {
+      stats[algorithm].total++
+      if (lastActive && lastActive >= sevenDaysAgo) {
+        stats[algorithm].active_7d++
+      }
+    }
+  })
+
+  return stats
+}
+
+/**
  * Generate aggregate comparison between SM-2 and FSRS cohorts
  * This should be run periodically (e.g., daily cron job)
  */
@@ -453,13 +486,16 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
   const thirtyDaysAgo = new Date(now)
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
+  // Get user counts from profiles (all assigned users)
+  const distribution = await getDistributionFromProfiles()
+
   // Query each algorithm separately to match available index:
   // (algorithm ASC, total_reviews DESC)
   let sm2Users: AlgorithmResearchSummary[] = []
   let fsrsUsers: AlgorithmResearchSummary[] = []
 
   try {
-    // Query SM-2 users
+    // Query SM-2 users with review data
     const sm2Snap = await adminDb
       .collectionGroup('summary')
       .where('algorithm', '==', 'sm2')
@@ -477,7 +513,7 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
   }
 
   try {
-    // Query FSRS users
+    // Query FSRS users with review data
     const fsrsSnap = await adminDb
       .collectionGroup('summary')
       .where('algorithm', '==', 'fsrs')
@@ -494,9 +530,9 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
     console.warn('[ResearchTracker] Failed to query FSRS summaries:', error)
   }
 
-  // Calculate cohort stats
-  const sm2Stats = calculateCohortStats('sm2', sm2Users, thirtyDaysAgo)
-  const fsrsStats = calculateCohortStats('fsrs', fsrsUsers, thirtyDaysAgo)
+  // Calculate cohort stats - use distribution totals for user counts
+  const sm2Stats = calculateCohortStats('sm2', sm2Users, thirtyDaysAgo, distribution.sm2.total)
+  const fsrsStats = calculateCohortStats('fsrs', fsrsUsers, thirtyDaysAgo, distribution.fsrs.total)
 
   // Calculate comparison
   const comparison: {
@@ -574,10 +610,17 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
 function calculateCohortStats(
   algorithm: SpacedRepetitionAlgorithm,
   users: AlgorithmResearchSummary[],
-  thirtyDaysAgo: Date
+  thirtyDaysAgo: Date,
+  totalAssignedUsers?: number  // Total from profiles (assigned), not just with review data
 ): AlgorithmCohortStats {
+  // Use the total assigned users from profiles, fallback to users with review data
+  const totalUsers = totalAssignedUsers ?? users.length
+
   if (users.length === 0) {
-    return createEmptyCohortStats(algorithm)
+    // Return stats with total_users from distribution, but zeroed metrics
+    const emptyStats = createEmptyCohortStats(algorithm)
+    emptyStats.total_users = totalUsers
+    return emptyStats
   }
 
   const sevenDaysAgo = new Date()
@@ -595,7 +638,7 @@ function calculateCohortStats(
 
   return {
     algorithm,
-    total_users: users.length,
+    total_users: totalUsers,  // Use assigned user count from profiles
     active_users_7d: activeUsers7d.length,
     active_users_30d: activeUsers30d.length,
     users_with_overrides: 0, // All overridden users were filtered out
