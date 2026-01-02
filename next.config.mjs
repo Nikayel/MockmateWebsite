@@ -61,25 +61,48 @@ const nextConfig = {
             value: 'camera=(), microphone=(self), geolocation=()'
           },
           {
+            // Content Security Policy - Hardened configuration
+            // SECURITY NOTE: 'unsafe-inline' for scripts/styles is required for Next.js.
+            // This is a known limitation. For stricter security, implement nonce-based CSP.
+            // See: https://nextjs.org/docs/app/building-your-application/configuring/content-security-policy
             key: 'Content-Security-Policy',
             value: [
+              // Default: only allow same-origin resources
               "default-src 'self'",
-              // Note: 'unsafe-inline' is required for Next.js/Turbopack development mode
-              // Next.js injects inline scripts for hydration and HMR that need inline execution
-              // In production, consider implementing nonce-based CSP for better security
-              "script-src 'self' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com https://cdn.jsdelivr.net https://apis.google.com https://*.googleapis.com https://www.gstatic.com https://accounts.google.com 'wasm-unsafe-eval'",
-              // Note: 'unsafe-inline' for styles is still needed for Next.js/React inline styles
-              // TODO: Implement nonce-based CSP for even stricter security
+
+              // Scripts: Minimum required for Next.js + integrations
+              // - unsafe-inline: Required for Next.js hydration (cannot be removed without nonces)
+              // - wasm-unsafe-eval: Required for Monaco editor WebAssembly
+              // - NO unsafe-eval: Blocked to prevent XSS code execution
+              "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://cdn.jsdelivr.net https://apis.google.com https://*.googleapis.com https://www.gstatic.com https://accounts.google.com",
+
+              // Styles: Required for Next.js + external fonts
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+
+              // Images: Allow data URIs and HTTPS sources
               "img-src 'self' data: https: blob:",
+
+              // Fonts: Google Fonts only
               "font-src 'self' data: https://fonts.gstatic.com",
-              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com https://*.firebase.googleapis.com https://*.google-analytics.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://oauth2.googleapis.com https://www.googleapis.com wss://*.firebaseio.com https://api.stripe.com https://cdn.jsdelivr.net wss://api.deepgram.com wss://*.deepgram.com",
+
+              // API connections: Explicitly listed trusted endpoints
+              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com https://*.firebase.googleapis.com https://*.google-analytics.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://oauth2.googleapis.com https://www.googleapis.com wss://*.firebaseio.com https://api.stripe.com https://cdn.jsdelivr.net wss://api.deepgram.com wss://*.deepgram.com https://emkc.org",
+
+              // Workers: Monaco editor and code sandbox
               "worker-src 'self' blob: https://cdn.jsdelivr.net",
+
+              // Iframes: Payment + auth only (no arbitrary embedding)
               "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://www.youtube.com https://accounts.google.com https://*.googleapis.com https://*.firebaseapp.com https://*.web.app",
+
+              // Hard blocks for dangerous features
               "object-src 'none'",
               "base-uri 'self'",
-              "form-action 'self'",
+              "form-action 'self' https://checkout.stripe.com",
               "frame-ancestors 'self'",
+              "manifest-src 'self'",
+              "media-src 'self' blob:",
+
+              // Force HTTPS
               "upgrade-insecure-requests"
             ].join('; ')
           }

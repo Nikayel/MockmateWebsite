@@ -146,31 +146,38 @@ export class PineconeVectorDB implements VectorDB {
                 text: doc.text || '',
             }
             
-            // Flatten tags array to comma-separated string
+            // SECURITY FIX: Use JSON serialization instead of comma-separated values
+            // Comma-separated can lose data if values contain commas
+
+            // Flatten tags array to JSON string
             if (doc.metadata?.tags && Array.isArray(doc.metadata.tags)) {
-                flatMetadata.tags = doc.metadata.tags.join(',')
+                flatMetadata.tags = JSON.stringify(doc.metadata.tags)
+                flatMetadata._tags_is_json = true
             }
-            
-            // Flatten topPatterns array to comma-separated string
+
+            // Flatten topPatterns array to JSON string
             if (doc.metadata?.topPatterns && Array.isArray(doc.metadata.topPatterns)) {
-                flatMetadata.topPatterns = doc.metadata.topPatterns.join(',')
+                flatMetadata.topPatterns = JSON.stringify(doc.metadata.topPatterns)
+                flatMetadata._topPatterns_is_json = true
             }
-            
-            // Flatten difficultyDistribution object to string
+
+            // Flatten difficultyDistribution object to JSON string
             if (doc.metadata?.difficultyDistribution && typeof doc.metadata.difficultyDistribution === 'object') {
-                const dist = doc.metadata.difficultyDistribution as Record<string, any>
-                flatMetadata.difficultyDistribution = `easy:${dist.easy || 0},medium:${dist.medium || 0},hard:${dist.hard || 0}`
+                flatMetadata.difficultyDistribution = JSON.stringify(doc.metadata.difficultyDistribution)
+                flatMetadata._difficultyDistribution_is_json = true
             }
-            
-            // Remove any remaining nested objects/arrays
+
+            // Remove any remaining nested objects/arrays - convert to JSON
             Object.keys(flatMetadata).forEach(key => {
                 const value = flatMetadata[key]
                 if (value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
                     // Convert nested object to JSON string
                     flatMetadata[key] = JSON.stringify(value)
-                } else if (Array.isArray(value) && value.length > 0 && typeof value[0] !== 'string') {
-                    // Convert array of non-strings to comma-separated string
-                    flatMetadata[key] = value.join(',')
+                    flatMetadata[`_${key}_is_json`] = true
+                } else if (Array.isArray(value) && value.length > 0) {
+                    // Convert array to JSON string
+                    flatMetadata[key] = JSON.stringify(value)
+                    flatMetadata[`_${key}_is_json`] = true
                 }
             })
             
@@ -247,28 +254,69 @@ export class PineconeVectorDB implements VectorDB {
 
                 const restored: Record<string, any> = { ...match.metadata }
 
-                // Restore tags from comma-separated string
-                if (typeof restored.tags === 'string') {
-                    restored.tags = restored.tags.split(',').filter(Boolean)
-                }
-
-                // Restore topPatterns from comma-separated string
-                if (typeof restored.topPatterns === 'string') {
-                    restored.topPatterns = restored.topPatterns.split(',').filter(Boolean)
-                }
-
-                // Restore difficultyDistribution from string format
-                if (typeof restored.difficultyDistribution === 'string') {
-                    const distStr = restored.difficultyDistribution
-                    const dist: Record<string, number> = {}
-                    distStr.split(',').forEach(part => {
-                        const [key, value] = part.split(':')
-                        if (key && value) {
-                            dist[key.trim()] = parseFloat(value.trim()) || 0
+                // Helper to safely parse JSON with fallback to comma-separated for backwards compatibility
+                const parseJsonOrCsv = (value: string, isJsonFlag: boolean): any => {
+                    if (isJsonFlag) {
+                        try {
+                            return JSON.parse(value)
+                        } catch {
+                            // Fall through to comma-separated parsing
                         }
-                    })
-                    restored.difficultyDistribution = dist
+                    }
+                    // Backwards compatibility: parse comma-separated
+                    return value.split(',').filter(Boolean)
                 }
+
+                // Restore tags from JSON or comma-separated string
+                if (typeof restored.tags === 'string') {
+                    restored.tags = parseJsonOrCsv(restored.tags, restored._tags_is_json)
+                    delete restored._tags_is_json
+                }
+
+                // Restore topPatterns from JSON or comma-separated string
+                if (typeof restored.topPatterns === 'string') {
+                    restored.topPatterns = parseJsonOrCsv(restored.topPatterns, restored._topPatterns_is_json)
+                    delete restored._topPatterns_is_json
+                }
+
+                // Restore difficultyDistribution from JSON or legacy format
+                if (typeof restored.difficultyDistribution === 'string') {
+                    if (restored._difficultyDistribution_is_json) {
+                        try {
+                            restored.difficultyDistribution = JSON.parse(restored.difficultyDistribution)
+                        } catch {
+                            // Fall through to legacy parsing
+                            const distStr = restored.difficultyDistribution
+                            const dist: Record<string, number> = {}
+                            distStr.split(',').forEach((part: string) => {
+                                const [key, value] = part.split(':')
+                                if (key && value) {
+                                    dist[key.trim()] = parseFloat(value.trim()) || 0
+                                }
+                            })
+                            restored.difficultyDistribution = dist
+                        }
+                    } else {
+                        // Legacy comma-separated format
+                        const distStr = restored.difficultyDistribution
+                        const dist: Record<string, number> = {}
+                        distStr.split(',').forEach((part: string) => {
+                            const [key, value] = part.split(':')
+                            if (key && value) {
+                                dist[key.trim()] = parseFloat(value.trim()) || 0
+                            }
+                        })
+                        restored.difficultyDistribution = dist
+                    }
+                    delete restored._difficultyDistribution_is_json
+                }
+
+                // Clean up any remaining _is_json flags
+                Object.keys(restored).forEach(key => {
+                    if (key.startsWith('_') && key.endsWith('_is_json')) {
+                        delete restored[key]
+                    }
+                })
 
                 return {
                     id: match.id,

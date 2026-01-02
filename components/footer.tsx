@@ -20,9 +20,28 @@ export function Footer() {
               simulations and personalized feedback.
             </p>
             <div className="flex space-x-4">
-              <Github className="h-5 w-5 text-gray-400 hover:text-white cursor-pointer transition-colors" />
-              <Twitter className="h-5 w-5 text-gray-400 hover:text-white cursor-pointer transition-colors" />
-              <Mail className="h-5 w-5 text-gray-400 hover:text-white cursor-pointer transition-colors" />
+              <a
+                href="https://github.com/Nikayel/codesparring"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="GitHub"
+              >
+                <Github className="h-5 w-5 text-gray-400 hover:text-white cursor-pointer transition-colors" />
+              </a>
+              <a
+                href="https://twitter.com/codesparring"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Twitter"
+              >
+                <Twitter className="h-5 w-5 text-gray-400 hover:text-white cursor-pointer transition-colors" />
+              </a>
+              <a
+                href="mailto:hello@codesparring.dev"
+                aria-label="Email us"
+              >
+                <Mail className="h-5 w-5 text-gray-400 hover:text-white cursor-pointer transition-colors" />
+              </a>
             </div>
           </div>
 
