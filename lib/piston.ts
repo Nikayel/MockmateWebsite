@@ -135,8 +135,10 @@ export async function executeWithPiston(
  * Also captures console.log/warn/error calls for display in the console panel
  */
 function wrapCodeForExecution(code: string, language: string, testInput: any): string {
+  const inputKeys = Object.keys(testInput)
   const inputValues = Object.values(testInput)
   const inputJson = JSON.stringify(inputValues)
+  const inputKeysJson = JSON.stringify(inputKeys)
 
   if (language === 'python') {
     // Extract function name from Python code
@@ -217,15 +219,29 @@ ${code}
 # Execute with test input
 try:
     _input = json.loads('${inputJson.replace(/'/g, "\\'")}')
+    _input_keys = json.loads('${inputKeysJson.replace(/'/g, "\\'")}')
 
-    # Convert array inputs to TreeNode if function expects TreeNode
+    # Keywords that indicate TreeNode conversion needed
+    _tree_keywords = {'root', 'tree', 'node', 'p', 'q', 't1', 't2', 'left', 'right', 'subroot'}
+    _list_keywords = {'head', 'list', 'l1', 'l2'}
+
+    # Convert array inputs to TreeNode/ListNode based on parameter name
     _processed_input = []
-    for arg in _input:
-        if isinstance(arg, list) and len(arg) > 0:
-            # Check if it might be a tree (has nested None values pattern)
-            _processed_input.append(_build_tree(arg) if any(x is None for x in arg[1:] if len(arg) > 1) else arg)
+    for i, arg in enumerate(_input):
+        key = _input_keys[i].lower() if i < len(_input_keys) else ''
+
+        if isinstance(arg, list):
+            if key in _tree_keywords:
+                # Convert to TreeNode when key explicitly indicates a tree
+                _processed_input.append(_build_tree(arg) if arg else None)
+            elif key in _list_keywords:
+                # TODO: Convert to ListNode for linked list problems
+                _processed_input.append(arg)
+            else:
+                # Default: keep as array (e.g., nums, arr, data)
+                _processed_input.append(arg)
         else:
-            _processed_input.append(arg if not isinstance(arg, list) else _build_tree(arg) if arg else None)
+            _processed_input.append(arg)
 
     _result = ${funcName}(*_processed_input)
 
@@ -370,12 +386,24 @@ try {
     process.exit(1);
   }
 
-  // Process input - convert arrays to TreeNode if needed
-  const _processedInput = _input.map(arg => {
-    if (Array.isArray(arg) && arg.length > 0) {
-      // Check if it looks like a tree array (contains null values typically)
-      const hasNulls = arg.some((x, i) => i > 0 && x === null);
-      return hasNulls ? _buildTree(arg) : arg;
+  // Keywords that indicate TreeNode/ListNode conversion needed
+  const _treeKeywords = new Set(['root', 'tree', 'node', 'p', 'q', 't1', 't2', 'left', 'right', 'subroot']);
+  const _listKeywords = new Set(['head', 'list', 'l1', 'l2']);
+  const _inputKeys = ${inputKeysJson};
+
+  // Process input - convert arrays to TreeNode/ListNode based on parameter name
+  const _processedInput = _input.map((arg, i) => {
+    const key = (_inputKeys[i] || '').toLowerCase();
+
+    if (Array.isArray(arg)) {
+      if (_treeKeywords.has(key)) {
+        // Convert to TreeNode when key explicitly indicates a tree
+        return arg.length > 0 ? _buildTree(arg) : null;
+      } else if (_listKeywords.has(key)) {
+        // TODO: Convert to ListNode for linked list problems
+        return arg;
+      }
+      // Default: keep as array (e.g., nums, arr, data)
     }
     return arg;
   });

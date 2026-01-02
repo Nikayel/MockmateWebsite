@@ -137,10 +137,29 @@ export function CodeConsole({
   onClear,
 }: CodeConsoleProps) {
   const consoleRef = useRef<HTMLDivElement>(null);
+  const userScrolledUpRef = useRef(false);
+  const prevOutputLengthRef = useRef(0);
 
-  // Auto-scroll to bottom when new output arrives
+  // Track if user has scrolled up (to disable auto-scroll)
+  const handleScroll = () => {
+    if (!consoleRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = consoleRef.current;
+    // User is "at bottom" if within 50px of the bottom
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    userScrolledUpRef.current = !isAtBottom;
+  };
+
+  // Auto-scroll to bottom only if user hasn't scrolled up
+  // Also reset scroll tracking when new test run starts
   useEffect(() => {
-    if (consoleRef.current) {
+    // Reset scroll state when a new test run starts (going from no results to running)
+    if (isRunning && prevOutputLengthRef.current === 0) {
+      userScrolledUpRef.current = false;
+    }
+    prevOutputLengthRef.current = outputs.length + testResults.length;
+
+    // Only auto-scroll if user hasn't scrolled up to read errors
+    if (consoleRef.current && !userScrolledUpRef.current) {
       consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
     }
   }, [outputs, testResults, isRunning]);
@@ -202,6 +221,7 @@ export function CodeConsole({
       {/* Console Content */}
       <div
         ref={consoleRef}
+        onScroll={handleScroll}
         className="flex-1 overflow-y-auto p-2 space-y-1 font-mono text-xs min-h-[100px] max-h-[200px]"
       >
         {/* Empty state */}
