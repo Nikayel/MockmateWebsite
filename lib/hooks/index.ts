@@ -32,3 +32,5 @@ export type {
   UseNotificationsOptions,
   UseNotificationsReturn,
 } from "./useNotifications"
+
+export { useSessionMetrics } from "./use-session-metrics"
