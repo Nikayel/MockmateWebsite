@@ -57,8 +57,9 @@ const OVERDUE_RESET_MULTIPLIER = 2;
 // Max interval cap
 const MAX_INTERVAL_DAYS = 180;
 
-// Min ease factor
+// Ease factor bounds (standard SM-2 uses 1.3 - 2.5)
 const MIN_EASE_FACTOR = 1.3;
+const MAX_EASE_FACTOR = 2.5;
 const DEFAULT_EASE_FACTOR = 2.5;
 
 /**
@@ -117,6 +118,8 @@ export function calculateConfidence(
 
 /**
  * Determine mastery level based on interval and review count
+ *
+ * Note: reviewCount here is the NEW count AFTER the review (so first review = 1)
  */
 export function determineMasteryLevel(
   interval: number,
@@ -126,12 +129,14 @@ export function determineMasteryLevel(
   // Failed review = back to learning
   if (quality < 3) return 'learning';
 
-  // First review = new
+  // Never reviewed = new (reviewCount is post-review, so 0 means never reviewed)
   if (reviewCount === 0) return 'new';
 
-  // Based on interval
+  // Based on interval thresholds
   if (interval >= 30) return 'mastered';
   if (interval >= 7) return 'reviewing';
+
+  // First few reviews with short intervals = still learning
   return 'learning';
 }
 
@@ -246,8 +251,8 @@ export function calculateNextInterval(input: SM2Input): SM2Output {
   let newEaseFactor = previousEaseFactor +
     (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
 
-  // Ensure ease factor stays within bounds
-  newEaseFactor = Math.max(MIN_EASE_FACTOR, newEaseFactor);
+  // Ensure ease factor stays within bounds (1.3 - 2.5)
+  newEaseFactor = Math.max(MIN_EASE_FACTOR, Math.min(MAX_EASE_FACTOR, newEaseFactor));
 
   const masteryLevel = determineMasteryLevel(interval, reviewCount + 1, quality);
   const confidence = calculateConfidence(interval, quality, reviewCount + 1, scoresHistory);

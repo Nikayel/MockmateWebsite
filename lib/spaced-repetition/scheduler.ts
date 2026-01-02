@@ -6,6 +6,7 @@
  */
 
 import { adminDb } from '../firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import type { DSAPattern } from '../types/dsa-patterns';
 import type { SpacedRepetitionAlgorithm, SpacedRepetitionMasteryLevel } from '../types';
 import { getScenarioById, scenarios } from '../scenarios';
@@ -96,21 +97,27 @@ export interface DueItem {
   last_score: number;
   days_overdue: number;
   days_until_review: number; // Days until next review (negative if overdue)
+  minutes_until_review?: number; // Minutes until review (for FSRS learning steps)
   next_review_at: string; // ISO date string
   priority: 'critical' | 'high' | 'medium' | 'low';
   priority_score: number;
   estimated_minutes: number;
   mastery_level: MasteryLevel;
   retention_estimate: number;
+  algorithm?: SpacedRepetitionAlgorithm; // User's assigned algorithm
+  fsrs_state?: 'new' | 'learning' | 'review' | 'relearning'; // FSRS-specific state
 }
 
 export interface DueQueueResult {
   due_now: DueItem[];      // Overdue items
+  due_in_minutes: DueItem[]; // FSRS learning steps - due within the hour
   due_today: DueItem[];    // Due today
   upcoming: DueItem[];     // Next 7 days
+  user_algorithm?: SpacedRepetitionAlgorithm; // User's assigned algorithm
   stats: {
     total_due: number;
     overdue_count: number;
+    learning_steps_due: number; // FSRS learning steps count
     streak_at_risk: boolean;
   };
 }
@@ -154,11 +161,15 @@ export async function getDueProblems(
   } = options;
 
   const now = new Date();
+  const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
   const todayEnd = new Date(now);
   todayEnd.setHours(23, 59, 59, 999);
 
   const upcomingEnd = new Date(now);
   upcomingEnd.setDate(upcomingEnd.getDate() + upcomingDays);
+
+  // Get user's algorithm for transparency
+  const userAlgorithm = await getUserAlgorithm(userId);
 
   // Query problem mastery collection
   const masteryRef = adminDb
@@ -179,6 +190,7 @@ export async function getDueProblems(
   // Get all problems with their review dates
   const snapshot = await query.get();
 
+  const dueInMinutes: DueItem[] = []; // FSRS learning steps
   const dueNow: DueItem[] = [];
   const dueToday: DueItem[] = [];
   const upcoming: DueItem[] = [];
@@ -186,9 +198,11 @@ export async function getDueProblems(
   snapshot.docs.forEach((doc) => {
     const data = doc.data() as ProblemMastery;
     const nextReviewAt = new Date(data.next_review_at);
-    const daysDiff = Math.floor(
-      (nextReviewAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-    );
+
+    // Calculate time differences
+    const millisDiff = nextReviewAt.getTime() - now.getTime();
+    const minutesDiff = Math.floor(millisDiff / (1000 * 60));
+    const daysDiff = Math.floor(millisDiff / (1000 * 60 * 60 * 24));
 
     const daysOverdue = Math.max(0, -daysDiff);
     const priorityScore = calculateReviewPriority(
@@ -205,8 +219,18 @@ export async function getDueProblems(
     );
 
     // Use canonical difficulty from scenario definition to fix any data inconsistencies
-    // Pass title as fallback for old data that has wrong scenario_id
     const canonicalDifficulty = getCanonicalDifficulty(data.scenario_id, data.difficulty, data.title);
+
+    // Extract FSRS state if available
+    let fsrsState: 'new' | 'learning' | 'review' | 'relearning' | undefined;
+    if ((data as any).fsrs_state) {
+      try {
+        const parsed = JSON.parse((data as any).fsrs_state);
+        fsrsState = parsed.state;
+      } catch {
+        // Ignore parse errors
+      }
+    }
 
     const dueItem: DueItem = {
       problem_id: data.problem_id,
@@ -216,20 +240,28 @@ export async function getDueProblems(
       difficulty: canonicalDifficulty,
       last_score: data.last_score,
       days_overdue: daysOverdue,
-      days_until_review: daysDiff, // Negative if overdue, positive if upcoming
+      days_until_review: daysDiff,
+      minutes_until_review: minutesDiff > 0 ? minutesDiff : undefined,
       next_review_at: data.next_review_at,
       priority: getPriorityLevel(priorityScore),
       priority_score: priorityScore,
       estimated_minutes: ESTIMATED_TIME[canonicalDifficulty],
       mastery_level: data.mastery_level,
       retention_estimate: retention,
+      algorithm: userAlgorithm,
+      fsrs_state: fsrsState,
     };
 
+    // Categorize based on timing
     if (nextReviewAt <= now) {
       // Overdue
       dueNow.push(dueItem);
+    } else if (nextReviewAt <= oneHourFromNow && userAlgorithm === 'fsrs' &&
+               (fsrsState === 'learning' || fsrsState === 'relearning')) {
+      // FSRS learning steps due within the hour (special category)
+      dueInMinutes.push(dueItem);
     } else if (nextReviewAt <= todayEnd) {
-      // Due today
+      // Due later today
       dueToday.push(dueItem);
     } else if (includeUpcoming && nextReviewAt <= upcomingEnd) {
       // Upcoming
@@ -237,15 +269,19 @@ export async function getDueProblems(
     }
   });
 
-  // Sort by priority (highest first)
+  // Sort by priority (highest first), but dueInMinutes by time
   const sortByPriority = (a: DueItem, b: DueItem) =>
     b.priority_score - a.priority_score;
+  const sortByMinutes = (a: DueItem, b: DueItem) =>
+    (a.minutes_until_review || 0) - (b.minutes_until_review || 0);
 
+  dueInMinutes.sort(sortByMinutes); // Soonest first for learning steps
   dueNow.sort(sortByPriority);
   dueToday.sort(sortByPriority);
   upcoming.sort(sortByPriority);
 
   // Apply limit
+  const limitedDueInMinutes = dueInMinutes.slice(0, limit);
   const limitedDueNow = dueNow.slice(0, limit);
   const limitedDueToday = dueToday.slice(0, limit);
   const limitedUpcoming = upcoming.slice(0, limit);
@@ -272,11 +308,14 @@ export async function getDueProblems(
 
   return {
     due_now: limitedDueNow,
+    due_in_minutes: limitedDueInMinutes,
     due_today: limitedDueToday,
     upcoming: limitedUpcoming,
+    user_algorithm: userAlgorithm,
     stats: {
-      total_due: dueNow.length + dueToday.length,
+      total_due: dueNow.length + dueInMinutes.length + dueToday.length,
       overdue_count: dueNow.length,
+      learning_steps_due: dueInMinutes.length,
       streak_at_risk: streakAtRisk,
     },
   };
@@ -336,6 +375,11 @@ export async function getOrCreateProblemMastery(
 
 /**
  * Update problem mastery after a review
+ *
+ * Uses atomic operations where possible to handle concurrent requests:
+ * - review_count: FieldValue.increment(1)
+ * - time_spent_minutes: FieldValue.increment(delta)
+ * - hints_used_total: FieldValue.increment(delta)
  */
 export async function updateProblemMastery(
   userId: string,
@@ -344,6 +388,7 @@ export async function updateProblemMastery(
     performance_score: number;
     time_spent_minutes?: number;
     hints_used?: number;
+    increment_review_count?: boolean; // Whether to atomically increment review_count
   }
 ): Promise<ProblemMastery> {
   const masteryRef = adminDb
@@ -381,31 +426,59 @@ export async function updateProblemMastery(
     // Also fix scenario_id if it doesn't match a known scenario
     const correctScenarioId = getScenarioIdByTitle(current.title) || current.scenario_id;
 
-    const updateData: Partial<ProblemMastery> = {
-      ...update,
-      scenario_id: correctScenarioId, // Fix old data with wrong scenario_id
+    // Prepare update data - separate atomic operations from regular updates
+    const { increment_review_count, time_spent_minutes, hints_used, ...restUpdate } = update;
+
+    // Build the Firestore update object with atomic increments
+    const firestoreUpdate: Record<string, unknown> = {
+      ...restUpdate,
+      scenario_id: correctScenarioId,
       difficulty: canonicalDifficulty,
       last_score: update.performance_score,
       average_score: Math.round(newAverage),
       best_score: newBest,
       scores_history: newScoresHistory,
       last_reviewed_at: now,
-      time_spent_minutes:
-        current.time_spent_minutes + (update.time_spent_minutes || 0),
-      hints_used_total: current.hints_used_total + (update.hints_used || 0),
     };
 
-    transaction.update(masteryRef, updateData);
+    // Use atomic increments for counters to prevent race conditions
+    if (increment_review_count) {
+      firestoreUpdate.review_count = FieldValue.increment(1);
+    }
+    if (time_spent_minutes && time_spent_minutes > 0) {
+      firestoreUpdate.time_spent_minutes = FieldValue.increment(time_spent_minutes);
+    }
+    if (hints_used && hints_used > 0) {
+      firestoreUpdate.hints_used_total = FieldValue.increment(hints_used);
+    }
 
+    transaction.update(masteryRef, firestoreUpdate);
+
+    // Return the expected new state (approximation since we used atomic increments)
     return {
       ...current,
-      ...updateData,
+      ...restUpdate,
+      scenario_id: correctScenarioId,
+      difficulty: canonicalDifficulty,
+      last_score: update.performance_score,
+      average_score: Math.round(newAverage),
+      best_score: newBest,
+      scores_history: newScoresHistory,
+      last_reviewed_at: now,
+      review_count: increment_review_count ? current.review_count + 1 : current.review_count,
+      time_spent_minutes: current.time_spent_minutes + (time_spent_minutes || 0),
+      hints_used_total: current.hints_used_total + (hints_used || 0),
     } as ProblemMastery;
   });
 }
 
 /**
  * Mark a problem as skipped with penalty
+ *
+ * Applies penalties for both SM-2 and FSRS:
+ * - SM-2: Reduces ease factor by 0.1 (10%)
+ * - FSRS: Increases difficulty by 0.5 and reduces stability by 10%
+ * - Both: Reschedules to tomorrow
  */
 export async function skipProblem(
   userId: string,
@@ -425,16 +498,45 @@ export async function skipProblem(
 
   const current = doc.data() as ProblemMastery;
 
-  // Apply skip penalty: reduce ease factor and keep short interval
-  const newEaseFactor = Math.max(1.3, current.ease_factor - 0.1);
+  // Get user's algorithm
+  const userAlgorithm = await getUserAlgorithm(userId);
+
   const nextReview = new Date();
   nextReview.setDate(nextReview.getDate() + 1); // Due tomorrow
 
-  await masteryRef.update({
-    ease_factor: newEaseFactor,
+  const updateData: Record<string, unknown> = {
     next_review_at: nextReview.toISOString(),
+    interval_days: 1, // Reset to 1 day interval
     // Don't change review_count - skipped doesn't count as reviewed
-  });
+  };
+
+  if (userAlgorithm === 'fsrs') {
+    // FSRS penalty: increase difficulty and reduce stability
+    const currentDifficulty = (current as any).fsrs_difficulty || 5;
+    const currentStability = (current as any).fsrs_stability || current.interval_days || 1;
+
+    updateData.fsrs_difficulty = Math.min(10, currentDifficulty + 0.5);
+    updateData.fsrs_stability = Math.max(0.5, currentStability * 0.9);
+
+    // Also update the serialized FSRS state if it exists
+    if ((current as any).fsrs_state) {
+      try {
+        const fsrsState = JSON.parse((current as any).fsrs_state);
+        fsrsState.difficulty = updateData.fsrs_difficulty;
+        fsrsState.stability = updateData.fsrs_stability;
+        fsrsState.nextReview = nextReview.toISOString();
+        fsrsState.scheduledDays = 1;
+        updateData.fsrs_state = JSON.stringify(fsrsState);
+      } catch {
+        // Ignore parse errors
+      }
+    }
+  } else {
+    // SM-2 penalty: reduce ease factor by 10%
+    updateData.ease_factor = Math.max(1.3, current.ease_factor - 0.1);
+  }
+
+  await masteryRef.update(updateData);
 }
 
 /**

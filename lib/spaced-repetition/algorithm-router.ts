@@ -50,6 +50,7 @@ export interface AlgorithmState {
 
   // SM-2 specific
   ease_factor?: number
+  scores_history?: number[]
 
   // FSRS specific
   fsrs_state?: FSRSCard
@@ -174,6 +175,7 @@ function calculateSM2Review(
     lastReviewDate: new Date(),
     problemDifficulty: input.problem_difficulty,
     streakDays: input.streak_days,
+    scoresHistory: currentState.scores_history,
     isEarlyReview: input.is_early_review,
     daysOverdue: input.days_overdue,
   }
@@ -206,9 +208,12 @@ function calculateFSRSReview(
   let card: FSRSCard = currentState.fsrs_state || createFSRSCard()
 
   // Map performance score to FSRS rating
+  // Handle time_spent_minutes = 0 (untracked) by using neutral ratio of 1.0
   const expectedMinutes = input.problem_difficulty === 'easy' ? 10 :
                           input.problem_difficulty === 'medium' ? 20 : 30
-  const timeRatio = input.time_spent_minutes / expectedMinutes
+  const timeRatio = input.time_spent_minutes > 0
+    ? input.time_spent_minutes / expectedMinutes
+    : 1.0 // Neutral ratio when time is not tracked
 
   const rating = mapPerformanceToFSRSRating(
     input.performance_score,
@@ -290,6 +295,7 @@ export function reconstructState(
     fsrs_state?: string
     fsrs_lapses?: number
     last_reviewed_at?: string
+    scores_history?: number[]
   }
 ): AlgorithmState {
   const baseState: AlgorithmState = {
@@ -305,28 +311,40 @@ export function reconstructState(
     return {
       ...baseState,
       ease_factor: data.ease_factor || 2.5,
+      scores_history: data.scores_history,
     }
   } else {
     // Reconstruct FSRS card from stored data
     const lastReview = data.last_reviewed_at ? new Date(data.last_reviewed_at) : null
     const nextReview = new Date(data.next_review_at)
 
-    const fsrsCard: FSRSCard = data.fsrs_state
-      ? JSON.parse(data.fsrs_state)
-      : {
-          difficulty: data.fsrs_difficulty || 5,
-          stability: data.fsrs_stability || data.interval_days || 1,
-          state: data.review_count === 0 ? 'new' :
-                 data.mastery_level === 'learning' ? 'learning' : 'review',
-          lastReview,
-          nextReview,
-          reps: data.review_count,
-          lapses: data.fsrs_lapses || 0,
-          elapsedDays: lastReview
-            ? Math.floor((Date.now() - lastReview.getTime()) / (1000 * 60 * 60 * 24))
-            : 0,
-          scheduledDays: data.interval_days,
-        }
+    let fsrsCard: FSRSCard
+
+    if (data.fsrs_state) {
+      // Parse JSON and reconstruct Date objects (JSON.parse loses Date types)
+      const parsed = JSON.parse(data.fsrs_state)
+      fsrsCard = {
+        ...parsed,
+        lastReview: parsed.lastReview ? new Date(parsed.lastReview) : null,
+        nextReview: new Date(parsed.nextReview),
+      }
+    } else {
+      // Build from individual fields
+      fsrsCard = {
+        difficulty: data.fsrs_difficulty || 5,
+        stability: data.fsrs_stability || data.interval_days || 1,
+        state: data.review_count === 0 ? 'new' :
+               data.mastery_level === 'learning' ? 'learning' : 'review',
+        lastReview,
+        nextReview,
+        reps: data.review_count,
+        lapses: data.fsrs_lapses || 0,
+        elapsedDays: lastReview
+          ? Math.floor((Date.now() - lastReview.getTime()) / (1000 * 60 * 60 * 24))
+          : 0,
+        scheduledDays: data.interval_days,
+      }
+    }
 
     return {
       ...baseState,
@@ -370,7 +388,13 @@ export function prepareStateForStorage(state: AlgorithmState): Record<string, un
 // ============================================
 
 /**
- * Estimate current retention for a problem
+ * Estimate current retention for a problem using algorithm-specific formulas.
+ *
+ * Both algorithms use different forgetting curves:
+ * - SM-2: Uses Ebbinghaus-style exponential decay with stability based on interval/review count
+ * - FSRS: Uses power-law decay (more accurate) with ML-derived stability
+ *
+ * The returned value is normalized to 0-100% scale for UI consistency.
  */
 export function estimateRetention(
   algorithm: SpacedRepetitionAlgorithm,
@@ -378,9 +402,51 @@ export function estimateRetention(
   daysSinceReview: number
 ): number {
   if (algorithm === 'fsrs' && state.fsrs_state) {
-    return calculateRetrievability(state.fsrs_state.stability, daysSinceReview) * 100
+    // FSRS uses power-law forgetting curve: R = (1 + t/(9*S))^(-1)
+    const retention = calculateRetrievability(state.fsrs_state.stability, daysSinceReview) * 100
+    return Math.round(Math.max(0, Math.min(100, retention)))
   } else {
-    return sm2EstimateRetention(daysSinceReview, state.interval_days, state.review_count)
+    // SM-2 uses exponential decay approximation
+    const retention = sm2EstimateRetention(daysSinceReview, state.interval_days, state.review_count)
+    return Math.round(Math.max(0, Math.min(100, retention)))
+  }
+}
+
+/**
+ * Estimate retention for algorithm (wrapper for scheduler compatibility)
+ */
+export function estimateRetentionForAlgorithm(
+  algorithm: SpacedRepetitionAlgorithm,
+  state: AlgorithmState,
+  daysSinceReview: number
+): number {
+  return estimateRetention(algorithm, state, daysSinceReview)
+}
+
+/**
+ * Convert retention to a consistent "memory strength" score
+ * This provides a normalized metric for comparing across algorithms
+ * Returns 0-100 where:
+ * - 90-100: Strong memory (safe to review later)
+ * - 70-89: Good memory (review on schedule)
+ * - 50-69: Weakening memory (review soon)
+ * - 0-49: Memory fading (review now)
+ */
+export function getMemoryStrength(
+  algorithm: SpacedRepetitionAlgorithm,
+  state: AlgorithmState,
+  daysSinceReview: number
+): { score: number; label: string; urgency: 'safe' | 'ok' | 'warning' | 'urgent' } {
+  const retention = estimateRetention(algorithm, state, daysSinceReview)
+
+  if (retention >= 90) {
+    return { score: retention, label: 'Strong', urgency: 'safe' }
+  } else if (retention >= 70) {
+    return { score: retention, label: 'Good', urgency: 'ok' }
+  } else if (retention >= 50) {
+    return { score: retention, label: 'Weakening', urgency: 'warning' }
+  } else {
+    return { score: retention, label: 'Fading', urgency: 'urgent' }
   }
 }
 

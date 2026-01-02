@@ -17,6 +17,7 @@ export {
   reconstructState,
   prepareStateForStorage,
   estimateRetention as estimateRetentionForAlgorithm,
+  getMemoryStrength,
   getAlgorithmDistribution,
   migrateExistingUsers,
   type AlgorithmState,

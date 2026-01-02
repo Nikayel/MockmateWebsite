@@ -233,54 +233,64 @@ async function updateDailyMetrics(
 
     await metricsRef.set(newMetrics)
   } else {
-    // Update existing record
-    const existing = doc.data() as AlgorithmDailyMetrics
-    const newScores = [...existing.scores, data.score]
-    const newIntervals = [...existing.intervals_scheduled, data.intervalScheduled]
-    const retained = newScores.filter(s => s >= 56).length
-    const newQualityDist = { ...existing.quality_distribution }
-    newQualityDist[data.qualityRating] = (newQualityDist[data.qualityRating] || 0) + 1
+    // Update existing record using a transaction for data consistency
+    await adminDb.runTransaction(async (transaction) => {
+      const freshDoc = await transaction.get(metricsRef)
+      if (!freshDoc.exists) return
 
-    // Update difficulty stats
-    const diffStats = { ...existing.problems_by_difficulty }
-    const currentDiff = diffStats[data.difficulty]
-    const newAttempted = currentDiff.attempted + 1
-    const newAvgScore = ((currentDiff.avg_score * currentDiff.attempted) + data.score) / newAttempted
-    diffStats[data.difficulty] = {
-      attempted: newAttempted,
-      avg_score: Math.round(newAvgScore),
-    }
+      const existing = freshDoc.data() as AlgorithmDailyMetrics
+      const newReviewCount = existing.reviews_completed + 1
+      const newTotalTime = existing.total_review_time_minutes + data.timeSpentMinutes
 
-    await metricsRef.update({
-      reviews_completed: FieldValue.increment(1),
-      total_review_time_minutes: FieldValue.increment(data.timeSpentMinutes),
-      average_review_time_minutes:
-        (existing.total_review_time_minutes + data.timeSpentMinutes) / (existing.reviews_completed + 1),
-      scores: newScores,
-      average_score: Math.round(newScores.reduce((a, b) => a + b, 0) / newScores.length),
-      median_score: median(newScores),
-      lowest_score: Math.min(existing.lowest_score, data.score),
-      highest_score: Math.max(existing.highest_score, data.score),
-      quality_distribution: newQualityDist,
-      retention_rate: Math.round((retained / newScores.length) * 100),
-      lapse_count: data.lapsed ? FieldValue.increment(1) : existing.lapse_count,
-      first_try_success_rate: Math.round((retained / newScores.length) * 100),
-      problems_completed: FieldValue.increment(1),
-      new_problems_learned: data.isNewProblem
-        ? FieldValue.increment(1)
-        : existing.new_problems_learned,
-      problems_mastered_today: data.masteredToday
-        ? FieldValue.increment(1)
-        : existing.problems_mastered_today,
-      problems_regressed_today: data.regressedToday
-        ? FieldValue.increment(1)
-        : existing.problems_regressed_today,
-      intervals_scheduled: newIntervals,
-      average_interval_days: Math.round(newIntervals.reduce((a, b) => a + b, 0) / newIntervals.length),
-      max_interval_days: Math.max(existing.max_interval_days, data.intervalScheduled),
-      hints_used: FieldValue.increment(data.hintsUsed),
-      problems_by_difficulty: diffStats,
-      updated_at: new Date().toISOString(),
+      const newScores = [...existing.scores, data.score]
+      const newIntervals = [...existing.intervals_scheduled, data.intervalScheduled]
+      const retained = newScores.filter(s => s >= 56).length
+      const newQualityDist = { ...existing.quality_distribution }
+      newQualityDist[data.qualityRating] = (newQualityDist[data.qualityRating] || 0) + 1
+
+      // Update difficulty stats
+      const diffStats = { ...existing.problems_by_difficulty }
+      const currentDiff = diffStats[data.difficulty]
+      const newAttempted = currentDiff.attempted + 1
+      const newAvgScore = ((currentDiff.avg_score * currentDiff.attempted) + data.score) / newAttempted
+      diffStats[data.difficulty] = {
+        attempted: newAttempted,
+        avg_score: Math.round(newAvgScore),
+      }
+
+      // Calculate all derived values atomically from fresh data
+      const updateData: Record<string, unknown> = {
+        reviews_completed: newReviewCount,
+        total_review_time_minutes: newTotalTime,
+        average_review_time_minutes: Math.round((newTotalTime / newReviewCount) * 10) / 10,
+        scores: newScores,
+        average_score: Math.round(newScores.reduce((a, b) => a + b, 0) / newScores.length),
+        median_score: median(newScores),
+        lowest_score: Math.min(existing.lowest_score, data.score),
+        highest_score: Math.max(existing.highest_score, data.score),
+        quality_distribution: newQualityDist,
+        retention_rate: Math.round((retained / newScores.length) * 100),
+        lapse_count: data.lapsed ? existing.lapse_count + 1 : existing.lapse_count,
+        first_try_success_rate: Math.round((retained / newScores.length) * 100),
+        problems_completed: existing.problems_completed + 1,
+        new_problems_learned: data.isNewProblem
+          ? existing.new_problems_learned + 1
+          : existing.new_problems_learned,
+        problems_mastered_today: data.masteredToday
+          ? existing.problems_mastered_today + 1
+          : existing.problems_mastered_today,
+        problems_regressed_today: data.regressedToday
+          ? existing.problems_regressed_today + 1
+          : existing.problems_regressed_today,
+        intervals_scheduled: newIntervals,
+        average_interval_days: Math.round(newIntervals.reduce((a, b) => a + b, 0) / newIntervals.length),
+        max_interval_days: Math.max(existing.max_interval_days, data.intervalScheduled),
+        hints_used: existing.hints_used + data.hintsUsed,
+        problems_by_difficulty: diffStats,
+        updated_at: new Date().toISOString(),
+      }
+
+      transaction.update(metricsRef, updateData)
     })
   }
 }

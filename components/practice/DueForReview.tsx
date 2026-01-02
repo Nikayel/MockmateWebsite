@@ -10,11 +10,14 @@ import {
   AlertTriangle,
   Check,
   SkipForward,
+  Zap,
+  Brain,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export type Priority = "critical" | "high" | "medium" | "low";
 export type MasteryLevel = "new" | "learning" | "reviewing" | "mastered";
+export type Algorithm = "sm2" | "fsrs";
 
 export interface DueItem {
   problem_id: string;
@@ -25,20 +28,25 @@ export interface DueItem {
   last_score: number;
   days_overdue: number;
   days_until_review: number; // Days until next review (negative if overdue)
+  minutes_until_review?: number; // Minutes until review (for FSRS learning steps)
   next_review_at: string; // ISO date string
   priority: Priority;
   priority_score: number;
   estimated_minutes: number;
   mastery_level: MasteryLevel;
   retention_estimate: number;
+  algorithm?: Algorithm; // User's assigned algorithm
+  fsrs_state?: "new" | "learning" | "review" | "relearning"; // FSRS-specific state
 }
 
 interface DueForReviewProps {
   dueNow: DueItem[];
   dueToday: DueItem[];
+  dueInMinutes?: DueItem[]; // FSRS learning steps - due within the hour
   upcoming: DueItem[];
   totalDue: number;
   overdueCount: number;
+  userAlgorithm?: Algorithm; // User's assigned algorithm for transparency
   onSkip?: (problemId: string) => Promise<void>;
   onMarkReviewed?: (problemId: string, scenarioId: string) => Promise<void>;
   isLoading?: boolean;
@@ -55,14 +63,45 @@ function formatPattern(pattern: string): string {
 }
 
 /**
- * Get SM-2 based reasoning for why review is scheduled at this time.
- * Based on Ebbinghaus forgetting curve and spaced repetition science.
+ * Get algorithm-aware reasoning for why review is scheduled at this time.
+ * Adapts messaging based on SM-2 vs FSRS algorithm.
  * Returns both a short reason and an educational tooltip.
  */
 function getReviewReason(item: DueItem): { short: string; tooltip: string } {
   const daysUntil = item.days_until_review;
+  const minutesUntil = item.minutes_until_review;
   const retention = item.retention_estimate;
   const interval = Math.abs(daysUntil);
+  const isFSRS = item.algorithm === "fsrs";
+  const algorithmName = isFSRS ? "FSRS" : "SM-2";
+
+  // FSRS learning phase - due in minutes
+  if (isFSRS && minutesUntil !== undefined && minutesUntil <= 60 && minutesUntil > 0) {
+    if (minutesUntil <= 1) {
+      return {
+        short: "Learning step — review now!",
+        tooltip: `FSRS uses graduated learning steps (1min → 10min → 1day). Complete this step to progress. Missing it resets progress.`
+      };
+    }
+    if (minutesUntil <= 10) {
+      return {
+        short: `Learning step — ${minutesUntil}min`,
+        tooltip: `FSRS learning phase uses short intervals to establish initial memory. Review within ${minutesUntil} minutes for best results.`
+      };
+    }
+    return {
+      short: `Due in ${minutesUntil}min`,
+      tooltip: `You're in the learning phase. FSRS schedules quick reviews to build memory before moving to longer intervals.`
+    };
+  }
+
+  // FSRS relearning phase
+  if (isFSRS && item.fsrs_state === "relearning") {
+    return {
+      short: "Relearning — needs reinforcement",
+      tooltip: `You struggled with this last time. FSRS has moved it to relearning phase with shorter intervals until you demonstrate recall.`
+    };
+  }
 
   // Overdue items
   if (daysUntil < 0) {
@@ -83,7 +122,9 @@ function getReviewReason(item: DueItem): { short: string; tooltip: string } {
     if (daysUntil <= 1) {
       return {
         short: "Short interval — building foundation",
-        tooltip: `New memories need frequent reinforcement. SM-2 algorithm starts with 1-day intervals, then 3 days, then expands based on performance.`
+        tooltip: isFSRS
+          ? `FSRS uses ML-optimized intervals. After passing learning steps, you get a 1-day review to confirm retention.`
+          : `New memories need frequent reinforcement. SM-2 starts with 1-day intervals, then 3 days, then expands based on performance.`
       };
     }
     if (daysUntil <= 3) {
@@ -102,12 +143,14 @@ function getReviewReason(item: DueItem): { short: string; tooltip: string } {
     if (retention >= 80) {
       return {
         short: "Retention strong — interval extended",
-        tooltip: `Your ~${Math.round(retention)}% retention shows solid recall. The algorithm extended your interval to ${interval} days to maximize efficiency.`
+        tooltip: `Your ~${Math.round(retention)}% retention shows solid recall. ${algorithmName} extended your interval to ${interval} days to maximize efficiency.`
       };
     }
     return {
       short: "Optimal spacing for retention",
-      tooltip: `Reviewing at ${interval}-day intervals balances efficiency with retention. Too soon wastes time; too late risks forgetting.`
+      tooltip: isFSRS
+        ? `FSRS calculates intervals to maintain 90% target retention. Your ${interval}-day interval balances efficiency with memory strength.`
+        : `Reviewing at ${interval}-day intervals balances efficiency with retention. Too soon wastes time; too late risks forgetting.`
     };
   }
 
@@ -122,7 +165,7 @@ function getReviewReason(item: DueItem): { short: string; tooltip: string } {
   if (item.difficulty === "hard") {
     return {
       short: "Harder problems need more practice",
-      tooltip: `Complex problems require more repetitions to reach automaticity. The algorithm adjusts intervals based on problem difficulty.`
+      tooltip: `Complex problems require more repetitions to reach automaticity. ${algorithmName} adjusts intervals based on problem difficulty.`
     };
   }
 
@@ -305,9 +348,11 @@ function DueItemRow({
 export function DueForReview({
   dueNow,
   dueToday,
+  dueInMinutes = [],
   upcoming,
   totalDue,
   overdueCount,
+  userAlgorithm,
   onSkip,
   onMarkReviewed,
   isLoading = false,
@@ -346,7 +391,7 @@ export function DueForReview({
     );
   }
 
-  const allDue = [...dueNow, ...dueToday];
+  const allDue = [...dueInMinutes, ...dueNow, ...dueToday];
 
   if (allDue.length === 0 && upcoming.length === 0) {
     return (
@@ -364,12 +409,34 @@ export function DueForReview({
 
   return (
     <div>
-      {/* Header */}
+      {/* Header with Algorithm Indicator */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <h3 className="text-lg font-medium text-white">Due for Review</h3>
           {totalDue > 0 && (
             <span className="text-sm text-gray-500">{totalDue} problems</span>
+          )}
+          {/* Algorithm transparency indicator */}
+          {userAlgorithm && (
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-help ${
+                userAlgorithm === "fsrs"
+                  ? "bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                  : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+              }`}
+              title={
+                userAlgorithm === "fsrs"
+                  ? "FSRS: ML-optimized algorithm with 90% retention target. Uses learning steps (1min → 10min → 1day) for new items."
+                  : "SM-2: Classic spaced repetition algorithm. Intervals: 1d → 3d → expanding based on ease factor."
+              }
+            >
+              {userAlgorithm === "fsrs" ? (
+                <Zap className="h-3 w-3" />
+              ) : (
+                <Brain className="h-3 w-3" />
+              )}
+              {userAlgorithm.toUpperCase()}
+            </span>
           )}
         </div>
         {allDue.length > 0 && (
@@ -387,6 +454,31 @@ export function DueForReview({
         <div className="flex items-center gap-2 mb-4 py-2 px-3 bg-rose-500/5 border border-rose-500/10 rounded-lg text-rose-400 text-sm">
           <AlertTriangle className="h-4 w-4" />
           <span>{overdueCount} overdue - review soon to maintain retention</span>
+        </div>
+      )}
+
+      {/* FSRS Learning Steps - Due in Minutes (Critical for FSRS users) */}
+      {dueInMinutes.length > 0 && (
+        <div className="mb-6">
+          <h4 className="text-xs font-medium text-purple-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+            <Zap className="h-3 w-3" />
+            Learning Steps - Review Now
+          </h4>
+          <p className="text-xs text-gray-500 mb-3">
+            Complete these quick reviews to progress through the learning phase
+          </p>
+          <div className="divide-y divide-white/5">
+            {dueInMinutes.map((item) => (
+              <DueItemRow
+                key={item.problem_id}
+                item={item}
+                onSkip={onSkip ? handleSkip : undefined}
+                onMarkReviewed={onMarkReviewed ? handleMarkReviewed : undefined}
+                isSkipping={skippingId === item.problem_id}
+                isMarkingReviewed={markingReviewedId === item.problem_id}
+              />
+            ))}
+          </div>
         </div>
       )}
 
