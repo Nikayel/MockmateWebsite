@@ -15,7 +15,7 @@ import { Pinecone } from "@pinecone-database/pinecone"
 import { logger } from "@/lib/logger"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-12-15.clover",
+  apiVersion: "2025-12-15.clover" as any,
 })
 
 // Rate limiting: Track recent deletions to prevent abuse
