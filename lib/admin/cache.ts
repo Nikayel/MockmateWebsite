@@ -102,6 +102,7 @@ export const CACHE_TTL = {
   COHORTS: 5 * 60 * 1000,    // 5 minutes
   USERS: 10 * 1000,          // 10 seconds
   USAGE: 30 * 1000,          // 30 seconds
+  REVENUE: 60 * 1000,        // 1 minute
 } as const
 
 /**
