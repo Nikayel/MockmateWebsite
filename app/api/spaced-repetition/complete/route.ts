@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
       const learningState = learningStateDoc.data();
       const streakDays = learningState?.streak_days || 0;
 
-      // Reconstruct algorithm state from stored data
+      // Reconstruct algorithm state from stored data (including scores_history for SM-2)
       const currentState = reconstructState(userAlgorithm, {
         interval_days: existingMastery.interval_days,
         next_review_at: existingMastery.next_review_at,
@@ -134,6 +134,7 @@ export async function POST(request: NextRequest) {
         confidence: existingMastery.confidence,
         ease_factor: existingMastery.ease_factor,
         last_reviewed_at: existingMastery.last_reviewed_at,
+        scores_history: existingMastery.scores_history,
       });
 
       // Estimate pre-review retention
@@ -154,25 +155,28 @@ export async function POST(request: NextRequest) {
         streak_days: streakDays,
       });
 
-      // Prepare storage data
+      // Prepare storage data (don't include review_count - it will be incremented atomically)
       const storageData = prepareStateForStorage({
         algorithm: reviewResult.algorithm,
         interval_days: reviewResult.next_interval_days,
         next_review_at: reviewResult.next_review_at,
-        review_count: existingMastery.review_count + 1,
+        review_count: existingMastery.review_count + 1, // For FSRS state only
         mastery_level: reviewResult.mastery_level,
         confidence: reviewResult.confidence,
         ease_factor: reviewResult.ease_factor,
         fsrs_state: reviewResult.fsrs_state,
       });
 
-      // Update problem mastery
+      // Remove review_count from storageData - we'll increment it atomically
+      const { review_count: _, ...storageDataWithoutCount } = storageData as Record<string, unknown>;
+
+      // Update problem mastery with atomic increment for review_count
       updatedMastery = await updateProblemMastery(userId, problem_id, {
         performance_score,
         time_spent_minutes,
         hints_used,
-        ...storageData,
-        review_count: existingMastery.review_count + 1,
+        increment_review_count: true, // Use atomic increment
+        ...storageDataWithoutCount,
       });
 
       // Record research event for A/B testing analysis
@@ -224,10 +228,12 @@ export async function POST(request: NextRequest) {
 
       // Record research event for first review
       try {
-        // Map score to quality for research tracking
+        // Use consistent quality mapping based on algorithm
+        // SM-2 quality (0-5): maps performance to quality via mapScoreToQuality
+        // FSRS rating (1-4): maps via mapPerformanceToFSRSRating
         const qualityRating = userAlgorithm === 'fsrs'
           ? (performance_score >= 85 ? 4 : performance_score >= 60 ? 3 : performance_score >= 40 ? 2 : 1)
-          : Math.min(5, Math.max(0, Math.floor(performance_score / 20)));
+          : Math.min(5, Math.max(0, performance_score <= 20 ? 0 : performance_score <= 40 ? 1 : performance_score <= 55 ? 2 : performance_score <= 70 ? 3 : performance_score <= 85 ? 4 : 5));
 
         await recordReviewEvent({
           userId,
