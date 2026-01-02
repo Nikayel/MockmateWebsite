@@ -11,15 +11,15 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/auth-context"
 import { getUserProfile } from "@/lib/firestore-helpers"
-import { Check, Crown, Zap, Star, ArrowRight, CheckCircle } from "lucide-react"
+import { Check, Crown, Zap, ArrowRight, CheckCircle, Shield, Sparkles, X } from "lucide-react"
 import { PRICING_CONFIG, getProPricing } from "@/lib/config"
-import { User, Profile } from "@/lib/types"
+import { Profile } from "@/lib/types"
 import { toast } from "sonner"
 import { ErrorBoundary } from "@/components/error-boundary"
+import Link from "next/link"
 
 function UpgradePageContent() {
   const searchParams = useSearchParams()
@@ -30,7 +30,7 @@ function UpgradePageContent() {
   const [loading, setLoading] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('yearly')
-  const proPricing = getProPricing('website') // Website pricing
+  const proPricing = getProPricing('website')
   const currentPrice = billingPeriod === 'yearly' ? proPricing.yearly : proPricing.monthly
 
   useEffect(() => {
@@ -45,7 +45,6 @@ function UpgradePageContent() {
 
     const handleStripeRedirect = async () => {
       try {
-        // Check for Stripe redirect success
         const success = searchParams?.get("success")
         const canceled = searchParams?.get("canceled")
 
@@ -53,12 +52,9 @@ function UpgradePageContent() {
           const sessionId = searchParams?.get("session_id")
           toast.success("Payment successful! Syncing your account...")
 
-          // IMPORTANT: Save user info BEFORE any state changes
-          // router.replace can trigger re-renders that lose auth state
           const currentUserId = user?.id
           const currentFirebaseUser = firebaseUser
 
-          // Sync subscription with retries to handle webhook race condition
           if (sessionId && currentFirebaseUser && currentUserId) {
             let syncSuccess = false
             let attempts = 0
@@ -67,9 +63,8 @@ function UpgradePageContent() {
             while (!syncSuccess && attempts < maxAttempts) {
               attempts++
               try {
-                const token = await currentFirebaseUser.getIdToken(true) // Force refresh token
+                const token = await currentFirebaseUser.getIdToken(true)
 
-                // Call sync API to check Stripe and update profile
                 const syncResponse = await fetch("/api/sync-subscription", {
                   method: "POST",
                   headers: {
@@ -82,7 +77,6 @@ function UpgradePageContent() {
                 if (syncResponse.ok) {
                   const syncData = await syncResponse.json()
 
-                  // Check if user is now Pro
                   if (syncData.profile?.subscription_tier === "pro") {
                     syncSuccess = true
                     setProfile(prev => ({
@@ -91,7 +85,6 @@ function UpgradePageContent() {
                     } as Profile))
                     toast.success("You're now a Pro member!")
                   } else {
-                    // Not yet synced, wait and retry
                     await new Promise(resolve => setTimeout(resolve, 1500))
                   }
                 } else {
@@ -107,11 +100,9 @@ function UpgradePageContent() {
             }
           }
 
-          // Clean URL and redirect AFTER sync is complete
           router.replace("/account")
         } else if (canceled === "true") {
           toast.info("Payment canceled. You can try again anytime.")
-          // Clean URL params after showing toast
           router.replace("/upgrade")
         }
       } catch {
@@ -147,7 +138,7 @@ function UpgradePageContent() {
 
   const handleUpgrade = async (planType: 'monthly' | 'yearly') => {
     if (isProUser) {
-      toast.success("You're already on Pro! 🎉")
+      toast.success("You're already on Pro!")
       router.push("/account")
       return
     }
@@ -159,10 +150,8 @@ function UpgradePageContent() {
 
     setLoading(planType)
     try {
-      // Get Firebase ID token for authentication
       const idToken = await firebaseUser.getIdToken()
 
-      // Create Stripe checkout session
       const response = await fetch("/api/create-checkout", {
         method: "POST",
         headers: {
@@ -182,7 +171,6 @@ function UpgradePageContent() {
       }
 
       if (data.url) {
-        // Redirect to Stripe Checkout immediately
         window.location.href = data.url
       } else {
         throw new Error(data.error || "Failed to create checkout session")
@@ -197,32 +185,51 @@ function UpgradePageContent() {
     }
   }
 
+  // Compact features for display
+  const freeFeatures = [
+    "2 scenarios/month",
+    "All 200+ problems",
+    "AI interviewer",
+  ]
+
+  const freeLimitations = [
+    "No spaced repetition",
+    "No personalized roadmap",
+  ]
+
+  const proFeatures = [
+    "35 scenarios/month",
+    "Unlimited practice",
+    "Spaced repetition",
+    "Personalized roadmap",
+    "System design prep",
+    "Priority support",
+  ]
+
   return (
     <main className="min-h-screen bg-black">
       <Header />
 
-      <div className="pt-24 pb-16">
-        <div className="container mx-auto px-4 max-w-4xl">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <Badge className="bg-accent/20 text-accent border-accent/30 mb-4">
-              <Crown className="mr-1 h-3 w-3" />
-              Join 2,000+ developers
-            </Badge>
-            <h1 className="text-4xl font-bold text-white mb-4">Get Hired Faster</h1>
-            <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              Stop grinding without a system. Pro gives you science-backed spaced repetition,
-              personalized roadmaps, and unlimited practice.
+      <div className="pt-16 pb-8 md:pt-20 md:pb-12">
+        <div className="container mx-auto px-4 max-w-5xl">
+
+          {/* Compact Header */}
+          <div className="text-center mb-6">
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
+              Choose Your Plan
+            </h1>
+            <p className="text-gray-400 text-sm md:text-base">
+              Start free, upgrade when you're ready
             </p>
           </div>
 
-          {/* Billing Toggle */}
+          {/* Billing Toggle - Compact */}
           {!isProUser && (
-            <div className="flex justify-center mb-8">
-              <div className="relative inline-flex items-center gap-3 p-1.5 rounded-full bg-white/5 border border-white/10">
+            <div className="flex justify-center mb-6">
+              <div className="inline-flex items-center gap-2 p-1 rounded-full bg-white/5 border border-white/10">
                 <button
                   onClick={() => setBillingPeriod('monthly')}
-                  className={`relative px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
                     billingPeriod === 'monthly' ? "text-black bg-white" : "text-gray-400 hover:text-white"
                   }`}
                 >
@@ -230,126 +237,158 @@ function UpgradePageContent() {
                 </button>
                 <button
                   onClick={() => setBillingPeriod('yearly')}
-                  className={`relative px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
                     billingPeriod === 'yearly' ? "text-black bg-white" : "text-gray-400 hover:text-white"
                   }`}
                 >
                   Yearly
                 </button>
                 {billingPeriod === 'yearly' && (
-                  <span className="absolute -right-24 md:-right-28 px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs font-semibold border border-green-500/30">
-                    Save 25%
+                  <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs font-semibold border border-green-500/30 ml-1">
+                    -25%
                   </span>
                 )}
               </div>
             </div>
           )}
 
-          {/* Pro Plan */}
+          {/* Pricing Cards - Side by Side */}
           {!isProUser && (
-            <div className="max-w-lg mx-auto mb-12">
-              <Card className="bg-gradient-to-br from-accent/10 to-neural/10 border-accent/50 relative">
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <Badge className="bg-accent text-black font-semibold">
-                    <Star className="mr-1 h-3 w-3" />
-                    {billingPeriod === 'yearly' ? 'Save $75/year' : 'Most Popular'}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
+
+              {/* Free Plan */}
+              <div className="rounded-2xl p-5 md:p-6 border bg-white/[0.02] border-white/10 hover:border-white/20 transition-colors">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="w-5 h-5 text-gray-400" />
+                  <h3 className="text-lg font-bold text-white">Free</h3>
+                </div>
+
+                <div className="mb-1">
+                  <span className="text-3xl font-bold text-white">$0</span>
+                </div>
+                <p className="text-gray-500 text-xs mb-4">Best for trying it out</p>
+
+                <ul className="space-y-2 mb-5">
+                  {freeFeatures.map((feature, idx) => (
+                    <li key={idx} className="flex items-center gap-2 text-sm">
+                      <Check className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                      <span className="text-gray-300">{feature}</span>
+                    </li>
+                  ))}
+                  {freeLimitations.map((limitation, idx) => (
+                    <li key={`limit-${idx}`} className="flex items-center gap-2 text-sm">
+                      <X className="w-4 h-4 text-gray-700 flex-shrink-0" />
+                      <span className="text-gray-600">{limitation}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <Link href="/interview">
+                  <Button
+                    variant="outline"
+                    className="w-full border-white/20 text-white hover:bg-white/10"
+                  >
+                    Start Free
+                  </Button>
+                </Link>
+              </div>
+
+              {/* Pro Plan */}
+              <div className="relative rounded-2xl p-5 md:p-6 border-2 bg-gradient-to-br from-accent/5 to-transparent border-accent/50 hover:border-accent transition-colors">
+                {/* Badge */}
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <Badge className="bg-accent text-black text-xs font-semibold px-3 py-0.5">
+                    Most Popular
                   </Badge>
                 </div>
-                <CardHeader className="pt-8">
-                  <CardTitle className="text-white flex items-center">
-                    <Crown className="mr-2 h-5 w-5 text-accent" />
-                    Pro {billingPeriod === 'yearly' ? 'Yearly' : 'Monthly'}
-                  </CardTitle>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-bold text-accent">
-                      {currentPrice.priceDisplay}
-                    </span>
-                    <span className="text-sm font-normal text-gray-400">{currentPrice.period}</span>
-                    {billingPeriod === 'yearly' && (
-                      <span className="text-sm text-gray-600 line-through">$25/mo</span>
-                    )}
-                  </div>
-                  <div className="text-sm text-gray-400">
-                    {currentPrice.billingNote}
-                  </div>
+
+                <div className="flex items-center gap-2 mb-3 mt-1">
+                  <Crown className="w-5 h-5 text-accent" />
+                  <h3 className="text-lg font-bold text-white">Pro</h3>
+                </div>
+
+                <div className="flex items-baseline gap-2 mb-1">
+                  <span className="text-3xl font-bold text-accent">
+                    {currentPrice.priceDisplay}
+                  </span>
+                  <span className="text-gray-400 text-sm">{currentPrice.period}</span>
                   {billingPeriod === 'yearly' && (
+                    <span className="text-gray-600 text-sm line-through">$25/mo</span>
+                  )}
+                </div>
+                <p className="text-gray-500 text-xs mb-1">
+                  Best for landing your dream job
+                </p>
+                {billingPeriod === 'yearly' && (
+                  <p className="text-green-400 text-xs font-medium mb-3">
+                    Save ${proPricing.yearly.savings}/year (3 months free)
+                  </p>
+                )}
+                {billingPeriod === 'monthly' && <div className="mb-3" />}
+
+                <ul className="space-y-2 mb-5">
+                  {proFeatures.map((feature, idx) => (
+                    <li key={idx} className="flex items-center gap-2 text-sm">
+                      <Check className="w-4 h-4 text-accent flex-shrink-0" />
+                      <span className="text-gray-200">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <Button
+                  onClick={() => handleUpgrade(billingPeriod)}
+                  disabled={loading === billingPeriod}
+                  className="w-full bg-accent hover:bg-accent/90 text-black font-semibold"
+                >
+                  {loading === billingPeriod ? (
+                    "Processing..."
+                  ) : (
                     <>
-                      <div className="text-sm text-green-400 mt-2 font-medium">
-                        Save ${proPricing.yearly.savings}/year — that's 3 months free
-                      </div>
-                      <div className="text-xs text-gray-400 mt-1">
-                        One-time payment for 12 months access
-                      </div>
+                      <Zap className="mr-1.5 h-4 w-4" />
+                      {billingPeriod === 'yearly' ? `Get Pro — ${proPricing.yearly.totalDisplay}/yr` : 'Get Pro — $25/mo'}
+                      <ArrowRight className="ml-1.5 h-4 w-4" />
                     </>
                   )}
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Value highlight */}
-                  <div className="p-4 rounded-xl bg-white/5 border border-white/10 mb-4">
-                    <p className="text-white text-sm font-medium mb-1">Unlimited Practice</p>
-                    <p className="text-gray-400 text-xs">
-                      35 scenarios/month, each with 10+ problems. Practice unlimited times—only scenarios count.
-                    </p>
-                  </div>
+                </Button>
 
-                  {PRICING_CONFIG.pro.highlights.map((feature, index) => (
-                    <div key={index} className="flex items-center space-x-2">
-                      <Check className="h-4 w-4 text-green-400 flex-shrink-0" />
-                      <span className="text-white text-sm">{feature}</span>
-                    </div>
-                  ))}
-                  <Button
-                    onClick={() => handleUpgrade(billingPeriod)}
-                    disabled={loading === billingPeriod}
-                    size="lg"
-                    className="w-full bg-accent hover:bg-accent/90 text-black font-semibold mt-4"
-                  >
-                    {loading === billingPeriod ? (
-                      "Processing..."
-                    ) : (
-                      <>
-                        <Zap className="mr-2 h-5 w-5" />
-                        {billingPeriod === 'yearly' ? `Get Hired Faster for ${proPricing.yearly.totalDisplay}` : 'Start Pro Monthly'}
-                        <ArrowRight className="ml-2 h-5 w-5" />
-                      </>
-                    )}
-                  </Button>
+                {/* Trust signal */}
+                <div className="mt-3 flex items-center justify-center gap-1.5 text-xs text-gray-500">
+                  <Shield className="w-3 h-3 text-green-500" />
+                  <span>30-day money-back guarantee</span>
+                </div>
+              </div>
+            </div>
+          )}
 
-                  {/* Trust signals */}
-                  <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-500">
-                    <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-                    <span>30-day money-back guarantee</span>
-                  </div>
-                </CardContent>
-              </Card>
+          {/* Trust Bar - Compact */}
+          {!isProUser && (
+            <div className="flex items-center justify-center gap-4 text-xs text-gray-500 flex-wrap">
+              <span>Cancel anytime</span>
+              <span className="text-gray-700">•</span>
+              <span>No hidden fees</span>
+              <span className="text-gray-700">•</span>
+              <span>Used by engineers at Google, Meta, Amazon</span>
             </div>
           )}
 
           {/* Already Pro Message */}
           {isProUser && (
-            <div className="text-center space-y-4 mb-12">
+            <div className="text-center space-y-4 py-8">
               <div className="inline-flex items-center rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-emerald-200">
                 <CheckCircle className="mr-2 h-5 w-5 text-emerald-400" />
                 You're already enjoying CodeSparring Pro!
               </div>
-              <Button
-                onClick={() => router.push("/account")}
-                size="lg"
-                className="bg-gray-100 text-black font-semibold px-8 py-4 text-lg hover:bg-white"
-              >
-                Manage subscription
-              </Button>
+              <div>
+                <Button
+                  onClick={() => router.push("/account")}
+                  size="lg"
+                  className="bg-gray-100 text-black font-semibold px-8 hover:bg-white"
+                >
+                  Manage subscription
+                </Button>
+              </div>
               <p className="text-gray-400 text-sm">
                 Need help? Contact support@codesparring.dev
-              </p>
-            </div>
-          )}
-
-          {!isProUser && (
-            <div className="text-center space-y-2">
-              <p className="text-gray-400 text-sm">Cancel anytime. No hidden fees.</p>
-              <p className="text-gray-600 text-xs">
-                Trusted by engineers at Google, Meta, Amazon, and 50+ other companies
               </p>
             </div>
           )}
