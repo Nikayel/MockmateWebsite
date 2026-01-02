@@ -156,8 +156,8 @@ function getNextReviewDisplay(item: DueItem): { timing: string; context: string 
 
   if (daysUntil <= 7) {
     return {
-      timing: `Review in ${daysUntil} days`,
-      context: `Interval based on SM-2 algorithm`
+      timing: `In ${daysUntil} day${daysUntil === 1 ? '' : 's'}`,
+      context: `${daysUntil}-day interval from last review`
     };
   }
 
@@ -237,8 +237,8 @@ function DueItemRow({
             )}
             {showUpcomingDate && item.days_until_review > 0 && (
               <span
-                className="text-xs text-blue-400 flex items-center gap-1 bg-blue-500/10 px-2 py-0.5 rounded-full"
-                title={nextReview.context}
+                className="text-xs text-blue-400 flex items-center gap-1 bg-blue-500/10 px-2 py-0.5 rounded-full cursor-help"
+                title={`Scheduled for review in ${item.days_until_review} day${item.days_until_review === 1 ? '' : 's'} based on your last score of ${item.last_score}%`}
               >
                 <Clock className="h-3 w-3" />
                 {nextReview.timing}
@@ -251,6 +251,11 @@ function DueItemRow({
             </span>
             <span className="text-gray-500">{formatPattern(item.pattern)}</span>
             <span className="text-gray-600">{item.estimated_minutes}m</span>
+            {item.last_score > 0 && (
+              <span className={`${item.last_score >= 70 ? 'text-emerald-500' : item.last_score >= 50 ? 'text-amber-500' : 'text-rose-400'}`}>
+                Last: {item.last_score}%
+              </span>
+            )}
             {/* Show review reason with science tooltip */}
             <span className="text-gray-500 flex items-center">
               <span className="text-gray-600">·</span>
@@ -435,13 +440,7 @@ export function DueForReview({
             onClick={() => setIsUpcomingExpanded(!isUpcomingExpanded)}
             className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 hover:text-gray-400 transition-colors w-full"
           >
-            <span>Upcoming ({upcoming.length})</span>
-            <span
-              className="text-gray-600 font-normal normal-case ml-1"
-              title="Spaced repetition schedules reviews at optimal intervals based on your performance and the forgetting curve"
-            >
-              — next 7 days
-            </span>
+            <span>Scheduled Soon ({upcoming.length})</span>
             <span className="flex-1" />
             {isUpcomingExpanded ? (
               <ChevronUp className="h-3 w-3" />
@@ -449,6 +448,11 @@ export function DueForReview({
               <ChevronDown className="h-3 w-3" />
             )}
           </button>
+          {!isUpcomingExpanded && (
+            <p className="text-xs text-gray-600 -mt-1 mb-2">
+              Each problem has its own interval based on your performance
+            </p>
+          )}
           {isUpcomingExpanded && (
             <div className="divide-y divide-white/5">
               {upcoming.map((item) => (
