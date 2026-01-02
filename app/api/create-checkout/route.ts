@@ -122,12 +122,41 @@ export async function POST(request: NextRequest) {
     // Check if user already has a customer ID
     if (profile?.stripe_customer_id) {
       try {
-        await stripe.customers.retrieve(profile.stripe_customer_id)
-        stripeCustomerId = profile.stripe_customer_id
-        logger.info("Using existing customer for checkout", { userId, customerId: stripeCustomerId })
-      } catch {
-        // Customer doesn't exist, will create new one
-        logger.warn("Existing customer ID invalid, will create new", { userId, invalidId: profile.stripe_customer_id })
+        const existingCustomer = await stripe.customers.retrieve(profile.stripe_customer_id)
+
+        // Check if customer exists AND is not deleted
+        // Stripe returns deleted customers without throwing, so we must check the 'deleted' flag
+        if ('deleted' in existingCustomer && existingCustomer.deleted) {
+          logger.warn("Stored customer was deleted in Stripe, clearing from profile", {
+            userId,
+            deletedCustomerId: profile.stripe_customer_id
+          })
+          // Clear the invalid customer ID from the profile
+          await adminDb.collection("profiles").doc(userId).update({
+            stripe_customer_id: null,
+            updated_at: new Date().toISOString()
+          })
+          // Don't use this customer ID
+        } else {
+          stripeCustomerId = profile.stripe_customer_id
+          logger.info("Using existing customer for checkout", { userId, customerId: stripeCustomerId })
+        }
+      } catch (customerError: any) {
+        // Customer doesn't exist at all (404), clear it from profile
+        logger.warn("Existing customer ID invalid, clearing from profile", {
+          userId,
+          invalidId: profile.stripe_customer_id,
+          error: customerError?.message
+        })
+        // Clear the invalid customer ID so we don't keep trying to use it
+        try {
+          await adminDb.collection("profiles").doc(userId).update({
+            stripe_customer_id: null,
+            updated_at: new Date().toISOString()
+          })
+        } catch (updateError) {
+          logger.error("Failed to clear invalid customer ID", { userId, error: updateError })
+        }
       }
     }
 
