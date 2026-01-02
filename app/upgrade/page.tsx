@@ -235,7 +235,7 @@ function UpgradePageContent() {
 
                 <div className="flex items-baseline gap-1 mb-2">
                   <span className="text-4xl font-bold text-accent">
-                    {billingPeriod === 'yearly' && currentPrice.totalDisplay 
+                    {billingPeriod === 'yearly' && 'totalDisplay' in currentPrice && currentPrice.totalDisplay
                       ? currentPrice.totalDisplay 
                       : currentPrice.priceDisplay}
                   </span>
