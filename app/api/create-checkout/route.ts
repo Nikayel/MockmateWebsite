@@ -205,17 +205,6 @@ export async function POST(request: NextRequest) {
       automatic_tax: {
         enabled: true,
       },
-      // Automatically save the billing address entered in Checkout to the Customer
-      // This is required for automatic tax calculation when the customer doesn't have an address yet
-      customer_update: {
-        address: 'auto',
-      },
-    }
-
-    // Only set payment_method_collection for subscriptions (recurring payments)
-    // This parameter is not allowed for one-time payments (yearly plans)
-    if (planType === 'monthly') {
-      sessionParams.payment_method_collection = 'if_required'
     }
 
     // payment_method_collection only works with subscriptions, not one-time payments
@@ -227,8 +216,14 @@ export async function POST(request: NextRequest) {
     // Attach pre-created customer if we have one
     if (stripeCustomerId) {
       sessionParams.customer = stripeCustomerId
+      // customer_update only works when customer is set
+      // This saves the billing address to the customer for future tax calculation
+      sessionParams.customer_update = {
+        address: 'auto',
+      }
     } else if (userEmail) {
       // Fallback: Let Stripe create customer but pre-fill email
+      // Note: customer_update not available without existing customer
       sessionParams.customer_email = userEmail
     }
 
