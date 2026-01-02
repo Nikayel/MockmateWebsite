@@ -143,11 +143,62 @@ function wrapCodeForExecution(code: string, language: string, testInput: any): s
     const funcMatch = code.match(/def\s+(\w+)\s*\(/)
     const funcName = funcMatch ? funcMatch[1] : 'solution'
 
-    // Python wrapper with print capture
+    // Python wrapper with print capture and common imports/classes for DSA problems
     return `
 import json
 import sys
 import time
+from typing import Optional, List, Dict, Set, Tuple, Any
+
+# Common DSA classes used in problems
+class TreeNode:
+    def __init__(self, val=0, left=None, right=None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val = val
+        self.next = next
+
+# Helper to build tree from array (for test input)
+def _build_tree(arr):
+    if not arr or arr[0] is None:
+        return None
+    root = TreeNode(arr[0])
+    queue = [root]
+    i = 1
+    while queue and i < len(arr):
+        node = queue.pop(0)
+        if i < len(arr) and arr[i] is not None:
+            node.left = TreeNode(arr[i])
+            queue.append(node.left)
+        i += 1
+        if i < len(arr) and arr[i] is not None:
+            node.right = TreeNode(arr[i])
+            queue.append(node.right)
+        i += 1
+    return root
+
+# Helper to convert tree to array (for output)
+def _tree_to_array(root):
+    if not root:
+        return []
+    result = []
+    queue = [root]
+    while queue:
+        node = queue.pop(0)
+        if node:
+            result.append(node.val)
+            queue.append(node.left)
+            queue.append(node.right)
+        else:
+            result.append(None)
+    # Remove trailing Nones
+    while result and result[-1] is None:
+        result.pop()
+    return result
 
 # Capture print statements
 _console_logs = []
@@ -166,7 +217,22 @@ ${code}
 # Execute with test input
 try:
     _input = json.loads('${inputJson.replace(/'/g, "\\'")}')
-    _result = ${funcName}(*_input)
+
+    # Convert array inputs to TreeNode if function expects TreeNode
+    _processed_input = []
+    for arg in _input:
+        if isinstance(arg, list) and len(arg) > 0:
+            # Check if it might be a tree (has nested None values pattern)
+            _processed_input.append(_build_tree(arg) if any(x is None for x in arg[1:] if len(arg) > 1) else arg)
+        else:
+            _processed_input.append(arg if not isinstance(arg, list) else _build_tree(arg) if arg else None)
+
+    _result = ${funcName}(*_processed_input)
+
+    # Convert TreeNode result back to array for comparison
+    if isinstance(_result, TreeNode):
+        _result = _tree_to_array(_result)
+
     # Output format: LOGS|||RESULT
     print = _original_print  # Restore for final output
     print("__LOGS__:" + json.dumps(_console_logs))
@@ -186,8 +252,68 @@ except Exception as e:
   const funcMatch = code.match(/(?:function\s+(\w+)|const\s+(\w+)\s*=|let\s+(\w+)\s*=|var\s+(\w+)\s*=)/)
   const funcName = funcMatch ? (funcMatch[1] || funcMatch[2] || funcMatch[3] || funcMatch[4]) : null
 
-  // JavaScript wrapper with console capture
+  // JavaScript wrapper with console capture and common DSA classes
   return `
+// Common DSA classes used in problems
+class TreeNode {
+  constructor(val = 0, left = null, right = null) {
+    this.val = val;
+    this.left = left;
+    this.right = right;
+  }
+}
+
+class ListNode {
+  constructor(val = 0, next = null) {
+    this.val = val;
+    this.next = next;
+  }
+}
+
+// Helper to build tree from array
+function _buildTree(arr) {
+  if (!arr || arr.length === 0 || arr[0] === null) return null;
+  const root = new TreeNode(arr[0]);
+  const queue = [root];
+  let i = 1;
+  while (queue.length > 0 && i < arr.length) {
+    const node = queue.shift();
+    if (i < arr.length && arr[i] !== null) {
+      node.left = new TreeNode(arr[i]);
+      queue.push(node.left);
+    }
+    i++;
+    if (i < arr.length && arr[i] !== null) {
+      node.right = new TreeNode(arr[i]);
+      queue.push(node.right);
+    }
+    i++;
+  }
+  return root;
+}
+
+// Helper to convert tree to array
+function _treeToArray(root) {
+  if (!root) return [];
+  const result = [];
+  const queue = [root];
+  while (queue.length > 0) {
+    const node = queue.shift();
+    if (node) {
+      result.push(node.val);
+      queue.push(node.left);
+      queue.push(node.right);
+    } else {
+      result.push(null);
+    }
+  }
+  // Remove trailing nulls
+  while (result.length > 0 && result[result.length - 1] === null) {
+    result.pop();
+  }
+  return result;
+}
+
 // Capture console methods
 const _consoleLogs = [];
 const _originalLog = console.log;
@@ -225,6 +351,7 @@ try {
   if (!_func && typeof twoSum === 'function') _func = twoSum;
   if (!_func && typeof main === 'function') _func = main;
   if (!_func && typeof isSameTree === 'function') _func = isSameTree;
+  if (!_func && typeof invertTree === 'function') _func = invertTree;
 
   // For bugfix scenarios - look for common function names
   if (!_func && typeof processAdjacentPairs === 'function') _func = processAdjacentPairs;
@@ -243,7 +370,22 @@ try {
     process.exit(1);
   }
 
-  const _result = _func(..._input);
+  // Process input - convert arrays to TreeNode if needed
+  const _processedInput = _input.map(arg => {
+    if (Array.isArray(arg) && arg.length > 0) {
+      // Check if it looks like a tree array (contains null values typically)
+      const hasNulls = arg.some((x, i) => i > 0 && x === null);
+      return hasNulls ? _buildTree(arg) : arg;
+    }
+    return arg;
+  });
+
+  let _result = _func(..._processedInput);
+
+  // Convert TreeNode result back to array
+  if (_result instanceof TreeNode) {
+    _result = _treeToArray(_result);
+  }
 
   // Restore and output
   console.log = _originalLog;
