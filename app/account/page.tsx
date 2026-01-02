@@ -193,9 +193,12 @@ export default function AccountPage() {
     if (!user || !firebaseUser) return
 
     try {
-      // Get Firebase ID token for authentication
-      if (!firebaseUser) {
-        toast.error("Please sign in again")
+      // Check if user has Stripe customer ID before making request
+      if (!profile?.stripe_customer_id && !profile?.stripe_subscription_id) {
+        // User has no Stripe data - suggest sync or show helpful message
+        toast.error("No subscription data found", {
+          description: "Try clicking 'Sync Subscription Status' first. If the issue persists, contact support.",
+        })
         return
       }
 
@@ -215,12 +218,16 @@ export default function AccountPage() {
       if (data.success && data.url) {
         window.location.href = data.url
       } else {
-        throw new Error(data.error || "Failed to open portal")
+        // Use the API's message field which contains user-friendly text
+        toast.error(data.error || "Failed to open portal", {
+          description: data.message || "Please try again or contact support.",
+        })
       }
     } catch (error) {
-      console.error("Customer portal error:", error)
+      // Log for debugging but don't expose technical details to user
+      console.warn("Customer portal error:", error)
       toast.error("Failed to open subscription portal", {
-        description: error instanceof Error ? error.message : "Please try again",
+        description: "Please try again. If the issue persists, contact support.",
       })
     }
   }
