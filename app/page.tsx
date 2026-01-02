@@ -3,6 +3,7 @@ import { HeroSection } from "@/components/hero-section"
 import { ProblemTeaser } from "@/components/problem-teaser"
 import { FeaturesSection } from "@/components/features-section"
 import { AIAssistedSection } from "@/components/ai-assisted-section"
+import { MetricsMarketingSection } from "@/components/metrics-marketing-section"
 import { Footer } from "@/components/footer"
 import { HomePageClient } from "@/components/home/HomePageClient"
 
@@ -31,6 +32,7 @@ export default function HomePage() {
       <ProblemTeaser />
       <AIAssistedSection />
       <FeaturesSection />
+      <MetricsMarketingSection />
       <Footer />
     </main>
   )

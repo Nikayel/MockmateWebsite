@@ -37,6 +37,17 @@ const OnboardingModal = dynamic(() => import("@/components/OnboardingModal").the
 const InteractiveTour = dynamic(() => import("@/components/InteractiveTour").then(mod => mod.InteractiveTour), {
   ssr: false
 })
+const MetricsOverview = dynamic(() => import("@/components/dashboard/MetricsOverview").then(mod => mod.MetricsOverview), {
+  ssr: false,
+  loading: () => (
+    <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6">
+      <div className="animate-pulse space-y-3">
+        <div className="h-4 bg-gray-800 rounded w-1/3"></div>
+        <div className="h-4 bg-gray-800 rounded w-1/2"></div>
+      </div>
+    </div>
+  )
+})
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -342,8 +353,10 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          {/* Recent Activity */}
-          <Card className="bg-gray-900/50 border-gray-700" data-tour="recent-activity">
+          {/* Content Grid: Recent Activity & Metrics */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            {/* Recent Activity - Takes 2 columns */}
+            <Card className="bg-gray-900/50 border-gray-700 lg:col-span-2" data-tour="recent-activity">
             <CardHeader>
               <CardTitle className="text-white flex items-center justify-between">
                 <span className="flex items-center">
@@ -414,6 +427,10 @@ export default function DashboardPage() {
               )}
             </CardContent>
           </Card>
+
+            {/* Performance Insights - Takes 1 column */}
+            <MetricsOverview />
+          </div>
         </div>
       </div>
 

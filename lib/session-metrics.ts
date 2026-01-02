@@ -1,0 +1,755 @@
+/**
+ * Session Metrics Tracking System
+ *
+ * Comprehensive tracking of user interactions during interview sessions.
+ * Collects data for:
+ * - Performance analysis and scoring
+ * - RAG personalization
+ * - Algorithm research (SM-2 vs FSRS)
+ * - User insights and recommendations
+ */
+
+import { adminDb } from './firebase-admin'
+import { FieldValue, Timestamp } from 'firebase-admin/firestore'
+import { trackUsageEvent } from './usage-tracking'
+import type { InteractionMetrics, ScoreBreakdown } from './scoring'
+import { calculateUserScore, getPerformanceFeedback } from './scoring'
+
+// =============================================================================
+// TYPES
+// =============================================================================
+
+export interface SessionMetricsState {
+  sessionId: string
+  userId: string
+  scenarioId: string
+  scenarioTitle: string
+  pattern: string
+  difficulty: 'easy' | 'medium' | 'hard'
+  scenarioType: 'dsa' | 'bugfix' | 'system-design'
+
+  // Timestamps
+  startedAt: string
+  lastActivityAt: string
+  completedAt?: string
+
+  // Chat tracking
+  chatMessages: ChatMetric[]
+  interviewerMessages: ChatMetric[]
+  totalChatMessages: number
+  totalInterviewerMessages: number
+
+  // AI collaboration
+  aiQuestionsAsked: number
+  aiSuggestionsReceived: number
+  aiSuggestionsApplied: number
+  aiSuggestionsCopiedBlindly: number
+
+  // Hints
+  hintsViewed: number[]
+  hintsTotal: number
+  timeToFirstHint?: number // seconds from start
+
+  // Code execution
+  codeExecutions: CodeExecutionMetric[]
+  totalExecutions: number
+  successfulExecutions: number
+
+  // Problem solving signals
+  approachExplained: boolean
+  complexityDiscussed: boolean
+  edgeCasesIdentified: string[]
+  debuggingAttempts: number
+  optimizationAttempts: number
+
+  // Workspace (for bugfix/system-design)
+  filesViewed: string[]
+  workspaceContextUsed: boolean
+
+  // Communication quality (updated by AI analysis)
+  communicationScore?: number
+  thoughtProcessShared?: number
+
+  // Final state
+  finalCode?: string
+  language?: string
+  testsPassed?: number
+  testsTotal?: number
+  efficiencyScore?: number
+  performanceScore?: number
+}
+
+export interface ChatMetric {
+  timestamp: string
+  type: 'user' | 'ai'
+  messageLength: number
+  containsCode: boolean
+  containsQuestion: boolean
+  responseTimeMs?: number // time since last message
+}
+
+export interface CodeExecutionMetric {
+  timestamp: string
+  passed: number
+  total: number
+  hasErrors: boolean
+  executionTimeMs: number
+}
+
+export interface SessionSummary {
+  sessionId: string
+  userId: string
+  scenarioId: string
+  pattern: string
+  difficulty: 'easy' | 'medium' | 'hard'
+  durationMinutes: number
+  performanceScore: number
+  scoreBreakdown: ScoreBreakdown
+  feedback: ReturnType<typeof getPerformanceFeedback>
+  interactionMetrics: InteractionMetrics
+  completedAt: string
+}
+
+// =============================================================================
+// IN-MEMORY SESSION TRACKING (for active sessions)
+// =============================================================================
+
+// Store active sessions in memory for fast updates
+const activeSessions = new Map<string, SessionMetricsState>()
+
+/**
+ * Initialize metrics tracking for a new session
+ */
+export async function initSessionMetrics(params: {
+  sessionId: string
+  userId: string
+  scenarioId: string
+  scenarioTitle: string
+  pattern: string
+  difficulty: 'easy' | 'medium' | 'hard'
+  scenarioType: 'dsa' | 'bugfix' | 'system-design'
+  hintsTotal: number
+}): Promise<SessionMetricsState> {
+  const now = new Date().toISOString()
+
+  const state: SessionMetricsState = {
+    sessionId: params.sessionId,
+    userId: params.userId,
+    scenarioId: params.scenarioId,
+    scenarioTitle: params.scenarioTitle,
+    pattern: params.pattern,
+    difficulty: params.difficulty,
+    scenarioType: params.scenarioType,
+    startedAt: now,
+    lastActivityAt: now,
+    chatMessages: [],
+    interviewerMessages: [],
+    totalChatMessages: 0,
+    totalInterviewerMessages: 0,
+    aiQuestionsAsked: 0,
+    aiSuggestionsReceived: 0,
+    aiSuggestionsApplied: 0,
+    aiSuggestionsCopiedBlindly: 0,
+    hintsViewed: [],
+    hintsTotal: params.hintsTotal,
+    codeExecutions: [],
+    totalExecutions: 0,
+    successfulExecutions: 0,
+    approachExplained: false,
+    complexityDiscussed: false,
+    edgeCasesIdentified: [],
+    debuggingAttempts: 0,
+    optimizationAttempts: 0,
+    filesViewed: [],
+    workspaceContextUsed: false,
+  }
+
+  // Store in memory
+  activeSessions.set(params.sessionId, state)
+
+  // Track session start event
+  await trackUsageEvent({
+    userId: params.userId,
+    eventType: 'session_start',
+    sessionId: params.sessionId,
+    scenarioId: params.scenarioId,
+    metadata: {
+      pattern: params.pattern,
+      difficulty: params.difficulty,
+      scenarioType: params.scenarioType,
+    },
+  })
+
+  // Persist initial state to Firestore
+  await persistSessionMetrics(state)
+
+  return state
+}
+
+/**
+ * Get current session metrics state
+ */
+export function getSessionMetrics(sessionId: string): SessionMetricsState | null {
+  return activeSessions.get(sessionId) || null
+}
+
+/**
+ * Track a chat message
+ */
+export async function trackChatMessage(params: {
+  sessionId: string
+  type: 'user' | 'ai'
+  message: string
+  chatType: 'partner' | 'interviewer'
+}): Promise<void> {
+  const state = activeSessions.get(params.sessionId)
+  if (!state) return
+
+  const now = new Date().toISOString()
+  const lastMessage = params.chatType === 'partner'
+    ? state.chatMessages[state.chatMessages.length - 1]
+    : state.interviewerMessages[state.interviewerMessages.length - 1]
+
+  const metric: ChatMetric = {
+    timestamp: now,
+    type: params.type,
+    messageLength: params.message.length,
+    containsCode: /```|function|const |let |var |def |class /.test(params.message),
+    containsQuestion: /\?/.test(params.message),
+    responseTimeMs: lastMessage
+      ? new Date(now).getTime() - new Date(lastMessage.timestamp).getTime()
+      : undefined,
+  }
+
+  if (params.chatType === 'partner') {
+    state.chatMessages.push(metric)
+    state.totalChatMessages++
+
+    // Track AI interactions
+    if (params.type === 'user' && metric.containsQuestion) {
+      state.aiQuestionsAsked++
+    }
+    if (params.type === 'ai') {
+      state.aiSuggestionsReceived++
+    }
+  } else {
+    state.interviewerMessages.push(metric)
+    state.totalInterviewerMessages++
+
+    // Analyze for approach explanation and complexity discussion
+    if (params.type === 'user') {
+      const lowerMessage = params.message.toLowerCase()
+      if (lowerMessage.includes('approach') || lowerMessage.includes('plan') || lowerMessage.includes('strategy')) {
+        state.approachExplained = true
+      }
+      if (lowerMessage.includes('o(') || lowerMessage.includes('time complexity') || lowerMessage.includes('space complexity')) {
+        state.complexityDiscussed = true
+      }
+      if (lowerMessage.includes('edge case') || lowerMessage.includes('corner case') || lowerMessage.includes('what if')) {
+        const edgeCase = params.message.slice(0, 100)
+        if (!state.edgeCasesIdentified.includes(edgeCase)) {
+          state.edgeCasesIdentified.push(edgeCase)
+        }
+      }
+    }
+  }
+
+  state.lastActivityAt = now
+
+  // Track chat message usage (fire and forget)
+  trackUsageEvent({
+    userId: state.userId,
+    eventType: 'chat_message',
+    sessionId: params.sessionId,
+    metadata: {
+      chatType: params.chatType,
+      messageType: params.type,
+      messageLength: params.message.length,
+    },
+  }).catch(() => {}) // Don't fail on tracking errors
+}
+
+/**
+ * Track hint reveal
+ */
+export async function trackHintReveal(params: {
+  sessionId: string
+  hintIndex: number
+}): Promise<void> {
+  const state = activeSessions.get(params.sessionId)
+  if (!state) return
+
+  const now = new Date().toISOString()
+
+  if (!state.hintsViewed.includes(params.hintIndex)) {
+    state.hintsViewed.push(params.hintIndex)
+
+    // Track time to first hint
+    if (state.hintsViewed.length === 1) {
+      const startTime = new Date(state.startedAt).getTime()
+      const hintTime = new Date(now).getTime()
+      state.timeToFirstHint = Math.round((hintTime - startTime) / 1000)
+    }
+  }
+
+  state.lastActivityAt = now
+
+  // Track hint usage event
+  await trackUsageEvent({
+    userId: state.userId,
+    eventType: 'hint_request',
+    sessionId: params.sessionId,
+    metadata: {
+      hintIndex: params.hintIndex,
+      hintsRevealed: state.hintsViewed.length,
+      hintsTotal: state.hintsTotal,
+      timeToFirstHint: state.timeToFirstHint,
+    },
+  })
+}
+
+/**
+ * Track code execution
+ */
+export async function trackCodeExecution(params: {
+  sessionId: string
+  passed: number
+  total: number
+  hasErrors: boolean
+  executionTimeMs: number
+}): Promise<void> {
+  const state = activeSessions.get(params.sessionId)
+  if (!state) return
+
+  const now = new Date().toISOString()
+
+  const metric: CodeExecutionMetric = {
+    timestamp: now,
+    passed: params.passed,
+    total: params.total,
+    hasErrors: params.hasErrors,
+    executionTimeMs: params.executionTimeMs,
+  }
+
+  state.codeExecutions.push(metric)
+  state.totalExecutions++
+
+  if (params.passed === params.total && !params.hasErrors) {
+    state.successfulExecutions++
+  }
+
+  // Track debugging attempts (failed executions followed by changes)
+  if (params.passed < params.total || params.hasErrors) {
+    state.debuggingAttempts++
+  }
+
+  state.lastActivityAt = now
+}
+
+/**
+ * Track file view (for bugfix/system-design)
+ */
+export function trackFileView(sessionId: string, fileName: string): void {
+  const state = activeSessions.get(sessionId)
+  if (!state) return
+
+  if (!state.filesViewed.includes(fileName)) {
+    state.filesViewed.push(fileName)
+    state.workspaceContextUsed = true
+  }
+
+  state.lastActivityAt = new Date().toISOString()
+}
+
+/**
+ * Track optimization attempt
+ */
+export function trackOptimizationAttempt(sessionId: string): void {
+  const state = activeSessions.get(sessionId)
+  if (!state) return
+
+  state.optimizationAttempts++
+  state.lastActivityAt = new Date().toISOString()
+}
+
+/**
+ * Track AI suggestion application
+ */
+export function trackAISuggestionApplied(sessionId: string, wasUnderstood: boolean): void {
+  const state = activeSessions.get(sessionId)
+  if (!state) return
+
+  if (wasUnderstood) {
+    state.aiSuggestionsApplied++
+  } else {
+    state.aiSuggestionsCopiedBlindly++
+  }
+
+  state.lastActivityAt = new Date().toISOString()
+}
+
+/**
+ * Complete session and calculate final metrics
+ */
+export async function completeSessionMetrics(params: {
+  sessionId: string
+  finalCode: string
+  language: string
+  testsPassed: number
+  testsTotal: number
+  efficiencyScore: number
+  communicationScore?: number
+  thoughtProcessShared?: number
+}): Promise<SessionSummary | null> {
+  const state = activeSessions.get(params.sessionId)
+  if (!state) {
+    console.error(`[Session Metrics] No active session found: ${params.sessionId}`)
+    return null
+  }
+
+  const now = new Date().toISOString()
+  const startTime = new Date(state.startedAt).getTime()
+  const endTime = new Date(now).getTime()
+  const durationMinutes = Math.round((endTime - startTime) / 60000)
+
+  // Update final state
+  state.completedAt = now
+  state.finalCode = params.finalCode
+  state.language = params.language
+  state.testsPassed = params.testsPassed
+  state.testsTotal = params.testsTotal
+  state.efficiencyScore = params.efficiencyScore
+  state.communicationScore = params.communicationScore
+  state.thoughtProcessShared = params.thoughtProcessShared
+
+  // Build InteractionMetrics for scoring
+  const interactionMetrics: InteractionMetrics = {
+    // Code Understanding
+    codeExplanationQuality: state.communicationScore || 50,
+    approachExplanationGiven: state.approachExplained,
+    complexityAnalysisProvided: state.complexityDiscussed,
+    edgeCasesIdentified: state.edgeCasesIdentified.length,
+
+    // Debugging
+    debuggingAttempts: state.debuggingAttempts,
+    testDrivenApproach: state.totalExecutions > 2,
+    systematicDebugging: state.debuggingAttempts > 0 && state.successfulExecutions > 0,
+
+    // Code Quality
+    testCasesPassed: params.testsPassed,
+    testCasesTotal: params.testsTotal,
+    codeEfficiencyScore: params.efficiencyScore,
+    codeQualityScore: params.efficiencyScore, // Can be enhanced with linting
+    codeReadability: 60, // Default - could be analyzed
+
+    // Problem-Solving
+    brokeDownProblem: state.approachExplained,
+    consideredAlternatives: state.optimizationAttempts > 0,
+    optimizationAttempted: state.optimizationAttempts > 0,
+
+    // AI Collaboration
+    aiQuestionsAsked: state.aiQuestionsAsked,
+    aiSuggestionsUnderstood: state.aiSuggestionsApplied,
+    aiSuggestionsMisunderstood: state.aiSuggestionsCopiedBlindly,
+    aiUsedStrategically: state.aiQuestionsAsked > 0 && state.aiSuggestionsCopiedBlindly === 0,
+
+    // Communication
+    interviewerQuestionsAnswered: state.interviewerMessages.filter(m => m.type === 'user').length,
+    clarifyingQuestionsAsked: state.interviewerMessages.filter(m => m.type === 'user' && m.containsQuestion).length,
+    thoughtProcessShared: state.thoughtProcessShared || 50,
+
+    // Problem Context
+    problemDifficulty: state.difficulty,
+    problemType: state.scenarioType,
+    skillsDemonstrated: [state.pattern],
+
+    // Time & Hints
+    timeSpent: durationMinutes * 60,
+    hintsRevealed: state.hintsViewed.length,
+    hintsTotal: state.hintsTotal,
+
+    // Workspace
+    workspaceFilesViewed: state.filesViewed.length,
+    workspaceFilesTotal: state.scenarioType !== 'dsa' ? 5 : 0, // Approximate
+    workspaceContextUsed: state.workspaceContextUsed,
+  }
+
+  // Calculate score using the scoring system
+  const scoreBreakdown = calculateUserScore(interactionMetrics)
+  const feedback = getPerformanceFeedback(scoreBreakdown)
+
+  state.performanceScore = scoreBreakdown.overallScore
+
+  // Create summary
+  const summary: SessionSummary = {
+    sessionId: state.sessionId,
+    userId: state.userId,
+    scenarioId: state.scenarioId,
+    pattern: state.pattern,
+    difficulty: state.difficulty,
+    durationMinutes,
+    performanceScore: scoreBreakdown.overallScore,
+    scoreBreakdown,
+    feedback,
+    interactionMetrics,
+    completedAt: now,
+  }
+
+  // Track session end event
+  await trackUsageEvent({
+    userId: state.userId,
+    eventType: 'session_end',
+    sessionId: params.sessionId,
+    metadata: {
+      durationMinutes,
+      performanceScore: scoreBreakdown.overallScore,
+      testsPassed: params.testsPassed,
+      testsTotal: params.testsTotal,
+    },
+  })
+
+  // Persist final state
+  await persistSessionMetrics(state)
+
+  // Store session summary for RAG and analytics
+  await storeSessionSummary(summary)
+
+  // Clean up memory
+  activeSessions.delete(params.sessionId)
+
+  return summary
+}
+
+// =============================================================================
+// PERSISTENCE
+// =============================================================================
+
+/**
+ * Persist session metrics to Firestore
+ */
+async function persistSessionMetrics(state: SessionMetricsState): Promise<void> {
+  try {
+    await adminDb
+      .collection('session_metrics')
+      .doc(state.sessionId)
+      .set({
+        ...state,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true })
+  } catch (error) {
+    console.error('[Session Metrics] Failed to persist:', error)
+  }
+}
+
+/**
+ * Store session summary for analytics and RAG
+ */
+async function storeSessionSummary(summary: SessionSummary): Promise<void> {
+  try {
+    // Store in user's session history
+    await adminDb
+      .collection('users')
+      .doc(summary.userId)
+      .collection('session_summaries')
+      .doc(summary.sessionId)
+      .set({
+        ...summary,
+        createdAt: FieldValue.serverTimestamp(),
+      })
+
+    // Update user's aggregate stats
+    await updateUserAggregateStats(summary)
+  } catch (error) {
+    console.error('[Session Metrics] Failed to store summary:', error)
+  }
+}
+
+/**
+ * Update user's aggregate statistics
+ */
+async function updateUserAggregateStats(summary: SessionSummary): Promise<void> {
+  const userStatsRef = adminDb.collection('user_stats').doc(summary.userId)
+
+  await adminDb.runTransaction(async (transaction) => {
+    const doc = await transaction.get(userStatsRef)
+
+    if (!doc.exists) {
+      // Create new stats document
+      transaction.set(userStatsRef, {
+        userId: summary.userId,
+        totalSessions: 1,
+        totalPracticeMinutes: summary.durationMinutes,
+        totalScore: summary.performanceScore,
+        averageScore: summary.performanceScore,
+        patternStats: {
+          [summary.pattern]: {
+            sessions: 1,
+            totalScore: summary.performanceScore,
+            averageScore: summary.performanceScore,
+            bestScore: summary.performanceScore,
+          },
+        },
+        difficultyStats: {
+          [summary.difficulty]: {
+            sessions: 1,
+            totalScore: summary.performanceScore,
+            averageScore: summary.performanceScore,
+          },
+        },
+        lastSessionAt: summary.completedAt,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      })
+    } else {
+      const data = doc.data()!
+      const totalSessions = (data.totalSessions || 0) + 1
+      const totalScore = (data.totalScore || 0) + summary.performanceScore
+
+      // Update pattern stats
+      const patternStats = data.patternStats || {}
+      const patternData = patternStats[summary.pattern] || { sessions: 0, totalScore: 0, averageScore: 0, bestScore: 0 }
+      patternData.sessions++
+      patternData.totalScore += summary.performanceScore
+      patternData.averageScore = Math.round(patternData.totalScore / patternData.sessions)
+      patternData.bestScore = Math.max(patternData.bestScore, summary.performanceScore)
+      patternStats[summary.pattern] = patternData
+
+      // Update difficulty stats
+      const difficultyStats = data.difficultyStats || {}
+      const diffData = difficultyStats[summary.difficulty] || { sessions: 0, totalScore: 0, averageScore: 0 }
+      diffData.sessions++
+      diffData.totalScore += summary.performanceScore
+      diffData.averageScore = Math.round(diffData.totalScore / diffData.sessions)
+      difficultyStats[summary.difficulty] = diffData
+
+      transaction.update(userStatsRef, {
+        totalSessions,
+        totalPracticeMinutes: FieldValue.increment(summary.durationMinutes),
+        totalScore,
+        averageScore: Math.round(totalScore / totalSessions),
+        patternStats,
+        difficultyStats,
+        lastSessionAt: summary.completedAt,
+        updatedAt: FieldValue.serverTimestamp(),
+      })
+    }
+  })
+}
+
+// =============================================================================
+// RETRIEVAL
+// =============================================================================
+
+/**
+ * Get user's aggregate stats
+ */
+export async function getUserStats(userId: string): Promise<{
+  totalSessions: number
+  totalPracticeMinutes: number
+  averageScore: number
+  patternStats: Record<string, { sessions: number; averageScore: number; bestScore: number }>
+  difficultyStats: Record<string, { sessions: number; averageScore: number }>
+  lastSessionAt?: string
+} | null> {
+  try {
+    const doc = await adminDb.collection('user_stats').doc(userId).get()
+    if (!doc.exists) return null
+
+    const data = doc.data()!
+    return {
+      totalSessions: data.totalSessions || 0,
+      totalPracticeMinutes: data.totalPracticeMinutes || 0,
+      averageScore: data.averageScore || 0,
+      patternStats: data.patternStats || {},
+      difficultyStats: data.difficultyStats || {},
+      lastSessionAt: data.lastSessionAt,
+    }
+  } catch (error) {
+    console.error('[Session Metrics] Failed to get user stats:', error)
+    return null
+  }
+}
+
+/**
+ * Get user's recent session summaries
+ */
+export async function getRecentSessions(userId: string, limit: number = 10): Promise<SessionSummary[]> {
+  try {
+    const snapshot = await adminDb
+      .collection('users')
+      .doc(userId)
+      .collection('session_summaries')
+      .orderBy('completedAt', 'desc')
+      .limit(limit)
+      .get()
+
+    return snapshot.docs.map(doc => doc.data() as SessionSummary)
+  } catch (error) {
+    console.error('[Session Metrics] Failed to get recent sessions:', error)
+    return []
+  }
+}
+
+/**
+ * Get user's performance trends
+ */
+export async function getPerformanceTrends(userId: string, days: number = 30): Promise<{
+  daily: Array<{ date: string; score: number; sessions: number }>
+  weeklyAverage: number
+  trend: 'improving' | 'stable' | 'declining'
+}> {
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+
+    const snapshot = await adminDb
+      .collection('users')
+      .doc(userId)
+      .collection('session_summaries')
+      .where('completedAt', '>=', startDate.toISOString())
+      .orderBy('completedAt', 'asc')
+      .get()
+
+    // Group by date
+    const dailyMap = new Map<string, { total: number; count: number }>()
+
+    snapshot.docs.forEach(doc => {
+      const data = doc.data()
+      const date = data.completedAt.split('T')[0]
+      const existing = dailyMap.get(date) || { total: 0, count: 0 }
+      existing.total += data.performanceScore
+      existing.count++
+      dailyMap.set(date, existing)
+    })
+
+    const daily = Array.from(dailyMap.entries()).map(([date, { total, count }]) => ({
+      date,
+      score: Math.round(total / count),
+      sessions: count,
+    }))
+
+    // Calculate weekly average (last 7 days)
+    const lastWeek = daily.slice(-7)
+    const weeklyAverage = lastWeek.length > 0
+      ? Math.round(lastWeek.reduce((sum, d) => sum + d.score, 0) / lastWeek.length)
+      : 0
+
+    // Calculate trend
+    let trend: 'improving' | 'stable' | 'declining' = 'stable'
+    if (daily.length >= 4) {
+      const firstHalf = daily.slice(0, Math.floor(daily.length / 2))
+      const secondHalf = daily.slice(Math.floor(daily.length / 2))
+
+      const firstAvg = firstHalf.reduce((s, d) => s + d.score, 0) / firstHalf.length
+      const secondAvg = secondHalf.reduce((s, d) => s + d.score, 0) / secondHalf.length
+
+      if (secondAvg - firstAvg > 5) trend = 'improving'
+      else if (firstAvg - secondAvg > 5) trend = 'declining'
+    }
+
+    return { daily, weeklyAverage, trend }
+  } catch (error) {
+    console.error('[Session Metrics] Failed to get trends:', error)
+    return { daily: [], weeklyAverage: 0, trend: 'stable' }
+  }
+}
