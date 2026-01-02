@@ -12,7 +12,7 @@ import { signOut } from "@/lib/auth"
 import { getUserProfile } from "@/lib/firestore-helpers"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore"
-import { User, Crown, BarChart3, Calendar, ExternalLink, LogOut, AlertCircle, XCircle, Shield, Download, Trash2, Cookie, Bell, RefreshCw, CreditCard, Receipt } from "lucide-react"
+import { User, Crown, BarChart3, Calendar, ExternalLink, AlertCircle, XCircle, Shield, Download, Trash2, Cookie, Bell, RefreshCw, CreditCard, Receipt } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Profile, ProfileQuota, NotificationPreferences, PaymentHistory } from "@/lib/types"
@@ -188,18 +188,6 @@ export default function AccountPage() {
 
     loadUserData()
   }, [firebaseUser, authLoading, initialized, authCheckComplete])
-
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-      window.location.href = "/"
-    } catch (error) {
-      console.error("Sign out error:", error)
-      toast.error("Failed to sign out", {
-        description: error instanceof Error ? error.message : "Please try again",
-      })
-    }
-  }
 
   const handleManageSubscription = async () => {
     if (!user || !firebaseUser) return
@@ -447,14 +435,6 @@ export default function AccountPage() {
                   <p className="text-gray-400">{user?.email}</p>
                 </div>
               </div>
-              <Button
-                onClick={handleSignOut}
-                variant="outline"
-                className="border-gray-600 text-white hover:bg-gray-800 bg-transparent"
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                Sign Out
-              </Button>
             </div>
 
             <div className="flex items-center space-x-3">
