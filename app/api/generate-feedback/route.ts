@@ -189,10 +189,19 @@ Analyze and return this exact JSON structure (no markdown, no explanation):
 }
 
 VALIDATION RULES:
-- isCoherent: false if responses are gibberish, random words, or nonsensical
-- responsesRelevant: false if candidate responses don't relate to questions asked
+- isCoherent: false ONLY if responses are complete gibberish, random words, or totally nonsensical
+- responsesRelevant: false ONLY if candidate responses have zero relation to questions asked
 - complexityAccurate: ONLY true if stated complexity matches actual code complexity
-- communicationScore: 0-30 if incoherent, 30-50 if minimal, 50-70 if basic, 70-85 if good, 85-100 if excellent
+- communicationScore: Be GENEROUS when the candidate explains their thought process:
+  * 0-25: Completely incoherent or gibberish responses
+  * 40-55: Minimal communication but at least attempted to explain
+  * 55-75: Basic communication - explained their approach or answered questions
+  * 75-90: Good communication - clear thought process and engaged with interviewer
+  * 90-100: Excellent - thorough explanations and proactive communication
+
+IMPORTANT: If the candidate explained their approach AND the solution works, lean toward HIGHER scores.
+For easy problems, be MORE forgiving - quick solutions with brief explanations are acceptable.
+The goal is to encourage communication, not penalize concise but clear explanations.
 
 Return ONLY the JSON object, nothing else.`
 
@@ -800,7 +809,7 @@ function calculateBugFixScores(
  */
 function calculateValidatedScores(
   passRate: number,
-  efficiencyMetrics: { efficiencyScore?: number } | undefined,
+  efficiencyMetrics: { efficiencyScore?: number; difficulty?: string } | undefined,
   preScreen: ReturnType<typeof preScreenConversation>,
   aiValidation: ConversationValidation,
   scenarioType?: string,
@@ -911,15 +920,16 @@ function calculateValidatedScores(
 
   // === COMMUNICATION SCORE (20%) ===
   // This is where AI validation matters most
-  let communication = 30 // Base
+  // Be more forgiving - focus on whether they explained their thought process
+  let communication = 40 // Higher base - assume good faith
 
   // If AI detected incoherence or gibberish, cap severely
   if (!aiValidation.isCoherent) {
     communication = Math.min(25, aiValidation.communicationScore)
   }
-  // If responses weren't relevant to questions, penalize
+  // If responses weren't relevant to questions, penalize (but not as harshly)
   else if (!aiValidation.responsesRelevant) {
-    communication = Math.min(40, aiValidation.communicationScore)
+    communication = Math.min(50, aiValidation.communicationScore)
   }
   // If pre-screening detected suspicious patterns (keyword stuffing), cap
   else if (preScreen.suspiciousPatterns.keywordStuffing) {
@@ -938,9 +948,33 @@ function calculateValidatedScores(
     }
   }
 
+  // SOLUTION SUCCESS BONUS: A correct, optimal solution demonstrates understanding
+  // even if they didn't over-explain. Actions speak louder than words.
+  const isOptimalSolution = passRate >= 100 && (effScore || 0) >= 80
+  const isCorrectSolution = passRate >= 100
+  const difficulty = efficiencyMetrics?.difficulty || 'medium'
+
+  // For easy problems, be more generous - quick, correct solutions are expected
+  const difficultyBonus = difficulty === 'easy' ? 10 : difficulty === 'medium' ? 5 : 0
+
+  if (isOptimalSolution && aiValidation.approachExplained) {
+    // Optimal solution + explained approach = strong communicator
+    communication = Math.max(75, Math.min(95, communication + 15 + difficultyBonus))
+  } else if (isOptimalSolution) {
+    // Optimal solution even without much explanation = decent communication
+    // For easy problems, this should be even more forgiving
+    communication = Math.max(65 + difficultyBonus, communication + 10 + difficultyBonus)
+  } else if (isCorrectSolution && aiValidation.approachExplained) {
+    // Correct solution + explained = good enough
+    communication = Math.max(65, communication + 10 + difficultyBonus)
+  } else if (isCorrectSolution) {
+    // Correct solution = some credit
+    communication = Math.max(55, communication + 5 + difficultyBonus)
+  }
+
   // Floor for candidates who at least had a real conversation
   if (preScreen.hasContent && preScreen.candidateMessageCount >= 2 && aiValidation.isCoherent) {
-    communication = Math.max(40, communication)
+    communication = Math.max(50, communication) // Raised from 40
   }
 
   // For incomplete solutions, communication can stay higher IF they discussed well
@@ -972,6 +1006,7 @@ function calculateValidatedScores(
 /**
  * Apply score floors for correct solutions
  * A perfect, optimal solution should never get a failing grade
+ * Be more generous - solving the problem correctly IS demonstrating competence
  */
 function applyScoreFloors(
   scores: ReturnType<typeof calculateValidatedScores>,
@@ -980,23 +1015,31 @@ function applyScoreFloors(
   aiValidation: ConversationValidation
 ): ReturnType<typeof calculateValidatedScores> {
   const isOptimal = (efficiencyScore || 0) >= 80
-  const hasGoodComm = aiValidation.communicationScore >= 60 && aiValidation.isCoherent
+  // Lower threshold - if they explained their approach at all, that's decent communication
+  const hasDecentComm = aiValidation.communicationScore >= 50 && aiValidation.isCoherent
+  const hasGoodComm = aiValidation.communicationScore >= 65 && aiValidation.isCoherent
 
   let overall = scores.overall
+  let communication = scores.communication
 
   if (passRate >= 100 && isOptimal && hasGoodComm) {
-    overall = Math.max(85, overall) // A range
+    overall = Math.max(88, overall) // A range (raised from 85)
+    communication = Math.max(75, communication) // Good comm floor for optimal
+  } else if (passRate >= 100 && isOptimal && hasDecentComm) {
+    overall = Math.max(83, overall) // A- range (new tier)
+    communication = Math.max(65, communication) // Decent comm floor for optimal
   } else if (passRate >= 100 && isOptimal) {
-    overall = Math.max(78, overall) // B+ range
+    overall = Math.max(80, overall) // B+ range (raised from 78)
+    communication = Math.max(55, communication) // Even minimal comm gets a floor for optimal
   } else if (passRate >= 100) {
-    overall = Math.max(72, overall) // B range
+    overall = Math.max(75, overall) // B range (raised from 72)
   } else if (passRate >= 90) {
-    overall = Math.max(68, overall) // B- range
+    overall = Math.max(70, overall) // B- range (raised from 68)
   } else if (passRate >= 80) {
-    overall = Math.max(62, overall) // C+ range
+    overall = Math.max(65, overall) // C+ range (raised from 62)
   }
 
-  return { ...scores, overall }
+  return { ...scores, overall, communication }
 }
 
 
@@ -1278,7 +1321,7 @@ BUG FIX FOCUS:
       }
 
       // Default DSA instruction
-      return `You are a senior interviewer delivering a focused technical debrief. Be BRUTALLY HONEST - do not soften the blow for incomplete or non-working solutions.
+      return `You are a senior interviewer delivering a focused, constructive technical debrief. Be HONEST about gaps, but RECOGNIZE ACHIEVEMENTS - if someone solved the problem correctly, acknowledge that accomplishment.
 
 ${baseRules}
 
