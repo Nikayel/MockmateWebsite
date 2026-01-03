@@ -12,7 +12,7 @@ import { vectorDB, isPineconeEnabled, getVectorDBProvider } from './vectordb'
 import type { TextEmbedding, SimilarResult, SimilaritySearchOptions, VectorDocument } from './types'
 import { adminDb } from '../firebase-admin'
 import { Timestamp } from 'firebase-admin/firestore'
-import { trackEmbeddingUsage, EMBEDDING_COSTS } from '../usage-tracking'
+import { trackEmbeddingUsageAccurate, EMBEDDING_COSTS } from '../usage-tracking'
 
 // Initialize hybrid embedding provider
 // Uses Gemini text-embedding-004 as primary (768D, most cost-effective)
@@ -42,8 +42,9 @@ export async function generateTextEmbedding(text: string): Promise<number[]> {
 }
 
 /**
- * Generate text embedding with usage tracking
+ * Generate text embedding with ACCURATE usage tracking
  * Use this when you have user context to track costs
+ * Now uses js-tiktoken for accurate token counting
  */
 export async function generateTrackedEmbedding(
     text: string,
@@ -60,21 +61,59 @@ export async function generateTrackedEmbedding(
         : activeProvider === 'openai'
             ? 'text-embedding-3-small'
             : 'text-embedding-004'
-    const provider = activeProvider === 'openai' ? 'openai' : 'gemini'
+    const provider = activeProvider === 'openai' ? 'openai' : activeProvider === 'tfidf' ? 'tfidf' : 'gemini'
 
-    // Track the embedding usage (fire-and-forget)
-    trackEmbeddingUsage({
+    // Track the embedding usage with ACCURATE token counting (fire-and-forget)
+    trackEmbeddingUsageAccurate({
         userId,
-        characterCount: text.length,
-        embeddingCount: 1,
+        texts: [text],
         model: model as keyof typeof EMBEDDING_COSTS,
         provider,
         latencyMs,
+        dimensions: embedding.length,
     }).catch((err) => {
         console.warn('[RAG] Failed to track embedding usage:', err)
     })
 
     return embedding
+}
+
+/**
+ * Generate multiple embeddings with ACCURATE usage tracking
+ * Batched version for efficiency
+ */
+export async function generateTrackedEmbeddings(
+    texts: string[],
+    userId: string
+): Promise<number[][]> {
+    if (texts.length === 0) return []
+
+    const startTime = Date.now()
+    const embeddings = await embeddingProvider.generateEmbeddings(texts)
+    const latencyMs = Date.now() - startTime
+
+    // Determine which model was used
+    const activeProvider = embeddingProvider.getActiveProvider()
+    const model = activeProvider === 'gemini'
+        ? 'text-embedding-004'
+        : activeProvider === 'openai'
+            ? 'text-embedding-3-small'
+            : 'text-embedding-004'
+    const provider = activeProvider === 'openai' ? 'openai' : activeProvider === 'tfidf' ? 'tfidf' : 'gemini'
+
+    // Track the embedding usage with ACCURATE token counting (fire-and-forget)
+    trackEmbeddingUsageAccurate({
+        userId,
+        texts,
+        model: model as keyof typeof EMBEDDING_COSTS,
+        provider,
+        latencyMs,
+        dimensions: embeddings[0]?.length || 0,
+    }).catch((err) => {
+        console.warn('[RAG] Failed to track embedding usage:', err)
+    })
+
+    return embeddings
 }
 
 /**
