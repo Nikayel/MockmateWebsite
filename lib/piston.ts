@@ -151,6 +151,9 @@ import json
 import sys
 import time
 from typing import Optional, List, Dict, Set, Tuple, Any
+from collections import deque, defaultdict, Counter
+import heapq
+import math
 
 # Common DSA classes used in problems
 class TreeNode:
@@ -202,6 +205,28 @@ def _tree_to_array(root):
         result.pop()
     return result
 
+# Helper to build linked list from array (for test input)
+def _build_list(arr):
+    if not arr:
+        return None
+    head = ListNode(arr[0])
+    current = head
+    for val in arr[1:]:
+        current.next = ListNode(val)
+        current = current.next
+    return head
+
+# Helper to convert linked list to array (for output)
+def _list_to_array(head):
+    result = []
+    current = head
+    seen = set()  # Detect cycles
+    while current and id(current) not in seen:
+        seen.add(id(current))
+        result.append(current.val)
+        current = current.next
+    return result
+
 # Capture print statements
 _console_logs = []
 _original_print = print
@@ -223,7 +248,8 @@ try:
 
     # Keywords that indicate TreeNode conversion needed
     _tree_keywords = {'root', 'tree', 'node', 'p', 'q', 't1', 't2', 'left', 'right', 'subroot'}
-    _list_keywords = {'head', 'list', 'l1', 'l2'}
+    # Keywords that indicate ListNode conversion needed (includes 'values' used in test cases)
+    _list_keywords = {'head', 'list', 'l1', 'l2', 'values'}
 
     # Convert array inputs to TreeNode/ListNode based on parameter name
     _processed_input = []
@@ -235,8 +261,8 @@ try:
                 # Convert to TreeNode when key explicitly indicates a tree
                 _processed_input.append(_build_tree(arg) if arg else None)
             elif key in _list_keywords:
-                # TODO: Convert to ListNode for linked list problems
-                _processed_input.append(arg)
+                # Convert to ListNode when key indicates a linked list
+                _processed_input.append(_build_list(arg) if arg else None)
             else:
                 # Default: keep as array (e.g., nums, arr, data)
                 _processed_input.append(arg)
@@ -248,6 +274,9 @@ try:
     # Convert TreeNode result back to array for comparison
     if isinstance(_result, TreeNode):
         _result = _tree_to_array(_result)
+    # Convert ListNode result back to array for comparison
+    elif isinstance(_result, ListNode):
+        _result = _list_to_array(_result)
 
     # Output format: LOGS|||RESULT
     print = _original_print  # Restore for final output
@@ -330,6 +359,31 @@ function _treeToArray(root) {
   return result;
 }
 
+// Helper to build linked list from array
+function _buildList(arr) {
+  if (!arr || arr.length === 0) return null;
+  const head = new ListNode(arr[0]);
+  let current = head;
+  for (let i = 1; i < arr.length; i++) {
+    current.next = new ListNode(arr[i]);
+    current = current.next;
+  }
+  return head;
+}
+
+// Helper to convert linked list to array
+function _listToArray(head) {
+  const result = [];
+  let current = head;
+  const seen = new Set(); // Detect cycles
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    result.push(current.val);
+    current = current.next;
+  }
+  return result;
+}
+
 // Capture console methods
 const _consoleLogs = [];
 const _originalLog = console.log;
@@ -388,7 +442,8 @@ try {
 
   // Keywords that indicate TreeNode/ListNode conversion needed
   const _treeKeywords = new Set(['root', 'tree', 'node', 'p', 'q', 't1', 't2', 'left', 'right', 'subroot']);
-  const _listKeywords = new Set(['head', 'list', 'l1', 'l2']);
+  // Includes 'values' which is used in linked list test cases
+  const _listKeywords = new Set(['head', 'list', 'l1', 'l2', 'values']);
   const _inputKeys = ${inputKeysJson};
 
   // Process input - convert arrays to TreeNode/ListNode based on parameter name
@@ -400,8 +455,8 @@ try {
         // Convert to TreeNode when key explicitly indicates a tree
         return arg.length > 0 ? _buildTree(arg) : null;
       } else if (_listKeywords.has(key)) {
-        // TODO: Convert to ListNode for linked list problems
-        return arg;
+        // Convert to ListNode when key indicates a linked list
+        return arg.length > 0 ? _buildList(arg) : null;
       }
       // Default: keep as array (e.g., nums, arr, data)
     }
@@ -413,6 +468,10 @@ try {
   // Convert TreeNode result back to array
   if (_result instanceof TreeNode) {
     _result = _treeToArray(_result);
+  }
+  // Convert ListNode result back to array
+  else if (_result instanceof ListNode) {
+    _result = _listToArray(_result);
   }
 
   // Restore and output
