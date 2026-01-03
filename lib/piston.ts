@@ -169,7 +169,9 @@ class ListNode:
 
 # Helper to build tree from array (for test input)
 def _build_tree(arr):
-    if not arr or arr[0] is None:
+    if not arr or len(arr) == 0:
+        return None
+    if arr[0] is None:
         return None
     root = TreeNode(arr[0])
     queue = [root]
@@ -259,10 +261,17 @@ try:
         if isinstance(arg, list):
             if key in _tree_keywords:
                 # Convert to TreeNode when key explicitly indicates a tree
-                _processed_input.append(_build_tree(arg) if arg else None)
+                # Handle empty list explicitly
+                if not arg or len(arg) == 0:
+                    _processed_input.append(None)
+                else:
+                    _processed_input.append(_build_tree(arg))
             elif key in _list_keywords:
                 # Convert to ListNode when key indicates a linked list
-                _processed_input.append(_build_list(arg) if arg else None)
+                if not arg or len(arg) == 0:
+                    _processed_input.append(None)
+                else:
+                    _processed_input.append(_build_list(arg))
             else:
                 # Default: keep as array (e.g., nums, arr, data)
                 _processed_input.append(arg)
@@ -271,12 +280,23 @@ try:
 
     _result = ${funcName}(*_processed_input)
 
+    # Check if any input was a tree (to handle None -> [] conversion for tree problems)
+    _had_tree_input = False
+    for i, arg in enumerate(_input):
+        key = _input_keys[i].lower() if i < len(_input_keys) else ''
+        if isinstance(arg, list) and key in _tree_keywords:
+            _had_tree_input = True
+            break
+
     # Convert TreeNode result back to array for comparison
     if isinstance(_result, TreeNode):
         _result = _tree_to_array(_result)
     # Convert ListNode result back to array for comparison
     elif isinstance(_result, ListNode):
         _result = _list_to_array(_result)
+    # If result is None and input was a tree, convert to [] for empty tree
+    elif _result is None and _had_tree_input:
+        _result = []
 
     # Output format: LOGS|||RESULT
     print = _original_print  # Restore for final output
@@ -465,6 +485,12 @@ try {
 
   let _result = _func(..._processedInput);
 
+  // Check if any input was a tree (to handle null -> [] conversion for tree problems)
+  const _hadTreeInput = _processedInput.some((arg, i) => {
+    const key = (_inputKeys[i] || '').toLowerCase();
+    return Array.isArray(_input[i]) && _treeKeywords.has(key);
+  });
+
   // Convert TreeNode result back to array
   if (_result instanceof TreeNode) {
     _result = _treeToArray(_result);
@@ -472,6 +498,10 @@ try {
   // Convert ListNode result back to array
   else if (_result instanceof ListNode) {
     _result = _listToArray(_result);
+  }
+  // If result is null and input was a tree, convert to [] for empty tree
+  else if (_result === null && _hadTreeInput) {
+    _result = [];
   }
 
   // Restore and output
