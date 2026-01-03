@@ -257,6 +257,8 @@ export async function updateLongestStreak(userId: string): Promise<void> {
 /**
  * Complete session and update both topic-level and problem-level mastery
  * This is the main entry point for recording completed practice sessions
+ *
+ * IMPORTANT: This also records research events for A/B testing analytics
  */
 export async function completeSessionWithMastery(
   userId: string,
@@ -290,22 +292,27 @@ export async function completeSessionWithMastery(
   // Update problem-level mastery
   const { initializeProblemMasteryFromSession, updateProblemMastery, getAllUserProblems } =
     await import("./spaced-repetition/scheduler");
-  const { calculateNextInterval } = await import("./spaced-repetition/sm2-algorithm");
+  const { calculateNextInterval, mapScoreToQuality } = await import("./spaced-repetition/sm2-algorithm");
+  const { recordReviewEvent, getUserAlgorithm, estimateRetention } =
+    await import("./spaced-repetition");
 
   // Check if problem mastery exists
   const problems = await getAllUserProblems(userId);
   const existingMastery = problems.find((p) => p.problem_id === sessionData.scenarioId);
 
   let masteryResult;
+  const now = new Date();
 
   if (existingMastery) {
     // Calculate new interval using enhanced SM-2
     const learningState = await getUserLearningState(userId);
     const streakDays = learningState?.streak_days || 0;
 
-    const now = new Date();
     const lastReviewAt = new Date(existingMastery.last_reviewed_at);
     const nextReviewAt = new Date(existingMastery.next_review_at);
+    const daysSinceLastReview = Math.floor(
+      (now.getTime() - lastReviewAt.getTime()) / (1000 * 60 * 60 * 24)
+    );
     const daysOverdue = nextReviewAt < now
       ? Math.floor((now.getTime() - nextReviewAt.getTime()) / (1000 * 60 * 60 * 24))
       : 0;
@@ -338,6 +345,47 @@ export async function completeSessionWithMastery(
       mastery_level: sm2Result.masteryLevel,
       confidence: sm2Result.confidence,
     });
+
+    // Record research event for A/B testing analytics
+    // This populates the research dashboard with real user data
+    try {
+      const predictedRetention = estimateRetention(
+        existingMastery.interval_days,
+        existingMastery.ease_factor,
+        daysSinceLastReview
+      );
+
+      await recordReviewEvent({
+        userId,
+        problemId: sessionData.scenarioId,
+        scenarioId: sessionData.scenarioId,
+        pattern: sessionData.pattern,
+        difficulty: sessionData.difficulty,
+        score: sessionData.performanceScore,
+        qualityRating: mapScoreToQuality(sessionData.performanceScore),
+        timeSpentMinutes: sessionData.timeSpentMinutes || 0,
+        hintsUsed: sessionData.hintsUsed || 0,
+        preReviewState: {
+          intervalDays: existingMastery.interval_days,
+          daysSinceLastReview,
+          daysOverdue,
+          easeFactor: existingMastery.ease_factor,
+          predictedRetention,
+          masteryLevel: existingMastery.mastery_level as any,
+        },
+        postReviewState: {
+          newIntervalDays: sm2Result.nextInterval,
+          newEaseFactor: sm2Result.newEaseFactor,
+          masteryLevel: sm2Result.masteryLevel,
+        },
+        isEarlyReview,
+        isFirstReview: false,
+        sessionNumber: existingMastery.review_count + 1,
+      });
+    } catch (error) {
+      // Don't fail session completion if research tracking fails
+      console.error("[Learning State] Failed to record research event:", error);
+    }
   } else {
     // Initialize new problem mastery
     masteryResult = await initializeProblemMasteryFromSession(userId, {
@@ -349,6 +397,40 @@ export async function completeSessionWithMastery(
       time_spent_minutes: sessionData.timeSpentMinutes,
       hints_used: sessionData.hintsUsed,
     });
+
+    // Record research event for first review
+    try {
+      const qualityRating = mapScoreToQuality(sessionData.performanceScore);
+
+      await recordReviewEvent({
+        userId,
+        problemId: sessionData.scenarioId,
+        scenarioId: sessionData.scenarioId,
+        pattern: sessionData.pattern,
+        difficulty: sessionData.difficulty,
+        score: sessionData.performanceScore,
+        qualityRating,
+        timeSpentMinutes: sessionData.timeSpentMinutes || 0,
+        hintsUsed: sessionData.hintsUsed || 0,
+        preReviewState: {
+          intervalDays: 0,
+          daysSinceLastReview: 0,
+          daysOverdue: 0,
+          predictedRetention: 0,
+          masteryLevel: "new",
+        },
+        postReviewState: {
+          newIntervalDays: masteryResult.interval_days,
+          newEaseFactor: masteryResult.ease_factor,
+          masteryLevel: masteryResult.mastery_level as any,
+        },
+        isEarlyReview: false,
+        isFirstReview: true,
+        sessionNumber: 1,
+      });
+    } catch (error) {
+      console.error("[Learning State] Failed to record first review research event:", error);
+    }
   }
 
   // Update longest streak
