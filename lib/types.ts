@@ -82,6 +82,7 @@ export interface InterviewSession {
   difficulty: "easy" | "medium" | "hard"
   topic: string
   type?: string // scenario type: 'dsa', 'bugfix', etc.
+  pattern?: string // DSA pattern: 'arrays-hashing', 'two-pointers', etc.
   scenario_id?: string // scenario ID for reopening sessions
   performance_score?: number
   feedback?: string
