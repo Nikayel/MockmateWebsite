@@ -16,15 +16,11 @@ import { PRICING_CONFIG } from "@/lib/config"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import {
-  User,
   Crown,
   BarChart3,
   Calendar,
   Terminal,
-  TrendingUp,
-  Target,
   Clock,
-  Zap,
   ArrowRight
 } from "lucide-react"
 import Link from "next/link"
@@ -199,12 +195,6 @@ export default function DashboardPage() {
   const isPro = profile?.subscription_tier === "pro"
   const usagePercentage = usage ? (usage.used / usage.limit) * 100 : 0
 
-  // Calculate performance metrics from completed sessions
-  const completedSessions = sessions.filter(s => s.completed_at && s.performance_score !== undefined)
-  const avgPerformance = completedSessions.length > 0
-    ? Math.round(completedSessions.reduce((sum, s) => sum + (s.performance_score || 0), 0) / completedSessions.length)
-    : null
-
   // Get user's first name for welcome message
   const userName = user?.user_metadata?.full_name?.split(' ')[0] || firebaseUser?.displayName?.split(' ')[0]
 
@@ -264,7 +254,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {/* Usage Card */}
             <Card className="bg-gray-900/50 border-gray-700" data-tour="sessions-card">
               <CardHeader className="pb-3">
@@ -326,29 +316,6 @@ export default function DashboardPage() {
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
-              </CardContent>
-            </Card>
-
-            {/* Performance Card */}
-            <Card className="bg-gray-900/50 border-gray-700">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-white text-sm font-medium flex items-center">
-                  <TrendingUp className="h-4 w-4 mr-2" />
-                  Performance
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {avgPerformance !== null ? (
-                  <>
-                    <div className="text-3xl font-bold text-white mb-1">{avgPerformance}%</div>
-                    <p className="text-xs text-gray-400">Average score across {completedSessions.length} session{completedSessions.length !== 1 ? 's' : ''}</p>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-3xl font-bold text-white mb-1">--</div>
-                    <p className="text-xs text-gray-400">Complete sessions to see stats</p>
-                  </>
-                )}
               </CardContent>
             </Card>
           </div>

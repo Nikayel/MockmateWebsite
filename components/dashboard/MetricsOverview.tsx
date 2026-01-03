@@ -35,6 +35,13 @@ interface QuickMetrics {
     name: string
     score: number
   }
+  // Score breakdown from the 4 weighted categories
+  scoreBreakdown?: {
+    codeQuality: number      // 30%
+    problemSolving: number   // 25%
+    understanding: number    // 25%
+    communication: number    // 20%
+  }
 }
 
 export function MetricsOverview() {
@@ -80,6 +87,7 @@ export function MetricsOverview() {
                 name: weakestPattern.displayName,
                 score: weakestPattern.averageScore,
               } : undefined,
+              scoreBreakdown: data.data.scoreBreakdown || undefined,
             })
           }
         }
@@ -189,6 +197,43 @@ export function MetricsOverview() {
           </div>
           <Progress value={metrics.averageScore} className="h-2" />
         </div>
+
+        {/* Score Breakdown - 4 weighted categories */}
+        {metrics.scoreBreakdown && (
+          <div className="space-y-2">
+            <div className="text-xs text-gray-400 font-medium mb-2">Skill Breakdown</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-2 bg-gray-800/50 rounded">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs text-gray-400">Code Quality</span>
+                  <span className="text-xs font-mono text-white">{metrics.scoreBreakdown.codeQuality}%</span>
+                </div>
+                <Progress value={metrics.scoreBreakdown.codeQuality} className="h-1" />
+              </div>
+              <div className="p-2 bg-gray-800/50 rounded">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs text-gray-400">Problem Solving</span>
+                  <span className="text-xs font-mono text-white">{metrics.scoreBreakdown.problemSolving}%</span>
+                </div>
+                <Progress value={metrics.scoreBreakdown.problemSolving} className="h-1" />
+              </div>
+              <div className="p-2 bg-gray-800/50 rounded">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs text-gray-400">Understanding</span>
+                  <span className="text-xs font-mono text-white">{metrics.scoreBreakdown.understanding}%</span>
+                </div>
+                <Progress value={metrics.scoreBreakdown.understanding} className="h-1" />
+              </div>
+              <div className="p-2 bg-gray-800/50 rounded">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs text-gray-400">Communication</span>
+                  <span className="text-xs font-mono text-white">{metrics.scoreBreakdown.communication}%</span>
+                </div>
+                <Progress value={metrics.scoreBreakdown.communication} className="h-1" />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Pattern Highlights */}
         {metrics.topPattern && (
