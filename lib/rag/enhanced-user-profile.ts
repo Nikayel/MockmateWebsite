@@ -843,17 +843,18 @@ export class EnhancedProfileService {
       const performanceRAG = getUserPerformanceRAG()
       const baseProfile = await performanceRAG.getPerformanceProfile(userId)
 
-      // Get raw session data for deeper analysis
+      // Get raw session data for deeper analysis from session_summaries subcollection
       const sessionsSnapshot = await adminDb
-        .collection('sessions')
-        .where('userId', '==', userId)
-        .orderBy('createdAt', 'desc')
+        .collection('users')
+        .doc(userId)
+        .collection('session_summaries')
+        .orderBy('completedAt', 'desc')
         .limit(100)
         .get()
 
       const sessions = sessionsSnapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter((s: Record<string, unknown>) => s.status === 'completed' && s.feedback)
+        .filter((s: Record<string, unknown>) => s.performanceScore !== undefined)
         .map((s: Record<string, unknown>) => this.sessionToAnalysis(s))
 
       // Load existing misconceptions
@@ -920,27 +921,27 @@ export class EnhancedProfileService {
   }
 
   /**
-   * Convert session doc to analysis
+   * Convert session summary doc to analysis
+   * Maps session_summaries subcollection format to SessionAnalysis
    */
   private sessionToAnalysis(session: Record<string, unknown>): SessionAnalysis {
-    const feedback = session.feedback as Record<string, unknown> | undefined
-    const metrics = session.metrics as Record<string, unknown> | undefined
-    const testResults = session.testResults as Record<string, unknown> | undefined
+    const scoreBreakdown = session.scoreBreakdown as Record<string, unknown> | undefined
+    const interactionMetrics = session.interactionMetrics as Record<string, unknown> | undefined
 
     return {
-      sessionId: session.id as string,
+      sessionId: session.sessionId as string || session.id as string,
       userId: session.userId as string,
       scenarioId: session.scenarioId as string,
       pattern: (session.pattern || 'arrays-hashing') as DSAPattern,
       difficulty: (session.difficulty || 'medium') as 'easy' | 'medium' | 'hard',
-      score: (feedback?.score as number) || 0,
-      duration: (session.duration as number) || 0,
-      hintsUsed: (metrics?.hintsUsed as number) || 0,
-      testsRun: (metrics?.testRunsExecuted as number) || 0,
-      testsPassed: (testResults?.passed as number) || 0,
-      codeQuality: ((feedback?.breakdown as Record<string, number>)?.codeQuality) || 50,
-      timestamp: session.createdAt
-        ? (session.createdAt as Timestamp).toDate()
+      score: (session.performanceScore as number) || (scoreBreakdown?.overallScore as number) || 0,
+      duration: ((session.durationMinutes as number) || 0) * 60, // Convert to seconds
+      hintsUsed: (interactionMetrics?.hintsUsed as number) || 0,
+      testsRun: (interactionMetrics?.codeExecutions as number) || 0,
+      testsPassed: (interactionMetrics?.testsPassed as number) || 0,
+      codeQuality: (scoreBreakdown?.codeQualityScore as number) || 50,
+      timestamp: session.completedAt
+        ? (session.completedAt as Timestamp).toDate?.() || new Date(session.completedAt as string)
         : new Date(),
     }
   }

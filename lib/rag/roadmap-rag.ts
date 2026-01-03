@@ -319,11 +319,12 @@ export class RAGRoadmapGenerator {
     const advice: string[] = []
 
     try {
-      // Get user's past sessions
+      // Get user's past sessions from session_summaries subcollection
       const sessionsSnapshot = await adminDb
-        .collection('sessions')
-        .where('userId', '==', userId)
-        .orderBy('createdAt', 'desc')
+        .collection('users')
+        .doc(userId)
+        .collection('session_summaries')
+        .orderBy('completedAt', 'desc')
         .limit(20)
         .get()
 
@@ -335,11 +336,10 @@ export class RAGRoadmapGenerator {
         return advice
       }
 
-      // Analyze past performance
+      // Analyze past performance (session_summaries are all completed)
       const sessions = sessionsSnapshot.docs.map(doc => doc.data())
-      const completedSessions = sessions.filter(s => s.status === 'completed')
-      const avgScore = completedSessions.length > 0
-        ? completedSessions.reduce((sum, s) => sum + (s.feedback?.score || 0), 0) / completedSessions.length
+      const avgScore = sessions.length > 0
+        ? sessions.reduce((sum, s) => sum + (s.performanceScore || 0), 0) / sessions.length
         : 0
 
       // Score-based advice
@@ -390,19 +390,20 @@ export class RAGRoadmapGenerator {
     const adjustments: AdaptiveAdjustment[] = []
 
     try {
-      // Check user's past performance
+      // Check user's past performance from session_summaries subcollection
       const sessionsSnapshot = await adminDb
-        .collection('sessions')
-        .where('userId', '==', userId)
-        .orderBy('createdAt', 'desc')
+        .collection('users')
+        .doc(userId)
+        .collection('session_summaries')
+        .orderBy('completedAt', 'desc')
         .limit(10)
         .get()
 
       if (!sessionsSnapshot.empty) {
         const sessions = sessionsSnapshot.docs.map(doc => doc.data())
         const recentScores = sessions
-          .filter(s => s.feedback?.score)
-          .map(s => s.feedback.score)
+          .filter(s => s.performanceScore !== undefined)
+          .map(s => s.performanceScore as number)
 
         // Difficulty adjustment
         const avgRecentScore = recentScores.length > 0

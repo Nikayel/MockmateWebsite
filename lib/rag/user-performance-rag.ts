@@ -139,11 +139,12 @@ export class UserPerformanceRAG {
    */
   async buildPerformanceProfile(userId: string): Promise<UserPerformanceProfile> {
     try {
-      // Get all user sessions
+      // Get all user sessions from session_summaries subcollection
       const sessionsSnapshot = await adminDb
-        .collection('sessions')
-        .where('userId', '==', userId)
-        .orderBy('createdAt', 'desc')
+        .collection('users')
+        .doc(userId)
+        .collection('session_summaries')
+        .orderBy('completedAt', 'desc')
         .limit(100)
         .get()
 
@@ -154,11 +155,11 @@ export class UserPerformanceRAG {
       const sessions = sessionsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-      })) as Array<{ id: string; status?: string; feedback?: unknown; [key: string]: unknown }>
+      })) as Array<{ id: string; performanceScore?: number; [key: string]: unknown }>
 
-      // Analyze sessions
+      // Analyze sessions (session_summaries are all completed)
       const analyses = sessions
-        .filter(s => s.status === 'completed' && s.feedback)
+        .filter(s => s.performanceScore !== undefined)
         .map(s => this.analyzeSession(s))
 
       // Calculate overall metrics
@@ -225,26 +226,26 @@ export class UserPerformanceRAG {
 
   /**
    * Analyze a single session
+   * Maps session_summaries subcollection format to SessionAnalysis
    */
   private analyzeSession(session: Record<string, unknown>): SessionAnalysis {
-    const feedback = session.feedback as Record<string, unknown> | undefined
-    const metrics = session.metrics as Record<string, unknown> | undefined
-    const testResults = session.testResults as Record<string, unknown> | undefined
+    const scoreBreakdown = session.scoreBreakdown as Record<string, unknown> | undefined
+    const interactionMetrics = session.interactionMetrics as Record<string, unknown> | undefined
 
     return {
-      sessionId: session.id as string || session.sessionId as string,
+      sessionId: session.sessionId as string || session.id as string,
       userId: session.userId as string,
       scenarioId: session.scenarioId as string,
       pattern: (session.pattern || 'arrays-hashing') as DSAPattern,
       difficulty: (session.difficulty || 'medium') as 'easy' | 'medium' | 'hard',
-      score: (feedback?.score as number) || 0,
-      duration: (session.duration as number) || 0,
-      hintsUsed: (metrics?.hintsUsed as number) || 0,
-      testsRun: (metrics?.testRunsExecuted as number) || 0,
-      testsPassed: (testResults?.passed as number) || 0,
-      codeQuality: ((feedback?.breakdown as Record<string, number>)?.codeQuality) || 50,
-      timestamp: session.createdAt
-        ? (session.createdAt as Timestamp).toDate()
+      score: (session.performanceScore as number) || (scoreBreakdown?.overallScore as number) || 0,
+      duration: ((session.durationMinutes as number) || 0) * 60, // Convert to seconds
+      hintsUsed: (interactionMetrics?.hintsUsed as number) || 0,
+      testsRun: (interactionMetrics?.codeExecutions as number) || 0,
+      testsPassed: (interactionMetrics?.testsPassed as number) || 0,
+      codeQuality: (scoreBreakdown?.codeQualityScore as number) || 50,
+      timestamp: session.completedAt
+        ? (session.completedAt as Timestamp).toDate?.() || new Date(session.completedAt as string)
         : new Date(),
     }
   }
