@@ -440,12 +440,15 @@ function buildKnowledgeGraph(
     'union-find': ['disjoint-sets', 'path-compression', 'union-by-rank'],
   }
 
-  // Analyze concept mastery
+  // Analyze concept mastery - only for patterns the user has actually practiced
   const patternSessions = new Map<DSAPattern, SessionAnalysis[]>()
+  const practicedPatterns = new Set<DSAPattern>()
+
   for (const s of sessions) {
     const existing = patternSessions.get(s.pattern) || []
     existing.push(s)
     patternSessions.set(s.pattern, existing)
+    practicedPatterns.add(s.pattern)
   }
 
   for (const [pattern, patternSessionList] of patternSessions) {
@@ -473,7 +476,8 @@ function buildKnowledgeGraph(
     }
   }
 
-  // Detect prerequisite gaps
+  // Detect prerequisite gaps - ONLY for patterns the user has actually attempted
+  // Don't show gaps for patterns they haven't tried yet
   const patternPrerequisites: Record<string, DSAPattern[]> = {
     'dp-1d': ['arrays-hashing', 'recursion' as DSAPattern],
     'dp-2d': ['dp-1d'],
@@ -484,12 +488,23 @@ function buildKnowledgeGraph(
   }
 
   for (const [pattern, prereqs] of Object.entries(patternPrerequisites)) {
+    // CRITICAL FIX: Only check prerequisites for patterns the user has actually practiced
+    // This prevents showing "dp-1d prerequisite gap" to users who haven't even tried dp-1d
+    if (!practicedPatterns.has(pattern as DSAPattern)) {
+      continue
+    }
+
     const patternMastery = concepts.find(c => c.parentPattern === pattern)?.predictedMastery || 0
 
+    // Only flag as a gap if they're struggling with the pattern (score < 60)
     if (patternMastery < 60) {
       const missingPrereqs = prereqs.filter(prereq => {
-        const prereqMastery = concepts.find(c => c.parentPattern === prereq)?.predictedMastery || 0
-        return prereqMastery < 70
+        // Check if they've practiced the prerequisite
+        const prereqConcept = concepts.find(c => c.parentPattern === prereq)
+        // If they haven't practiced prereq OR their prereq mastery is low
+        const prereqMastery = prereqConcept?.predictedMastery || 0
+        // Only flag if prereq wasn't practiced or has low score
+        return !practicedPatterns.has(prereq) || prereqMastery < 70
       })
 
       if (missingPrereqs.length > 0) {
@@ -497,7 +512,7 @@ function buildKnowledgeGraph(
           pattern: pattern as DSAPattern,
           missingPrerequisites: missingPrereqs.map(prereq => ({
             concept: prereq,
-            importance: 'critical' as const,
+            importance: practicedPatterns.has(prereq) ? 'important' as const : 'critical' as const,
           })),
           impact: missingPrereqs.length > 1 ? 'blocking' : 'slowing',
         })
