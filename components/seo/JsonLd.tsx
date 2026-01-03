@@ -110,7 +110,7 @@ export function SoftwareApplicationJsonLd() {
         price: "25",
         priceCurrency: "USD",
         billingDuration: "P1M",
-        description: "35 scenarios/month with unlimited practice",
+        description: "350+ problems/month with unlimited practice",
       },
       {
         "@type": "Offer",
@@ -118,7 +118,7 @@ export function SoftwareApplicationJsonLd() {
         price: "225",
         priceCurrency: "USD",
         billingDuration: "P1Y",
-        description: "35 scenarios/month, save 25% with annual billing",
+        description: "350+ problems/month, save 25% with annual billing",
       },
     ],
     // NOTE: aggregateRating removed - only add back when you have real user reviews

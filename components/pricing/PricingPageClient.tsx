@@ -124,7 +124,7 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
               <ul className="space-y-1.5 text-sm text-gray-300">
                 <li className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-accent" />
-                  35 scenarios/month
+                  350+ problems/month
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-accent" />

@@ -305,6 +305,9 @@ function InterviewPageContent() {
   // Mobile panel switcher - only one visible at a time (Miller's Law)
   const [activePanel, setActivePanel] = useState<'problem' | 'editor' | 'chat'>('editor')
 
+  // State for focus mode problem peek overlay
+  const [showProblemPeek, setShowProblemPeek] = useState(false)
+
   // Toggle calm mode on document for CSS cascade
   useEffect(() => {
     if (calmMode) {
@@ -314,6 +317,17 @@ function InterviewPageContent() {
     }
     return () => document.documentElement.classList.remove('calm')
   }, [calmMode])
+
+  // Toggle focus mode class on document for CSS cascade
+  useEffect(() => {
+    if (focusMode) {
+      document.documentElement.classList.add('focus-mode-active')
+    } else {
+      document.documentElement.classList.remove('focus-mode-active')
+      setShowProblemPeek(false) // Close peek when exiting focus mode
+    }
+    return () => document.documentElement.classList.remove('focus-mode-active')
+  }, [focusMode])
 
   // Code protection state
   const [protectedElements, setProtectedElements] = useState<ReturnType<typeof extractProtectedElements> | null>(null)
@@ -623,14 +637,16 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
     if (maxHints > revealedHints) {
       setRevealedHints(maxHints)
-      // Play sound and show notification
-      playSound('hint')
+      // Show notification (no sound to avoid interrupting focus)
       toast.info(`💡 New hint available! (${maxHints}/${hints.length})`)
     }
   }, [elapsedTime, isInterviewStarted, selectedScenario, showFeedback, revealedHints])
 
-  // Sound effects
+  // Sound effects - disabled in calm mode for reduced stimulation
   const playSound = (type: 'hint' | 'success' | 'fail' | 'milestone') => {
+    // Skip sounds in calm mode - reduces anxiety triggers
+    if (calmMode) return
+
     // Use Web Audio API for subtle sound effects
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
     const oscillator = audioContext.createOscillator()
@@ -2366,12 +2382,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           playSound('fail')
         }
 
-        // Start post-interview discussion after running tests (when code at least runs)
+        // Just show results - don't auto-trigger submission
+        // User must explicitly click Submit to proceed to feedback
         setIsRunningTests(false)
-        setShowPostInterviewDiscussion(true)
-
-        // Trigger interviewer to analyze the solution
-        triggerPostInterviewDiscussion(data.results, data.summary)
       }
     } catch (error) {
       console.error("Code execution error:", error)
@@ -2381,6 +2394,88 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           label: "Retry",
           onClick: () => runCode(),
         },
+      })
+    } finally {
+      setIsRunningTests(false)
+    }
+  }
+
+  // Submit code - runs tests and triggers post-interview discussion/feedback
+  const submitCode = async () => {
+    if (!selectedScenario) return
+
+    setIsRunningTests(true)
+    setTestResults([])
+    setConsoleLogs([])
+
+    // Analyze code efficiency
+    const metrics = analyzeCodeEfficiency(code)
+    setEfficiencyMetrics(metrics)
+
+    try {
+      const response = await fetch("/api/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          scenarioId: selectedScenario.id,
+          language: selectedLanguage,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.results) {
+        setTestResults(data.results)
+        setTestSummary(data.summary)
+
+        // Store console logs from execution
+        if (data.consoleLogs && data.consoleLogs.length > 0) {
+          setConsoleLogs(data.consoleLogs)
+        }
+
+        // Check for syntax/compilation errors
+        const errorResults = data.results.filter((r: TestResult) => r.error)
+        const allFailed = data.summary.passRate === 0
+
+        if (allFailed && errorResults.length > 0) {
+          const firstError = errorResults[0].error
+          const isSyntaxError = firstError && (
+            firstError.includes('SyntaxError') ||
+            firstError.includes('Compilation error') ||
+            firstError.includes('Unexpected token') ||
+            firstError.includes('unexpected token') ||
+            firstError.includes('Parse error') ||
+            firstError.includes('IndentationError') ||
+            firstError.includes('invalid syntax')
+          )
+
+          playSound('fail')
+          setIsRunningTests(false)
+          toast.error("Fix errors before submitting", {
+            description: isSyntaxError ? "There's a syntax error in your code." : "Your code has errors that need to be fixed.",
+          })
+          return
+        }
+
+        // Play sound based on results
+        if (data.summary.passRate === 100) {
+          playSound('success')
+        } else if (data.summary.passRate >= 50) {
+          playSound('milestone')
+        } else {
+          playSound('fail')
+        }
+
+        // Proceed to post-interview discussion
+        setIsRunningTests(false)
+        setShowPostInterviewDiscussion(true)
+        triggerPostInterviewDiscussion(data.results, data.summary)
+      }
+    } catch (error) {
+      console.error("Code submission error:", error)
+      toast.error("Failed to submit", {
+        description: "There was a problem submitting your code. Please try again.",
       })
     } finally {
       setIsRunningTests(false)
@@ -2585,11 +2680,59 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               ═══════════════════════════════════════════════════════════════ */}
               {!showFeedback && !showPostInterviewDiscussion ? (
                 <div
-                  className={`grid gap-1.5 sm:gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${focusMode
+                  className={`relative grid gap-1.5 sm:gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${focusMode
                       ? 'grid-cols-1' // Focus mode: editor only
                       : 'grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_260px] xl:grid-cols-[320px_minmax(0,1fr)_300px] 2xl:grid-cols-[380px_minmax(0,1fr)_340px]'
                     }`}
                 >
+                  {/* Focus Mode: Floating problem peek button */}
+                  {focusMode && selectedScenario && (
+                    <button
+                      onClick={() => setShowProblemPeek(!showProblemPeek)}
+                      className={`fixed top-20 left-4 z-50 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all shadow-lg ${
+                        showProblemPeek
+                          ? 'bg-accent text-accent-foreground'
+                          : 'bg-gray-800/90 text-gray-300 hover:bg-gray-700/90 border border-gray-600'
+                      }`}
+                      title="Peek at problem description"
+                    >
+                      <Target className="h-3.5 w-3.5" />
+                      <span>{showProblemPeek ? 'Hide Problem' : 'Show Problem'}</span>
+                    </button>
+                  )}
+
+                  {/* Focus Mode: Problem peek overlay */}
+                  {focusMode && showProblemPeek && selectedScenario && (
+                    <div className="fixed top-32 left-4 z-40 w-96 max-h-[60vh] bg-gray-900/95 backdrop-blur-sm border border-gray-700 rounded-xl shadow-2xl overflow-hidden">
+                      <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Target className="h-4 w-4 text-accent" />
+                          <span className="font-semibold text-white text-sm">{selectedScenario.title}</span>
+                        </div>
+                        <Badge className={`text-xs ${
+                          selectedScenario.difficulty === 'easy' ? 'bg-green-500/20 text-green-400' :
+                          selectedScenario.difficulty === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                          'bg-red-500/20 text-red-400'
+                        }`}>
+                          {selectedScenario.difficulty}
+                        </Badge>
+                      </div>
+                      <div className="p-4 overflow-y-auto max-h-[calc(60vh-60px)]">
+                        <p className="text-gray-200 text-sm leading-relaxed">{selectedScenario.problemStatement}</p>
+                        {selectedScenario.type === 'dsa' && selectedScenario.examples && selectedScenario.examples.length > 0 && (
+                          <div className="mt-4 space-y-3">
+                            <h4 className="text-accent text-xs font-semibold uppercase tracking-wide">Examples</h4>
+                            {selectedScenario.examples.slice(0, 2).map((ex, idx) => (
+                              <div key={idx} className="bg-gray-800/50 rounded-lg p-3 text-xs font-mono">
+                                <div className="text-gray-400">Input: <span className="text-blue-300">{ex.input}</span></div>
+                                <div className="text-gray-400">Output: <span className="text-green-300">{ex.output}</span></div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {/* Left: Problem Description / File Upload
                       - Hidden in focus mode (desktop)
                       - Only visible when activePanel === 'problem' (mobile)
@@ -2955,7 +3098,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           </div>
                         </div>
                       ) : (
-                        /* Run Tests button for coding problems */
+                        /* Run Tests and Submit buttons for coding problems */
                         <div className="flex items-center justify-end gap-2 flex-shrink-0">
                           {!isLanguageSupported(selectedLanguage) && (
                             <span className="text-[10px] text-yellow-400 mr-1">
@@ -2976,13 +3119,33 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                               }
                               runCode()
                             }}
-                            disabled={showFeedback}
-                            loading={isRunningTests}
+                            disabled={showFeedback || isRunningTests}
                             className={`${isLanguageSupported(selectedLanguage) ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 hover:bg-gray-500"} text-white text-xs h-7`}
                             aria-label={isRunningTests ? "Running tests" : "Run tests"}
                           >
                             {!isRunningTests && <PlayCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
                             {isRunningTests ? "Running..." : "Run Tests"}
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              if (!isLanguageSupported(selectedLanguage)) {
+                                toast.error(`${selectedLanguage.toUpperCase()} execution not supported yet`, {
+                                  description: "Switch to JavaScript or Python to submit.",
+                                  action: {
+                                    label: "Use JavaScript",
+                                    onClick: () => setSelectedLanguage("javascript"),
+                                  },
+                                })
+                                return
+                              }
+                              submitCode()
+                            }}
+                            disabled={showFeedback || isRunningTests}
+                            className="bg-accent hover:bg-accent/80 text-accent-foreground text-xs h-7 font-semibold"
+                            aria-label="Submit code"
+                          >
+                            <Send className="mr-1 h-3 w-3" aria-hidden="true" />
+                            Submit
                           </Button>
                         </div>
                       )}

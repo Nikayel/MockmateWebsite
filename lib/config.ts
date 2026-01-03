@@ -63,7 +63,7 @@ export const PRICING_CONFIG = {
     },
     // Shared features
     sessionsPerMonth: 35,
-    sessionsDisplay: "35 unique scenarios per month",
+    sessionsDisplay: "350+ problems per month",
     // Core value: what makes Pro worth it
     valueProps: [
       {
@@ -81,7 +81,7 @@ export const PRICING_CONFIG = {
     ],
     // Complete feature list for Pro
     features: [
-      "35 unique scenarios per month",
+      "350+ problems per month",
       "Unlimited practice within each scenario",
       "10+ DSA problems per scenario",
       "Spaced repetition scheduling (SM-2 algorithm)",
@@ -95,7 +95,7 @@ export const PRICING_CONFIG = {
     ],
     // Quick comparison for pricing cards
     highlights: [
-      "35 scenarios/month (10+ problems each)",
+      "350+ problems/month",
       "Unlimited practice per problem",
       "Spaced repetition scheduling",
       "Personalized roadmap",

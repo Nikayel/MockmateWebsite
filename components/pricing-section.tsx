@@ -209,7 +209,7 @@ export function PricingSection() {
               <ul className="space-y-2 mb-4 flex-grow">
                 <li className="flex items-start gap-2 text-sm">
                   <Infinity className="w-4 h-4 flex-shrink-0 mt-0.5 text-accent" />
-                  <span className="text-foreground font-medium">35 scenarios/month</span>
+                  <span className="text-foreground font-medium">350+ problems/month</span>
                 </li>
                 {PRICING_CONFIG.pro.highlights.slice(0, 4).map((feature, featureIndex) => (
                   <li key={featureIndex} className="flex items-start gap-2 text-sm">
