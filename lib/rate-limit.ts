@@ -395,6 +395,19 @@ function getRateLimitStore(): RateLimitStore {
 
   // Fallback to in-memory (development only)
   if (isProduction) {
+    // SECURITY: In production, require distributed rate limiting to prevent bypass
+    // Each serverless instance has its own in-memory store, allowing attackers
+    // to bypass limits by distributing requests across instances
+    const errorMessage =
+      'SECURITY ERROR: No distributed rate limiting configured in production. ' +
+      'Configure UPSTASH_REDIS_REST_URL/TOKEN or ensure Firebase Admin is properly configured. ' +
+      'Set ALLOW_INSECURE_RATE_LIMIT=true to override (NOT RECOMMENDED).'
+
+    if (process.env.ALLOW_INSECURE_RATE_LIMIT !== 'true') {
+      logger.error(errorMessage)
+      throw new Error(errorMessage)
+    }
+
     logger.warn(
       'Using in-memory rate limiting in production - this may allow rate limit bypass. ' +
       'Configure UPSTASH_REDIS_REST_URL/TOKEN or ensure Firebase Admin is properly configured.'

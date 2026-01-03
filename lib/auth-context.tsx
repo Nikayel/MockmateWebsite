@@ -50,8 +50,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (fbUser) {
             const convertedUser = convertFirebaseUser(fbUser)
             setUser(convertedUser)
+            // Set auth indicator cookie for middleware (server-side route protection)
+            document.cookie = `firebase-auth-token=1; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
           } else {
             setUser(null)
+            // Clear auth indicator cookie on logout
+            document.cookie = 'firebase-auth-token=; path=/; max-age=0; SameSite=Lax'
           }
 
           setLoading(false)

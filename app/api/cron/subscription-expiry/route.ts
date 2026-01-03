@@ -13,6 +13,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { PRICING_CONFIG } from "@/lib/config";
+import { logger } from "@/lib/logger";
+
+// Create a child logger for subscription expiry cron
+const cronLogger = logger.child({ service: "cron-subscription-expiry" });
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -98,7 +102,7 @@ export async function GET(request: NextRequest) {
     // Verify authorization
     const authHeader = request.headers.get("authorization");
     if (!CRON_SECRET) {
-      console.error("[Cron Expiry] CRON_SECRET not configured");
+      cronLogger.error("CRON_SECRET not configured");
       return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
     }
     if (authHeader !== `Bearer ${CRON_SECRET}`) {
@@ -116,7 +120,7 @@ export async function GET(request: NextRequest) {
     };
 
     // 1. Find and downgrade expired yearly subscriptions
-    console.log("[Cron Expiry] Checking for expired yearly subscriptions...");
+    cronLogger.info("Checking for expired yearly subscriptions");
 
     const expiredQuery = await adminDb
       .collection("profiles")
@@ -144,7 +148,7 @@ export async function GET(request: NextRequest) {
         await updateQuotaToFree(userId);
 
         results.expired.downgraded++;
-        console.log(`[Cron Expiry] Downgraded user ${userId} - yearly plan expired`);
+        cronLogger.info("Downgraded user - yearly plan expired", { userId });
 
         // Send expiration email (non-blocking)
         if (profile.email) {
@@ -157,17 +161,17 @@ export async function GET(request: NextRequest) {
               accessUntil: now.toISOString(),
             });
           } catch (emailError) {
-            console.error(`[Cron Expiry] Failed to send expiry email to ${userId}:`, emailError);
+            cronLogger.error("Failed to send expiry email", { userId, error: emailError });
           }
         }
       } catch (error) {
         results.expired.failed++;
-        console.error(`[Cron Expiry] Failed to downgrade user ${userId}:`, error);
+        cronLogger.error("Failed to downgrade user", { userId, error });
       }
     }
 
     // 2. Send 7-day expiry reminders
-    console.log("[Cron Expiry] Checking for 7-day expiry reminders...");
+    cronLogger.info("Checking for 7-day expiry reminders");
 
     const sevenDayQuery = await adminDb
       .collection("profiles")
@@ -206,16 +210,16 @@ export async function GET(request: NextRequest) {
           });
 
           results.reminders.sent7Day++;
-          console.log(`[Cron Expiry] Sent 7-day reminder to ${userId}`);
+          cronLogger.info("Sent 7-day reminder", { userId });
         } catch (error) {
           results.reminders.failed++;
-          console.error(`[Cron Expiry] Failed to send 7-day reminder to ${userId}:`, error);
+          cronLogger.error("Failed to send 7-day reminder", { userId, error });
         }
       }
     }
 
     // 3. Send 1-day expiry reminders
-    console.log("[Cron Expiry] Checking for 1-day expiry reminders...");
+    cronLogger.info("Checking for 1-day expiry reminders");
 
     const oneDayQuery = await adminDb
       .collection("profiles")
@@ -248,17 +252,17 @@ export async function GET(request: NextRequest) {
           });
 
           results.reminders.sent1Day++;
-          console.log(`[Cron Expiry] Sent 1-day reminder to ${userId}`);
+          cronLogger.info("Sent 1-day reminder", { userId });
         } catch (error) {
           results.reminders.failed++;
-          console.error(`[Cron Expiry] Failed to send 1-day reminder to ${userId}:`, error);
+          cronLogger.error("Failed to send 1-day reminder", { userId, error });
         }
       }
     }
 
     // 4. Reset monthly quotas for active yearly subscribers
     // This ensures yearly plan users get their 35 sessions reset each month
-    console.log("[Cron Expiry] Checking yearly subscribers for monthly quota reset...");
+    cronLogger.info("Checking yearly subscribers for monthly quota reset");
 
     const activeYearlyQuery = await adminDb
       .collection("profiles")
@@ -276,7 +280,7 @@ export async function GET(request: NextRequest) {
         const wasReset = await resetYearlySubscriberQuota(userId);
         if (wasReset) {
           results.quotaResets.reset++;
-          console.log(`[Cron Expiry] Reset monthly quota for yearly subscriber ${userId}`);
+          cronLogger.info("Reset monthly quota for yearly subscriber", { userId });
 
           // Update last_quota_reset on profile
           await adminDb.collection("profiles").doc(userId).update({
@@ -286,11 +290,11 @@ export async function GET(request: NextRequest) {
         }
       } catch (error) {
         results.quotaResets.failed++;
-        console.error(`[Cron Expiry] Failed to reset quota for ${userId}:`, error);
+        cronLogger.error("Failed to reset quota", { userId, error });
       }
     }
 
-    console.log("[Cron Expiry] Completed:", results);
+    cronLogger.info("Subscription expiry check completed", { results });
 
     return NextResponse.json({
       success: true,
@@ -299,7 +303,7 @@ export async function GET(request: NextRequest) {
       timestamp: now.toISOString(),
     });
   } catch (error) {
-    console.error("[Cron Expiry] Fatal error:", error);
+    cronLogger.error("Fatal error in subscription expiry cron", { error });
     return NextResponse.json(
       { error: "Internal server error", details: error instanceof Error ? error.message : "Unknown" },
       { status: 500 }
