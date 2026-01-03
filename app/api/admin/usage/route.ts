@@ -12,6 +12,8 @@ import {
   getUserUsageSummary,
   getServiceBreakdown,
   getUserServiceBreakdown,
+  getGranularUsageBreakdown,
+  getDailyUsageTrends,
   BUDGET_CAPS,
   DEEPGRAM_COSTS,
   EMBEDDING_COSTS,
@@ -54,10 +56,14 @@ export async function GET(request: NextRequest) {
   try {
     switch (view) {
       case 'overview': {
-        // Get overall usage stats
-        const stats = await getAdminUsageStats()
-        const cacheStats = getCacheStats()
-        const serviceBreakdown = await getServiceBreakdown()
+        // Get all usage data in parallel for performance
+        const [stats, cacheStats, serviceBreakdown, granularBreakdown, dailyTrends] = await Promise.all([
+          getAdminUsageStats(),
+          getCacheStats(),
+          getServiceBreakdown(),
+          getGranularUsageBreakdown(),
+          getDailyUsageTrends(30),
+        ])
 
         return NextResponse.json({
           success: true,
@@ -66,7 +72,11 @@ export async function GET(request: NextRequest) {
               totalUsers: stats.totalUsers,
               totalCost: stats.totalCost,
               totalRequests: stats.totalRequests,
+              totalTokens: dailyTrends.totals.tokens,
               averageCostPerUser: stats.totalUsers > 0 ? stats.totalCost / stats.totalUsers : 0,
+              averageTokensPerRequest: dailyTrends.totals.requests > 0
+                ? Math.round(dailyTrends.totals.tokens / dailyTrends.totals.requests)
+                : 0,
             },
             cache: cacheStats,
             topUsers: stats.userStats.slice(0, 20),
@@ -74,6 +84,18 @@ export async function GET(request: NextRequest) {
             // Service breakdown by type
             services: serviceBreakdown.byService,
             providers: serviceBreakdown.byProvider,
+            // NEW: Granular breakdown by pattern, difficulty, scenario
+            granular: {
+              byPattern: granularBreakdown.byPattern,
+              byDifficulty: granularBreakdown.byDifficulty,
+              topCostlyScenarios: granularBreakdown.topCostlyScenarios.slice(0, 10),
+              topTokenScenarios: granularBreakdown.topTokenScenarios.slice(0, 10),
+            },
+            // NEW: Daily trends for charting
+            trends: {
+              daily: dailyTrends.daily,
+              totals: dailyTrends.totals,
+            },
             // Cost reference
             costs: {
               llm: PROVIDER_COSTS,
