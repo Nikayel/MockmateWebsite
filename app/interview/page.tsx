@@ -623,8 +623,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
     if (maxHints > revealedHints) {
       setRevealedHints(maxHints)
-      // Play sound and show notification
-      playSound('hint')
+      // Show notification (no sound to avoid interrupting focus)
       toast.info(`💡 New hint available! (${maxHints}/${hints.length})`)
     }
   }, [elapsedTime, isInterviewStarted, selectedScenario, showFeedback, revealedHints])
@@ -2366,12 +2365,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           playSound('fail')
         }
 
-        // Start post-interview discussion after running tests (when code at least runs)
+        // Just show results - don't auto-trigger submission
+        // User must explicitly click Submit to proceed to feedback
         setIsRunningTests(false)
-        setShowPostInterviewDiscussion(true)
-
-        // Trigger interviewer to analyze the solution
-        triggerPostInterviewDiscussion(data.results, data.summary)
       }
     } catch (error) {
       console.error("Code execution error:", error)
@@ -2381,6 +2377,88 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           label: "Retry",
           onClick: () => runCode(),
         },
+      })
+    } finally {
+      setIsRunningTests(false)
+    }
+  }
+
+  // Submit code - runs tests and triggers post-interview discussion/feedback
+  const submitCode = async () => {
+    if (!selectedScenario) return
+
+    setIsRunningTests(true)
+    setTestResults([])
+    setConsoleLogs([])
+
+    // Analyze code efficiency
+    const metrics = analyzeCodeEfficiency(code)
+    setEfficiencyMetrics(metrics)
+
+    try {
+      const response = await fetch("/api/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          scenarioId: selectedScenario.id,
+          language: selectedLanguage,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.results) {
+        setTestResults(data.results)
+        setTestSummary(data.summary)
+
+        // Store console logs from execution
+        if (data.consoleLogs && data.consoleLogs.length > 0) {
+          setConsoleLogs(data.consoleLogs)
+        }
+
+        // Check for syntax/compilation errors
+        const errorResults = data.results.filter((r: TestResult) => r.error)
+        const allFailed = data.summary.passRate === 0
+
+        if (allFailed && errorResults.length > 0) {
+          const firstError = errorResults[0].error
+          const isSyntaxError = firstError && (
+            firstError.includes('SyntaxError') ||
+            firstError.includes('Compilation error') ||
+            firstError.includes('Unexpected token') ||
+            firstError.includes('unexpected token') ||
+            firstError.includes('Parse error') ||
+            firstError.includes('IndentationError') ||
+            firstError.includes('invalid syntax')
+          )
+
+          playSound('fail')
+          setIsRunningTests(false)
+          toast.error("Fix errors before submitting", {
+            description: isSyntaxError ? "There's a syntax error in your code." : "Your code has errors that need to be fixed.",
+          })
+          return
+        }
+
+        // Play sound based on results
+        if (data.summary.passRate === 100) {
+          playSound('success')
+        } else if (data.summary.passRate >= 50) {
+          playSound('milestone')
+        } else {
+          playSound('fail')
+        }
+
+        // Proceed to post-interview discussion
+        setIsRunningTests(false)
+        setShowPostInterviewDiscussion(true)
+        triggerPostInterviewDiscussion(data.results, data.summary)
+      }
+    } catch (error) {
+      console.error("Code submission error:", error)
+      toast.error("Failed to submit", {
+        description: "There was a problem submitting your code. Please try again.",
       })
     } finally {
       setIsRunningTests(false)
@@ -2955,7 +3033,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           </div>
                         </div>
                       ) : (
-                        /* Run Tests button for coding problems */
+                        /* Run Tests and Submit buttons for coding problems */
                         <div className="flex items-center justify-end gap-2 flex-shrink-0">
                           {!isLanguageSupported(selectedLanguage) && (
                             <span className="text-[10px] text-yellow-400 mr-1">
@@ -2976,13 +3054,33 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                               }
                               runCode()
                             }}
-                            disabled={showFeedback}
-                            loading={isRunningTests}
+                            disabled={showFeedback || isRunningTests}
                             className={`${isLanguageSupported(selectedLanguage) ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 hover:bg-gray-500"} text-white text-xs h-7`}
                             aria-label={isRunningTests ? "Running tests" : "Run tests"}
                           >
                             {!isRunningTests && <PlayCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
                             {isRunningTests ? "Running..." : "Run Tests"}
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              if (!isLanguageSupported(selectedLanguage)) {
+                                toast.error(`${selectedLanguage.toUpperCase()} execution not supported yet`, {
+                                  description: "Switch to JavaScript or Python to submit.",
+                                  action: {
+                                    label: "Use JavaScript",
+                                    onClick: () => setSelectedLanguage("javascript"),
+                                  },
+                                })
+                                return
+                              }
+                              submitCode()
+                            }}
+                            disabled={showFeedback || isRunningTests}
+                            className="bg-accent hover:bg-accent/80 text-accent-foreground text-xs h-7 font-semibold"
+                            aria-label="Submit code"
+                          >
+                            <Send className="mr-1 h-3 w-3" aria-hidden="true" />
+                            Submit
                           </Button>
                         </div>
                       )}
