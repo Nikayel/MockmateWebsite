@@ -255,12 +255,19 @@ export default function PracticeFeedback({
   const feedbackLower = feedback.toLowerCase()
   
   // Check if edge cases were DISCUSSED with interviewer (not just solved correctly)
-  const edgeCasesDiscussed = /edge cases considered:\s*yes/i.test(feedback) || 
+  const edgeCasesDiscussed = /edge cases considered:\s*yes/i.test(feedback) ||
     /discussed.*edge case/i.test(feedback) ||
     /mentioned.*edge case/i.test(feedback) ||
     feedbackLower.includes('edge case') || feedbackLower.includes('corner case')
   const hasAlternatives = feedbackLower.includes('alternative') || feedbackLower.includes('another approach') || feedbackLower.includes('trade-off') || feedbackLower.includes('tradeoff')
-  const complexityAccurate = (efficiencyScore || 0) >= 70
+
+  // CRITICAL: Only show "optimal complexity" if:
+  // 1. The efficiency score is high (>= 70)
+  // 2. AND the solution actually works (> 50% tests passing)
+  // This prevents showing "optimal" for incomplete solutions that only pass edge cases
+  const testPassRate = testsTotal > 0 ? (testsPassed / testsTotal) * 100 : 0
+  const solutionWorks = testPassRate >= 50
+  const complexityAccurate = (efficiencyScore || 0) >= 70 && solutionWorks
 
   // System design specific indicators
   const hasRequirements = feedbackLower.includes('requirement') || feedbackLower.includes('clarif') || feedbackLower.includes('scope')
@@ -287,8 +294,13 @@ export default function PracticeFeedback({
   }
 
   // Try to extract explanations from feedback
+  // For non-working solutions, don't claim anything about complexity
   const complexityExplanation = extractFeedbackExplanation('complexity|time complexity|space complexity', feedback) ||
-    (complexityAccurate ? 'Optimal complexity achieved' : 'Could improve complexity analysis')
+    (!solutionWorks
+      ? 'Solution must pass tests before complexity can be evaluated'
+      : complexityAccurate
+        ? 'Optimal complexity achieved'
+        : 'Could improve complexity analysis')
   const edgeCasesExplanation = extractFeedbackExplanation('edge case|corner case', feedback) ||
     (edgeCasesDiscussed ? 'Edge cases discussed with interviewer' : 'Did not discuss edge cases with interviewer')
   const alternativesExplanation = extractFeedbackExplanation('alternative|another approach|different approach', feedback) ||

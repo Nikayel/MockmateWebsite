@@ -252,6 +252,166 @@ function getDefaultValidation(): ConversationValidation {
 }
 
 /**
+ * Detect if a DSA solution is incomplete/stub code
+ * This catches cases where user only wrote base case but no actual algorithm
+ *
+ * Examples of incomplete solutions:
+ * - Just a null check with `pass`
+ * - Only base cases, no recursive/iterative logic
+ * - Contains `pass`, `...`, `TODO`, `NotImplementedError`
+ * - Returns only for edge cases, no main logic
+ */
+interface IncompleteSolutionAnalysis {
+  isIncomplete: boolean
+  reason: string
+  hasBaseCase: boolean
+  hasActualLogic: boolean
+  stubPatterns: string[]
+}
+
+function analyzeCodeCompleteness(code: string, language: string = 'python'): IncompleteSolutionAnalysis {
+  if (!code || !code.trim()) {
+    return {
+      isIncomplete: true,
+      reason: 'Empty solution submitted',
+      hasBaseCase: false,
+      hasActualLogic: false,
+      stubPatterns: ['empty']
+    }
+  }
+
+  const trimmedCode = code.trim()
+  const lines = trimmedCode.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+  const stubPatterns: string[] = []
+
+  // Detect common stub/placeholder patterns
+  const stubIndicators = {
+    python: [
+      { pattern: /^\s*pass\s*$/m, name: 'pass statement' },
+      { pattern: /^\s*\.\.\.\s*$/m, name: 'ellipsis placeholder' },
+      { pattern: /raise\s+NotImplementedError/i, name: 'NotImplementedError' },
+      { pattern: /#\s*TODO/i, name: 'TODO comment' },
+      { pattern: /#\s*FIXME/i, name: 'FIXME comment' },
+      { pattern: /#\s*your\s+code\s+here/i, name: 'placeholder comment' },
+      { pattern: /#\s*implement\s+here/i, name: 'implement comment' },
+    ],
+    javascript: [
+      { pattern: /throw\s+new\s+Error\s*\(\s*['"]not\s+implemented/i, name: 'not implemented error' },
+      { pattern: /\/\/\s*TODO/i, name: 'TODO comment' },
+      { pattern: /\/\/\s*FIXME/i, name: 'FIXME comment' },
+      { pattern: /\/\/\s*your\s+code\s+here/i, name: 'placeholder comment' },
+      { pattern: /return\s*;\s*$/m, name: 'empty return' },
+    ],
+    typescript: [
+      { pattern: /throw\s+new\s+Error\s*\(\s*['"]not\s+implemented/i, name: 'not implemented error' },
+      { pattern: /\/\/\s*TODO/i, name: 'TODO comment' },
+      { pattern: /\/\/\s*FIXME/i, name: 'FIXME comment' },
+      { pattern: /return\s*;\s*$/m, name: 'empty return' },
+    ],
+    java: [
+      { pattern: /throw\s+new\s+UnsupportedOperationException/i, name: 'unsupported operation' },
+      { pattern: /\/\/\s*TODO/i, name: 'TODO comment' },
+      { pattern: /return\s+null\s*;\s*$/m, name: 'null return only' },
+    ]
+  }
+
+  const indicators = stubIndicators[language as keyof typeof stubIndicators] || stubIndicators.python
+  for (const indicator of indicators) {
+    if (indicator.pattern.test(trimmedCode)) {
+      stubPatterns.push(indicator.name)
+    }
+  }
+
+  // Detect base case patterns (null checks, empty checks)
+  const baseCasePatterns = [
+    /if\s+.*(?:is\s+None|==\s*None|===?\s*null|\.length\s*===?\s*0|==\s*0)\s*:/i,  // Python/JS null checks
+    /if\s*\(\s*!?\w+\s*(?:===?\s*null|===?\s*undefined|\.length\s*===?\s*0)\s*\)/i, // JS null checks
+    /if\s+(?:not\s+)?(?:root|head|node|arr|nums|s|str)\s*:/i,  // Common variable null checks
+    /if\s+len\s*\(\s*\w+\s*\)\s*==\s*0/i,  // Python length check
+    /return\s+(?:None|null|undefined|\[\]|\{\})\s*$/m,  // Early return for edge cases
+  ]
+
+  let hasBaseCase = false
+  for (const pattern of baseCasePatterns) {
+    if (pattern.test(trimmedCode)) {
+      hasBaseCase = true
+      break
+    }
+  }
+
+  // Detect actual algorithm implementation patterns
+  const algorithmPatterns = [
+    // Recursion
+    /def\s+(\w+).*:[\s\S]*\1\s*\(/,  // Python recursive call
+    /function\s+(\w+)[\s\S]*\1\s*\(/,  // JS recursive call
+    // Loops
+    /for\s+\w+\s+in\s+/,  // Python for-in
+    /for\s*\([^)]+\)/,    // JS/Java for loop
+    /while\s*[\(:].*:/,   // While loops
+    // Data structure operations
+    /\.append\s*\(/,
+    /\.push\s*\(/,
+    /\.pop\s*\(/,
+    /\.insert\s*\(/,
+    /\[\w+\]\s*=/,        // Array/dict assignment
+    // Tree/Node operations
+    /\.left\s*=/,
+    /\.right\s*=/,
+    /\.next\s*=/,
+    /\.val\s*=/,
+    // Common algorithm patterns
+    /left.*right|right.*left/i,  // Two pointer or tree swap
+    /temp\s*=|swap/i,            // Swap operation
+    /result\s*[+=]/,             // Building result
+    /stack\s*[.=\[]|queue\s*[.=\[]/i,  // Stack/Queue usage
+    /\bmap\s*\(|\breduce\s*\(|\bfilter\s*\(/,  // Functional patterns
+    /return\s+\[.*for.*in/,      // List comprehension return
+  ]
+
+  let hasActualLogic = false
+  for (const pattern of algorithmPatterns) {
+    if (pattern.test(trimmedCode)) {
+      hasActualLogic = true
+      break
+    }
+  }
+
+  // Special case: Very short code with only base case and no logic
+  // e.g., "if root is None: return None\n    pass"
+  const nonCommentLines = lines.filter(l => !l.startsWith('#') && !l.startsWith('//'))
+  const isVeryShort = nonCommentLines.length <= 5
+
+  // Check for "base case + pass/return" pattern (incomplete implementation)
+  const baseCasePlusStub = /if\s+.*(?:None|null|0)\s*:[\s\S]{0,50}(?:return|pass)[\s\S]{0,20}(?:pass|\.\.\.|$)/i
+
+  // Determine if solution is incomplete
+  let isIncomplete = false
+  let reason = ''
+
+  if (stubPatterns.length > 0 && !hasActualLogic) {
+    isIncomplete = true
+    reason = `Solution contains stub patterns (${stubPatterns.join(', ')}) without actual implementation`
+  } else if (hasBaseCase && !hasActualLogic && isVeryShort) {
+    isIncomplete = true
+    reason = 'Solution only handles base/edge cases without implementing the main algorithm'
+  } else if (baseCasePlusStub.test(trimmedCode)) {
+    isIncomplete = true
+    reason = 'Solution has base case check but then just pass/return without actual logic'
+  } else if (nonCommentLines.length <= 2 && hasBaseCase) {
+    isIncomplete = true
+    reason = 'Solution is too short to contain meaningful implementation'
+  }
+
+  return {
+    isIncomplete,
+    reason,
+    hasBaseCase,
+    hasActualLogic,
+    stubPatterns
+  }
+}
+
+/**
  * Detect if design notes are just the blank template (not filled in)
  * This is CRITICAL for scoring - empty submissions should get low scores
  */
@@ -663,6 +823,17 @@ function calculateValidatedScores(
   }
 
   // DSA SCORING (default) - test pass rate + code quality
+
+  // CRITICAL: Check if solution is incomplete/stub code FIRST
+  // This prevents giving credit for edge case handling when the actual algorithm is missing
+  const codeCompleteness = code ? analyzeCodeCompleteness(code, 'python') : { isIncomplete: false, reason: '', hasBaseCase: false, hasActualLogic: true, stubPatterns: [] }
+
+  // If solution is incomplete AND has very low pass rate, cap all scores severely
+  // This catches cases like: only base case check with 'pass', getting 1 test to pass
+  const isIncompleteSolution = codeCompleteness.isIncomplete
+  const hasOnlyBaseCasePassing = passRate > 0 && passRate < 30 && codeCompleteness.hasBaseCase && !codeCompleteness.hasActualLogic
+  const maxScoreForIncomplete = 25 // Cap at 25% for incomplete solutions
+
   // === UNDERSTANDING SCORE (30%) ===
   // Primary: test pass rate (proves they understood the problem)
   // Secondary: approach explanation quality
@@ -688,11 +859,19 @@ function calculateValidatedScores(
   }
 
   // Bonus for ACCURATE complexity discussion (not just mentioning it)
-  if (aiValidation.complexityDiscussed && aiValidation.complexityAccurate) {
+  // BUT: Only give complexity bonus if the solution actually works (passRate >= 50)
+  // No credit for discussing complexity of a non-working solution
+  if (aiValidation.complexityDiscussed && aiValidation.complexityAccurate && passRate >= 50) {
     understanding = Math.min(98, understanding + 5)
   } else if (aiValidation.complexityDiscussed && !aiValidation.complexityAccurate) {
     // Penalty for wrong complexity claim
     understanding = Math.max(20, understanding - 5)
+  }
+
+  // CRITICAL: Cap understanding for incomplete solutions
+  // Can't claim to "understand" the problem if you didn't implement the solution
+  if (isIncompleteSolution || hasOnlyBaseCasePassing) {
+    understanding = Math.min(maxScoreForIncomplete, understanding)
   }
 
   // === PROBLEM-SOLVING SCORE (25%) ===
@@ -702,21 +881,33 @@ function calculateValidatedScores(
   let problemSolving = Math.round((passRate * 0.6) + (effScore * 0.4))
 
   // Bonus only if AI validated these as real discussions (not keyword stuffing)
-  if (aiValidation.alternativesDiscussed && aiValidation.isCoherent) {
+  // AND solution has actual implementation
+  if (aiValidation.alternativesDiscussed && aiValidation.isCoherent && !isIncompleteSolution) {
     problemSolving = Math.min(95, problemSolving + 5)
   }
-  if (aiValidation.edgeCasesConsidered && aiValidation.isCoherent) {
+  if (aiValidation.edgeCasesConsidered && aiValidation.isCoherent && !isIncompleteSolution) {
     problemSolving = Math.min(95, problemSolving + 5)
+  }
+
+  // CRITICAL: Cap problem-solving for incomplete solutions
+  if (isIncompleteSolution || hasOnlyBaseCasePassing) {
+    problemSolving = Math.min(maxScoreForIncomplete, problemSolving)
   }
 
   // === CODE QUALITY SCORE (25%) ===
   // Purely algorithmic - based on test results and efficiency
   // This CAN'T be gamed through conversation
-  const codeQuality = Math.min(100, Math.round(
+  let codeQuality = Math.min(100, Math.round(
     passRate * 0.50 +
     effScore * 0.30 +
     50 * 0.20
   ))
+
+  // CRITICAL: Cap code quality for incomplete solutions
+  // Stub code with a passing edge case test is NOT quality code
+  if (isIncompleteSolution || hasOnlyBaseCasePassing) {
+    codeQuality = Math.min(maxScoreForIncomplete, codeQuality)
+  }
 
   // === COMMUNICATION SCORE (20%) ===
   // This is where AI validation matters most
@@ -752,13 +943,22 @@ function calculateValidatedScores(
     communication = Math.max(40, communication)
   }
 
+  // For incomplete solutions, communication can stay higher IF they discussed well
+  // BUT overall will still be capped due to other components being low
+
   // === OVERALL SCORE ===
-  const overall = Math.round(
+  let overall = Math.round(
     understanding * 0.30 +
     problemSolving * 0.25 +
     codeQuality * 0.25 +
     communication * 0.20
   )
+
+  // FINAL CAP: Incomplete solutions CANNOT pass (cap at 30%)
+  // Even with good communication, an incomplete solution is a fail
+  if (isIncompleteSolution || hasOnlyBaseCasePassing) {
+    overall = Math.min(30, overall)
+  }
 
   return {
     understanding: Math.round(understanding),
@@ -1078,35 +1278,55 @@ BUG FIX FOCUS:
       }
 
       // Default DSA instruction
-      return `You are a senior interviewer delivering a focused technical debrief. Be direct and constructive.
+      return `You are a senior interviewer delivering a focused technical debrief. Be BRUTALLY HONEST - do not soften the blow for incomplete or non-working solutions.
 
 ${baseRules}
 
+## CRITICAL: HANDLING INCOMPLETE/STUB SOLUTIONS
+If the code analysis shows "INCOMPLETE SOLUTION DETECTED":
+- This means the candidate wrote only base case checks (like null checks) but NO actual algorithm
+- Examples: "if root is None: return None" with "pass", or just edge case handling
+- TL;DR MUST state: "Solution is incomplete - only edge cases handled, no actual algorithm implemented"
+- "What Worked" should ONLY say: "Identified the base case" - nothing more. Do NOT praise code structure or efficiency for non-existent code.
+- "Fix Next" MUST lead with: "CRITICAL: You must actually IMPLEMENT the algorithm, not just write the base case"
+- Do NOT mention "optimal complexity" for incomplete solutions - there IS no working algorithm to analyze
+- Be blunt: "You submitted a skeleton without the actual solution"
+
+## HANDLING LOW TEST PASS RATES
+If tests passed < 50%:
+- Lead with what's broken, not what works
+- "What Worked" should be minimal - don't fabricate positives
+- Focus feedback on fixing the failing cases
+
 ## OUTPUT FORMAT
 
-**TL;DR** – One sentence: what they did well + biggest gap.
+**TL;DR** – One sentence: If incomplete, state clearly "Solution incomplete - only base case, no algorithm." Otherwise: what they did well + biggest gap.
 
 **Score Snapshot** (use the PRE-CALCULATED SCORES provided)
-- Understanding: X/100 – brief justification
-- Problem-Solving: X/100 – brief justification
-- Code Quality: X/100 – brief justification
+- Understanding: X/100 – If incomplete, state "Cannot demonstrate understanding without implementing solution"
+- Problem-Solving: X/100 – If incomplete, state "No problem-solving demonstrated - base case only"
+- Code Quality: X/100 – If incomplete, state "Incomplete code cannot be evaluated for quality"
 - Communication: X/100 – brief justification
 - Overall: X/100
 
 **What Worked** (max 3 bullets)
-- specific strength with evidence
+- If incomplete/failing: ONLY mention trivial things like "Identified base case" - nothing more
+- If working: specific strength with evidence
 
 **Fix Next** (max 3 bullets, prioritized)
+- If incomplete: "IMPLEMENT THE COMPLETE ALGORITHM - base case alone is not a solution"
 - specific improvement with concrete action
 
 **Action Plan** (3 numbered steps)
-1. Immediate action
+1. If incomplete: "IMMEDIATE: Write the complete solution, not just edge case handling"
 2. Short-term practice
 3. Long-term skill development
 
 DSA FOCUS:
 - Reference actual data (tests passed, complexity, time).
 - Never praise if tests fail. Address failures first.
+- NEVER mention "optimal complexity" or efficiency for solutions that don't work or are incomplete.
+- Be honest: a null check is NOT "good code structure" - it's the bare minimum that everyone writes.
 `
     }
 
@@ -1320,12 +1540,44 @@ IMPORTANT:
 - Focus on: bug identification, root cause analysis, fix quality, communication`
       }
 
-      // Default DSA prompt
+      // Default DSA prompt - analyze code completeness first
+      const codeAnalysis = code ? analyzeCodeCompleteness(code, language || 'python') : { isIncomplete: true, reason: 'No code submitted', hasBaseCase: false, hasActualLogic: false, stubPatterns: ['empty'] }
+
+      // Build completeness context for AI
+      let completenessContext = ''
+      if (codeAnalysis.isIncomplete) {
+        completenessContext = `
+⚠️ INCOMPLETE SOLUTION DETECTED ⚠️
+- Reason: ${codeAnalysis.reason}
+- Has base case only: ${codeAnalysis.hasBaseCase ? 'YES' : 'NO'}
+- Has actual algorithm logic: ${codeAnalysis.hasActualLogic ? 'YES' : 'NO'}
+${codeAnalysis.stubPatterns.length > 0 ? `- Stub patterns found: ${codeAnalysis.stubPatterns.join(', ')}` : ''}
+- This is a FAILING submission - the solution is not complete
+- Your feedback MUST reflect this: be direct that they only wrote edge case handling, no actual solution
+- Do NOT praise complexity or efficiency - there is no working algorithm to analyze
+- "What Worked" should ONLY mention "Identified the base case" at most
+`
+      } else if (passRate < 30) {
+        completenessContext = `
+⚠️ LOW PASS RATE (${Math.round(passRate)}%) ⚠️
+- Most tests are failing
+- Focus on what's broken, not minor positives
+- Do NOT mention "optimal complexity" if the solution doesn't work
+`
+      } else if (passRate < 50) {
+        completenessContext = `
+⚠️ PARTIAL SOLUTION (${Math.round(passRate)}% passing) ⚠️
+- Less than half of tests pass
+- Lead with fixing failures before praising what works
+`
+      }
+
       return `Generate interview feedback narrative using the pre-calculated scores below.
 
 ${baseInfo}
 ${testResultsSummary}
 ${efficiencyInfo}
+${completenessContext}
 
 SOLUTION CODE:
 \`\`\`${language || 'javascript'}
@@ -1338,7 +1590,13 @@ ${testResults.filter((t: any) => !t.passed).slice(0, 3).map((t: any) =>
     ).join('\n')}
 ` : ''}
 
-IMPORTANT: Use the PRE-CALCULATED SCORES above exactly. Focus on generating helpful narrative feedback, not recalculating scores.`
+CRITICAL INSTRUCTIONS:
+- Use the PRE-CALCULATED SCORES above exactly - they reflect what actually happened
+- If "INCOMPLETE SOLUTION DETECTED" above: Be blunt that the solution is not complete. Do NOT fabricate positives.
+- If pass rate < 50%: Lead with failures, minimize "What Worked"
+- NEVER say "optimal complexity achieved" for incomplete or failing solutions
+- A base case check (like null check) is NOT praiseworthy - it's the minimum everyone writes
+- Be a tough but fair interviewer - honesty helps candidates improve`
     }
 
     const prompt = buildPrompt()
