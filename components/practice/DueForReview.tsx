@@ -176,46 +176,51 @@ function getReviewReason(item: DueItem): { short: string; tooltip: string } {
 }
 
 /**
- * Format the next review timing with context
+ * Format the next review timing with context AND exact date
  */
-function getNextReviewDisplay(item: DueItem): { timing: string; context: string } {
+function getNextReviewDisplay(item: DueItem): { timing: string; context: string; exactDate: string } {
   const daysUntil = item.days_until_review;
+  const reviewDate = new Date(item.next_review_at);
+  const exactDate = reviewDate.toLocaleDateString("en-US", { weekday: 'short', month: "short", day: "numeric" });
 
   if (daysUntil < 0) {
     const daysOverdue = Math.abs(daysUntil);
     return {
       timing: daysOverdue === 1 ? "1 day overdue" : `${daysOverdue} days overdue`,
-      context: "Review soon to maintain progress"
+      context: "Review soon to maintain progress",
+      exactDate: `Was due ${exactDate}`
     };
   }
 
   if (daysUntil === 0) {
-    return { timing: "Due today", context: "Review to maintain streak" };
+    return { timing: "Due today", context: "Review to maintain streak", exactDate: "Today" };
   }
 
   if (daysUntil === 1) {
-    return { timing: "Review tomorrow", context: "Based on your performance" };
+    return { timing: "Tomorrow", context: "Based on your performance", exactDate };
   }
 
   if (daysUntil <= 7) {
     return {
-      timing: `In ${daysUntil} day${daysUntil === 1 ? '' : 's'}`,
-      context: `${daysUntil}-day interval from last review`
+      timing: exactDate,
+      context: `${daysUntil}-day interval from last review`,
+      exactDate
     };
   }
 
   if (daysUntil <= 30) {
     return {
-      timing: `Review in ${daysUntil} days`,
-      context: "Extended interval — you're progressing well"
+      timing: exactDate,
+      context: "Extended interval — you're progressing well",
+      exactDate
     };
   }
 
   // Format as date for items more than a month away
-  const date = new Date(item.next_review_at);
   return {
-    timing: `Review ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
-    context: "Mastery maintenance interval"
+    timing: exactDate,
+    context: "Mastery maintenance interval",
+    exactDate
   };
 }
 
@@ -525,14 +530,32 @@ export function DueForReview({
         </div>
       )}
 
-      {/* Upcoming */}
+      {/* Upcoming - Show exact dates */}
       {upcoming.length > 0 && (
         <div>
           <button
             onClick={() => setIsUpcomingExpanded(!isUpcomingExpanded)}
             className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 hover:text-gray-400 transition-colors w-full"
           >
-            <span>Scheduled Soon ({upcoming.length})</span>
+            <span>
+              Coming Up ({upcoming.length})
+              {upcoming.length > 0 && (
+                <span className="text-gray-400 font-normal normal-case ml-1">
+                  · {(() => {
+                    // Show date range for upcoming reviews
+                    const dates = upcoming.map(item => new Date(item.next_review_at));
+                    const earliest = new Date(Math.min(...dates.map(d => d.getTime())));
+                    const latest = new Date(Math.max(...dates.map(d => d.getTime())));
+                    const formatDate = (d: Date) => d.toLocaleDateString("en-US", { weekday: 'short', month: "short", day: "numeric" });
+
+                    if (earliest.toDateString() === latest.toDateString()) {
+                      return formatDate(earliest);
+                    }
+                    return `${formatDate(earliest)} – ${formatDate(latest)}`;
+                  })()}
+                </span>
+              )}
+            </span>
             <span className="flex-1" />
             {isUpcomingExpanded ? (
               <ChevronUp className="h-3 w-3" />
@@ -542,7 +565,7 @@ export function DueForReview({
           </button>
           {!isUpcomingExpanded && (
             <p className="text-xs text-gray-600 -mt-1 mb-2">
-              Each problem has its own interval based on your performance
+              Intervals based on your performance — expand for details
             </p>
           )}
           {isUpcomingExpanded && (
