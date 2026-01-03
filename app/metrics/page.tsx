@@ -374,7 +374,7 @@ export default function MetricsPage() {
                                 <div>
                                   <div className="flex items-center gap-2 mb-1">
                                     <span className="text-white font-medium capitalize">
-                                      {session.pattern.replace(/-/g, ' ')}
+                                      {(session.pattern || 'unknown').replace(/-/g, ' ')}
                                     </span>
                                     <Badge className={difficultyColors[session.difficulty as keyof typeof difficultyColors]}>
                                       {session.difficulty.toUpperCase()}
