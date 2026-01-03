@@ -218,26 +218,31 @@ async function getRecentSessionsForUser(userId: string) {
  * Aggregates data from:
  * - user_learning_state: streak, topics, last activity
  * - user_problem_mastery: problem-level mastery
- * - user_stats: aggregate session stats
+ * - user_stats: aggregate session stats (PRIMARY FALLBACK)
+ * - users/{userId}/session_summaries: individual sessions (SECONDARY FALLBACK)
  */
 async function getLearningStateForUser(userId: string) {
   try {
     // Fetch data from all relevant sources in parallel
-    const [learningDoc, statsDoc, masterySnap] = await Promise.all([
+    const [learningDoc, statsDoc, masterySnap, sessionSummariesSnap] = await Promise.all([
       adminDb.collection("user_learning_state").doc(userId).get(),
       adminDb.collection("user_stats").doc(userId).get(),
       adminDb.collection("user_problem_mastery").doc(userId).collection("problems").get(),
+      // Also fetch session summaries as fallback for computing stats
+      adminDb.collection("users").doc(userId).collection("session_summaries")
+        .orderBy("completedAt", "desc").limit(100).get(),
     ])
 
     const learningData = learningDoc.exists ? learningDoc.data() : null
     const statsData = statsDoc.exists ? statsDoc.data() : null
     const masteryDocs = masterySnap.docs
+    const sessionDocs = sessionSummariesSnap.docs
 
     // Calculate pattern progress from problem mastery
     const patternProgress: Record<string, number> = {}
     const patternCounts: Record<string, { total: number; mastered: number }> = {}
     let totalSolved = 0
-    let totalScore = 0
+    let totalMasteryScore = 0
 
     masteryDocs.forEach(doc => {
       const data = doc.data()
@@ -248,13 +253,14 @@ async function getLearningStateForUser(userId: string) {
       }
       patternCounts[pattern].total++
 
-      if (data.mastery_level === 'mastered' || data.mastery_level === 'reviewing') {
+      // Count as solved if mastery level is proficient or higher
+      if (['proficient', 'expert', 'mastered', 'reviewing'].includes(data.mastery_level)) {
         patternCounts[pattern].mastered++
         totalSolved++
       }
 
-      if (data.last_score) {
-        totalScore += data.last_score
+      if (data.average_score || data.last_score) {
+        totalMasteryScore += data.average_score || data.last_score
       }
     })
 
@@ -263,31 +269,93 @@ async function getLearningStateForUser(userId: string) {
       patternProgress[pattern] = Math.round((counts.mastered / counts.total) * 100)
     })
 
-    // Get patterns that are "completed" (70%+ mastery)
+    // FALLBACK: If no mastery data, compute from session summaries
+    if (masteryDocs.length === 0 && sessionDocs.length > 0) {
+      const patternSessions: Record<string, { count: number; totalScore: number; solved: number }> = {}
+
+      sessionDocs.forEach(doc => {
+        const data = doc.data()
+        const pattern = data.pattern || 'unknown'
+        const score = data.performanceScore || 0
+
+        if (!patternSessions[pattern]) {
+          patternSessions[pattern] = { count: 0, totalScore: 0, solved: 0 }
+        }
+        patternSessions[pattern].count++
+        patternSessions[pattern].totalScore += score
+        if (score >= 70) {
+          patternSessions[pattern].solved++
+        }
+      })
+
+      Object.entries(patternSessions).forEach(([pattern, stats]) => {
+        const avgScore = Math.round(stats.totalScore / stats.count)
+        patternProgress[pattern] = avgScore
+        patternCounts[pattern] = { total: stats.count, mastered: stats.solved }
+        totalSolved += stats.solved
+      })
+    }
+
+    // Get patterns that are "completed" (70%+ average score)
     const patternsCompleted = Object.entries(patternProgress)
       .filter(([, progress]) => progress >= 70)
       .map(([pattern]) => pattern)
 
-    // Determine current pattern (most recent topic from learning state)
+    // Determine current pattern (most recent topic from learning state or session summaries)
+    let currentPattern: string | null = null
     const topics = learningData?.topics || {}
     const topicEntries = Object.entries(topics)
-    const mostRecent = topicEntries.length > 0
-      ? topicEntries.sort((a: any, b: any) =>
-          new Date(b[1].last_practiced_at || 0).getTime() - new Date(a[1].last_practiced_at || 0).getTime()
-        )[0]
-      : null
-    const currentPattern = mostRecent ? (mostRecent[1] as any).pattern : null
+
+    if (topicEntries.length > 0) {
+      const mostRecent = topicEntries.sort((a: any, b: any) =>
+        new Date(b[1].last_practiced_at || 0).getTime() - new Date(a[1].last_practiced_at || 0).getTime()
+      )[0]
+      currentPattern = (mostRecent[1] as any).pattern
+    } else if (sessionDocs.length > 0) {
+      // Fallback to most recent session
+      currentPattern = sessionDocs[0].data().pattern || null
+    }
+
+    // Calculate total problems attempted - use multiple fallbacks
+    const totalProblemsAttempted = masteryDocs.length > 0
+      ? masteryDocs.length
+      : sessionDocs.length > 0
+        ? new Set(sessionDocs.map(d => d.data().scenarioId)).size  // Unique problems
+        : statsData?.totalSessions || 0
+
+    // Calculate average performance with fallbacks
+    let averagePerformance = 0
+    if (masteryDocs.length > 0 && totalMasteryScore > 0) {
+      averagePerformance = Math.round(totalMasteryScore / masteryDocs.length)
+    } else if (sessionDocs.length > 0) {
+      const totalSessionScore = sessionDocs.reduce((sum, doc) => sum + (doc.data().performanceScore || 0), 0)
+      averagePerformance = Math.round(totalSessionScore / sessionDocs.length)
+    } else if (statsData?.averageScore) {
+      averagePerformance = Math.round(statsData.averageScore)
+    }
+
+    // Calculate streak - check if it should be reset due to inactivity
+    let studyStreak = learningData?.streak_days || 0
+    if (learningData?.last_session_date) {
+      const lastSessionDate = new Date(learningData.last_session_date)
+      const today = new Date()
+      const daysDiff = Math.floor((today.getTime() - lastSessionDate.getTime()) / (24 * 60 * 60 * 1000))
+
+      // If more than 1 day since last session, streak is effectively 0 (needs new session to restart)
+      if (daysDiff > 1) {
+        studyStreak = 0
+      }
+    }
 
     return {
       currentPattern,
       patternsCompleted,
-      totalProblemsAttempted: masteryDocs.length || statsData?.totalSessions || 0,
-      totalProblemsSolved: totalSolved,
-      averagePerformance: masteryDocs.length > 0
-        ? Math.round(totalScore / masteryDocs.length)
-        : (statsData?.averageScore || 0),
-      studyStreak: learningData?.streak_days || 0,
-      lastActive: learningData?.last_session_at || statsData?.lastSessionAt,
+      totalProblemsAttempted,
+      totalProblemsSolved: totalSolved || (sessionDocs.filter(d => (d.data().performanceScore || 0) >= 70).length),
+      averagePerformance,
+      studyStreak,
+      lastActive: learningData?.last_session_at || statsData?.lastSessionAt ||
+        (sessionDocs.length > 0 ? sessionDocs[0].data().completedAt : null),
       patternProgress,
     }
   } catch (error) {

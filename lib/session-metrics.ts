@@ -557,8 +557,12 @@ async function storeSessionSummary(summary: SessionSummary): Promise<void> {
         createdAt: FieldValue.serverTimestamp(),
       })
 
-    // Update user's aggregate stats
-    await updateUserAggregateStats(summary)
+    // Update all user learning data in parallel
+    await Promise.all([
+      updateUserAggregateStats(summary),
+      updateUserLearningState(summary),
+      updateUserProblemMastery(summary),
+    ])
   } catch (error) {
     console.error('[Session Metrics] Failed to store summary:', error)
   }
@@ -634,6 +638,150 @@ async function updateUserAggregateStats(summary: SessionSummary): Promise<void> 
       })
     }
   })
+}
+
+/**
+ * Update user's learning state (streak, topics, last active)
+ * This powers the Learning Progress display in admin dashboard
+ */
+async function updateUserLearningState(summary: SessionSummary): Promise<void> {
+  try {
+    const learningStateRef = adminDb.collection('user_learning_state').doc(summary.userId)
+
+    await adminDb.runTransaction(async (transaction) => {
+      const doc = await transaction.get(learningStateRef)
+      const now = new Date(summary.completedAt)
+      const today = now.toISOString().split('T')[0]
+
+      if (!doc.exists) {
+        // Create new learning state document
+        transaction.set(learningStateRef, {
+          userId: summary.userId,
+          streak_days: 1,
+          last_session_at: summary.completedAt,
+          last_session_date: today,
+          topics: {
+            [summary.scenarioId]: {
+              pattern: summary.pattern,
+              last_practiced_at: summary.completedAt,
+              performance_score: summary.performanceScore,
+              interval_days: 1,
+              ease_factor: 2.5,
+            },
+          },
+          total_sessions: 1,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        })
+      } else {
+        const data = doc.data()!
+        const lastSessionDate = data.last_session_date || ''
+        let streakDays = data.streak_days || 0
+
+        // Calculate streak
+        if (lastSessionDate !== today) {
+          const lastDate = new Date(lastSessionDate)
+          const daysDiff = Math.floor((now.getTime() - lastDate.getTime()) / (24 * 60 * 60 * 1000))
+
+          if (daysDiff === 1) {
+            // Consecutive day - increment streak
+            streakDays++
+          } else if (daysDiff > 1) {
+            // Streak broken - reset to 1
+            streakDays = 1
+          }
+          // If daysDiff === 0, same day - don't change streak
+        }
+
+        // Update topics
+        const topics = data.topics || {}
+        topics[summary.scenarioId] = {
+          pattern: summary.pattern,
+          last_practiced_at: summary.completedAt,
+          performance_score: summary.performanceScore,
+          interval_days: topics[summary.scenarioId]?.interval_days || 1,
+          ease_factor: topics[summary.scenarioId]?.ease_factor || 2.5,
+        }
+
+        transaction.update(learningStateRef, {
+          streak_days: streakDays,
+          last_session_at: summary.completedAt,
+          last_session_date: today,
+          topics,
+          total_sessions: FieldValue.increment(1),
+          updatedAt: FieldValue.serverTimestamp(),
+        })
+      }
+    })
+  } catch (error) {
+    console.error('[Session Metrics] Failed to update learning state:', error)
+  }
+}
+
+/**
+ * Update user's problem mastery (tracks mastery level per problem)
+ * This powers the detailed Learning Progress stats
+ */
+async function updateUserProblemMastery(summary: SessionSummary): Promise<void> {
+  try {
+    const masteryRef = adminDb
+      .collection('user_problem_mastery')
+      .doc(summary.userId)
+      .collection('problems')
+      .doc(summary.scenarioId)
+
+    await adminDb.runTransaction(async (transaction) => {
+      const doc = await transaction.get(masteryRef)
+
+      // Calculate mastery level based on score
+      const getMasteryLevel = (score: number, practiceCount: number): string => {
+        if (practiceCount < 2) return 'novice'
+        if (score >= 90) return 'expert'
+        if (score >= 75) return 'proficient'
+        if (score >= 60) return 'practicing'
+        if (score >= 40) return 'learning'
+        return 'novice'
+      }
+
+      if (!doc.exists) {
+        transaction.set(masteryRef, {
+          userId: summary.userId,
+          problemId: summary.scenarioId,
+          pattern: summary.pattern,
+          difficulty: summary.difficulty,
+          mastery_level: getMasteryLevel(summary.performanceScore, 1),
+          last_score: summary.performanceScore,
+          best_score: summary.performanceScore,
+          practice_count: 1,
+          total_score: summary.performanceScore,
+          average_score: summary.performanceScore,
+          first_practiced_at: summary.completedAt,
+          last_practiced_at: summary.completedAt,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        })
+      } else {
+        const data = doc.data()!
+        const practiceCount = (data.practice_count || 0) + 1
+        const totalScore = (data.total_score || 0) + summary.performanceScore
+        const averageScore = Math.round(totalScore / practiceCount)
+        const bestScore = Math.max(data.best_score || 0, summary.performanceScore)
+
+        transaction.update(masteryRef, {
+          mastery_level: getMasteryLevel(averageScore, practiceCount),
+          last_score: summary.performanceScore,
+          best_score: bestScore,
+          practice_count: practiceCount,
+          total_score: totalScore,
+          average_score: averageScore,
+          last_practiced_at: summary.completedAt,
+          updatedAt: FieldValue.serverTimestamp(),
+        })
+      }
+    })
+  } catch (error) {
+    console.error('[Session Metrics] Failed to update problem mastery:', error)
+  }
 }
 
 // =============================================================================
