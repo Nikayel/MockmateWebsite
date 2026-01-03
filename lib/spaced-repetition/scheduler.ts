@@ -430,7 +430,7 @@ export async function updateProblemMastery(
     const { increment_review_count, time_spent_minutes, hints_used, ...restUpdate } = update;
 
     // Build the Firestore update object with atomic increments
-    const firestoreUpdate: Record<string, unknown> = {
+    const firestoreUpdate: Record<string, any> = {
       ...restUpdate,
       scenario_id: correctScenarioId,
       difficulty: canonicalDifficulty,

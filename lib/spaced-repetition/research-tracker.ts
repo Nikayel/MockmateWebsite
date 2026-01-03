@@ -259,7 +259,7 @@ async function updateDailyMetrics(
       }
 
       // Calculate all derived values atomically from fresh data
-      const updateData: Record<string, unknown> = {
+      const updateData: Record<string, any> = {
         reviews_completed: newReviewCount,
         total_review_time_minutes: newTotalTime,
         average_review_time_minutes: Math.round((newTotalTime / newReviewCount) * 10) / 10,
@@ -405,7 +405,7 @@ async function updateResearchSummary(
     const newIntervalDist = { ...existing.interval_distribution }
     newIntervalDist[intervalBucket] = (newIntervalDist[intervalBucket] || 0) + 1
 
-    const updateData: Record<string, unknown> = {
+    const updateData: Record<string, any> = {
       total_reviews: FieldValue.increment(1),
       total_time_spent_minutes: FieldValue.increment(data.timeSpentMinutes),
       lifetime_average_score: Math.round(
