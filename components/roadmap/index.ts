@@ -12,3 +12,7 @@ export { TodaysFocus } from './TodaysFocus'
 export { PatternCoverage } from './PatternCoverage'
 export { WeeklyCalendar } from './WeeklyCalendar'
 export { CompanyInterviewGuide } from './CompanyInterviewGuide'
+
+// Status components
+export { RoadmapStatusBanner, ArchivedRoadmapItem, ArchivedRoadmapsList } from './RoadmapStatusBanner'
+export type { RoadmapStatusType } from './RoadmapStatusBanner'

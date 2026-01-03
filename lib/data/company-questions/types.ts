@@ -186,7 +186,7 @@ export interface PersonalizedRoadmap {
   milestones: Milestone[]
 
   // Status
-  status: 'active' | 'completed' | 'abandoned'
+  status: 'active' | 'completed' | 'abandoned' | 'archived'
   isOnTrack: boolean
   daysAhead: number  // Positive = ahead, negative = behind
 
