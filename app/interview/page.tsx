@@ -1124,6 +1124,44 @@ Interviews are conversations, not just coding exercises.`
     }
   }
 
+  // Track session completion through metrics API for proper stats tracking
+  const trackSessionCompletion = async (params: {
+    sessionId: string
+    finalCode: string
+    language: string
+    testsPassed: number
+    testsTotal: number
+    efficiencyScore: number
+    communicationScore?: number
+  }) => {
+    try {
+      const token = await firebaseUser?.getIdToken()
+      if (!token) return
+
+      await fetch("/api/session/metrics", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          event: "session_complete",
+          sessionId: params.sessionId,
+          data: {
+            finalCode: params.finalCode,
+            language: params.language,
+            testsPassed: params.testsPassed,
+            testsTotal: params.testsTotal,
+            efficiencyScore: params.efficiencyScore,
+            communicationScore: params.communicationScore,
+          },
+        }),
+      })
+    } catch (error) {
+      console.error("[Session Metrics] Failed to track completion:", error)
+    }
+  }
+
   // Analyze code for context-aware proactive feedback
   // IMPORTANT: This analysis is NEUTRAL - do not praise patterns until correctness is verified
   const analyzeCodeForProactiveFeedback = (code: string): string => {
@@ -1361,6 +1399,16 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             }
           )
 
+          // Track session completion for user stats (async, non-blocking)
+          trackSessionCompletion({
+            sessionId: currentSessionId,
+            finalCode: code,
+            language: selectedLanguage,
+            testsPassed: summary.passed,
+            testsTotal: summary.total,
+            efficiencyScore: efficiencyData?.efficiencyScore || 50,
+          }).catch(err => console.error("Session metrics tracking failed:", err))
+
           // Mark question complete in roadmap if user came from roadmap
           if (isFromRoadmap && selectedScenario && activeRoadmap) {
             markQuestionCompleted(selectedScenario.id, calculatedPerformanceScore)
@@ -1503,6 +1551,30 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           scenario.id
         )
         setCurrentSessionId(sessionId)
+
+        // Initialize session metrics tracking (required for completion tracking)
+        const token = await firebaseUser?.getIdToken()
+        if (token) {
+          fetch("/api/session/metrics", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              event: "session_start",
+              sessionId,
+              data: {
+                scenarioId: scenario.id,
+                scenarioTitle: scenario.title,
+                pattern: ('pattern' in scenario ? scenario.pattern : scenario.type) || 'unknown',
+                difficulty: scenario.difficulty,
+                scenarioType: scenario.type,
+                hintsTotal: (scenario as any).hints?.length || 3,
+              },
+            }),
+          }).catch(err => console.error("Session metrics init failed:", err))
+        }
 
         // Record session start (uses free opens or consumes 1 usage)
         const result = await recordSessionStart(user.id)
@@ -2230,6 +2302,17 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               testResults: [],
             }
           )
+
+          // Track session completion for user stats (async, non-blocking)
+          trackSessionCompletion({
+            sessionId: currentSessionId,
+            finalCode: code || '// Design notes',
+            language: 'notes',
+            testsPassed: 1, // System design counts as passed
+            testsTotal: 1,
+            efficiencyScore: 50, // Not applicable for system design
+            communicationScore: calculatedPerformanceScore,
+          }).catch(err => console.error("Session metrics tracking failed:", err))
 
           // Mark question complete in roadmap if user came from roadmap
           const isFromRoadmap = searchParams.get('from') === 'roadmap'

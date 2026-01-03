@@ -3,15 +3,17 @@
  *
  * Tracks all AI API calls, tokens, and costs per user.
  * Uses Firebase Firestore for persistence.
+ * Now with ACCURATE token counting via js-tiktoken.
  *
  * Cost caps:
- * - Free tier: $0 (limited sessions)
+ * - Free tier: $0.50 (limited sessions)
  * - Pro tier: $25/month budget cap
  * - Enterprise: $100/month budget cap
  */
 
 import { adminDb } from './firebase-admin'
 import { FieldValue, Timestamp } from 'firebase-admin/firestore'
+import { countTokens } from './token-counter'
 
 // Cost per 1K tokens for each provider (input + output averaged) - Dec 2025
 export const PROVIDER_COSTS = {
@@ -71,6 +73,11 @@ export interface UsageEvent {
   cached?: boolean
   sessionId?: string
   scenarioId?: string
+  // NEW: Granular tracking fields
+  pattern?: string           // DSA pattern (arrays-hashing, trees, etc.)
+  difficulty?: string        // easy, medium, hard
+  scenarioTitle?: string     // Problem title
+  isExactTokenCount?: boolean // Whether tokens are accurate or estimated
   metadata?: Record<string, any>
   createdAt: Date | Timestamp
 }
@@ -321,18 +328,29 @@ export function calculateVoiceCost(
 }
 
 /**
- * Calculate cost for embedding generation
- * @param characterCount - Number of characters in the text
+ * Calculate cost for embedding generation using ACCURATE token counting
+ * @param text - The text to embed (for accurate token counting)
  * @param model - Embedding model used
  */
 export function calculateEmbeddingCost(
-  characterCount: number,
+  text: string,
+  model: keyof typeof EMBEDDING_COSTS = 'text-embedding-004'
+): { cost: number; tokens: number; isExact: boolean } {
+  const costPer1k = EMBEDDING_COSTS[model] || EMBEDDING_COSTS['text-embedding-004']
+  const tokenResult = countTokens(text)
+  const cost = (tokenResult.tokens / 1000) * costPer1k
+  return { cost, tokens: tokenResult.tokens, isExact: tokenResult.isExact }
+}
+
+/**
+ * Calculate cost from token count (when tokens are already known)
+ */
+export function calculateEmbeddingCostFromTokens(
+  tokens: number,
   model: keyof typeof EMBEDDING_COSTS = 'text-embedding-004'
 ): number {
   const costPer1k = EMBEDDING_COSTS[model] || EMBEDDING_COSTS['text-embedding-004']
-  // Rough estimate: ~4 characters per token
-  const estimatedTokens = characterCount / 4
-  return (estimatedTokens / 1000) * costPer1k
+  return (tokens / 1000) * costPer1k
 }
 
 /**
@@ -363,7 +381,8 @@ export async function trackVoiceUsage(params: {
 }
 
 /**
- * Track embedding generation usage
+ * Track embedding generation usage (legacy - uses character count estimation)
+ * @deprecated Use trackEmbeddingUsageAccurate instead
  */
 export async function trackEmbeddingUsage(params: {
   userId: string
@@ -374,20 +393,85 @@ export async function trackEmbeddingUsage(params: {
   latencyMs?: number
 }): Promise<void> {
   const { userId, characterCount, embeddingCount, model, provider, latencyMs } = params
-  const cost = calculateEmbeddingCost(characterCount, model)
+  // Estimate tokens from character count for backwards compatibility
+  const estimatedTokens = Math.ceil(characterCount / 4)
+  const cost = calculateEmbeddingCostFromTokens(estimatedTokens, model)
 
   await trackUsageEvent({
     userId,
     eventType: 'embedding_generation',
     provider,
     model,
+    totalTokens: estimatedTokens,
     cost,
     latencyMs,
+    isExactTokenCount: false,
     metadata: {
       characterCount,
       embeddingCount,
+      estimatedTokens,
     },
   })
+}
+
+/**
+ * Track embedding generation usage with ACCURATE token counting
+ * This is the preferred method for tracking embeddings
+ */
+export async function trackEmbeddingUsageAccurate(params: {
+  userId: string
+  texts: string[]  // The actual texts being embedded
+  model: keyof typeof EMBEDDING_COSTS
+  provider: 'gemini' | 'openai' | 'tfidf'
+  latencyMs?: number
+  cached?: boolean
+  dimensions?: number
+  // Optional: provide token count if already known from API response (OpenAI)
+  tokensFromApi?: number
+}): Promise<{ totalTokens: number; cost: number }> {
+  const { userId, texts, model, provider, latencyMs, cached = false, dimensions, tokensFromApi } = params
+
+  let totalTokens: number
+  let isExact: boolean
+
+  if (tokensFromApi !== undefined) {
+    // Use API-provided token count (most accurate for OpenAI)
+    totalTokens = tokensFromApi
+    isExact = true
+  } else {
+    // Count tokens for all texts
+    let allExact = true
+    totalTokens = 0
+    for (const text of texts) {
+      const result = countTokens(text)
+      totalTokens += result.tokens
+      if (!result.isExact) allExact = false
+    }
+    isExact = allExact
+  }
+
+  const cost = calculateEmbeddingCostFromTokens(totalTokens, model)
+  const totalCharacters = texts.reduce((sum, t) => sum + t.length, 0)
+
+  await trackUsageEvent({
+    userId,
+    eventType: 'embedding_generation',
+    provider,
+    model,
+    totalTokens,
+    cost,
+    latencyMs,
+    cached,
+    isExactTokenCount: isExact,
+    metadata: {
+      embeddingCount: texts.length,
+      totalCharacters,
+      dimensions,
+      tokensFromApi: tokensFromApi !== undefined,
+    },
+  })
+
+  return { totalTokens, cost }
 }
 
 /**
@@ -478,20 +562,19 @@ export async function getServiceBreakdown(): Promise<{
   byService: {
     llm: { requests: number; cost: number; tokens: number }
     voice: { requests: number; cost: number; durationSeconds: number }
-    embeddings: { requests: number; cost: number; characterCount: number }
+    embeddings: { requests: number; cost: number; tokens: number; characterCount: number }
   }
-  byProvider: Record<string, { requests: number; cost: number }>
+  byProvider: Record<string, { requests: number; cost: number; tokens: number }>
 }> {
   const now = new Date()
-  const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
   const result = {
     byService: {
       llm: { requests: 0, cost: 0, tokens: 0 },
       voice: { requests: 0, cost: 0, durationSeconds: 0 },
-      embeddings: { requests: 0, cost: 0, characterCount: 0 },
+      embeddings: { requests: 0, cost: 0, tokens: 0, characterCount: 0 },
     },
-    byProvider: {} as Record<string, { requests: number; cost: number }>,
+    byProvider: {} as Record<string, { requests: number; cost: number; tokens: number }>,
   }
 
   try {
@@ -506,14 +589,16 @@ export async function getServiceBreakdown(): Promise<{
       const event = doc.data()
       const eventType = event.eventType as UsageEventType
       const cost = event.cost || 0
+      const tokens = event.totalTokens || 0
       const provider = event.provider || 'unknown'
 
       // Aggregate by provider
       if (!result.byProvider[provider]) {
-        result.byProvider[provider] = { requests: 0, cost: 0 }
+        result.byProvider[provider] = { requests: 0, cost: 0, tokens: 0 }
       }
       result.byProvider[provider].requests++
       result.byProvider[provider].cost += cost
+      result.byProvider[provider].tokens += tokens
 
       // Aggregate by service type
       if (eventType === 'voice_transcription') {
@@ -523,12 +608,13 @@ export async function getServiceBreakdown(): Promise<{
       } else if (eventType === 'embedding_generation') {
         result.byService.embeddings.requests++
         result.byService.embeddings.cost += cost
-        result.byService.embeddings.characterCount += event.metadata?.characterCount || 0
+        result.byService.embeddings.tokens += tokens
+        result.byService.embeddings.characterCount += event.metadata?.totalCharacters || event.metadata?.characterCount || 0
       } else {
         // LLM events (chat_message, feedback_generation, etc.)
         result.byService.llm.requests++
         result.byService.llm.cost += cost
-        result.byService.llm.tokens += event.totalTokens || 0
+        result.byService.llm.tokens += tokens
       }
     }
   } catch (error) {
@@ -544,16 +630,16 @@ export async function getServiceBreakdown(): Promise<{
 export async function getUserServiceBreakdown(userId: string): Promise<{
   llm: { requests: number; tokens: number; cost: number }
   voice: { requests: number; durationSeconds: number; cost: number }
-  embeddings: { requests: number; characterCount: number; cost: number }
-  total: { requests: number; cost: number }
+  embeddings: { requests: number; tokens: number; characterCount: number; cost: number }
+  total: { requests: number; tokens: number; cost: number }
 }> {
   const summary = await getUserUsageSummary(userId)
 
   const result = {
     llm: { requests: 0, tokens: 0, cost: 0 },
     voice: { requests: 0, durationSeconds: 0, cost: 0 },
-    embeddings: { requests: 0, characterCount: 0, cost: 0 },
-    total: { requests: 0, cost: 0 },
+    embeddings: { requests: 0, tokens: 0, characterCount: 0, cost: 0 },
+    total: { requests: 0, tokens: 0, cost: 0 },
   }
 
   if (!summary) {
@@ -575,9 +661,11 @@ export async function getUserServiceBreakdown(userId: string): Promise<{
       const event = doc.data()
       const eventType = event.eventType as UsageEventType
       const cost = event.cost || 0
+      const tokens = event.totalTokens || 0
 
       result.total.requests++
       result.total.cost += cost
+      result.total.tokens += tokens
 
       if (eventType === 'voice_transcription') {
         result.voice.requests++
@@ -586,11 +674,12 @@ export async function getUserServiceBreakdown(userId: string): Promise<{
       } else if (eventType === 'embedding_generation') {
         result.embeddings.requests++
         result.embeddings.cost += cost
-        result.embeddings.characterCount += event.metadata?.characterCount || 0
+        result.embeddings.tokens += tokens
+        result.embeddings.characterCount += event.metadata?.totalCharacters || event.metadata?.characterCount || 0
       } else {
         result.llm.requests++
         result.llm.cost += cost
-        result.llm.tokens += event.totalTokens || 0
+        result.llm.tokens += tokens
       }
     }
   } catch (error) {
@@ -599,6 +688,7 @@ export async function getUserServiceBreakdown(userId: string): Promise<{
     result.llm.tokens = summary.totalTokens
     result.total.requests = summary.totalRequests
     result.total.cost = summary.totalCost
+    result.total.tokens = summary.totalTokens
   }
 
   return result
@@ -625,4 +715,390 @@ export async function logUserActivity(
   } catch (error) {
     console.error('[Activity Log] Failed to log activity:', error)
   }
+}
+
+// =============================================================================
+// ACCURATE TOKEN COUNTING HELPERS
+// =============================================================================
+
+/**
+ * Count tokens accurately using js-tiktoken
+ * Use this before tracking events to get accurate token counts
+ */
+export function countTokensAccurate(text: string): { tokens: number; isExact: boolean } {
+  const result = countTokens(text)
+  return { tokens: result.tokens, isExact: result.isExact }
+}
+
+/**
+ * Calculate accurate cost from text content
+ */
+export function calculateCostFromText(
+  inputText: string,
+  outputText: string,
+  provider: string
+): { inputTokens: number; outputTokens: number; totalTokens: number; cost: number } {
+  const input = countTokens(inputText)
+  const output = countTokens(outputText)
+  const totalTokens = input.tokens + output.tokens
+  const cost = calculateCost(input.tokens, output.tokens, provider)
+
+  return {
+    inputTokens: input.tokens,
+    outputTokens: output.tokens,
+    totalTokens,
+    cost,
+  }
+}
+
+// =============================================================================
+// GRANULAR USAGE TRACKING - BY PATTERN, SCENARIO, DIFFICULTY
+// =============================================================================
+
+export interface PatternUsage {
+  pattern: string
+  requests: number
+  tokens: number
+  cost: number
+  scenarios: string[]
+}
+
+export interface ScenarioUsage {
+  scenarioId: string
+  scenarioTitle: string
+  pattern: string
+  difficulty: string
+  requests: number
+  tokens: number
+  cost: number
+  avgTokensPerRequest: number
+}
+
+export interface GranularUsageBreakdown {
+  byPattern: Record<string, PatternUsage>
+  byDifficulty: Record<string, { requests: number; tokens: number; cost: number }>
+  byScenario: ScenarioUsage[]
+  topCostlyScenarios: ScenarioUsage[]
+  topTokenScenarios: ScenarioUsage[]
+}
+
+/**
+ * Get granular usage breakdown by pattern and scenario
+ * This powers the detailed AI Usage admin dashboard
+ */
+export async function getGranularUsageBreakdown(options?: {
+  userId?: string
+  startDate?: Date
+  endDate?: Date
+  limit?: number
+}): Promise<GranularUsageBreakdown> {
+  const now = new Date()
+  const startOfMonth = options?.startDate || new Date(now.getFullYear(), now.getMonth(), 1)
+  const limit = options?.limit || 50
+
+  const result: GranularUsageBreakdown = {
+    byPattern: {},
+    byDifficulty: {},
+    byScenario: [],
+    topCostlyScenarios: [],
+    topTokenScenarios: [],
+  }
+
+  try {
+    let query = adminDb
+      .collection('usage_events')
+      .where('createdAt', '>=', startOfMonth)
+      .orderBy('createdAt', 'desc')
+
+    if (options?.userId) {
+      query = query.where('userId', '==', options.userId)
+    }
+
+    const eventsSnapshot = await query.limit(10000).get()
+
+    // Aggregate by pattern, difficulty, and scenario
+    const scenarioMap = new Map<string, ScenarioUsage>()
+
+    for (const doc of eventsSnapshot.docs) {
+      const event = doc.data()
+      const pattern = event.pattern || event.metadata?.pattern || 'unknown'
+      const difficulty = event.difficulty || event.metadata?.difficulty || 'unknown'
+      const scenarioId = event.scenarioId || 'unknown'
+      const scenarioTitle = event.scenarioTitle || event.metadata?.scenarioTitle || scenarioId
+      const tokens = event.totalTokens || 0
+      const cost = event.cost || 0
+
+      // Aggregate by pattern
+      if (!result.byPattern[pattern]) {
+        result.byPattern[pattern] = {
+          pattern,
+          requests: 0,
+          tokens: 0,
+          cost: 0,
+          scenarios: [],
+        }
+      }
+      result.byPattern[pattern].requests++
+      result.byPattern[pattern].tokens += tokens
+      result.byPattern[pattern].cost += cost
+      if (scenarioId !== 'unknown' && !result.byPattern[pattern].scenarios.includes(scenarioId)) {
+        result.byPattern[pattern].scenarios.push(scenarioId)
+      }
+
+      // Aggregate by difficulty
+      if (!result.byDifficulty[difficulty]) {
+        result.byDifficulty[difficulty] = { requests: 0, tokens: 0, cost: 0 }
+      }
+      result.byDifficulty[difficulty].requests++
+      result.byDifficulty[difficulty].tokens += tokens
+      result.byDifficulty[difficulty].cost += cost
+
+      // Aggregate by scenario
+      const key = scenarioId
+      if (!scenarioMap.has(key)) {
+        scenarioMap.set(key, {
+          scenarioId,
+          scenarioTitle,
+          pattern,
+          difficulty,
+          requests: 0,
+          tokens: 0,
+          cost: 0,
+          avgTokensPerRequest: 0,
+        })
+      }
+      const scenario = scenarioMap.get(key)!
+      scenario.requests++
+      scenario.tokens += tokens
+      scenario.cost += cost
+    }
+
+    // Convert scenario map to array and calculate averages
+    result.byScenario = Array.from(scenarioMap.values()).map(s => ({
+      ...s,
+      avgTokensPerRequest: s.requests > 0 ? Math.round(s.tokens / s.requests) : 0,
+    }))
+
+    // Get top costly scenarios
+    result.topCostlyScenarios = [...result.byScenario]
+      .sort((a, b) => b.cost - a.cost)
+      .slice(0, limit)
+
+    // Get top token-heavy scenarios
+    result.topTokenScenarios = [...result.byScenario]
+      .sort((a, b) => b.tokens - a.tokens)
+      .slice(0, limit)
+
+  } catch (error) {
+    console.error('[Usage Tracking] Failed to get granular breakdown:', error)
+  }
+
+  return result
+}
+
+/**
+ * Get per-session usage breakdown
+ */
+export async function getSessionUsageBreakdown(sessionId: string): Promise<{
+  totalTokens: number
+  totalCost: number
+  events: Array<{
+    eventType: string
+    tokens: number
+    cost: number
+    provider: string
+    timestamp: Date
+  }>
+}> {
+  const result = {
+    totalTokens: 0,
+    totalCost: 0,
+    events: [] as Array<{
+      eventType: string
+      tokens: number
+      cost: number
+      provider: string
+      timestamp: Date
+    }>,
+  }
+
+  try {
+    const eventsSnapshot = await adminDb
+      .collection('usage_events')
+      .where('sessionId', '==', sessionId)
+      .orderBy('createdAt', 'asc')
+      .get()
+
+    for (const doc of eventsSnapshot.docs) {
+      const event = doc.data()
+      const tokens = event.totalTokens || 0
+      const cost = event.cost || 0
+
+      result.totalTokens += tokens
+      result.totalCost += cost
+      result.events.push({
+        eventType: event.eventType,
+        tokens,
+        cost,
+        provider: event.provider || 'unknown',
+        timestamp: event.createdAt?.toDate() || new Date(),
+      })
+    }
+  } catch (error) {
+    console.error('[Usage Tracking] Failed to get session breakdown:', error)
+  }
+
+  return result
+}
+
+/**
+ * Get daily usage trends for the admin dashboard
+ */
+export async function getDailyUsageTrends(days: number = 30): Promise<{
+  daily: Array<{
+    date: string
+    requests: number
+    tokens: number
+    cost: number
+    uniqueUsers: number
+  }>
+  totals: { requests: number; tokens: number; cost: number; uniqueUsers: number }
+}> {
+  const startDate = new Date()
+  startDate.setDate(startDate.getDate() - days)
+  startDate.setHours(0, 0, 0, 0)
+
+  const result = {
+    daily: [] as Array<{
+      date: string
+      requests: number
+      tokens: number
+      cost: number
+      uniqueUsers: number
+    }>,
+    totals: { requests: 0, tokens: 0, cost: 0, uniqueUsers: 0 },
+  }
+
+  try {
+    const eventsSnapshot = await adminDb
+      .collection('usage_events')
+      .where('createdAt', '>=', startDate)
+      .orderBy('createdAt', 'asc')
+      .get()
+
+    const dailyMap = new Map<string, {
+      requests: number
+      tokens: number
+      cost: number
+      users: Set<string>
+    }>()
+
+    const allUsers = new Set<string>()
+
+    for (const doc of eventsSnapshot.docs) {
+      const event = doc.data()
+      const date = event.createdAt?.toDate()?.toISOString().split('T')[0] || 'unknown'
+      const tokens = event.totalTokens || 0
+      const cost = event.cost || 0
+      const userId = event.userId
+
+      if (!dailyMap.has(date)) {
+        dailyMap.set(date, { requests: 0, tokens: 0, cost: 0, users: new Set() })
+      }
+
+      const day = dailyMap.get(date)!
+      day.requests++
+      day.tokens += tokens
+      day.cost += cost
+      day.users.add(userId)
+      allUsers.add(userId)
+
+      result.totals.requests++
+      result.totals.tokens += tokens
+      result.totals.cost += cost
+    }
+
+    result.totals.uniqueUsers = allUsers.size
+
+    // Convert to array sorted by date
+    result.daily = Array.from(dailyMap.entries())
+      .map(([date, data]) => ({
+        date,
+        requests: data.requests,
+        tokens: data.tokens,
+        cost: data.cost,
+        uniqueUsers: data.users.size,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+
+  } catch (error) {
+    console.error('[Usage Tracking] Failed to get daily trends:', error)
+  }
+
+  return result
+}
+
+/**
+ * Track LLM usage with accurate token counting
+ * Enhanced version that includes pattern/scenario context
+ */
+export async function trackLLMUsageAccurate(params: {
+  userId: string
+  inputText: string
+  outputText: string
+  provider: string
+  model?: string
+  eventType?: UsageEventType
+  sessionId?: string
+  scenarioId?: string
+  scenarioTitle?: string
+  pattern?: string
+  difficulty?: string
+  latencyMs?: number
+  cached?: boolean
+}): Promise<void> {
+  const {
+    userId,
+    inputText,
+    outputText,
+    provider,
+    model,
+    eventType = 'chat_message',
+    sessionId,
+    scenarioId,
+    scenarioTitle,
+    pattern,
+    difficulty,
+    latencyMs,
+    cached = false,
+  } = params
+
+  // Calculate accurate tokens
+  const inputCount = countTokens(inputText)
+  const outputCount = countTokens(outputText)
+  const totalTokens = inputCount.tokens + outputCount.tokens
+  const cost = calculateCost(inputCount.tokens, outputCount.tokens, provider)
+
+  await trackUsageEvent({
+    userId,
+    eventType,
+    provider,
+    model,
+    inputTokens: inputCount.tokens,
+    outputTokens: outputCount.tokens,
+    totalTokens,
+    cost,
+    latencyMs,
+    cached,
+    sessionId,
+    scenarioId,
+    pattern,
+    difficulty,
+    isExactTokenCount: inputCount.isExact && outputCount.isExact,
+    metadata: {
+      scenarioTitle,
+      inputCharacters: inputText.length,
+      outputCharacters: outputText.length,
+    },
+  })
 }

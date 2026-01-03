@@ -17,15 +17,54 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Cpu, DollarSign, Zap, Database, RefreshCw, Users, Mic, Code, MessageSquare, Trash2, Settings, CheckCircle, AlertCircle } from "lucide-react"
+import {
+  Cpu,
+  DollarSign,
+  Zap,
+  Database,
+  RefreshCw,
+  Users,
+  Mic,
+  Code,
+  MessageSquare,
+  Trash2,
+  Settings,
+  CheckCircle,
+  AlertCircle,
+  TrendingUp,
+  Hash,
+  BarChart3,
+  Target,
+} from "lucide-react"
 import { getProviderCostInfo, AI_BUDGET_CAPS } from "@/lib/pricing"
+
+interface PatternUsage {
+  pattern: string
+  requests: number
+  tokens: number
+  cost: number
+  scenarios: string[]
+}
+
+interface ScenarioUsage {
+  scenarioId: string
+  scenarioTitle: string
+  pattern: string
+  difficulty: string
+  requests: number
+  tokens: number
+  cost: number
+  avgTokensPerRequest: number
+}
 
 interface AIUsageData {
   overview: {
     totalUsers: number
     totalCost: number
     totalRequests: number
+    totalTokens: number
     averageCostPerUser: number
+    averageTokensPerRequest: number
   }
   cache: {
     memoryCacheSize: number
@@ -43,9 +82,19 @@ interface AIUsageData {
   services?: {
     llm: { requests: number; cost: number; tokens: number }
     voice: { requests: number; cost: number; durationSeconds: number }
-    embeddings: { requests: number; cost: number; characterCount: number }
+    embeddings: { requests: number; cost: number; tokens: number; characterCount: number }
   }
-  providers?: Record<string, { requests: number; cost: number }>
+  providers?: Record<string, { requests: number; cost: number; tokens: number }>
+  granular?: {
+    byPattern: Record<string, PatternUsage>
+    byDifficulty: Record<string, { requests: number; tokens: number; cost: number }>
+    topCostlyScenarios: ScenarioUsage[]
+    topTokenScenarios: ScenarioUsage[]
+  }
+  trends?: {
+    daily: Array<{ date: string; requests: number; tokens: number; cost: number; uniqueUsers: number }>
+    totals: { requests: number; tokens: number; cost: number; uniqueUsers: number }
+  }
 }
 
 export default function AIUsagePage() {
@@ -112,7 +161,6 @@ export default function AIUsagePage() {
       if (response.ok && data.success) {
         setCacheCleared(true)
         setActionSuccess("AI cache cleared successfully")
-        // Reload data to show updated cache stats
         await loadData()
         setTimeout(() => {
           setCacheCleared(false)
@@ -164,7 +212,6 @@ export default function AIUsagePage() {
         setBudgetDialogOpen(false)
         setSelectedUser(null)
         setNewBudget("")
-        // Reload data
         await loadData()
         setTimeout(() => setActionSuccess(null), 3000)
       } else {
@@ -176,6 +223,12 @@ export default function AIUsagePage() {
     } finally {
       setSettingBudget(false)
     }
+  }
+
+  const formatTokens = (tokens: number) => {
+    if (tokens >= 1000000) return `${(tokens / 1000000).toFixed(2)}M`
+    if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}K`
+    return tokens.toString()
   }
 
   if (loading) {
@@ -192,7 +245,7 @@ export default function AIUsagePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-heading font-bold text-white">AI Usage</h1>
-          <p className="text-gray-400 mt-1">AI API costs and usage tracking</p>
+          <p className="text-gray-400 mt-1">Accurate token tracking and cost analytics</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -243,7 +296,7 @@ export default function AIUsagePage() {
       {/* Key Metrics */}
       {aiUsage && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
             <MetricCard
               title="Total AI Cost"
               value={`$${aiUsage.overview.totalCost.toFixed(4)}`}
@@ -253,24 +306,175 @@ export default function AIUsagePage() {
               iconColor="text-green-400"
             />
             <MetricCard
+              title="Total Tokens"
+              value={formatTokens(aiUsage.overview.totalTokens || 0)}
+              subtitle="Accurate count"
+              icon={Hash}
+              iconColor="text-blue-400"
+            />
+            <MetricCard
               title="AI Requests"
               value={aiUsage.overview.totalRequests}
               icon={Zap}
             />
             <MetricCard
-              title="Cache Entries"
-              value={aiUsage.cache.memoryCacheSize}
-              icon={Database}
-              iconColor="text-purple-400"
+              title="Avg Tokens/Request"
+              value={aiUsage.overview.averageTokensPerRequest || 0}
+              icon={TrendingUp}
+              iconColor="text-yellow-400"
             />
             <MetricCard
               title="Cache Hits"
               value={aiUsage.cache.memoryHits}
-              subtitle="Requests served from cache"
-              icon={Cpu}
-              iconColor="text-[#00d9ff]"
+              subtitle={`${aiUsage.cache.memoryCacheSize} cached`}
+              icon={Database}
+              iconColor="text-purple-400"
             />
           </div>
+
+          {/* Usage by Pattern - NEW */}
+          {aiUsage.granular && Object.keys(aiUsage.granular.byPattern).length > 0 && (
+            <Card className="bg-gray-900/50 border-gray-800">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Target className="h-5 w-5 text-[#00d9ff]" />
+                  Usage by DSA Pattern
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Token and cost breakdown by algorithm pattern
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Object.entries(aiUsage.granular.byPattern)
+                    .sort((a, b) => b[1].cost - a[1].cost)
+                    .slice(0, 9)
+                    .map(([pattern, data]) => (
+                      <div key={pattern} className="p-4 bg-gray-800/50 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-white font-medium capitalize">
+                            {pattern.replace(/-/g, ' ')}
+                          </span>
+                          <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30">
+                            {data.scenarios.length} problems
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-sm">
+                          <div>
+                            <span className="text-gray-500 block">Requests</span>
+                            <span className="text-white font-mono">{data.requests}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 block">Tokens</span>
+                            <span className="text-white font-mono">{formatTokens(data.tokens)}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 block">Cost</span>
+                            <span className="text-green-400 font-mono">${data.cost.toFixed(4)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Usage by Difficulty - NEW */}
+          {aiUsage.granular && Object.keys(aiUsage.granular.byDifficulty).length > 0 && (
+            <Card className="bg-gray-900/50 border-gray-800">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-[#00d9ff]" />
+                  Usage by Difficulty
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {['easy', 'medium', 'hard'].map((diff) => {
+                    const data = aiUsage.granular?.byDifficulty[diff]
+                    if (!data) return null
+                    return (
+                      <div key={diff} className="p-4 bg-gray-800/50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Badge className={
+                            diff === 'easy' ? 'bg-green-600/20 text-green-400 border-green-600/30' :
+                            diff === 'medium' ? 'bg-yellow-600/20 text-yellow-400 border-yellow-600/30' :
+                            'bg-red-600/20 text-red-400 border-red-600/30'
+                          }>
+                            {diff.toUpperCase()}
+                          </Badge>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-gray-400 text-sm">Requests</span>
+                            <span className="text-white font-mono">{data.requests}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400 text-sm">Tokens</span>
+                            <span className="text-white font-mono">{formatTokens(data.tokens)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400 text-sm">Cost</span>
+                            <span className="text-green-400 font-mono">${data.cost.toFixed(4)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Top Token-Heavy Scenarios - NEW */}
+          {aiUsage.granular?.topTokenScenarios && aiUsage.granular.topTokenScenarios.length > 0 && (
+            <Card className="bg-gray-900/50 border-gray-800">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Hash className="h-5 w-5 text-[#00d9ff]" />
+                  Most Token-Heavy Problems
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Problems consuming the most tokens - useful for optimization
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {aiUsage.granular.topTokenScenarios.slice(0, 5).map((scenario, idx) => (
+                    <div
+                      key={scenario.scenarioId}
+                      className="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-gray-500 font-mono w-6">#{idx + 1}</span>
+                        <div>
+                          <span className="text-white text-sm block">{scenario.scenarioTitle}</span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline" className="text-xs text-gray-400 border-gray-700">
+                              {scenario.pattern}
+                            </Badge>
+                            <Badge className={
+                              scenario.difficulty === 'easy' ? 'bg-green-600/20 text-green-400 text-xs' :
+                              scenario.difficulty === 'medium' ? 'bg-yellow-600/20 text-yellow-400 text-xs' :
+                              'bg-red-600/20 text-red-400 text-xs'
+                            }>
+                              {scenario.difficulty}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[#00d9ff] font-mono block">{formatTokens(scenario.tokens)} tokens</span>
+                        <span className="text-gray-500 text-xs">{scenario.requests} requests</span>
+                        <span className="text-gray-500 text-xs"> | avg {scenario.avgTokensPerRequest}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Service Breakdown */}
           {aiUsage.services && (
@@ -296,7 +500,7 @@ export default function AIUsagePage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400 text-sm">Tokens</span>
-                        <span className="text-white font-mono">{aiUsage.services.llm.tokens.toLocaleString()}</span>
+                        <span className="text-white font-mono">{formatTokens(aiUsage.services.llm.tokens)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400 text-sm">Cost</span>
@@ -339,8 +543,12 @@ export default function AIUsagePage() {
                         <span className="text-white font-mono">{aiUsage.services.embeddings.requests.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
+                        <span className="text-gray-400 text-sm">Tokens</span>
+                        <span className="text-white font-mono">{formatTokens(aiUsage.services.embeddings.tokens || 0)}</span>
+                      </div>
+                      <div className="flex justify-between">
                         <span className="text-gray-400 text-sm">Characters</span>
-                        <span className="text-white font-mono">{Math.round(aiUsage.services.embeddings.characterCount / 1000)}K</span>
+                        <span className="text-gray-500 font-mono text-xs">{Math.round(aiUsage.services.embeddings.characterCount / 1000)}K</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400 text-sm">Cost</span>
@@ -458,6 +666,9 @@ export default function AIUsagePage() {
             <Cpu className="h-5 w-5 text-[#00d9ff]" />
             AI Provider Costs
           </CardTitle>
+          <CardDescription className="text-gray-400">
+            Current pricing per 1K tokens (updated Dec 2025)
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -485,7 +696,7 @@ export default function AIUsagePage() {
               This will clear all cached AI responses. This action is useful when:
               <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
                 <li>AI responses seem stale or outdated</li>
-                <li>You've updated prompts or system instructions</li>
+                <li>You&apos;ve updated prompts or system instructions</li>
                 <li>You want to force fresh responses for testing</li>
               </ul>
               <br />
