@@ -170,6 +170,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
   }
 
+  // SECURITY: Replay attack protection - reject events older than 5 minutes
+  // Stripe events have a 'created' timestamp (Unix seconds)
+  const eventAge = Date.now() / 1000 - event.created
+  const MAX_EVENT_AGE_SECONDS = 300 // 5 minutes
+
+  if (eventAge > MAX_EVENT_AGE_SECONDS) {
+    paymentLogger.warn("Webhook event too old, possible replay attack", {
+      eventId: event.id,
+      eventType: event.type,
+      eventCreated: event.created,
+      eventAgeSeconds: Math.round(eventAge),
+      maxAgeSeconds: MAX_EVENT_AGE_SECONDS
+    })
+    return NextResponse.json({ error: "Event too old" }, { status: 400 })
+  }
+
   // Check for idempotency - prevent processing the same event twice
   // Use event.id + idempotency_key if available for more robust deduplication
   const idempotencyKey = event.request?.idempotency_key

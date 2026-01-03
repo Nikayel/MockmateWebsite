@@ -24,10 +24,11 @@ const RATE_LIMIT_WINDOW = 60 * 1000 // 1 minute
 const RATE_LIMIT_MAX_DELETIONS = 5 // Max 5 deletions per minute per admin
 
 // Protected emails that cannot be deleted via API
-const PROTECTED_EMAILS = [
-  "alinikayeljamal@gmail.com",
-  "nikayeeljamaljan@gmail.com",
-]
+// SECURITY: Load from environment variable instead of hardcoding in source
+const PROTECTED_EMAILS = (process.env.ADMIN_PROTECTED_EMAILS || '')
+  .split(',')
+  .map(email => email.trim().toLowerCase())
+  .filter(email => email.length > 0)
 
 function checkRateLimit(adminId: string): { allowed: boolean; retryAfter?: number } {
   const now = Date.now()
