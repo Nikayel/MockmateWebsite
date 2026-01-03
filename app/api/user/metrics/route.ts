@@ -9,9 +9,105 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { adminAuth } from '@/lib/firebase-admin'
+import { adminAuth, adminDb } from '@/lib/firebase-admin'
 import { getUserStats, getRecentSessions, getPerformanceTrends } from '@/lib/session-metrics'
 import { getUserUsageSummary } from '@/lib/usage-tracking'
+
+/**
+ * Fallback: Get stats directly from interview_sessions if user_stats is empty
+ * This handles cases where sessions were completed but user_stats wasn't populated
+ */
+async function getStatsFromInterviewSessions(userId: string): Promise<{
+  totalSessions: number
+  totalPracticeMinutes: number
+  averageScore: number
+  patternStats: Record<string, { sessions: number; averageScore: number; bestScore: number }>
+  difficultyStats: Record<string, { sessions: number; averageScore: number }>
+  lastSessionAt?: string
+} | null> {
+  try {
+    const snapshot = await adminDb
+      .collection('interview_sessions')
+      .where('user_id', '==', userId)
+      .where('completed_at', '!=', null)
+      .get()
+
+    if (snapshot.empty) return null
+
+    const sessions = snapshot.docs.map(doc => doc.data())
+
+    // Aggregate stats
+    let totalPracticeMinutes = 0
+    let totalScore = 0
+    let scoredSessions = 0
+    let lastSessionAt: string | undefined
+    const patternStats: Record<string, { sessions: number; totalScore: number; averageScore: number; bestScore: number }> = {}
+    const difficultyStats: Record<string, { sessions: number; totalScore: number; averageScore: number }> = {}
+
+    for (const session of sessions) {
+      // Calculate duration
+      if (session.started_at && session.completed_at) {
+        const start = new Date(session.started_at).getTime()
+        const end = new Date(session.completed_at).getTime()
+        totalPracticeMinutes += Math.round((end - start) / 60000)
+      }
+
+      // Track score if available
+      if (session.performance_score !== undefined && session.performance_score !== null) {
+        totalScore += session.performance_score
+        scoredSessions++
+      }
+
+      // Track last session
+      if (!lastSessionAt || session.completed_at > lastSessionAt) {
+        lastSessionAt = session.completed_at
+      }
+
+      // Pattern stats
+      const pattern = session.pattern || 'unknown'
+      if (!patternStats[pattern]) {
+        patternStats[pattern] = { sessions: 0, totalScore: 0, averageScore: 0, bestScore: 0 }
+      }
+      patternStats[pattern].sessions++
+      if (session.performance_score !== undefined) {
+        patternStats[pattern].totalScore += session.performance_score
+        patternStats[pattern].bestScore = Math.max(patternStats[pattern].bestScore, session.performance_score)
+      }
+
+      // Difficulty stats
+      const difficulty = session.difficulty || 'medium'
+      if (!difficultyStats[difficulty]) {
+        difficultyStats[difficulty] = { sessions: 0, totalScore: 0, averageScore: 0 }
+      }
+      difficultyStats[difficulty].sessions++
+      if (session.performance_score !== undefined) {
+        difficultyStats[difficulty].totalScore += session.performance_score
+      }
+    }
+
+    // Calculate averages
+    for (const pattern of Object.keys(patternStats)) {
+      const p = patternStats[pattern]
+      p.averageScore = p.sessions > 0 ? Math.round(p.totalScore / p.sessions) : 0
+    }
+    for (const diff of Object.keys(difficultyStats)) {
+      const d = difficultyStats[diff]
+      d.averageScore = d.sessions > 0 ? Math.round(d.totalScore / d.sessions) : 0
+    }
+
+    return {
+      totalSessions: sessions.length,
+      totalPracticeMinutes,
+      averageScore: scoredSessions > 0 ? Math.round(totalScore / scoredSessions) : 0,
+      patternStats,
+      difficultyStats,
+      lastSessionAt,
+    }
+  } catch (error) {
+    console.error('[User Metrics API] Fallback stats error:', error)
+    return null
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,18 +133,27 @@ export async function GET(request: NextRequest) {
       getUserUsageSummary(userId),
     ])
 
+    // Fallback: if user_stats is empty, try to get stats from interview_sessions directly
+    let finalStats = stats
+    if (!stats || stats.totalSessions === 0) {
+      const fallbackStats = await getStatsFromInterviewSessions(userId)
+      if (fallbackStats && fallbackStats.totalSessions > 0) {
+        finalStats = fallbackStats
+      }
+    }
+
     // Build response
     const response = {
       success: true,
       data: {
         overview: {
-          totalSessions: stats?.totalSessions || 0,
-          totalPracticeMinutes: stats?.totalPracticeMinutes || 0,
-          totalPracticeHours: Math.round((stats?.totalPracticeMinutes || 0) / 6) / 10, // 1 decimal place
-          averageScore: stats?.averageScore || 0,
-          lastSessionAt: stats?.lastSessionAt || null,
+          totalSessions: finalStats?.totalSessions || 0,
+          totalPracticeMinutes: finalStats?.totalPracticeMinutes || 0,
+          totalPracticeHours: Math.round((finalStats?.totalPracticeMinutes || 0) / 6) / 10, // 1 decimal place
+          averageScore: finalStats?.averageScore || 0,
+          lastSessionAt: finalStats?.lastSessionAt || null,
         },
-        patterns: Object.entries(stats?.patternStats || {}).map(([pattern, data]) => ({
+        patterns: Object.entries(finalStats?.patternStats || {}).map(([pattern, data]) => ({
           pattern,
           displayName: formatPatternName(pattern),
           sessions: data.sessions,
@@ -56,7 +161,7 @@ export async function GET(request: NextRequest) {
           bestScore: data.bestScore,
           proficiency: getProficiencyLevel(data.averageScore),
         })).sort((a, b) => b.sessions - a.sessions),
-        difficulty: Object.entries(stats?.difficultyStats || {}).map(([difficulty, data]) => ({
+        difficulty: Object.entries(finalStats?.difficultyStats || {}).map(([difficulty, data]) => ({
           difficulty,
           sessions: data.sessions,
           averageScore: data.averageScore,
@@ -76,7 +181,26 @@ export async function GET(request: NextRequest) {
           durationMinutes: session.durationMinutes,
           completedAt: session.completedAt,
           feedback: session.feedback?.level || 'average',
+          scoreBreakdown: session.scoreBreakdown ? {
+            codeQuality: session.scoreBreakdown.codeQualityScore,
+            problemSolving: session.scoreBreakdown.problemSolvingScore,
+            understanding: session.scoreBreakdown.understandingScore,
+            communication: session.scoreBreakdown.communicationScore,
+          } : null,
         })),
+        // Aggregate score breakdown from recent sessions
+        scoreBreakdown: recentSessions.length > 0 ? (() => {
+          const sessionsWithBreakdown = recentSessions.filter(s => s.scoreBreakdown)
+          if (sessionsWithBreakdown.length === 0) return null
+
+          const avg = (arr: number[]) => arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0
+          return {
+            codeQuality: avg(sessionsWithBreakdown.map(s => s.scoreBreakdown?.codeQualityScore || 0)),
+            problemSolving: avg(sessionsWithBreakdown.map(s => s.scoreBreakdown?.problemSolvingScore || 0)),
+            understanding: avg(sessionsWithBreakdown.map(s => s.scoreBreakdown?.understandingScore || 0)),
+            communication: avg(sessionsWithBreakdown.map(s => s.scoreBreakdown?.communicationScore || 0)),
+          }
+        })() : null,
         usage: usageSummary ? {
           totalCost: usageSummary.totalCost,
           totalRequests: usageSummary.totalRequests,
