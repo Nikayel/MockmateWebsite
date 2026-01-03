@@ -153,28 +153,58 @@ async function getMisconceptionsSummary(userId: string) {
 
 /**
  * Get recent sessions for a user
+ * Queries from users/{userId}/session_summaries which is where session data is stored
  */
 async function getRecentSessionsForUser(userId: string) {
   try {
-    const sessionsSnap = await adminDb
-      .collection("sessions")
-      .where("userId", "==", userId)
-      .orderBy("timestamp", "desc")
+    // First try the session_summaries subcollection (primary source)
+    const summariesSnap = await adminDb
+      .collection("users")
+      .doc(userId)
+      .collection("session_summaries")
+      .orderBy("completedAt", "desc")
       .limit(10)
       .get()
 
-    return sessionsSnap.docs.map(doc => {
+    if (summariesSnap.docs.length > 0) {
+      return summariesSnap.docs.map(doc => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          problemId: data.scenarioId || doc.id,
+          problemTitle: data.scenarioId, // Title stored in scenario ID for summaries
+          pattern: data.pattern,
+          difficulty: data.difficulty,
+          performance: data.performanceScore,
+          duration: data.durationMinutes,
+          completed: true,
+          timestamp: data.completedAt,
+        }
+      })
+    }
+
+    // Fallback: Try session_metrics collection
+    const metricsSnap = await adminDb
+      .collection("session_metrics")
+      .where("userId", "==", userId)
+      .orderBy("startedAt", "desc")
+      .limit(10)
+      .get()
+
+    return metricsSnap.docs.map(doc => {
       const data = doc.data()
       return {
         id: doc.id,
-        problemId: data.problemId,
-        problemTitle: data.problemTitle,
+        problemId: data.scenarioId,
+        problemTitle: data.scenarioTitle,
         pattern: data.pattern,
         difficulty: data.difficulty,
-        performance: data.performance,
-        duration: data.duration,
-        completed: data.completed,
-        timestamp: data.timestamp?.toDate?.() || data.timestamp,
+        performance: data.performanceScore,
+        duration: data.completedAt ? Math.round(
+          (new Date(data.completedAt).getTime() - new Date(data.startedAt).getTime()) / 60000
+        ) : undefined,
+        completed: !!data.completedAt,
+        timestamp: data.completedAt || data.startedAt,
       }
     })
   } catch (error) {
@@ -185,25 +215,80 @@ async function getRecentSessionsForUser(userId: string) {
 
 /**
  * Get learning state for a user
+ * Aggregates data from:
+ * - user_learning_state: streak, topics, last activity
+ * - user_problem_mastery: problem-level mastery
+ * - user_stats: aggregate session stats
  */
 async function getLearningStateForUser(userId: string) {
   try {
-    const learningDoc = await adminDb.collection("user_learning_state").doc(userId).get()
+    // Fetch data from all relevant sources in parallel
+    const [learningDoc, statsDoc, masterySnap] = await Promise.all([
+      adminDb.collection("user_learning_state").doc(userId).get(),
+      adminDb.collection("user_stats").doc(userId).get(),
+      adminDb.collection("user_problem_mastery").doc(userId).collection("problems").get(),
+    ])
 
-    if (!learningDoc.exists) {
-      return null
-    }
+    const learningData = learningDoc.exists ? learningDoc.data() : null
+    const statsData = statsDoc.exists ? statsDoc.data() : null
+    const masteryDocs = masterySnap.docs
 
-    const data = learningDoc.data()
+    // Calculate pattern progress from problem mastery
+    const patternProgress: Record<string, number> = {}
+    const patternCounts: Record<string, { total: number; mastered: number }> = {}
+    let totalSolved = 0
+    let totalScore = 0
+
+    masteryDocs.forEach(doc => {
+      const data = doc.data()
+      const pattern = data.pattern || 'unknown'
+
+      if (!patternCounts[pattern]) {
+        patternCounts[pattern] = { total: 0, mastered: 0 }
+      }
+      patternCounts[pattern].total++
+
+      if (data.mastery_level === 'mastered' || data.mastery_level === 'reviewing') {
+        patternCounts[pattern].mastered++
+        totalSolved++
+      }
+
+      if (data.last_score) {
+        totalScore += data.last_score
+      }
+    })
+
+    // Calculate pattern progress percentages
+    Object.entries(patternCounts).forEach(([pattern, counts]) => {
+      patternProgress[pattern] = Math.round((counts.mastered / counts.total) * 100)
+    })
+
+    // Get patterns that are "completed" (70%+ mastery)
+    const patternsCompleted = Object.entries(patternProgress)
+      .filter(([, progress]) => progress >= 70)
+      .map(([pattern]) => pattern)
+
+    // Determine current pattern (most recent topic from learning state)
+    const topics = learningData?.topics || {}
+    const topicEntries = Object.entries(topics)
+    const mostRecent = topicEntries.length > 0
+      ? topicEntries.sort((a: any, b: any) =>
+          new Date(b[1].last_practiced_at || 0).getTime() - new Date(a[1].last_practiced_at || 0).getTime()
+        )[0]
+      : null
+    const currentPattern = mostRecent ? (mostRecent[1] as any).pattern : null
+
     return {
-      currentPattern: data?.currentPattern,
-      patternsCompleted: data?.patternsCompleted || [],
-      totalProblemsAttempted: data?.totalProblemsAttempted || 0,
-      totalProblemsSolved: data?.totalProblemsSolved || 0,
-      averagePerformance: data?.averagePerformance || 0,
-      studyStreak: data?.studyStreak || 0,
-      lastActive: data?.lastActive?.toDate?.() || data?.lastActive,
-      patternProgress: data?.patternProgress || {},
+      currentPattern,
+      patternsCompleted,
+      totalProblemsAttempted: masteryDocs.length || statsData?.totalSessions || 0,
+      totalProblemsSolved: totalSolved,
+      averagePerformance: masteryDocs.length > 0
+        ? Math.round(totalScore / masteryDocs.length)
+        : (statsData?.averageScore || 0),
+      studyStreak: learningData?.streak_days || 0,
+      lastActive: learningData?.last_session_at || statsData?.lastSessionAt,
+      patternProgress,
     }
   } catch (error) {
     logger.error("Error fetching learning state for admin", { error, userId })
