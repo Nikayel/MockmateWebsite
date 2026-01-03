@@ -184,6 +184,17 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      case 'backfill-research': {
+        // Backfill research data from existing problem mastery and session summaries
+        // This populates algorithm_research_metrics for users who practiced before tracking was added
+        const result = await backfillResearchData()
+        return NextResponse.json({
+          success: true,
+          message: `Backfilled research data for ${result.usersProcessed} users (${result.researchSummariesCreated} research summaries, ${result.userStatsUpdated} user_stats)`,
+          data: result,
+        })
+      }
+
       default:
         return NextResponse.json(
           { success: false, error: `Unknown action: ${action}` },
@@ -200,6 +211,226 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+/**
+ * Backfill research data from existing problem mastery and session summaries
+ * This creates algorithm_research_metrics/summary documents for users who practiced
+ * before research tracking was added, and updates user_stats if missing
+ */
+async function backfillResearchData(): Promise<{
+  usersProcessed: number
+  researchSummariesCreated: number
+  userStatsUpdated: number
+  errors: string[]
+}> {
+  const result = {
+    usersProcessed: 0,
+    researchSummariesCreated: 0,
+    userStatsUpdated: 0,
+    errors: [] as string[],
+  }
+
+  try {
+    // Get all user profiles
+    const profilesSnap = await adminDb.collection('profiles').get()
+    const userIds = profilesSnap.docs.map(doc => doc.id)
+
+    for (const userId of userIds) {
+      try {
+        result.usersProcessed++
+
+        // Get user's algorithm assignment
+        const profileData = profilesSnap.docs.find(d => d.id === userId)?.data()
+        const algorithm = (profileData?.spaced_repetition_algorithm || 'sm2') as 'sm2' | 'fsrs'
+
+        // Check if research summary already exists
+        const existingSummary = await adminDb
+          .collection('algorithm_research_metrics')
+          .doc(userId)
+          .collection('summary')
+          .doc('current')
+          .get()
+
+        // Get problem mastery data
+        const masterySnap = await adminDb
+          .collection('user_problem_mastery')
+          .doc(userId)
+          .collection('problems')
+          .get()
+
+        // Get session summaries
+        const sessionsSnap = await adminDb
+          .collection('users')
+          .doc(userId)
+          .collection('session_summaries')
+          .orderBy('completedAt', 'desc')
+          .limit(100)
+          .get()
+
+        const sessions = sessionsSnap.docs.map(d => d.data())
+        const masteryDocs = masterySnap.docs.map(d => d.data())
+
+        // Skip if no data to backfill
+        if (sessions.length === 0 && masteryDocs.length === 0) {
+          continue
+        }
+
+        // Create research summary if it doesn't exist
+        if (!existingSummary.exists && (sessions.length > 0 || masteryDocs.length > 0)) {
+          const totalReviews = masteryDocs.reduce((sum, m) => sum + (m.review_count || 1), 0)
+          const totalScore = sessions.reduce((sum, s) => sum + (s.performanceScore || 0), 0)
+          const avgScore = sessions.length > 0 ? Math.round(totalScore / sessions.length) : 0
+          const retainedCount = sessions.filter(s => (s.performanceScore || 0) >= 56).length
+          const retentionRate = sessions.length > 0 ? Math.round((retainedCount / sessions.length) * 100) : 0
+          const problemsMastered = masteryDocs.filter(m =>
+            m.mastery_level === 'mastered' || m.mastery_level === 'reviewing'
+          ).length
+
+          const totalMinutes = sessions.reduce((sum, s) => sum + (s.durationMinutes || 0), 0)
+
+          // Get first and last review dates
+          const sortedSessions = [...sessions].sort((a, b) =>
+            new Date(a.completedAt || 0).getTime() - new Date(b.completedAt || 0).getTime()
+          )
+          const firstReview = sortedSessions[0]?.completedAt || new Date().toISOString()
+          const lastReview = sortedSessions[sortedSessions.length - 1]?.completedAt || new Date().toISOString()
+
+          const now = new Date().toISOString()
+          const researchSummary = {
+            user_id: userId,
+            algorithm,
+            algorithm_assigned_at: profileData?.created_at || now,
+            algorithm_user_overridden: false,
+            total_reviews: totalReviews,
+            total_problems_seen: masteryDocs.length || sessions.length,
+            total_time_spent_minutes: totalMinutes,
+            total_days_active: new Set(sessions.map(s =>
+              s.completedAt?.split('T')[0]
+            ).filter(Boolean)).size || 1,
+            lifetime_average_score: avgScore,
+            lifetime_retention_rate: retentionRate,
+            lifetime_lapse_rate: 100 - retentionRate,
+            problems_mastered: problemsMastered,
+            problems_learning: masteryDocs.length - problemsMastered,
+            problems_struggling: 0,
+            average_time_to_mastery_days: 7, // Default estimate
+            longest_streak: profileData?.longest_streak_days || 1,
+            current_streak: profileData?.streak_days || 0,
+            average_daily_reviews: totalReviews / Math.max(1, new Set(sessions.map(s =>
+              s.completedAt?.split('T')[0]
+            ).filter(Boolean)).size),
+            average_session_length_minutes: sessions.length > 0 ? Math.round(totalMinutes / sessions.length) : 0,
+            weekly_averages: [],
+            average_interval_accuracy: 50, // Default estimate
+            interval_distribution: {
+              '1-3_days': 0,
+              '4-7_days': 0,
+              '8-14_days': 0,
+              '15-30_days': 0,
+              '31-60_days': 0,
+              '60+_days': 0,
+            },
+            first_review_at: firstReview,
+            last_review_at: lastReview,
+            created_at: now,
+            updated_at: now,
+          }
+
+          // Populate interval distribution from mastery data
+          for (const mastery of masteryDocs) {
+            const interval = mastery.interval_days || 1
+            if (interval <= 3) researchSummary.interval_distribution['1-3_days']++
+            else if (interval <= 7) researchSummary.interval_distribution['4-7_days']++
+            else if (interval <= 14) researchSummary.interval_distribution['8-14_days']++
+            else if (interval <= 30) researchSummary.interval_distribution['15-30_days']++
+            else if (interval <= 60) researchSummary.interval_distribution['31-60_days']++
+            else researchSummary.interval_distribution['60+_days']++
+          }
+
+          await adminDb
+            .collection('algorithm_research_metrics')
+            .doc(userId)
+            .collection('summary')
+            .doc('current')
+            .set(researchSummary)
+
+          result.researchSummariesCreated++
+        }
+
+        // Check and update user_stats if missing or empty
+        const userStatsDoc = await adminDb.collection('user_stats').doc(userId).get()
+        const existingStats = userStatsDoc.data()
+
+        if (!userStatsDoc.exists || (existingStats?.totalSessions || 0) === 0) {
+          if (sessions.length > 0) {
+            // Rebuild user_stats from session summaries
+            const patternStats: Record<string, any> = {}
+            const difficultyStats: Record<string, any> = {}
+            let totalMinutes = 0
+            let totalScore = 0
+
+            for (const session of sessions) {
+              totalMinutes += session.durationMinutes || 0
+              totalScore += session.performanceScore || 0
+
+              const pattern = session.pattern || 'unknown'
+              if (!patternStats[pattern]) {
+                patternStats[pattern] = { sessions: 0, totalScore: 0, averageScore: 0, bestScore: 0 }
+              }
+              patternStats[pattern].sessions++
+              patternStats[pattern].totalScore += session.performanceScore || 0
+              patternStats[pattern].bestScore = Math.max(
+                patternStats[pattern].bestScore,
+                session.performanceScore || 0
+              )
+
+              const difficulty = session.difficulty || 'medium'
+              if (!difficultyStats[difficulty]) {
+                difficultyStats[difficulty] = { sessions: 0, totalScore: 0, averageScore: 0 }
+              }
+              difficultyStats[difficulty].sessions++
+              difficultyStats[difficulty].totalScore += session.performanceScore || 0
+            }
+
+            // Calculate averages
+            for (const p of Object.values(patternStats) as any[]) {
+              p.averageScore = p.sessions > 0 ? Math.round(p.totalScore / p.sessions) : 0
+            }
+            for (const d of Object.values(difficultyStats) as any[]) {
+              d.averageScore = d.sessions > 0 ? Math.round(d.totalScore / d.sessions) : 0
+            }
+
+            const userStats = {
+              userId,
+              totalSessions: sessions.length,
+              totalPracticeMinutes: totalMinutes,
+              totalScore,
+              averageScore: sessions.length > 0 ? Math.round(totalScore / sessions.length) : 0,
+              patternStats,
+              difficultyStats,
+              lastSessionAt: sessions[0]?.completedAt,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            }
+
+            await adminDb.collection('user_stats').doc(userId).set(userStats, { merge: true })
+            result.userStatsUpdated++
+          }
+        }
+      } catch (userError) {
+        result.errors.push(`User ${userId}: ${userError instanceof Error ? userError.message : 'Unknown error'}`)
+      }
+    }
+
+    // Regenerate aggregate comparison with new data
+    await generateAggregateComparison()
+
+  } catch (error) {
+    result.errors.push(`Global error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
+
+  return result
 }
 
 /**
