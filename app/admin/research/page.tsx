@@ -122,6 +122,7 @@ export default function ResearchDashboard() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [migrating, setMigrating] = useState(false)
+  const [backfilling, setBackfilling] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const loadData = useCallback(async (forceRefresh = false) => {
@@ -179,6 +180,36 @@ export default function ResearchDashboard() {
       setError(err instanceof Error ? err.message : 'Migration failed')
     } finally {
       setMigrating(false)
+    }
+  }
+
+  const backfillData = async () => {
+    if (!firebaseUser) return
+
+    setBackfilling(true)
+    try {
+      const token = await firebaseUser.getIdToken()
+      const response = await fetch('/api/admin/algorithm-research', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'backfill-research' }),
+      })
+
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Backfill failed')
+      }
+
+      const result = await response.json()
+      alert(result.message)
+      loadData(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Backfill failed')
+    } finally {
+      setBackfilling(false)
     }
   }
 
@@ -252,6 +283,19 @@ export default function ResearchDashboard() {
               <Database className="h-4 w-4 mr-2" />
             )}
             Migrate Users
+          </Button>
+          <Button
+            onClick={backfillData}
+            variant="outline"
+            disabled={backfilling}
+            className="border-[#00d9ff] text-[#00d9ff] hover:bg-[#00d9ff]/10"
+          >
+            {backfilling ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Repeat className="h-4 w-4 mr-2" />
+            )}
+            Backfill Data
           </Button>
         </div>
       </div>
