@@ -133,6 +133,12 @@
  * Principles: Muted colors, reduced visual noise, blue-green spectrum for relaxation
  * Source: Color Psychology in UI Design 2025, UXmatters Calm Design Principles
  */
+
+/* Smooth transition for all color changes */
+.dark {
+  transition: background-color 0.5s ease, border-color 0.3s ease;
+}
+
 .dark.calm {
   /* Even calmer background with slight blue tint for relaxation */
   --background: oklch(0.15 0.008 240);
@@ -153,6 +159,69 @@
   /* Calm editor colors */
   --editor-bg: oklch(0.17 0.006 240);
   --editor-selection: oklch(0.45 0.04 210 / 0.20);
+
+  /* Calm mode specific overrides for hardcoded Tailwind colors */
+  --calm-success: oklch(0.65 0.10 160); /* Muted green */
+  --calm-warning: oklch(0.70 0.08 85);  /* Muted amber */
+  --calm-error: oklch(0.60 0.08 25);    /* Muted red */
+  --calm-info: oklch(0.65 0.06 220);    /* Muted blue */
+}
+
+/* Calm mode utility classes for interview page */
+.dark.calm .calm-card {
+  background-color: oklch(0.17 0.008 240 / 0.6) !important;
+  border-color: oklch(0.28 0.006 240) !important;
+}
+
+.dark.calm .calm-success {
+  color: oklch(0.70 0.12 160) !important; /* Softer green */
+}
+
+.dark.calm .calm-error {
+  color: oklch(0.65 0.10 25) !important; /* Softer red */
+}
+
+.dark.calm .calm-warning {
+  color: oklch(0.72 0.10 85) !important; /* Softer yellow */
+}
+
+.dark.calm .calm-accent {
+  background-color: oklch(0.55 0.08 210) !important;
+  color: oklch(0.15 0.01 240) !important;
+}
+
+/* Reduce visual noise in calm mode */
+.dark.calm .glass-effect {
+  backdrop-filter: blur(8px);
+  background-color: oklch(0.16 0.008 240 / 0.7) !important;
+}
+
+/* Calm timer - less anxiety-inducing colors */
+.dark.calm .timer-warning {
+  color: oklch(0.70 0.06 85) !important; /* Muted yellow instead of bright */
+}
+
+.dark.calm .timer-danger {
+  color: oklch(0.65 0.08 25) !important; /* Muted red instead of bright */
+}
+
+/* Reduce animation intensity in calm mode */
+.dark.calm .animate-pulse {
+  animation-duration: 3s; /* Slower pulse */
+}
+
+.dark.calm .animate-spin {
+  animation-duration: 2s; /* Slower spin */
+}
+
+/* Focus mode styles */
+.focus-mode-active .focus-hide {
+  display: none !important;
+}
+
+.focus-mode-active .focus-center {
+  max-width: 900px;
+  margin: 0 auto;
 }
 
 @theme inline {

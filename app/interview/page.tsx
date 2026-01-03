@@ -305,6 +305,9 @@ function InterviewPageContent() {
   // Mobile panel switcher - only one visible at a time (Miller's Law)
   const [activePanel, setActivePanel] = useState<'problem' | 'editor' | 'chat'>('editor')
 
+  // State for focus mode problem peek overlay
+  const [showProblemPeek, setShowProblemPeek] = useState(false)
+
   // Toggle calm mode on document for CSS cascade
   useEffect(() => {
     if (calmMode) {
@@ -314,6 +317,17 @@ function InterviewPageContent() {
     }
     return () => document.documentElement.classList.remove('calm')
   }, [calmMode])
+
+  // Toggle focus mode class on document for CSS cascade
+  useEffect(() => {
+    if (focusMode) {
+      document.documentElement.classList.add('focus-mode-active')
+    } else {
+      document.documentElement.classList.remove('focus-mode-active')
+      setShowProblemPeek(false) // Close peek when exiting focus mode
+    }
+    return () => document.documentElement.classList.remove('focus-mode-active')
+  }, [focusMode])
 
   // Code protection state
   const [protectedElements, setProtectedElements] = useState<ReturnType<typeof extractProtectedElements> | null>(null)
@@ -628,8 +642,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     }
   }, [elapsedTime, isInterviewStarted, selectedScenario, showFeedback, revealedHints])
 
-  // Sound effects
+  // Sound effects - disabled in calm mode for reduced stimulation
   const playSound = (type: 'hint' | 'success' | 'fail' | 'milestone') => {
+    // Skip sounds in calm mode - reduces anxiety triggers
+    if (calmMode) return
+
     // Use Web Audio API for subtle sound effects
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
     const oscillator = audioContext.createOscillator()
@@ -2663,11 +2680,59 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               ═══════════════════════════════════════════════════════════════ */}
               {!showFeedback && !showPostInterviewDiscussion ? (
                 <div
-                  className={`grid gap-1.5 sm:gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${focusMode
+                  className={`relative grid gap-1.5 sm:gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${focusMode
                       ? 'grid-cols-1' // Focus mode: editor only
                       : 'grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_260px] xl:grid-cols-[320px_minmax(0,1fr)_300px] 2xl:grid-cols-[380px_minmax(0,1fr)_340px]'
                     }`}
                 >
+                  {/* Focus Mode: Floating problem peek button */}
+                  {focusMode && selectedScenario && (
+                    <button
+                      onClick={() => setShowProblemPeek(!showProblemPeek)}
+                      className={`fixed top-20 left-4 z-50 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all shadow-lg ${
+                        showProblemPeek
+                          ? 'bg-accent text-accent-foreground'
+                          : 'bg-gray-800/90 text-gray-300 hover:bg-gray-700/90 border border-gray-600'
+                      }`}
+                      title="Peek at problem description"
+                    >
+                      <Target className="h-3.5 w-3.5" />
+                      <span>{showProblemPeek ? 'Hide Problem' : 'Show Problem'}</span>
+                    </button>
+                  )}
+
+                  {/* Focus Mode: Problem peek overlay */}
+                  {focusMode && showProblemPeek && selectedScenario && (
+                    <div className="fixed top-32 left-4 z-40 w-96 max-h-[60vh] bg-gray-900/95 backdrop-blur-sm border border-gray-700 rounded-xl shadow-2xl overflow-hidden">
+                      <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Target className="h-4 w-4 text-accent" />
+                          <span className="font-semibold text-white text-sm">{selectedScenario.title}</span>
+                        </div>
+                        <Badge className={`text-xs ${
+                          selectedScenario.difficulty === 'easy' ? 'bg-green-500/20 text-green-400' :
+                          selectedScenario.difficulty === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                          'bg-red-500/20 text-red-400'
+                        }`}>
+                          {selectedScenario.difficulty}
+                        </Badge>
+                      </div>
+                      <div className="p-4 overflow-y-auto max-h-[calc(60vh-60px)]">
+                        <p className="text-gray-200 text-sm leading-relaxed">{selectedScenario.problemStatement}</p>
+                        {selectedScenario.type === 'dsa' && selectedScenario.examples && selectedScenario.examples.length > 0 && (
+                          <div className="mt-4 space-y-3">
+                            <h4 className="text-accent text-xs font-semibold uppercase tracking-wide">Examples</h4>
+                            {selectedScenario.examples.slice(0, 2).map((ex, idx) => (
+                              <div key={idx} className="bg-gray-800/50 rounded-lg p-3 text-xs font-mono">
+                                <div className="text-gray-400">Input: <span className="text-blue-300">{ex.input}</span></div>
+                                <div className="text-gray-400">Output: <span className="text-green-300">{ex.output}</span></div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {/* Left: Problem Description / File Upload
                       - Hidden in focus mode (desktop)
                       - Only visible when activePanel === 'problem' (mobile)
