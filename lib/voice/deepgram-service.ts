@@ -265,27 +265,85 @@ export class DeepgramVoiceService {
    * Start capturing and sending audio
    */
   private startAudioCapture(stream: MediaStream, ws: WebSocket): void {
-    // Use MediaRecorder for audio capture
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-      ? 'audio/webm;codecs=opus'
-      : 'audio/webm'
-
-    const mediaRecorder = new MediaRecorder(stream, {
-      mimeType,
-      audioBitsPerSecond: 16000,
-    })
-
-    mediaRecorder.ondataavailable = async (event) => {
-      if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-        ws.send(event.data)
+    try {
+      // Check if stream is active
+      if (!stream || stream.active === false) {
+        throw new Error('MediaStream is not active')
       }
+
+      // Check if MediaRecorder is supported
+      if (typeof MediaRecorder === 'undefined') {
+        throw new Error('MediaRecorder is not supported in this browser')
+      }
+
+      // Find a supported mime type
+      const supportedTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4',
+        'audio/mpeg',
+      ]
+
+      let mimeType: string | undefined
+      for (const type of supportedTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          mimeType = type
+          break
+        }
+      }
+
+      if (!mimeType) {
+        throw new Error('No supported audio mime type found')
+      }
+
+      // Create MediaRecorder with error handling
+      let mediaRecorder: MediaRecorder
+      try {
+        mediaRecorder = new MediaRecorder(stream, {
+          mimeType,
+          audioBitsPerSecond: 16000,
+        })
+      } catch (error) {
+        // Fallback: try without options
+        console.warn('[Deepgram] Failed to create MediaRecorder with options, trying without:', error)
+        mediaRecorder = new MediaRecorder(stream)
+      }
+
+      mediaRecorder.ondataavailable = async (event) => {
+        if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+          ws.send(event.data)
+        }
+      }
+
+      mediaRecorder.onerror = (event) => {
+        console.error('[Deepgram] MediaRecorder error:', event)
+        this.onError?.(new Error('MediaRecorder error occurred'))
+      }
+
+      // Check MediaRecorder state before starting
+      if (mediaRecorder.state === 'recording') {
+        console.warn('[Deepgram] MediaRecorder already recording')
+        return
+      }
+
+      // Capture audio in 100ms chunks for low latency
+      // Some browsers may not support timeslice parameter, so wrap in try-catch
+      try {
+        mediaRecorder.start(100)
+      } catch (error) {
+        // Fallback: start without timeslice
+        console.warn('[Deepgram] Failed to start with timeslice, trying without:', error)
+        mediaRecorder.start()
+      }
+
+      this.connection.mediaRecorder = mediaRecorder
+      console.log('[Deepgram] Audio capture started with mime type:', mimeType)
+    } catch (error) {
+      console.error('[Deepgram] Error starting audio capture:', error)
+      this.onError?.(error instanceof Error ? error : new Error('Failed to start audio capture'))
+      throw error
     }
-
-    // Capture audio in 100ms chunks for low latency
-    mediaRecorder.start(100)
-    this.connection.mediaRecorder = mediaRecorder
-
-    console.log('[Deepgram] Audio capture started')
   }
 
   /**
