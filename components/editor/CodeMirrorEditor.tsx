@@ -3,16 +3,25 @@
 import React, { memo, useMemo, useCallback, useEffect, useState } from "react"
 import CodeMirror, { ReactCodeMirrorRef } from "@uiw/react-codemirror"
 import { javascript } from "@codemirror/lang-javascript"
-import { python } from "@codemirror/lang-python"
-import { java } from "@codemirror/lang-java"
-import { cpp } from "@codemirror/lang-cpp"
-import { rust } from "@codemirror/lang-rust"
-import { go } from "@codemirror/lang-go"
 import { oneDark } from "@codemirror/theme-one-dark"
 import { EditorView, keymap } from "@codemirror/view"
 import { Extension } from "@codemirror/state"
 import { indentUnit } from "@codemirror/language"
 import { insertNewlineAndIndent, indentMore, indentLess } from "@codemirror/commands"
+
+// Lazy-loaded language extensions (reduces initial bundle by ~100KB)
+// These are only loaded when the specific language is needed
+const languageLoaders: Record<string, () => Promise<Extension>> = {
+  python: async () => (await import("@codemirror/lang-python")).python(),
+  py: async () => (await import("@codemirror/lang-python")).python(),
+  java: async () => (await import("@codemirror/lang-java")).java(),
+  cpp: async () => (await import("@codemirror/lang-cpp")).cpp(),
+  c: async () => (await import("@codemirror/lang-cpp")).cpp(),
+  csharp: async () => (await import("@codemirror/lang-java")).java(), // Similar syntax
+  rust: async () => (await import("@codemirror/lang-rust")).rust(),
+  rs: async () => (await import("@codemirror/lang-rust")).rust(),
+  go: async () => (await import("@codemirror/lang-go")).go(),
+}
 
 export interface CodeMirrorEditorProps {
   value: string
@@ -27,41 +36,27 @@ export interface CodeMirrorEditorProps {
   calmMode?: boolean
 }
 
-// Language extension mapping with proper indentation settings
-interface LanguageConfig {
-  extension: () => Extension
-  indentSize: number
+// Language indentation settings
+const languageIndentMap: Record<string, number> = {
+  python: 4, py: 4,
+  javascript: 2, typescript: 2, js: 2, jsx: 2, ts: 2, tsx: 2,
+  java: 4, cpp: 4, c: 4, csharp: 4, rust: 4, go: 4, rs: 4,
 }
 
-const getLanguageConfig = (language: string): LanguageConfig | null => {
-  const languageMap: Record<string, LanguageConfig> = {
-    // Python uses 4 spaces per PEP 8
-    python: { extension: () => python(), indentSize: 4 },
-    py: { extension: () => python(), indentSize: 4 },
-    // JavaScript/TypeScript use 2 spaces
-    javascript: { extension: () => javascript({ jsx: true, typescript: false }), indentSize: 2 },
-    typescript: { extension: () => javascript({ jsx: true, typescript: true }), indentSize: 2 },
-    js: { extension: () => javascript({ jsx: true, typescript: false }), indentSize: 2 },
-    jsx: { extension: () => javascript({ jsx: true, typescript: false }), indentSize: 2 },
-    ts: { extension: () => javascript({ jsx: true, typescript: true }), indentSize: 2 },
-    tsx: { extension: () => javascript({ jsx: true, typescript: true }), indentSize: 2 },
-    // Other languages
-    java: { extension: () => java(), indentSize: 4 },
-    cpp: { extension: () => cpp(), indentSize: 4 },
-    c: { extension: () => cpp(), indentSize: 4 },
-    csharp: { extension: () => java(), indentSize: 4 }, // Use Java for C# (similar syntax highlighting)
-    rust: { extension: () => rust(), indentSize: 4 },
-    go: { extension: () => go(), indentSize: 4 },
-    rs: { extension: () => rust(), indentSize: 4 },
+const getIndentSize = (language: string): number => {
+  return languageIndentMap[language.toLowerCase()] ?? 2
+}
+
+// Synchronous JavaScript extension (bundled with core - always available)
+const getJsExtension = (language: string): Extension | null => {
+  const lang = language.toLowerCase()
+  if (['javascript', 'js', 'jsx'].includes(lang)) {
+    return javascript({ jsx: true, typescript: false })
   }
-
-  return languageMap[language.toLowerCase()] || null
-}
-
-// Legacy function for backward compatibility
-const getLanguageExtension = (language: string): Extension | null => {
-  const config = getLanguageConfig(language)
-  return config ? config.extension() : null
+  if (['typescript', 'ts', 'tsx'].includes(lang)) {
+    return javascript({ jsx: true, typescript: true })
+  }
+  return null
 }
 
 /*
@@ -260,8 +255,42 @@ function CodeMirrorEditorComponent({
 }: CodeMirrorEditorProps) {
   const editorRef = React.useRef<ReactCodeMirrorRef>(null)
 
+  // State for lazy-loaded language extension
+  const [loadedLangExt, setLoadedLangExt] = useState<Extension | null>(null)
+  const [langLoading, setLangLoading] = useState(false)
+
   // Detect calm mode from DOM if not explicitly passed
   const [isCalm, setIsCalm] = useState(calmMode)
+
+  // Lazy load language extension when language changes
+  useEffect(() => {
+    const lang = language.toLowerCase()
+
+    // Check if it's a JS/TS language (bundled, no lazy load needed)
+    const jsExt = getJsExtension(lang)
+    if (jsExt) {
+      setLoadedLangExt(jsExt)
+      return
+    }
+
+    // Check if we have a loader for this language
+    const loader = languageLoaders[lang]
+    if (loader) {
+      setLangLoading(true)
+      loader()
+        .then((ext) => {
+          setLoadedLangExt(ext)
+        })
+        .catch((err) => {
+          console.warn(`Failed to load language extension for ${lang}:`, err)
+          setLoadedLangExt(null)
+        })
+        .finally(() => setLangLoading(false))
+    } else {
+      // Unknown language, no extension
+      setLoadedLangExt(null)
+    }
+  }, [language])
 
   useEffect(() => {
     // Check if calm class is on document
@@ -284,17 +313,16 @@ function CodeMirrorEditorComponent({
   // Normalize theme to dark/light
   const isDarkTheme = theme === "dark" || theme === "vs-dark" || theme === "hc-black" || !theme
 
-  // Get language-specific config for indentation
-  const langConfig = useMemo(() => getLanguageConfig(language), [language])
-  const indentSize = langConfig?.indentSize ?? 2
+  // Get indentation size for the language
+  const indentSize = getIndentSize(language)
 
   // Memoize extensions to prevent unnecessary re-renders
   const extensions = useMemo(() => {
     const exts: Extension[] = [...baseExtensions]
 
-    // Add language extension with proper indentation
-    if (langConfig) {
-      exts.push(langConfig.extension())
+    // Add loaded language extension
+    if (loadedLangExt) {
+      exts.push(loadedLangExt)
     }
 
     // Add indentUnit extension for proper auto-indentation
@@ -325,7 +353,7 @@ function CodeMirrorEditorComponent({
     }
 
     return exts
-  }, [langConfig, indentSize, isDarkTheme, isCalm])
+  }, [loadedLangExt, indentSize, isDarkTheme, isCalm])
 
   // Handle value changes
   const handleChange = useCallback((val: string) => {
