@@ -4,210 +4,404 @@
       "collectionGroup": "interview_sessions",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "userId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "interview_sessions",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "userId", "order": "ASCENDING" },
-        { "fieldPath": "completed", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "completed",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "user_profiles",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "tier", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "DESCENDING" }
+        {
+          "fieldPath": "tier",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "usage",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "userId", "order": "ASCENDING" },
-        { "fieldPath": "month", "order": "DESCENDING" }
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "month",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "text_embeddings",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "type", "order": "ASCENDING" },
-        { "fieldPath": "metadata.timestamp", "order": "DESCENDING" }
+        {
+          "fieldPath": "type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "metadata.timestamp",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "text_embeddings",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "type", "order": "ASCENDING" },
-        { "fieldPath": "metadata.userId", "order": "ASCENDING" },
-        { "fieldPath": "metadata.timestamp", "order": "DESCENDING" }
+        {
+          "fieldPath": "type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "metadata.userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "metadata.timestamp",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "text_embeddings",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "metadata.problemId", "order": "ASCENDING" },
-        { "fieldPath": "metadata.timestamp", "order": "DESCENDING" }
+        {
+          "fieldPath": "metadata.problemId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "metadata.timestamp",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "text_embeddings",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "type", "order": "ASCENDING" },
-        { "fieldPath": "metadata.problemId", "order": "ASCENDING" },
-        { "fieldPath": "metadata.userId", "order": "ASCENDING" }
+        {
+          "fieldPath": "type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "metadata.problemId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "metadata.userId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "text_embeddings",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "type", "order": "ASCENDING" },
-        { "fieldPath": "metadata.problemId", "order": "ASCENDING" },
-        { "fieldPath": "metadata.user_id", "order": "ASCENDING" }
+        {
+          "fieldPath": "type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "metadata.problemId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "metadata.user_id",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "session_vectors",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "userId", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "DESCENDING" }
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "session_vectors",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "userId", "order": "ASCENDING" },
-        { "fieldPath": "metadata.type", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "DESCENDING" }
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "metadata.type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "notifications",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "userId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "notifications",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "userId", "order": "ASCENDING" },
-        { "fieldPath": "type", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "in_app_notifications",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "userId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "in_app_notifications",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "userId", "order": "ASCENDING" },
-        { "fieldPath": "read", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "read",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "notification_queue",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "scheduledFor", "order": "ASCENDING" },
-        { "fieldPath": "priority", "order": "ASCENDING" }
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "scheduledFor",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "priority",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "notification_queue",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "updatedAt", "order": "ASCENDING" }
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "in_app_notifications",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "userId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "ASCENDING" }
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "profiles",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "subscription_tier", "order": "ASCENDING" },
-        { "fieldPath": "subscription_type", "order": "ASCENDING" },
-        { "fieldPath": "subscription_current_period_end", "order": "ASCENDING" }
+        {
+          "fieldPath": "subscription_tier",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subscription_type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subscription_current_period_end",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "profiles",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "subscription_type", "order": "ASCENDING" },
-        { "fieldPath": "subscription_tier", "order": "ASCENDING" },
-        { "fieldPath": "subscription_current_period_end", "order": "ASCENDING" }
+        {
+          "fieldPath": "subscription_type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subscription_tier",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subscription_current_period_end",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "algorithm_research_events",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "algorithm", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "DESCENDING" }
+        {
+          "fieldPath": "algorithm",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "algorithm_research_events",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "user_id", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "DESCENDING" }
+        {
+          "fieldPath": "user_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "summary",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        { "fieldPath": "algorithm", "order": "ASCENDING" },
-        { "fieldPath": "total_reviews", "order": "DESCENDING" }
+        {
+          "fieldPath": "algorithm",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "total_reviews",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "problems",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "pattern", "order": "ASCENDING" },
-        { "fieldPath": "next_review_at", "order": "ASCENDING" }
+        {
+          "fieldPath": "pattern",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "next_review_at",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "problems",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "difficulty", "order": "ASCENDING" },
-        { "fieldPath": "next_review_at", "order": "ASCENDING" }
+        {
+          "fieldPath": "difficulty",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "next_review_at",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "analytics_events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "event_name",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
       ]
     }
   ],
