@@ -129,9 +129,9 @@ export function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-gray-400 transition-colors"
-              title="Nikayel Ali Jamal - Founder of CodeSparring"
+              title="Nikayel Ali - Founder of CodeSparring"
             >
-              Nikayel Ali Jamal
+              Nikayel Ali
             </a>
             {" "}in Sacramento, CA
           </p>
