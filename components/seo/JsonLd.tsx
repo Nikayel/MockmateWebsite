@@ -57,9 +57,19 @@ export function OrganizationJsonLd() {
       "@type": "Person",
       name: "Nikayel Ali Jamal",
       // alternateName helps Google understand name variations people might search
-      alternateName: ["Nikayel Jamal", "Nikayel Ali", "Nikayeel Jamal"],
+      alternateName: [
+        "Nikayel",
+        "Nikayeel",
+        "Nikayel Ali",
+        "Nikayeel Ali",
+        "Nikayel Jamal",
+        "Nikayeel Jamal",
+        "Ali Nikayel",
+        "Nikayel Ali Jamal",
+        "Nikayeel Ali Jamal",
+      ],
       jobTitle: "Founder & CEO",
-      description: "Computer Science student at Sacramento State building AI-powered interview prep tools",
+      description: "Computer Science student at Sacramento State. Built CodeSparring to help engineers prepare for technical interviews with AI.",
       url: "https://linkedin.com/in/nikayel-ali",
       sameAs: [
         "https://linkedin.com/in/nikayel-ali",

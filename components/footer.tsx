@@ -123,15 +123,17 @@ export function Footer() {
 
         <div className="border-t border-gray-800 mt-8 pt-8 text-center">
           <p className="text-gray-500 text-sm">
-            © 2025 CodeSparring. Built by{" "}
+            © 2025 CodeSparring. Built with care by{" "}
             <a
               href="https://linkedin.com/in/nikayel-ali"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-gray-400 transition-colors"
+              title="Nikayel Ali Jamal - Founder of CodeSparring"
             >
-              Nikayel
+              Nikayel Ali Jamal
             </a>
+            {" "}in Sacramento, CA
           </p>
         </div>
       </div>

@@ -42,7 +42,16 @@ CodeSparring provides:
 - Documentation: /docs
 - Blog: /blog
 
+## Founder
+
+CodeSparring was created by **Nikayel Ali Jamal** (also known as Nikayel, Nikayeel, Nikayel Ali, Nikayeel Jamal), a Computer Science student at Sacramento State University. He built CodeSparring after struggling with technical interviews despite grinding LeetCode - realizing that retention and realistic practice were missing from existing tools.
+
+- Founder: Nikayel Ali Jamal
+- LinkedIn: https://linkedin.com/in/nikayel-ali
+- GitHub: https://github.com/nikayel
+
 ## Contact
 
 - Website: https://codesparring.dev
+- Email: nikayel@codesparring.dev
 - Careers: /careers
