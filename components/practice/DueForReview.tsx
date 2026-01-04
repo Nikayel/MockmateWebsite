@@ -310,10 +310,13 @@ function DueItemRow({
     };
   };
 
-  const handleStartClick = (e: React.MouseEvent) => {
+  const handleStartClick = () => {
     if (isUpcoming && item.days_until_review > 1) {
-      e.preventDefault();
+      // Show warning for items more than 1 day away
       setShowEarlyWarning(true);
+    } else {
+      // Navigate directly for items due soon
+      window.location.href = `/interview?scenario=${item.scenario_id}`;
     }
   };
 
