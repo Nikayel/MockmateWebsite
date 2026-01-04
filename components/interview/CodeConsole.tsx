@@ -53,15 +53,17 @@ interface CodeConsoleProps {
 function parseErrorLineNumber(error: string): number | null {
   // Common patterns:
   // JavaScript: "at line 5" or "line 5" or ":5:"
-  // Python: "line 5" or ", line 5"
+  // Python: "line 5" or ", line 5" or "File "<string>", line 5"
   // TypeScript: "(5,10)" or ":5:"
 
   const patterns = [
-    /line\s+(\d+)/i,           // "line 5", "Line 5"
-    /:(\d+):/,                  // ":5:" (stack trace format)
-    /:(\d+)\)/,                 // ":5)" (TypeScript format)
-    /\((\d+),\s*\d+\)/,        // "(5, 10)" (TypeScript format)
-    /at\s+.*:(\d+):\d+/,       // "at function (file:5:10)"
+    /File\s+"<string>",\s+line\s+(\d+)/i,  // Python: File "<string>", line 5
+    /line\s+(\d+)/i,                        // "line 5", "Line 5"
+    /:(\d+):/,                              // ":5:" (stack trace format)
+    /:(\d+)\)/,                             // ":5)" (TypeScript format)
+    /\((\d+),\s*\d+\)/,                     // "(5, 10)" (TypeScript format)
+    /at\s+.*:(\d+):\d+/,                    // "at function (file:5:10)"
+    /^\s+(\d+)\s+\|/m,                      // "  5 | code" (Python caret format)
   ];
 
   for (const pattern of patterns) {
@@ -74,58 +76,120 @@ function parseErrorLineNumber(error: string): number | null {
 }
 
 // Detect error type from message
-function getErrorType(error: string): 'syntax' | 'runtime' | 'type' | 'unknown' {
+function getErrorType(error: string): 'syntax' | 'runtime' | 'type' | 'logic' | 'timeout' | 'unknown' {
   const lowerError = error.toLowerCase();
 
+  // Syntax/Parse errors
   if (
     lowerError.includes('syntaxerror') ||
     lowerError.includes('unexpected token') ||
     lowerError.includes('parse error') ||
     lowerError.includes('indentationerror') ||
-    lowerError.includes('invalid syntax')
+    lowerError.includes('invalid syntax') ||
+    lowerError.includes('unterminated string') ||
+    lowerError.includes('missing )') ||
+    lowerError.includes('missing }') ||
+    lowerError.includes('expected')
   ) {
     return 'syntax';
   }
 
+  // Type errors
   if (
     lowerError.includes('typeerror') ||
-    lowerError.includes('compilation error')
+    lowerError.includes('compilation error') ||
+    lowerError.includes('cannot read property') ||
+    lowerError.includes('is not a function') ||
+    lowerError.includes('is not defined') ||
+    lowerError.includes('has no attribute') ||
+    lowerError.includes('attributeerror')
   ) {
     return 'type';
   }
 
+  // Timeout/Recursion errors
+  if (
+    lowerError.includes('timeout') ||
+    lowerError.includes('timed out') ||
+    lowerError.includes('maximum call stack') ||
+    lowerError.includes('too much recursion') ||
+    lowerError.includes('recursionerror') ||
+    lowerError.includes('maximum recursion depth') ||
+    lowerError.includes('infinite loop')
+  ) {
+    return 'timeout';
+  }
+
+  // Runtime/Value errors
   if (
     lowerError.includes('referenceerror') ||
     lowerError.includes('rangeerror') ||
     lowerError.includes('nameerror') ||
     lowerError.includes('valueerror') ||
     lowerError.includes('keyerror') ||
-    lowerError.includes('indexerror')
+    lowerError.includes('indexerror') ||
+    lowerError.includes('zerodivisionerror') ||
+    lowerError.includes('division by zero') ||
+    lowerError.includes('overflowerror') ||
+    lowerError.includes('memoryerror') ||
+    lowerError.includes('assertionerror') ||
+    lowerError.includes('index out of') ||
+    lowerError.includes('list index') ||
+    lowerError.includes('undefined') ||
+    lowerError.includes('null') ||
+    lowerError.includes("'nonetype'")
   ) {
     return 'runtime';
+  }
+
+  // Logic errors (wrong output, usually caught by test comparison)
+  if (
+    lowerError.includes('expected') ||
+    lowerError.includes('assertion') ||
+    lowerError.includes('mismatch')
+  ) {
+    return 'logic';
   }
 
   return 'unknown';
 }
 
-// Format error message for display
-function formatErrorMessage(error: string): { title: string; details: string } {
+// Format error message for display with helpful hints
+function formatErrorMessage(error: string): { title: string; details: string; hint?: string } {
   const errorType = getErrorType(error);
   const lineNum = parseErrorLineNumber(error);
 
   const titles: Record<string, string> = {
-    syntax: 'Syntax Error',
-    type: 'Type Error',
-    runtime: 'Runtime Error',
-    unknown: 'Error',
+    syntax: '🔴 Syntax Error',
+    type: '🟠 Type Error',
+    runtime: '🔴 Runtime Error',
+    timeout: '⏱️ Timeout/Recursion Error',
+    logic: '🟡 Logic Error',
+    unknown: '❌ Error',
+  };
+
+  const hints: Record<string, string> = {
+    syntax: 'Check for missing brackets, quotes, or typos near the indicated line.',
+    type: 'Verify variable types and function signatures match what you expect.',
+    runtime: 'Check for null/undefined values, invalid indices, or missing variables.',
+    timeout: 'Your code may have an infinite loop or too deep recursion. Add base cases.',
+    logic: 'Your solution runs but produces incorrect output. Review your algorithm.',
+    unknown: 'Review your code for potential issues.',
   };
 
   let title = titles[errorType];
   if (lineNum) {
-    title += ` (line ${lineNum})`;
+    title += ` on line ${lineNum}`;
   }
 
-  return { title, details: error };
+  // Clean up the error message for display
+  let details = error;
+
+  // Remove the wrapper code line numbers (they're offset from user's code)
+  // The wrapped code adds ~50 lines of setup, so actual user code starts around line 50
+  // We'll show the error as-is but the hint helps explain
+
+  return { title, details, hint: hints[errorType] };
 }
 
 export function CodeConsole({
@@ -269,7 +333,12 @@ export function CodeConsole({
                   <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
                     <div className="font-semibold mb-1">{errorInfo.title}</div>
-                    <div className="text-red-300/80 break-all whitespace-pre-wrap text-[11px]">
+                    {errorInfo.hint && (
+                      <div className="text-yellow-300/80 text-[11px] mb-2 italic">
+                        💡 {errorInfo.hint}
+                      </div>
+                    )}
+                    <div className="text-red-300/80 break-all whitespace-pre-wrap text-[11px] bg-black/20 p-2 rounded font-mono">
                       {errorInfo.details}
                     </div>
                   </div>
@@ -301,21 +370,34 @@ export function CodeConsole({
                   </span>
                 </div>
 
-                {/* Show details for failed tests (unless it's a code error) */}
-                {!result.passed && !result.error && (
+                {/* Show details for failed tests */}
+                {!result.passed && (
                   <div className="ml-5 mt-1 space-y-0.5 text-[11px]">
-                    <div className="flex items-start gap-2">
-                      <span className="text-gray-500 w-14">Input:</span>
-                      <span className="text-blue-300">{JSON.stringify(result.input)}</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-gray-500 w-14">Expected:</span>
-                      <span className="text-green-300">{JSON.stringify(result.expected)}</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-gray-500 w-14">Got:</span>
-                      <span className="text-red-300">{JSON.stringify(result.actual)}</span>
-                    </div>
+                    {/* Always show input for debugging */}
+                    {result.input && (
+                      <div className="flex items-start gap-2">
+                        <span className="text-gray-500 w-14">Input:</span>
+                        <span className="text-blue-300 break-all">{JSON.stringify(result.input)}</span>
+                      </div>
+                    )}
+                    {/* Show expected/got for wrong output, show error for code errors */}
+                    {result.error ? (
+                      <div className="flex items-start gap-2">
+                        <span className="text-gray-500 w-14">Error:</span>
+                        <span className="text-red-300 break-all">{result.error}</span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-start gap-2">
+                          <span className="text-gray-500 w-14">Expected:</span>
+                          <span className="text-green-300 break-all">{JSON.stringify(result.expected)}</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="text-gray-500 w-14">Got:</span>
+                          <span className="text-red-300 break-all">{JSON.stringify(result.actual)}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
