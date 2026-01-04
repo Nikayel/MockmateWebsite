@@ -244,7 +244,7 @@ export function CodeConsole({
         {/* Console.log outputs */}
         {outputs.map((output, index) => (
           <div
-            key={output.id ?? `output-${output.type}-${index}`}
+            key={`output-${output.type}-${index}`}
             className={cn(
               'flex items-start gap-2',
               output.type === 'error' && 'text-red-400',

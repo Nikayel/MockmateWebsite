@@ -81,7 +81,7 @@ export function InterviewerChat({
             <>
               {interviewerMessages.map((msg, index) => (
                 <div
-                  key={msg.id ?? `msg-${msg.type}-${index}`}
+                  key={`msg-${msg.type}-${index}`}
                   className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
@@ -207,7 +207,7 @@ export function AIChatPartner({
       </div>
       <div className="flex-1 overflow-y-auto space-y-1 mb-2 p-2 bg-gray-800/30 rounded min-h-0">
         {chatMessages.map((msg, index) => (
-          <div key={msg.id ?? `chat-${msg.type}-${index}`} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
+          <div key={`chat-${msg.type}-${index}`} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
             <div
               className={`max-w-[85%] p-1.5 rounded text-xs ${
                 msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-100"

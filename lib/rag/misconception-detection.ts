@@ -99,8 +99,8 @@ const ERROR_SIGNATURES: Record<DSAPattern | 'general', ErrorSignature[]> = {
     {
       type: 'initialization-error',
       patterns: [
-        /let\s+\w+\s*;[^=]*\n.*\1/,  // Uninitialized variable used
-        /const\s+\w+\s*=\s*\[\s*\]\s*;.*push/s,  // Empty array that might need initial value
+        /let\s+(\w+)\s*;[^=]*\n.*\1/,  // Uninitialized variable used
+        /const\s+\w+\s*=\s*\[\s*\]\s*;[\s\S]*push/,  // Empty array that might need initial value
       ],
       testFailurePatterns: [
         /undefined/i,
@@ -144,7 +144,7 @@ const ERROR_SIGNATURES: Record<DSAPattern | 'general', ErrorSignature[]> = {
       type: 'incorrect-complexity',
       patterns: [
         /\.sort\s*\(\s*\).*\.sort\s*\(\s*\)/,  // Double sort
-        /for.*for.*for/s,  // Triple nested loops
+        /for.*for.*for/,  // Triple nested loops
       ],
       description: 'Solution has higher time complexity than necessary',
       suggestedFix: 'Consider if a single pass with a hash map could solve this in O(n)',
@@ -156,8 +156,8 @@ const ERROR_SIGNATURES: Record<DSAPattern | 'general', ErrorSignature[]> = {
     {
       type: 'boundary-confusion',
       patterns: [
-        /while\s*\(\s*left\s*<\s*right\s*\).*left\s*=\s*right/s,  // Pointer crossing
-        /while\s*\(\s*left\s*<=?\s*right\s*\)(?!.*break)/s,  // No break condition
+        /while\s*\(\s*left\s*<\s*right\s*\)[\s\S]*left\s*=\s*right/,  // Pointer crossing
+        /while\s*\(\s*left\s*<=?\s*right\s*\)(?![\s\S]*break)/,  // No break condition
       ],
       testFailurePatterns: [
         /infinite/i,
@@ -211,7 +211,7 @@ const ERROR_SIGNATURES: Record<DSAPattern | 'general', ErrorSignature[]> = {
     {
       type: 'wrong-algorithm',
       patterns: [
-        /function\s+\w+\s*\([^)]*\)\s*{[^}]*\1\s*\(/s,  // Recursion without memoization
+        /function\s+(\w+)\s*\([^)]*\)\s*{[\s\S]*\1\s*\(/,  // Recursion without memoization
       ],
       testFailurePatterns: [
         /timeout/i,
@@ -258,7 +258,7 @@ const ERROR_SIGNATURES: Record<DSAPattern | 'general', ErrorSignature[]> = {
     {
       type: 'missing-edge-case',
       patterns: [
-        /function\s+\w+\s*\(\s*\w+\s*\)\s*{(?!.*if\s*\(\s*!\w+|null|undefined)/s,  // No null check
+        /function\s+\w+\s*\(\s*\w+\s*\)\s*{(?![\s\S]*if\s*\(\s*!\w+|null|undefined)/,  // No null check
       ],
       testFailurePatterns: [
         /null/i,
@@ -271,7 +271,7 @@ const ERROR_SIGNATURES: Record<DSAPattern | 'general', ErrorSignature[]> = {
     {
       type: 'wrong-algorithm',
       patterns: [
-        /\.push\s*\(\s*node\s*\).*\.push\s*\(\s*node\.left\s*\).*\.push\s*\(\s*node\.right\s*\)/s,
+        /\.push\s*\(\s*node\s*\)[\s\S]*\.push\s*\(\s*node\.left\s*\)[\s\S]*\.push\s*\(\s*node\.right\s*\)/,
       ],
       description: 'Incorrect BFS/DFS implementation',
       suggestedFix: 'For BFS use queue (FIFO), for DFS use stack (LIFO) or recursion',
@@ -283,7 +283,7 @@ const ERROR_SIGNATURES: Record<DSAPattern | 'general', ErrorSignature[]> = {
     {
       type: 'missing-edge-case',
       patterns: [
-        /function\s+\w+\s*\([^)]*\)\s*{(?!.*visited|seen)/s,  // No visited check
+        /function\s+\w+\s*\([^)]*\)\s*{(?![\s\S]*visited|seen)/,  // No visited check
       ],
       testFailurePatterns: [
         /infinite/i,
@@ -300,8 +300,8 @@ const ERROR_SIGNATURES: Record<DSAPattern | 'general', ErrorSignature[]> = {
     {
       type: 'logic-error',
       patterns: [
-        /\.next\s*=\s*\w+\s*;[^}]*\.next\s*=/s,  // Multiple .next assignments
-        /\w+\s*=\s*\w+\.next\s*;[^}]*\w+\.next\s*=/s,  // Lost reference
+        /\.next\s*=\s*\w+\s*;[\s\S]*\.next\s*=/,  // Multiple .next assignments
+        /\w+\s*=\s*\w+\.next\s*;[\s\S]*\w+\.next\s*=/,  // Lost reference
       ],
       description: 'Linked list pointer manipulation error',
       suggestedFix: 'Save references before modifying .next pointers to avoid losing nodes',
@@ -310,7 +310,7 @@ const ERROR_SIGNATURES: Record<DSAPattern | 'general', ErrorSignature[]> = {
     {
       type: 'missing-edge-case',
       patterns: [
-        /function\s+\w+\s*\(\s*head\s*\)\s*{(?!.*if\s*\(\s*!head)/s,
+        /function\s+\w+\s*\(\s*head\s*\)\s*{(?![\s\S]*if\s*\(\s*!head)/,
       ],
       description: 'Missing null check for head node',
       suggestedFix: 'Check if head is null before processing',
@@ -323,7 +323,7 @@ const ERROR_SIGNATURES: Record<DSAPattern | 'general', ErrorSignature[]> = {
       type: 'logic-error',
       patterns: [
         /\.pop\s*\(\s*\)(?![^;]*=)/,  // pop() without using result
-        /\.push\s*\([^)]*\).*\.push\s*\([^)]*\)/s,  // Multiple pushes in condition
+        /\.push\s*\([^)]*\)[\s\S]*\.push\s*\([^)]*\)/,  // Multiple pushes in condition
       ],
       description: 'Stack operation result not properly handled',
       suggestedFix: 'Store pop() result if needed, or check stack is not empty before popping',
@@ -357,7 +357,7 @@ const ERROR_SIGNATURES: Record<DSAPattern | 'general', ErrorSignature[]> = {
     {
       type: 'logic-error',
       patterns: [
-        /\.push\s*\([^)]+\)(?![^}]*\.pop\s*\(\s*\))/s,  // push without pop (no backtrack)
+        /\.push\s*\([^)]+\)(?![\s\S]*\.pop\s*\(\s*\))/,  // push without pop (no backtrack)
       ],
       description: 'Missing backtrack step after recursive call',
       suggestedFix: 'After the recursive call returns, undo the choice (pop from path, unmark visited)',
@@ -381,7 +381,7 @@ const ERROR_SIGNATURES: Record<DSAPattern | 'general', ErrorSignature[]> = {
     {
       type: 'wrong-algorithm',
       patterns: [
-        /for.*for.*for/s,  // Trying all combinations for greedy problem
+        /for.*for.*for/,  // Trying all combinations for greedy problem
       ],
       description: 'Using brute force for a greedy problem',
       suggestedFix: 'Greedy problems have optimal substructure - make locally optimal choices',
@@ -590,7 +590,7 @@ function detectPatternMisuse(code: string, expectedPattern: DSAPattern): Pattern
 
   // Detect recursion without memoization for DP
   if (expectedPattern.startsWith('dp-')) {
-    const hasRecursion = /function\s+\w+[^}]*\1\s*\(/.test(code)
+    const hasRecursion = /function\s+(\w+)[\s\S]*\1\s*\(/.test(code)
     const hasMemo = /memo|cache|dp\[/.test(code)
 
     if (hasRecursion && !hasMemo) {
