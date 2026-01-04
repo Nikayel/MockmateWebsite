@@ -1543,12 +1543,15 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     if (user) {
       try {
         // Create session document first
+        // Include pattern for stats aggregation (used by dashboard Performance Insights)
+        const scenarioPattern = ('pattern' in scenario ? scenario.pattern : scenario.type) || 'unknown'
         const sessionId = await createInterviewSession(
           user.id,
           scenario.title,
           scenario.type,
           scenario.difficulty,
-          scenario.id
+          scenario.id,
+          scenarioPattern
         )
         setCurrentSessionId(sessionId)
 

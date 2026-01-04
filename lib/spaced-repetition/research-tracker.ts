@@ -53,7 +53,8 @@ export async function recordReviewEvent(params: {
   scenarioId: string
   pattern: string
   difficulty: SpacedRepetitionDifficulty
-  score: number
+  score: number                    // Interview score (includes communication)
+  masteryScore: number             // Code-focused score (for SR algorithm)
   qualityRating: number
   timeSpentMinutes: number
   hintsUsed: number
@@ -97,6 +98,7 @@ export async function recordReviewEvent(params: {
     pattern: params.pattern,
     difficulty: params.difficulty,
     score: params.score,
+    mastery_score: params.masteryScore,
     quality_rating: params.qualityRating,
     time_spent_minutes: params.timeSpentMinutes,
     hints_used: params.hintsUsed,

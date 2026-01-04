@@ -14,6 +14,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { trackUsageEvent } from './usage-tracking'
 import type { InteractionMetrics, ScoreBreakdown } from './scoring'
 import { calculateUserScore, getPerformanceFeedback } from './scoring'
+import { calculateMasteryScore, fromInteractionMetrics, type MasteryScoreResult } from './spaced-repetition/mastery-score'
 
 // =============================================================================
 // TYPES
@@ -103,7 +104,9 @@ export interface SessionSummary {
   pattern: string
   difficulty: 'easy' | 'medium' | 'hard'
   durationMinutes: number
-  performanceScore: number
+  performanceScore: number          // Interview score (includes communication)
+  masteryScore: number              // Code-focused score for SR algorithm
+  masteryScoreDetails: MasteryScoreResult  // Breakdown for analytics
   scoreBreakdown: ScoreBreakdown
   feedback: ReturnType<typeof getPerformanceFeedback>
   interactionMetrics: InteractionMetrics
@@ -401,10 +404,57 @@ export async function completeSessionMetrics(params: {
   communicationScore?: number
   thoughtProcessShared?: number
 }): Promise<SessionSummary | null> {
-  const state = activeSessions.get(params.sessionId)
+  let state = activeSessions.get(params.sessionId)
+
+  // Fallback: If session not in memory (server restart, edge function cold start, etc.)
+  // try to reconstruct minimal state from interview_sessions collection
   if (!state) {
-    console.error(`[Session Metrics] No active session found: ${params.sessionId}`)
-    return null
+    console.warn(`[Session Metrics] Session ${params.sessionId} not in memory, attempting fallback...`)
+    try {
+      const sessionDoc = await adminDb.collection('interview_sessions').doc(params.sessionId).get()
+      if (sessionDoc.exists) {
+        const data = sessionDoc.data()!
+        // Reconstruct minimal state for scoring
+        state = {
+          sessionId: params.sessionId,
+          userId: data.user_id,
+          scenarioId: data.scenario_id || params.sessionId,
+          scenarioTitle: data.topic || 'Unknown',
+          pattern: data.pattern || data.type || 'unknown',
+          difficulty: data.difficulty || 'medium',
+          scenarioType: data.type || 'dsa',
+          startedAt: data.started_at || data.created_at || new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          chatMessages: [],
+          interviewerMessages: [],
+          totalChatMessages: 0,
+          totalInterviewerMessages: 0,
+          aiQuestionsAsked: 0,
+          aiSuggestionsReceived: 0,
+          aiSuggestionsApplied: 0,
+          aiSuggestionsCopiedBlindly: 0,
+          hintsViewed: [],
+          hintsTotal: 3,
+          codeExecutions: [],
+          totalExecutions: 0,
+          successfulExecutions: params.testsPassed > 0 ? 1 : 0,
+          approachExplained: false,
+          complexityDiscussed: false,
+          edgeCasesIdentified: [],
+          debuggingAttempts: 0,
+          optimizationAttempts: 0,
+          filesViewed: [],
+          workspaceContextUsed: false,
+        }
+        console.log(`[Session Metrics] Reconstructed session from interview_sessions: ${params.sessionId}`)
+      } else {
+        console.error(`[Session Metrics] No active session found and no fallback available: ${params.sessionId}`)
+        return null
+      }
+    } catch (fallbackError) {
+      console.error(`[Session Metrics] Fallback failed for session ${params.sessionId}:`, fallbackError)
+      return null
+    }
   }
 
   const now = new Date().toISOString()
@@ -478,7 +528,21 @@ export async function completeSessionMetrics(params: {
   const scoreBreakdown = calculateUserScore(interactionMetrics)
   const feedback = getPerformanceFeedback(scoreBreakdown)
 
+  // Calculate mastery score for spaced repetition (code-focused, excludes communication)
+  // This is what the SR algorithm uses to determine review intervals
+  const masteryInput = fromInteractionMetrics(interactionMetrics)
+  const masteryScoreDetails = calculateMasteryScore(masteryInput)
+
   state.performanceScore = scoreBreakdown.overallScore
+
+  // Log the score separation for analytics
+  console.log('[Session Metrics] Score breakdown:', {
+    sessionId: state.sessionId,
+    performanceScore: scoreBreakdown.overallScore,  // Interview score (with communication)
+    masteryScore: masteryScoreDetails.masteryScore,  // Code-focused score (for SR)
+    difference: scoreBreakdown.overallScore - masteryScoreDetails.masteryScore,
+    components: masteryScoreDetails.components,
+  })
 
   // Create summary
   const summary: SessionSummary = {
@@ -489,6 +553,8 @@ export async function completeSessionMetrics(params: {
     difficulty: state.difficulty,
     durationMinutes,
     performanceScore: scoreBreakdown.overallScore,
+    masteryScore: masteryScoreDetails.masteryScore,
+    masteryScoreDetails,
     scoreBreakdown,
     feedback,
     interactionMetrics,
@@ -503,6 +569,7 @@ export async function completeSessionMetrics(params: {
     metadata: {
       durationMinutes,
       performanceScore: scoreBreakdown.overallScore,
+      masteryScore: masteryScoreDetails.masteryScore,
       testsPassed: params.testsPassed,
       testsTotal: params.testsTotal,
     },

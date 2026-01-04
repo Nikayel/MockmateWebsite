@@ -362,6 +362,7 @@ export async function completeSessionWithMastery(
         pattern: sessionData.pattern,
         difficulty: sessionData.difficulty,
         score: sessionData.performanceScore,
+        masteryScore: sessionData.performanceScore, // Fallback: use performance score when detailed metrics unavailable
         qualityRating: mapScoreToQuality(sessionData.performanceScore),
         timeSpentMinutes: sessionData.timeSpentMinutes || 0,
         hintsUsed: sessionData.hintsUsed || 0,
@@ -409,6 +410,7 @@ export async function completeSessionWithMastery(
         pattern: sessionData.pattern,
         difficulty: sessionData.difficulty,
         score: sessionData.performanceScore,
+        masteryScore: sessionData.performanceScore, // Fallback: use performance score when detailed metrics unavailable
         qualityRating,
         timeSpentMinutes: sessionData.timeSpentMinutes || 0,
         hintsUsed: sessionData.hintsUsed || 0,

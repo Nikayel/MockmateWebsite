@@ -426,7 +426,8 @@ export async function createInterviewSession(
   scenarioTitle: string,
   scenarioType: string,
   difficulty: "easy" | "medium" | "hard",
-  scenarioId?: string
+  scenarioId?: string,
+  pattern?: string  // DSA pattern for stats aggregation (e.g., "arrays-hashing", "two-pointers")
 ): Promise<string> {
   const sessionRef = doc(collection(db, "interview_sessions"))
   const sessionData = {
@@ -434,6 +435,7 @@ export async function createInterviewSession(
     user_id: userId,
     topic: scenarioTitle,
     type: scenarioType,
+    pattern: pattern || scenarioType, // Store pattern for stats, fallback to type
     scenario_id: scenarioId, // Store scenario ID for reopening
     difficulty: difficulty,
     started_at: new Date().toISOString(),

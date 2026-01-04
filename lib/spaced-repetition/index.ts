@@ -115,3 +115,13 @@ export {
   getUserDailyMetrics,
   getRecentEvents,
 } from './research-tracker';
+
+// Mastery Score (Code-focused scoring for SR algorithm)
+// Separate from interview score - focuses on correctness, not communication
+export {
+  calculateMasteryScore,
+  fromInteractionMetrics,
+  quickMasteryScore,
+  type MasteryScoreInput,
+  type MasteryScoreResult,
+} from './mastery-score';

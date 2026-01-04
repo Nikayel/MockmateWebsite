@@ -162,12 +162,15 @@ export function useInterviewSession({
       await recordSessionStart(userId)
 
       // Create session in Firestore
+      // Include pattern for stats aggregation (used by dashboard Performance Insights)
+      const scenarioPattern = ('pattern' in selectedScenario ? selectedScenario.pattern : selectedScenario.type) || 'unknown'
       const sessionId = await createInterviewSession(
         userId,
         selectedScenario.title,
         selectedScenario.type,
         selectedScenario.difficulty,
-        selectedScenario.id
+        selectedScenario.id,
+        scenarioPattern
       )
 
       setCurrentSessionId(sessionId)
