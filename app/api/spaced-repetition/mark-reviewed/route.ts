@@ -116,6 +116,7 @@ export async function POST(request: NextRequest) {
     // Calculate next review using algorithm router
     const reviewResult = await calculateNextReview(userId, currentState, {
       performance_score: DEFAULT_MANUAL_REVIEW_SCORE,
+      mastery_score: DEFAULT_MANUAL_REVIEW_SCORE, // Same for manual reviews (no detailed metrics)
       time_spent_minutes: 0,
       hints_used: 0,
       problem_difficulty: difficulty,
@@ -153,6 +154,7 @@ export async function POST(request: NextRequest) {
         pattern: existingMastery.pattern,
         difficulty,
         score: DEFAULT_MANUAL_REVIEW_SCORE,
+        masteryScore: DEFAULT_MANUAL_REVIEW_SCORE, // Same as score for manual reviews (no detailed metrics)
         qualityRating: reviewResult.quality_rating,
         timeSpentMinutes: 0,
         hintsUsed: 0,

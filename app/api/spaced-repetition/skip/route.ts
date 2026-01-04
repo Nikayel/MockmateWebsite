@@ -2,6 +2,7 @@
  * POST /api/spaced-repetition/skip
  *
  * Skip a problem with a small penalty to ease factor.
+ * Records the skip in research tracking for A/B analysis.
  *
  * Request Body:
  * - problem_id: string - The problem/scenario ID to skip
@@ -9,7 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth-helpers';
-import { skipProblem } from '@/lib/spaced-repetition';
+import { skipProblem, recordSkippedReview } from '@/lib/spaced-repetition';
 import { logger } from '@/lib/logger';
 
 interface SkipRequestBody {
@@ -43,6 +44,14 @@ export async function POST(request: NextRequest) {
 
     // Skip the problem
     await skipProblem(userId, problem_id);
+
+    // Record skip in research tracking for A/B analysis
+    try {
+      await recordSkippedReview(userId);
+    } catch (researchError) {
+      // Don't fail the skip if research tracking fails
+      logger.error('Failed to record skipped review in research tracking', { error: researchError });
+    }
 
     return NextResponse.json({
       success: true,
