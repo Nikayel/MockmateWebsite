@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+out/
+coverage/
+
+# Config files that shouldn't be formatted
+*.config.js
+*.config.mjs
+package-lock.json
+pnpm-lock.yaml
+
+# Generated files
+.next/types/**
+next-env.d.ts
+
+# Extension (separate project)
+extension/
+
+# Documentation
+*.md
