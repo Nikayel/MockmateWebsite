@@ -41,6 +41,7 @@ import {
   quickMasteryScore,
 } from '@/lib/spaced-repetition';
 import { updateLearningStateAfterSession } from '@/lib/learning-state';
+import { triggerSessionNotifications } from '@/lib/services/session-notifications';
 import type { DSAPattern } from '@/lib/types/dsa-patterns';
 import type { Difficulty } from '@/lib/spaced-repetition';
 import type { SpacedRepetitionMasteryLevel } from '@/lib/types';
@@ -320,10 +321,35 @@ export async function POST(request: NextRequest) {
     // Get daily progress
     const dailyProgress = await getDailyGoalProgress(userId);
 
-    // Get updated streak
-    const { adminDb } = await import('@/lib/firebase-admin');
-    const learningStateDoc = await adminDb.collection('user_learning_state').doc(userId).get();
+    // Get updated streak and problems count
+    const { adminDb: adminDbForNotifications } = await import('@/lib/firebase-admin');
+    const [learningStateDoc, problemsCountSnapshot] = await Promise.all([
+      adminDbForNotifications.collection('user_learning_state').doc(userId).get(),
+      adminDbForNotifications
+        .collection('problem_mastery')
+        .doc(userId)
+        .collection('problems')
+        .count()
+        .get(),
+    ]);
     const learningState = learningStateDoc.data();
+    const problemsSolvedTotal = problemsCountSnapshot.data().count;
+
+    // Trigger smart notifications (milestones, weak patterns, etc.)
+    // This runs async and won't block the response
+    triggerSessionNotifications({
+      userId,
+      problemId: problem_id,
+      scenarioId: scenario_id,
+      pattern,
+      performanceScore: performance_score,
+      masteryScore,
+      timeSpentMinutes: time_spent_minutes,
+      hintsUsed: hints_used,
+      streakDays: learningState?.streak_days || 0,
+      problemsSolvedTotal,
+      isNewProblem: !existingMastery,
+    }).catch(err => logger.error('Session notification error', { error: err }));
 
     // Calculate XP earned (gamification)
     let xpEarned = 10; // Base XP
