@@ -225,6 +225,7 @@ export async function POST(request: NextRequest) {
           pattern,
           difficulty,
           score: performance_score,
+          masteryScore: masteryScore,  // Code-focused score for research comparison
           qualityRating: reviewResult.quality_rating,
           timeSpentMinutes: time_spent_minutes,
           hintsUsed: hints_used,
@@ -279,6 +280,7 @@ export async function POST(request: NextRequest) {
           pattern,
           difficulty,
           score: performance_score,
+          masteryScore: masteryScore,  // Code-focused score for research comparison
           qualityRating,
           timeSpentMinutes: time_spent_minutes,
           hintsUsed: hints_used,

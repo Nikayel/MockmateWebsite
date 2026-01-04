@@ -542,7 +542,8 @@ export interface AlgorithmResearchEvent {
   difficulty: SpacedRepetitionDifficulty
 
   // Performance
-  score: number
+  score: number                        // Interview score (includes communication)
+  mastery_score: number                // Code-focused score (for SR algorithm)
   quality_rating: number               // SM-2: 0-5, FSRS: 1-4
   time_spent_minutes: number
   hints_used: number
