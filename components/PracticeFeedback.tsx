@@ -678,7 +678,7 @@ export default function PracticeFeedback({
                   sections.whatWorked.slice(0, 3).map((item, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
                       <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-                      <span className="line-clamp-2">{item}</span>
+                      <span>{item}</span>
                     </li>
                   ))
                 ) : overallScore < 25 && problemType === 'system-design' ? (
@@ -704,22 +704,22 @@ export default function PracticeFeedback({
                   sections.fixNext.slice(0, 3).map((item, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
                       <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
-                      <span className="line-clamp-2">{item}</span>
+                      <span>{item}</span>
                     </li>
                   ))
                 ) : overallScore < 25 && problemType === 'system-design' ? (
                   <>
                     <li className="flex items-start gap-2 text-sm text-gray-300">
                       <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-                      <span className="line-clamp-2">ENGAGE with the interviewer - system design is a conversation, not a silent exercise</span>
+                      <span>ENGAGE with the interviewer - system design is a conversation, not a silent exercise</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm text-gray-300">
                       <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
-                      <span className="line-clamp-2">Document your design decisions in the notes panel</span>
+                      <span>Document your design decisions in the notes panel</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm text-gray-300">
                       <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
-                      <span className="line-clamp-2">Practice explaining your thought process out loud</span>
+                      <span>Practice explaining your thought process out loud</span>
                     </li>
                   </>
                 ) : (
