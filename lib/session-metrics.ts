@@ -14,6 +14,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { trackUsageEvent } from './usage-tracking'
 import type { InteractionMetrics, ScoreBreakdown } from './scoring'
 import { calculateUserScore, getPerformanceFeedback } from './scoring'
+import { calculateMasteryScore, fromInteractionMetrics, type MasteryScoreResult } from './spaced-repetition/mastery-score'
 
 // =============================================================================
 // TYPES
@@ -103,7 +104,9 @@ export interface SessionSummary {
   pattern: string
   difficulty: 'easy' | 'medium' | 'hard'
   durationMinutes: number
-  performanceScore: number
+  performanceScore: number          // Interview score (includes communication)
+  masteryScore: number              // Code-focused score for SR algorithm
+  masteryScoreDetails: MasteryScoreResult  // Breakdown for analytics
   scoreBreakdown: ScoreBreakdown
   feedback: ReturnType<typeof getPerformanceFeedback>
   interactionMetrics: InteractionMetrics
@@ -478,7 +481,21 @@ export async function completeSessionMetrics(params: {
   const scoreBreakdown = calculateUserScore(interactionMetrics)
   const feedback = getPerformanceFeedback(scoreBreakdown)
 
+  // Calculate mastery score for spaced repetition (code-focused, excludes communication)
+  // This is what the SR algorithm uses to determine review intervals
+  const masteryInput = fromInteractionMetrics(interactionMetrics)
+  const masteryScoreDetails = calculateMasteryScore(masteryInput)
+
   state.performanceScore = scoreBreakdown.overallScore
+
+  // Log the score separation for analytics
+  console.log('[Session Metrics] Score breakdown:', {
+    sessionId: state.sessionId,
+    performanceScore: scoreBreakdown.overallScore,  // Interview score (with communication)
+    masteryScore: masteryScoreDetails.masteryScore,  // Code-focused score (for SR)
+    difference: scoreBreakdown.overallScore - masteryScoreDetails.masteryScore,
+    components: masteryScoreDetails.components,
+  })
 
   // Create summary
   const summary: SessionSummary = {
@@ -489,6 +506,8 @@ export async function completeSessionMetrics(params: {
     difficulty: state.difficulty,
     durationMinutes,
     performanceScore: scoreBreakdown.overallScore,
+    masteryScore: masteryScoreDetails.masteryScore,
+    masteryScoreDetails,
     scoreBreakdown,
     feedback,
     interactionMetrics,
@@ -503,6 +522,7 @@ export async function completeSessionMetrics(params: {
     metadata: {
       durationMinutes,
       performanceScore: scoreBreakdown.overallScore,
+      masteryScore: masteryScoreDetails.masteryScore,
       testsPassed: params.testsPassed,
       testsTotal: params.testsTotal,
     },

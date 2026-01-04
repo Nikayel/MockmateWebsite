@@ -57,13 +57,19 @@ export interface AlgorithmState {
 }
 
 export interface ReviewInput {
-  performance_score: number      // 0-100
+  performance_score: number      // 0-100 (interview score - includes communication)
   time_spent_minutes: number
   hints_used: number
   problem_difficulty: Difficulty
   is_early_review?: boolean
   days_overdue?: number
   streak_days?: number
+
+  // Code-focused mastery score (optional, preferred for SR calculations)
+  // This score focuses on correctness/time/hints, EXCLUDING communication
+  // If provided, this is what the SR algorithm uses to determine intervals
+  // If not provided, falls back to performance_score for backwards compatibility
+  mastery_score?: number         // 0-100 (code mastery - excludes communication)
 }
 
 export interface ReviewOutput {
@@ -162,15 +168,22 @@ export async function calculateNextReview(
 
 /**
  * Calculate review using SM-2 algorithm
+ *
+ * Uses mastery_score (code-focused) if available, otherwise falls back to
+ * performance_score (interview score including communication).
  */
 function calculateSM2Review(
   currentState: AlgorithmState,
   input: ReviewInput
 ): ReviewOutput {
+  // Use mastery_score for SR calculations if available (code-focused, no communication)
+  // Fall back to performance_score for backwards compatibility
+  const scoreForSR = input.mastery_score ?? input.performance_score
+
   const sm2Input: SM2Input = {
     previousInterval: currentState.interval_days,
     previousEaseFactor: currentState.ease_factor || 2.5,
-    performanceScore: input.performance_score,
+    performanceScore: scoreForSR,
     reviewCount: currentState.review_count,
     lastReviewDate: new Date(),
     problemDifficulty: input.problem_difficulty,
@@ -199,6 +212,9 @@ function calculateSM2Review(
 
 /**
  * Calculate review using FSRS algorithm
+ *
+ * Uses mastery_score (code-focused) if available, otherwise falls back to
+ * performance_score (interview score including communication).
  */
 function calculateFSRSReview(
   currentState: AlgorithmState,
@@ -206,6 +222,10 @@ function calculateFSRSReview(
 ): ReviewOutput {
   // Get or create FSRS card state
   let card: FSRSCard = currentState.fsrs_state || createFSRSCard()
+
+  // Use mastery_score for SR calculations if available (code-focused, no communication)
+  // Fall back to performance_score for backwards compatibility
+  const scoreForSR = input.mastery_score ?? input.performance_score
 
   // Map performance score to FSRS rating
   // Handle time_spent_minutes = 0 (untracked) by using neutral ratio of 1.0
@@ -216,7 +236,7 @@ function calculateFSRSReview(
     : 1.0 // Neutral ratio when time is not tracked
 
   const rating = mapPerformanceToFSRSRating(
-    input.performance_score,
+    scoreForSR,
     input.hints_used,
     timeRatio
   )

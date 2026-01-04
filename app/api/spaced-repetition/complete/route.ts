@@ -5,10 +5,18 @@
  *
  * Request Body:
  * - problem_id: string - The problem/scenario ID
- * - performance_score: number - 0-100 score
+ * - performance_score: number - 0-100 interview score (includes communication)
+ * - mastery_score: number (optional) - 0-100 code-focused score for SR algorithm
  * - time_spent_minutes: number - Time spent on the problem
  * - hints_used: number - Number of hints used
+ * - test_cases_passed: number (optional) - For mastery score calculation
+ * - test_cases_total: number (optional) - For mastery score calculation
  * - completed_at: string (optional) - ISO date string
+ *
+ * Note: The spaced repetition algorithm uses mastery_score (code correctness)
+ * rather than performance_score (which includes communication skills).
+ * This separation ensures SR focuses on cognitive retention of patterns,
+ * not interview soft skills.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -29,6 +37,8 @@ import {
   estimateRetentionForAlgorithm,
   // Research Tracking
   recordReviewEvent,
+  // Mastery Score (code-focused scoring for SR)
+  quickMasteryScore,
 } from '@/lib/spaced-repetition';
 import { updateLearningStateAfterSession } from '@/lib/learning-state';
 import type { DSAPattern } from '@/lib/types/dsa-patterns';
@@ -38,9 +48,12 @@ import type { SpacedRepetitionMasteryLevel } from '@/lib/types';
 interface CompleteRequestBody {
   problem_id: string;
   scenario_id?: string;
-  performance_score: number;
+  performance_score: number;        // Interview score (includes communication)
+  mastery_score?: number;           // Code-focused score for SR (optional, calculated if not provided)
   time_spent_minutes?: number;
   hints_used?: number;
+  test_cases_passed?: number;       // For mastery score calculation
+  test_cases_total?: number;        // For mastery score calculation
   completed_at?: string;
 }
 
@@ -64,8 +77,11 @@ export async function POST(request: NextRequest) {
       problem_id,
       scenario_id = problem_id,
       performance_score,
+      mastery_score: providedMasteryScore,
       time_spent_minutes = 0,
       hints_used = 0,
+      test_cases_passed = 0,
+      test_cases_total = 0,
       completed_at = new Date().toISOString(),
     } = body;
 
@@ -95,6 +111,25 @@ export async function POST(request: NextRequest) {
 
     const pattern = (scenario as any).pattern as DSAPattern || 'arrays-hashing';
     const difficulty = scenario.difficulty as Difficulty;
+
+    // Calculate mastery score for spaced repetition
+    // This is separate from performance_score - it focuses on code correctness, not communication
+    const masteryScore = providedMasteryScore ?? quickMasteryScore({
+      performanceScore: performance_score,
+      testCasesPassed: test_cases_passed,
+      testCasesTotal: test_cases_total,
+      timeSpentMinutes: time_spent_minutes,
+      hintsUsed: hints_used,
+      problemDifficulty: difficulty,
+    });
+
+    logger.info('SR scoring', {
+      userId,
+      problemId: problem_id,
+      performanceScore: performance_score,  // Interview score (with communication)
+      masteryScore,                         // Code-focused score (for SR)
+      scoreDifference: performance_score - masteryScore,
+    });
 
     // Get existing problem mastery or create new
     const problems = await getAllUserProblems(userId);
@@ -145,8 +180,10 @@ export async function POST(request: NextRequest) {
       );
 
       // Calculate next review using algorithm router (A/B testing)
+      // Pass mastery_score for SR calculations (code-focused, excludes communication)
       const reviewResult = await calculateNextReview(userId, currentState, {
         performance_score,
+        mastery_score: masteryScore,  // Code-focused score for SR algorithm
         time_spent_minutes,
         hints_used,
         problem_difficulty: difficulty,
