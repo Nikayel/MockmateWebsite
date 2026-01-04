@@ -244,7 +244,7 @@ export function CodeConsole({
         {/* Console.log outputs */}
         {outputs.map((output, index) => (
           <div
-            key={index}
+            key={output.id ?? `output-${output.type}-${index}`}
             className={cn(
               'flex items-start gap-2',
               output.type === 'error' && 'text-red-400',
@@ -286,7 +286,7 @@ export function CodeConsole({
 
             {/* Individual test results */}
             {testResults.map((result, index) => (
-              <div key={index} className="py-0.5">
+              <div key={`test-${result.description?.slice(0, 20) ?? index}-${index}`} className="py-0.5">
                 <div className={cn(
                   'flex items-center gap-2',
                   result.passed ? 'text-green-400' : 'text-red-400'

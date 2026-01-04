@@ -67,7 +67,7 @@ export function TimeSeriesChart({
           {formatXAxis(label)}
         </p>
         {payload.map((entry: any, index: number) => (
-          <div key={index} className="flex items-center gap-2 text-sm">
+          <div key={entry.name ?? `tooltip-${index}`} className="flex items-center gap-2 text-sm">
             <div
               className="w-3 h-3 rounded-full"
               style={{ backgroundColor: entry.color }}

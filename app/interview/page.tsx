@@ -3288,7 +3288,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                   </p>
                                 ) : (
                                   chatMessages.slice(-4).map((msg, index) => (
-                                    <div key={index} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
+                                    <div key={msg.id ?? `inline-chat-${msg.type}-${index}`} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
                                       <div className={`max-w-[85%] px-2 py-1 rounded text-[10px] ${msg.type === "user" ? "bg-blue-600/80 text-white" : "bg-gray-700 text-gray-200"}`}>
                                         <p className="break-words whitespace-pre-wrap">{msg.message}</p>
                                       </div>
@@ -3353,7 +3353,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           <>
                             {interviewerMessages.map((msg, index) => (
                               <div
-                                key={index}
+                                key={msg.id ?? `interviewer-${msg.type}-${index}`}
                                 className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
                               >
                                 <div

@@ -140,7 +140,7 @@ export function TestResultsPanel({
       <div className="space-y-1 max-h-48 overflow-y-auto">
         {results.map((result, index) => (
           <div
-            key={index}
+            key={`test-${result.description.slice(0, 20)}-${index}`}
             className={cn(
               'rounded border transition-colors',
               result.passed
