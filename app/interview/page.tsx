@@ -2422,9 +2422,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         const errorMessage = data.error || `Server error (${response.status})`
 
         // Show error in console instead of just toast
-        setConsoleLogs([`❌ Execution Error: ${errorMessage}`])
+        setConsoleLogs([{ type: 'error', message: `❌ Execution Error: ${errorMessage}`, timestamp: Date.now() }])
         setTestResults([{
-          name: "Execution Error",
+          description: "Execution Error",
           passed: false,
           error: errorMessage,
           input: "",
@@ -2542,9 +2542,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         const errorMessage = data.error || `Server error (${response.status})`
 
         // Show error in console instead of just toast
-        setConsoleLogs([`❌ Execution Error: ${errorMessage}`])
+        setConsoleLogs([{ type: 'error', message: `❌ Execution Error: ${errorMessage}`, timestamp: Date.now() }])
         setTestResults([{
-          name: "Execution Error",
+          description: "Execution Error",
           passed: false,
           error: errorMessage,
           input: "",

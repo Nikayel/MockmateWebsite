@@ -70,6 +70,10 @@ export async function executeWithPiston(
   try {
     const startTime = Date.now()
 
+    // Create abort controller for timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second total timeout
+
     const response = await fetch(`${PISTON_API_URL}/execute`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -78,17 +82,35 @@ export async function executeWithPiston(
         version: langConfig.version,
         files: [{ content: wrappedCode }],
         stdin: '',
-        run_timeout: 5000, // 5 second timeout
+        run_timeout: 5000, // 5 second timeout for code execution
         compile_timeout: 5000,
       }),
+      signal: controller.signal,
     })
+
+    clearTimeout(timeoutId)
 
     if (!response.ok) {
       const errorText = await response.text()
+      // Provide more helpful error messages for common issues
+      if (response.status === 429) {
+        return {
+          success: false,
+          output: null,
+          error: 'Code execution service is busy. Please try again in a few seconds.',
+        }
+      }
+      if (response.status >= 500) {
+        return {
+          success: false,
+          output: null,
+          error: 'Code execution service is temporarily unavailable. Please try again.',
+        }
+      }
       return {
         success: false,
         output: null,
-        error: `Piston API error: ${response.status} - ${errorText}`,
+        error: `Code execution failed (${response.status}): ${errorText}`,
       }
     }
 
@@ -122,10 +144,33 @@ export async function executeWithPiston(
       executionTime,
     }
   } catch (error) {
+    // Handle specific error types
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        return {
+          success: false,
+          output: null,
+          error: 'Code execution timed out. Try simplifying your solution or check for infinite loops.',
+        }
+      }
+      // Network errors
+      if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('ECONNREFUSED')) {
+        return {
+          success: false,
+          output: null,
+          error: 'Unable to connect to code execution service. Please check your connection and try again.',
+        }
+      }
+      return {
+        success: false,
+        output: null,
+        error: error.message,
+      }
+    }
     return {
       success: false,
       output: null,
-      error: error instanceof Error ? error.message : 'Failed to execute code',
+      error: 'An unexpected error occurred while running your code.',
     }
   }
 }
