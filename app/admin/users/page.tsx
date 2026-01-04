@@ -50,10 +50,11 @@ export default function UsersPage() {
   const [authToken, setAuthToken] = useState<string | null>(null)
 
   // Protected emails - these users cannot be deleted
-  const PROTECTED_EMAILS = [
-    "alinikayeljamal@gmail.com",
-    "nikayeeljamaljan@gmail.com",
-  ]
+  // SECURITY: Load from environment variable (UI check only - real protection is server-side)
+  const PROTECTED_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_PROTECTED_EMAILS || '')
+    .split(',')
+    .map(email => email.trim().toLowerCase())
+    .filter(email => email.length > 0)
 
   const loadData = useCallback(async () => {
     if (!firebaseUser) return
@@ -286,8 +287,8 @@ export default function UsersPage() {
                           item.color === "yellow"
                             ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
                             : item.color === "purple"
-                            ? "bg-purple-600/20 text-purple-400 border-purple-600/30"
-                            : "bg-gray-600/20 text-gray-400 border-gray-600/30"
+                              ? "bg-purple-600/20 text-purple-400 border-purple-600/30"
+                              : "bg-gray-600/20 text-gray-400 border-gray-600/30"
                         }
                       >
                         {item.tier}
@@ -297,13 +298,12 @@ export default function UsersPage() {
                       <span className="text-white font-semibold">{item.count}</span>
                       <div className="w-32 h-2 bg-gray-700 rounded-full overflow-hidden">
                         <div
-                          className={`h-full rounded-full ${
-                            item.color === "yellow"
-                              ? "bg-yellow-400"
-                              : item.color === "purple"
+                          className={`h-full rounded-full ${item.color === "yellow"
+                            ? "bg-yellow-400"
+                            : item.color === "purple"
                               ? "bg-purple-400"
                               : "bg-gray-400"
-                          }`}
+                            }`}
                           style={{
                             width: `${metrics.users.total > 0 ? (item.count / metrics.users.total) * 100 : 0}%`,
                           }}
@@ -388,8 +388,8 @@ export default function UsersPage() {
                               user.subscription_tier === "pro"
                                 ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
                                 : user.subscription_tier === "enterprise"
-                                ? "bg-purple-600/20 text-purple-400 border-purple-600/30"
-                                : "bg-gray-600/20 text-gray-400 border-gray-600/30"
+                                  ? "bg-purple-600/20 text-purple-400 border-purple-600/30"
+                                  : "bg-gray-600/20 text-gray-400 border-gray-600/30"
                             }
                           >
                             {user.subscription_tier || "free"}
