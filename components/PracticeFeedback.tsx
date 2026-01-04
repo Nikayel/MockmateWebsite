@@ -1,28 +1,22 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   CheckCircle,
   TrendingUp,
   Target,
   Code,
-  MessageSquare,
   ChevronDown,
   ChevronUp,
-  FileText,
   RotateCcw,
   Play,
   Download,
   Sparkles,
   Clock,
-  BarChart3,
   Lightbulb,
   AlertTriangle,
-  Award,
   Zap,
   BookOpen,
   Layers,
@@ -30,11 +24,11 @@ import {
   Search,
   Bug,
   Wrench,
-  XCircle
+  XCircle,
+  MessageSquare
 } from "lucide-react"
 import { LearningRecommendations } from "@/components/LearningRecommendations"
 import { NextProblemRecommendations } from "@/components/NextProblemRecommendations"
-import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 
 interface FeedbackSection {
@@ -166,7 +160,6 @@ function parseFeedback(feedback: string): FeedbackSection {
       sections.scores.communication = communication.score
     }
 
-    // Legacy scores
     const correctness = parseScoreWithJustification('Correctness', scoreText, true)
     sections.scores.correctness = correctness.score === 0 ? parseScoreWithJustification('Correctness', scoreText, false).score : correctness.score
 
@@ -254,78 +247,39 @@ export default function PracticeFeedback({
   const [showRecommendations, setShowRecommendations] = useState(false)
 
   const sections = parseFeedback(feedback)
-
   const feedbackLower = feedback.toLowerCase()
-  
-  // Check if edge cases were DISCUSSED with interviewer (not just solved correctly)
+
   const edgeCasesDiscussed = /edge cases considered:\s*yes/i.test(feedback) ||
     /discussed.*edge case/i.test(feedback) ||
     /mentioned.*edge case/i.test(feedback) ||
     feedbackLower.includes('edge case') || feedbackLower.includes('corner case')
   const hasAlternatives = feedbackLower.includes('alternative') || feedbackLower.includes('another approach') || feedbackLower.includes('trade-off') || feedbackLower.includes('tradeoff')
 
-  // CRITICAL: Only show "optimal complexity" if:
-  // 1. The efficiency score is high (>= 70)
-  // 2. AND the solution actually works (> 50% tests passing)
-  // This prevents showing "optimal" for incomplete solutions that only pass edge cases
   const testPassRate = testsTotal > 0 ? (testsPassed / testsTotal) * 100 : 0
   const solutionWorks = testPassRate >= 50
   const complexityAccurate = (efficiencyScore || 0) >= 70 && solutionWorks
 
-  // System design specific indicators
   const hasRequirements = feedbackLower.includes('requirement') || feedbackLower.includes('clarif') || feedbackLower.includes('scope')
   const hasScalability = feedbackLower.includes('scal') || feedbackLower.includes('performance') || feedbackLower.includes('load') || feedbackLower.includes('capacity')
-
-  // Bug fix specific indicators
   const hasBugIdentified = feedbackLower.includes('bug') || feedbackLower.includes('issue') || feedbackLower.includes('problem') || feedbackLower.includes('error')
   const hasRootCause = feedbackLower.includes('root cause') || feedbackLower.includes('because') || feedbackLower.includes('reason') || feedbackLower.includes('why')
-
-  // Extract one-liner feedback for complexity, edge cases, and alternatives
-  const extractFeedbackExplanation = (keyword: string, context: string): string => {
-    const regex = new RegExp(`(${keyword}[^.]*?\\.)`, 'i')
-    const match = context.match(regex)
-    if (match) {
-      // Clean up the match - remove the keyword itself and trim
-      let explanation = match[1].replace(new RegExp(keyword, 'i'), '').trim()
-      // Remove leading punctuation
-      explanation = explanation.replace(/^[:\-–—\s]+/, '').trim()
-      // Limit to one sentence
-      const sentences = explanation.split(/[.!?]+/)
-      return sentences[0]?.trim() || ''
-    }
-    return ''
-  }
-
-  // Try to extract explanations from feedback
-  // For non-working solutions, don't claim anything about complexity
-  const complexityExplanation = extractFeedbackExplanation('complexity|time complexity|space complexity', feedback) ||
-    (!solutionWorks
-      ? 'Solution must pass tests before complexity can be evaluated'
-      : complexityAccurate
-        ? 'Optimal complexity achieved'
-        : 'Could improve complexity analysis')
-  const edgeCasesExplanation = extractFeedbackExplanation('edge case|corner case', feedback) ||
-    (edgeCasesDiscussed ? 'Edge cases discussed with interviewer' : 'Did not discuss edge cases with interviewer')
-  const alternativesExplanation = extractFeedbackExplanation('alternative|another approach|different approach', feedback) ||
-    (hasAlternatives ? 'Alternative approaches discussed' : 'Consider discussing alternatives')
 
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60)
     return minutes > 0 ? `${minutes}m` : `${seconds}s`
   }
 
-  // Fallback score inference
   const hasParsedScores = sections.scores.understanding > 0 || sections.scores.problemSolving > 0 ||
     sections.scores.codeQuality > 0 || sections.scores.communication > 0
 
   if (!hasParsedScores && performanceScore > 0) {
     const baseScore = performanceScore <= 10 ? performanceScore * 10 : performanceScore
-    const testPassRate = testsTotal > 0 ? testsPassed / testsTotal : 1
+    const testPassRateVal = testsTotal > 0 ? testsPassed / testsTotal : 1
     const hasCommunicationIssues = feedbackLower.includes('explain') || feedbackLower.includes('thought process')
 
-    sections.scores.understanding = Math.round(baseScore * testPassRate * 0.9)
-    sections.scores.problemSolving = Math.round(baseScore * (testPassRate > 0.8 ? 1 : 0.8))
-    sections.scores.codeQuality = Math.round(baseScore * testPassRate)
+    sections.scores.understanding = Math.round(baseScore * testPassRateVal * 0.9)
+    sections.scores.problemSolving = Math.round(baseScore * (testPassRateVal > 0.8 ? 1 : 0.8))
+    sections.scores.codeQuality = Math.round(baseScore * testPassRateVal)
     sections.scores.communication = Math.round(baseScore * (hasCommunicationIssues ? 0.5 : 0.7))
 
     sections.scores.overall = Math.round(
@@ -345,21 +299,19 @@ export default function PracticeFeedback({
     communication: normalizeScore(sections.scores.communication || 0),
   }
 
-  // Use performanceScore as primary source if available, otherwise use parsed overall score
-  // This ensures consistency between what's saved and what's displayed
-  const overallScore = performanceScore > 0 ? normalizeScore(performanceScore) : 
+  const overallScore = performanceScore > 0 ? normalizeScore(performanceScore) :
     (sections.scores.overall > 0 ? normalizeScore(sections.scores.overall) : 0)
 
   const getLetterGrade = (score: number) => {
     if (score >= 95) return { grade: "A+", color: "text-emerald-400" }
     if (score >= 90) return { grade: "A", color: "text-emerald-400" }
     if (score >= 85) return { grade: "A-", color: "text-emerald-400" }
-    if (score >= 80) return { grade: "B+", color: "text-[#00d9ff]" }
-    if (score >= 75) return { grade: "B", color: "text-[#00d9ff]" }
-    if (score >= 70) return { grade: "B-", color: "text-[#00d9ff]" }
-    if (score >= 65) return { grade: "C+", color: "text-yellow-400" }
-    if (score >= 60) return { grade: "C", color: "text-yellow-400" }
-    if (score >= 55) return { grade: "C-", color: "text-yellow-400" }
+    if (score >= 80) return { grade: "B+", color: "text-sky-400" }
+    if (score >= 75) return { grade: "B", color: "text-sky-400" }
+    if (score >= 70) return { grade: "B-", color: "text-sky-400" }
+    if (score >= 65) return { grade: "C+", color: "text-amber-400" }
+    if (score >= 60) return { grade: "C", color: "text-amber-400" }
+    if (score >= 55) return { grade: "C-", color: "text-amber-400" }
     if (score >= 50) return { grade: "D", color: "text-orange-400" }
     return { grade: "F", color: "text-red-400" }
   }
@@ -374,7 +326,7 @@ export default function PracticeFeedback({
 
     doc.setFontSize(20)
     doc.setFont("helvetica", "bold")
-    doc.text("CodeSparring - Interview Feedback", margin, y)
+    doc.text("MockMate - Interview Feedback", margin, y)
     y += 12
 
     doc.setFontSize(10)
@@ -415,412 +367,313 @@ export default function PracticeFeedback({
       })
     }
 
-    doc.save(`codesparring-feedback-${Date.now()}.pdf`)
+    doc.save(`mockmate-feedback-${Date.now()}.pdf`)
   }
 
+  // Score items config based on problem type
+  const scoreItems = problemType === 'system-design' ? [
+    { name: "Requirements", score: scores.understanding, weight: "20%", icon: Search, colorClass: "text-sky-400" },
+    { name: "Architecture", score: scores.problemSolving, weight: "30%", icon: Layers, colorClass: "text-emerald-400" },
+    { name: "Scalability", score: scores.codeQuality, weight: "20%", icon: Scale, colorClass: "text-violet-400" },
+    { name: "Communication", score: scores.communication, weight: "30%", icon: MessageSquare, colorClass: "text-amber-400" },
+  ] : problemType === 'bugfix' ? [
+    { name: "Bug Found", score: scores.understanding, weight: "35%", icon: Bug, colorClass: "text-sky-400" },
+    { name: "Root Cause", score: scores.problemSolving, weight: "25%", icon: Search, colorClass: "text-emerald-400" },
+    { name: "Fix Quality", score: scores.codeQuality, weight: "20%", icon: Wrench, colorClass: "text-violet-400" },
+    { name: "Communication", score: scores.communication, weight: "20%", icon: MessageSquare, colorClass: "text-amber-400" },
+  ] : [
+    { name: "Understanding", score: scores.understanding, weight: "30%", icon: Lightbulb, colorClass: "text-sky-400" },
+    { name: "Problem-Solving", score: scores.problemSolving, weight: "25%", icon: Zap, colorClass: "text-emerald-400" },
+    { name: "Code Quality", score: scores.codeQuality, weight: "25%", icon: Code, colorClass: "text-violet-400" },
+    { name: "Communication", score: scores.communication, weight: "20%", icon: MessageSquare, colorClass: "text-amber-400" },
+  ]
+
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-4">
+    <div className="w-full space-y-4">
       {/* Screen reader */}
       <div role="status" aria-live="polite" className="sr-only">
         Interview feedback loaded. Grade: {grade}. Score: {overallScore}/100.
       </div>
 
-      {/* Hero Section - Grade + Quick Actions */}
-      <div className="bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 rounded-2xl border border-gray-800 overflow-hidden">
-        <div className="p-6">
-          {/* Header row */}
-          <div className="flex items-start justify-between gap-4 mb-4">
+      {/* Compact Header with Grade */}
+      <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl overflow-hidden">
+        <div className="p-5">
+          <div className="flex items-start gap-4">
+            {/* Grade Circle - Compact */}
+            <div className={cn(
+              "w-14 h-14 rounded-xl flex items-center justify-center border shrink-0",
+              overallScore >= 80 ? "border-emerald-500/30 bg-emerald-500/10" :
+                overallScore >= 60 ? "border-sky-500/30 bg-sky-500/10" :
+                  overallScore >= 40 ? "border-amber-500/30 bg-amber-500/10" :
+                    "border-red-500/30 bg-red-500/10"
+            )}>
+              <span className={cn("text-xl font-bold", color)}>{grade}</span>
+            </div>
+
+            {/* TL;DR */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
-                <Badge className="bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/30 text-xs">
-                  {difficulty || "Medium"}
-                </Badge>
-                <Badge className={cn(
-                  "text-xs",
-                  overallScore >= 60
-                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
-                    : overallScore >= 40
-                      ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
-                      : "bg-red-500/20 text-red-400 border-red-500/30"
-                )}>
-                  {overallScore >= 60
-                    ? "Completed"
-                    : overallScore >= 40
-                      ? "Needs Work"
-                      : overallScore >= 20
-                        ? "Incomplete"
-                        : "Not Attempted"}
-                </Badge>
+              <p className="text-zinc-300 text-sm leading-relaxed">
+                {sections.tldr || (
+                  problemType === 'system-design'
+                    ? (overallScore < 25
+                        ? `Submitted without engagement. No design discussion provided.`
+                        : overallScore < 40
+                          ? `Minimal system design discussion. More participation needed.`
+                          : `Completed design discussion in ${formatTime(elapsedTime)}.`)
+                    : problemType === 'bugfix'
+                      ? `Completed bug fix in ${formatTime(elapsedTime)}. Fixed ${testsPassed}/${testsTotal} issues.`
+                      : `Completed ${testsPassed}/${testsTotal} tests in ${formatTime(elapsedTime)}.`
+                )}
+              </p>
+
+              {/* Quick stats */}
+              <div className="flex flex-wrap items-center gap-3 mt-3 text-xs text-zinc-500">
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {formatTime(elapsedTime)}
+                </span>
+                {problemType === 'system-design' ? (
+                  <>
+                    <span className="flex items-center gap-1">
+                      {hasRequirements ? <CheckCircle className="h-3 w-3 text-emerald-500" /> : <AlertTriangle className="h-3 w-3 text-zinc-600" />}
+                      Requirements
+                    </span>
+                    <span className="flex items-center gap-1">
+                      {hasScalability ? <CheckCircle className="h-3 w-3 text-emerald-500" /> : <AlertTriangle className="h-3 w-3 text-zinc-600" />}
+                      Scalability
+                    </span>
+                  </>
+                ) : problemType === 'bugfix' ? (
+                  <>
+                    <span className="flex items-center gap-1">
+                      {hasBugIdentified ? <CheckCircle className="h-3 w-3 text-emerald-500" /> : <AlertTriangle className="h-3 w-3 text-zinc-600" />}
+                      Bug Found
+                    </span>
+                    <span className="flex items-center gap-1">
+                      {hasRootCause ? <CheckCircle className="h-3 w-3 text-emerald-500" /> : <AlertTriangle className="h-3 w-3 text-zinc-600" />}
+                      Root Cause
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="flex items-center gap-1">
+                      {complexityAccurate ? <CheckCircle className="h-3 w-3 text-emerald-500" /> : <AlertTriangle className="h-3 w-3 text-zinc-600" />}
+                      Complexity
+                    </span>
+                    <span className="flex items-center gap-1">
+                      {edgeCasesDiscussed ? <CheckCircle className="h-3 w-3 text-emerald-500" /> : <AlertTriangle className="h-3 w-3 text-zinc-600" />}
+                      Edge Cases
+                    </span>
+                  </>
+                )}
               </div>
-              <h1 className="text-xl font-bold text-white truncate">
-                {problemTitle || problemType || "Interview Session"}
-              </h1>
             </div>
-
-            {/* Grade circle */}
-            <div className="flex flex-col items-center">
-              <div className={cn(
-                "w-16 h-16 rounded-full flex items-center justify-center border-4",
-                overallScore >= 80 ? "border-emerald-500/50 bg-emerald-500/10" :
-                  overallScore >= 60 ? "border-[#00d9ff]/50 bg-[#00d9ff]/10" :
-                    "border-yellow-500/50 bg-yellow-500/10"
-              )}>
-                <span className={cn("text-2xl font-bold", color)}>{grade}</span>
-              </div>
-              <span className="text-xs text-gray-500 mt-1">{overallScore}%</span>
-            </div>
-          </div>
-
-          {/* TL;DR - scenario-specific fallback with low score handling */}
-          <p className="text-gray-400 text-sm leading-relaxed mb-4">
-            {sections.tldr || (
-              problemType === 'system-design'
-                ? (overallScore < 25
-                    ? `Submitted without meaningful engagement. No design discussion or documentation provided.`
-                    : overallScore < 40
-                      ? `Minimal engagement in system design discussion. More participation required.`
-                      : `Completed system design discussion in ${formatTime(elapsedTime)}.`)
-                : problemType === 'bugfix'
-                  ? `Completed bug fix in ${formatTime(elapsedTime)}. Fixed ${testsPassed}/${testsTotal} issues.`
-                  : `Completed ${testsPassed}/${testsTotal} tests in ${formatTime(elapsedTime)}.`
-            )}
-          </p>
-
-          {/* Quick stats row - scenario-specific */}
-          <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
-            <span className="flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5" />
-              {formatTime(elapsedTime)}
-            </span>
-            {problemType === 'system-design' ? (
-              // System design quick stats
-              <>
-                <span className="flex items-center gap-1.5 group relative" title="Requirements gathering and clarification">
-                  {hasRequirements ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
-                  Requirements
-                </span>
-                <span className="flex items-center gap-1.5 group relative" title="Scalability and performance considerations">
-                  {hasScalability ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
-                  Scalability
-                </span>
-                <span className="flex items-center gap-1.5 group relative" title={alternativesExplanation || "Trade-offs and alternative approaches"}>
-                  {hasAlternatives ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
-                  Trade-offs
-                  {alternativesExplanation && alternativesExplanation.length < 60 && (
-                    <span className="text-gray-600 ml-1 hidden sm:inline">• {alternativesExplanation}</span>
-                  )}
-                </span>
-              </>
-            ) : problemType === 'bugfix' ? (
-              // Bug fix quick stats
-              <>
-                <span className="flex items-center gap-1.5 group relative" title="Bug identification">
-                  {hasBugIdentified ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
-                  Bug Found
-                </span>
-                <span className="flex items-center gap-1.5 group relative" title="Root cause analysis">
-                  {hasRootCause ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
-                  Root Cause
-                </span>
-                <span className="flex items-center gap-1.5 group relative" title="Fix applied successfully">
-                  {testsPassed === testsTotal && testsTotal > 0 ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
-                  Fix Applied
-                </span>
-              </>
-            ) : (
-              // DSA quick stats (default) with explanations
-              <>
-                <span className="flex items-center gap-1.5 group relative" title={complexityExplanation}>
-                  {complexityAccurate ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
-                  <span>Complexity</span>
-                  {complexityExplanation && complexityExplanation.length < 60 && (
-                    <span className="text-gray-600 ml-1 hidden sm:inline">• {complexityExplanation}</span>
-                  )}
-                  {complexityExplanation && complexityExplanation.length >= 60 && (
-                    <span className="absolute left-0 top-full mt-1 w-64 p-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                      {complexityExplanation}
-                    </span>
-                  )}
-                </span>
-                <span className="flex items-center gap-1.5 group relative" title={edgeCasesExplanation}>
-                  {edgeCasesDiscussed ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
-                  <span>Edge Cases</span>
-                  {edgeCasesExplanation && edgeCasesExplanation.length < 60 && (
-                    <span className="text-gray-600 ml-1 hidden sm:inline">• {edgeCasesExplanation}</span>
-                  )}
-                  {edgeCasesExplanation && edgeCasesExplanation.length >= 60 && (
-                    <span className="absolute left-0 top-full mt-1 w-64 p-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                      {edgeCasesExplanation}
-                    </span>
-                  )}
-                </span>
-                <span className="flex items-center gap-1.5 group relative" title={alternativesExplanation}>
-                  {hasAlternatives ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-gray-500" />}
-                  <span>Alternatives</span>
-                  {alternativesExplanation && alternativesExplanation.length < 60 && (
-                    <span className="text-gray-600 ml-1 hidden sm:inline">• {alternativesExplanation}</span>
-                  )}
-                  {alternativesExplanation && alternativesExplanation.length >= 60 && (
-                    <span className="absolute left-0 top-full mt-1 w-64 p-2 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                      {alternativesExplanation}
-                    </span>
-                  )}
-                </span>
-              </>
-            )}
           </div>
         </div>
 
-        {/* Action buttons */}
-        <div className="flex border-t border-gray-800">
+        {/* Action buttons - Compact bar */}
+        <div className="flex border-t border-zinc-800/50 text-xs">
           <button
             onClick={onRetry}
-            className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800/50 transition-colors border-r border-gray-800"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-colors"
           >
-            <RotateCcw className="h-4 w-4" />
+            <RotateCcw className="h-3.5 w-3.5" />
             Retry
           </button>
+          <div className="w-px bg-zinc-800/50" />
           <button
             onClick={onNewProblem}
-            className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-[#00d9ff] hover:bg-[#00d9ff]/10 transition-colors border-r border-gray-800"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-white hover:bg-zinc-800/50 transition-colors"
           >
-            <Play className="h-4 w-4" />
+            <Play className="h-3.5 w-3.5" />
             New Problem
           </button>
+          <div className="w-px bg-zinc-800/50" />
           <button
             onClick={onExport || generatePDF}
-            className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800/50 transition-colors border-r border-gray-800"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-colors"
           >
-            <Download className="h-4 w-4" />
+            <Download className="h-3.5 w-3.5" />
             Export
           </button>
           {onEndInterview && (
-            <button
-              onClick={onEndInterview}
-              className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
-            >
-              <XCircle className="h-4 w-4" />
-              End Session
-            </button>
+            <>
+              <div className="w-px bg-zinc-800/50" />
+              <button
+                onClick={onEndInterview}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+              >
+                <XCircle className="h-3.5 w-3.5" />
+                End
+              </button>
+            </>
           )}
         </div>
       </div>
 
-      {/* Main Content Grid - Scores on side, Code and Recommendations higher */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Left Column - Main Content */}
-        <div className="lg:col-span-3 space-y-4">
-          {/* Collapsible: Code/Design Solution - Moved Higher */}
-          {code && (
-            <Collapsible open={showCode} onOpenChange={setShowCode}>
-              <CollapsibleTrigger asChild>
-                <button className="w-full flex items-center justify-between p-4 bg-gray-900/50 border border-gray-800 rounded-xl hover:bg-gray-800/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    {problemType === 'system-design' ? (
-                      <Layers className="h-4 w-4 text-[#00d9ff]" />
-                    ) : (
-                      <Code className="h-4 w-4 text-[#00d9ff]" />
-                    )}
-                    <span className="text-sm font-medium text-white">
-                      {problemType === 'system-design' ? 'Your Design Notes' : 'Your Solution'}
-                    </span>
-                  </div>
-                  {showCode ? <ChevronUp className="h-4 w-4 text-gray-500" /> : <ChevronDown className="h-4 w-4 text-gray-500" />}
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="mt-2 bg-black/50 border border-gray-800 rounded-xl p-4 max-h-[300px] overflow-auto">
-                  <pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap">
-                    <code>{code}</code>
-                  </pre>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
-
-          {/* Collapsible: Learning Recommendations - Moved Higher */}
-          {userId && (
-            <Collapsible open={showRecommendations} onOpenChange={setShowRecommendations}>
-              <CollapsibleTrigger asChild>
-                <button className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-[#00d9ff]/10 to-transparent border border-[#00d9ff]/20 rounded-xl hover:bg-[#00d9ff]/5 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-[#00d9ff]" />
-                    <span className="text-sm font-medium text-white">Learning Recommendations</span>
-                  </div>
-                  {showRecommendations ? <ChevronUp className="h-4 w-4 text-gray-500" /> : <ChevronDown className="h-4 w-4 text-gray-500" />}
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="mt-2 space-y-4">
-                  <Card className="bg-gray-900/30 border-gray-800">
-                    <CardContent className="p-4">
-                      <LearningRecommendations
-                        userId={userId}
-                        currentProblemType={problemType}
-                        currentDifficulty={difficulty}
-                        performanceScore={overallScore}
-                        onSelectProblem={() => onNewProblem?.()}
-                      />
-                    </CardContent>
-                  </Card>
-
-                  {problemTitle && (
-                    <NextProblemRecommendations
-                      userId={userId}
-                      currentProblemText={`${problemTitle}: ${feedback.substring(0, 200)}`}
-                      currentProblemId={problemTitle}
-                      onSelectProblem={() => onNewProblem?.()}
-                    />
-                  )}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
-
-          {/* Feedback Sections - Two columns on desktop */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* What Worked - scenario-specific fallbacks with low score handling */}
-            <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="h-4 w-4 text-emerald-400" />
-                <span className="text-sm font-medium text-emerald-400">What Worked</span>
-              </div>
-              <ul className="space-y-2">
-                {sections.whatWorked.length > 0 ? (
-                  sections.whatWorked.slice(0, 3).map((item, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
-                      <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-                      <span>{item}</span>
-                    </li>
-                  ))
-                ) : overallScore < 25 && problemType === 'system-design' ? (
-                  <li className="text-sm text-gray-500 italic">
-                    The candidate opened the design problem but did not engage with the interview.
-                  </li>
-                ) : (
-                  <li className="text-sm text-gray-500 italic">
-                    No strengths identified - review feedback above for details
-                  </li>
-                )}
-              </ul>
+      {/* Score Breakdown - Horizontal compact cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        {scoreItems.map((item) => (
+          <div key={item.name} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-3">
+            <div className="flex items-center gap-1.5 mb-2">
+              <item.icon className={cn("h-3.5 w-3.5", item.colorClass)} />
+              <span className="text-[11px] text-zinc-400">{item.name}</span>
+              <span className="text-[10px] text-zinc-600 ml-auto">{item.weight}</span>
             </div>
-
-            {/* Areas to Improve - scenario-specific fallbacks with low score handling */}
-            <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Target className="h-4 w-4 text-yellow-400" />
-                <span className="text-sm font-medium text-yellow-400">To Improve</span>
-              </div>
-              <ul className="space-y-2">
-                {sections.fixNext.length > 0 ? (
-                  sections.fixNext.slice(0, 3).map((item, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
-                      <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
-                      <span>{item}</span>
-                    </li>
-                  ))
-                ) : overallScore < 25 && problemType === 'system-design' ? (
-                  <>
-                    <li className="flex items-start gap-2 text-sm text-gray-300">
-                      <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-                      <span>ENGAGE with the interviewer - system design is a conversation, not a silent exercise</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm text-gray-300">
-                      <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
-                      <span>Document your design decisions in the notes panel</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm text-gray-300">
-                      <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
-                      <span>Practice explaining your thought process out loud</span>
-                    </li>
-                  </>
-                ) : (
-                  <li className="text-sm text-gray-500 italic">
-                    Review feedback above for specific areas to improve
-                  </li>
-                )}
-              </ul>
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-semibold text-white">{item.score}%</span>
+              <Progress value={item.score} className="h-1 flex-1 bg-zinc-800" />
             </div>
           </div>
+        ))}
+      </div>
+
+      {/* What Worked / To Improve - Side by side compact */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* What Worked */}
+        <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4">
+          <div className="flex items-center gap-1.5 mb-3">
+            <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
+            <span className="text-xs font-medium text-emerald-400">What Worked</span>
+          </div>
+          <ul className="space-y-2">
+            {sections.whatWorked.length > 0 ? (
+              sections.whatWorked.slice(0, 3).map((item, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
+                  <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                  <span className="line-clamp-2">{item}</span>
+                </li>
+              ))
+            ) : (
+              <li className="text-xs text-zinc-600 italic">No strengths identified</li>
+            )}
+          </ul>
         </div>
 
-        {/* Right Column - Compact Scores Sidebar - scenario-specific */}
-        <div className="lg:col-span-1 space-y-3">
-          {(problemType === 'system-design' ? [
-            // System Design: Requirements, Architecture, Scalability, Communication
-            { name: "Requirements", score: scores.understanding, weight: "20%", icon: Search, color: "#00d9ff" },
-            { name: "Architecture", score: scores.problemSolving, weight: "30%", icon: Layers, color: "#00ff88" },
-            { name: "Scalability", score: scores.codeQuality, weight: "20%", icon: Scale, color: "#a78bfa" },
-            { name: "Communication", score: scores.communication, weight: "30%", icon: MessageSquare, color: "#fbbf24" },
-          ] : problemType === 'bugfix' ? [
-            // Bug Fix: Bug Identification, Root Cause, Fix Quality, Communication
-            { name: "Bug Found", score: scores.understanding, weight: "35%", icon: Bug, color: "#00d9ff" },
-            { name: "Root Cause", score: scores.problemSolving, weight: "25%", icon: Search, color: "#00ff88" },
-            { name: "Fix Quality", score: scores.codeQuality, weight: "20%", icon: Wrench, color: "#a78bfa" },
-            { name: "Communication", score: scores.communication, weight: "20%", icon: MessageSquare, color: "#fbbf24" },
-          ] : [
-            // DSA (default): Understanding, Problem-Solving, Code Quality, Communication
-            { name: "Understanding", score: scores.understanding, weight: "30%", icon: Lightbulb, color: "#00d9ff" },
-            { name: "Problem-Solving", score: scores.problemSolving, weight: "25%", icon: Zap, color: "#00ff88" },
-            { name: "Code Quality", score: scores.codeQuality, weight: "25%", icon: Code, color: "#a78bfa" },
-            { name: "Communication", score: scores.communication, weight: "20%", icon: MessageSquare, color: "#fbbf24" },
-          ]).map((item) => (
-            <div key={item.name} className="bg-gray-900/50 border border-gray-800 rounded-xl p-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-1.5">
-                  <item.icon className="h-3.5 w-3.5" style={{ color: item.color }} />
-                  <span className="text-xs text-gray-300">{item.name}</span>
-                </div>
-                <span className="text-xs text-gray-600">{item.weight}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xl font-bold text-white">{item.score}%</span>
-                <div className="flex-1 ml-2">
-                  <Progress value={item.score} className="h-1 bg-gray-800" />
-                </div>
-              </div>
-            </div>
-          ))}
+        {/* To Improve */}
+        <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4">
+          <div className="flex items-center gap-1.5 mb-3">
+            <Target className="h-3.5 w-3.5 text-amber-400" />
+            <span className="text-xs font-medium text-amber-400">To Improve</span>
+          </div>
+          <ul className="space-y-2">
+            {sections.fixNext.length > 0 ? (
+              sections.fixNext.slice(0, 3).map((item, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                  <span className="line-clamp-2">{item}</span>
+                </li>
+              ))
+            ) : (
+              <li className="text-xs text-zinc-600 italic">Review feedback for details</li>
+            )}
+          </ul>
         </div>
       </div>
-      {/* Collapsible: Action Plan */}
-      {sections.actionPlan.length > 0 && (
-        <Collapsible open={showDetails} onOpenChange={setShowDetails}>
-          <CollapsibleTrigger asChild>
-            <button className="w-full flex items-center justify-between p-4 bg-gray-900/50 border border-gray-800 rounded-xl hover:bg-gray-800/50 transition-colors">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-4 w-4 text-[#00d9ff]" />
-                <span className="text-sm font-medium text-white">Action Plan</span>
-                <span className="text-xs text-gray-600">({sections.actionPlan.length} steps)</span>
-              </div>
-              {showDetails ? <ChevronUp className="h-4 w-4 text-gray-500" /> : <ChevronDown className="h-4 w-4 text-gray-500" />}
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="mt-2 bg-gray-900/30 border border-gray-800 rounded-xl p-4">
-              <ol className="space-y-3">
-                {sections.actionPlan.map((item, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm text-gray-300">
-                    <span className="w-6 h-6 bg-[#00d9ff]/20 text-[#00d9ff] rounded-full flex items-center justify-center text-xs font-bold shrink-0">
-                      {i + 1}
-                    </span>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ol>
+
+      {/* Expandable Sections */}
+      <div className="space-y-2">
+        {/* Code Solution */}
+        {code && (
+          <button
+            onClick={() => setShowCode(!showCode)}
+            className="w-full flex items-center justify-between p-3 bg-zinc-900/50 border border-zinc-800/50 rounded-xl hover:bg-zinc-800/30 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              {problemType === 'system-design' ? (
+                <Layers className="h-3.5 w-3.5 text-zinc-400" />
+              ) : (
+                <Code className="h-3.5 w-3.5 text-zinc-400" />
+              )}
+              <span className="text-xs font-medium text-zinc-300">
+                {problemType === 'system-design' ? 'Your Design' : 'Your Solution'}
+              </span>
             </div>
-          </CollapsibleContent>
-        </Collapsible>
-      )}
+            {showCode ? <ChevronUp className="h-3.5 w-3.5 text-zinc-500" /> : <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />}
+          </button>
+        )}
+        {showCode && code && (
+          <div className="bg-zinc-950 border border-zinc-800/50 rounded-xl p-4 max-h-64 overflow-auto">
+            <pre className="text-xs text-zinc-300 font-mono whitespace-pre-wrap">
+              <code>{code}</code>
+            </pre>
+          </div>
+        )}
 
+        {/* Learning Recommendations */}
+        {userId && (
+          <>
+            <button
+              onClick={() => setShowRecommendations(!showRecommendations)}
+              className="w-full flex items-center justify-between p-3 bg-zinc-900/50 border border-zinc-800/50 rounded-xl hover:bg-zinc-800/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-violet-400" />
+                <span className="text-xs font-medium text-zinc-300">Learning Recommendations</span>
+              </div>
+              {showRecommendations ? <ChevronUp className="h-3.5 w-3.5 text-zinc-500" /> : <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />}
+            </button>
+            {showRecommendations && (
+              <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-xl p-4 space-y-4">
+                <LearningRecommendations
+                  userId={userId}
+                  currentProblemType={problemType}
+                  currentDifficulty={difficulty}
+                  performanceScore={overallScore}
+                  onSelectProblem={() => onNewProblem?.()}
+                />
+                {problemTitle && (
+                  <NextProblemRecommendations
+                    userId={userId}
+                    currentProblemText={`${problemTitle}: ${feedback.substring(0, 200)}`}
+                    currentProblemId={problemTitle}
+                    onSelectProblem={() => onNewProblem?.()}
+                  />
+                )}
+              </div>
+            )}
+          </>
+        )}
 
-      {/* Footer note - scenario-specific */}
-      <p className="text-center text-xs text-gray-600">
+        {/* Action Plan */}
+        {sections.actionPlan.length > 0 && (
+          <>
+            <button
+              onClick={() => setShowDetails(!showDetails)}
+              className="w-full flex items-center justify-between p-3 bg-zinc-900/50 border border-zinc-800/50 rounded-xl hover:bg-zinc-800/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-3.5 w-3.5 text-zinc-400" />
+                <span className="text-xs font-medium text-zinc-300">Action Plan</span>
+                <span className="text-[10px] text-zinc-600">({sections.actionPlan.length} steps)</span>
+              </div>
+              {showDetails ? <ChevronUp className="h-3.5 w-3.5 text-zinc-500" /> : <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />}
+            </button>
+            {showDetails && (
+              <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-xl p-4">
+                <ol className="space-y-2">
+                  {sections.actionPlan.map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
+                      <span className="w-5 h-5 bg-zinc-800 text-zinc-400 rounded flex items-center justify-center text-[10px] font-medium shrink-0">
+                        {i + 1}
+                      </span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Footer */}
+      <p className="text-center text-[10px] text-zinc-600">
         {problemType === 'system-design'
-          ? "Evaluated like real FAANG system design interviews · Discussion-based"
+          ? "Graded like real FAANG system design interviews"
           : problemType === 'bugfix'
-            ? "Graded on debugging process & fix quality · AI collaboration allowed"
-            : "Graded like real Meta/Google interviews · AI usage optional"}
+            ? "Graded on debugging process & fix quality"
+            : "Graded like real Meta/Google interviews"}
       </p>
     </div>
   )
