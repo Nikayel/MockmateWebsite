@@ -1,0 +1,48 @@
+# CodeSparring - AI-Powered Technical Interview Practice
+# https://codesparring.dev
+
+> CodeSparring is an AI-powered platform that helps software engineers prepare for technical interviews through realistic mock interviews with intelligent feedback.
+
+## What We Do
+
+CodeSparring provides:
+- **AI Mock Interviews**: Practice coding interviews with an AI interviewer that simulates real FAANG-style technical interviews
+- **Spaced Repetition Learning**: Scientifically-proven review scheduling to maximize retention of DSA patterns
+- **Personalized Roadmaps**: Custom study plans based on target company, interview date, and skill level
+- **Real-time Feedback**: Get instant feedback on code correctness, communication, and problem-solving approach
+- **Pattern-Based Learning**: Master 15+ DSA patterns (arrays, trees, graphs, DP, etc.) used in top tech interviews
+
+## Key Features
+
+- Voice-enabled mock interviews with AI interviewer
+- Smart notifications for optimal practice timing
+- Progress tracking with streak and milestone gamification
+- Company-specific preparation (Google, Meta, Amazon, etc.)
+- Behavioral interview practice
+- Code execution and test case validation
+
+## Target Audience
+
+- Software engineers preparing for technical interviews
+- Bootcamp graduates entering the job market
+- Career switchers moving into software development
+- Engineers targeting FAANG/top tech companies
+
+## Core Technology
+
+- Built with Next.js, TypeScript, and Firebase
+- AI-powered by Claude (Anthropic) for natural interview conversations
+- Uses proven spaced repetition algorithms (SM-2, FSRS) for learning optimization
+
+## Documentation
+
+- Pricing: /pricing
+- How it works: /why-codesparring
+- Sample interviews: /samples
+- Documentation: /docs
+- Blog: /blog
+
+## Contact
+
+- Website: https://codesparring.dev
+- Careers: /careers

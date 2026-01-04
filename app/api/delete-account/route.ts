@@ -124,7 +124,7 @@ export async function DELETE(request: NextRequest) {
     if (process.env.PINECONE_API_KEY) {
       try {
         const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY })
-        const indexName = process.env.PINECONE_INDEX_NAME || "skillon-raggemini"
+        const indexName = process.env.PINECONE_INDEX_NAME || "codesparring-rag"
         const index = pinecone.index(indexName)
 
         // Delete from all namespaces that might contain user data

@@ -3,7 +3,6 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Github, Terminal, CheckCircle } from "lucide-react"
 import { signInWithGitHub, signInWithGoogle } from "@/lib/auth"
 import { createOrUpdateProfile } from "@/lib/firestore-helpers"
@@ -20,7 +19,6 @@ function LoginPageContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [authStatus, setAuthStatus] = useState<"idle" | "authenticating" | "creating-profile" | "complete">("idle")
   const [authProvider, setAuthProvider] = useState<"github" | "google" | null>(null)
-  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false)
   const searchParams = useSearchParams()
   const router = useRouter()
   const redirect = searchParams.get("redirect")
@@ -295,36 +293,13 @@ function LoginPageContent() {
               </div>
             </motion.div>
 
-            {/* Terms + Age Acceptance */}
-            <motion.div variants={staggerItem} className="mb-6">
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <Checkbox
-                  id="terms-acceptance"
-                  checked={hasAcceptedTerms}
-                  onCheckedChange={(checked) => setHasAcceptedTerms(checked === true)}
-                  className="mt-0.5 data-[state=checked]:bg-accent data-[state=checked]:border-accent"
-                  aria-describedby="terms-description"
-                />
-                <span id="terms-description" className="text-sm text-muted-foreground leading-relaxed">
-                  I confirm I am at least <strong className="text-foreground">16 years old</strong> and agree to the{" "}
-                  <Link href="/legal#terms-of-service" className="text-accent hover:underline" target="_blank">
-                    Terms of Service
-                  </Link>{" "}
-                  and{" "}
-                  <Link href="/legal#privacy-policy" className="text-accent hover:underline" target="_blank">
-                    Privacy Policy
-                  </Link>
-                </span>
-              </label>
-            </motion.div>
-
-            {/* Login buttons - clean and spacious */}
+            {/* Login buttons - ONE CLICK signup */}
             <motion.div variants={staggerItem} className="space-y-4">
 
-              {/* GitHub */}
+              {/* GitHub - Primary */}
               <Button
                 onClick={handleGitHubLogin}
-                disabled={isLoading || !hasAcceptedTerms}
+                disabled={isLoading}
                 className="w-full h-14 bg-foreground hover:bg-foreground/90 text-background text-base font-medium rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 aria-label="Continue with GitHub"
               >
@@ -341,7 +316,7 @@ function LoginPageContent() {
               {/* Google */}
               <Button
                 onClick={handleGoogleLogin}
-                disabled={isLoading || !hasAcceptedTerms}
+                disabled={isLoading}
                 variant="outline"
                 className="w-full h-14 bg-transparent hover:bg-secondary/50 text-foreground text-base font-medium rounded-xl border-border hover:border-border/80 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 aria-label="Continue with Google"
@@ -362,8 +337,22 @@ function LoginPageContent() {
               </Button>
             </motion.div>
 
-            {/* Minimal footer text */}
-            <motion.div variants={staggerItem} className="mt-10 text-center">
+            {/* Implicit terms - no friction */}
+            <motion.div variants={staggerItem} className="mt-6 text-center">
+              <p className="text-xs text-muted-foreground/70">
+                By signing up, you confirm you're 16+ and agree to our{" "}
+                <Link href="/legal#terms-of-service" className="text-accent/70 hover:text-accent hover:underline">
+                  Terms
+                </Link>{" "}
+                and{" "}
+                <Link href="/legal#privacy-policy" className="text-accent/70 hover:text-accent hover:underline">
+                  Privacy Policy
+                </Link>
+              </p>
+            </motion.div>
+
+            {/* Free to start */}
+            <motion.div variants={staggerItem} className="mt-4 text-center">
               <p className="text-sm text-muted-foreground">
                 Free to start. No credit card needed.
               </p>

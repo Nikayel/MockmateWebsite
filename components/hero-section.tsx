@@ -147,7 +147,7 @@ export function HeroSection() {
                       <div className="w-2.5 h-2.5 bg-yellow-500/50 rounded-full" />
                       <div className="w-2.5 h-2.5 bg-green-500/50 rounded-full" />
                     </div>
-                    <span className="ml-3 text-xs text-muted-foreground font-mono">skillon.dev/interview</span>
+                    <span className="ml-3 text-xs text-muted-foreground font-mono">codesparring.dev/interview</span>
 
                     {/* Live indicator */}
                     <div className="ml-auto flex items-center gap-1.5">

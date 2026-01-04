@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { X, Cookie, Shield } from "lucide-react"
 import Link from "next/link"
 
-const CONSENT_COOKIE_NAME = "skillon_cookie_consent"
+const CONSENT_COOKIE_NAME = "codesparring_cookie_consent"
 const CONSENT_VERSION = "1.0" // Increment when policy changes
 
 export type ConsentPreferences = {

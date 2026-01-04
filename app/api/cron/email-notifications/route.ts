@@ -28,6 +28,7 @@ import {
   calculateRetention,
 } from "@/lib/email";
 import type { Profile, UserLearningState, ProblemMasteryRecord } from "@/lib/types";
+import { checkStreakAtRisk, sendDailyReminderIfNeeded } from "@/lib/services/session-notifications";
 
 const db = adminDb;
 
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
       inactivityEmails: { sent: 0, skipped: 0, failed: 0 },
       spacedRepetitionEmails: { sent: 0, skipped: 0, failed: 0 },
       roadmapEmails: { sent: 0, skipped: 0, failed: 0 },
+      streakAlerts: { sent: 0, skipped: 0 },
       errors: [] as string[],
     };
 
@@ -89,6 +91,13 @@ export async function GET(request: NextRequest) {
     // 4. ROADMAP-BASED REMINDERS
     // ============================================
     await processRoadmapReminders(now, results);
+
+    // ============================================
+    // 5. STREAK AT RISK ALERTS (in-app only, evening hours)
+    // ============================================
+    if (currentHour >= 19 && currentHour <= 22) {
+      await processStreakAlerts(results);
+    }
 
     return NextResponse.json({
       success: true,
@@ -804,6 +813,51 @@ async function logEmailNotification(userId: string, emailType: string, now: Date
     sent_at: now.toISOString(),
     created_at: now.toISOString(),
   });
+}
+
+/**
+ * Process streak at risk alerts (in-app notifications)
+ * Finds users with 3+ day streaks who haven't practiced today and sends them an alert
+ */
+async function processStreakAlerts(
+  results: { streakAlerts: { sent: number; skipped: number } }
+): Promise<void> {
+  try {
+    // Find users with streaks >= 3 days
+    const learningStatesSnap = await db
+      .collection("user_learning_state")
+      .where("streak_days", ">=", 3)
+      .limit(100)
+      .get();
+
+    const today = new Date().toISOString().split("T")[0];
+
+    for (const doc of learningStatesSnap.docs) {
+      const userId = doc.id;
+      const learningState = doc.data();
+
+      // Skip if they already practiced today
+      const lastPractice = learningState.last_practice_date;
+      if (lastPractice?.split("T")[0] === today) {
+        results.streakAlerts.skipped++;
+        continue;
+      }
+
+      try {
+        const sent = await checkStreakAtRisk(userId);
+        if (sent) {
+          results.streakAlerts.sent++;
+        } else {
+          results.streakAlerts.skipped++;
+        }
+      } catch (err) {
+        console.error(`[Cron] Error checking streak for ${userId}:`, err);
+        results.streakAlerts.skipped++;
+      }
+    }
+  } catch (error) {
+    console.error("[Cron] Error processing streak alerts:", error);
+  }
 }
 
 // Support POST for manual triggering

@@ -9,8 +9,8 @@ import { Pinecone } from '@pinecone-database/pinecone'
 import type { VectorDB, VectorDocument, QueryOptions, QueryResult } from '../types'
 
 // Pinecone index configuration
-// Default to skillon-raggemini for Gemini embeddings (768D)
-const INDEX_NAME = process.env.PINECONE_INDEX_NAME || 'skillon-raggemini'
+// Default to codesparring-rag for Gemini embeddings (768D)
+const INDEX_NAME = process.env.PINECONE_INDEX_NAME || 'codesparring-rag'
 const NAMESPACE_PREFIX = 'mockmate_'
 
 // Singleton Pinecone client

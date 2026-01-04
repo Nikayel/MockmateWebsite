@@ -37,7 +37,7 @@ import {
   Repeat
 } from "lucide-react"
 
-interface WhySkilonPageClientProps {
+interface WhyCodesparringPageClientProps {
   sciencePrinciples: {
     icon: string
     title: string
@@ -55,7 +55,7 @@ interface WhySkilonPageClientProps {
   }[]
   comparisonFeatures: {
     feature: string
-    skillon: boolean
+    codesparring: boolean
     leetcode: boolean
   }[]
 }
@@ -78,11 +78,11 @@ const iconMap: { [key: string]: React.ComponentType<{ className?: string }> } = 
   Timer,
 }
 
-export function WhySkilonPageClient({
+export function WhyCodesparringPageClient({
   sciencePrinciples,
   notificationTypes,
   comparisonFeatures
-}: WhySkilonPageClientProps) {
+}: WhyCodesparringPageClientProps) {
   return (
     <main className="min-h-screen bg-background">
       <Header />
@@ -421,7 +421,7 @@ export function WhySkilonPageClient({
                 >
                   <div className="text-gray-300">{row.feature}</div>
                   <div className="text-center">
-                    {row.skillon ? (
+                    {row.codesparring ? (
                       <Check className="w-5 h-5 text-neural mx-auto" />
                     ) : (
                       <X className="w-5 h-5 text-gray-700 mx-auto" />

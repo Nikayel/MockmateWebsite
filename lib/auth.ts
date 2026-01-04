@@ -376,8 +376,8 @@ export async function getCurrentUser(): Promise<FirebaseUser | null> {
 
 export function generateVSCodeDeepLink(token: string) {
   const encodedToken = encodeURIComponent(token)
-  // VS Code extension coming soon - will use skillon extension ID
-  return `vscode://nikayel.skillon/auth-callback?token=${encodedToken}`
+  // VS Code extension coming soon - will use codesparring extension ID
+  return `vscode://nikayel.codesparring/auth-callback?token=${encodedToken}`
 }
 
 // Helper to convert Firebase user to our User type

@@ -25,7 +25,7 @@ try {
 
 import { Pinecone } from '@pinecone-database/pinecone'
 
-const INDEX_NAME = process.env.PINECONE_INDEX_NAME || 'skillon-rag'
+const INDEX_NAME = process.env.PINECONE_INDEX_NAME || 'codesparring-rag'
 const DIMENSION = 256 // Matches TF-IDF embedding dimension
 
 async function main() {

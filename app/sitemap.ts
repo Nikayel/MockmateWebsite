@@ -21,7 +21,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.9,
     },
     {
-      url: `${BASE_URL}/why-skillon`,
+      url: `${BASE_URL}/why-codesparring`,
       lastModified: currentDate,
       changeFrequency: 'monthly',
       priority: 0.8,

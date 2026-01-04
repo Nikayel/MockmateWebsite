@@ -14,12 +14,12 @@ export const metadata: Metadata = {
     "interleaving practice coding",
   ],
   alternates: {
-    canonical: "/why-skillon",
+    canonical: "/why-codesparring",
   },
   openGraph: {
     title: "How It Works - Science-Backed Interview Prep | CodeSparring",
     description: "Stop guessing how much to practice. Our algorithm calculates exactly when and how often to review each problem.",
-    url: "/why-skillon",
+    url: "/why-codesparring",
     type: "website",
   },
   twitter: {
