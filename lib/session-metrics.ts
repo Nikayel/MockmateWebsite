@@ -404,10 +404,57 @@ export async function completeSessionMetrics(params: {
   communicationScore?: number
   thoughtProcessShared?: number
 }): Promise<SessionSummary | null> {
-  const state = activeSessions.get(params.sessionId)
+  let state = activeSessions.get(params.sessionId)
+
+  // Fallback: If session not in memory (server restart, edge function cold start, etc.)
+  // try to reconstruct minimal state from interview_sessions collection
   if (!state) {
-    console.error(`[Session Metrics] No active session found: ${params.sessionId}`)
-    return null
+    console.warn(`[Session Metrics] Session ${params.sessionId} not in memory, attempting fallback...`)
+    try {
+      const sessionDoc = await adminDb.collection('interview_sessions').doc(params.sessionId).get()
+      if (sessionDoc.exists) {
+        const data = sessionDoc.data()!
+        // Reconstruct minimal state for scoring
+        state = {
+          sessionId: params.sessionId,
+          userId: data.user_id,
+          scenarioId: data.scenario_id || params.sessionId,
+          scenarioTitle: data.topic || 'Unknown',
+          pattern: data.pattern || data.type || 'unknown',
+          difficulty: data.difficulty || 'medium',
+          scenarioType: data.type || 'dsa',
+          startedAt: data.started_at || data.created_at || new Date().toISOString(),
+          lastActivityAt: new Date().toISOString(),
+          chatMessages: [],
+          interviewerMessages: [],
+          totalChatMessages: 0,
+          totalInterviewerMessages: 0,
+          aiQuestionsAsked: 0,
+          aiSuggestionsReceived: 0,
+          aiSuggestionsApplied: 0,
+          aiSuggestionsCopiedBlindly: 0,
+          hintsViewed: [],
+          hintsTotal: 3,
+          codeExecutions: [],
+          totalExecutions: 0,
+          successfulExecutions: params.testsPassed > 0 ? 1 : 0,
+          approachExplained: false,
+          complexityDiscussed: false,
+          edgeCasesIdentified: [],
+          debuggingAttempts: 0,
+          optimizationAttempts: 0,
+          filesViewed: [],
+          workspaceContextUsed: false,
+        }
+        console.log(`[Session Metrics] Reconstructed session from interview_sessions: ${params.sessionId}`)
+      } else {
+        console.error(`[Session Metrics] No active session found and no fallback available: ${params.sessionId}`)
+        return null
+      }
+    } catch (fallbackError) {
+      console.error(`[Session Metrics] Fallback failed for session ${params.sessionId}:`, fallbackError)
+      return null
+    }
   }
 
   const now = new Date().toISOString()
