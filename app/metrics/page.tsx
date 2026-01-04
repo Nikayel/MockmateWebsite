@@ -1,29 +1,21 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/lib/auth-context"
 import {
-  BarChart3,
-  TrendingUp,
-  TrendingDown,
-  Minus,
   Clock,
-  Target,
-  Award,
-  Calendar,
-  Zap,
-  Brain,
-  Code,
   ArrowRight,
-  Flame,
-  Star,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
+  ChevronRight,
+  Activity,
+  Layers,
+  Crosshair,
 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -73,26 +65,140 @@ interface MetricsData {
   } | null
 }
 
-const proficiencyColors = {
-  novice: 'bg-gray-500',
-  learning: 'bg-blue-500',
-  practicing: 'bg-yellow-500',
-  proficient: 'bg-green-500',
-  expert: 'bg-purple-500',
+// Mini sparkline component for trends
+function Sparkline({ data, color = "#fff" }: { data: number[], color?: string }) {
+  if (data.length === 0) return null
+
+  const max = Math.max(...data, 1)
+  const min = Math.min(...data, 0)
+  const range = max - min || 1
+  const width = 80
+  const height = 24
+  const points = data.map((val, i) => {
+    const x = (i / (data.length - 1 || 1)) * width
+    const y = height - ((val - min) / range) * height
+    return `${x},${y}`
+  }).join(' ')
+
+  return (
+    <svg width={width} height={height} className="opacity-60">
+      <polyline
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+        points={points}
+      />
+    </svg>
+  )
 }
 
-const proficiencyLabels = {
-  novice: 'Novice',
-  learning: 'Learning',
-  practicing: 'Practicing',
-  proficient: 'Proficient',
-  expert: 'Expert',
+// Activity heatmap inspired by GitHub
+function ActivityHeatmap({ sessions }: { sessions: Array<{ completedAt: string; performanceScore: number }> }) {
+  const today = new Date()
+  const weeks = 12
+  const days = weeks * 7
+
+  // Create a map of date -> session data
+  const sessionMap = useMemo(() => {
+    const map = new Map<string, { count: number; avgScore: number }>()
+    sessions.forEach(s => {
+      const date = new Date(s.completedAt).toISOString().split('T')[0]
+      const existing = map.get(date)
+      if (existing) {
+        existing.count++
+        existing.avgScore = (existing.avgScore + s.performanceScore) / 2
+      } else {
+        map.set(date, { count: 1, avgScore: s.performanceScore })
+      }
+    })
+    return map
+  }, [sessions])
+
+  const cells = []
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(today)
+    date.setDate(date.getDate() - i)
+    const dateStr = date.toISOString().split('T')[0]
+    const session = sessionMap.get(dateStr)
+
+    let intensity = 0
+    if (session) {
+      intensity = Math.min(4, session.count)
+    }
+
+    const colors = [
+      'bg-zinc-800/50',
+      'bg-emerald-900/60',
+      'bg-emerald-700/70',
+      'bg-emerald-500/80',
+      'bg-emerald-400'
+    ]
+
+    cells.push(
+      <div
+        key={dateStr}
+        className={`w-2.5 h-2.5 rounded-sm ${colors[intensity]} transition-colors hover:ring-1 hover:ring-white/30`}
+        title={session ? `${dateStr}: ${session.count} session(s), avg ${Math.round(session.avgScore)}%` : dateStr}
+      />
+    )
+  }
+
+  return (
+    <div className="flex flex-wrap gap-0.5" style={{ maxWidth: `${weeks * 12}px` }}>
+      {cells}
+    </div>
+  )
 }
 
-const difficultyColors = {
-  easy: 'text-green-400 bg-green-500/20 border-green-500/30',
-  medium: 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30',
-  hard: 'text-red-400 bg-red-500/20 border-red-500/30',
+// Score ring visualization
+function ScoreRing({ score, size = 120, label }: { score: number; size?: number; label: string }) {
+  const radius = (size - 12) / 2
+  const circumference = 2 * Math.PI * radius
+  const progress = (score / 100) * circumference
+  const remaining = circumference - progress
+
+  const getScoreColor = (s: number) => {
+    if (s >= 80) return '#22c55e'
+    if (s >= 60) return '#eab308'
+    return '#ef4444'
+  }
+
+  return (
+    <div className="relative inline-flex items-center justify-center">
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="#27272a"
+          strokeWidth="6"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={getScoreColor(score)}
+          strokeWidth="6"
+          strokeDasharray={`${progress} ${remaining}`}
+          strokeLinecap="round"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl font-bold text-white">{score}%</span>
+        <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{label}</span>
+      </div>
+    </div>
+  )
+}
+
+const proficiencyConfig: Record<string, { label: string; color: string; bg: string }> = {
+  novice: { label: 'Novice', color: 'text-zinc-400', bg: 'bg-zinc-700' },
+  learning: { label: 'Learning', color: 'text-sky-400', bg: 'bg-sky-500/20' },
+  practicing: { label: 'Practicing', color: 'text-amber-400', bg: 'bg-amber-500/20' },
+  proficient: { label: 'Proficient', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
+  expert: { label: 'Expert', color: 'text-violet-400', bg: 'bg-violet-500/20' },
 }
 
 export default function MetricsPage() {
@@ -140,22 +246,26 @@ export default function MetricsPage() {
 
   if (authLoading || !initialized || loading) {
     return (
-      <main className="min-h-screen bg-black flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
+      <main className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="flex items-center gap-3">
+          <div className="w-2 h-2 bg-zinc-600 rounded-full animate-pulse" />
+          <div className="w-2 h-2 bg-zinc-500 rounded-full animate-pulse delay-75" />
+          <div className="w-2 h-2 bg-zinc-400 rounded-full animate-pulse delay-150" />
+        </div>
       </main>
     )
   }
 
   if (error) {
     return (
-      <main className="min-h-screen bg-black">
+      <main className="min-h-screen bg-zinc-950">
         <Header />
         <div className="pt-24 pb-16">
-          <div className="container mx-auto px-4 max-w-7xl">
+          <div className="container mx-auto px-4 max-w-5xl">
             <div className="text-center py-16">
-              <p className="text-red-400 mb-4">{error}</p>
-              <Button onClick={() => window.location.reload()} variant="outline">
-                Try Again
+              <p className="text-red-400 mb-4 font-mono text-sm">{error}</p>
+              <Button onClick={() => window.location.reload()} variant="outline" className="border-zinc-700">
+                Retry
               </Button>
             </div>
           </div>
@@ -167,335 +277,290 @@ export default function MetricsPage() {
 
   const hasData = metrics && metrics.overview.totalSessions > 0
 
+  // Calculate trend data for sparkline
+  const trendScores = metrics?.trends.daily.map(d => d.score) || []
+
+  // Get difficulty breakdown
+  const easyData = metrics?.difficulty.find(d => d.difficulty === 'easy')
+  const mediumData = metrics?.difficulty.find(d => d.difficulty === 'medium')
+  const hardData = metrics?.difficulty.find(d => d.difficulty === 'hard')
+
   return (
-    <main className="min-h-screen bg-black">
+    <main className="min-h-screen bg-zinc-950">
       <Header />
 
       <div className="pt-24 pb-16">
-        <div className="container mx-auto px-4 max-w-7xl">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-heading font-bold text-white mb-2 flex items-center gap-3">
-              <BarChart3 className="h-10 w-10 text-[#00d9ff]" />
-              Your Performance Metrics
-            </h1>
-            <p className="text-gray-400">
-              Track your progress, identify patterns, and level up your interview skills
-            </p>
-          </div>
+        <div className="container mx-auto px-4 max-w-6xl">
 
           {!hasData ? (
-            /* Empty State */
-            <Card className="bg-gray-900/50 border-gray-700">
-              <CardContent className="py-16 text-center">
-                <div className="max-w-md mx-auto">
-                  <BarChart3 className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-                  <h2 className="text-2xl font-bold text-white mb-2">No Sessions Yet</h2>
-                  <p className="text-gray-400 mb-6">
-                    Complete your first practice session to start tracking your performance
-                    and see detailed analytics here.
-                  </p>
-                  <Link href="/interview">
-                    <Button className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
-                      Start Your First Session
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
+            /* Empty State - Minimal */
+            <div className="max-w-lg mx-auto text-center py-24">
+              <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-6">
+                <Activity className="w-8 h-8 text-zinc-600" />
+              </div>
+              <h1 className="text-2xl font-semibold text-white mb-3">No sessions yet</h1>
+              <p className="text-zinc-500 mb-8 leading-relaxed">
+                Complete your first practice session to see your performance analytics.
+              </p>
+              <Link href="/interview">
+                <Button className="bg-white hover:bg-zinc-200 text-zinc-900 font-medium">
+                  Start practicing
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
           ) : (
             <>
-              {/* Overview Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <Card className="bg-gray-900/50 border-gray-700">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-400 text-sm">Total Sessions</p>
-                        <p className="text-3xl font-bold text-white">{metrics.overview.totalSessions}</p>
-                      </div>
-                      <div className="p-3 bg-[#00d9ff]/20 rounded-lg">
-                        <Code className="h-6 w-6 text-[#00d9ff]" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gray-900/50 border-gray-700">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-400 text-sm">Practice Time</p>
-                        <p className="text-3xl font-bold text-white">{metrics.overview.totalPracticeHours}h</p>
-                      </div>
-                      <div className="p-3 bg-purple-500/20 rounded-lg">
-                        <Clock className="h-6 w-6 text-purple-400" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gray-900/50 border-gray-700">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-400 text-sm">Average Score</p>
-                        <p className="text-3xl font-bold text-white">{metrics.overview.averageScore}%</p>
-                      </div>
-                      <div className="p-3 bg-green-500/20 rounded-lg">
-                        <Target className="h-6 w-6 text-green-400" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gray-900/50 border-gray-700">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-400 text-sm">Weekly Trend</p>
-                        <div className="flex items-center gap-2">
-                          <p className="text-3xl font-bold text-white">{metrics.trends.weeklyAverage}%</p>
-                          {metrics.trends.trend === 'improving' && <TrendingUp className="h-5 w-5 text-green-400" />}
-                          {metrics.trends.trend === 'declining' && <TrendingDown className="h-5 w-5 text-red-400" />}
-                          {metrics.trends.trend === 'stable' && <Minus className="h-5 w-5 text-gray-400" />}
-                        </div>
-                      </div>
-                      <div className="p-3 bg-yellow-500/20 rounded-lg">
-                        <Flame className="h-6 w-6 text-yellow-400" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              {/* Header - Compact */}
+              <div className="mb-12">
+                <div className="flex items-center gap-2 text-zinc-500 text-sm mb-2">
+                  <Activity className="w-4 h-4" />
+                  <span>Performance Analytics</span>
+                </div>
+                <h1 className="text-3xl font-semibold text-white">Your Progress</h1>
               </div>
 
-              {/* Trend Message */}
-              <Card className={`mb-8 border-l-4 ${
-                metrics.trends.trend === 'improving' ? 'border-l-green-500 bg-green-500/5' :
-                metrics.trends.trend === 'declining' ? 'border-l-red-500 bg-red-500/5' :
-                'border-l-gray-500 bg-gray-500/5'
-              } bg-gray-900/50 border-gray-700`}>
-                <CardContent className="py-4">
-                  <div className="flex items-center gap-3">
-                    {metrics.trends.trend === 'improving' && <TrendingUp className="h-5 w-5 text-green-400" />}
-                    {metrics.trends.trend === 'declining' && <TrendingDown className="h-5 w-5 text-red-400" />}
-                    {metrics.trends.trend === 'stable' && <Minus className="h-5 w-5 text-gray-400" />}
-                    <p className="text-gray-300">{metrics.trends.trendDescription}</p>
+              {/* Main Stats - Bento Grid */}
+              <div className="grid grid-cols-12 gap-4 mb-8">
+
+                {/* Big Number - Sessions */}
+                <div className="col-span-12 md:col-span-4 bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <span className="text-zinc-500 text-sm">Total Sessions</span>
+                    <span className="text-zinc-600 font-mono text-xs">30d</span>
                   </div>
-                </CardContent>
-              </Card>
-
-              <Tabs defaultValue="patterns" className="mb-8">
-                <TabsList className="bg-gray-800 border-gray-700">
-                  <TabsTrigger value="patterns" className="data-[state=active]:bg-gray-700">
-                    <Brain className="h-4 w-4 mr-2" />
-                    Pattern Mastery
-                  </TabsTrigger>
-                  <TabsTrigger value="sessions" className="data-[state=active]:bg-gray-700">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Recent Sessions
-                  </TabsTrigger>
-                  <TabsTrigger value="difficulty" className="data-[state=active]:bg-gray-700">
-                    <Zap className="h-4 w-4 mr-2" />
-                    By Difficulty
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* Pattern Mastery Tab */}
-                <TabsContent value="patterns">
-                  <Card className="bg-gray-900/50 border-gray-700">
-                    <CardHeader>
-                      <CardTitle className="text-white flex items-center gap-2">
-                        <Brain className="h-5 w-5 text-[#00d9ff]" />
-                        Pattern Mastery
-                      </CardTitle>
-                      <CardDescription className="text-gray-400">
-                        Your proficiency across different DSA patterns
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {metrics.patterns.length === 0 ? (
-                        <p className="text-gray-500 text-center py-8">
-                          Complete sessions to see your pattern mastery
-                        </p>
-                      ) : (
-                        <div className="space-y-4">
-                          {metrics.patterns.map((pattern) => (
-                            <div key={pattern.pattern} className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <span className="text-white font-medium">{pattern.displayName}</span>
-                                  <Badge className={`${proficiencyColors[pattern.proficiency]} text-white text-xs`}>
-                                    {proficiencyLabels[pattern.proficiency]}
-                                  </Badge>
-                                </div>
-                                <div className="flex items-center gap-4 text-sm">
-                                  <span className="text-gray-400">{pattern.sessions} sessions</span>
-                                  <span className="text-gray-400">Best: {pattern.bestScore}%</span>
-                                  <span className="text-[#00d9ff] font-mono">{pattern.averageScore}%</span>
-                                </div>
-                              </div>
-                              <Progress value={pattern.averageScore} className="h-2" />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                {/* Recent Sessions Tab */}
-                <TabsContent value="sessions">
-                  <Card className="bg-gray-900/50 border-gray-700">
-                    <CardHeader>
-                      <CardTitle className="text-white flex items-center gap-2">
-                        <Calendar className="h-5 w-5 text-[#00d9ff]" />
-                        Recent Sessions
-                      </CardTitle>
-                      <CardDescription className="text-gray-400">
-                        Your latest practice sessions
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {metrics.recentSessions.length === 0 ? (
-                        <p className="text-gray-500 text-center py-8">
-                          No sessions yet
-                        </p>
-                      ) : (
-                        <div className="space-y-3">
-                          {metrics.recentSessions.map((session) => (
-                            <Link
-                              key={session.id}
-                              href={`/sessions/${session.id}`}
-                              className="block p-4 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-white font-medium capitalize">
-                                      {(session.pattern || 'unknown').replace(/-/g, ' ')}
-                                    </span>
-                                    <Badge className={difficultyColors[session.difficulty as keyof typeof difficultyColors]}>
-                                      {session.difficulty.toUpperCase()}
-                                    </Badge>
-                                  </div>
-                                  <div className="flex items-center gap-4 text-sm text-gray-400">
-                                    <span className="flex items-center gap-1">
-                                      <Clock className="h-3 w-3" />
-                                      {session.durationMinutes} min
-                                    </span>
-                                    <span>
-                                      {new Date(session.completedAt).toLocaleDateString()}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <div className={`text-2xl font-bold ${
-                                    session.performanceScore >= 80 ? 'text-green-400' :
-                                    session.performanceScore >= 60 ? 'text-yellow-400' :
-                                    'text-red-400'
-                                  }`}>
-                                    {session.performanceScore}%
-                                  </div>
-                                  <Badge variant="outline" className={`text-xs ${
-                                    session.feedback === 'excellent' ? 'border-green-500 text-green-400' :
-                                    session.feedback === 'good' ? 'border-blue-500 text-blue-400' :
-                                    session.feedback === 'average' ? 'border-yellow-500 text-yellow-400' :
-                                    'border-red-500 text-red-400'
-                                  }`}>
-                                    {session.feedback}
-                                  </Badge>
-                                </div>
-                              </div>
-                            </Link>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                {/* Difficulty Tab */}
-                <TabsContent value="difficulty">
-                  <Card className="bg-gray-900/50 border-gray-700">
-                    <CardHeader>
-                      <CardTitle className="text-white flex items-center gap-2">
-                        <Zap className="h-5 w-5 text-[#00d9ff]" />
-                        Performance by Difficulty
-                      </CardTitle>
-                      <CardDescription className="text-gray-400">
-                        How you perform across different difficulty levels
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {metrics.difficulty.length === 0 ? (
-                        <p className="text-gray-500 text-center py-8">
-                          Complete sessions to see difficulty breakdown
-                        </p>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          {['easy', 'medium', 'hard'].map((diff) => {
-                            const data = metrics.difficulty.find(d => d.difficulty === diff)
-                            return (
-                              <div
-                                key={diff}
-                                className={`p-6 rounded-lg border ${
-                                  diff === 'easy' ? 'border-green-500/30 bg-green-500/5' :
-                                  diff === 'medium' ? 'border-yellow-500/30 bg-yellow-500/5' :
-                                  'border-red-500/30 bg-red-500/5'
-                                }`}
-                              >
-                                <div className="text-center">
-                                  <Badge className={difficultyColors[diff as keyof typeof difficultyColors]}>
-                                    {diff.toUpperCase()}
-                                  </Badge>
-                                  {data ? (
-                                    <>
-                                      <div className={`text-4xl font-bold mt-4 ${
-                                        diff === 'easy' ? 'text-green-400' :
-                                        diff === 'medium' ? 'text-yellow-400' :
-                                        'text-red-400'
-                                      }`}>
-                                        {data.averageScore}%
-                                      </div>
-                                      <p className="text-gray-400 text-sm mt-1">
-                                        {data.sessions} sessions
-                                      </p>
-                                    </>
-                                  ) : (
-                                    <div className="mt-4">
-                                      <p className="text-gray-500 text-sm">No sessions yet</p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-
-              {/* Call to Action */}
-              <Card className="bg-gradient-to-r from-[#00d9ff]/10 to-purple-500/10 border-[#00d9ff]/30">
-                <CardContent className="py-8">
-                  <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-white mb-1">Ready for your next challenge?</h3>
-                      <p className="text-gray-400">Keep practicing to improve your metrics and ace your interviews.</p>
+                  <div className="flex items-end gap-4">
+                    <span className="text-5xl font-light text-white tracking-tight">
+                      {metrics.overview.totalSessions}
+                    </span>
+                    <div className="pb-2">
+                      <Sparkline data={metrics.trends.daily.map(d => d.sessions)} color="#71717a" />
                     </div>
-                    <Link href="/interview">
-                      <Button className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
-                        <Star className="mr-2 h-4 w-4" />
-                        Start Practice Session
-                      </Button>
-                    </Link>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+
+                {/* Score Ring */}
+                <div className="col-span-6 md:col-span-4 bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-6 flex flex-col items-center justify-center">
+                  <ScoreRing score={metrics.overview.averageScore} label="avg score" />
+                </div>
+
+                {/* Trend + Practice Time Stack */}
+                <div className="col-span-6 md:col-span-4 flex flex-col gap-4">
+                  {/* Trend */}
+                  <div className="flex-1 bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-5">
+                    <span className="text-zinc-500 text-sm">Weekly Trend</span>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="text-2xl font-light text-white">{metrics.trends.weeklyAverage}%</span>
+                      {metrics.trends.trend === 'improving' && (
+                        <span className="flex items-center text-emerald-500 text-sm">
+                          <ArrowUpRight className="w-4 h-4" />
+                        </span>
+                      )}
+                      {metrics.trends.trend === 'declining' && (
+                        <span className="flex items-center text-red-500 text-sm">
+                          <ArrowDownRight className="w-4 h-4" />
+                        </span>
+                      )}
+                      {metrics.trends.trend === 'stable' && (
+                        <span className="flex items-center text-zinc-500 text-sm">
+                          <Minus className="w-4 h-4" />
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Practice Time */}
+                  <div className="flex-1 bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-5">
+                    <span className="text-zinc-500 text-sm">Practice Time</span>
+                    <div className="flex items-baseline gap-1 mt-2">
+                      <span className="text-2xl font-light text-white">{metrics.overview.totalPracticeHours}</span>
+                      <span className="text-zinc-500 text-sm">hours</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Activity Heatmap */}
+                <div className="col-span-12 bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-zinc-500 text-sm">Activity</span>
+                    <span className="text-zinc-600 text-xs">Last 12 weeks</span>
+                  </div>
+                  <ActivityHeatmap sessions={metrics.recentSessions} />
+                  <div className="flex items-center gap-2 mt-4 text-xs text-zinc-600">
+                    <span>Less</span>
+                    <div className="flex gap-0.5">
+                      <div className="w-2.5 h-2.5 rounded-sm bg-zinc-800/50" />
+                      <div className="w-2.5 h-2.5 rounded-sm bg-emerald-900/60" />
+                      <div className="w-2.5 h-2.5 rounded-sm bg-emerald-700/70" />
+                      <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500/80" />
+                      <div className="w-2.5 h-2.5 rounded-sm bg-emerald-400" />
+                    </div>
+                    <span>More</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Trend Message - Inline */}
+              {metrics.trends.trendDescription && (
+                <div className="mb-8 flex items-center gap-3 text-sm">
+                  <div className={`w-1.5 h-1.5 rounded-full ${
+                    metrics.trends.trend === 'improving' ? 'bg-emerald-500' :
+                    metrics.trends.trend === 'declining' ? 'bg-red-500' :
+                    'bg-zinc-500'
+                  }`} />
+                  <span className="text-zinc-400">{metrics.trends.trendDescription}</span>
+                </div>
+              )}
+
+              {/* Two Column Layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+
+                {/* Pattern Mastery */}
+                <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl">
+                  <div className="p-5 border-b border-zinc-800/50 flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-zinc-600" />
+                    <span className="text-sm font-medium text-zinc-300">Pattern Mastery</span>
+                  </div>
+                  <div className="p-4">
+                    {metrics.patterns.length === 0 ? (
+                      <p className="text-zinc-600 text-sm p-4">Complete sessions to track patterns</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {metrics.patterns.slice(0, 6).map((pattern) => {
+                          const config = proficiencyConfig[pattern.proficiency]
+                          return (
+                            <div
+                              key={pattern.pattern}
+                              className="flex items-center justify-between p-3 rounded-lg hover:bg-zinc-800/30 transition-colors group"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="text-sm text-white">{pattern.displayName}</span>
+                                <span className={`text-xs px-2 py-0.5 rounded ${config.bg} ${config.color}`}>
+                                  {config.label}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <span className="text-xs text-zinc-500">{pattern.sessions} sessions</span>
+                                <span className="text-sm font-mono text-zinc-300 w-12 text-right">{pattern.averageScore}%</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Difficulty Breakdown */}
+                <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl">
+                  <div className="p-5 border-b border-zinc-800/50 flex items-center gap-2">
+                    <Crosshair className="w-4 h-4 text-zinc-600" />
+                    <span className="text-sm font-medium text-zinc-300">By Difficulty</span>
+                  </div>
+                  <div className="p-5">
+                    <div className="grid grid-cols-3 gap-4">
+                      {[
+                        { key: 'easy', label: 'Easy', data: easyData, color: 'emerald' },
+                        { key: 'medium', label: 'Medium', data: mediumData, color: 'amber' },
+                        { key: 'hard', label: 'Hard', data: hardData, color: 'red' },
+                      ].map(({ key, label, data, color }) => (
+                        <div key={key} className="text-center">
+                          <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium mb-3
+                            ${color === 'emerald' ? 'bg-emerald-500/10 text-emerald-500' : ''}
+                            ${color === 'amber' ? 'bg-amber-500/10 text-amber-500' : ''}
+                            ${color === 'red' ? 'bg-red-500/10 text-red-500' : ''}
+                          `}>
+                            {label}
+                          </div>
+                          {data ? (
+                            <>
+                              <div className={`text-3xl font-light mb-1
+                                ${color === 'emerald' ? 'text-emerald-400' : ''}
+                                ${color === 'amber' ? 'text-amber-400' : ''}
+                                ${color === 'red' ? 'text-red-400' : ''}
+                              `}>
+                                {data.averageScore}%
+                              </div>
+                              <div className="text-xs text-zinc-500">{data.sessions} sessions</div>
+                            </>
+                          ) : (
+                            <div className="text-zinc-600 text-sm">—</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Sessions - List Style */}
+              <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl mb-8">
+                <div className="p-5 border-b border-zinc-800/50 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-zinc-600" />
+                    <span className="text-sm font-medium text-zinc-300">Recent Sessions</span>
+                  </div>
+                  <span className="text-xs text-zinc-600">{metrics.recentSessions.length} total</span>
+                </div>
+                <div>
+                  {metrics.recentSessions.length === 0 ? (
+                    <p className="text-zinc-600 text-sm p-6">No sessions yet</p>
+                  ) : (
+                    <div className="divide-y divide-zinc-800/50">
+                      {metrics.recentSessions.slice(0, 5).map((session) => (
+                        <Link
+                          key={session.id}
+                          href={`/sessions/${session.id}`}
+                          className="flex items-center justify-between p-4 hover:bg-zinc-800/30 transition-colors group"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-mono text-sm
+                              ${session.performanceScore >= 80 ? 'bg-emerald-500/10 text-emerald-400' : ''}
+                              ${session.performanceScore >= 60 && session.performanceScore < 80 ? 'bg-amber-500/10 text-amber-400' : ''}
+                              ${session.performanceScore < 60 ? 'bg-red-500/10 text-red-400' : ''}
+                            `}>
+                              {session.performanceScore}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-white capitalize">
+                                  {(session.pattern || 'unknown').replace(/-/g, ' ')}
+                                </span>
+                                <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded
+                                  ${session.difficulty === 'easy' ? 'text-emerald-500' : ''}
+                                  ${session.difficulty === 'medium' ? 'text-amber-500' : ''}
+                                  ${session.difficulty === 'hard' ? 'text-red-500' : ''}
+                                `}>
+                                  {session.difficulty}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 text-xs text-zinc-500 mt-0.5">
+                                <span>{session.durationMinutes} min</span>
+                                <span>{new Date(session.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* CTA - Minimal */}
+              <div className="flex items-center justify-between p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-2xl">
+                <div>
+                  <h3 className="text-white font-medium mb-1">Ready for more practice?</h3>
+                  <p className="text-sm text-zinc-500">Keep building your skills with targeted sessions.</p>
+                </div>
+                <Link href="/interview">
+                  <Button variant="outline" className="border-zinc-700 hover:bg-zinc-800 text-white">
+                    Practice now
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
             </>
           )}
         </div>
