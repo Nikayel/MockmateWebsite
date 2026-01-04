@@ -29,7 +29,8 @@ import {
   Scale,
   Search,
   Bug,
-  Wrench
+  Wrench,
+  XCircle
 } from "lucide-react"
 import { LearningRecommendations } from "@/components/LearningRecommendations"
 import { NextProblemRecommendations } from "@/components/NextProblemRecommendations"
@@ -84,6 +85,7 @@ interface PracticeFeedbackProps {
   onRetry?: () => void
   onNewProblem?: () => void
   onExport?: () => void
+  onEndInterview?: () => void
 }
 
 function parseFeedback(feedback: string): FeedbackSection {
@@ -245,6 +247,7 @@ export default function PracticeFeedback({
   onRetry,
   onNewProblem,
   onExport,
+  onEndInterview,
 }: PracticeFeedbackProps) {
   const [showCode, setShowCode] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
@@ -586,11 +589,20 @@ export default function PracticeFeedback({
           </button>
           <button
             onClick={onExport || generatePDF}
-            className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800/50 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800/50 transition-colors border-r border-gray-800"
           >
             <Download className="h-4 w-4" />
             Export
           </button>
+          {onEndInterview && (
+            <button
+              onClick={onEndInterview}
+              className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+            >
+              <XCircle className="h-4 w-4" />
+              End Session
+            </button>
+          )}
         </div>
       </div>
 

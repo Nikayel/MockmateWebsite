@@ -259,6 +259,7 @@ function DueItemRow({
   isMarkingReviewed,
   showOverdue = false,
   showUpcomingDate = false,
+  isUpcoming = false,
 }: {
   item: DueItem;
   onSkip?: (problemId: string) => Promise<void>;
@@ -267,86 +268,182 @@ function DueItemRow({
   isMarkingReviewed?: boolean;
   showOverdue?: boolean;
   showUpcomingDate?: boolean;
+  isUpcoming?: boolean;
 }) {
+  const [showEarlyWarning, setShowEarlyWarning] = useState(false);
   const reviewReason = getReviewReason(item);
   const nextReview = getNextReviewDisplay(item);
 
+  // Get early practice warning based on how far out the review is scheduled
+  const getEarlyPracticeWarning = (): { title: string; message: string; canProceed: boolean } => {
+    const days = item.days_until_review;
+
+    if (days <= 1) {
+      return {
+        title: "Almost due",
+        message: "This review is scheduled for soon. Practicing now is fine!",
+        canProceed: true
+      };
+    }
+
+    if (days <= 3) {
+      return {
+        title: "Slightly early",
+        message: `This problem is scheduled for ${days} days from now. Practicing early won't hurt, but waiting would be more efficient for long-term retention.`,
+        canProceed: true
+      };
+    }
+
+    if (days <= 7) {
+      return {
+        title: "Review not due yet",
+        message: `Spaced repetition works by reviewing at optimal intervals. This problem is scheduled for ${days} days from now — practicing too early means you're not testing your memory at the forgetting threshold, which reduces the strengthening effect.`,
+        canProceed: true
+      };
+    }
+
+    // More than a week away
+    return {
+      title: "Too early for optimal learning",
+      message: `This problem isn't due for ${days} days. Research shows that reviewing too early provides weaker memory reinforcement because you haven't reached the "desirable difficulty" threshold. Your brain strengthens memories most when you recall them just before forgetting. Consider practicing problems that are due now instead.`,
+      canProceed: true
+    };
+  };
+
+  const handleStartClick = (e: React.MouseEvent) => {
+    if (isUpcoming && item.days_until_review > 1) {
+      e.preventDefault();
+      setShowEarlyWarning(true);
+    }
+  };
+
+  const warning = getEarlyPracticeWarning();
+
   return (
-    <div className="group flex items-center justify-between py-3 px-4 -mx-4 hover:bg-white/[0.02] rounded-lg transition-colors">
-      <div className="flex items-center gap-4 min-w-0 flex-1">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-white font-medium truncate">{item.title}</span>
-            {showOverdue && item.days_overdue > 0 && (
-              <span className="text-xs text-rose-400 flex items-center gap-1 bg-rose-500/10 px-2 py-0.5 rounded-full">
-                <AlertTriangle className="h-3 w-3" />
-                {item.days_overdue}d overdue
+    <>
+      <div className="group flex items-center justify-between py-3 px-4 -mx-4 hover:bg-white/[0.02] rounded-lg transition-colors">
+        <div className="flex items-center gap-4 min-w-0 flex-1">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-white font-medium truncate">{item.title}</span>
+              {showOverdue && item.days_overdue > 0 && (
+                <span className="text-xs text-rose-400 flex items-center gap-1 bg-rose-500/10 px-2 py-0.5 rounded-full">
+                  <AlertTriangle className="h-3 w-3" />
+                  {item.days_overdue}d overdue
+                </span>
+              )}
+              {showUpcomingDate && item.days_until_review > 0 && (
+                <span
+                  className="text-xs text-blue-400 flex items-center gap-1 bg-blue-500/10 px-2 py-0.5 rounded-full cursor-help"
+                  title={`Scheduled for review in ${item.days_until_review} day${item.days_until_review === 1 ? '' : 's'} based on your last score of ${item.last_score}%`}
+                >
+                  <Clock className="h-3 w-3" />
+                  {nextReview.timing}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 mt-1.5 text-sm flex-wrap">
+              <span className={difficultyStyles[item.difficulty]}>
+                {item.difficulty}
               </span>
-            )}
-            {showUpcomingDate && item.days_until_review > 0 && (
-              <span
-                className="text-xs text-blue-400 flex items-center gap-1 bg-blue-500/10 px-2 py-0.5 rounded-full cursor-help"
-                title={`Scheduled for review in ${item.days_until_review} day${item.days_until_review === 1 ? '' : 's'} based on your last score of ${item.last_score}%`}
-              >
-                <Clock className="h-3 w-3" />
-                {nextReview.timing}
+              <span className="text-gray-500">{formatPattern(item.pattern)}</span>
+              <span className="text-gray-600">{item.estimated_minutes}m</span>
+              {item.last_score > 0 && (
+                <span className={`${item.last_score >= 70 ? 'text-emerald-500' : item.last_score >= 50 ? 'text-amber-500' : 'text-rose-400'}`}>
+                  Last: {item.last_score}%
+                </span>
+              )}
+              {/* Show review reason with science tooltip */}
+              <span className="text-gray-500 flex items-center">
+                <span className="text-gray-600">·</span>
+                <span className="ml-2 text-gray-400 italic">{reviewReason.short}</span>
+                <InfoTooltip text={reviewReason.tooltip} />
               </span>
-            )}
-          </div>
-          <div className="flex items-center gap-3 mt-1.5 text-sm flex-wrap">
-            <span className={difficultyStyles[item.difficulty]}>
-              {item.difficulty}
-            </span>
-            <span className="text-gray-500">{formatPattern(item.pattern)}</span>
-            <span className="text-gray-600">{item.estimated_minutes}m</span>
-            {item.last_score > 0 && (
-              <span className={`${item.last_score >= 70 ? 'text-emerald-500' : item.last_score >= 50 ? 'text-amber-500' : 'text-rose-400'}`}>
-                Last: {item.last_score}%
-              </span>
-            )}
-            {/* Show review reason with science tooltip */}
-            <span className="text-gray-500 flex items-center">
-              <span className="text-gray-600">·</span>
-              <span className="ml-2 text-gray-400 italic">{reviewReason.short}</span>
-              <InfoTooltip text={reviewReason.tooltip} />
-            </span>
+            </div>
           </div>
         </div>
+        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          {onSkip && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-gray-500 hover:text-gray-300 h-8 w-8 p-0"
+              onClick={() => onSkip(item.problem_id)}
+              disabled={isSkipping}
+              title="Skip for now"
+            >
+              <SkipForward className="h-4 w-4" />
+            </Button>
+          )}
+          {onMarkReviewed && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-emerald-500 hover:text-emerald-400 h-8 px-2"
+              onClick={() => onMarkReviewed(item.problem_id, item.scenario_id)}
+              disabled={isMarkingReviewed}
+              title="Mark as reviewed (practiced elsewhere)"
+            >
+              <Check className="h-4 w-4 mr-1" />
+              Done
+            </Button>
+          )}
+          {isUpcoming ? (
+            <Button
+              size="sm"
+              className="h-8 bg-gray-700 text-gray-300 hover:bg-gray-600"
+              onClick={handleStartClick}
+            >
+              <Play className="h-3 w-3 mr-1" />
+              Practice Early
+            </Button>
+          ) : (
+            <Link href={`/interview?scenario=${item.scenario_id}`}>
+              <Button size="sm" className="h-8 bg-white text-black hover:bg-gray-200">
+                <Play className="h-3 w-3 mr-1" />
+                Start
+              </Button>
+            </Link>
+          )}
+        </div>
       </div>
-      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        {onSkip && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-gray-500 hover:text-gray-300 h-8 w-8 p-0"
-            onClick={() => onSkip(item.problem_id)}
-            disabled={isSkipping}
-            title="Skip for now"
-          >
-            <SkipForward className="h-4 w-4" />
-          </Button>
-        )}
-        {onMarkReviewed && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-emerald-500 hover:text-emerald-400 h-8 px-2"
-            onClick={() => onMarkReviewed(item.problem_id, item.scenario_id)}
-            disabled={isMarkingReviewed}
-            title="Mark as reviewed (practiced elsewhere)"
-          >
-            <Check className="h-4 w-4 mr-1" />
-            Done
-          </Button>
-        )}
-        <Link href={`/interview?scenario=${item.scenario_id}`}>
-          <Button size="sm" className="h-8 bg-white text-black hover:bg-gray-200">
-            <Play className="h-3 w-3 mr-1" />
-            Start
-          </Button>
-        </Link>
-      </div>
-    </div>
+
+      {/* Early Practice Warning Modal */}
+      {showEarlyWarning && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2 bg-amber-500/10 rounded-lg">
+                <Clock className="h-5 w-5 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">{warning.title}</h3>
+                <p className="text-gray-400 text-sm mt-1 leading-relaxed">{warning.message}</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <Button
+                variant="outline"
+                className="flex-1 border-gray-700 text-gray-300 hover:bg-gray-800"
+                onClick={() => setShowEarlyWarning(false)}
+              >
+                Wait for Due Date
+              </Button>
+              <Link href={`/interview?scenario=${item.scenario_id}`} className="flex-1">
+                <Button className="w-full bg-amber-600 hover:bg-amber-500 text-white">
+                  Practice Anyway
+                </Button>
+              </Link>
+            </div>
+
+            <p className="text-xs text-gray-500 mt-4 text-center">
+              Tip: Focus on overdue problems first for maximum retention benefit
+            </p>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -571,7 +668,7 @@ export function DueForReview({
           {isUpcomingExpanded && (
             <div className="divide-y divide-white/5">
               {upcoming.map((item) => (
-                <DueItemRow key={item.problem_id} item={item} showUpcomingDate />
+                <DueItemRow key={item.problem_id} item={item} showUpcomingDate isUpcoming />
               ))}
             </div>
           )}
