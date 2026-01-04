@@ -2417,6 +2417,32 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
       const data = await response.json()
 
+      // Handle API errors (scenario not found, execution timeout, etc.)
+      if (!response.ok || data.error) {
+        const errorMessage = data.error || `Server error (${response.status})`
+
+        // Show error in console instead of just toast
+        setConsoleLogs([{ type: 'error', message: `❌ Execution Error: ${errorMessage}`, timestamp: Date.now() }])
+        setTestResults([{
+          description: "Execution Error",
+          passed: false,
+          error: errorMessage,
+          input: "",
+          expected: "",
+          actual: ""
+        }])
+
+        // Add interviewer message about the error
+        setInterviewerMessages(prev => [...prev, {
+          type: 'ai',
+          message: `There was a problem running your code: ${errorMessage}. Check that your function name matches what the problem expects, and try again.`
+        }])
+
+        playSound('fail')
+        setIsRunningTests(false)
+        return
+      }
+
       if (data.results) {
         setTestResults(data.results)
         setTestSummary(data.summary)
@@ -2510,6 +2536,31 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       })
 
       const data = await response.json()
+
+      // Handle API errors (scenario not found, execution timeout, etc.)
+      if (!response.ok || data.error) {
+        const errorMessage = data.error || `Server error (${response.status})`
+
+        // Show error in console instead of just toast
+        setConsoleLogs([{ type: 'error', message: `❌ Execution Error: ${errorMessage}`, timestamp: Date.now() }])
+        setTestResults([{
+          description: "Execution Error",
+          passed: false,
+          error: errorMessage,
+          input: "",
+          expected: "",
+          actual: ""
+        }])
+
+        setInterviewerMessages(prev => [...prev, {
+          type: 'ai',
+          message: `There was a problem running your code: ${errorMessage}. Check that your function name matches what the problem expects, and try again.`
+        }])
+
+        playSound('fail')
+        setIsRunningTests(false)
+        return
+      }
 
       if (data.results) {
         setTestResults(data.results)

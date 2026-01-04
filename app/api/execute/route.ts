@@ -169,17 +169,22 @@ export async function POST(request: NextRequest) {
   try {
     const { code, scenarioId, language = 'javascript', sessionId, userId } = await request.json()
 
+    logger.info("Execute API called", { scenarioId, language, codeLength: code?.length })
+
     if (!code) {
+      logger.warn("Execute API: Missing code", { scenarioId })
       return NextResponse.json({ error: "Code is required" }, { status: 400 })
     }
 
     if (!scenarioId) {
+      logger.warn("Execute API: Missing scenarioId")
       return NextResponse.json({ error: "Scenario ID is required" }, { status: 400 })
     }
 
     // Validate language parameter
     const validLanguages = ['javascript', 'typescript', 'python']
     if (!validLanguages.includes(language)) {
+      logger.warn("Execute API: Invalid language", { language, scenarioId })
       return NextResponse.json({
         error: `Unsupported language: ${language}. Supported languages are: ${validLanguages.join(', ')}`
       }, { status: 400 })
@@ -189,7 +194,8 @@ export async function POST(request: NextRequest) {
     const scenario = getScenarioById(scenarioId)
 
     if (!scenario) {
-      return NextResponse.json({ error: "Scenario not found" }, { status: 404 })
+      logger.warn("Execute API: Scenario not found", { scenarioId })
+      return NextResponse.json({ error: `Scenario '${scenarioId}' not found. The problem may have been removed or renamed.` }, { status: 404 })
     }
 
     // Get test cases from scenario (only DSA and some other types have testCases)
@@ -266,6 +272,16 @@ export async function POST(request: NextRequest) {
     const totalCount = testCases.length
     const passRate = totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0
     const executionTimeMs = Date.now() - startTime
+
+    // Log execution results for debugging
+    logger.info("Execute API completed", {
+      scenarioId,
+      language,
+      totalTests: totalCount,
+      passedTests: passedCount,
+      allPassed,
+      executionTimeMs,
+    })
 
     // Track code execution analytics
     trackCodeExecutionServer({
