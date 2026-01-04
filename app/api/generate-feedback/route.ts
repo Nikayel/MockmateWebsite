@@ -919,17 +919,17 @@ function calculateValidatedScores(
   }
 
   // === COMMUNICATION SCORE (20%) ===
-  // This is where AI validation matters most
-  // Be more forgiving - focus on whether they explained their thought process
-  let communication = 40 // Higher base - assume good faith
+  // CRITICAL: Real interviews require explaining your approach BEFORE coding
+  // Passing tests without explanation is NOT good communication
+  let communication = 35 // Lower base - must earn through actual communication
 
   // If AI detected incoherence or gibberish, cap severely
   if (!aiValidation.isCoherent) {
     communication = Math.min(25, aiValidation.communicationScore)
   }
-  // If responses weren't relevant to questions, penalize (but not as harshly)
+  // If responses weren't relevant to questions, penalize
   else if (!aiValidation.responsesRelevant) {
-    communication = Math.min(50, aiValidation.communicationScore)
+    communication = Math.min(45, aiValidation.communicationScore)
   }
   // If pre-screening detected suspicious patterns (keyword stuffing), cap
   else if (preScreen.suspiciousPatterns.keywordStuffing) {
@@ -939,42 +939,50 @@ function calculateValidatedScores(
   else {
     communication = aiValidation.communicationScore
 
-    // Small bonus if they answered most interviewer questions
+    // Bonus if they answered most interviewer questions
     if (aiValidation.questionsAsked > 0) {
       const answerRate = aiValidation.questionsAnswered / aiValidation.questionsAsked
       if (answerRate >= 0.8) {
-        communication = Math.min(95, communication + 5)
+        communication = Math.min(90, communication + 5)
       }
     }
   }
 
-  // SOLUTION SUCCESS BONUS: A correct, optimal solution demonstrates understanding
-  // even if they didn't over-explain. Actions speak louder than words.
+  // APPROACH EXPLANATION IS CRITICAL
+  // In real interviews, you MUST explain your approach before coding
   const isOptimalSolution = passRate >= 100 && (effScore || 0) >= 80
   const isCorrectSolution = passRate >= 100
   const difficulty = efficiencyMetrics?.difficulty || 'medium'
+  const difficultyBonus = difficulty === 'easy' ? 5 : 0
 
-  // For easy problems, be more generous - quick, correct solutions are expected
-  const difficultyBonus = difficulty === 'easy' ? 10 : difficulty === 'medium' ? 5 : 0
-
-  if (isOptimalSolution && aiValidation.approachExplained) {
-    // Optimal solution + explained approach = strong communicator
-    communication = Math.max(75, Math.min(95, communication + 15 + difficultyBonus))
-  } else if (isOptimalSolution) {
-    // Optimal solution even without much explanation = decent communication
-    // For easy problems, this should be even more forgiving
-    communication = Math.max(65 + difficultyBonus, communication + 10 + difficultyBonus)
-  } else if (isCorrectSolution && aiValidation.approachExplained) {
-    // Correct solution + explained = good enough
-    communication = Math.max(65, communication + 10 + difficultyBonus)
-  } else if (isCorrectSolution) {
-    // Correct solution = some credit
-    communication = Math.max(55, communication + 5 + difficultyBonus)
+  if (aiValidation.approachExplained && aiValidation.isCoherent) {
+    // Explained approach = this is what we want
+    if (isOptimalSolution) {
+      // Optimal solution + explained approach = excellent communicator
+      communication = Math.max(80, Math.min(95, communication + 15 + difficultyBonus))
+    } else if (isCorrectSolution) {
+      // Correct solution + explained = good communicator
+      communication = Math.max(70, Math.min(90, communication + 10 + difficultyBonus))
+    } else {
+      // Explained but failed = at least they communicated (small boost)
+      communication = Math.min(75, communication + 5)
+    }
+  } else {
+    // DID NOT explain approach - this is a problem even if solution is correct
+    // Real interviewers care about thought process, not just the answer
+    if (isCorrectSolution) {
+      // Correct but silent = poor communication, cap at 55
+      // "You got the right answer but I have no idea how you think"
+      communication = Math.min(55, communication)
+    } else {
+      // Wrong AND silent = very poor communication
+      communication = Math.min(40, communication)
+    }
   }
 
-  // Floor for candidates who at least had a real conversation
-  if (preScreen.hasContent && preScreen.candidateMessageCount >= 2 && aiValidation.isCoherent) {
-    communication = Math.max(50, communication) // Raised from 40
+  // Minimum floor only if they actually had meaningful conversation
+  if (preScreen.hasContent && preScreen.candidateMessageCount >= 3 && aiValidation.isCoherent && aiValidation.approachExplained) {
+    communication = Math.max(55, communication)
   }
 
   // For incomplete solutions, communication can stay higher IF they discussed well
@@ -1005,8 +1013,8 @@ function calculateValidatedScores(
 
 /**
  * Apply score floors for correct solutions
- * A perfect, optimal solution should never get a failing grade
- * Be more generous - solving the problem correctly IS demonstrating competence
+ * A correct solution should get at least a passing grade for code quality
+ * BUT communication score should NOT be boosted if they didn't explain approach
  */
 function applyScoreFloors(
   scores: ReturnType<typeof calculateValidatedScores>,
@@ -1015,28 +1023,34 @@ function applyScoreFloors(
   aiValidation: ConversationValidation
 ): ReturnType<typeof calculateValidatedScores> {
   const isOptimal = (efficiencyScore || 0) >= 80
-  // Lower threshold - if they explained their approach at all, that's decent communication
-  const hasDecentComm = aiValidation.communicationScore >= 50 && aiValidation.isCoherent
-  const hasGoodComm = aiValidation.communicationScore >= 65 && aiValidation.isCoherent
+  // CRITICAL: Only boost communication if they actually explained their approach
+  const explainedApproach = aiValidation.approachExplained && aiValidation.isCoherent
+  const hasGoodComm = aiValidation.communicationScore >= 65 && explainedApproach
 
   let overall = scores.overall
   let communication = scores.communication
 
+  // Overall score floors based on correctness
+  // But DO NOT boost communication unless approach was explained
   if (passRate >= 100 && isOptimal && hasGoodComm) {
-    overall = Math.max(88, overall) // A range (raised from 85)
-    communication = Math.max(75, communication) // Good comm floor for optimal
-  } else if (passRate >= 100 && isOptimal && hasDecentComm) {
-    overall = Math.max(83, overall) // A- range (new tier)
-    communication = Math.max(65, communication) // Decent comm floor for optimal
+    overall = Math.max(88, overall) // A range - optimal + explained
+    communication = Math.max(75, communication)
+  } else if (passRate >= 100 && isOptimal && explainedApproach) {
+    overall = Math.max(83, overall) // A- range - optimal + some explanation
+    communication = Math.max(65, communication)
   } else if (passRate >= 100 && isOptimal) {
-    overall = Math.max(80, overall) // B+ range (raised from 78)
-    communication = Math.max(55, communication) // Even minimal comm gets a floor for optimal
+    // Optimal but SILENT - good code quality, but cap communication
+    overall = Math.max(78, overall) // B+ range - penalized for no communication
+    // DO NOT boost communication - they didn't explain
+  } else if (passRate >= 100 && explainedApproach) {
+    overall = Math.max(75, overall) // B range - correct + explained
   } else if (passRate >= 100) {
-    overall = Math.max(75, overall) // B range (raised from 72)
+    // Correct but SILENT - lower floor
+    overall = Math.max(72, overall) // B- range - penalized for no communication
   } else if (passRate >= 90) {
-    overall = Math.max(70, overall) // B- range (raised from 68)
+    overall = Math.max(68, overall) // C+ range
   } else if (passRate >= 80) {
-    overall = Math.max(65, overall) // C+ range (raised from 62)
+    overall = Math.max(62, overall) // C range
   }
 
   return { ...scores, overall, communication }
@@ -1340,6 +1354,15 @@ If tests passed < 50%:
 - Lead with what's broken, not what works
 - "What Worked" should be minimal - don't fabricate positives
 - Focus feedback on fixing the failing cases
+
+## HANDLING POOR COMMUNICATION (CRITICAL)
+If communication score < 60 or "Approach explained: NO" in the analysis:
+- This is a MAJOR issue even if the solution is correct
+- In real FAANG interviews, you MUST explain your approach before coding
+- TL;DR must mention: "...but needs to explain approach before coding"
+- "Fix Next" MUST include: "EXPLAIN YOUR APPROACH before writing code - interviewers need to understand your thought process"
+- Communication score justification should state: "Did not explain approach before coding"
+- Even with a correct solution, call this out: "You got the right answer, but in a real interview, coding silently is a red flag"
 
 ## OUTPUT FORMAT
 

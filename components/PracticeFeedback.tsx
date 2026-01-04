@@ -29,7 +29,8 @@ import {
   Scale,
   Search,
   Bug,
-  Wrench
+  Wrench,
+  XCircle
 } from "lucide-react"
 import { LearningRecommendations } from "@/components/LearningRecommendations"
 import { NextProblemRecommendations } from "@/components/NextProblemRecommendations"
@@ -84,6 +85,7 @@ interface PracticeFeedbackProps {
   onRetry?: () => void
   onNewProblem?: () => void
   onExport?: () => void
+  onEndInterview?: () => void
 }
 
 function parseFeedback(feedback: string): FeedbackSection {
@@ -245,6 +247,7 @@ export default function PracticeFeedback({
   onRetry,
   onNewProblem,
   onExport,
+  onEndInterview,
 }: PracticeFeedbackProps) {
   const [showCode, setShowCode] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
@@ -586,11 +589,20 @@ export default function PracticeFeedback({
           </button>
           <button
             onClick={onExport || generatePDF}
-            className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800/50 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800/50 transition-colors border-r border-gray-800"
           >
             <Download className="h-4 w-4" />
             Export
           </button>
+          {onEndInterview && (
+            <button
+              onClick={onEndInterview}
+              className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+            >
+              <XCircle className="h-4 w-4" />
+              End Session
+            </button>
+          )}
         </div>
       </div>
 
@@ -678,7 +690,7 @@ export default function PracticeFeedback({
                   sections.whatWorked.slice(0, 3).map((item, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
                       <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-                      <span className="line-clamp-2">{item}</span>
+                      <span>{item}</span>
                     </li>
                   ))
                 ) : overallScore < 25 && problemType === 'system-design' ? (
@@ -704,22 +716,22 @@ export default function PracticeFeedback({
                   sections.fixNext.slice(0, 3).map((item, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
                       <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
-                      <span className="line-clamp-2">{item}</span>
+                      <span>{item}</span>
                     </li>
                   ))
                 ) : overallScore < 25 && problemType === 'system-design' ? (
                   <>
                     <li className="flex items-start gap-2 text-sm text-gray-300">
                       <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-                      <span className="line-clamp-2">ENGAGE with the interviewer - system design is a conversation, not a silent exercise</span>
+                      <span>ENGAGE with the interviewer - system design is a conversation, not a silent exercise</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm text-gray-300">
                       <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
-                      <span className="line-clamp-2">Document your design decisions in the notes panel</span>
+                      <span>Document your design decisions in the notes panel</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm text-gray-300">
                       <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
-                      <span className="line-clamp-2">Practice explaining your thought process out loud</span>
+                      <span>Practice explaining your thought process out loud</span>
                     </li>
                   </>
                 ) : (

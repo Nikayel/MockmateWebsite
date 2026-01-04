@@ -3697,6 +3697,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       language={selectedLanguage}
                       onRetry={resetInterview}
                       onNewProblem={resetInterview}
+                      onEndInterview={() => router.push("/practice")}
                     />
                   </ErrorBoundary>
                   {isFromRoadmap && activeRoadmap && (
