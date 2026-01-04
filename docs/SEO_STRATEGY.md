@@ -43,14 +43,14 @@ This document outlines CodeSparring's comprehensive SEO strategy, including keyw
 | dsa patterns | 1,600 | Medium | Informational | /blog/15-dsa-patterns |
 | coding interview practice | 4,400 | High | Transactional | /pricing |
 | faang interview prep | 2,400 | Medium | Commercial | /blog/faang-interview-what-big-tech-looks-for |
-| technical interview prep | 3,200 | High | Commercial | /why-skillon |
+| technical interview prep | 3,200 | High | Commercial | /why-codesparring |
 
 ### Long-Tail Opportunities (Low Competition, High Intent)
 
 | Keyword | Monthly Volume | Target Page |
 |---------|----------------|-------------|
 | how to practice coding interviews alone | 480 | /blog (new) |
-| spaced repetition for coding | 320 | /why-skillon |
+| spaced repetition for coding | 320 | /why-codesparring |
 | ai coding interview practice | 590 | / (home) |
 | voice mock interview for coding | 210 | / (home) |
 | two sum interview question | 1,900 | /blog/two-sum-5-solutions |

@@ -1,6 +1,6 @@
-# Skillon Testing Guide: From A to Z
+# CodeSparring Testing Guide: From A to Z
 
-> A comprehensive guide to understanding and implementing tests in the Skillon codebase. Written for developers new to testing.
+> A comprehensive guide to understanding and implementing tests in the CodeSparring codebase. Written for developers new to testing.
 
 ## Table of Contents
 

@@ -412,7 +412,7 @@ export default function PracticeFeedback({
       })
     }
 
-    doc.save(`skillon-feedback-${Date.now()}.pdf`)
+    doc.save(`codesparring-feedback-${Date.now()}.pdf`)
   }
 
   return (

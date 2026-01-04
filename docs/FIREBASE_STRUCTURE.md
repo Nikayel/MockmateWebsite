@@ -1,6 +1,6 @@
 # Firebase Structure Guide
 
-This document explains the Firestore database structure for the Skillon platform.
+This document explains the Firestore database structure for the CodeSparring platform.
 
 ## Overview
 

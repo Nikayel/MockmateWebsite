@@ -210,7 +210,7 @@ export function ProblemTeaser() {
                 <span className="text-white">optimal moment</span>—right before you forget.
               </p>
               <Link
-                href="/why-skillon"
+                href="/why-codesparring"
                 className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent/80 transition-colors group"
               >
                 Learn the science

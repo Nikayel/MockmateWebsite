@@ -1,8 +1,8 @@
-import { WhySkilonPageClient } from "@/components/why-skillon/WhySkilonPageClient"
+import { WhyCodesparringPageClient } from "@/components/why-codesparring/WhyCodesparringPageClient"
 import { HowToJsonLd } from "@/components/seo/JsonLd"
 
 /**
- * Why Skillon Page - Server Component
+ * Why CodeSparring Page - Server Component
  *
  * This page explains the science behind our spaced repetition approach.
  * Static content is defined server-side for SEO benefits.
@@ -69,14 +69,14 @@ const notificationTypes = [
 
 // Comparison data
 const comparisonFeatures = [
-  { feature: "Personalized practice schedule", skillon: true, leetcode: false },
-  { feature: "Knows when you'll forget", skillon: true, leetcode: false },
-  { feature: "AI-powered review timing", skillon: true, leetcode: false },
-  { feature: "Pattern-specific decay tracking", skillon: true, leetcode: false },
-  { feature: "Interview countdown optimization", skillon: true, leetcode: false },
-  { feature: "Science-backed spaced repetition", skillon: true, leetcode: false },
-  { feature: "Smart notification system", skillon: true, leetcode: false },
-  { feature: "Large problem database", skillon: true, leetcode: true },
+  { feature: "Personalized practice schedule", codesparring: true, leetcode: false },
+  { feature: "Knows when you'll forget", codesparring: true, leetcode: false },
+  { feature: "AI-powered review timing", codesparring: true, leetcode: false },
+  { feature: "Pattern-specific decay tracking", codesparring: true, leetcode: false },
+  { feature: "Interview countdown optimization", codesparring: true, leetcode: false },
+  { feature: "Science-backed spaced repetition", codesparring: true, leetcode: false },
+  { feature: "Smart notification system", codesparring: true, leetcode: false },
+  { feature: "Large problem database", codesparring: true, leetcode: true },
 ]
 
 export default function WhySkilonPage() {
@@ -84,7 +84,7 @@ export default function WhySkilonPage() {
     <>
       {/* JSON-LD for SEO - rendered server-side */}
       <HowToJsonLd />
-      <WhySkilonPageClient
+      <WhyCodesparringPageClient
         sciencePrinciples={sciencePrinciples}
         notificationTypes={notificationTypes}
         comparisonFeatures={comparisonFeatures}

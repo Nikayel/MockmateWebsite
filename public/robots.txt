@@ -6,7 +6,7 @@ Allow: /
 
 # Allow important marketing pages
 Allow: /pricing
-Allow: /why-skillon
+Allow: /why-codesparring
 Allow: /docs
 Allow: /samples
 Allow: /careers

@@ -37,7 +37,7 @@ CodeSparring provides:
 ## Documentation
 
 - Pricing: /pricing
-- How it works: /why-skillon
+- How it works: /why-codesparring
 - Sample interviews: /samples
 - Documentation: /docs
 - Blog: /blog

@@ -245,7 +245,7 @@ export function FeaturesSection() {
                 Try It Free
               </MagneticButton>
             </Link>
-            <Link href="/why-skillon">
+            <Link href="/why-codesparring">
               <MagneticButton size="lg" variant="outline" glowColor="none">
                 How It Works
               </MagneticButton>

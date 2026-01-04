@@ -95,7 +95,7 @@ export function Header() {
               </>
             ) : (
               <>
-                <Link href="/why-skillon" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
+                <Link href="/why-codesparring" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
                   How it works
                 </Link>
                 <a href="/#features" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
@@ -204,7 +204,7 @@ export function Header() {
               ) : (
                 <>
                   <Link
-                    href="/why-skillon"
+                    href="/why-codesparring"
                     className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >

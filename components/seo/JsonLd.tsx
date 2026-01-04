@@ -203,7 +203,7 @@ export function WebPageJsonLd({
   )
 }
 
-// How-To Schema - for the why-skillon page explaining the process
+// How-To Schema - for the why-codesparring page explaining the process
 export function HowToJsonLd() {
   const schema = {
     "@context": "https://schema.org",
