@@ -6,13 +6,11 @@ import dynamic from "next/dynamic"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { useAuth } from "@/lib/auth-context"
-import { getUserProfile, initializeUserQuota, checkUsageLimit } from "@/lib/firestore-helpers"
-import { Profile, ProfileQuota, InterviewSession } from "@/lib/types"
-import { PRICING_CONFIG } from "@/lib/config"
+import { getUserProfile, checkUsageLimit } from "@/lib/firestore-helpers"
+import { Profile, InterviewSession } from "@/lib/types"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import {
@@ -21,12 +19,15 @@ import {
   Calendar,
   Terminal,
   Clock,
-  ArrowRight
+  ArrowRight,
+  ChevronRight,
+  Zap,
+  Target,
+  TrendingUp
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 
-// Dynamically import modals to reduce initial bundle size
 const OnboardingModal = dynamic(() => import("@/components/OnboardingModal").then(mod => mod.OnboardingModal), {
   ssr: false
 })
@@ -36,10 +37,10 @@ const InteractiveTour = dynamic(() => import("@/components/InteractiveTour").the
 const MetricsOverview = dynamic(() => import("@/components/dashboard/MetricsOverview").then(mod => mod.MetricsOverview), {
   ssr: false,
   loading: () => (
-    <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6">
-      <div className="animate-pulse space-y-3">
-        <div className="h-4 bg-gray-800 rounded w-1/3"></div>
-        <div className="h-4 bg-gray-800 rounded w-1/2"></div>
+    <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4">
+      <div className="animate-pulse space-y-2">
+        <div className="h-3 bg-zinc-800 rounded w-1/3"></div>
+        <div className="h-3 bg-zinc-800 rounded w-1/2"></div>
       </div>
     </div>
   )
@@ -56,35 +57,27 @@ export default function DashboardPage() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showTour, setShowTour] = useState(false)
 
-  // Separate effect to handle auth check with delay to prevent race condition on refresh
   useEffect(() => {
     if (!initialized || authLoading) return
-
-    // Give Firebase a moment to restore session on page refresh before checking auth
     const timer = setTimeout(() => {
       setAuthCheckComplete(true)
     }, 300)
-
     return () => clearTimeout(timer)
   }, [initialized, authLoading])
 
   useEffect(() => {
     const loadDashboard = async () => {
-      // Wait for auth to fully initialize and complete our auth check
       if (authLoading || !initialized || !authCheckComplete) return
 
-      // Redirect if not authenticated
       if (!firebaseUser) {
         router.push("/login?redirect=dashboard")
         return
       }
 
       try {
-        // Parallelize initial data loading for faster page load
         const [userProfile, usageData, sessionsSnap] = await Promise.all([
           getUserProfile(firebaseUser.uid),
           checkUsageLimit(firebaseUser.uid),
-          // Load recent sessions in parallel
           (async () => {
             try {
               const sessionsQuery = query(
@@ -101,19 +94,16 @@ export default function DashboardPage() {
         setProfile(userProfile)
         setUsage(usageData)
 
-        // Check if onboarding is needed for new users
         if (userProfile && !userProfile.onboarding_completed) {
           setShowOnboarding(true)
         }
 
-        // Process sessions if loaded
         if (sessionsSnap && !sessionsSnap.empty) {
           const sessionsData = sessionsSnap.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           } as InterviewSession))
 
-          // Sort by started_at descending and take first 5
           sessionsData.sort((a, b) => {
             const dateA = new Date(a.started_at).getTime()
             const dateB = new Date(b.started_at).getTime()
@@ -123,11 +113,8 @@ export default function DashboardPage() {
           setSessions(sessionsData.slice(0, 5))
         }
 
-        // Auto-sync subscription if user has Stripe IDs but tier is "free"
-        // This fixes Pro users who were incorrectly reset (non-blocking)
         if (userProfile && (userProfile.stripe_subscription_id || userProfile.stripe_customer_id) &&
             userProfile.subscription_tier === "free") {
-          // Run sync in background, don't block page load
           firebaseUser.getIdToken().then(token => {
             fetch("/api/sync-subscription", {
               method: "POST",
@@ -142,7 +129,6 @@ export default function DashboardPage() {
               }
             }).then(syncData => {
               if (syncData?.success && syncData.profile.subscription_tier === "pro") {
-                // Reload profile and usage after sync
                 Promise.all([
                   getUserProfile(firebaseUser.uid),
                   checkUsageLimit(firebaseUser.uid)
@@ -152,7 +138,6 @@ export default function DashboardPage() {
                 })
               }
             }).catch((error) => {
-              // Auto-sync failed - show toast so user knows to try manual refresh
               console.error("Subscription sync failed:", error)
               toast.error("Could not sync subscription status. Please refresh the page.")
             })
@@ -167,7 +152,6 @@ export default function DashboardPage() {
 
     loadDashboard()
 
-    // Refresh data when page becomes visible (e.g., after returning from Stripe)
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible" && !authLoading) {
         loadDashboard()
@@ -182,8 +166,12 @@ export default function DashboardPage() {
 
   if (authLoading || !initialized || !authCheckComplete || dataLoading) {
     return (
-      <main className="min-h-screen bg-black flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
+      <main className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="flex items-center gap-3">
+          <div className="w-2 h-2 bg-zinc-600 rounded-full animate-pulse" />
+          <div className="w-2 h-2 bg-zinc-500 rounded-full animate-pulse delay-75" />
+          <div className="w-2 h-2 bg-zinc-400 rounded-full animate-pulse delay-150" />
+        </div>
       </main>
     )
   }
@@ -194,24 +182,34 @@ export default function DashboardPage() {
 
   const isPro = profile?.subscription_tier === "pro"
   const usagePercentage = usage ? (usage.used / usage.limit) * 100 : 0
-
-  // Get user's first name for welcome message
   const userName = user?.user_metadata?.full_name?.split(' ')[0] || firebaseUser?.displayName?.split(' ')[0]
 
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-emerald-400'
+    if (score >= 60) return 'text-amber-400'
+    return 'text-red-400'
+  }
+
+  const getDifficultyStyle = (difficulty: string) => {
+    switch (difficulty) {
+      case 'easy': return 'text-emerald-400'
+      case 'medium': return 'text-amber-400'
+      case 'hard': return 'text-red-400'
+      default: return 'text-zinc-400'
+    }
+  }
+
   return (
-    <main className="min-h-screen bg-black">
-      {/* Onboarding modal for first-time users */}
+    <main className="min-h-screen bg-zinc-950">
       <OnboardingModal
         isOpen={showOnboarding}
         userId={firebaseUser?.uid || ""}
         userName={userName}
         onComplete={async (takeTour: boolean) => {
           setShowOnboarding(false)
-          // Show tour if user chose to take it
           if (takeTour) {
             setShowTour(true)
           }
-          // Reload profile to get updated onboarding status
           if (firebaseUser) {
             try {
               const updatedProfile = await getUserProfile(firebaseUser.uid)
@@ -225,7 +223,6 @@ export default function DashboardPage() {
         }}
       />
 
-      {/* Interactive tour for new users */}
       {firebaseUser && (
         <InteractiveTour
           isOpen={showTour}
@@ -243,161 +240,197 @@ export default function DashboardPage() {
 
       <Header />
 
-      <div className="pt-24 pb-16">
-        <div className="container mx-auto px-4 max-w-7xl">
-          {/* Welcome Section */}
-          <div className="mb-8" data-tour="welcome">
-            <h1 className="text-4xl font-heading font-bold text-white mb-2">
-              Welcome back, {user.user_metadata?.full_name || "Developer"}!
-            </h1>
-            <p className="text-gray-400">Here's your interview preparation overview</p>
+      <div className="pt-20 sm:pt-24 pb-12 sm:pb-16">
+        <div className="container mx-auto px-4 max-w-6xl">
+          {/* Header Row - Responsive */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8" data-tour="welcome">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-semibold text-white">
+                Welcome back{userName ? `, ${userName}` : ''}
+              </h1>
+              <p className="text-zinc-500 text-sm mt-1">Your interview prep overview</p>
+            </div>
+            <Link href="/interview" data-tour="start-practice-btn">
+              <Button className="w-full sm:w-auto bg-white hover:bg-zinc-200 text-zinc-900 font-medium">
+                <Terminal className="mr-2 h-4 w-4" />
+                Start Practice
+              </Button>
+            </Link>
           </div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {/* Usage Card */}
-            <Card className="bg-gray-900/50 border-gray-700" data-tour="sessions-card">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-white text-sm font-medium flex items-center">
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  Sessions This Month
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-white mb-2">
-                  {usage?.used || 0} / {usage?.limit || 2}
-                </div>
-                <Progress value={usagePercentage} className="h-2 mb-2" />
-                <p className="text-xs text-gray-400">
-                  {usage?.allowed ? `${usage.limit - (usage.used || 0)} sessions remaining` : "Limit reached"}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Resets {usage?.periodEnd
-                    ? new Date(usage.periodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                    : 'next month'}
-                </p>
-              </CardContent>
-            </Card>
+          {/* Stats Row - Responsive grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+            {/* Sessions Used */}
+            <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4" data-tour="sessions-card">
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart3 className="h-4 w-4 text-zinc-500" />
+                <span className="text-xs text-zinc-500">Sessions</span>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl sm:text-3xl font-light text-white">{usage?.used || 0}</span>
+                <span className="text-zinc-500 text-sm">/ {usage?.limit || 2}</span>
+              </div>
+              <Progress value={usagePercentage} className="h-1 mt-2 bg-zinc-800" />
+              <p className="text-[10px] text-zinc-600 mt-1.5">
+                Resets {usage?.periodEnd
+                  ? new Date(usage.periodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  : 'next month'}
+              </p>
+            </div>
 
-            {/* Plan Card */}
-            <Card className="bg-gray-900/50 border-gray-700" data-tour="subscription-card">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-white text-sm font-medium flex items-center">
-                  <Crown className="h-4 w-4 mr-2" />
-                  Subscription
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Badge className={isPro ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" : "bg-gray-500/20 text-gray-400 border-gray-500/30"}>
-                  {isPro ? "Pro Plan" : "Free Plan"}
-                </Badge>
-                {!isPro && (
-                  <Link href="/upgrade" className="block mt-3">
-                    <Button size="sm" className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
-                      Upgrade
-                    </Button>
-                  </Link>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Quick Start Card */}
-            <Card className="bg-gray-900/50 border-gray-700" data-tour="quick-start">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-white text-sm font-medium flex items-center">
-                  <Terminal className="h-4 w-4 mr-2" />
-                  Quick Start
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Link href="/interview">
-                  <Button className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white" data-tour="start-practice-btn">
-                    Start Practice
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Content Grid: Recent Activity & Metrics */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            {/* Recent Activity - Takes 2 columns */}
-            <Card className="bg-gray-900/50 border-gray-700 lg:col-span-2" data-tour="recent-activity">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center justify-between">
-                <span className="flex items-center">
-                  <Clock className="h-5 w-5 mr-2 text-[#00d9ff]" />
-                  Recent Activity
+            {/* Plan */}
+            <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4" data-tour="subscription-card">
+              <div className="flex items-center gap-2 mb-2">
+                <Crown className="h-4 w-4 text-zinc-500" />
+                <span className="text-xs text-zinc-500">Plan</span>
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`text-lg font-medium ${isPro ? 'text-amber-400' : 'text-zinc-300'}`}>
+                  {isPro ? 'Pro' : 'Free'}
                 </span>
-                <Link href="/sessions">
-                  <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-                    View All
+                {isPro && <Crown className="h-4 w-4 text-amber-400" />}
+              </div>
+              {!isPro && (
+                <Link href="/upgrade">
+                  <Button size="sm" variant="outline" className="w-full h-7 text-xs border-zinc-700 text-zinc-300 hover:bg-zinc-800 mt-1">
+                    Upgrade
                   </Button>
                 </Link>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+              )}
+            </div>
+
+            {/* Total Sessions */}
+            <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="h-4 w-4 text-zinc-500" />
+                <span className="text-xs text-zinc-500">Total Sessions</span>
+              </div>
+              <span className="text-2xl sm:text-3xl font-light text-white">{sessions.length > 0 ? sessions.length : '0'}</span>
+              <p className="text-[10px] text-zinc-600 mt-1.5">All time</p>
+            </div>
+
+            {/* Avg Score */}
+            <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="h-4 w-4 text-zinc-500" />
+                <span className="text-xs text-zinc-500">Avg Score</span>
+              </div>
+              {sessions.filter(s => s.performance_score).length > 0 ? (
+                <>
+                  <span className={`text-2xl sm:text-3xl font-light ${getScoreColor(
+                    Math.round(sessions.filter(s => s.performance_score).reduce((acc, s) => acc + (s.performance_score || 0), 0) / sessions.filter(s => s.performance_score).length)
+                  )}`}>
+                    {Math.round(sessions.filter(s => s.performance_score).reduce((acc, s) => acc + (s.performance_score || 0), 0) / sessions.filter(s => s.performance_score).length)}%
+                  </span>
+                  <p className="text-[10px] text-zinc-600 mt-1.5">From completed sessions</p>
+                </>
+              ) : (
+                <>
+                  <span className="text-2xl sm:text-3xl font-light text-zinc-600">—</span>
+                  <p className="text-[10px] text-zinc-600 mt-1.5">No data yet</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Main Content - Responsive 2-column */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
+            {/* Recent Activity - 3 cols on lg */}
+            <div className="lg:col-span-3 bg-zinc-900/50 border border-zinc-800/50 rounded-xl" data-tour="recent-activity">
+              <div className="flex items-center justify-between p-4 border-b border-zinc-800/50">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-zinc-500" />
+                  <span className="text-sm font-medium text-zinc-300">Recent Activity</span>
+                </div>
+                <Link href="/sessions">
+                  <Button variant="ghost" size="sm" className="text-zinc-500 hover:text-white h-7 text-xs">
+                    View All
+                    <ChevronRight className="ml-1 h-3 w-3" />
+                  </Button>
+                </Link>
+              </div>
+
               {sessions.length === 0 ? (
-                <div className="text-center py-8">
-                  <Calendar className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-                  <p className="text-gray-400">No recent sessions</p>
-                  <p className="text-gray-500 text-sm mt-2">Start practicing to see your activity here</p>
-                  <Link href="/interview" className="block mt-4">
-                    <Button className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
-                      <Terminal className="mr-2 h-4 w-4" />
-                      Start Practice Session
+                <div className="p-8 sm:p-12 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center mx-auto mb-4">
+                    <Calendar className="h-6 w-6 text-zinc-600" />
+                  </div>
+                  <p className="text-zinc-400 text-sm mb-1">No sessions yet</p>
+                  <p className="text-zinc-600 text-xs mb-4">Start practicing to track your progress</p>
+                  <Link href="/interview">
+                    <Button size="sm" className="bg-white hover:bg-zinc-200 text-zinc-900">
+                      <Zap className="mr-1.5 h-3.5 w-3.5" />
+                      Start First Session
                     </Button>
                   </Link>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="divide-y divide-zinc-800/50">
                   {sessions.map((session) => (
                     <Link
                       key={session.id}
                       href={session.completed_at ? `/sessions/${session.id}` : `/interview?session=${session.id}&scenario=${session.scenario_id}`}
-                      className="block p-3 bg-gray-800/50 rounded-lg hover:bg-gray-800 transition-colors"
+                      className="flex items-center gap-3 p-3 sm:p-4 hover:bg-zinc-800/30 transition-colors"
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h4 className="text-white font-medium text-sm mb-1">{session.topic}</h4>
-                          <div className="flex items-center gap-2 text-xs text-gray-400">
-                            <Calendar className="h-3 w-3" />
-                            {new Date(session.started_at).toLocaleDateString()}
-                            {session.completed_at && session.performance_score !== undefined && (
-                              <>
-                                <span>•</span>
-                                <span className="text-[#00d9ff]">{Math.round(session.performance_score)}% score</span>
-                              </>
-                            )}
-                            {!session.completed_at && (
-                              <>
-                                <span>•</span>
-                                <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-xs">
-                                  In Progress
-                                </Badge>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        <Badge className={
-                          session.difficulty === "easy" ? "bg-green-600/20 text-green-400 border-green-600/30" :
-                          session.difficulty === "medium" ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30" :
-                          "bg-red-600/20 text-red-400 border-red-600/30"
-                        }>
-                          {session.difficulty.toUpperCase()}
-                        </Badge>
+                      {/* Score indicator */}
+                      <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center font-mono text-sm shrink-0 ${
+                        session.performance_score
+                          ? session.performance_score >= 80 ? 'bg-emerald-500/10 text-emerald-400' :
+                            session.performance_score >= 60 ? 'bg-amber-500/10 text-amber-400' :
+                            'bg-red-500/10 text-red-400'
+                          : !session.completed_at ? 'bg-amber-500/10 text-amber-400' : 'bg-zinc-800 text-zinc-500'
+                      }`}>
+                        {session.performance_score ? Math.round(session.performance_score) : !session.completed_at ? '...' : '—'}
                       </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-sm text-white font-medium truncate">{session.topic}</span>
+                          <span className={`text-[10px] uppercase tracking-wider ${getDifficultyStyle(session.difficulty)}`}>
+                            {session.difficulty}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-zinc-500">
+                          <span>{new Date(session.started_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                          {!session.completed_at && (
+                            <Badge className="bg-amber-500/10 text-amber-400 border-0 text-[10px] px-1.5 py-0">
+                              In Progress
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      <ChevronRight className="h-4 w-4 text-zinc-600 shrink-0" />
                     </Link>
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
 
-            {/* Performance Insights - Takes 1 column */}
-            <MetricsOverview />
+            {/* Metrics Overview - 2 cols on lg */}
+            <div className="lg:col-span-2" data-tour="quick-start">
+              <MetricsOverview />
+            </div>
           </div>
+
+          {/* Usage Warning - Show when low */}
+          {!isPro && usagePercentage >= 80 && (
+            <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p className="text-amber-400 text-sm font-medium">Running low on sessions</p>
+                  <p className="text-zinc-400 text-xs mt-0.5">Upgrade to Pro for unlimited access</p>
+                </div>
+                <Link href="/upgrade">
+                  <Button size="sm" className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-black">
+                    <Crown className="mr-1.5 h-3.5 w-3.5" />
+                    Upgrade
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -405,4 +438,3 @@ export default function DashboardPage() {
     </main>
   )
 }
-
