@@ -53,6 +53,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/lib/auth-context"
 import { checkUsageLimit, recordSessionStart, getUserProfile, createInterviewSession, updateInterviewSession, checkSessionCost, saveSessionState, getSessionState } from "@/lib/firestore-helpers"
+import { getOrCreateGuestId, getGuestId, canStartFreeTrial, markFreeTrialUsed, saveGuestSessionData, isGuestId } from "@/lib/guest-session"
+import { SignupPrompt } from "@/components/SignupPrompt"
 import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { scenarios, filterScenarios, getScenarioById, type Scenario, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
 import { extractProtectedElements, validateCodeProtection, enforceCodeProtection } from "@/lib/code-protection"
@@ -182,6 +184,11 @@ function InterviewPageContent() {
 
   // Filters (handled inside ScenarioBrowser now)
   const [completedProblems, setCompletedProblems] = useState<string[]>([])
+
+  // Guest mode state
+  const [isGuestMode, setIsGuestMode] = useState(false)
+  const [guestId, setGuestId] = useState<string | null>(null)
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false)
 
   // Chat states
   const [interviewerMessages, setInterviewerMessages] = useState<ChatMessage[]>([])
@@ -421,9 +428,25 @@ function InterviewPageContent() {
       if (authLoading || !initialized || !authCheckComplete) return
 
       if (!firebaseUser) {
-        router.push("/login?redirect=interview")
-        return
+        // Check if guest can start free trial
+        const canTrial = canStartFreeTrial()
+        if (canTrial) {
+          // Allow guest mode
+          const gId = getOrCreateGuestId()
+          setGuestId(gId)
+          setIsGuestMode(true)
+          setIsLoading(false)
+          return
+        } else {
+          // Free trial already used, require signup
+          router.push("/login?redirect=interview&message=trial-used")
+          return
+        }
       }
+
+      // Authenticated user - disable guest mode if it was set
+      setIsGuestMode(false)
+      setGuestId(null)
 
       // Check usage limit
       const usage = await checkUsageLimit(firebaseUser.uid)
@@ -1593,6 +1616,58 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           description: "Your progress will still be saved locally. You can continue the interview.",
         })
       }
+    } else if (isGuestMode && guestId) {
+      // Guest user - create session via API
+      try {
+        const scenarioPattern = ('pattern' in scenario ? scenario.pattern : scenario.type) || 'unknown'
+        const response = await fetch('/api/guest-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            guestId,
+            scenarioTitle: scenario.title,
+            scenarioType: scenario.type,
+            scenarioId: scenario.id,
+            difficulty: scenario.difficulty,
+            pattern: scenarioPattern,
+          }),
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          if (data.code === 'FREE_TRIAL_EXHAUSTED') {
+            toast.error("Free trial already used", {
+              description: "Sign up to continue practicing!",
+            })
+            markFreeTrialUsed()
+            router.push("/login?redirect=interview")
+            return
+          }
+          throw new Error(data.error || 'Failed to create session')
+        }
+
+        setCurrentSessionId(data.sessionId)
+
+        // Save initial guest session data to localStorage
+        saveGuestSessionData({
+          sessionId: data.sessionId,
+          scenarioId: scenario.id,
+          scenarioTitle: scenario.title,
+          startedAt: new Date().toISOString(),
+        })
+
+        toast.success("Free trial session started!", {
+          description: "Complete the interview to see your personalized feedback.",
+        })
+      } catch (error) {
+        console.error("Error creating guest session:", error)
+        toast.error("Session tracking error", {
+          description: "Your progress will still be saved locally. You can continue the interview.",
+        })
+      }
     }
 
     setIsInterviewStarted(true)
@@ -1867,6 +1942,30 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
   const proceedToFinalFeedback = async () => {
     setShowPostInterviewDiscussion(false)
     setShowFeedback(true)
+
+    // Show signup prompt for guest users after feedback
+    if (isGuestMode && guestId) {
+      // Small delay to let user see their feedback first
+      setTimeout(() => {
+        setShowSignupPrompt(true)
+      }, 2000)
+
+      // Mark free trial as used and save feedback to localStorage
+      markFreeTrialUsed()
+      if (currentSessionId && selectedScenario) {
+        saveGuestSessionData({
+          sessionId: currentSessionId,
+          scenarioId: selectedScenario.id,
+          scenarioTitle: selectedScenario.title,
+          startedAt: new Date().toISOString(),
+          feedback: {
+            score: performanceScore || 0,
+            summary: comprehensiveFeedback,
+            feedbackData: null,
+          },
+        })
+      }
+    }
   }
 
   // Fetch RAG hints for the current problem
@@ -2633,7 +2732,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     )
   }
 
-  if (!user) {
+  // Allow both authenticated users and guest mode
+  if (!user && !isGuestMode) {
     return null
   }
 
@@ -2644,6 +2744,24 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
   return (
     <main className="min-h-screen bg-black">
       {!isInterviewMode && <Header />}
+
+      {/* Guest Mode Banner */}
+      {isGuestMode && !showFeedback && (
+        <div className="bg-gradient-to-r from-accent/20 to-purple-600/20 border-b border-accent/30">
+          <div className="container mx-auto px-4 py-2 flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-accent font-medium">Free Trial</span>
+              <span className="text-muted-foreground">Complete this interview to see your AI-powered feedback</span>
+            </div>
+            <button
+              onClick={() => router.push("/login?redirect=interview")}
+              className="text-accent hover:text-accent/80 font-medium transition-colors"
+            >
+              Sign up for unlimited access
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Scenario Browser (Pattern / basket style) */}
       {showScenarioBrowser && (
@@ -3716,6 +3834,20 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             </div>
           </div>
         </section>
+      )}
+
+      {/* Guest User Signup Prompt - shown after feedback */}
+      {isGuestMode && showFeedback && performanceScore !== null && showSignupPrompt && (
+        <SignupPrompt
+          score={performanceScore}
+          sessionId={currentSessionId || ''}
+          scenarioTitle={selectedScenario?.title || ''}
+          feedbackSummary={comprehensiveFeedback}
+          onDismiss={() => {
+            setShowSignupPrompt(false)
+            markFreeTrialUsed()
+          }}
+        />
       )}
 
       {/* Code Viewer Side Panel */}
