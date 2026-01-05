@@ -33,6 +33,9 @@ next-env.d.ts
 # Extension directory (cloned repo for context, not part of website build)
 /extension/
 
-# Internal documentation files
-*.md
+# Allow documentation files
 !README.md
+!SECURITY.md
+!CONTRIBUTING.md
+!CHANGELOG.md
+!docs/*.md
