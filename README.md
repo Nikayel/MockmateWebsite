@@ -1,110 +1,74 @@
-```
-   ____          _      ____                       _
-  / ___|___   __| | ___/ ___| _ __   __ _ _ __ _ __(_)_ __   __ _
- | |   / _ \ / _` |/ _ \___ \| '_ \ / _` | '__| '__| | '_ \ / _` |
- | |__| (_) | (_| |  __/___) | |_) | (_| | |  | |  | | | | | (_| |
-  \____\___/ \__,_|\___|____/| .__/ \__,_|_|  |_|  |_|_| |_|\__, |
-                             |_|                           |___/
-```
+<p align="center">
+  <img src="public/logo-codesparring.svg" alt="CodeSparring Logo" width="300" />
+</p>
 
-<div align="center">
+<h1 align="center">CodeSparring</h1>
 
-**AI-Powered Coding Interview Practice Platform**
+<p align="center">
+  <strong>AI-Powered Coding Interview Practice Platform</strong>
+</p>
 
-[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-38B2AC?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
-[![Firebase](https://img.shields.io/badge/Firebase-Auth%20%26%20DB-FFCA28?style=flat-square&logo=firebase)](https://firebase.google.com/)
+<p align="center">
+  <a href="https://codesparring.com">Live Demo</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="docs/API.md">API Docs</a> •
+  <a href="docs/ARCHITECTURE.md">Architecture</a>
+</p>
 
-[Live Demo](https://codesparring.com) • [Documentation](https://codesparring.com/docs) • [Blog](https://codesparring.com/blog)
-
-</div>
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-16-black?logo=next.js" alt="Next.js 16" />
+  <img src="https://img.shields.io/badge/React-19-blue?logo=react" alt="React 19" />
+  <img src="https://img.shields.io/badge/TypeScript-5-blue?logo=typescript" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Tailwind-4-38B2AC?logo=tailwind-css" alt="Tailwind CSS" />
+</p>
 
 ---
 
 ## What is CodeSparring?
 
-CodeSparring helps developers prepare for technical interviews by simulating realistic coding interviews with an AI interviewer. Practice in your browser with real-time feedback and comprehensive performance analytics.
+CodeSparring helps developers prepare for technical interviews by simulating realistic coding interviews with an AI interviewer. Practice in your browser with real-time feedback, spaced repetition learning, and voice mode.
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                                                                     │
-│   "Finally, a platform that feels like a real interview,           │
-│    not just another LeetCode clone."                               │
-│                                                                     │
-│                                    — Software Engineer @ Google     │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
+### Key Features
 
-## Features
+| Feature | Description |
+|---------|-------------|
+| **AI Interviewer** | Practice with an AI that asks clarifying questions, gives hints, and evaluates your approach |
+| **Code Execution** | Write and run code in 7+ languages with instant test validation |
+| **Spaced Repetition** | Never forget patterns with science-backed scheduling (FSRS algorithm) |
+| **Voice Mode** | Talk through your solution like a real interview |
+| **Smart Recommendations** | AI-powered suggestions based on your strengths and gaps |
+| **Study Roadmaps** | Personalized learning paths for target companies |
 
-```
-┌────────────────────┐  ┌────────────────────┐  ┌────────────────────┐
-│   AI Interviewer   │  │  Spaced Repetition │  │   Voice Practice   │
-│                    │  │                    │  │                    │
-│  Natural dialogue  │  │  Science-backed    │  │  Talk through      │
-│  Contextual hints  │  │  retention system  │  │  solutions like    │
-│  Real feedback     │  │  Never forget      │  │  a real interview  │
-└────────────────────┘  └────────────────────┘  └────────────────────┘
-
-┌────────────────────┐  ┌────────────────────┐  ┌────────────────────┐
-│   Live Coding      │  │   Analytics        │  │   Pattern-Based    │
-│                    │  │                    │  │                    │
-│  Monaco editor     │  │  Track progress    │  │  15 DSA patterns   │
-│  Code execution    │  │  Identify gaps     │  │  organized by      │
-│  Syntax highlight  │  │  Performance data  │  │  interview freq    │
-└────────────────────┘  └────────────────────┘  └────────────────────┘
-```
-
-## Architecture
-
-```
-                              ┌──────────────────────────────────────┐
-                              │           CodeSparring               │
-                              │         Architecture                 │
-                              └──────────────────────────────────────┘
-                                              │
-                    ┌─────────────────────────┼─────────────────────────┐
-                    │                         │                         │
-                    ▼                         ▼                         ▼
-           ┌───────────────┐        ┌───────────────┐        ┌───────────────┐
-           │   Frontend    │        │   Backend     │        │   Services    │
-           │   (Next.js)   │        │   (API)       │        │   (External)  │
-           └───────────────┘        └───────────────┘        └───────────────┘
-                    │                         │                         │
-        ┌───────────┴───────────┐    ┌───────┴───────┐    ┌────────────┴────────────┐
-        │                       │    │               │    │                         │
-        ▼                       ▼    ▼               ▼    ▼                         ▼
-┌───────────────┐    ┌───────────────┐    ┌───────────────┐    ┌───────────────┐
-│  App Router   │    │   React 19    │    │  API Routes   │    │   Firebase    │
-│  Pages/Blog   │    │  Components   │    │  /api/*       │    │  Auth + DB    │
-└───────────────┘    └───────────────┘    └───────────────┘    └───────────────┘
-                                                  │
-                              ┌───────────────────┼───────────────────┐
-                              │                   │                   │
-                              ▼                   ▼                   ▼
-                     ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
-                     │  Google       │   │   Stripe      │   │   Deepgram    │
-                     │  Gemini AI    │   │   Payments    │   │   Voice AI    │
-                     └───────────────┘   └───────────────┘   └───────────────┘
-```
+---
 
 ## Tech Stack
 
-| Layer | Technology | Purpose |
-|-------|------------|---------|
-| **Framework** | Next.js 16 | React framework with App Router |
-| **Language** | TypeScript | Type-safe development |
-| **Styling** | Tailwind CSS 4 | Utility-first styling |
-| **Auth & DB** | Firebase | Authentication + Firestore |
-| **AI** | Google Gemini | AI interviewer & feedback |
-| **Voice** | Deepgram | Speech-to-text for voice mode |
-| **Payments** | Stripe | Subscription management |
-| **Editor** | Monaco/CodeMirror | Code editing |
-| **Vectors** | Pinecone | RAG for contextual hints |
+| Category | Technologies |
+|----------|-------------|
+| **Frontend** | Next.js 16, React 19, TypeScript, Tailwind CSS 4 |
+| **UI Components** | shadcn/ui, Radix UI, Framer Motion |
+| **State Management** | Zustand |
+| **Code Editor** | CodeMirror 6 |
+| **Database** | Firebase Firestore |
+| **Authentication** | Firebase Auth (GitHub/Google OAuth) |
+| **AI** | Google Gemini 2.5 Flash |
+| **Vector Search** | Pinecone / Firestore |
+| **Payments** | Stripe |
+| **Voice** | Deepgram |
+| **Deployment** | Vercel |
+
+---
 
 ## Quick Start
+
+### Prerequisites
+
+- Node.js 18+
+- pnpm (recommended) or npm
+- Firebase project
+- Gemini API key
+
+### Installation
 
 ```bash
 # Clone the repository
@@ -112,166 +76,210 @@ git clone https://github.com/Nikayel/MockmateWebsite.git
 cd MockmateWebsite
 
 # Install dependencies
-npm install
+pnpm install
 
 # Set up environment variables
 cp .env.example .env.local
+# Edit .env.local with your credentials
 
 # Start development server
-npm run dev
+pnpm dev
 ```
 
-Visit `http://localhost:3000`
+Visit http://localhost:3000
 
-## Environment Variables
+### Environment Variables
 
 ```env
-# Firebase Configuration (Required)
-NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
+# Required
+NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+GEMINI_API_KEY=your_gemini_key
 
-# AI Configuration (Required)
-GEMINI_API_KEY=your_gemini_api_key
-
-# Stripe Configuration (Optional - for payments)
+# Optional (for payments)
 STRIPE_SECRET_KEY=sk_test_...
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 ```
+
+See `.env.example` for full configuration.
+
+---
 
 ## Project Structure
 
 ```
 MockmateWebsite/
-├── app/                          # Next.js App Router
-│   ├── api/                      # API routes
-│   │   ├── chat/                 # AI interviewer
-│   │   ├── execute/              # Code execution
-│   │   └── generate-feedback/    # Performance analysis
-│   ├── blog/                     # Blog (MDX-based)
-│   ├── docs/                     # Documentation
-│   ├── interview/                # Live practice
-│   ├── pricing/                  # Pricing page
-│   └── dashboard/                # User dashboard
-├── components/                   # React components
-│   ├── blog/                     # Blog components
-│   ├── seo/                      # SEO (JSON-LD, meta)
-│   └── ui/                       # Reusable UI
-├── content/
-│   └── blog/                     # MDX blog posts
-├── lib/                          # Utilities
-│   ├── mdx.ts                    # Blog loader
-│   ├── firebase.ts               # Firebase config
-│   ├── roadmap/                  # Learning paths
-│   └── spaced-repetition/        # SM-2 algorithm
-└── public/                       # Static assets
+├── app/                      # Next.js App Router
+│   ├── api/                  # API routes (50+ endpoints)
+│   ├── dashboard/            # User dashboard
+│   ├── interview/            # Interview interface
+│   ├── practice/             # Practice mode
+│   └── admin/                # Admin panel
+├── components/               # React components
+│   ├── ui/                   # shadcn/ui primitives
+│   ├── interview/            # Interview components
+│   ├── dashboard/            # Dashboard components
+│   └── ...
+├── lib/                      # Core logic
+│   ├── rag/                  # RAG system
+│   ├── spaced-repetition/    # Learning algorithms
+│   ├── stores/               # Zustand stores
+│   └── types.ts              # TypeScript types
+├── docs/                     # Documentation
+│   ├── API.md                # API reference
+│   ├── ARCHITECTURE.md       # System design
+│   ├── ONBOARDING.md         # New engineer guide
+│   └── ...
+└── public/                   # Static assets
 ```
 
-## Key Pages
+---
 
-| Route | Description |
-|-------|-------------|
-| `/` | Landing page |
-| `/login` | GitHub/Google OAuth |
-| `/interview` | Live coding practice |
-| `/dashboard` | User progress & stats |
-| `/pricing` | Subscription plans |
-| `/blog` | Technical articles |
-| `/docs` | Getting started guide |
+## Documentation
 
-## API Endpoints
+| Document | Description |
+|----------|-------------|
+| [API Reference](docs/API.md) | Complete API documentation |
+| [Architecture](docs/ARCHITECTURE.md) | System design & data flow |
+| [Onboarding Guide](docs/ONBOARDING.md) | New engineer setup |
+| [Firebase Structure](docs/FIREBASE_STRUCTURE.md) | Database schema |
+| [Testing Guide](docs/TESTING_GUIDE.md) | How to write tests |
+| [Contributing](CONTRIBUTING.md) | Contribution guidelines |
+| [Security](SECURITY.md) | Security policy |
 
-| Endpoint | Purpose |
-|----------|---------|
-| `POST /api/chat` | AI interviewer responses |
-| `POST /api/execute` | Code execution sandbox |
-| `POST /api/generate-feedback` | Performance analysis |
-| `POST /api/create-checkout` | Stripe checkout session |
-| `POST /api/customer-portal` | Subscription management |
+---
 
 ## Development
 
+### Available Scripts
+
 ```bash
-# Start dev server with Turbopack
-npm run dev
-
-# Build for production
-npm run build
-
-# Start production server
-npm start
-
-# Type checking
-npm run type-check
-
-# Linting
-npm run lint
+pnpm dev          # Start dev server (Turbopack)
+pnpm build        # Production build
+pnpm start        # Start production server
+pnpm test         # Run tests
+pnpm test:watch   # Tests in watch mode
+pnpm test:coverage # Tests with coverage
+pnpm lint         # Check code style
+pnpm lint:fix     # Fix linting issues
+pnpm typecheck    # TypeScript check
+pnpm format       # Format code (Prettier)
 ```
 
-## Deployment
+### Code Quality
 
-The site deploys automatically to Vercel on push to `main`.
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   GitHub    │────▶│   Vercel    │────▶│  Production │
-│   Push      │     │   Build     │     │   Deploy    │
-└─────────────┘     └─────────────┘     └─────────────┘
+```bash
+# Before committing
+pnpm lint && pnpm typecheck && pnpm test
 ```
 
-## Blog System
-
-The blog uses MDX files with frontmatter:
-
-```mdx
----
-title: "Your Post Title"
-description: "Meta description for SEO"
-date: "2025-12-28"
-author: "CodeSparring Team"
-category: "dsa" | "faang" | "system-design" | "career" | "guides"
-tags: ["tag1", "tag2"]
-featured: true | false
 ---
 
-Your content here...
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        CodeSparring                          │
+├─────────────────────────────────────────────────────────────┤
+│  Frontend (Next.js)  │  Backend (API Routes)  │  Services   │
+│  - React 19          │  - Chat API            │  - Gemini   │
+│  - Zustand           │  - Execute API         │  - Firebase │
+│  - CodeMirror        │  - User APIs           │  - Stripe   │
+│  - shadcn/ui         │  - Admin APIs          │  - Piston   │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Security
+See [Architecture Documentation](docs/ARCHITECTURE.md) for detailed system design.
 
-- **Firebase Security Rules**: Row-level security for user data
-- **API Rate Limiting**: Protection against abuse
-- **Content Security Policy**: XSS prevention
-- **Server-only imports**: Sensitive code protected
+---
+
+## API Highlights
+
+### Interview Chat
+
+```typescript
+POST /api/chat
+{
+  "message": "How should I approach this?",
+  "code": "function twoSum(nums, target) { }",
+  "scenarioTitle": "Two Sum",
+  "language": "javascript",
+  "roleType": "interviewer"
+}
+```
+
+### Code Execution
+
+```typescript
+POST /api/execute
+{
+  "code": "function twoSum(...) { ... }",
+  "language": "javascript",
+  "scenarioId": "two-sum"
+}
+```
+
+See [API Documentation](docs/API.md) for all endpoints.
+
+---
+
+## Engineering Domains
+
+The codebase is organized into clear ownership areas:
+
+| Domain | Description | Key Files |
+|--------|-------------|-----------|
+| **Interview Engine** | Core interview experience | `components/interview/`, `app/api/chat/` |
+| **Learning System** | Spaced repetition & roadmaps | `lib/spaced-repetition/`, `components/roadmap/` |
+| **AI/RAG Platform** | Embeddings & retrieval | `lib/rag/`, `lib/agents/` |
+| **User Dashboard** | Metrics & progress | `components/dashboard/`, `components/practice/` |
+| **Platform & Infra** | Auth, billing, admin | `lib/admin/`, `app/api/webhook/` |
+| **Growth** | Notifications & engagement | `lib/email/`, `app/api/cron/` |
+
+---
 
 ## Contributing
 
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Quick Contribution Guide
+
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing`)
-5. Open a Pull Request
+3. Make your changes
+4. Run tests (`pnpm test`)
+5. Commit (`git commit -m 'feat: add amazing feature'`)
+6. Push and create a Pull Request
+
+---
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for security policies and vulnerability reporting.
+
+---
 
 ## License
 
 Proprietary - All rights reserved.
 
+---
+
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/Nikayel/MockmateWebsite/issues)
-- **Email**: support@codesparring.dev
-- **Twitter**: [@codesparring](https://twitter.com/codesparring)
+- **Issues:** [GitHub Issues](https://github.com/Nikayel/MockmateWebsite/issues)
+- **Email:** support@codesparring.com
+- **Twitter:** [@codesparring](https://twitter.com/codesparring)
 
 ---
 
-<div align="center">
+<p align="center">
+  <strong>Built with ☕ and determination</strong>
+</p>
 
-**Built with caffeine and determination**
-
-[Website](https://codesparring.com) • [Blog](https://codesparring.com/blog) • [Pricing](https://codesparring.com/pricing)
-
-</div>
+<p align="center">
+  <a href="https://codesparring.com">Website</a> •
+  <a href="https://codesparring.com/blog">Blog</a> •
+  <a href="https://codesparring.com/pricing">Pricing</a>
+</p>

@@ -1,6 +1,6 @@
-# Contributing to MockMate
+# Contributing to CodeSparring
 
-Thank you for your interest in contributing to MockMate! This document provides guidelines and instructions for contributing to the project.
+Thank you for your interest in contributing to CodeSparring! This document provides guidelines and instructions for contributing to the project.
 
 ## Table of Contents
 
@@ -464,7 +464,7 @@ async function generateFeedback(
 
 - **GitHub Discussions:** Ask questions and share ideas
 - **Discord:** Join our community server (coming soon)
-- **Email:** Reach out to support@mockmate.dev
+- **Email:** Reach out to support@codesparring.com
 - **Office Hours:** Monthly contributor calls (calendar link)
 
 ### Recognition
@@ -493,4 +493,4 @@ By contributing, you agree that your contributions will be licensed under the pr
 
 **Questions?** Open an issue or reach out to the maintainers!
 
-Thank you for contributing to MockMate! 🚀
+Thank you for contributing to CodeSparring! 🚀

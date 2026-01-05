@@ -11,7 +11,7 @@ We release security patches for the following versions:
 
 ## Reporting a Vulnerability
 
-We take the security of MockMate seriously. If you believe you have found a security vulnerability, please report it to us as described below.
+We take the security of CodeSparring seriously. If you believe you have found a security vulnerability, please report it to us as described below.
 
 ### Please Do NOT:
 
@@ -21,7 +21,7 @@ We take the security of MockMate seriously. If you believe you have found a secu
 
 ### Please DO:
 
-**Report via Email:** Send details to security@mockmate.dev
+**Report via Email:** Send details to security@codesparring.com
 
 **Include the following information:**
 - Type of vulnerability (e.g., XSS, SQL injection, authentication bypass)
@@ -65,7 +65,7 @@ We take the security of MockMate seriously. If you believe you have found a secu
 
 ### Code Execution Security
 
-MockMate allows users to execute code in interview sessions. We implement multiple layers of protection:
+CodeSparring allows users to execute code in interview sessions. We implement multiple layers of protection:
 
 - **Sandboxed Execution:** Code runs in isolated containers with resource limits
 - **Timeout Protection:** Maximum execution time of 10 seconds
@@ -91,7 +91,7 @@ npm update
 
 ## Security Best Practices for Contributors
 
-If you're contributing to MockMate, please follow these security guidelines:
+If you're contributing to CodeSparring, please follow these security guidelines:
 
 ### Code Review Checklist
 
@@ -175,9 +175,9 @@ MockMate is designed to comply with:
 
 ## Security Contacts
 
-- **General Security:** security@mockmate.dev
-- **Vulnerability Reports:** security@mockmate.dev
-- **PGP Key:** Available at https://mockmate.dev/.well-known/pgp-key.txt
+- **General Security:** security@codesparring.com
+- **Vulnerability Reports:** security@codesparring.com
+- **PGP Key:** Available at https://codesparring.com/.well-known/pgp-key.txt
 
 ## Bug Bounty Program
 
