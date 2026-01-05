@@ -22,6 +22,7 @@ interface ScenarioBrowserProps {
   onStartInterview: (scenario: Scenario) => void
   usageLimit: UsageLimit | null
   completedProblems: string[]
+  hasGuestBanner?: boolean
 }
 
 type ViewMode = 'roadmap' | 'patterns' | 'list'
@@ -95,7 +96,7 @@ const COMPANIES = [
   'Google', 'Meta', 'Amazon', 'Microsoft', 'Apple', 'Netflix', 'Airbnb', 'Shopify', 'Walmart'
 ] as const
 
-export const ScenarioBrowser = memo(function ScenarioBrowser({ onStartInterview, usageLimit, completedProblems }: ScenarioBrowserProps) {
+export const ScenarioBrowser = memo(function ScenarioBrowser({ onStartInterview, usageLimit, completedProblems, hasGuestBanner = false }: ScenarioBrowserProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('roadmap')
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false)
   const {
@@ -144,19 +145,24 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({ onStartInterview,
     return config || EXERCISE_TYPES[0]
   }
 
+  // Dynamic padding: more when guest banner is shown (header 64px + banner ~40px)
+  const topPadding = hasGuestBanner ? 'pt-28' : 'pt-20'
+
   return (
-    <section className="pt-24 pb-16 bg-zinc-950">
+    <section className={`${topPadding} pb-12 bg-zinc-950`}>
       <div className="container mx-auto px-4">
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-10">
-            <h1 className="text-3xl md:text-4xl font-semibold text-white mb-3">
-              Practice Problems
-            </h1>
-            <p className="text-zinc-400 mb-8">Choose your challenge. Track your progress.</p>
+          {/* Compact Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-semibold text-white">
+                Practice Problems
+              </h1>
+              <p className="text-zinc-400 text-sm mt-1">Choose your challenge. Track your progress.</p>
+            </div>
 
             {/* View Mode Toggle - Pill Style */}
-            <div className="inline-flex bg-zinc-900 rounded-full p-1 border border-zinc-800">
+            <div className="inline-flex bg-zinc-900 rounded-full p-1 border border-zinc-800 self-start sm:self-auto">
               <button
                 onClick={() => setViewMode('roadmap')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${

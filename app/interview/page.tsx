@@ -2861,13 +2861,13 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     <main className="min-h-screen bg-black">
       {!isInterviewMode && <Header />}
 
-      {/* Guest Mode Banner */}
+      {/* Guest Mode Banner - Sticky below header */}
       {isGuestMode && !showFeedback && (
-        <div className="bg-gradient-to-r from-accent/20 to-purple-600/20 border-b border-accent/30">
+        <div className="fixed top-[64px] left-0 right-0 z-40 bg-gradient-to-r from-accent/20 to-purple-600/20 border-b border-accent/30 backdrop-blur-sm">
           <div className="container mx-auto px-4 py-2 flex items-center justify-between text-sm">
             <div className="flex items-center gap-2">
               <span className="text-accent font-medium">Free Trial</span>
-              <span className="text-muted-foreground">Complete this interview to see your AI-powered feedback</span>
+              <span className="text-muted-foreground hidden sm:inline">Complete this interview to see your AI-powered feedback</span>
             </div>
             <button
               onClick={() => router.push("/login?redirect=interview")}
@@ -2888,6 +2888,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           }}
           usageLimit={usageLimit}
           completedProblems={completedProblems}
+          hasGuestBanner={isGuestMode && !showFeedback}
         />
       )}
 
