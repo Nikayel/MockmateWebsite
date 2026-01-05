@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useMemo, useRef, useEffect } from "react"
-import { Play, Lock, Check, ChevronDown, ChevronUp, Info, Target, GitBranch, Zap, Clock, HardDrive } from "lucide-react"
+import { useState, useMemo, useRef } from "react"
+import { Play, Lock, Check, ChevronDown, ChevronUp, GitBranch } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import {
@@ -108,11 +107,19 @@ const getDifficultyColor = (difficulty: DifficultyLevel) => {
   }
 }
 
-const TIER_COLORS = {
-  1: { bg: "from-emerald-600/30 to-emerald-800/30", border: "border-emerald-500/50", text: "text-emerald-400", label: "Foundation", glow: "shadow-emerald-500/20" },
-  2: { bg: "from-blue-600/30 to-blue-800/30", border: "border-blue-500/50", text: "text-blue-400", label: "Core", glow: "shadow-blue-500/20" },
-  3: { bg: "from-purple-600/30 to-purple-800/30", border: "border-purple-500/50", text: "text-purple-400", label: "Advanced", glow: "shadow-purple-500/20" },
-  4: { bg: "from-orange-600/30 to-orange-800/30", border: "border-orange-500/50", text: "text-orange-400", label: "Expert", glow: "shadow-orange-500/20" },
+// Simplified: single style for unlocked nodes (reduces cognitive load from 4 tier colors to 1)
+const NODE_STYLE = {
+  unlocked: { bg: "from-zinc-700/50 to-zinc-800/50", border: "border-zinc-600", text: "text-white", glow: "shadow-zinc-500/10" },
+  locked: { bg: "bg-zinc-900/50", border: "border-zinc-800", text: "text-zinc-500" },
+  mastered: { bg: "from-emerald-900/30 to-emerald-950/30", border: "border-emerald-500/50", text: "text-emerald-400", glow: "shadow-emerald-500/20" },
+}
+
+// Keep tier labels for modal only (progressive disclosure)
+const TIER_LABELS: Record<number, string> = {
+  1: "Foundation",
+  2: "Core",
+  3: "Advanced",
+  4: "Expert",
 }
 
 // Node positions for the tree layout - organized as a proper skill tree
@@ -206,70 +213,49 @@ export function DSARoadmap({ onStartInterview, completedProblems = [] }: DSARoad
     return paths
   }, [nodeStats])
 
-  // Get color based on node status
-  const getNodeColor = (nodeId: string, isUnlocked: boolean, isMastered: boolean) => {
-    if (isMastered) return '#00d9ff'
-    if (isUnlocked) {
-      const tier = NODE_POSITIONS[nodeId]?.tier || 1
-      switch (tier) {
-        case 1: return '#10b981' // emerald
-        case 2: return '#3b82f6' // blue
-        case 3: return '#a855f7' // purple
-        case 4: return '#f97316' // orange
-        default: return '#6b7280'
-      }
-    }
-    return '#374151' // gray-700
+  // Simplified: only 3 states instead of 4 tier colors + 3 states
+  const getNodeStyle = (isUnlocked: boolean, isMastered: boolean) => {
+    if (isMastered) return NODE_STYLE.mastered
+    if (isUnlocked) return NODE_STYLE.unlocked
+    return NODE_STYLE.locked
   }
 
   return (
-    <div className="space-y-6" ref={containerRef}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
-            <GitBranch className="h-6 w-6 text-[#00d9ff]" />
+    <div className="space-y-4" ref={containerRef}>
+      {/* Compact Header with inline legend */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+            <GitBranch className="h-5 w-5 text-emerald-500" />
             DSA Skill Tree
           </h2>
-          <p className="text-gray-400">Master patterns in order. Each pattern builds on the ones before it.</p>
+          {/* Inline mini-legend */}
+          <div className="hidden sm:flex items-center gap-3 text-xs text-zinc-500">
+            <span className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-zinc-600"></div>
+              Ready
+            </span>
+            <span className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+              Done
+            </span>
+            <span className="flex items-center gap-1">
+              <Lock className="h-3 w-3" />
+              Locked
+            </span>
+          </div>
         </div>
-        <div className="text-right">
-          <div className="text-xs text-gray-400 uppercase tracking-wide mb-1">Overall Progress</div>
-          <div className="text-lg font-semibold text-gray-100">{totalCompleted}/{totalProblems} solved</div>
-        </div>
-      </div>
-
-      {/* Progress Bar */}
-      <div className="mb-8">
-        <div className="flex justify-between text-xs mb-2 text-gray-400">
-          <span>Overall mastery</span>
-          <span>{Math.round((totalCompleted / totalProblems) * 100)}%</span>
-        </div>
-        <Progress value={(totalCompleted / totalProblems) * 100} className="h-2 bg-gray-900/80" />
-      </div>
-
-      {/* Legend */}
-      <div className="flex flex-wrap gap-4 mb-6 p-3 bg-gray-900/50 rounded-lg border border-gray-800">
-        <div className="flex items-center gap-2 text-sm">
-          <div className="w-3 h-3 rounded-full bg-gradient-to-r from-emerald-500 to-blue-500"></div>
-          <span className="text-gray-300">Unlocked (ready to learn)</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm">
-          <div className="w-3 h-3 rounded-full bg-gray-600"></div>
-          <span className="text-gray-300">Locked (complete prerequisites)</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm">
-          <div className="w-3 h-3 rounded-full bg-[#00d9ff] shadow-lg shadow-[#00d9ff]/50"></div>
-          <span className="text-gray-300">Mastered (50%+ complete)</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm ml-auto">
-          <span className="text-gray-500">Click any unlocked pattern to see problems</span>
+        <div className="flex items-center gap-4">
+          <div className="text-sm text-zinc-400">
+            <span className="text-white font-medium">{totalCompleted}</span>/{totalProblems} solved
+          </div>
+          <Progress value={(totalCompleted / totalProblems) * 100} className="w-24 h-1.5 bg-zinc-800" />
         </div>
       </div>
 
-      {/* Visual Tree Map */}
-      <div className="relative bg-gray-900/30 rounded-xl border border-gray-800 p-4 overflow-x-auto">
-        <div className="relative" style={{ minHeight: '700px', minWidth: '900px' }}>
+      {/* Visual Tree Map - reduced height for less scroll */}
+      <div className="relative bg-zinc-900/30 rounded-xl border border-zinc-800 p-3 overflow-x-auto">
+        <div className="relative" style={{ minHeight: '520px', minWidth: '800px' }}>
           {/* SVG for connection lines */}
           <svg
             className="absolute inset-0 pointer-events-none"
@@ -320,7 +306,7 @@ export function DSARoadmap({ onStartInterview, completedProblems = [] }: DSARoad
             })}
           </svg>
 
-          {/* Pattern Nodes */}
+          {/* Pattern Nodes - Simplified cards */}
           {PATTERN_ROADMAP.map((node) => {
             const pos = NODE_POSITIONS[node.id]
             if (!pos) return null
@@ -331,8 +317,7 @@ export function DSARoadmap({ onStartInterview, completedProblems = [] }: DSARoad
             const isHovered = hoveredNode === node.id
             const isExpanded = expandedNode === node.id
             const prerequisites = getPatternPrerequisites(node.id)
-            const tierConfig = TIER_COLORS[pos.tier as keyof typeof TIER_COLORS]
-            const nodeColor = getNodeColor(node.id, isUnlocked, isMastered)
+            const style = getNodeStyle(isUnlocked, isMastered)
 
             return (
               <div
@@ -343,119 +328,73 @@ export function DSARoadmap({ onStartInterview, completedProblems = [] }: DSARoad
                   top: `${pos.y}%`,
                 }}
               >
-                {/* Node Card */}
+                {/* Simplified Node Card */}
                 <div
                   onClick={() => isUnlocked && setExpandedNode(isExpanded ? null : node.id)}
                   onMouseEnter={() => setHoveredNode(node.id)}
                   onMouseLeave={() => setHoveredNode(null)}
                   className={`
-                    relative transition-all duration-300 cursor-pointer
-                    ${isExpanded ? 'scale-110 z-50' : isHovered ? 'scale-105 z-20' : 'z-10'}
-                    ${!isUnlocked ? 'opacity-50 cursor-not-allowed' : ''}
+                    relative transition-all duration-200 cursor-pointer
+                    ${isHovered && isUnlocked ? 'scale-105 z-20' : 'z-10'}
+                    ${!isUnlocked ? 'opacity-40 cursor-not-allowed' : ''}
                   `}
                 >
-                  {/* Glow effect for mastered nodes */}
-                  {isMastered && (
-                    <div
-                      className="absolute inset-0 rounded-xl blur-xl opacity-40"
-                      style={{ backgroundColor: '#00d9ff' }}
-                    />
-                  )}
-
                   <Card
                     className={`
-                      relative overflow-hidden
-                      w-36 transition-all duration-300
-                      ${isUnlocked
-                        ? `bg-gradient-to-br ${tierConfig.bg} ${tierConfig.border} border hover:shadow-lg ${tierConfig.glow}`
-                        : 'bg-gray-900/50 border-gray-700'
-                      }
-                      ${isMastered ? 'ring-2 ring-[#00d9ff]/60 shadow-lg shadow-[#00d9ff]/20' : ''}
+                      relative overflow-hidden w-32 transition-all duration-200
+                      bg-gradient-to-br ${style.bg} ${style.border} border
+                      ${isUnlocked && !isMastered ? 'hover:border-zinc-500' : ''}
+                      ${isMastered ? 'ring-1 ring-emerald-500/40' : ''}
                     `}
                   >
-                    {/* Mastered indicator */}
+                    {/* Mastered checkmark */}
                     {isMastered && (
-                      <div className="absolute -top-1.5 -right-1.5 bg-[#00d9ff] rounded-full p-1 shadow-lg">
-                        <Check className="h-3 w-3 text-black" />
+                      <div className="absolute -top-1 -right-1 bg-emerald-500 rounded-full p-0.5">
+                        <Check className="h-2.5 w-2.5 text-black" />
                       </div>
                     )}
 
-                    {/* Lock overlay */}
+                    {/* Lock icon for locked nodes */}
                     {!isUnlocked && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg z-20">
-                        <Lock className="h-5 w-5 text-gray-500" />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg z-20">
+                        <Lock className="h-4 w-4 text-zinc-600" />
                       </div>
                     )}
 
-                    <CardContent className="p-3">
-                      {/* Tier badge */}
-                      <Badge
-                        className={`${tierConfig.text} bg-transparent border ${tierConfig.border} text-[10px] px-1.5 py-0 mb-1.5`}
-                      >
-                        Tier {pos.tier}
-                      </Badge>
-
-                      {/* Node name */}
-                      <h3 className={`font-semibold text-sm leading-tight mb-1.5 ${isUnlocked ? 'text-white' : 'text-gray-500'}`}>
+                    <CardContent className="p-2.5">
+                      {/* Node name - larger, clearer */}
+                      <h3 className={`font-medium text-sm leading-tight mb-2 ${style.text}`}>
                         {node.name}
                       </h3>
 
-                      {/* Progress bar */}
-                      <div className="mb-1.5">
-                        <div className="flex justify-between text-[10px] text-gray-400 mb-0.5">
-                          <span>{stats?.completed || 0}/{stats?.total || 0}</span>
-                          <span>{Math.round(stats?.progress || 0)}%</span>
-                        </div>
-                        <Progress
-                          value={stats?.progress || 0}
-                          className="h-1 bg-gray-800"
-                        />
+                      {/* Simple progress: just the count */}
+                      <div className="flex items-center justify-between text-xs text-zinc-400 mb-1">
+                        <span>{stats?.completed || 0}/{stats?.total || 0}</span>
                       </div>
-
-                      {/* Difficulty distribution */}
-                      {stats && stats.total > 0 && (
-                        <div className="flex gap-1">
-                          {['easy', 'medium', 'hard'].map(diff => {
-                            const count = stats.scenarios.filter(s => s.difficulty === diff).length
-                            if (count === 0) return null
-                            const colors: Record<string, string> = {
-                              easy: 'bg-emerald-500',
-                              medium: 'bg-amber-500',
-                              hard: 'bg-rose-500'
-                            }
-                            return (
-                              <div
-                                key={diff}
-                                className={`${colors[diff]} text-[9px] text-white px-1 rounded`}
-                                title={`${count} ${diff}`}
-                              >
-                                {count}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
+                      <Progress
+                        value={stats?.progress || 0}
+                        className="h-1 bg-zinc-800"
+                      />
                     </CardContent>
                   </Card>
 
-                  {/* Prerequisites tooltip on hover */}
-                  {isHovered && prerequisites.length > 0 && !isExpanded && (
-                    <div className="absolute left-1/2 transform -translate-x-1/2 top-full mt-2 z-50 w-48">
-                      <div className="bg-gray-800 border border-gray-700 rounded-lg p-2 shadow-xl text-xs">
-                        <div className="text-gray-400 mb-1">Requires:</div>
+                  {/* Prerequisites tooltip - only on hover for locked nodes */}
+                  {isHovered && !isUnlocked && prerequisites.length > 0 && (
+                    <div className="absolute left-1/2 transform -translate-x-1/2 top-full mt-1.5 z-50 w-40">
+                      <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-2 shadow-xl text-xs">
+                        <div className="text-zinc-400 mb-1">Complete first:</div>
                         <div className="flex flex-wrap gap-1">
                           {prerequisites.map(p => (
-                            <Badge
+                            <span
                               key={p.id}
-                              className={`text-[10px] ${
+                              className={`text-xs px-1.5 py-0.5 rounded ${
                                 nodeStats[p.id]?.isComplete
-                                  ? 'bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/50'
-                                  : 'bg-gray-700 text-gray-400 border-gray-600'
+                                  ? 'bg-emerald-500/20 text-emerald-400'
+                                  : 'bg-zinc-700 text-zinc-400'
                               }`}
                             >
                               {p.name}
-                              {nodeStats[p.id]?.isComplete && <Check className="h-2 w-2 ml-0.5" />}
-                            </Badge>
+                            </span>
                           ))}
                         </div>
                       </div>
@@ -468,18 +407,19 @@ export function DSARoadmap({ onStartInterview, completedProblems = [] }: DSARoad
         </div>
       </div>
 
-      {/* Expanded Problem List Modal */}
+      {/* Expanded Problem List Modal - Contains tier/difficulty info moved from cards */}
       {expandedNode && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setExpandedNode(null)}>
           <div
-            className="bg-gray-900 border border-gray-700 rounded-xl max-w-3xl w-full max-h-[80vh] overflow-hidden shadow-2xl"
+            className="bg-zinc-900 border border-zinc-700 rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {(() => {
               const node = PATTERN_ROADMAP.find(n => n.id === expandedNode)
               const stats = nodeStats[expandedNode]
               const prerequisites = getPatternPrerequisites(expandedNode)
-              const tierConfig = TIER_COLORS[node?.tier as keyof typeof TIER_COLORS] || TIER_COLORS[1]
+              const pos = NODE_POSITIONS[expandedNode]
+              const tierLabel = TIER_LABELS[pos?.tier || 1]
 
               // Get pattern metadata for display
               const firstPattern = node?.patterns[0]
@@ -487,134 +427,108 @@ export function DSARoadmap({ onStartInterview, completedProblems = [] }: DSARoad
 
               if (!node || !stats) return null
 
+              // Calculate difficulty distribution for this pattern
+              const difficultyCount = {
+                easy: stats.scenarios.filter(s => s.difficulty === 'easy').length,
+                medium: stats.scenarios.filter(s => s.difficulty === 'medium').length,
+                hard: stats.scenarios.filter(s => s.difficulty === 'hard').length,
+              }
+
               return (
                 <>
-                  {/* Header */}
-                  <div className={`bg-gradient-to-r ${tierConfig.bg} p-4 border-b border-gray-700`}>
-                    <div className="flex items-center justify-between">
+                  {/* Cleaner Header */}
+                  <div className="p-4 border-b border-zinc-800">
+                    <div className="flex items-start justify-between">
                       <div>
-                        <Badge className={`${tierConfig.text} bg-transparent border ${tierConfig.border} mb-2`}>
-                          Tier {node.tier}: {tierConfig.label}
-                        </Badge>
-                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                          {node.name}
+                        <div className="flex items-center gap-2 mb-1">
+                          <h2 className="text-lg font-semibold text-white">{node.name}</h2>
                           {stats.isComplete && (
-                            <span className="bg-[#00d9ff] rounded-full p-1">
-                              <Check className="h-4 w-4 text-black" />
+                            <span className="bg-emerald-500 rounded-full p-0.5">
+                              <Check className="h-3 w-3 text-black" />
                             </span>
                           )}
-                        </h2>
-                        <p className="text-gray-300 text-sm mt-1">{node.description}</p>
+                        </div>
+                        <p className="text-zinc-400 text-sm">{node.description}</p>
+
+                        {/* Tier + Difficulty info (moved here from cards) */}
+                        <div className="flex items-center gap-3 mt-3">
+                          <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded">
+                            {tierLabel}
+                          </span>
+                          <div className="flex items-center gap-1.5 text-xs">
+                            {difficultyCount.easy > 0 && (
+                              <span className="text-emerald-400">{difficultyCount.easy} easy</span>
+                            )}
+                            {difficultyCount.medium > 0 && (
+                              <span className="text-amber-400">{difficultyCount.medium} medium</span>
+                            )}
+                            {difficultyCount.hard > 0 && (
+                              <span className="text-rose-400">{difficultyCount.hard} hard</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                       <button
                         onClick={() => setExpandedNode(null)}
-                        className="text-gray-400 hover:text-white p-2"
+                        className="text-zinc-500 hover:text-white p-1 -mr-1 -mt-1"
                       >
-                        <ChevronUp className="h-6 w-6" />
+                        <ChevronUp className="h-5 w-5" />
                       </button>
                     </div>
 
-                    {/* Prerequisites */}
-                    {prerequisites.length > 0 && (
-                      <div className="mt-3 flex items-center gap-2">
-                        <span className="text-xs text-gray-400">Prerequisites:</span>
+                    {/* Progress bar */}
+                    <div className="mt-3 flex items-center gap-3">
+                      <Progress value={stats.progress} className="flex-1 h-1.5 bg-zinc-800" />
+                      <span className="text-xs text-zinc-400">{stats.completed}/{stats.total}</span>
+                    </div>
+
+                    {/* Prerequisites - only show if not all complete */}
+                    {prerequisites.length > 0 && !prerequisites.every(p => nodeStats[p.id]?.isComplete) && (
+                      <div className="mt-3 flex items-center gap-2 text-xs">
+                        <span className="text-zinc-500">Requires:</span>
                         {prerequisites.map(p => (
-                          <Badge
+                          <span
                             key={p.id}
-                            className={`text-xs ${
+                            className={`px-1.5 py-0.5 rounded ${
                               nodeStats[p.id]?.isComplete
-                                ? 'bg-[#00d9ff]/20 text-[#00d9ff] border-[#00d9ff]/50'
-                                : 'bg-gray-800 text-gray-400'
+                                ? 'bg-emerald-500/20 text-emerald-400'
+                                : 'bg-zinc-800 text-zinc-400'
                             }`}
                           >
                             {p.name}
-                            {nodeStats[p.id]?.isComplete && <Check className="h-3 w-3 ml-1" />}
-                          </Badge>
+                          </span>
                         ))}
                       </div>
                     )}
-
-                    {/* Progress */}
-                    <div className="mt-3">
-                      <div className="flex justify-between text-sm text-gray-300 mb-1">
-                        <span>Progress: {stats.completed}/{stats.total} problems</span>
-                        <span>{Math.round(stats.progress)}%</span>
-                      </div>
-                      <Progress value={stats.progress} className="h-2" />
-                    </div>
                   </div>
 
-                  {/* Pattern Analysis */}
+                  {/* Pattern Tips - Collapsed by default, expandable */}
                   {metadata && (
-                    <div className="p-4 border-b border-gray-800 bg-gray-900/50">
-                      <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                        <Target className="h-4 w-4 text-[#00d9ff]" />
-                        Pattern Analysis
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Key Techniques */}
-                        <div className="bg-gray-800/50 rounded-lg p-3">
-                          <h4 className="text-xs text-gray-400 mb-2 flex items-center gap-1">
-                            <Zap className="h-3 w-3 text-yellow-400" />
-                            Key Techniques
-                          </h4>
-                          <div className="flex flex-wrap gap-1">
-                            {metadata.keyTechniques.map((tech, i) => (
-                              <Badge key={i} variant="outline" className="text-xs bg-gray-700/50 text-gray-300 border-gray-600">
-                                {tech}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Time Complexity */}
-                        <div className="bg-gray-800/50 rounded-lg p-3">
-                          <h4 className="text-xs text-gray-400 mb-2 flex items-center gap-1">
-                            <Clock className="h-3 w-3 text-green-400" />
-                            Time Complexity
-                          </h4>
-                          <div className="space-y-1">
-                            {metadata.timeComplexityHints.slice(0, 2).map((hint, i) => (
-                              <p key={i} className="text-xs text-green-300">{hint}</p>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Space Complexity */}
-                        <div className="bg-gray-800/50 rounded-lg p-3">
-                          <h4 className="text-xs text-gray-400 mb-2 flex items-center gap-1">
-                            <HardDrive className="h-3 w-3 text-blue-400" />
-                            Space Complexity
-                          </h4>
-                          <div className="space-y-1">
-                            {metadata.spaceComplexityHints.slice(0, 2).map((hint, i) => (
-                              <p key={i} className="text-xs text-blue-300">{hint}</p>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Interviewer Questions */}
-                      <div className="mt-3 bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
-                        <h4 className="text-xs text-orange-300 font-medium mb-2">Common Interviewer Questions</h4>
-                        <ul className="space-y-1">
-                          {metadata.interviewerFollowUps.slice(0, 3).map((q, i) => (
-                            <li key={i} className="text-xs text-gray-300 flex items-start gap-1.5">
-                              <span className="text-orange-400 flex-shrink-0">•</span>
-                              {q}
-                            </li>
+                    <details className="border-b border-zinc-800 group">
+                      <summary className="p-3 cursor-pointer text-xs text-zinc-500 hover:text-zinc-300 flex items-center gap-2 select-none">
+                        <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
+                        Pattern tips & common questions
+                      </summary>
+                      <div className="px-3 pb-3 space-y-2">
+                        {/* Key techniques as simple tags */}
+                        <div className="flex flex-wrap gap-1">
+                          {metadata.keyTechniques.slice(0, 4).map((tech, i) => (
+                            <span key={i} className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded">
+                              {tech}
+                            </span>
                           ))}
-                        </ul>
+                        </div>
+                        {/* One complexity hint */}
+                        {metadata.timeComplexityHints[0] && (
+                          <p className="text-xs text-zinc-500">{metadata.timeComplexityHints[0]}</p>
+                        )}
                       </div>
-                    </div>
+                    </details>
                   )}
 
-                  {/* Problems List */}
-                  <div className="p-4 overflow-y-auto" style={{ maxHeight: '40vh' }}>
-                    <h3 className="text-sm font-semibold text-white mb-3">
-                      Problems ({stats.total})
-                    </h3>
-                    <div className="space-y-2">
+                  {/* Problems List - Simplified */}
+                  <div className="p-3 overflow-y-auto" style={{ maxHeight: '50vh' }}>
+                    <div className="space-y-1.5">
                       {stats.scenarios
                         .sort((a, b) => {
                           const order = { easy: 0, medium: 1, hard: 2 }
@@ -622,58 +536,47 @@ export function DSARoadmap({ onStartInterview, completedProblems = [] }: DSARoad
                         })
                         .map((scenario) => {
                           const isCompleted = completedProblems.includes(scenario.id)
+                          const diffColor = {
+                            easy: 'text-emerald-400',
+                            medium: 'text-amber-400',
+                            hard: 'text-rose-400'
+                          }[scenario.difficulty]
 
                           return (
                             <div
                               key={scenario.id}
-                              className={`p-3 rounded-lg bg-gray-800/50 border border-gray-700/50 hover:border-gray-600 transition-colors ${
-                                isCompleted ? 'opacity-70' : ''
+                              className={`flex items-center justify-between p-2.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition-colors group ${
+                                isCompleted ? 'opacity-60' : ''
                               }`}
                             >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3 flex-1">
-                                  {isCompleted ? (
-                                    <div className="p-1.5 rounded-full bg-green-500/20">
-                                      <Check className="h-4 w-4 text-green-400" />
-                                    </div>
-                                  ) : (
-                                    <div className="p-1.5 rounded-full bg-gray-700">
-                                      <Play className="h-4 w-4 text-gray-400" />
-                                    </div>
-                                  )}
-                                  <div className="flex-1">
-                                    <p className={`font-medium ${isCompleted ? 'text-gray-400' : 'text-white'}`}>
-                                      {scenario.title}
-                                    </p>
-                                    <div className="flex items-center gap-2 mt-1">
-                                      <Badge className={`${getDifficultyColor(scenario.difficulty)} text-xs`}>
-                                        {scenario.difficulty}
-                                      </Badge>
-                                      <span className="text-xs text-gray-500">
-                                        {scenario.companies.slice(0, 2).join(', ')}
-                                      </span>
-                                      <span className="text-xs text-gray-500">
-                                        ~{scenario.estimatedTime} min
-                                      </span>
-                                    </div>
+                              <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                                {isCompleted ? (
+                                  <Check className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                                ) : (
+                                  <Play className="h-4 w-4 text-zinc-500 flex-shrink-0" />
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <p className={`text-sm truncate ${isCompleted ? 'text-zinc-500' : 'text-white'}`}>
+                                    {scenario.title}
+                                  </p>
+                                  <div className="flex items-center gap-2 text-xs text-zinc-500">
+                                    <span className={diffColor}>{scenario.difficulty}</span>
+                                    <span>·</span>
+                                    <span>{scenario.estimatedTime}m</span>
                                   </div>
                                 </div>
-                                <Button
-                                  size="sm"
-                                  onClick={() => {
-                                    setExpandedNode(null)
-                                    onStartInterview(scenario)
-                                  }}
-                                  className={`${
-                                    isCompleted
-                                      ? 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                                      : 'bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-black'
-                                  }`}
-                                >
-                                  <Play className="h-3 w-3 mr-1" />
-                                  {isCompleted ? 'Redo' : 'Start'}
-                                </Button>
                               </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setExpandedNode(null)
+                                  onStartInterview(scenario)
+                                }}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity h-7 px-2 text-xs"
+                              >
+                                {isCompleted ? 'Redo' : 'Start'}
+                              </Button>
                             </div>
                           )
                         })}
@@ -686,31 +589,6 @@ export function DSARoadmap({ onStartInterview, completedProblems = [] }: DSARoad
         </div>
       )}
 
-      {/* Tips Section */}
-      <div className="mt-8 p-4 bg-gray-900/30 rounded-lg border border-gray-800">
-        <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
-          <Info className="h-4 w-4 text-[#00d9ff]" />
-          How to Use the Skill Tree
-        </h4>
-        <ul className="space-y-2 text-sm text-gray-300">
-          <li className="flex items-start gap-2">
-            <span className="text-emerald-400 font-bold">1.</span>
-            <span><strong className="text-emerald-400">Start with Arrays & Hashing</strong> - it&apos;s the root of the tree and foundation for everything else.</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-blue-400 font-bold">2.</span>
-            <span><strong className="text-blue-400">Follow the branches</strong> - each pattern unlocks once you master 50% of its prerequisites.</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-purple-400 font-bold">3.</span>
-            <span><strong className="text-purple-400">Lines show dependencies</strong> - bright lines mean the prerequisite is complete.</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-orange-400 font-bold">4.</span>
-            <span><strong className="text-orange-400">Don&apos;t skip ahead</strong> - patterns build on each other. Two Pointers uses Array concepts, Trees use Stack + Linked List, etc.</span>
-          </li>
-        </ul>
-      </div>
     </div>
   )
 }
