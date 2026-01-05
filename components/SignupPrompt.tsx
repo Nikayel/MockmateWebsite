@@ -26,25 +26,15 @@ import { toast } from "sonner"
 import { motion } from "framer-motion"
 
 /**
- * Get retention insight based on score
- * Used to show the VALUE of spaced repetition without claiming we've calculated anything
+ * Get retention insight for spaced repetition value prop
+ * NOTE: Spaced repetition is specifically for CODE/PROBLEM-SOLVING retention,
+ * not communication or interview soft skills. The overall score includes
+ * communication, but SR focuses on whether you can solve the problem again.
  */
-function getRetentionInsight(score: number): { message: string; emphasis: string } {
-  if (score >= 80) {
-    return {
-      message: "You nailed this one! But research shows even strong performers forget 60% within a week without review.",
-      emphasis: "Lock in your knowledge",
-    }
-  } else if (score >= 60) {
-    return {
-      message: "Good foundation! The forgetting curve means you'll lose most of this by next week without a scheduled review.",
-      emphasis: "Don't let it slip away",
-    }
-  } else {
-    return {
-      message: "This is exactly when spaced repetition helps most - reviewing at the right time can 3x your retention.",
-      emphasis: "Turn struggle into mastery",
-    }
+function getRetentionInsight(): { message: string; emphasis: string } {
+  return {
+    message: "Even if you solved it today, research shows you'll forget the approach within a week without review. Spaced repetition helps you retain the pattern so it sticks for your real interview.",
+    emphasis: "Remember the pattern, not just the answer",
   }
 }
 
@@ -106,8 +96,8 @@ export function SignupPrompt({
 
   const scoreMessage = getScoreMessage()
 
-  // Get retention insight for value prop messaging
-  const retentionInsight = getRetentionInsight(score)
+  // Get retention insight for value prop messaging (score-independent since SR is for code retention)
+  const retentionInsight = getRetentionInsight()
 
   const handleAuth = async (provider: "github" | "google") => {
     try {
@@ -153,8 +143,8 @@ export function SignupPrompt({
     },
     {
       icon: Brain,
-      title: "Smart review schedule",
-      description: "Science-backed spaced repetition",
+      title: "Pattern review schedule",
+      description: "Re-practice problems at optimal times",
     },
     {
       icon: Target,
@@ -240,15 +230,15 @@ export function SignupPrompt({
                 <ul className="text-xs text-muted-foreground space-y-1.5 ml-5">
                   <li className="flex items-start gap-2">
                     <RefreshCw className="h-3 w-3 mt-0.5 shrink-0 text-accent/70" />
-                    <span>Personalized review schedule calculated from YOUR performance</span>
+                    <span>Review schedule based on your code correctness & efficiency</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Clock className="h-3 w-3 mt-0.5 shrink-0 text-accent/70" />
-                    <span>Smart reminders when it's optimal to review this problem</span>
+                    <span>Reminders to re-solve problems before you forget the pattern</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <TrendingUp className="h-3 w-3 mt-0.5 shrink-0 text-accent/70" />
-                    <span>Your <strong className="text-foreground">/review</strong> page with all due problems in one place</span>
+                    <span>Your <strong className="text-foreground">/review</strong> page with problems due for practice</span>
                   </li>
                 </ul>
               </div>
