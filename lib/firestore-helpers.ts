@@ -661,3 +661,232 @@ export async function updateQuotaForSubscriptionTier(
   await initializeUserQuota(userId, subscriptionTier, signupDate, stripeCurrentPeriodEnd)
 }
 
+// ============================================================================
+// GUEST SESSION MANAGEMENT
+// ============================================================================
+
+/**
+ * Create an interview session for a guest user
+ * Guest sessions are stored with is_guest: true flag and can be migrated later
+ */
+export async function createGuestInterviewSession(
+  guestId: string,
+  scenarioTitle: string,
+  scenarioType: string,
+  difficulty: "easy" | "medium" | "hard",
+  scenarioId?: string,
+  pattern?: string
+): Promise<string> {
+  const sessionRef = doc(collection(db, "interview_sessions"))
+  const sessionData = {
+    id: sessionRef.id,
+    user_id: guestId, // Store the guest ID as user_id for consistency
+    is_guest: true,
+    topic: scenarioTitle,
+    type: scenarioType,
+    pattern: pattern || scenarioType,
+    scenario_id: scenarioId,
+    difficulty: difficulty,
+    started_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    // Guest sessions expire after 48 hours if not claimed
+    expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+  }
+
+  await setDoc(sessionRef, sessionData)
+  return sessionRef.id
+}
+
+/**
+ * Get a guest session by ID
+ */
+export async function getGuestSession(sessionId: string, guestId: string): Promise<any | null> {
+  try {
+    const sessionRef = doc(db, "interview_sessions", sessionId)
+    const sessionSnap = await getDoc(sessionRef)
+
+    if (!sessionSnap.exists()) return null
+
+    const data = sessionSnap.data()
+
+    // Verify this session belongs to the guest
+    if (data.user_id !== guestId || !data.is_guest) {
+      return null
+    }
+
+    return data
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Update a guest interview session
+ */
+export async function updateGuestInterviewSession(
+  sessionId: string,
+  guestId: string,
+  updateData: {
+    performanceScore?: number
+    feedback?: string
+    code?: string
+    language?: string
+    testResults?: Array<any>
+    timeComplexity?: string
+    spaceComplexity?: string
+    efficiencyScore?: number
+  }
+): Promise<boolean> {
+  try {
+    // First verify the session belongs to this guest
+    const session = await getGuestSession(sessionId, guestId)
+    if (!session) return false
+
+    const sessionRef = doc(db, "interview_sessions", sessionId)
+    const data: any = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (updateData.performanceScore !== undefined) {
+      data.performance_score = updateData.performanceScore
+      data.completed_at = new Date().toISOString()
+    }
+    if (updateData.feedback) data.feedback = updateData.feedback
+    if (updateData.code) data.final_code = updateData.code
+    if (updateData.language) data.language = updateData.language
+    if (updateData.testResults) {
+      data.test_results = updateData.testResults
+      data.tests_passed = updateData.testResults.filter((t: any) => t.passed).length
+      data.tests_total = updateData.testResults.length
+    }
+    if (updateData.timeComplexity) data.time_complexity = updateData.timeComplexity
+    if (updateData.spaceComplexity) data.space_complexity = updateData.spaceComplexity
+    if (updateData.efficiencyScore) data.efficiency_score = updateData.efficiencyScore
+
+    await setDoc(sessionRef, data, { merge: true })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Migrate a guest session to an authenticated user
+ * This transfers ownership from guest ID to user ID
+ */
+export async function migrateGuestSession(
+  sessionId: string,
+  guestId: string,
+  newUserId: string
+): Promise<boolean> {
+  try {
+    // Verify the session belongs to this guest
+    const session = await getGuestSession(sessionId, guestId)
+    if (!session) return false
+
+    const sessionRef = doc(db, "interview_sessions", sessionId)
+    await setDoc(sessionRef, {
+      user_id: newUserId, // Transfer ownership
+      is_guest: false, // No longer a guest session
+      migrated_from_guest: guestId, // Keep track of original guest ID
+      migrated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }, { merge: true })
+
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Find all guest sessions for a guest ID
+ * Used during migration to find all sessions to transfer
+ */
+export async function findGuestSessions(guestId: string): Promise<Array<{ id: string; data: any }>> {
+  try {
+    const sessionsQuery = query(
+      collection(db, "interview_sessions"),
+      where("user_id", "==", guestId),
+      where("is_guest", "==", true),
+      limit(10) // Limit to prevent abuse
+    )
+
+    const snapshot = await getDocs(sessionsQuery)
+    const sessions: Array<{ id: string; data: any }> = []
+
+    snapshot.forEach((doc) => {
+      sessions.push({
+        id: doc.id,
+        data: doc.data(),
+      })
+    })
+
+    return sessions
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Migrate all guest sessions to an authenticated user
+ */
+export async function migrateAllGuestSessions(
+  guestId: string,
+  newUserId: string
+): Promise<{ migrated: number; failed: number }> {
+  const sessions = await findGuestSessions(guestId)
+  let migrated = 0
+  let failed = 0
+
+  for (const session of sessions) {
+    const success = await migrateGuestSession(session.id, guestId, newUserId)
+    if (success) {
+      migrated++
+    } else {
+      failed++
+    }
+  }
+
+  return { migrated, failed }
+}
+
+/**
+ * Save session state for a guest session
+ */
+export async function saveGuestSessionState(
+  sessionId: string,
+  guestId: string,
+  state: {
+    code: string
+    selectedLanguage: string
+    elapsedTime: number
+    chatMessages?: Array<{ type: string; message: string }>
+    interviewerMessages?: Array<{ type: string; message: string }>
+    testResults?: Array<any>
+  }
+): Promise<void> {
+  try {
+    // Verify this session belongs to the guest
+    const session = await getGuestSession(sessionId, guestId)
+    if (!session) return
+
+    const sessionRef = doc(db, "interview_sessions", sessionId)
+    await setDoc(sessionRef, {
+      session_state: {
+        code: state.code,
+        language: state.selectedLanguage,
+        elapsed_time: state.elapsedTime,
+        chat_messages: state.chatMessages?.slice(-20),
+        interviewer_messages: state.interviewerMessages?.slice(-20),
+        test_results: state.testResults?.slice(-10),
+        saved_at: new Date().toISOString(),
+      },
+      updated_at: new Date().toISOString(),
+    }, { merge: true })
+  } catch {
+    // Non-blocking - localStorage backup exists
+  }
+}
+

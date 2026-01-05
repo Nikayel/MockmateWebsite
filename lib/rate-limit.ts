@@ -544,6 +544,24 @@ export const sensitiveOperationRateLimit = rateLimit({
   prefix: 'rl:sensitive'
 })
 
+// Guest session rate limit - strict to prevent abuse
+// 3 guest session creations per hour per IP
+export const guestSessionRateLimit = rateLimit({
+  interval: 60 * 60 * 1000, // 1 hour
+  uniqueTokenPerInterval: 500,
+  maxRequests: 3,
+  prefix: 'rl:guest'
+})
+
+// Guest API rate limit - for chat/execute during guest sessions
+// More lenient than session creation but still limited
+export const guestApiRateLimit = rateLimit({
+  interval: 60 * 1000, // 1 minute
+  uniqueTokenPerInterval: 500,
+  maxRequests: 15, // Slightly lower than authenticated users
+  prefix: 'rl:guest-api'
+})
+
 // Export types and utilities for testing
 export type { RateLimitConfig, RateLimitEntry, RateLimitResult, RateLimitStore }
 export { InMemoryRateLimitStore, getClientIdentifier }

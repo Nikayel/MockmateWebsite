@@ -14,6 +14,7 @@ import { motion } from "framer-motion"
 import { GridBackground } from "@/components/GridBackground"
 import { staggerContainer, staggerItem } from "@/lib/motion"
 import Link from "next/link"
+import { getGuestId, confirmGuestSessionMigration, getGuestSessionData } from "@/lib/guest-session"
 
 function LoginPageContent() {
   const [isLoading, setIsLoading] = useState(false)
@@ -75,6 +76,63 @@ function LoginPageContent() {
           )
 
           console.log("Profile created/updated successfully for:", firebaseUser.uid)
+
+          // Check for pending guest session migration
+          const pendingMigration = localStorage.getItem("pending_guest_migration")
+          const guestIdFromStorage = getGuestId()
+
+          if (pendingMigration || guestIdFromStorage) {
+            try {
+              let migrationGuestId = guestIdFromStorage
+              let migrationSessionId = null
+
+              // Parse pending migration data if available
+              if (pendingMigration) {
+                const migrationData = JSON.parse(pendingMigration)
+                migrationGuestId = migrationData.guestId || guestIdFromStorage
+                migrationSessionId = migrationData.sessionId
+              }
+
+              if (migrationGuestId) {
+                console.log("Migrating guest session for:", migrationGuestId)
+                const token = await firebaseUser.getIdToken()
+                const migrationResponse = await fetch("/api/guest-session/migrate", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    guestId: migrationGuestId,
+                    sessionId: migrationSessionId,
+                  }),
+                })
+
+                const migrationResult = await migrationResponse.json()
+
+                if (migrationResponse.ok && migrationResult.migrated > 0) {
+                  toast.success("Your trial session has been saved!", {
+                    description: "View it in your sessions history.",
+                  })
+                  confirmGuestSessionMigration()
+
+                  // If there was a specific session, redirect to it
+                  const guestSessionData = getGuestSessionData()
+                  if (guestSessionData?.sessionId) {
+                    localStorage.setItem("auth_redirect", `sessions/${guestSessionData.sessionId}`)
+                  }
+                } else {
+                  console.log("No sessions to migrate or migration skipped:", migrationResult)
+                }
+              }
+            } catch (migrationError) {
+              // Non-blocking - don't fail login if migration fails
+              console.warn("Guest session migration failed:", migrationError)
+            } finally {
+              // Clean up migration markers
+              localStorage.removeItem("pending_guest_migration")
+            }
+          }
 
           // Send welcome email and create in-app notification for new users
           if (isNewUser && firebaseUser.email) {

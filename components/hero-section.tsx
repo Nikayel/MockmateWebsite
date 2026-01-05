@@ -119,14 +119,14 @@ export function HeroSection() {
                     className="w-full sm:w-auto"
                   >
                     <Play className="w-5 h-5" />
-                    Try a free mock interview
+                    Try Free - No Signup Required
                     <ArrowRight className="w-5 h-5" />
                   </MagneticButton>
                 </Link>
               </motion.div>
 
               <motion.p variants={staggerItem} className="text-sm text-muted-foreground/60">
-                Free to start. No credit card needed.
+                Complete one full interview with AI feedback. No account needed.
               </motion.p>
             </div>
 
