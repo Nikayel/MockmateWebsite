@@ -1,0 +1,227 @@
+---
+title: "How CodeSparring Creates Your Personalized Interview Roadmap"
+description: "A deep dive into the algorithm behind our AI-powered study plans. Learn how we combine company data, spaced repetition, and your skill assessment to build the optimal path to your interview."
+date: "2026-01-05"
+author: "Nikayel Ali Jamal"
+category: "product"
+tags: ["roadmap", "personalization", "algorithm", "interview-prep", "ai", "study-plan"]
+featured: true
+---
+
+"Just follow this 14-day study plan."
+
+You've seen them everywhere—generic roadmaps that ignore whether you're interviewing at Google or a startup, whether your interview is in 2 weeks or 3 months, whether you're a new grad or a senior engineer.
+
+**Generic plans produce generic results.** Here's how we do it differently.
+
+## The Three Inputs That Change Everything
+
+When you create a roadmap on CodeSparring, we ask for three things:
+
+### 1. Your Target Company
+
+Not all tech interviews are the same. Here's actual data from our company database:
+
+| Company | Top Pattern | Hard Problems | Interview Style |
+|---------|-------------|---------------|-----------------|
+| Google | Binary Search (85%) | 30% | Moderate pace, hints provided |
+| Meta | Arrays & Trees (85%) | 20% | Fast pace, 2 problems/round |
+| Amazon | Arrays (90%) | 20% | LP questions every round |
+| Netflix | Graphs (90%) | 40% | Optimal solution required |
+
+Preparing for Netflix? You need 2x the graph practice and harder problems.
+
+Preparing for Meta? Speed matters—you need to solve 2 problems in 45 minutes.
+
+[Browse all 19 company prep guides →](/interview-prep)
+
+### 2. Your Interview Date
+
+Time changes everything:
+
+**30 days until interview:**
+- Cover all 15 patterns
+- 2-3 problems per pattern
+- Mix of difficulty levels
+- Built-in review cycles
+
+**7 days until interview:**
+- Focus on top 5 patterns for your company
+- High-frequency "must-know" problems only
+- No time for deep exploration—just pattern recognition
+
+**90 days until interview:**
+- Deep pattern mastery
+- Multiple variations per pattern
+- System design integration
+- Mock interview practice
+
+Our algorithm adjusts problem count, difficulty distribution, and review frequency based on your timeline.
+
+### 3. Your Current Skill Level
+
+Not everyone starts at the same place. Our quick assessment captures:
+
+- **Experience level**: Intern, beginner, intermediate, or advanced
+- **Problems solved**: Rough estimate of LeetCode/practice history
+- **Pattern familiarity**: Self-assessment of each pattern (unknown, seen, practiced, confident)
+- **Daily availability**: How many hours you can realistically study
+
+An intern with 50 problems solved gets a fundamentally different plan than a senior engineer with 500.
+
+## Inside the Algorithm
+
+Here's a simplified view of how we prioritize problems:
+
+### Step 1: Score Every Pattern
+
+For each of the 15 DSA patterns, we calculate a priority score:
+
+```
+Priority = (Company Weight × 35%) +
+           (Must-Know Questions × 25%) +
+           (Your Knowledge Gap × 20%) +
+           (Time Efficiency × 15%) +
+           (Prerequisites Met × 5%)
+```
+
+**Company Weight**: How often this pattern appears at your target company. Google heavily tests Binary Search (85% frequency). Meta loves Trees (85%).
+
+**Must-Know Questions**: Critical problems that appear repeatedly. Two Sum, LRU Cache, Number of Islands—these are non-negotiable for certain companies.
+
+**Knowledge Gap**: If you marked "Sliding Window" as "unknown" but it's critical for your company, it gets bumped up significantly.
+
+**Time Efficiency**: With limited days, some patterns offer better ROI. Arrays & Hashing problems can often be solved quickly, giving you more coverage.
+
+**Prerequisites**: You can't master DP without understanding recursion. We ensure you have foundations before advanced topics.
+
+### Step 2: Generate Daily Plans
+
+Once patterns are prioritized, we allocate problems to each day:
+
+1. **Theme each day**: "Day 3: Sliding Window" keeps your focus clear
+2. **Progressive difficulty**: Start easy, ramp to hard within each pattern
+3. **Time-box to your availability**: 2 hours/day? You get 3-4 problems. 4 hours? 5-6 problems.
+4. **Buffer days**: We don't schedule 100% capacity—life happens
+
+### Step 3: Build in Spaced Repetition
+
+This is where magic happens. Problems you struggle with automatically get scheduled for review:
+
+```
+Day 1: Solve "Longest Substring Without Repeating" → Struggled
+Day 4: Review "Longest Substring Without Repeating" → Got it
+Day 11: Review again → Easy now
+Day 30: Quick check before interview → Locked in
+```
+
+[Learn more about spaced repetition →](/blog/spaced-repetition-for-coding-interviews)
+
+### Step 4: Set Milestones
+
+We break your roadmap into checkpoints:
+
+- **Week 1**: Core patterns (Arrays, Two Pointers, Sliding Window)
+- **Week 2**: Trees & Graphs
+- **Week 3**: Advanced patterns (DP, Backtracking)
+- **Week 4**: Review and mock interviews
+
+Milestones keep you on track and give you a sense of progress.
+
+## What Makes This Different from Generic Plans
+
+| Generic Plans | CodeSparring Roadmap |
+|---------------|---------------------|
+| Same problems for everyone | Company-specific question selection |
+| Fixed difficulty curve | Adapts to your current level |
+| No review system | Spaced repetition built-in |
+| Arbitrary timelines | Optimized for YOUR interview date |
+| Static list | Dynamic—adjusts as you progress |
+
+## Real Example: 30-Day Google Prep
+
+Here's what an intermediate candidate preparing for Google would see:
+
+**Days 1-7: Foundation Patterns**
+- Arrays & Hashing (8 problems) - 95% frequency at Google
+- Binary Search (6 problems) - 85% frequency
+- Two Pointers (4 problems) - 60% frequency
+
+**Days 8-14: Core Structures**
+- Trees (7 problems) - 80% frequency
+- BFS/DFS (6 problems) - 75% frequency each
+- First review cycle begins
+
+**Days 15-21: Advanced Patterns**
+- Dynamic Programming (5 problems) - 70% frequency
+- Backtracking (3 problems) - 50% frequency
+- Heap (4 problems) - 55% frequency
+
+**Days 22-28: Polish**
+- Review weak patterns (algorithm-selected)
+- Must-know problems: LRU Cache, Number of Islands, Merge Intervals
+- System design prep (L4+)
+
+**Days 29-30: Final Prep**
+- Light review only
+- Mock interview simulation
+- Rest and confidence building
+
+## The Scoring in Action
+
+Let's say you're an intern preparing for Amazon with 30 days:
+
+**Input:**
+- Company: Amazon
+- Date: 30 days out
+- Level: Intern
+- Patterns: "Arrays - practiced", "DP - unknown", "Trees - seen"
+
+**Algorithm Output:**
+- Arrays & Hashing: Priority 95 (high frequency, you know it—maintain)
+- Trees: Priority 88 (high frequency, knowledge gap—focus here)
+- DP: Priority 75 (lower frequency at Amazon, unknown—but less critical for interns)
+- Leadership Principles prep: Added (Amazon-specific requirement)
+
+An intern at Amazon should focus on solid fundamentals and LP stories—not grinding Hard DP problems.
+
+## Why Personalization Matters
+
+Generic advice: "Do Blind 75 and you're set."
+
+Reality:
+- Blind 75 was created for general prep, not your specific company
+- It doesn't account for your timeline
+- It doesn't adapt to what you already know
+- It has no review system
+
+The engineers who pass interviews aren't the ones who solved the most problems. They're the ones who **retained the right patterns** and could **apply them under pressure**.
+
+That requires:
+1. Targeting the right problems for your company
+2. Studying with your timeline in mind
+3. Building genuine retention through review
+4. Knowing your weak spots
+
+## Get Your Personalized Roadmap
+
+Ready to stop guessing and start preparing strategically?
+
+1. **Pick your company** from our database of 19 top tech firms
+2. **Set your interview date**
+3. **Complete a 2-minute skill assessment**
+4. **Get your personalized day-by-day plan**
+
+[Create My Roadmap →](/roadmap/preview)
+
+---
+
+## The Bottom Line
+
+Every engineer's path to a job offer is different. Your roadmap should be too.
+
+Generic study plans waste your time on problems that don't matter for your interview. Our algorithm ensures every hour you invest is optimized for **your specific goal**.
+
+30 days of focused, personalized prep beats 90 days of random grinding.
+
+[Start your personalized roadmap now →](/roadmap/preview)

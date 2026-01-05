@@ -13,6 +13,13 @@ Allow: /careers
 Allow: /legal
 Allow: /blog
 
+# Allow company interview prep pages (high SEO value)
+Allow: /interview-prep
+Allow: /interview-prep/*
+
+# Allow roadmap preview (marketing feature)
+Allow: /roadmap/preview
+
 # Disallow authenticated/private routes
 Disallow: /dashboard
 Disallow: /account
@@ -26,7 +33,8 @@ Disallow: /admin
 Disallow: /api/
 Disallow: /auth
 Disallow: /login
-Disallow: /roadmap
+Disallow: /roadmap/new
+Disallow: /roadmap$
 
 # AI Crawlers - Allow discovery of public content
 User-agent: GPTBot
