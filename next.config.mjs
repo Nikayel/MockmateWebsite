@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Explicitly disable trailing slashes for consistent URLs
+  // This adds automatic 308 redirects from /page/ to /page
+  // Prevents "Alternate page with proper canonical tag" in Search Console
+  trailingSlash: false,
+
   // Empty turbopack config to use Turbopack with custom webpack config
   turbopack: {},
   // TypeScript errors must be fixed - do not ignore build errors in production
