@@ -861,9 +861,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     }
   }, [])
 
-  // Auto-save session data every 30 seconds (localStorage + Firestore)
+  // Auto-save session data every 30 seconds (localStorage + Firestore/API)
   useEffect(() => {
-    if (!isInterviewStarted || !selectedScenario || !firebaseUser) return
+    // Allow auto-save for both authenticated users and guests
+    if (!isInterviewStarted || !selectedScenario) return
+    if (!firebaseUser && !isGuestMode) return
 
     const autoSaveInterval = setInterval(async () => {
       try {
@@ -879,20 +881,46 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           timestamp: Date.now(),
         }
 
-        // Save to localStorage with user-specific key (immediate backup)
-        const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
-        localStorage.setItem(storageKey, JSON.stringify(sessionData))
+        if (firebaseUser) {
+          // Authenticated user - save to localStorage with user-specific key
+          const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
+          localStorage.setItem(storageKey, JSON.stringify(sessionData))
 
-        // Also save to Firestore if we have a session ID (for cross-device recovery)
-        if (currentSessionId) {
-          await saveSessionState(currentSessionId, {
-            code,
-            selectedLanguage,
-            elapsedTime,
-            chatMessages,
-            interviewerMessages,
-            testResults,
-          })
+          // Also save to Firestore if we have a session ID (for cross-device recovery)
+          if (currentSessionId) {
+            await saveSessionState(currentSessionId, {
+              code,
+              selectedLanguage,
+              elapsedTime,
+              chatMessages,
+              interviewerMessages,
+              testResults,
+            })
+          }
+        } else if (isGuestMode && guestId) {
+          // Guest user - save to localStorage with guest-specific key
+          const storageKey = `interview_autosave_guest_${selectedScenario.id}`
+          localStorage.setItem(storageKey, JSON.stringify(sessionData))
+
+          // Also save state to Firestore via API (for session recovery)
+          if (currentSessionId) {
+            await fetch('/api/guest-session', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sessionId: currentSessionId,
+                guestId,
+                sessionState: {
+                  code,
+                  language: selectedLanguage,
+                  elapsedTime,
+                  chatMessages: chatMessages.slice(-20), // Limit messages
+                  interviewerMessages: interviewerMessages.slice(-20),
+                  testResults: testResults.slice(-10),
+                },
+              }),
+            })
+          }
         }
       } catch (error) {
         console.error("Auto-save failed:", error)
@@ -903,7 +931,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     return () => {
       clearInterval(autoSaveInterval)
     }
-  }, [isInterviewStarted, selectedScenario, firebaseUser, code, chatMessages, interviewerMessages, selectedLanguage, elapsedTime, testResults, workspaceContext, currentSessionId])
+  }, [isInterviewStarted, selectedScenario, firebaseUser, isGuestMode, guestId, code, chatMessages, interviewerMessages, selectedLanguage, elapsedTime, testResults, workspaceContext, currentSessionId])
 
   // Track when code value changes
   useEffect(() => {
@@ -912,54 +940,100 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     }
   }, [code])
 
-  // Restore auto-saved session on mount (check both localStorage and Firestore)
+  // Restore auto-saved session on mount (check both localStorage and Firestore/API)
   useEffect(() => {
-    if (!firebaseUser || !selectedScenario || isInterviewStarted) return
+    // Allow restoration for both authenticated users and guests
+    if (!selectedScenario || isInterviewStarted) return
+    if (!firebaseUser && !isGuestMode) return
 
     const restoreSession = async () => {
       try {
-        // Check localStorage first (faster)
-        const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
-        const savedData = localStorage.getItem(storageKey)
         let localData = null
         let localTimestamp = 0
+        let remoteData = null
+        let remoteTimestamp = 0
 
-        if (savedData) {
-          const parsed = JSON.parse(savedData)
-          const timeSinceLastSave = Date.now() - parsed.timestamp
-          if (timeSinceLastSave < 24 * 60 * 60 * 1000) {
-            localData = parsed
-            localTimestamp = parsed.timestamp
-          } else {
-            localStorage.removeItem(storageKey)
+        if (firebaseUser) {
+          // Authenticated user - check localStorage with user-specific key
+          const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
+          const savedData = localStorage.getItem(storageKey)
+
+          if (savedData) {
+            const parsed = JSON.parse(savedData)
+            const timeSinceLastSave = Date.now() - parsed.timestamp
+            if (timeSinceLastSave < 24 * 60 * 60 * 1000) {
+              localData = parsed
+              localTimestamp = parsed.timestamp
+            } else {
+              localStorage.removeItem(storageKey)
+            }
+          }
+
+          // Check Firestore if we have a session ID in URL
+          const sessionIdFromUrl = searchParams?.get('session')
+          if (sessionIdFromUrl) {
+            const firestoreState = await getSessionState(sessionIdFromUrl)
+            if (firestoreState?.savedAt) {
+              remoteData = firestoreState
+              remoteTimestamp = new Date(firestoreState.savedAt).getTime()
+              setCurrentSessionId(sessionIdFromUrl)
+            }
+          }
+        } else if (isGuestMode && guestId) {
+          // Guest user - check localStorage with guest-specific key
+          const storageKey = `interview_autosave_guest_${selectedScenario.id}`
+          const savedData = localStorage.getItem(storageKey)
+
+          if (savedData) {
+            const parsed = JSON.parse(savedData)
+            const timeSinceLastSave = Date.now() - parsed.timestamp
+            // Guest sessions expire after 24 hours
+            if (timeSinceLastSave < 24 * 60 * 60 * 1000) {
+              localData = parsed
+              localTimestamp = parsed.timestamp
+            } else {
+              localStorage.removeItem(storageKey)
+            }
+          }
+
+          // Check API for saved session state
+          const sessionIdFromUrl = searchParams?.get('session')
+          if (sessionIdFromUrl) {
+            try {
+              const response = await fetch(`/api/guest-session?sessionId=${sessionIdFromUrl}&guestId=${guestId}`)
+              if (response.ok) {
+                const data = await response.json()
+                if (data.session?.session_state) {
+                  remoteData = {
+                    code: data.session.session_state.code,
+                    chatMessages: data.session.session_state.chat_messages,
+                    interviewerMessages: data.session.session_state.interviewer_messages,
+                    language: data.session.session_state.language,
+                    elapsedTime: data.session.session_state.elapsed_time,
+                    testResults: data.session.session_state.test_results,
+                    savedAt: data.session.session_state.saved_at,
+                  }
+                  remoteTimestamp = new Date(data.session.session_state.saved_at).getTime()
+                  setCurrentSessionId(sessionIdFromUrl)
+                }
+              }
+            } catch (err) {
+              console.error("Failed to fetch guest session state:", err)
+            }
           }
         }
 
-        // Check Firestore if we have a session ID in URL
-        const sessionIdFromUrl = searchParams.get('session')
-        let firestoreData = null
-        let firestoreTimestamp = 0
+        // Use the most recent save (prefer remote if same time for cross-device)
+        const useRemote = remoteData && (!localData || remoteTimestamp >= localTimestamp)
 
-        if (sessionIdFromUrl) {
-          const firestoreState = await getSessionState(sessionIdFromUrl)
-          if (firestoreState?.savedAt) {
-            firestoreData = firestoreState
-            firestoreTimestamp = new Date(firestoreState.savedAt).getTime()
-            setCurrentSessionId(sessionIdFromUrl)
-          }
-        }
-
-        // Use the most recent save (prefer Firestore if same time for cross-device)
-        const useFirestore = firestoreData && (!localData || firestoreTimestamp >= localTimestamp)
-
-        if (useFirestore && firestoreData) {
-          setCode(firestoreData.code || "")
-          setChatMessages((firestoreData.chatMessages as ChatMessage[]) || [])
-          setInterviewerMessages((firestoreData.interviewerMessages as ChatMessage[]) || [])
-          setSelectedLanguage((firestoreData.language as typeof selectedLanguage) || "javascript")
-          setTestResults(firestoreData.testResults || [])
-          if (firestoreData.elapsedTime) {
-            setElapsedTime(firestoreData.elapsedTime)
+        if (useRemote && remoteData) {
+          setCode(remoteData.code || "")
+          setChatMessages((remoteData.chatMessages as ChatMessage[]) || [])
+          setInterviewerMessages((remoteData.interviewerMessages as ChatMessage[]) || [])
+          setSelectedLanguage((remoteData.language as typeof selectedLanguage) || "javascript")
+          setTestResults(remoteData.testResults || [])
+          if (remoteData.elapsedTime) {
+            setElapsedTime(remoteData.elapsedTime)
           }
           toast.info("Session restored from cloud backup", {
             description: "Your progress was saved. Continue where you left off!",
@@ -987,7 +1061,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     }
 
     restoreSession()
-  }, [firebaseUser, selectedScenario, searchParams])
+  }, [firebaseUser, isGuestMode, guestId, selectedScenario, searchParams, isInterviewStarted])
 
   const triggerProactiveInterviewer = async () => {
     if (isLoadingInterviewer || showFeedback || showPostInterviewDiscussion) return
@@ -1502,6 +1576,29 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           toast.warning("Session progress may not be fully saved", {
             description: "Your feedback is still available, but progress tracking may be incomplete.",
           })
+        }
+      } else if (currentSessionId && isGuestMode && guestId) {
+        // Guest user - save completion data via API
+        try {
+          await fetch('/api/guest-session', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: currentSessionId,
+              guestId,
+              performanceScore: calculatedPerformanceScore,
+              feedback: comprehensiveFeedback,
+              finalCode: code,
+              language: selectedLanguage,
+              testResults,
+              timeComplexity: efficiencyData?.estimatedTimeComplexity,
+              spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
+              efficiencyScore: efficiencyData?.efficiencyScore,
+            }),
+          })
+        } catch (error) {
+          console.error("Error saving guest session completion:", error)
+          // Non-critical - user can still see feedback
         }
       }
     } catch (error) {
@@ -2449,6 +2546,25 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           }
         } catch (error) {
           console.error("Error updating session:", error)
+        }
+      } else if (currentSessionId && isGuestMode && guestId) {
+        // Guest user - save completion data via API
+        try {
+          await fetch('/api/guest-session', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: currentSessionId,
+              guestId,
+              performanceScore: calculatedPerformanceScore,
+              feedback: comprehensiveFeedback,
+              finalCode: code || '// Design notes',
+              language: 'notes',
+              testResults: [],
+            }),
+          })
+        } catch (error) {
+          console.error("Error saving guest session completion:", error)
         }
       }
 
@@ -3845,7 +3961,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           feedbackSummary={comprehensiveFeedback}
           onDismiss={() => {
             setShowSignupPrompt(false)
-            markFreeTrialUsed()
+            // Note: markFreeTrialUsed() is already called in SignupPrompt component
           }}
         />
       )}
