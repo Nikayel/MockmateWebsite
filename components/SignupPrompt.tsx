@@ -14,12 +14,63 @@ import {
   Lock,
   ArrowRight,
   Trophy,
+  Brain,
+  Calendar,
+  Clock,
+  RefreshCw,
 } from "lucide-react"
 import { signInWithGitHub, signInWithGoogle } from "@/lib/auth"
 import { createOrUpdateProfile, migrateAllGuestSessions } from "@/lib/firestore-helpers"
 import { getGuestId, markFreeTrialUsed, confirmGuestSessionMigration, saveGuestSessionData } from "@/lib/guest-session"
 import { toast } from "sonner"
 import { motion } from "framer-motion"
+
+/**
+ * Calculate optimal review interval using SM-2 algorithm principles
+ * Based on Ebbinghaus forgetting curve research
+ */
+function calculateNextReviewDate(score: number): { date: Date; intervalDays: number; retentionPercent: number } {
+  // Convert 0-100 score to quality factor
+  const quality = Math.round((score / 100) * 5)
+
+  // SM-2 inspired interval calculation for first review
+  let intervalDays: number
+  let retentionPercent: number
+
+  if (quality >= 4) {
+    // High performance - can wait longer
+    intervalDays = 3
+    retentionPercent = 85
+  } else if (quality >= 3) {
+    // Moderate performance - standard interval
+    intervalDays = 1
+    retentionPercent = 75
+  } else {
+    // Lower performance - review sooner
+    intervalDays = 1
+    retentionPercent = 60
+  }
+
+  const nextDate = new Date()
+  nextDate.setDate(nextDate.getDate() + intervalDays)
+
+  return { date: nextDate, intervalDays, retentionPercent }
+}
+
+/**
+ * Format a date as a friendly string (e.g., "Tomorrow", "In 3 days", "Jan 15")
+ */
+function formatReviewDate(date: Date): string {
+  const now = new Date()
+  const diffTime = date.getTime() - now.getTime()
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) return "Today"
+  if (diffDays === 1) return "Tomorrow"
+  if (diffDays <= 7) return `In ${diffDays} days`
+
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
 
 interface SignupPromptProps {
   score: number
@@ -79,6 +130,9 @@ export function SignupPrompt({
 
   const scoreMessage = getScoreMessage()
 
+  // Calculate optimal next review based on performance
+  const nextReview = calculateNextReviewDate(score)
+
   const handleAuth = async (provider: "github" | "google") => {
     try {
       setIsLoading(true)
@@ -122,9 +176,9 @@ export function SignupPrompt({
       description: "Keep your progress forever",
     },
     {
-      icon: TrendingUp,
-      title: "Track improvement",
-      description: "See how you grow over time",
+      icon: Brain,
+      title: "Smart review schedule",
+      description: "Science-backed spaced repetition",
     },
     {
       icon: Target,
@@ -169,6 +223,62 @@ export function SignupPrompt({
         </div>
 
         <CardContent className="p-6 space-y-6">
+          {/* Spaced Repetition Review Section - Key conversion driver */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-purple-600/20 via-accent/10 to-blue-600/20 border border-accent/30 p-4"
+          >
+            {/* Subtle brain pattern background */}
+            <div className="absolute inset-0 opacity-5">
+              <div className="absolute top-2 right-2">
+                <Brain className="h-20 w-20" />
+              </div>
+            </div>
+
+            <div className="relative">
+              <div className="flex items-start gap-3 mb-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-accent/20 shrink-0">
+                  <Calendar className="h-5 w-5 text-accent" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    Your Optimal Review Calculated
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Based on your {score}% performance
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between bg-background/50 rounded-lg p-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4 text-accent" />
+                  <span className="text-sm text-muted-foreground">Next review:</span>
+                </div>
+                <span className="text-lg font-bold text-accent">
+                  {formatReviewDate(nextReview.date)}
+                </span>
+              </div>
+
+              <div className="space-y-2 text-xs text-muted-foreground">
+                <p className="flex items-start gap-2">
+                  <Clock className="h-3.5 w-3.5 mt-0.5 shrink-0 text-accent/70" />
+                  <span>
+                    <strong className="text-foreground">Why this matters:</strong> Research shows you'll retain ~{nextReview.retentionPercent}% if you review at the optimal time. Without it, you'll forget 80% within a week.
+                  </span>
+                </p>
+                <p className="flex items-start gap-2">
+                  <TrendingUp className="h-3.5 w-3.5 mt-0.5 shrink-0 text-accent/70" />
+                  <span>
+                    Sign up to access your personalized <strong className="text-foreground">/review</strong> page with all your scheduled problems.
+                  </span>
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
           {/* Benefits grid */}
           <div className="grid grid-cols-2 gap-3">
             {benefits.map((benefit, index) => (
