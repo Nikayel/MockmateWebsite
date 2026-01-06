@@ -310,6 +310,20 @@ export default async function CompanyPrepPage({
                   </div>
                 </div>
               )}
+
+              {/* Personalized Roadmap CTA */}
+              <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-4">
+                <h3 className="text-sm font-medium text-white mb-2">Get a {company.name} study plan</h3>
+                <p className="text-xs text-zinc-400 mb-3">
+                  Enter your interview date → we prioritize {company.name}'s top patterns → you get a day-by-day schedule.
+                </p>
+                <Link href={`/roadmap/preview?company=${company.id}`}>
+                  <Button size="sm" className="w-full bg-white text-black hover:bg-zinc-200 text-xs">
+                    Create roadmap
+                    <ArrowRight className="ml-1.5 h-3 w-3" />
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
         </div>
