@@ -12,7 +12,7 @@ import { NotificationBell } from "@/components/notification-bell"
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const { user, loading: isLoading, initialized } = useAuth()
+  const { user, initialized } = useAuth()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -33,82 +33,117 @@ export function Header() {
 
   return (
     <header
-      className={`fixed top-0 w-full z-50 transition-all duration-500 ${
-        isScrolled ? "glass-minimal border-b border-accent/10" : "bg-transparent"
+      className={`fixed top-0 z-50 w-full transition-all duration-500 ${
+        isScrolled ? "glass-minimal border-accent/10 border-b" : "bg-transparent"
       }`}
     >
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-2 group">
-            <Logo size={32} className="text-accent group-hover:scale-105 transition-transform" />
-            <span className="text-2xl font-heading font-bold tracking-tight">
+          <Link href="/" className="group flex items-center space-x-2">
+            <Logo size={32} className="text-accent transition-transform group-hover:scale-105" />
+            <span className="font-heading text-2xl font-bold tracking-tight">
               <span className="text-white">Code</span>
               <span className="text-accent">Sparring</span>
             </span>
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-6">
+          <nav className="hidden items-center space-x-6 md:flex">
             {!initialized ? (
-              <div className="h-10 flex items-center">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white opacity-50"></div>
+              <div className="flex h-10 items-center">
+                <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-white opacity-50"></div>
               </div>
             ) : user ? (
               <>
-                <Link href="/dashboard" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
+                <Link
+                  href="/dashboard"
+                  className="hover:text-accent flex items-center space-x-1 text-white/90 transition-colors duration-300"
+                >
                   <LayoutDashboard className="h-4 w-4" />
                   <span>Dashboard</span>
                 </Link>
-                <Link href="/interview" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
+                <Link
+                  href="/interview"
+                  className="hover:text-accent flex items-center space-x-1 text-white/90 transition-colors duration-300"
+                >
                   <Terminal className="h-4 w-4" />
                   <span>Interview</span>
                 </Link>
-                <Link href="/sessions" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
+                <Link
+                  href="/sessions"
+                  className="hover:text-accent flex items-center space-x-1 text-white/90 transition-colors duration-300"
+                >
                   <Clock className="h-4 w-4" />
                   <span>Sessions</span>
                 </Link>
-                <Link href="/roadmap" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
+                <Link
+                  href="/roadmap"
+                  className="hover:text-accent flex items-center space-x-1 text-white/90 transition-colors duration-300"
+                >
                   <Map className="h-4 w-4" />
                   <span>Roadmap</span>
                 </Link>
-                <Link href="/practice" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
+                <Link
+                  href="/practice"
+                  className="hover:text-accent flex items-center space-x-1 text-white/90 transition-colors duration-300"
+                >
                   <Brain className="h-4 w-4" />
                   <span>Review</span>
                 </Link>
-                <Link href="/account" className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-1">
+                <Link
+                  href="/account"
+                  className="hover:text-accent flex items-center space-x-1 text-white/90 transition-colors duration-300"
+                >
                   <User className="h-4 w-4" />
                   <span>Account</span>
                 </Link>
-                <div className="flex items-center space-x-3 pl-4 border-l border-white/10">
+                <div className="flex items-center space-x-3 border-l border-white/10 pl-4">
                   <NotificationBell />
-                  <span className="text-sm text-gray-400">{user.user_metadata?.full_name || user.email}</span>
+                  <span className="text-sm text-gray-400">
+                    {user.user_metadata?.full_name || user.email}
+                  </span>
                   <Button
                     onClick={handleSignOut}
                     variant="outline"
                     size="sm"
-                    className="border-accent/50 text-accent hover:bg-accent hover:text-black transition-all duration-300 bg-transparent"
+                    className="border-accent/50 text-accent hover:bg-accent bg-transparent transition-all duration-300 hover:text-black"
                   >
-                    <LogOut className="h-4 w-4 mr-1" />
+                    <LogOut className="mr-1 h-4 w-4" />
                     Sign Out
                   </Button>
                 </div>
               </>
             ) : (
               <>
-                <Link href="/why-codesparring" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
+                <Link
+                  href="/interview-prep"
+                  className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
+                >
+                  Company Prep
+                </Link>
+                <Link
+                  href="/why-codesparring"
+                  className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
+                >
                   How it works
                 </Link>
-                <a href="/#features" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
+                <Link
+                  href="/#features"
+                  className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
+                >
                   Features
-                </a>
-                <Link href="/blog" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
+                </Link>
+                <Link
+                  href="/blog"
+                  className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
+                >
                   Blog
                 </Link>
-                <Link href="/docs" className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer">
-                  Docs
-                </Link>
-                <Link href="/careers" className="text-white/70 hover:text-white transition-colors duration-300 cursor-pointer">
-                  Join Us
+                <Link
+                  href="/pricing"
+                  className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
+                >
+                  Pricing
                 </Link>
                 <Link href="/login">
                   <Button
@@ -123,24 +158,27 @@ export function Header() {
           </nav>
 
           {/* Mobile Menu Button */}
-          <button className="md:hidden text-white cursor-pointer" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+          <button
+            className="cursor-pointer text-white md:hidden"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
             {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>
 
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
-          <nav className="md:hidden mt-4 pb-4 border-t border-white/20">
+          <nav className="mt-4 border-t border-white/20 pb-4 md:hidden">
             <div className="flex flex-col space-y-4 pt-4">
               {!initialized ? (
                 <div className="flex justify-center py-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white opacity-50"></div>
+                  <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-white opacity-50"></div>
                 </div>
               ) : user ? (
                 <>
                   <Link
                     href="/dashboard"
-                    className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-2"
+                    className="hover:text-accent flex items-center space-x-2 text-white/90 transition-colors duration-300"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <LayoutDashboard className="h-4 w-4" />
@@ -148,7 +186,7 @@ export function Header() {
                   </Link>
                   <Link
                     href="/interview"
-                    className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-2"
+                    className="hover:text-accent flex items-center space-x-2 text-white/90 transition-colors duration-300"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <Terminal className="h-4 w-4" />
@@ -156,7 +194,7 @@ export function Header() {
                   </Link>
                   <Link
                     href="/sessions"
-                    className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-2"
+                    className="hover:text-accent flex items-center space-x-2 text-white/90 transition-colors duration-300"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <Clock className="h-4 w-4" />
@@ -164,7 +202,7 @@ export function Header() {
                   </Link>
                   <Link
                     href="/roadmap"
-                    className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-2"
+                    className="hover:text-accent flex items-center space-x-2 text-white/90 transition-colors duration-300"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <Map className="h-4 w-4" />
@@ -172,7 +210,7 @@ export function Header() {
                   </Link>
                   <Link
                     href="/practice"
-                    className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-2"
+                    className="hover:text-accent flex items-center space-x-2 text-white/90 transition-colors duration-300"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <Brain className="h-4 w-4" />
@@ -180,23 +218,25 @@ export function Header() {
                   </Link>
                   <Link
                     href="/account"
-                    className="text-white/90 hover:text-accent transition-colors duration-300 flex items-center space-x-2"
+                    className="hover:text-accent flex items-center space-x-2 text-white/90 transition-colors duration-300"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <User className="h-4 w-4" />
                     <span>Account</span>
                   </Link>
-                  <div className="pt-4 border-t border-white/10">
-                    <p className="text-sm text-gray-400 mb-2">{user.user_metadata?.full_name || user.email}</p>
+                  <div className="border-t border-white/10 pt-4">
+                    <p className="mb-2 text-sm text-gray-400">
+                      {user.user_metadata?.full_name || user.email}
+                    </p>
                     <Button
                       onClick={() => {
                         handleSignOut()
                         setIsMobileMenuOpen(false)
                       }}
                       variant="outline"
-                      className="border-accent/50 text-accent hover:bg-accent hover:text-black transition-all duration-300 w-fit bg-transparent"
+                      className="border-accent/50 text-accent hover:bg-accent w-fit bg-transparent transition-all duration-300 hover:text-black"
                     >
-                      <LogOut className="h-4 w-4 mr-2" />
+                      <LogOut className="mr-2 h-4 w-4" />
                       Sign Out
                     </Button>
                   </div>
@@ -204,44 +244,44 @@ export function Header() {
               ) : (
                 <>
                   <Link
+                    href="/interview-prep"
+                    className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Company Prep
+                  </Link>
+                  <Link
                     href="/why-codesparring"
-                    className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
+                    className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     How it works
                   </Link>
-                  <a
+                  <Link
                     href="/#features"
-                    className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
+                    className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Features
-                  </a>
+                  </Link>
                   <Link
                     href="/blog"
-                    className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
+                    className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Blog
                   </Link>
                   <Link
-                    href="/docs"
-                    className="text-white/90 hover:text-accent transition-colors duration-300 cursor-pointer"
+                    href="/pricing"
+                    className="hover:text-accent cursor-pointer text-white/90 transition-colors duration-300"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    Docs
-                  </Link>
-                  <Link
-                    href="/careers"
-                    className="text-white/70 hover:text-white transition-colors duration-300 cursor-pointer"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Join Us
+                    Pricing
                   </Link>
                   <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
                     <Button
                       size="sm"
-                      className="bg-accent/10 hover:bg-accent/20 text-accent border-0 transition-all duration-300 w-fit"
+                      className="bg-accent/10 hover:bg-accent/20 text-accent w-fit border-0 transition-all duration-300"
                     >
                       Login
                     </Button>
