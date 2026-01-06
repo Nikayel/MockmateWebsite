@@ -25,7 +25,8 @@ import {
   Bug,
   Wrench,
   XCircle,
-  MessageSquare
+  MessageSquare,
+  Shield
 } from "lucide-react"
 import { LearningRecommendations } from "@/components/LearningRecommendations"
 import { NextProblemRecommendations } from "@/components/NextProblemRecommendations"
@@ -64,6 +65,7 @@ interface FeedbackSection {
 interface PracticeFeedbackProps {
   feedback: string
   performanceScore: number
+  constitutionalAICritique?: any
   testsPassed: number
   testsTotal: number
   timeComplexity?: string
@@ -225,6 +227,7 @@ function parseFeedback(feedback: string): FeedbackSection {
 export default function PracticeFeedback({
   feedback,
   performanceScore,
+  constitutionalAICritique,
   testsPassed,
   testsTotal,
   timeComplexity,
@@ -245,6 +248,7 @@ export default function PracticeFeedback({
   const [showCode, setShowCode] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
   const [showRecommendations, setShowRecommendations] = useState(false)
+  const [showQualityCheck, setShowQualityCheck] = useState(false)
 
   const sections = parseFeedback(feedback)
   const feedbackLower = feedback.toLowerCase()
@@ -661,6 +665,65 @@ export default function PracticeFeedback({
                     </li>
                   ))}
                 </ol>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Constitutional AI Quality Check - Only shown if adjustments were made */}
+        {constitutionalAICritique && (
+          <>
+            <button
+              onClick={() => setShowQualityCheck(!showQualityCheck)}
+              className="w-full flex items-center justify-between p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl hover:bg-yellow-500/20 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Shield className="h-3.5 w-3.5 text-yellow-400" />
+                <span className="text-xs font-medium text-yellow-400">Quality Check (Constitutional AI)</span>
+              </div>
+              {showQualityCheck ? <ChevronUp className="h-3.5 w-3.5 text-yellow-500" /> : <ChevronDown className="h-3.5 w-3.5 text-yellow-500" />}
+            </button>
+            {showQualityCheck && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 space-y-3">
+                <p className="text-yellow-400 font-semibold text-xs">Our AI reviewed its own work for fairness and accuracy.</p>
+
+                {constitutionalAICritique.scoreCritique && (
+                  <div className="bg-zinc-900/50 border border-yellow-500/20 rounded-lg p-3">
+                    <p className="font-semibold mb-2 text-xs text-yellow-300">Score Adjustments:</p>
+                    <p className="text-[10px] text-zinc-300 mb-3">{constitutionalAICritique.scoreCritique.reasoning}</p>
+                    <div className="grid grid-cols-2 gap-2 text-[10px] mb-3 p-2 bg-zinc-800/50 rounded">
+                      <div className="text-zinc-400">Original Overall: <span className="text-zinc-200">{constitutionalAICritique.scoreCritique.originalScores.overall}</span></div>
+                      <div className="text-yellow-400">Adjusted: <span className="font-semibold">{constitutionalAICritique.scoreCritique.adjustedScores.overall}</span></div>
+                    </div>
+                    <ul className="space-y-2">
+                      {constitutionalAICritique.scoreCritique.critiques.map((c: any, i: number) => (
+                        <li key={i} className="flex items-start gap-2 text-[10px] text-zinc-300">
+                          <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-[9px] font-medium capitalize shrink-0">
+                            {c.aspect}
+                          </span>
+                          <span>{c.issue}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {constitutionalAICritique.feedbackCritique && (
+                  <div className="bg-zinc-900/50 border border-yellow-500/20 rounded-lg p-3">
+                    <p className="font-semibold mb-2 text-xs text-yellow-300">Feedback Improvements:</p>
+                    <p className="text-[10px] text-zinc-300 mb-3">{constitutionalAICritique.feedbackCritique.reasoning}</p>
+                    <ul className="space-y-2">
+                      {constitutionalAICritique.feedbackCritique.critiques.map((c: any, i: number) => (
+                        <li key={i} className="flex items-start gap-2 text-[10px] text-zinc-300">
+                          <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-[9px] font-medium capitalize shrink-0">
+                            {c.aspect}
+                          </span>
+                          <span>{c.issue}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
           </>

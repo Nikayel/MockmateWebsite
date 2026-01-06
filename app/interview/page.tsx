@@ -177,6 +177,7 @@ function InterviewPageContent() {
   const [showPostInterviewDiscussion, setShowPostInterviewDiscussion] = useState(false)
   const [comprehensiveFeedback, setComprehensiveFeedback] = useState<string>("")
   const [performanceScore, setPerformanceScore] = useState<number | null>(null)
+  const [constitutionalAICritique, setConstitutionalAICritique] = useState<any>(null)
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false) // Track AI feedback generation
   const [isGeneratingDiscussion, setIsGeneratingDiscussion] = useState(false)
   const [showCodeInDiscussion, setShowCodeInDiscussion] = useState(false)
@@ -1418,6 +1419,10 @@ Ask ONE focused question based on these observations.`)
             const feedbackData = await feedbackResponse.json()
             comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
             calculatedPerformanceScore = feedbackData.performanceScore || calculatedPerformanceScore
+            // Store Constitutional AI critique if present
+            if (feedbackData.constitutionalAICritique) {
+              setConstitutionalAICritique(feedbackData.constitutionalAICritique)
+            }
           }
         } catch (feedbackError) {
           console.error("Error generating feedback:", feedbackError)
@@ -3940,6 +3945,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     <PracticeFeedback
                       feedback={comprehensiveFeedback || ""}
                       performanceScore={performanceScore ?? 0}
+                      constitutionalAICritique={constitutionalAICritique}
                       testsPassed={testSummary.passed}
                       testsTotal={testSummary.total}
                       timeComplexity={efficiencyMetrics?.estimatedTimeComplexity}

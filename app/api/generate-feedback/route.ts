@@ -69,6 +69,45 @@ interface ConversationValidation {
 }
 
 /**
+ * Constitutional AI Critique Result
+ * Reviews scoring and feedback for fairness, tone, accuracy, actionability
+ */
+interface CritiqueResult {
+  aspect: 'fairness' | 'tone' | 'accuracy' | 'actionability'
+  passed: boolean
+  issue?: string
+  suggestion?: string
+}
+
+/**
+ * Constitutional AI Score Critique
+ * Reviews calculated scores to ensure fairness and accuracy
+ */
+interface ScoreCritiqueAdjustment {
+  critiques: CritiqueResult[]
+  adjustedScores?: {
+    understanding: number
+    problemSolving: number
+    codeQuality: number
+    communication: number
+    overall: number
+  }
+  reasoning: string
+  madeChanges: boolean
+}
+
+/**
+ * Constitutional AI Feedback Critique
+ * Reviews generated feedback text for constructive tone and accuracy
+ */
+interface FeedbackCritiqueAdjustment {
+  critiques: CritiqueResult[]
+  revisedFeedback?: string
+  reasoning: string
+  madeChanges: boolean
+}
+
+/**
  * AI Partner code overlap analysis
  * Detects if candidate blindly copied AI suggestions without understanding
  */
@@ -1255,7 +1294,257 @@ function applyScoreFloors(
   return { ...scores, overall, communication, silentSolution: isSilentSolution }
 }
 
+/**
+ * Constitutional AI: Critique calculated scores for fairness
+ *
+ * Principles enforced:
+ * - Fairness: Scores should match performance reality
+ * - Harmlessness: Don't over-penalize learners for honest mistakes
+ * - Honesty: Don't inflate scores for incomplete work
+ * - Helpfulness: Scores should guide improvement
+ */
+async function critiqueScores(
+  scores: ReturnType<typeof calculateValidatedScores> & { silentSolution?: boolean },
+  context: {
+    passRate: number
+    scenarioType: string
+    aiValidation: ConversationValidation
+    codeCompleteness?: { isIncomplete: boolean; reason: string }
+    hasBlindCopying?: boolean
+  }
+): Promise<ScoreCritiqueAdjustment> {
 
+  const critiquePrompt = `You are a Constitutional AI reviewer ensuring fair, helpful, and honest scoring.
+
+CURRENT SCORES (0-100 scale):
+- Understanding: ${scores.understanding}
+- Problem-Solving: ${scores.problemSolving}
+- Code Quality: ${scores.codeQuality}
+- Communication: ${scores.communication}
+- Overall: ${scores.overall}
+
+PERFORMANCE CONTEXT:
+- Test pass rate: ${context.passRate}%
+- Scenario type: ${context.scenarioType}
+- Approach explained: ${context.aiValidation.approachExplained}
+- Approach quality: ${context.aiValidation.approachQuality}
+- Communication score: ${context.aiValidation.communicationScore}
+${context.codeCompleteness?.isIncomplete ? `- Code incomplete: ${context.codeCompleteness.reason}` : ''}
+${context.hasBlindCopying ? '- AI copying detected' : ''}
+${scores.silentSolution ? '- Silent solution (no explanation)' : ''}
+
+CONSTITUTIONAL PRINCIPLES - Critique against these 4 aspects:
+
+1. FAIRNESS: Do scores accurately reflect performance?
+   - Are penalties proportional to actual mistakes?
+   - Is someone being unfairly punished for minor issues?
+   - Example violation: Communication=20 when they explained well but didn't use specific keywords
+
+2. TONE (Harmlessness): Are scores discouraging vs. constructive?
+   - Are we being overly harsh on learners?
+   - Would these scores demotivate someone trying their best?
+   - Example violation: Overall=15 for someone who submitted incomplete work but showed effort
+
+3. ACCURACY (Honesty): Are scores truthful?
+   - Do scores match what actually happened?
+   - Are we inflating scores for political correctness?
+   - Example violation: Code Quality=70 when solution doesn't work
+
+4. ACTIONABILITY (Helpfulness): Do scores guide improvement?
+   - Can the student understand WHY they got this score?
+   - Is the gap between current and good performance clear?
+   - Example violation: All scores uniformly low without clear differentiation
+
+CRITICAL RULES:
+- Only flag if there's a CLEAR violation (be conservative)
+- Suggest score adjustments ONLY if absolutely necessary (±5-15 points max)
+- If scores are reasonable, return empty critiques
+- Focus on catching: unfair penalties, demotivating harshness, dishonest inflation
+
+Return JSON:
+{
+  "critiques": [
+    {
+      "aspect": "fairness|tone|accuracy|actionability",
+      "passed": false,
+      "issue": "Brief description of the problem",
+      "suggestion": "Specific fix"
+    }
+  ],
+  "adjustedScores": {
+    "understanding": number,
+    "problemSolving": number,
+    "codeQuality": number,
+    "communication": number,
+    "overall": number
+  },
+  "reasoning": "Why adjustments were made (1 sentence)",
+  "madeChanges": true/false
+}
+
+If no issues found, return:
+{
+  "critiques": [],
+  "reasoning": "Scores are fair and appropriate",
+  "madeChanges": false
+}`
+
+  try {
+    const response = await generateAIResponse(
+      'You are a Constitutional AI reviewer. Return only valid JSON, no markdown.',
+      critiquePrompt,
+      [],
+      { complexity: 'simple', temperature: 0.2 }
+    )
+
+    const jsonMatch = response.text.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]) as ScoreCritiqueAdjustment
+
+      // Log critique decisions
+      if (result.madeChanges) {
+        logger.info('[Constitutional AI] Score adjustment made', {
+          original: scores,
+          adjusted: result.adjustedScores,
+          critiques: result.critiques,
+          reasoning: result.reasoning
+        })
+      }
+
+      return result
+    }
+  } catch (error) {
+    logger.error('[Constitutional AI] Score critique failed', { error })
+  }
+
+  // Fallback: no changes
+  return {
+    critiques: [],
+    reasoning: 'Critique failed, using original scores',
+    madeChanges: false
+  }
+}
+
+/**
+ * Constitutional AI: Critique generated feedback text
+ *
+ * Principles enforced:
+ * - Tone: Constructive, not demoralizing
+ * - Accuracy: Truthful about performance
+ * - Actionability: Clear next steps
+ */
+async function critiqueFeedbackText(
+  feedback: string,
+  scores: {
+    understanding: number
+    problemSolving: number
+    codeQuality: number
+    communication: number
+    overall: number
+  },
+  context: {
+    passRate: number
+    scenarioType: string
+    isIncomplete: boolean
+  }
+): Promise<FeedbackCritiqueAdjustment> {
+
+  const critiquePrompt = `You are a Constitutional AI reviewer ensuring helpful, honest, and constructive feedback.
+
+GENERATED FEEDBACK:
+${feedback.substring(0, 1500)}${feedback.length > 1500 ? '\n[...truncated for brevity]' : ''}
+
+PERFORMANCE SCORES:
+- Overall: ${scores.overall}/100
+- Understanding: ${scores.understanding}/100
+- Problem-Solving: ${scores.problemSolving}/100
+- Code Quality: ${scores.codeQuality}/100
+- Communication: ${scores.communication}/100
+- Test pass rate: ${context.passRate}%
+- Scenario: ${context.scenarioType}
+- Incomplete: ${context.isIncomplete}
+
+CONSTITUTIONAL PRINCIPLES - Critique against these 4 aspects:
+
+1. FAIRNESS: Does feedback accurately represent what happened?
+   - Are criticisms backed by evidence?
+   - Are achievements recognized?
+   - Red flag: Harsh criticism without specific examples
+
+2. TONE: Is feedback constructive and motivating?
+   - Does it encourage improvement vs. demoralize?
+   - Is language respectful and professional?
+   - Red flags: "terrible", "awful", "completely wrong" without constructive guidance
+
+3. ACCURACY: Is feedback truthful?
+   - Does it match the actual scores?
+   - Are technical claims correct?
+   - Red flags: Praising "optimal complexity" when pass rate is low, claiming "explained well" when communication=30
+
+4. ACTIONABILITY: Does feedback give clear next steps?
+   - Can the student understand what to improve?
+   - Are suggestions specific and concrete?
+   - Red flags: Vague advice like "do better" or "study more" without specifics
+
+CRITICAL RULES:
+- Only flag SEVERE violations (be conservative)
+- Suggest rewrites ONLY if feedback is harmful/misleading
+- If feedback is reasonable, return empty critiques
+- Focus on: overly harsh tone, factual errors, unclear guidance
+
+Return JSON:
+{
+  "critiques": [
+    {
+      "aspect": "fairness|tone|accuracy|actionability",
+      "passed": false,
+      "issue": "What's wrong",
+      "suggestion": "How to fix it"
+    }
+  ],
+  "revisedFeedback": "Full rewritten feedback (only if absolutely necessary)",
+  "reasoning": "Why revision was needed (1 sentence)",
+  "madeChanges": true/false
+}
+
+If no issues:
+{
+  "critiques": [],
+  "reasoning": "Feedback is constructive and accurate",
+  "madeChanges": false
+}`
+
+  try {
+    const response = await generateAIResponse(
+      'You are a Constitutional AI reviewer. Return only valid JSON, no markdown.',
+      critiquePrompt,
+      [],
+      { complexity: 'simple', temperature: 0.2 }
+    )
+
+    const jsonMatch = response.text.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]) as FeedbackCritiqueAdjustment
+
+      if (result.madeChanges) {
+        logger.info('[Constitutional AI] Feedback revision made', {
+          critiques: result.critiques,
+          reasoning: result.reasoning
+        })
+      }
+
+      return result
+    }
+  } catch (error) {
+    logger.error('[Constitutional AI] Feedback critique failed', { error })
+  }
+
+  return {
+    critiques: [],
+    reasoning: 'Critique failed, using original feedback',
+    madeChanges: false
+  }
+}
 
 /**
  * Parse structured sections from feedback
@@ -1707,6 +1996,20 @@ CODE EFFICIENCY ANALYSIS:
       aiValidation
     )
 
+    // Step 5: Constitutional AI Score Critique
+    const scoreCritique = await critiqueScores(algorithmicScores, {
+      passRate,
+      scenarioType: scenarioType || 'dsa',
+      aiValidation,
+      codeCompleteness: code ? analyzeCodeCompleteness(code, language || 'python') : undefined,
+      hasBlindCopying
+    })
+
+    // Use adjusted scores if critique made changes
+    const finalScores = scoreCritique.madeChanges && scoreCritique.adjustedScores
+      ? scoreCritique.adjustedScores
+      : algorithmicScores
+
     // Send validated summary to AI for narrative generation
     const conversationSummary = `
 COMMUNICATION ANALYSIS (hybrid validated):
@@ -1722,17 +2025,17 @@ COMMUNICATION ANALYSIS (hybrid validated):
 - Total candidate messages: ${preScreen.candidateMessageCount}
 
 PRE-CALCULATED SCORES (use these as your scores):
-${scenarioType === 'system-design' ? `- Requirements: ${algorithmicScores.understanding}/100
-- Architecture: ${algorithmicScores.problemSolving}/100
-- Scalability: ${algorithmicScores.codeQuality}/100
-- Communication: ${algorithmicScores.communication}/100` : scenarioType === 'bugfix' ? `- Bug Found: ${algorithmicScores.understanding}/100
-- Root Cause: ${algorithmicScores.problemSolving}/100
-- Fix Quality: ${algorithmicScores.codeQuality}/100
-- Communication: ${algorithmicScores.communication}/100` : `- Understanding: ${algorithmicScores.understanding}/100
-- Problem-Solving: ${algorithmicScores.problemSolving}/100
-- Code Quality: ${algorithmicScores.codeQuality}/100
-- Communication: ${algorithmicScores.communication}/100`}
-- Overall: ${algorithmicScores.overall}/100
+${scenarioType === 'system-design' ? `- Requirements: ${finalScores.understanding}/100
+- Architecture: ${finalScores.problemSolving}/100
+- Scalability: ${finalScores.codeQuality}/100
+- Communication: ${finalScores.communication}/100` : scenarioType === 'bugfix' ? `- Bug Found: ${finalScores.understanding}/100
+- Root Cause: ${finalScores.problemSolving}/100
+- Fix Quality: ${finalScores.codeQuality}/100
+- Communication: ${finalScores.communication}/100` : `- Understanding: ${finalScores.understanding}/100
+- Problem-Solving: ${finalScores.problemSolving}/100
+- Code Quality: ${finalScores.codeQuality}/100
+- Communication: ${finalScores.communication}/100`}
+- Overall: ${finalScores.overall}/100
 `
 
     // Build scenario-specific prompt
@@ -1915,23 +2218,39 @@ CRITICAL INSTRUCTIONS:
 
     const feedback = aiResponse.text
 
-    // USE ALGORITHMIC SCORES as primary (deterministic, token-efficient)
+    // Step 6: Constitutional AI Feedback Critique
+    const feedbackCritique = await critiqueFeedbackText(
+      feedback,
+      finalScores,
+      {
+        passRate,
+        scenarioType: scenarioType || 'dsa',
+        isIncomplete: code ? analyzeCodeCompleteness(code, language || 'python').isIncomplete : false
+      }
+    )
+
+    // Use revised feedback if critique made changes
+    const finalFeedback = feedbackCritique.madeChanges && feedbackCritique.revisedFeedback
+      ? feedbackCritique.revisedFeedback
+      : feedback
+
+    // USE FINAL SCORES as primary (after Constitutional AI review)
     // AI-generated narrative is just for user-facing feedback text
     const scores: FeedbackScores = {
-      understanding: algorithmicScores.understanding,
-      problemSolving: algorithmicScores.problemSolving,
-      codeQuality: algorithmicScores.codeQuality,
-      communication: algorithmicScores.communication,
+      understanding: finalScores.understanding,
+      problemSolving: finalScores.problemSolving,
+      codeQuality: finalScores.codeQuality,
+      communication: finalScores.communication,
       // Legacy scores for backward compatibility
-      correctness: algorithmicScores.codeQuality,
+      correctness: finalScores.codeQuality,
       efficiency: efficiencyMetrics?.efficiencyScore || 50,
-      reasoningExplanation: algorithmicScores.communication,
+      reasoningExplanation: finalScores.communication,
       aiCollaboration: collaborationMessages > 0 ? 70 : 50,
-      overall: algorithmicScores.overall,
+      overall: finalScores.overall,
     }
 
-    // Parse structured sections from AI narrative
-    const sections = parseFeedbackSections(feedback)
+    // Parse structured sections from AI narrative (use final critiqued feedback)
+    const sections = parseFeedbackSections(finalFeedback)
 
     // Build structured response
     const structuredFeedback: StructuredFeedback = {
@@ -1941,7 +2260,7 @@ CRITICAL INSTRUCTIONS:
       fixNext: sections.fixNext || [],
       actionPlan: sections.actionPlan || [],
       aiWatchlist: sections.aiWatchlist || 'No watchlist items captured.',
-      rawFeedback: feedback,
+      rawFeedback: finalFeedback,
     }
 
     // Track feedback generation
@@ -2018,7 +2337,7 @@ CRITICAL INSTRUCTIONS:
     }
 
     return NextResponse.json({
-      feedback: feedback,
+      feedback: finalFeedback,
       performanceScore: scores.overall,
       scores: scores, // Full score breakdown
       structured: structuredFeedback, // Full structured data
@@ -2027,6 +2346,27 @@ CRITICAL INSTRUCTIONS:
       incompleteSolution: code ? analyzeCodeCompleteness(code, language || 'python').isIncomplete : false,
       aiCopyingDetected: hasBlindCopying, // True if >70% code copied from AI Partner
       aiOverlapPercentage: aiCodeOverlap.overlapPercentage, // How much code matches AI suggestions
+      // Constitutional AI critique metadata (only if changes were made)
+      ...(scoreCritique.madeChanges || feedbackCritique.madeChanges ? {
+        constitutionalAICritique: {
+          scoreCritique: scoreCritique.madeChanges ? {
+            critiques: scoreCritique.critiques,
+            reasoning: scoreCritique.reasoning,
+            originalScores: {
+              understanding: algorithmicScores.understanding,
+              problemSolving: algorithmicScores.problemSolving,
+              codeQuality: algorithmicScores.codeQuality,
+              communication: algorithmicScores.communication,
+              overall: algorithmicScores.overall
+            },
+            adjustedScores: scoreCritique.adjustedScores
+          } : null,
+          feedbackCritique: feedbackCritique.madeChanges ? {
+            critiques: feedbackCritique.critiques,
+            reasoning: feedbackCritique.reasoning
+          } : null
+        }
+      } : {}),
       provider: aiResponse.provider,
       latencyMs: aiResponse.latencyMs,
     })

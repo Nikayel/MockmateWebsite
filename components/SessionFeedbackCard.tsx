@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { CheckCircle, Target, Zap, Code, MessageSquare, ChevronDown, ChevronUp } from "lucide-react"
+import { CheckCircle, Target, Zap, Code, MessageSquare, ChevronDown, ChevronUp, Shield } from "lucide-react"
 import {
   RadarChart,
   PolarGrid,
@@ -34,6 +34,30 @@ interface FeedbackSection {
 interface SessionFeedbackCardProps {
   feedback: string
   performanceScore?: number
+  constitutionalAICritique?: {
+    scoreCritique?: {
+      critiques: Array<{ aspect: string; issue: string; suggestion: string }>
+      reasoning: string
+      originalScores: {
+        understanding: number
+        problemSolving: number
+        codeQuality: number
+        communication: number
+        overall: number
+      }
+      adjustedScores: {
+        understanding: number
+        problemSolving: number
+        codeQuality: number
+        communication: number
+        overall: number
+      }
+    }
+    feedbackCritique?: {
+      critiques: Array<{ aspect: string; issue: string; suggestion: string }>
+      reasoning: string
+    }
+  }
 }
 
 function parseFeedback(feedback: string): FeedbackSection {
@@ -128,7 +152,7 @@ function parseFeedback(feedback: string): FeedbackSection {
   return sections
 }
 
-export default function SessionFeedbackCard({ feedback, performanceScore }: SessionFeedbackCardProps) {
+export default function SessionFeedbackCard({ feedback, performanceScore, constitutionalAICritique }: SessionFeedbackCardProps) {
   const sections = parseFeedback(feedback)
 
   // Progressive disclosure state
@@ -136,6 +160,7 @@ export default function SessionFeedbackCard({ feedback, performanceScore }: Sess
   const [showWhatWorked, setShowWhatWorked] = useState(false)
   const [showActionPlan, setShowActionPlan] = useState(false)
   const [showAIWatchlist, setShowAIWatchlist] = useState(false)
+  const [showQualityCheck, setShowQualityCheck] = useState(false)
 
   // Fallback: If scores weren't parsed, use overall score as baseline and adjust based on feedback content
   const hasParsedScores = sections.scores.correctness > 0 || sections.scores.efficiency > 0 || 
@@ -401,6 +426,69 @@ export default function SessionFeedbackCard({ feedback, performanceScore }: Sess
             </CollapsibleTrigger>
             <CollapsibleContent className="px-3 pb-3 sm:px-4 sm:pb-4">
               <p className="text-[10px] sm:text-xs text-gray-200 leading-relaxed mt-2">{sections.aiWatchlist}</p>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+      )}
+
+      {/* Constitutional AI Quality Check - Only shown if adjustments were made */}
+      {constitutionalAICritique && (
+        <Collapsible open={showQualityCheck} onOpenChange={setShowQualityCheck}>
+          <Card className="bg-black border border-yellow-500/30">
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full justify-between p-3 sm:p-4 hover:bg-yellow-500/5 rounded-lg transition-colors cursor-pointer"
+                aria-expanded={showQualityCheck}
+                aria-label={showQualityCheck ? "Hide quality check" : "Show quality check"}
+              >
+                <span className="text-xs sm:text-sm text-yellow-400 flex items-center gap-2">
+                  <Shield className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" aria-hidden="true" />
+                  Quality Check (Constitutional AI)
+                </span>
+                {showQualityCheck ? (
+                  <ChevronUp className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-3 pb-3 sm:px-4 sm:pb-4">
+              <div className="space-y-2 mt-2 text-xs text-gray-300">
+                <p className="text-yellow-400 font-semibold text-[10px] sm:text-xs">Our AI reviewed its own work for fairness and accuracy.</p>
+
+                {constitutionalAICritique.scoreCritique && (
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded p-2">
+                    <p className="font-semibold mb-1 text-[10px] sm:text-xs">Score Adjustments:</p>
+                    <p className="text-[9px] sm:text-[10px] mb-2">{constitutionalAICritique.scoreCritique.reasoning}</p>
+                    <div className="grid grid-cols-2 gap-1 text-[8px] sm:text-[9px] mb-2">
+                      <div>Original Overall: {constitutionalAICritique.scoreCritique.originalScores.overall}</div>
+                      <div className="text-yellow-400">Adjusted: {constitutionalAICritique.scoreCritique.adjustedScores.overall}</div>
+                    </div>
+                    <ul className="mt-2 space-y-1">
+                      {constitutionalAICritique.scoreCritique.critiques.map((c, i) => (
+                        <li key={i} className="text-[9px] sm:text-[10px]">
+                          <span className="text-yellow-400 font-semibold capitalize">{c.aspect}:</span> {c.issue}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {constitutionalAICritique.feedbackCritique && (
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded p-2">
+                    <p className="font-semibold mb-1 text-[10px] sm:text-xs">Feedback Improvements:</p>
+                    <p className="text-[9px] sm:text-[10px] mb-2">{constitutionalAICritique.feedbackCritique.reasoning}</p>
+                    <ul className="mt-2 space-y-1">
+                      {constitutionalAICritique.feedbackCritique.critiques.map((c, i) => (
+                        <li key={i} className="text-[9px] sm:text-[10px]">
+                          <span className="text-yellow-400 font-semibold capitalize">{c.aspect}:</span> {c.issue}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </CollapsibleContent>
           </Card>
         </Collapsible>
