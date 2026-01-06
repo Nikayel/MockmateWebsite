@@ -1394,7 +1394,11 @@ If no issues found, return:
       'You are a Constitutional AI reviewer. Return only valid JSON, no markdown.',
       critiquePrompt,
       [],
-      { complexity: 'simple', temperature: 0.2 }
+      {
+        complexity: 'simple',
+        temperature: 0.2,
+        preferredProvider: 'claude' // Use Claude for Constitutional AI critique
+      }
     )
 
     const jsonMatch = response.text.match(/\{[\s\S]*\}/)
@@ -1519,7 +1523,11 @@ If no issues:
       'You are a Constitutional AI reviewer. Return only valid JSON, no markdown.',
       critiquePrompt,
       [],
-      { complexity: 'simple', temperature: 0.2 }
+      {
+        complexity: 'simple',
+        temperature: 0.2,
+        preferredProvider: 'claude' // Use Claude for Constitutional AI critique
+      }
     )
 
     const jsonMatch = response.text.match(/\{[\s\S]*\}/)
