@@ -486,11 +486,34 @@ export function getDueCards(
 
 /**
  * Calculate overall mastery level based on card state
+ *
+ * Aligned with SM-2 mastery thresholds for consistency:
+ * - 'new': Never reviewed
+ * - 'learning': In learning/relearning phase
+ * - 'familiar': Medium intervals (7-20 days scheduled), building confidence
+ * - 'mastered': Long intervals (21+ days scheduled), consistently good performance
+ *
+ * Uses scheduledDays (next interval) rather than stability directly,
+ * since that's what determines when the user will next see the problem.
+ *
+ * Typical FSRS progression with "Good" ratings:
+ * - Review 1: ~1 day interval → learning → familiar
+ * - Review 2: ~3-4 day interval → familiar
+ * - Review 3: ~7-10 day interval → familiar
+ * - Review 4: ~21+ day interval → mastered
  */
 export function getMasteryLevel(card: FSRSCard): 'new' | 'learning' | 'familiar' | 'mastered' {
   if (card.state === 'new') return 'new';
   if (card.state === 'learning' || card.state === 'relearning') return 'learning';
-  if (card.stability >= 30 && card.reps >= 5) return 'mastered';
+
+  // Use interval-based thresholds (aligned with SM-2's 21-day mastery threshold)
+  // This ensures consistent mastery progression regardless of algorithm assignment
+  const interval = card.scheduledDays;
+
+  // Mastered: 21+ day intervals indicate strong long-term retention
+  // Also require at least 3 successful reps to prevent gaming
+  if (interval >= 21 && card.reps >= 3) return 'mastered';
+
   return 'familiar';
 }
 
