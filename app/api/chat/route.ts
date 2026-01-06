@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { chatRateLimit } from "@/lib/rate-limit"
 import { enforceQuota } from "@/lib/quota-enforcement"
-import { generateAIResponse, validateResponseRelevance, type TaskComplexity } from "@/lib/ai-providers"
+import {
+  generateAIResponse,
+  validateResponseRelevance,
+  type TaskComplexity,
+} from "@/lib/ai-providers"
 import { trackAIChatServer } from "@/lib/analytics-server"
 import { getCompanyStyle, getPatternMetadata, type DSAPattern } from "@/lib/types/dsa-patterns"
 import { logger } from "@/lib/logger"
@@ -37,11 +41,12 @@ function manageContextWindow(
 
   // If within limits, return as-is
   if (context.length <= maxMessages) {
-    return context.map(msg => ({
+    return context.map((msg) => ({
       ...msg,
-      message: msg.message.length > MAX_MESSAGE_LENGTH
-        ? msg.message.slice(0, MAX_MESSAGE_LENGTH) + '... [truncated]'
-        : msg.message
+      message:
+        msg.message.length > MAX_MESSAGE_LENGTH
+          ? msg.message.slice(0, MAX_MESSAGE_LENGTH) + "... [truncated]"
+          : msg.message,
     }))
   }
 
@@ -52,24 +57,26 @@ function manageContextWindow(
   // Create summary of dropped messages
   const droppedCount = context.length - maxMessages
   const summaryMessage = {
-    type: 'model',
-    message: `[Previous ${droppedCount} messages summarized for context management]`
+    type: "model",
+    message: `[Previous ${droppedCount} messages summarized for context management]`,
   }
 
   return [
     {
       ...firstMessage,
-      message: firstMessage.message.length > MAX_MESSAGE_LENGTH
-        ? firstMessage.message.slice(0, MAX_MESSAGE_LENGTH) + '... [truncated]'
-        : firstMessage.message
+      message:
+        firstMessage.message.length > MAX_MESSAGE_LENGTH
+          ? firstMessage.message.slice(0, MAX_MESSAGE_LENGTH) + "... [truncated]"
+          : firstMessage.message,
     },
     summaryMessage,
-    ...recentMessages.map(msg => ({
+    ...recentMessages.map((msg) => ({
       ...msg,
-      message: msg.message.length > MAX_MESSAGE_LENGTH
-        ? msg.message.slice(0, MAX_MESSAGE_LENGTH) + '... [truncated]'
-        : msg.message
-    }))
+      message:
+        msg.message.length > MAX_MESSAGE_LENGTH
+          ? msg.message.slice(0, MAX_MESSAGE_LENGTH) + "... [truncated]"
+          : msg.message,
+    })),
   ]
 }
 
@@ -87,11 +94,12 @@ function manageWorkspaceContext(
   const limitedFiles = workspaceContext.slice(0, maxFiles)
 
   // Truncate large files
-  return limitedFiles.map(file => ({
+  return limitedFiles.map((file) => ({
     path: file.path,
-    content: file.content.length > maxFileSize
-      ? file.content.slice(0, maxFileSize) + '\n// ... [file truncated for context management]'
-      : file.content
+    content:
+      file.content.length > maxFileSize
+        ? file.content.slice(0, maxFileSize) + "\n// ... [file truncated for context management]"
+        : file.content,
   }))
 }
 
@@ -119,13 +127,22 @@ async function buildRAGContext(options: {
 ## Pattern Knowledge: ${patternKnowledge.displayName}
 
 ### When to Use
-${patternKnowledge.whenToUse.slice(0, 3).map(w => `- ${w}`).join('\n')}
+${patternKnowledge.whenToUse
+  .slice(0, 3)
+  .map((w) => `- ${w}`)
+  .join("\n")}
 
 ### Key Insights
-${patternKnowledge.keyInsights.slice(0, 3).map(i => `- ${i}`).join('\n')}
+${patternKnowledge.keyInsights
+  .slice(0, 3)
+  .map((i) => `- ${i}`)
+  .join("\n")}
 
 ### Common Mistakes to Avoid
-${patternKnowledge.commonMistakes.slice(0, 2).map(m => `- ${m}`).join('\n')}
+${patternKnowledge.commonMistakes
+  .slice(0, 2)
+  .map((m) => `- ${m}`)
+  .join("\n")}
 
 ### Expected Complexity
 - Time: ${patternKnowledge.timeComplexity.typical}
@@ -135,7 +152,7 @@ ${patternKnowledge.commonMistakes.slice(0, 2).map(m => `- ${m}`).join('\n')}
     }
 
     // 2. Get company-specific interview knowledge
-    if (options.scenarioCompany && options.scenarioCompany !== 'Generic') {
+    if (options.scenarioCompany && options.scenarioCompany !== "Generic") {
       const companyKnowledge = getCompanyInterviewKnowledge(options.scenarioCompany as CompanyId)
       if (companyKnowledge) {
         ragContextParts.push(`
@@ -144,13 +161,22 @@ ${patternKnowledge.commonMistakes.slice(0, 2).map(m => `- ${m}`).join('\n')}
 ### Interview Style
 ${companyKnowledge.interviewStyle.description}
 Pace: ${companyKnowledge.interviewStyle.pace}
-Expectations: ${companyKnowledge.interviewStyle.expectations.slice(0, 3).map(e => `- ${e}`).join('\n')}
+Expectations: ${companyKnowledge.interviewStyle.expectations
+          .slice(0, 3)
+          .map((e) => `- ${e}`)
+          .join("\n")}
 
 ### Focus Areas
-${companyKnowledge.topPatterns.slice(0, 4).map(p => `- ${p.pattern}`).join('\n')}
+${companyKnowledge.topPatterns
+  .slice(0, 4)
+  .map((p) => `- ${p.pattern}`)
+  .join("\n")}
 
 ### What They Value
-${companyKnowledge.cultureTips.slice(0, 2).map(t => `- ${t}`).join('\n')}
+${companyKnowledge.cultureTips
+  .slice(0, 2)
+  .map((t) => `- ${t}`)
+  .join("\n")}
 `)
       }
     }
@@ -168,25 +194,30 @@ ${companyKnowledge.cultureTips.slice(0, 2).map(t => `- ${t}`).join('\n')}
         ragContextParts.push(`
 ## Relevant Knowledge from RAG (${hintContext.retrievedDocs.length} documents)
 
-${hintContext.retrievedDocs.slice(0, 2).map((doc, i) => `
+${hintContext.retrievedDocs
+  .slice(0, 2)
+  .map(
+    (doc, i) => `
 ### Reference ${i + 1}
-${doc.text.substring(0, 400)}${doc.text.length > 400 ? '...' : ''}
-`).join('\n')}
+${doc.text.substring(0, 400)}${doc.text.length > 400 ? "..." : ""}
+`
+  )
+  .join("\n")}
 `)
       }
     }
   } catch (error) {
     // RAG errors should not break the chat - log and continue
-    logger.error('[Chat API] RAG context build error', { error })
+    logger.error("[Chat API] RAG context build error", { error })
   }
 
   if (ragContextParts.length === 0) {
-    return ''
+    return ""
   }
 
   return `
 === RAG-ENHANCED CONTEXT ===
-${ragContextParts.join('\n')}
+${ragContextParts.join("\n")}
 === END RAG CONTEXT ===
 `
 }
@@ -282,104 +313,129 @@ IMPORTANT: When referencing the candidate, use their first name or last name onl
     // Add current code context (truncate if too long)
     let currentCodeContext = ""
     if (currentCode && currentCode.trim()) {
-      const truncatedCode = currentCode.length > MAX_FILE_SIZE
-        ? currentCode.slice(0, MAX_FILE_SIZE) + '\n// ... [code truncated]'
-        : currentCode
+      const truncatedCode =
+        currentCode.length > MAX_FILE_SIZE
+          ? currentCode.slice(0, MAX_FILE_SIZE) + "\n// ... [code truncated]"
+          : currentCode
       currentCodeContext = `\n\n=== CURRENT SOLUTION CODE ===\n${truncatedCode}\n=== END CURRENT CODE ===\n`
     }
 
     // Define system prompts based on role with enhanced context awareness
     const problemContext = scenarioTitle
-      ? `\n\nCURRENT PROBLEM: ${scenarioTitle}${scenarioType ? ` (${scenarioType.toUpperCase()})` : ''}\n`
-      : ''
+      ? `\n\nCURRENT PROBLEM: ${scenarioTitle}${scenarioType ? ` (${scenarioType.toUpperCase()})` : ""}\n`
+      : ""
 
     // Get company-specific interview style
-    const companyStyle = getCompanyStyle(scenarioCompany || 'Generic')
+    const companyStyle = getCompanyStyle(scenarioCompany || "Generic")
 
     // Get pattern-specific metadata for DSA problems
     const patternMeta = scenarioPattern ? getPatternMetadata(scenarioPattern as DSAPattern) : null
 
     // Build company-specific context - handle Generic case (no specific company)
-    const isGenericCompany = !companyStyle.company || companyStyle.company === 'Generic'
-    const companyContext = isGenericCompany ? `
+    const isGenericCompany = !companyStyle.company || companyStyle.company === "Generic"
+    const companyContext = isGenericCompany
+      ? `
 INTERVIEW STYLE: ${companyStyle.style}
 YOU ARE: A professional technical interviewer conducting a coding interview. Do NOT mention any specific company name.
 
-FOCUS AREAS: ${companyStyle.focusAreas.join(', ')}
-EVALUATION EMPHASIS: ${companyStyle.evaluationEmphasis.join(', ')}
+FOCUS AREAS: ${companyStyle.focusAreas.join(", ")}
+EVALUATION EMPHASIS: ${companyStyle.evaluationEmphasis.join(", ")}
 PERSONALITY: ${companyStyle.interviewerPersonality}
-` : `
+`
+      : `
 COMPANY: ${companyStyle.company}
 INTERVIEW STYLE: ${companyStyle.style}
 YOU ARE: A ${companyStyle.company} interviewer conducting a technical interview.
 Mention you're interviewing for ${companyStyle.company} in your first response.
 
-FOCUS AREAS: ${companyStyle.focusAreas.join(', ')}
-EVALUATION EMPHASIS: ${companyStyle.evaluationEmphasis.join(', ')}
+FOCUS AREAS: ${companyStyle.focusAreas.join(", ")}
+EVALUATION EMPHASIS: ${companyStyle.evaluationEmphasis.join(", ")}
 PERSONALITY: ${companyStyle.interviewerPersonality}
 `
 
     // Build pattern-specific context for DSA problems
-    const patternContext = patternMeta ? `
+    const patternContext = patternMeta
+      ? `
 PROBLEM PATTERN: ${patternMeta.name}
-KEY TECHNIQUES: ${patternMeta.keyTechniques.join(', ')}
+KEY TECHNIQUES: ${patternMeta.keyTechniques.join(", ")}
 EXPECTED COMPLEXITY: Time ${patternMeta.timeComplexityHints[0]}, Space ${patternMeta.spaceComplexityHints[0]}
 PATTERN-SPECIFIC FOLLOW-UPS TO ASK:
-${patternMeta.interviewerFollowUps.slice(0, 3).map(q => `- ${q}`).join('\n')}
-` : ''
+${patternMeta.interviewerFollowUps
+  .slice(0, 3)
+  .map((q) => `- ${q}`)
+  .join("\n")}
+`
+      : ""
 
     // Build system design specific context with phase-based guidance
-    const isSystemDesign = scenarioType === 'system-design'
+    const isSystemDesign = scenarioType === "system-design"
     const elapsedMinutes = elapsedTime ? Math.floor(elapsedTime / 60) : 0
 
     // System design interviews should follow 4 phases (~45 min total)
     const getSystemDesignPhase = (minutes: number) => {
-      if (minutes < 10) return 'requirements' // Phase 1: Requirements gathering
-      if (minutes < 20) return 'high-level' // Phase 2: High-level design
-      if (minutes < 35) return 'deep-dive' // Phase 3: Deep dive
-      return 'wrap-up' // Phase 4: Bottlenecks & wrap-up
+      if (minutes < 10) return "requirements" // Phase 1: Requirements gathering
+      if (minutes < 20) return "high-level" // Phase 2: High-level design
+      if (minutes < 35) return "deep-dive" // Phase 3: Deep dive
+      return "wrap-up" // Phase 4: Bottlenecks & wrap-up
     }
 
     const systemDesignPhase = isSystemDesign ? getSystemDesignPhase(elapsedMinutes) : null
 
-    const systemDesignContext = isSystemDesign ? `
+    const systemDesignContext = isSystemDesign
+      ? `
 INTERVIEW TYPE: System Design (Architecture Discussion - NOT a coding interview)
 
 CURRENT PHASE: ${systemDesignPhase?.toUpperCase()} (${elapsedMinutes} min elapsed)
 
 PHASE GUIDANCE:
-${systemDesignPhase === 'requirements' ? `
+${
+  systemDesignPhase === "requirements"
+    ? `
 REQUIREMENTS PHASE (0-10 min):
 - Ask clarifying questions about scope and scale
 - Help candidate define functional requirements (what the system must do)
 - Help candidate define non-functional requirements (latency, availability, scale)
 - Ask: "How many users?" "What's the expected traffic?" "What's more important: consistency or availability?"
 - DON'T jump into architecture yet - requirements first!
-` : ''}
-${systemDesignPhase === 'high-level' ? `
+`
+    : ""
+}
+${
+  systemDesignPhase === "high-level"
+    ? `
 HIGH-LEVEL DESIGN PHASE (10-20 min):
 - Guide candidate to draw the major components
 - Ask about API design: "What endpoints do we need?"
 - Ask about data model: "What entities do we need to store?"
 - Ask about communication: "How will components communicate?"
 - Encourage thinking out loud about architectural choices
-` : ''}
-${systemDesignPhase === 'deep-dive' ? `
+`
+    : ""
+}
+${
+  systemDesignPhase === "deep-dive"
+    ? `
 DEEP DIVE PHASE (20-35 min):
 - Pick 1-2 components to explore deeply
 - Ask about scaling: "What happens at 10x traffic?"
 - Ask about failure modes: "What if this component fails?"
 - Discuss trade-offs: "Why did you choose X over Y?"
 - Probe on specific algorithms or data structures for key components
-` : ''}
-${systemDesignPhase === 'wrap-up' ? `
+`
+    : ""
+}
+${
+  systemDesignPhase === "wrap-up"
+    ? `
 WRAP-UP PHASE (35-45 min):
 - Ask about single points of failure
 - Discuss monitoring and observability
 - Ask about security considerations
 - Summarize the design and discuss improvements
 - Ask: "What would you do differently with more time?"
-` : ''}
+`
+    : ""
+}
 
 SYSTEM DESIGN EVALUATION CRITERIA:
 - Requirements Gathering: Did they ask good clarifying questions?
@@ -396,11 +452,13 @@ SYSTEM DESIGN SPECIFIC RULES:
 - Focus on WHY they make decisions, not just WHAT they propose
 - Encourage them to think about scale (millions of users, TB of data)
 - Ask about failure scenarios and edge cases
-` : ''
+`
+      : ""
 
     // Build bug fix specific context
-    const isBugFix = scenarioType === 'bugfix'
-    const bugFixContext = isBugFix ? `
+    const isBugFix = scenarioType === "bugfix"
+    const bugFixContext = isBugFix
+      ? `
 INTERVIEW TYPE: Bug Fix / Debugging Interview
 
 THIS IS A DEBUGGING EXERCISE - Focus on:
@@ -429,10 +487,11 @@ DO NOT:
 - Give away the bug location or fix too quickly
 - Accept a fix without understanding the root cause
 - Let them blindly try things without reasoning
-` : ''
+`
+      : ""
 
     const systemPrompts = {
-      interviewer: `You are a professional technical interviewer${isGenericCompany ? '' : ` at ${companyStyle.company}`}. Be direct and concise. You are conducting a REAL interview where the candidate speaks their thought process aloud (voice or text).
+      interviewer: `You are a professional technical interviewer${isGenericCompany ? "" : ` at ${companyStyle.company}`}. Be direct and concise. You are conducting a REAL interview where the candidate speaks their thought process aloud (voice or text).
 
 ${companyContext}
 ${userContextString}${problemContext}
@@ -455,7 +514,7 @@ YOUR BEHAVIOR AS A REAL INTERVIEWER:
 CORE RULES:
 - Keep responses SHORT (2-4 sentences max)
 - Ask ONE question at a time
-${isGenericCompany ? '- Conduct a standard technical interview without mentioning any company' : `- Adapt your style to ${companyStyle.company}'s interview culture`}
+${isGenericCompany ? "- Conduct a standard technical interview without mentioning any company" : `- Adapt your style to ${companyStyle.company}'s interview culture`}
 - No generic praise until tests pass
 - Sound natural, conversational, like a real person
 
@@ -474,7 +533,10 @@ When a candidate shows conceptual confusion (like mixing up keys vs values in a 
 Ground abstract concepts in concrete values to help them see the issue.
 
 COMPANY-SPECIFIC FOLLOW-UPS:
-${companyStyle.commonFollowUps.slice(0, 3).map(q => `- ${q}`).join('\n')}
+${companyStyle.commonFollowUps
+  .slice(0, 3)
+  .map((q) => `- ${q}`)
+  .join("\n")}
 
 WHAT TO DO:
 - When they share code: Ask about complexity OR edge cases (pick one)
@@ -556,7 +618,7 @@ WHAT NOT TO DO:
 - Don't be robotic or overly formal
 - Don't ask the same clarifying question more than twice - switch to concrete examples
 
-${scenarioTitle ? `Problem: ${scenarioTitle}` : ''}
+${scenarioTitle ? `Problem: ${scenarioTitle}` : ""}
 
 You've already introduced yourself. Continue naturally. Use their first name only. Remember: this is a CONVERSATION, not a Q&A session.`,
 
@@ -583,7 +645,7 @@ HOW TO HELP (Collaborative Partner Approach):
 - Wait for user requests - don't proactively suggest unless they ask
 - Be a tool they use, not an agent that acts for them
 
-${scenarioTitle ? `- Focus on helping with ${scenarioTitle}` : '- Focus on helping with the current problem'}
+${scenarioTitle ? `- Focus on helping with ${scenarioTitle}` : "- Focus on helping with the current problem"}
 - Remember their progress and build on previous conversations
 
 IMPORTANT:
@@ -618,9 +680,13 @@ Keep responses brief, actionable, and helpful. You're a tool they can use, but t
     })
 
     if (ragContext) {
-      if (role === 'interviewer') {
+      if (role === "interviewer") {
         // For interviewer, add RAG context to help ask better questions
-        systemPrompt = systemPrompt + '\n\n' + ragContext + `
+        systemPrompt =
+          systemPrompt +
+          "\n\n" +
+          ragContext +
+          `
 
 USE THIS KNOWLEDGE TO:
 - Ask more targeted questions based on the pattern
@@ -635,7 +701,11 @@ ANTI-HALLUCINATION RULES:
 - When discussing complexity, stick to what's documented in the pattern knowledge`
       } else {
         // For partner (AI assistant), add RAG with stricter grounding
-        systemPrompt = systemPrompt + '\n\n' + ragContext + `
+        systemPrompt =
+          systemPrompt +
+          "\n\n" +
+          ragContext +
+          `
 
 GROUNDING RULES (prevent hallucination):
 - Base your hints and suggestions ONLY on the retrieved knowledge above
@@ -650,7 +720,7 @@ GROUNDING RULES (prevent hallucination):
     const managedContext = manageContextWindow(context)
 
     // Convert to provider-agnostic format
-    const history: Array<{ role: 'user' | 'model'; content: string }> = []
+    const history: Array<{ role: "user" | "model"; content: string }> = []
     let foundFirstUser = false
     managedContext.forEach((msg) => {
       // Skip any model messages before the first user message
@@ -671,7 +741,7 @@ GROUNDING RULES (prevent hallucination):
     if (isProactive && role === "interviewer") {
       // Smart proactive engagement - jump in like a real interviewer
       const hasSubstantialCode = currentCode && currentCode.trim().length > 100
-      const codeLines = currentCode?.split('\n').length || 0
+      const codeLines = currentCode?.split("\n").length || 0
       const elapsedMinutes = elapsedTime ? Math.floor(elapsedTime / 60) : 0
 
       // TIME-BASED TRIGGER: Check in after 2+ minutes of silence
@@ -684,7 +754,7 @@ GROUNDING RULES (prevent hallucination):
         return NextResponse.json({
           reply: null,
           skipped: true,
-          reason: "Not enough code to comment on yet and not silent long enough"
+          reason: "Not enough code to comment on yet and not silent long enough",
         })
       }
 
@@ -717,27 +787,32 @@ Pick ONE natural response (under 20 words). Don't be pushy - they might be think
       // Use RAG context to ask smarter questions
       const patternSpecificQuestion = scenarioPattern
         ? `Based on the ${scenarioPattern} pattern, ask a relevant question about their approach or potential issues.`
-        : ''
+        : ""
 
       // AI Partner usage awareness - alert interviewer if candidate is heavily using AI
-      const aiPartnerContext = partnerMessagesCount && partnerMessagesCount > 0
-        ? `
+      const aiPartnerContext =
+        partnerMessagesCount && partnerMessagesCount > 0
+          ? `
 AI PARTNER USAGE ALERT:
 - Candidate has used AI Partner ${partnerMessagesCount} times this session
-${lastPartnerExchange ? `- Last AI interaction: "${lastPartnerExchange.slice(0, 200)}..."` : ''}
-${partnerMessagesCount >= 5 ? `- HIGH AI USAGE: Consider asking them to explain their understanding of the AI suggestions` : ''}
-${partnerMessagesCount >= 3 ? `- When they explain code, verify they understand it vs. blindly copied it` : ''}
+${lastPartnerExchange ? `- Last AI interaction: "${lastPartnerExchange.slice(0, 200)}..."` : ""}
+${partnerMessagesCount >= 5 ? `- HIGH AI USAGE: Consider asking them to explain their understanding of the AI suggestions` : ""}
+${partnerMessagesCount >= 3 ? `- When they explain code, verify they understand it vs. blindly copied it` : ""}
 `
-        : ''
+          : ""
 
       // Nudge topic tracking to avoid repetitive questions
-      const nudgeAvoidance = recentNudgeTopics && recentNudgeTopics.length > 0
-        ? `
+      const nudgeAvoidance =
+        recentNudgeTopics && recentNudgeTopics.length > 0
+          ? `
 AVOID REPEATING THESE TOPICS (already asked about):
-${recentNudgeTopics.slice(-3).map((t: string) => `- ${t}`).join('\n')}
+${recentNudgeTopics
+  .slice(-3)
+  .map((t: string) => `- ${t}`)
+  .join("\n")}
 If they're still stuck on these, give a CONCRETE hint instead of asking again.
 `
-        : ''
+          : ""
 
       // Keep proactive message SHORT and natural - like a real interviewer jumping in
       fullUserMessage = `[NATURAL CHECK-IN] The candidate has been working on code. Act like a real interviewer who just noticed something interesting or wants to understand their thinking.
@@ -748,7 +823,10 @@ ${patternSpecificQuestion}
 ${nudgeAvoidance}
 
 Options for how to engage:
-${proactivePrompts.slice(0, 3).map(p => `- "${p}"`).join('\n')}
+${proactivePrompts
+  .slice(0, 3)
+  .map((p) => `- "${p}"`)
+  .join("\n")}
 
 Pick ONE natural response (or create your own). Keep it under 20 words. Sound like a real person in the room, not a robot.`
     } else if (isWrapUp && role === "interviewer") {
@@ -764,7 +842,7 @@ ${currentCodeContext}
 
 TEST RESULTS: ${passedTests}/${totalTests} tests passed (${Math.round(passRate)}%)
 
-${partnerMessagesCount ? `AI Partner Usage: ${partnerMessagesCount} interactions` : 'No AI Partner usage'}
+${partnerMessagesCount ? `AI Partner Usage: ${partnerMessagesCount} interactions` : "No AI Partner usage"}
 
 Provide a 2-3 sentence wrap-up that:
 1. Acknowledges their effort (briefly)
@@ -775,25 +853,61 @@ Provide a 2-3 sentence wrap-up that:
 Example good wrap-up:
 "Nice work getting through this. You had good intuition using a hash map, though the initial key-value confusion slowed you down. What's the time complexity of your solution?"
 
-Keep it under 50 words. Be encouraging but honest.`
+Keep it under 50 words. Be encouraging but honest.
+
+IMPORTANT: After this wrap-up, if the candidate says goodbye or acknowledges, give a FINAL brief response (under 20 words) and DO NOT continue the conversation. The interview is over.`
     } else {
-      // Regular message
-      fullUserMessage = message
-      if (workspaceContextStr || currentCodeContext) {
-        fullUserMessage += workspaceContextStr + currentCodeContext
+      // Check for farewell/end-of-conversation messages
+      const farewellPatterns =
+        /\b(bye|goodbye|thanks|thank you|ok|okay|cool|got it|see you|later|cheers|take care|cya|thx|ty)\b/i
+      const messageLower = (message || "").toLowerCase().trim()
+      const isShortMessage = messageLower.length < 30
+      const isFarewell = isShortMessage && farewellPatterns.test(messageLower)
+
+      // Check if we're in post-interview wrap-up mode by looking at recent context
+      const recentMessages = context?.slice(-4) || []
+      const hasRecentWrapUp = recentMessages.some(
+        (msg: { message: string }) =>
+          msg.message?.toLowerCase().includes("wrap") ||
+          msg.message?.toLowerCase().includes("complexity") ||
+          msg.message?.toLowerCase().includes("session") ||
+          msg.message?.toLowerCase().includes("practice")
+      )
+
+      if (isFarewell && hasRecentWrapUp && role === "interviewer") {
+        // Final response - end the conversation gracefully
+        fullUserMessage = `[FINAL RESPONSE - CONVERSATION ENDING]
+The candidate has said goodbye: "${message}"
+
+This is the END of the interview. Provide ONE final brief response (under 15 words):
+- Thank them for their time
+- Wish them well
+- DO NOT ask any more questions
+- DO NOT continue discussing the problem
+- DO NOT say "feel free to..." or invite further discussion
+
+Example responses:
+- "Thanks for your time today. Good luck with your prep!"
+- "Great session. Take care!"
+- "Thanks, good luck with your interviews!"
+
+After this response, the conversation is OVER. Do not respond to any further messages.`
+      } else {
+        // Regular message
+        fullUserMessage = message
+        if (workspaceContextStr || currentCodeContext) {
+          fullUserMessage += workspaceContextStr + currentCodeContext
+        }
       }
     }
 
     // Determine task complexity for provider selection
-    const complexity: TaskComplexity = isProactive ? 'standard' : 'simple'
+    const complexity: TaskComplexity = isProactive ? "standard" : "simple"
 
     // Use AI provider abstraction with fallback
-    const aiResponse = await generateAIResponse(
-      systemPrompt,
-      fullUserMessage,
-      history,
-      { complexity }
-    )
+    const aiResponse = await generateAIResponse(systemPrompt, fullUserMessage, history, {
+      complexity,
+    })
 
     // Validate response relevance
     const validation = validateResponseRelevance(aiResponse.text, {
@@ -802,7 +916,7 @@ Keep it under 50 words. Be encouraging but honest.`
     })
 
     if (!validation.valid) {
-      logger.warn('[Chat API] Response may have relevance issues', { issues: validation.issues })
+      logger.warn("[Chat API] Response may have relevance issues", { issues: validation.issues })
       // Don't fail, but log for monitoring
     }
 
@@ -816,7 +930,7 @@ Keep it under 50 words. Be encouraging but honest.`
       messageLength: message?.length || 0,
       responseTimeMs,
       provider: aiResponse.provider, // Track which provider was used
-    }).catch(err => logger.error("Analytics tracking error", { error: err }))
+    }).catch((err) => logger.error("Analytics tracking error", { error: err }))
 
     return NextResponse.json({
       reply: aiResponse.text,
@@ -828,17 +942,23 @@ Keep it under 50 words. Be encouraging but honest.`
       error,
       message: error?.message,
       status: error?.status,
-      endpoint: '/api/chat'
+      endpoint: "/api/chat",
     })
     return NextResponse.json(
-      { 
-        error: error instanceof Error ? error.message : error?.message || "Failed to process chat message",
-        details: process.env.NODE_ENV === 'development' ? {
-          status: error?.status,
-          originalError: error?.originalError?.message || error?.originalError,
-        } : undefined,
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : error?.message || "Failed to process chat message",
+        details:
+          process.env.NODE_ENV === "development"
+            ? {
+                status: error?.status,
+                originalError: error?.originalError?.message || error?.originalError,
+              }
+            : undefined,
       },
-      { status: 500 },
+      { status: 500 }
     )
   }
 }

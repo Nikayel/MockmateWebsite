@@ -21,7 +21,7 @@
  * - Hint dependency - 15%
  */
 
-import type { InteractionMetrics } from '../scoring'
+import type { InteractionMetrics } from "../scoring"
 
 // =============================================================================
 // TYPES
@@ -34,7 +34,7 @@ export interface MasteryScoreInput {
   timeSpentMinutes: number
   hintsUsed: number
   hintsTotal: number
-  problemDifficulty: 'easy' | 'medium' | 'hard'
+  problemDifficulty: "easy" | "medium" | "hard"
 
   // Communication time adjustment (optional)
   // These help us subtract communication overhead from total time
@@ -55,9 +55,9 @@ export interface MasteryScoreResult {
 
   // Component breakdown for debugging/analytics
   components: {
-    correctnessScore: number      // 0-100, weighted 60%
-    timeEfficiencyScore: number   // 0-100, weighted 25%
-    independenceScore: number     // 0-100, weighted 15%
+    correctnessScore: number // 0-100, weighted 60%
+    timeEfficiencyScore: number // 0-100, weighted 25%
+    independenceScore: number // 0-100, weighted 15%
   }
 
   // Time analysis
@@ -66,12 +66,12 @@ export interface MasteryScoreResult {
     estimatedCommunicationMinutes: number
     adjustedTimeMinutes: number
     expectedTimeMinutes: number
-    timeRatio: number  // adjusted/expected, <1 is fast, >1 is slow
+    timeRatio: number // adjusted/expected, <1 is fast, >1 is slow
   }
 
   // Metadata
   metadata: {
-    algorithm: 'v1'
+    algorithm: "v1"
     calculatedAt: string
   }
 }
@@ -81,25 +81,25 @@ export interface MasteryScoreResult {
 // =============================================================================
 
 const WEIGHTS = {
-  correctness: 0.60,      // Did the code work?
-  timeEfficiency: 0.25,   // How quickly did they solve it?
-  independence: 0.15,     // Did they need hints?
+  correctness: 0.6, // Did the code work?
+  timeEfficiency: 0.25, // How quickly did they solve it?
+  independence: 0.15, // Did they need hints?
 }
 
 // Expected solve times by difficulty (minutes)
 // These are for PURE CODING time, excluding communication
 const EXPECTED_TIME = {
-  easy: 8,      // Easy problems should be ~8 min of coding
-  medium: 15,   // Medium problems ~15 min
-  hard: 25,     // Hard problems ~25 min
+  easy: 8, // Easy problems should be ~8 min of coding
+  medium: 15, // Medium problems ~15 min
+  hard: 25, // Hard problems ~25 min
 }
 
 // Estimated communication overhead (minutes per interaction type)
 const COMMUNICATION_OVERHEAD = {
-  perInterviewerMessage: 0.5,     // Each interviewer exchange ~30 sec
-  perAIMessage: 0.3,              // AI interactions are faster
-  approachExplanation: 2.0,       // Explaining approach takes ~2 min
-  complexityDiscussion: 1.5,      // Discussing complexity ~1.5 min
+  perInterviewerMessage: 0.5, // Each interviewer exchange ~30 sec
+  perAIMessage: 0.3, // AI interactions are faster
+  approachExplanation: 2.0, // Explaining approach takes ~2 min
+  complexityDiscussion: 1.5, // Discussing complexity ~1.5 min
 }
 
 // =============================================================================
@@ -132,8 +132,8 @@ export function calculateMasteryScore(input: MasteryScoreInput): MasteryScoreRes
   // Weighted final score
   const masteryScore = Math.round(
     correctnessScore * WEIGHTS.correctness +
-    timeEfficiencyScore * WEIGHTS.timeEfficiency +
-    independenceScore * WEIGHTS.independence
+      timeEfficiencyScore * WEIGHTS.timeEfficiency +
+      independenceScore * WEIGHTS.independence
   )
 
   return {
@@ -145,7 +145,7 @@ export function calculateMasteryScore(input: MasteryScoreInput): MasteryScoreRes
     },
     timeAnalysis,
     metadata: {
-      algorithm: 'v1',
+      algorithm: "v1",
       calculatedAt: now,
     },
   }
@@ -192,7 +192,7 @@ function calculateCorrectnessScore(input: MasteryScoreInput): number {
 /**
  * Analyze time spent, adjusting for communication overhead.
  */
-function analyzeTime(input: MasteryScoreInput): MasteryScoreResult['timeAnalysis'] {
+function analyzeTime(input: MasteryScoreInput): MasteryScoreResult["timeAnalysis"] {
   const rawTime = input.timeSpentMinutes || 0
   const expectedTime = EXPECTED_TIME[input.problemDifficulty]
 
@@ -200,7 +200,8 @@ function analyzeTime(input: MasteryScoreInput): MasteryScoreResult['timeAnalysis
   let communicationTime = 0
 
   if (input.interviewerMessagesCount) {
-    communicationTime += input.interviewerMessagesCount * COMMUNICATION_OVERHEAD.perInterviewerMessage
+    communicationTime +=
+      input.interviewerMessagesCount * COMMUNICATION_OVERHEAD.perInterviewerMessage
   }
 
   if (input.aiMessagesCount) {
@@ -236,7 +237,7 @@ function analyzeTime(input: MasteryScoreInput): MasteryScoreResult['timeAnalysis
  * Fast + correct = high score, slow + struggling = low score
  */
 function calculateTimeEfficiencyScore(
-  timeAnalysis: MasteryScoreResult['timeAnalysis'],
+  timeAnalysis: MasteryScoreResult["timeAnalysis"],
   input: MasteryScoreInput
 ): number {
   const { timeRatio } = timeAnalysis
@@ -304,11 +305,11 @@ function calculateIndependenceScore(input: MasteryScoreInput): number {
   let score = 100
   const hintsUsed = input.hintsUsed
 
-  if (hintsUsed >= 1) score -= 10  // First hint
-  if (hintsUsed >= 2) score -= 15  // Second hint
-  if (hintsUsed >= 3) score -= 20  // Third hint
-  if (hintsUsed >= 4) score -= 20  // Fourth hint
-  if (hintsUsed >= 5) score -= 15  // Fifth+ hints (diminishing penalty)
+  if (hintsUsed >= 1) score -= 10 // First hint
+  if (hintsUsed >= 2) score -= 15 // Second hint
+  if (hintsUsed >= 3) score -= 20 // Third hint
+  if (hintsUsed >= 4) score -= 20 // Fourth hint
+  if (hintsUsed >= 5) score -= 15 // Fifth+ hints (diminishing penalty)
 
   // Ratio bonus: using fewer of available hints shows restraint
   // e.g., using 1 of 5 available hints is better than 1 of 2
@@ -338,7 +339,8 @@ export function fromInteractionMetrics(metrics: InteractionMetrics): MasteryScor
     problemDifficulty: metrics.problemDifficulty,
 
     // Communication signals for time adjustment
-    interviewerMessagesCount: metrics.interviewerQuestionsAnswered + metrics.clarifyingQuestionsAsked,
+    interviewerMessagesCount:
+      metrics.interviewerQuestionsAnswered + metrics.clarifyingQuestionsAsked,
     aiMessagesCount: metrics.aiQuestionsAsked,
     approachExplained: metrics.approachExplanationGiven,
     complexityDiscussed: metrics.complexityAnalysisProvided,
@@ -352,18 +354,30 @@ export function fromInteractionMetrics(metrics: InteractionMetrics): MasteryScor
 /**
  * Quick mastery score from basic metrics (for API compatibility)
  * Use when full InteractionMetrics aren't available
+ *
+ * Key Philosophy:
+ * - Interview Score includes 20% communication weight
+ * - Mastery Score should focus on CODE CORRECTNESS only
+ * - For SR, we want to know "do they KNOW this pattern?" not "can they explain it?"
  */
 export function quickMasteryScore(params: {
-  performanceScore: number  // The interview score (used as baseline)
+  performanceScore: number // The interview score (used as baseline)
   testCasesPassed: number
   testCasesTotal: number
   timeSpentMinutes: number
   hintsUsed: number
-  problemDifficulty: 'easy' | 'medium' | 'hard'
+  problemDifficulty: "easy" | "medium" | "hard"
 }): number {
-  const { performanceScore, testCasesPassed, testCasesTotal, timeSpentMinutes, hintsUsed, problemDifficulty } = params
+  const {
+    performanceScore,
+    testCasesPassed,
+    testCasesTotal,
+    timeSpentMinutes,
+    hintsUsed,
+    problemDifficulty,
+  } = params
 
-  // If we have test case data, calculate properly
+  // If we have test case data, calculate properly using the full algorithm
   if (testCasesTotal > 0) {
     const result = calculateMasteryScore({
       testCasesPassed,
@@ -376,21 +390,51 @@ export function quickMasteryScore(params: {
     return result.masteryScore
   }
 
-  // Fallback: adjust performance score by removing estimated communication component
-  // Interview score has 20% communication weight, so we "remove" that influence
-  // by re-scaling the other 80% to 100%
+  // Fallback when no test data: derive mastery from performance score
+  // But we need to ACTUALLY remove the communication component
 
-  // But we also need to account for hints - penalize more heavily for SR
-  const hintPenalty = Math.min(30, hintsUsed * 10)
+  // Interview score breakdown (from scoring-algorithms.ts):
+  // - Understanding: 30% (technical)
+  // - Problem-Solving: 25% (technical)
+  // - Code Quality: 25% (technical)
+  // - Communication: 20% (NON-technical - exclude this for mastery)
 
-  // Estimate time penalty if way over expected
+  // Estimate the technical-only portion (80% of interview score)
+  // Then rescale to 0-100 range
+  // Formula: (performance_score * 0.80) / 0.80 would be same, so instead:
+  // We estimate technical score by assuming communication was average (50/100)
+  // If performance = 0.30*U + 0.25*PS + 0.25*CQ + 0.20*C
+  // Technical = 0.30*U + 0.25*PS + 0.25*CQ = performance - 0.20*C
+  // If C=50 (average), technical = performance - 10, rescaled = (performance - 10) / 0.80
+
+  // But simpler approach: use pass rate as primary signal, performance as modifier
+  // Since we don't have test data, assume ~70% correlation with performance
+  const baseScore = performanceScore * 0.85 // Technical portion (slightly less than full)
+
+  // Apply hint penalty - heavier for spaced repetition
+  // Each hint indicates they needed help understanding the pattern
+  const hintPenalty = Math.min(35, hintsUsed * 12) // More aggressive than before
+
+  // Time penalty - if they took way too long, they may not have mastered it
   const expectedTime = EXPECTED_TIME[problemDifficulty]
-  const timeRatio = timeSpentMinutes / expectedTime
-  const timePenalty = timeRatio > 2 ? Math.min(20, (timeRatio - 2) * 10) : 0
+  const timeRatio = timeSpentMinutes > 0 ? timeSpentMinutes / expectedTime : 1
 
-  // Rescale: remove communication boost/penalty, add SR-specific penalties
-  const rescaled = (performanceScore / 0.80) * 0.80 // Essentially the same, just cleaner
-  const adjusted = rescaled - hintPenalty - timePenalty
+  // Progressive time penalty
+  let timePenalty = 0
+  if (timeRatio > 2.0) {
+    timePenalty = Math.min(25, (timeRatio - 2.0) * 12) // Took more than 2x expected
+  } else if (timeRatio > 1.5) {
+    timePenalty = Math.min(10, (timeRatio - 1.5) * 10) // Took 1.5-2x expected
+  }
 
-  return Math.max(0, Math.min(100, Math.round(adjusted)))
+  // Time bonus for fast solvers (indicates strong pattern recognition)
+  let timeBonus = 0
+  if (timeRatio < 0.6 && performanceScore >= 70) {
+    timeBonus = 5 // Solved quickly AND correctly
+  }
+
+  // Calculate final mastery score
+  const masteryScore = baseScore - hintPenalty - timePenalty + timeBonus
+
+  return Math.max(0, Math.min(100, Math.round(masteryScore)))
 }

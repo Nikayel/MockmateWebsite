@@ -24,7 +24,7 @@ import {
   critiqueScores,
   critiqueFeedbackText,
   buildRAGFeedbackContext,
-  parseFeedbackSections
+  parseFeedbackSections,
 } from "@/lib/feedback"
 
 export async function POST(request: NextRequest) {
@@ -43,14 +43,32 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
-    const { code, scenarioTitle, scenarioType, scenarioId, scenarioDifficulty, scenarioPattern, testResults, language, timeSpent, aiCollaborationMetrics, interactionMetrics, efficiencyMetrics, conversationTranscript, partnerMessages, sessionId, userId } = await request.json()
+    const {
+      code,
+      scenarioTitle,
+      scenarioType,
+      scenarioId,
+      scenarioDifficulty,
+      scenarioPattern,
+      testResults,
+      language,
+      timeSpent,
+      aiCollaborationMetrics,
+      interactionMetrics,
+      efficiencyMetrics,
+      conversationTranscript,
+      partnerMessages,
+      sessionId,
+      userId,
+    } = await request.json()
 
     if (!code || !scenarioTitle) {
       return NextResponse.json({ error: "Code and scenario title are required" }, { status: 400 })
     }
 
     // Calculate collaboration message count
-    const collaborationMessages = (aiCollaborationMetrics?.partnerMessagesSent || 0) +
+    const collaborationMessages =
+      (aiCollaborationMetrics?.partnerMessagesSent || 0) +
       (interactionMetrics?.interviewerQuestionsAnswered || 0)
 
     // Calculate test metrics
@@ -68,7 +86,7 @@ RULES:
 - Reference the conversation and discussion quality.
 `
 
-      if (scenarioType === 'system-design') {
+      if (scenarioType === "system-design") {
         return `You are a brutally honest senior system design interviewer at a FAANG company. Be direct—if they didn't try, call it out.
 
 ${baseRules}
@@ -113,7 +131,7 @@ SYSTEM DESIGN FOCUS:
 `
       }
 
-      if (scenarioType === 'bugfix') {
+      if (scenarioType === "bugfix") {
         return `You are a senior debugging expert delivering focused feedback on bug fix performance. Be direct and constructive.
 
 ${baseRules}
@@ -211,25 +229,30 @@ DSA FOCUS:
 
     const systemInstruction = getSystemInstruction()
 
-    const testResultsSummary = testResults && Array.isArray(testResults)
-      ? `\n\nTEST RESULTS:\n- Total tests: ${testsTotal}\n- Passed: ${testsPassed}\n- Failed: ${testsTotal - testsPassed}\n`
+    const testResultsSummary =
+      testResults && Array.isArray(testResults)
+        ? `\n\nTEST RESULTS:\n- Total tests: ${testsTotal}\n- Passed: ${testsPassed}\n- Failed: ${testsTotal - testsPassed}\n`
+        : ""
+
+    const timeInfo = timeSpent
+      ? `TIME SPENT: ${Math.floor(timeSpent / 60)} minutes ${timeSpent % 60} seconds`
       : ""
 
-    const timeInfo = timeSpent ? `TIME SPENT: ${Math.floor(timeSpent / 60)} minutes ${timeSpent % 60} seconds` : ""
-
     // Simplified efficiency info (removed redundant verbose metrics)
-    const efficiencyInfo = efficiencyMetrics ? `
+    const efficiencyInfo = efficiencyMetrics
+      ? `
 CODE EFFICIENCY ANALYSIS:
-- Lines of code: ${efficiencyMetrics.linesOfCode || 'N/A'}
-- Code complexity level: ${efficiencyMetrics.complexity || 'N/A'}
-- Estimated time complexity: ${efficiencyMetrics.estimatedTimeComplexity || 'N/A'}
-- Optimal time complexity: ${efficiencyMetrics.optimalTimeComplexity || 'N/A'}
-- Estimated space complexity: ${efficiencyMetrics.estimatedSpaceComplexity || 'N/A'}
-- Optimal space complexity: ${efficiencyMetrics.optimalSpaceComplexity || 'N/A'}
-- Efficiency score: ${efficiencyMetrics.efficiencyScore || 'N/A'}/100
-- Time complexity match: ${efficiencyMetrics.estimatedTimeComplexity === efficiencyMetrics.optimalTimeComplexity ? 'YES - Optimal' : 'NO - Suboptimal'}
-- Space complexity match: ${efficiencyMetrics.estimatedSpaceComplexity === efficiencyMetrics.optimalSpaceComplexity ? 'YES - Optimal' : 'NO - Suboptimal'}
-` : `
+- Lines of code: ${efficiencyMetrics.linesOfCode || "N/A"}
+- Code complexity level: ${efficiencyMetrics.complexity || "N/A"}
+- Estimated time complexity: ${efficiencyMetrics.estimatedTimeComplexity || "N/A"}
+- Optimal time complexity: ${efficiencyMetrics.optimalTimeComplexity || "N/A"}
+- Estimated space complexity: ${efficiencyMetrics.estimatedSpaceComplexity || "N/A"}
+- Optimal space complexity: ${efficiencyMetrics.optimalSpaceComplexity || "N/A"}
+- Efficiency score: ${efficiencyMetrics.efficiencyScore || "N/A"}/100
+- Time complexity match: ${efficiencyMetrics.estimatedTimeComplexity === efficiencyMetrics.optimalTimeComplexity ? "YES - Optimal" : "NO - Suboptimal"}
+- Space complexity match: ${efficiencyMetrics.estimatedSpaceComplexity === efficiencyMetrics.optimalSpaceComplexity ? "YES - Optimal" : "NO - Suboptimal"}
+`
+      : `
 CODE EFFICIENCY ANALYSIS:
 - No efficiency data available
 `
@@ -248,32 +271,35 @@ CODE EFFICIENCY ANALYSIS:
     // Step 2: AI validation
     // For system design, always validate with AI (even minimal conversations) to get accurate feedback
     // For other types, skip AI call if: no content, gibberish detected, or keyword stuffing
-    const shouldValidateWithAI = scenarioType === 'system-design'
-      ? true // Always validate system design to analyze what was discussed (or not discussed)
-      : (preScreen.hasContent &&
-        !preScreen.suspiciousPatterns.possibleGibberish &&
-        !preScreen.suspiciousPatterns.keywordStuffing &&
-        preScreen.candidateMessageCount >= 1)
+    const shouldValidateWithAI =
+      scenarioType === "system-design"
+        ? true // Always validate system design to analyze what was discussed (or not discussed)
+        : preScreen.hasContent &&
+          !preScreen.suspiciousPatterns.possibleGibberish &&
+          !preScreen.suspiciousPatterns.keywordStuffing &&
+          preScreen.candidateMessageCount >= 1
 
     const aiValidation = shouldValidateWithAI
       ? await validateConversationWithAI(
           conversationTranscript,
           code,
-          efficiencyMetrics ? {
-            time: efficiencyMetrics.estimatedTimeComplexity || 'unknown',
-            space: efficiencyMetrics.estimatedSpaceComplexity || 'unknown'
-          } : null
+          efficiencyMetrics
+            ? {
+                time: efficiencyMetrics.estimatedTimeComplexity || "unknown",
+                space: efficiencyMetrics.estimatedSpaceComplexity || "unknown",
+              }
+            : null
         )
       : getDefaultValidation()
 
     // For system design with no/minimal conversation, ensure validation reflects reality
     // (Blank design notes are handled in scoring logic, not here - we still want to analyze conversation if it exists)
-    if (scenarioType === 'system-design' && !preScreen.hasContent) {
+    if (scenarioType === "system-design" && !preScreen.hasContent) {
       // Override default validation to reflect that nothing was discussed
       aiValidation.isCoherent = false
       aiValidation.responsesRelevant = false
       aiValidation.approachExplained = false
-      aiValidation.approachQuality = 'none'
+      aiValidation.approachQuality = "none"
       aiValidation.complexityDiscussed = false
       aiValidation.edgeCasesConsidered = false
       aiValidation.alternativesDiscussed = false
@@ -300,12 +326,12 @@ CODE EFFICIENCY ANALYSIS:
 
     // Apply AI copying penalty if detected
     // If they blindly copied >70% of their code from AI, penalize understanding
-    if (hasBlindCopying && scenarioType !== 'system-design') {
+    if (hasBlindCopying && scenarioType !== "system-design") {
       validatedScores.understanding = Math.min(
         validatedScores.understanding,
         Math.max(30, validatedScores.understanding - 25) // Cap at 30 or reduce by 25
       )
-      logger.info('AI copying penalty applied', {
+      logger.info("AI copying penalty applied", {
         sessionId,
         overlapPercentage: aiCodeOverlap.overlapPercentage,
         originalUnderstanding: validatedScores.understanding + 25,
@@ -324,55 +350,63 @@ CODE EFFICIENCY ANALYSIS:
     // Step 5: Constitutional AI Score Critique
     const scoreCritique = await critiqueScores(algorithmicScores, {
       passRate,
-      scenarioType: scenarioType || 'dsa',
+      scenarioType: scenarioType || "dsa",
       aiValidation,
-      codeCompleteness: code ? analyzeCodeCompleteness(code, language || 'python') : undefined,
-      hasBlindCopying
+      codeCompleteness: code ? analyzeCodeCompleteness(code, language || "python") : undefined,
+      hasBlindCopying,
     })
 
     // Use adjusted scores if critique made changes
-    const finalScores = scoreCritique.madeChanges && scoreCritique.adjustedScores
-      ? scoreCritique.adjustedScores
-      : algorithmicScores
+    const finalScores =
+      scoreCritique.madeChanges && scoreCritique.adjustedScores
+        ? scoreCritique.adjustedScores
+        : algorithmicScores
 
     // Send validated summary to AI for narrative generation
     const conversationSummary = `
 COMMUNICATION ANALYSIS (hybrid validated):
-- Coherent responses: ${aiValidation.isCoherent ? 'YES' : 'NO - possible gibberish detected'}
-- Responses relevant to questions: ${aiValidation.responsesRelevant ? 'YES' : 'NO'}
-- Approach explained: ${aiValidation.approachExplained ? `YES (${aiValidation.approachQuality})` : 'NO'}
-- Complexity discussed: ${aiValidation.complexityDiscussed ? 'YES' : 'NO'}
-- Complexity accurate: ${aiValidation.complexityAccurate ? 'YES' : 'NO - stated: ' + (aiValidation.statedComplexity || 'none')}
-- Edge cases considered: ${aiValidation.edgeCasesConsidered ? 'YES' : 'NO'}
-- Alternatives discussed: ${aiValidation.alternativesDiscussed ? 'YES' : 'NO'}
+- Coherent responses: ${aiValidation.isCoherent ? "YES" : "NO - possible gibberish detected"}
+- Responses relevant to questions: ${aiValidation.responsesRelevant ? "YES" : "NO"}
+- Approach explained: ${aiValidation.approachExplained ? `YES (${aiValidation.approachQuality})` : "NO"}
+- Complexity discussed: ${aiValidation.complexityDiscussed ? "YES" : "NO"}
+- Complexity accurate: ${aiValidation.complexityAccurate ? "YES" : "NO - stated: " + (aiValidation.statedComplexity || "none")}
+- Edge cases considered: ${aiValidation.edgeCasesConsidered ? "YES" : "NO"}
+- Alternatives discussed: ${aiValidation.alternativesDiscussed ? "YES" : "NO"}
 - Questions answered: ${aiValidation.questionsAnswered}/${aiValidation.questionsAsked}
 - Communication score: ${aiValidation.communicationScore}/100
 - Total candidate messages: ${preScreen.candidateMessageCount}
 
 PRE-CALCULATED SCORES (use these as your scores):
-${scenarioType === 'system-design' ? `- Requirements: ${finalScores.understanding}/100
+${
+  scenarioType === "system-design"
+    ? `- Requirements: ${finalScores.understanding}/100
 - Architecture: ${finalScores.problemSolving}/100
 - Scalability: ${finalScores.codeQuality}/100
-- Communication: ${finalScores.communication}/100` : scenarioType === 'bugfix' ? `- Bug Found: ${finalScores.understanding}/100
+- Communication: ${finalScores.communication}/100`
+    : scenarioType === "bugfix"
+      ? `- Bug Found: ${finalScores.understanding}/100
 - Root Cause: ${finalScores.problemSolving}/100
 - Fix Quality: ${finalScores.codeQuality}/100
-- Communication: ${finalScores.communication}/100` : `- Understanding: ${finalScores.understanding}/100
+- Communication: ${finalScores.communication}/100`
+      : `- Understanding: ${finalScores.understanding}/100
 - Problem-Solving: ${finalScores.problemSolving}/100
 - Code Quality: ${finalScores.codeQuality}/100
-- Communication: ${finalScores.communication}/100`}
+- Communication: ${finalScores.communication}/100`
+}
 - Overall: ${finalScores.overall}/100
 `
 
     // Build scenario-specific prompt
     const buildPrompt = () => {
-      const baseInfo = `PROBLEM: ${scenarioTitle}${scenarioType ? ` (${scenarioType.toUpperCase()})` : ''}
+      const baseInfo = `PROBLEM: ${scenarioTitle}${scenarioType ? ` (${scenarioType.toUpperCase()})` : ""}
 ${timeInfo}
 ${conversationSummary}`
 
-      if (scenarioType === 'system-design') {
+      if (scenarioType === "system-design") {
         // System design: focus on discussion, not code
         const hasDiscussion = preScreen.candidateMessageCount > 0
-        const hasMinimalDiscussion = preScreen.candidateMessageCount > 0 && preScreen.candidateMessageCount < 3
+        const hasMinimalDiscussion =
+          preScreen.candidateMessageCount > 0 && preScreen.candidateMessageCount < 3
         const hasBlankNotes = code ? isBlankDesignTemplate(code) : true
 
         // Determine engagement level for AI context
@@ -414,9 +448,13 @@ ${engagementContext}
 
 DESIGN NOTES SUBMITTED:
 \`\`\`
-${code && code.trim()
-  ? (code.length > 1500 ? code.slice(0, 1500) + '\n// ... [truncated]' : code)
-  : '[EMPTY - No design notes provided]'}
+${
+  code && code.trim()
+    ? code.length > 1500
+      ? code.slice(0, 1500) + "\n// ... [truncated]"
+      : code
+    : "[EMPTY - No design notes provided]"
+}
 \`\`\`
 
 CRITICAL INSTRUCTIONS:
@@ -429,7 +467,7 @@ CRITICAL INSTRUCTIONS:
 - Be a tough but fair interviewer - call out non-participation directly`
       }
 
-      if (scenarioType === 'bugfix') {
+      if (scenarioType === "bugfix") {
         // Bug fix: focus on debugging process
         return `Generate bug fix interview feedback using the pre-calculated scores below.
 
@@ -437,15 +475,24 @@ ${baseInfo}
 ${testResultsSummary}
 
 CANDIDATE'S FIX:
-\`\`\`${language || 'javascript'}
-${code.length > 2000 ? code.slice(0, 2000) + '\n// ... [truncated]' : code}
+\`\`\`${language || "javascript"}
+${code.length > 2000 ? code.slice(0, 2000) + "\n// ... [truncated]" : code}
 \`\`\`
-${testResults && testResults.filter((t: any) => !t.passed).length > 0 ? `
+${
+  testResults && testResults.filter((t: any) => !t.passed).length > 0
+    ? `
 REMAINING ISSUES (first 3):
-${testResults.filter((t: any) => !t.passed).slice(0, 3).map((t: any) =>
+${testResults
+  .filter((t: any) => !t.passed)
+  .slice(0, 3)
+  .map(
+    (t: any) =>
       `- ${t.description}: expected ${JSON.stringify(t.expected)}, got ${JSON.stringify(t.actual)}`
-    ).join('\n')}
-` : ''}
+  )
+  .join("\n")}
+`
+    : ""
+}
 
 IMPORTANT:
 - Evaluate the DEBUGGING PROCESS, not just whether the fix works
@@ -454,17 +501,25 @@ IMPORTANT:
       }
 
       // Default DSA prompt - analyze code completeness first
-      const codeAnalysis = code ? analyzeCodeCompleteness(code, language || 'python') : { isIncomplete: true, reason: 'No code submitted', hasBaseCase: false, hasActualLogic: false, stubPatterns: ['empty'] }
+      const codeAnalysis = code
+        ? analyzeCodeCompleteness(code, language || "python")
+        : {
+            isIncomplete: true,
+            reason: "No code submitted",
+            hasBaseCase: false,
+            hasActualLogic: false,
+            stubPatterns: ["empty"],
+          }
 
       // Build completeness context for AI
-      let completenessContext = ''
+      let completenessContext = ""
       if (codeAnalysis.isIncomplete) {
         completenessContext = `
 ⚠️ INCOMPLETE SOLUTION DETECTED ⚠️
 - Reason: ${codeAnalysis.reason}
-- Has base case only: ${codeAnalysis.hasBaseCase ? 'YES' : 'NO'}
-- Has actual algorithm logic: ${codeAnalysis.hasActualLogic ? 'YES' : 'NO'}
-${codeAnalysis.stubPatterns.length > 0 ? `- Stub patterns found: ${codeAnalysis.stubPatterns.join(', ')}` : ''}
+- Has base case only: ${codeAnalysis.hasBaseCase ? "YES" : "NO"}
+- Has actual algorithm logic: ${codeAnalysis.hasActualLogic ? "YES" : "NO"}
+${codeAnalysis.stubPatterns.length > 0 ? `- Stub patterns found: ${codeAnalysis.stubPatterns.join(", ")}` : ""}
 - This is a FAILING submission - the solution is not complete
 - Your feedback MUST reflect this: be direct that they only wrote edge case handling, no actual solution
 - Do NOT praise complexity or efficiency - there is no working algorithm to analyze
@@ -493,15 +548,24 @@ ${efficiencyInfo}
 ${completenessContext}
 
 SOLUTION CODE:
-\`\`\`${language || 'javascript'}
-${code.length > 2000 ? code.slice(0, 2000) + '\n// ... [truncated]' : code}
+\`\`\`${language || "javascript"}
+${code.length > 2000 ? code.slice(0, 2000) + "\n// ... [truncated]" : code}
 \`\`\`
-${testResults && testResults.filter((t: any) => !t.passed).length > 0 ? `
+${
+  testResults && testResults.filter((t: any) => !t.passed).length > 0
+    ? `
 FAILED TESTS (first 3):
-${testResults.filter((t: any) => !t.passed).slice(0, 3).map((t: any) =>
+${testResults
+  .filter((t: any) => !t.passed)
+  .slice(0, 3)
+  .map(
+    (t: any) =>
       `- ${t.description}: expected ${JSON.stringify(t.expected)}, got ${JSON.stringify(t.actual)}`
-    ).join('\n')}
-` : ''}
+  )
+  .join("\n")}
+`
+    : ""
+}
 
 CRITICAL INSTRUCTIONS:
 - Use the PRE-CALCULATED SCORES above exactly - they reflect what actually happened
@@ -515,23 +579,23 @@ CRITICAL INSTRUCTIONS:
     const prompt = buildPrompt()
 
     // Build RAG-enhanced context for better feedback (non-blocking)
-    let ragFeedbackContext = ''
+    let ragFeedbackContext = ""
     try {
       ragFeedbackContext = await buildRAGFeedbackContext({
-        problemText: scenarioTitle || '',
-        userCode: code || '',
+        problemText: scenarioTitle || "",
+        userCode: code || "",
         testResults: { passed: testsPassed, total: testsTotal },
         scenarioPattern: efficiencyMetrics?.problemPattern, // Pattern from efficiency analysis
-        difficulty: efficiencyMetrics?.difficulty as 'easy' | 'medium' | 'hard',
+        difficulty: efficiencyMetrics?.difficulty as "easy" | "medium" | "hard",
         userId,
       })
     } catch (error) {
-      logger.warn('[Feedback API] RAG context failed, continuing without', { error })
+      logger.warn("[Feedback API] RAG context failed, continuing without", { error })
     }
 
     // Combine system instruction with RAG context
     const enhancedSystemInstruction = ragFeedbackContext
-      ? systemInstruction + '\n\n' + ragFeedbackContext
+      ? systemInstruction + "\n\n" + ragFeedbackContext
       : systemInstruction
 
     // Use AI provider abstraction for narrative feedback only
@@ -544,20 +608,17 @@ CRITICAL INSTRUCTIONS:
     const feedback = aiResponse.text
 
     // Step 6: Constitutional AI Feedback Critique
-    const feedbackCritique = await critiqueFeedbackText(
-      feedback,
-      finalScores,
-      {
-        passRate,
-        scenarioType: scenarioType || 'dsa',
-        isIncomplete: code ? analyzeCodeCompleteness(code, language || 'python').isIncomplete : false
-      }
-    )
+    const feedbackCritique = await critiqueFeedbackText(feedback, finalScores, {
+      passRate,
+      scenarioType: scenarioType || "dsa",
+      isIncomplete: code ? analyzeCodeCompleteness(code, language || "python").isIncomplete : false,
+    })
 
     // Use revised feedback if critique made changes
-    const finalFeedback = feedbackCritique.madeChanges && feedbackCritique.revisedFeedback
-      ? feedbackCritique.revisedFeedback
-      : feedback
+    const finalFeedback =
+      feedbackCritique.madeChanges && feedbackCritique.revisedFeedback
+        ? feedbackCritique.revisedFeedback
+        : feedback
 
     // USE FINAL SCORES as primary (after Constitutional AI review)
     // AI-generated narrative is just for user-facing feedback text
@@ -580,11 +641,11 @@ CRITICAL INSTRUCTIONS:
     // Build structured response
     const structuredFeedback: StructuredFeedback = {
       scores,
-      tldr: sections.tldr || 'Feedback generated successfully.',
+      tldr: sections.tldr || "Feedback generated successfully.",
       whatWorked: sections.whatWorked || [],
       fixNext: sections.fixNext || [],
       actionPlan: sections.actionPlan || [],
-      aiWatchlist: sections.aiWatchlist || 'No watchlist items captured.',
+      aiWatchlist: sections.aiWatchlist || "No watchlist items captured.",
       rawFeedback: finalFeedback,
     }
 
@@ -594,10 +655,10 @@ CRITICAL INSTRUCTIONS:
       trackFeedbackGenerationServer({
         sessionId,
         userId,
-        scenarioType: scenarioType || 'unknown',
+        scenarioType: scenarioType || "unknown",
         performanceScore: scores.overall,
         durationMinutes,
-      }).catch(err => logger.error("Analytics tracking error", { error: err }))
+      }).catch((err) => logger.error("Analytics tracking error", { error: err }))
     }
 
     // Update learning state for spaced repetition email reminders
@@ -606,8 +667,22 @@ CRITICAL INSTRUCTIONS:
     if (userId && scenarioTitle && scenarioId) {
       try {
         // Use canonical values from frontend, with fallbacks
-        const pattern = (scenarioPattern || efficiencyMetrics?.problemPattern || 'arrays-hashing') as DSAPattern
-        const difficulty = (scenarioDifficulty || efficiencyMetrics?.difficulty || 'medium') as 'easy' | 'medium' | 'hard'
+        const pattern = (scenarioPattern ||
+          efficiencyMetrics?.problemPattern ||
+          "arrays-hashing") as DSAPattern
+        const difficulty = (scenarioDifficulty || efficiencyMetrics?.difficulty || "medium") as
+          | "easy"
+          | "medium"
+          | "hard"
+
+        logger.info("SR update starting", {
+          userId,
+          scenarioId,
+          scenarioTitle,
+          pattern,
+          difficulty,
+          performanceScore: scores.overall,
+        })
 
         // Update both topic-level (legacy) and problem-level mastery
         await completeSessionWithMastery(userId, {
@@ -620,10 +695,27 @@ CRITICAL INSTRUCTIONS:
           hintsUsed: interactionMetrics?.hintsUsed || 0,
           completedAt: new Date().toISOString(),
         })
+
+        logger.info("SR update completed successfully", { userId, scenarioId })
       } catch (err) {
         // Non-blocking - don't fail feedback if learning state update fails
-        logger.error("Learning state update error", { error: err })
+        logger.error("Learning state update error", {
+          error: err,
+          userId,
+          scenarioId,
+          scenarioTitle,
+        })
       }
+    } else {
+      // Log why SR update was skipped
+      logger.warn("SR update skipped - missing required fields", {
+        hasUserId: !!userId,
+        hasScenarioTitle: !!scenarioTitle,
+        hasScenarioId: !!scenarioId,
+        userId: userId || "missing",
+        scenarioId: scenarioId || "missing",
+        scenarioTitle: scenarioTitle || "missing",
+      })
     }
 
     // Store solution in RAG vector store for future similarity matching
@@ -631,10 +723,10 @@ CRITICAL INSTRUCTIONS:
       try {
         await embedAndStoreSolution(userId, sessionId, code, {
           problemTitle: scenarioTitle,
-          language: language || 'javascript',
+          language: language || "javascript",
           passed: scores.overall >= 70,
           score: scores.overall,
-          problemType: scenarioType || 'dsa',
+          problemType: scenarioType || "dsa",
         })
       } catch (err) {
         // Non-blocking - don't fail feedback if RAG storage fails
@@ -644,16 +736,25 @@ CRITICAL INSTRUCTIONS:
 
     // Analyze code for misconceptions and track them (non-blocking)
     // Only analyze DSA problems where we can detect pattern-specific errors
-    if (userId && code && scenarioType === 'dsa' && (scenarioPattern || efficiencyMetrics?.problemPattern)) {
+    if (
+      userId &&
+      code &&
+      scenarioType === "dsa" &&
+      (scenarioPattern || efficiencyMetrics?.problemPattern)
+    ) {
       try {
         const pattern = (scenarioPattern || efficiencyMetrics?.problemPattern) as DSAPattern
         await analyzeAndTrackMisconceptions(userId, code, pattern, {
           passed: testsPassed,
           total: testsTotal,
-          failingTests: testResults
-            ?.filter((t: any) => !t.passed)
-            ?.slice(0, 5)
-            ?.map((t: any) => `${t.description}: expected ${JSON.stringify(t.expected)}, got ${JSON.stringify(t.actual)}`) || [],
+          failingTests:
+            testResults
+              ?.filter((t: any) => !t.passed)
+              ?.slice(0, 5)
+              ?.map(
+                (t: any) =>
+                  `${t.description}: expected ${JSON.stringify(t.expected)}, got ${JSON.stringify(t.actual)}`
+              ) || [],
         })
       } catch (err) {
         // Non-blocking - don't fail feedback if misconception analysis fails
@@ -668,35 +769,43 @@ CRITICAL INSTRUCTIONS:
       structured: structuredFeedback, // Full structured data
       // Flags for frontend warnings
       silentSolution: algorithmicScores.silentSolution || false, // True if solved correctly but didn't explain approach
-      incompleteSolution: code ? analyzeCodeCompleteness(code, language || 'python').isIncomplete : false,
+      incompleteSolution: code
+        ? analyzeCodeCompleteness(code, language || "python").isIncomplete
+        : false,
       aiCopyingDetected: hasBlindCopying, // True if >70% code copied from AI Partner
       aiOverlapPercentage: aiCodeOverlap.overlapPercentage, // How much code matches AI suggestions
       // Constitutional AI critique metadata (only if changes were made)
-      ...(scoreCritique.madeChanges || feedbackCritique.madeChanges ? {
-        constitutionalAICritique: {
-          scoreCritique: scoreCritique.madeChanges ? {
-            critiques: scoreCritique.critiques,
-            reasoning: scoreCritique.reasoning,
-            originalScores: {
-              understanding: algorithmicScores.understanding,
-              problemSolving: algorithmicScores.problemSolving,
-              codeQuality: algorithmicScores.codeQuality,
-              communication: algorithmicScores.communication,
-              overall: algorithmicScores.overall
+      ...(scoreCritique.madeChanges || feedbackCritique.madeChanges
+        ? {
+            constitutionalAICritique: {
+              scoreCritique: scoreCritique.madeChanges
+                ? {
+                    critiques: scoreCritique.critiques,
+                    reasoning: scoreCritique.reasoning,
+                    originalScores: {
+                      understanding: algorithmicScores.understanding,
+                      problemSolving: algorithmicScores.problemSolving,
+                      codeQuality: algorithmicScores.codeQuality,
+                      communication: algorithmicScores.communication,
+                      overall: algorithmicScores.overall,
+                    },
+                    adjustedScores: scoreCritique.adjustedScores,
+                  }
+                : null,
+              feedbackCritique: feedbackCritique.madeChanges
+                ? {
+                    critiques: feedbackCritique.critiques,
+                    reasoning: feedbackCritique.reasoning,
+                  }
+                : null,
             },
-            adjustedScores: scoreCritique.adjustedScores
-          } : null,
-          feedbackCritique: feedbackCritique.madeChanges ? {
-            critiques: feedbackCritique.critiques,
-            reasoning: feedbackCritique.reasoning
-          } : null
-        }
-      } : {}),
+          }
+        : {}),
       provider: aiResponse.provider,
       latencyMs: aiResponse.latencyMs,
     })
   } catch (error) {
-    logger.error("Feedback generation error", { error, endpoint: '/api/generate-feedback' })
+    logger.error("Feedback generation error", { error, endpoint: "/api/generate-feedback" })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to generate feedback" },
       { status: 500 }
