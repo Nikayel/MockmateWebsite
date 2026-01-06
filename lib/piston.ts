@@ -10,6 +10,39 @@
 
 const PISTON_API_URL = process.env.PISTON_API_URL || 'https://emkc.org/api/v2/piston'
 
+/**
+ * Dedent code by removing consistent leading whitespace from all lines.
+ * This prevents IndentationError when user code has extra leading indentation.
+ * Also normalizes tabs to spaces for Python compatibility.
+ */
+function dedentCode(code: string): string {
+  // Normalize tabs to 4 spaces (Python standard)
+  code = code.replace(/\t/g, '    ')
+
+  const lines = code.split('\n')
+
+  // Find minimum indentation (ignoring empty lines)
+  let minIndent = Infinity
+  for (const line of lines) {
+    if (line.trim().length === 0) continue // Skip empty lines
+    const match = line.match(/^(\s*)/)
+    if (match) {
+      minIndent = Math.min(minIndent, match[1].length)
+    }
+  }
+
+  // If no indentation found or all lines empty, return as-is
+  if (minIndent === Infinity || minIndent === 0) {
+    return code
+  }
+
+  // Remove the common leading whitespace from all lines
+  return lines.map(line => {
+    if (line.trim().length === 0) return '' // Keep empty lines empty
+    return line.slice(minIndent)
+  }).join('\n')
+}
+
 // Language mappings for Piston
 const LANGUAGE_CONFIG: Record<string, { language: string; version: string }> = {
   javascript: { language: 'javascript', version: '18.15.0' },
@@ -180,6 +213,9 @@ export async function executeWithPiston(
  * Also captures console.log/warn/error calls for display in the console panel
  */
 function wrapCodeForExecution(code: string, language: string, testInput: any): string {
+  // Dedent user code to prevent IndentationError from inconsistent whitespace
+  code = dedentCode(code)
+
   const inputKeys = Object.keys(testInput)
   const inputValues = Object.values(testInput)
   const inputJson = JSON.stringify(inputValues)
