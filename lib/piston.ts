@@ -8,7 +8,33 @@
  * - Other processes
  */
 
-const PISTON_API_URL = process.env.PISTON_API_URL || 'https://emkc.org/api/v2/piston'
+const PISTON_API_URL = process.env.PISTON_API_URL || "https://emkc.org/api/v2/piston"
+
+/**
+ * Line offset for Python wrapper code.
+ * User code is inserted after imports, helper classes, and setup functions.
+ * When Python reports line numbers in errors, we need to subtract this offset
+ * to get the actual line number in the user's code.
+ *
+ * Breakdown:
+ * - import statements: 8 lines
+ * - TreeNode class: 5 lines
+ * - ListNode class: 4 lines
+ * - _build_tree function: 18 lines
+ * - _tree_to_array function: 14 lines
+ * - _build_list function: 8 lines
+ * - _list_to_array function: 9 lines
+ * - Print capture setup: 10 lines
+ * - Empty lines and comments: ~17 lines
+ * Total: ~93 lines before user code
+ */
+export const PYTHON_WRAPPER_LINE_OFFSET = 93
+
+/**
+ * Line offset for JavaScript wrapper code.
+ * Similar structure but slightly different count.
+ */
+export const JAVASCRIPT_WRAPPER_LINE_OFFSET = 110
 
 /**
  * Dedent code by removing consistent leading whitespace from all lines.
@@ -17,9 +43,9 @@ const PISTON_API_URL = process.env.PISTON_API_URL || 'https://emkc.org/api/v2/pi
  */
 function dedentCode(code: string): string {
   // Normalize tabs to 4 spaces (Python standard)
-  code = code.replace(/\t/g, '    ')
+  code = code.replace(/\t/g, "    ")
 
-  const lines = code.split('\n')
+  const lines = code.split("\n")
 
   // Find minimum indentation (ignoring empty lines)
   let minIndent = Infinity
@@ -37,23 +63,25 @@ function dedentCode(code: string): string {
   }
 
   // Remove the common leading whitespace from all lines
-  return lines.map(line => {
-    if (line.trim().length === 0) return '' // Keep empty lines empty
-    return line.slice(minIndent)
-  }).join('\n')
+  return lines
+    .map((line) => {
+      if (line.trim().length === 0) return "" // Keep empty lines empty
+      return line.slice(minIndent)
+    })
+    .join("\n")
 }
 
 // Language mappings for Piston
 const LANGUAGE_CONFIG: Record<string, { language: string; version: string }> = {
-  javascript: { language: 'javascript', version: '18.15.0' },
-  typescript: { language: 'typescript', version: '5.0.3' },
-  python: { language: 'python', version: '3.10.0' },
+  javascript: { language: "javascript", version: "18.15.0" },
+  typescript: { language: "typescript", version: "5.0.3" },
+  python: { language: "python", version: "3.10.0" },
 }
 
 export interface ConsoleLog {
-  type: 'log' | 'error' | 'warn' | 'info';
-  message: string;
-  timestamp: number;
+  type: "log" | "error" | "warn" | "info"
+  message: string
+  timestamp: number
 }
 
 export interface PistonExecuteResult {
@@ -108,13 +136,13 @@ export async function executeWithPiston(
     const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second total timeout
 
     const response = await fetch(`${PISTON_API_URL}/execute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         language: langConfig.language,
         version: langConfig.version,
         files: [{ content: wrappedCode }],
-        stdin: '',
+        stdin: "",
         run_timeout: 5000, // 5 second timeout for code execution
         compile_timeout: 5000,
       }),
@@ -130,14 +158,14 @@ export async function executeWithPiston(
         return {
           success: false,
           output: null,
-          error: 'Code execution service is busy. Please try again in a few seconds.',
+          error: "Code execution service is busy. Please try again in a few seconds.",
         }
       }
       if (response.status >= 500) {
         return {
           success: false,
           output: null,
-          error: 'Code execution service is temporarily unavailable. Please try again.',
+          error: "Code execution service is temporarily unavailable. Please try again.",
         }
       }
       return {
@@ -179,19 +207,25 @@ export async function executeWithPiston(
   } catch (error) {
     // Handle specific error types
     if (error instanceof Error) {
-      if (error.name === 'AbortError') {
+      if (error.name === "AbortError") {
         return {
           success: false,
           output: null,
-          error: 'Code execution timed out. Try simplifying your solution or check for infinite loops.',
+          error:
+            "Code execution timed out. Try simplifying your solution or check for infinite loops.",
         }
       }
       // Network errors
-      if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('ECONNREFUSED')) {
+      if (
+        error.message.includes("fetch") ||
+        error.message.includes("network") ||
+        error.message.includes("ECONNREFUSED")
+      ) {
         return {
           success: false,
           output: null,
-          error: 'Unable to connect to code execution service. Please check your connection and try again.',
+          error:
+            "Unable to connect to code execution service. Please check your connection and try again.",
         }
       }
       return {
@@ -203,7 +237,7 @@ export async function executeWithPiston(
     return {
       success: false,
       output: null,
-      error: 'An unexpected error occurred while running your code.',
+      error: "An unexpected error occurred while running your code.",
     }
   }
 }
@@ -221,10 +255,10 @@ function wrapCodeForExecution(code: string, language: string, testInput: any): s
   const inputJson = JSON.stringify(inputValues)
   const inputKeysJson = JSON.stringify(inputKeys)
 
-  if (language === 'python') {
+  if (language === "python") {
     // Extract function name from Python code
     const funcMatch = code.match(/def\s+(\w+)\s*\(/)
-    const funcName = funcMatch ? funcMatch[1] : 'solution'
+    const funcName = funcMatch ? funcMatch[1] : "solution"
 
     // Python wrapper with print capture and common imports/classes for DSA problems
     return `
@@ -395,8 +429,10 @@ except Exception as e:
 
   // JavaScript/TypeScript
   // Try to find the function name or use common patterns
-  const funcMatch = code.match(/(?:function\s+(\w+)|const\s+(\w+)\s*=|let\s+(\w+)\s*=|var\s+(\w+)\s*=)/)
-  const funcName = funcMatch ? (funcMatch[1] || funcMatch[2] || funcMatch[3] || funcMatch[4]) : null
+  const funcMatch = code.match(
+    /(?:function\s+(\w+)|const\s+(\w+)\s*=|let\s+(\w+)\s*=|var\s+(\w+)\s*=)/
+  )
+  const funcName = funcMatch ? funcMatch[1] || funcMatch[2] || funcMatch[3] || funcMatch[4] : null
 
   // JavaScript wrapper with console capture and common DSA classes
   return `
@@ -517,7 +553,7 @@ try {
   let _func;
 
   // Try to find the function
-  ${funcName ? `if (typeof ${funcName} === 'function') _func = ${funcName};` : ''}
+  ${funcName ? `if (typeof ${funcName} === 'function') _func = ${funcName};` : ""}
   if (!_func && typeof solution === 'function') _func = solution;
   if (!_func && typeof twoSum === 'function') _func = twoSum;
   if (!_func && typeof main === 'function') _func = main;
@@ -603,22 +639,22 @@ try {
  * Handles the new format with __LOGS__ and __RESULT__ prefixes
  */
 export function parseExecutionOutput(output: string): { result: any; consoleLogs: ConsoleLog[] } {
-  const lines = output.trim().split('\n')
+  const lines = output.trim().split("\n")
   let consoleLogs: ConsoleLog[] = []
   let result: any = null
 
   for (const line of lines) {
-    if (line.startsWith('__LOGS__:')) {
+    if (line.startsWith("__LOGS__:")) {
       try {
-        consoleLogs = JSON.parse(line.substring('__LOGS__:'.length))
+        consoleLogs = JSON.parse(line.substring("__LOGS__:".length))
       } catch {
         // Ignore parse errors for logs
       }
-    } else if (line.startsWith('__RESULT__:')) {
+    } else if (line.startsWith("__RESULT__:")) {
       try {
-        result = JSON.parse(line.substring('__RESULT__:'.length))
+        result = JSON.parse(line.substring("__RESULT__:".length))
       } catch {
-        result = line.substring('__RESULT__:'.length)
+        result = line.substring("__RESULT__:".length)
       }
     }
   }
