@@ -1,26 +1,26 @@
 /**
- * Next.js Edge Middleware
+ * Next.js Edge Proxy
  *
  * Provides server-side protection for admin routes BEFORE pages render.
  * This prevents admin pages from briefly flashing before client-side auth check.
  *
- * SECURITY: This middleware runs on Edge runtime (before page render).
+ * SECURITY: This proxy runs on Edge runtime (before page render).
  * - Checks for authentication token in cookies or Authorization header
  * - For /admin/* routes, requires authentication to proceed
  * - Actual admin role verification happens in admin layout (defense-in-depth)
  */
 
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 
 // Routes that require authentication
-const PROTECTED_ROUTES = ['/admin']
+const PROTECTED_ROUTES = ["/admin"]
 
 // Routes that should redirect authenticated users away
-const AUTH_ROUTES = ['/login', '/signup']
+const AUTH_ROUTES = ["/login", "/signup"]
 
 // Public routes that never require auth
-const PUBLIC_ROUTES = ['/', '/pricing', '/blog', '/about', '/privacy', '/terms']
+const PUBLIC_ROUTES = ["/", "/pricing", "/blog", "/about", "/privacy", "/terms"]
 
 /**
  * Check if user appears to be authenticated
@@ -28,21 +28,21 @@ const PUBLIC_ROUTES = ['/', '/pricing', '/blog', '/about', '/privacy', '/terms']
  */
 function hasAuthToken(request: NextRequest): boolean {
   // Check for Firebase session cookie (set by Firebase Auth)
-  const sessionCookie = request.cookies.get('__session')
+  const sessionCookie = request.cookies.get("__session")
   if (sessionCookie?.value) {
     return true
   }
 
   // Check for Firebase auth token in local storage indicator cookie
   // Firebase client SDK stores auth state - we check for indicator cookie
-  const firebaseAuth = request.cookies.get('firebase-auth-token')
+  const firebaseAuth = request.cookies.get("firebase-auth-token")
   if (firebaseAuth?.value) {
     return true
   }
 
   // Check Authorization header (for API-like requests to pages)
-  const authHeader = request.headers.get('authorization')
-  if (authHeader?.startsWith('Bearer ')) {
+  const authHeader = request.headers.get("authorization")
+  if (authHeader?.startsWith("Bearer ")) {
     return true
   }
 
@@ -53,29 +53,25 @@ function hasAuthToken(request: NextRequest): boolean {
  * Check if path matches any protected route patterns
  */
 function isProtectedRoute(pathname: string): boolean {
-  return PROTECTED_ROUTES.some(route =>
-    pathname === route || pathname.startsWith(`${route}/`)
-  )
+  return PROTECTED_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))
 }
 
 /**
  * Check if path is an auth route (login/signup)
  */
 function isAuthRoute(pathname: string): boolean {
-  return AUTH_ROUTES.some(route =>
-    pathname === route || pathname.startsWith(`${route}/`)
-  )
+  return AUTH_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Skip middleware for API routes, static files, etc.
+  // Skip proxy for API routes, static files, etc.
   if (
-    pathname.startsWith('/api/') ||
-    pathname.startsWith('/_next/') ||
-    pathname.startsWith('/static/') ||
-    pathname.includes('.') // Files with extensions
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/static/") ||
+    pathname.includes(".") // Files with extensions
   ) {
     return NextResponse.next()
   }
@@ -85,12 +81,12 @@ export function middleware(request: NextRequest) {
   // Protect admin routes - redirect to login if not authenticated
   if (isProtectedRoute(pathname)) {
     if (!isAuthenticated) {
-      const loginUrl = new URL('/login', request.url)
-      loginUrl.searchParams.set('redirect', pathname)
+      const loginUrl = new URL("/login", request.url)
+      loginUrl.searchParams.set("redirect", pathname)
 
-      // Add security header to indicate this was a middleware redirect
+      // Add security header to indicate this was a proxy redirect
       const response = NextResponse.redirect(loginUrl)
-      response.headers.set('X-Middleware-Redirect', 'auth-required')
+      response.headers.set("X-Proxy-Redirect", "auth-required")
       return response
     }
   }
@@ -104,7 +100,7 @@ export function middleware(request: NextRequest) {
   return NextResponse.next()
 }
 
-// Configure which routes use this middleware
+// Configure which routes use this proxy
 export const config = {
   matcher: [
     /*
@@ -115,6 +111,6 @@ export const config = {
      * - favicon.ico (favicon file)
      * - public files (images, etc.)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\..*|_next).*)',
+    "/((?!api|_next/static|_next/image|favicon.ico|.*\\..*|_next).*)",
   ],
 }
