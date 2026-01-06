@@ -21,7 +21,12 @@
 
 import { adminDb } from '@/lib/firebase-admin';
 import { logger } from '@/lib/logger';
-import { createInAppNotification, getNotificationPreferences, shouldSendNotification, recordNotificationSent } from '@/lib/notification-helpers';
+import {
+  createInAppNotificationServer,
+  getNotificationPreferencesServer,
+  shouldSendNotificationServer,
+  recordNotificationSentServer,
+} from '@/lib/notification-helpers-server';
 import { detectMilestones, generateNotificationMessage } from '@/lib/services/notification-service';
 import { getNotificationByType, type NotificationType } from '@/lib/rag/knowledge-base/notification-knowledge';
 import type { DSAPattern } from '@/lib/types/dsa-patterns';
@@ -407,7 +412,7 @@ async function sendSessionNotification(
     }
 
     // Check rate limits and user preferences
-    const { shouldSend, reason } = await shouldSendNotification(
+    const { shouldSend, reason } = await shouldSendNotificationServer(
       userId,
       type,
       knowledge.frequency.cooldownAfterDismiss,
@@ -420,7 +425,7 @@ async function sendSessionNotification(
     }
 
     // Check user preferences
-    const prefs = await getNotificationPreferences(userId);
+    const prefs = await getNotificationPreferencesServer(userId);
     if (!prefs.enabled) return false;
     if (!prefs.typePreferences[type]?.enabled) return false;
 
@@ -428,7 +433,7 @@ async function sendSessionNotification(
     const { title, body } = generateNotificationMessage(knowledge, variables);
 
     // Create in-app notification
-    await createInAppNotification({
+    await createInAppNotificationServer({
       userId,
       type,
       title,
@@ -438,7 +443,7 @@ async function sendSessionNotification(
     });
 
     // Record for analytics
-    await recordNotificationSent(userId, type);
+    await recordNotificationSentServer(userId, type);
 
     logger.info('Session notification sent', { userId, type, title });
     return true;
