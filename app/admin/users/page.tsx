@@ -165,10 +165,10 @@ export default function UsersPage() {
 
   const tierDistribution = metrics
     ? [
-        { name: "Free", value: metrics.users.byTier.free, color: "#6B7280" },
-        { name: "Pro", value: metrics.users.byTier.pro, color: "#FBBF24" },
-        { name: "Enterprise", value: metrics.users.byTier.enterprise, color: "#A855F7" },
-      ]
+      { name: "Free", value: metrics.users.byTier.free, color: "#6B7280" },
+      { name: "Pro", value: metrics.users.byTier.pro, color: "#FBBF24" },
+      { name: "Enterprise", value: metrics.users.byTier.enterprise, color: "#A855F7" },
+    ]
     : []
 
   const conversionRate =
@@ -298,13 +298,12 @@ export default function UsersPage() {
                       <span className="font-semibold text-white">{item.count}</span>
                       <div className="h-2 w-32 overflow-hidden rounded-full bg-gray-700">
                         <div
-                          className={`h-full rounded-full ${
-                            item.color === "yellow"
-                              ? "bg-yellow-400"
-                              : item.color === "purple"
-                                ? "bg-purple-400"
-                                : "bg-gray-400"
-                          }`}
+                          className={`h-full rounded-full ${item.color === "yellow"
+                            ? "bg-yellow-400"
+                            : item.color === "purple"
+                              ? "bg-purple-400"
+                              : "bg-gray-400"
+                            }`}
                           style={{
                             width: `${metrics.users.total > 0 ? (item.count / metrics.users.total) * 100 : 0}%`,
                           }}
