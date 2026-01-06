@@ -177,6 +177,7 @@ function InterviewPageContent() {
   const [showPostInterviewDiscussion, setShowPostInterviewDiscussion] = useState(false)
   const [comprehensiveFeedback, setComprehensiveFeedback] = useState<string>("")
   const [performanceScore, setPerformanceScore] = useState<number | null>(null)
+  const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false) // Track AI feedback generation
   const [isGeneratingDiscussion, setIsGeneratingDiscussion] = useState(false)
   const [showCodeInDiscussion, setShowCodeInDiscussion] = useState(false)
   const [code, setCode] = useState("")
@@ -1369,6 +1370,9 @@ Ask ONE focused question based on these observations.`)
       // Calculate efficiency metrics for feedback
       const efficiencyData = analyzeCodeEfficiency(code)
 
+      // Set generating state to show loading UI
+      setIsGeneratingFeedback(true)
+
       if (currentSessionId && user && code.trim()) {
         try {
           // Prepare conversation transcript for content-based evaluation
@@ -1423,8 +1427,10 @@ Ask ONE focused question based on these observations.`)
         }
       }
 
+      // Feedback is ready - update states
       setComprehensiveFeedback(comprehensiveFeedback)
       setPerformanceScore(calculatedPerformanceScore)
+      setIsGeneratingFeedback(false) // Feedback generation complete
 
       // Now trigger interviewer to discuss the solution
       const userProfile = user ? await getUserProfile(user.id) : null
@@ -3912,12 +3918,28 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     </Button>
                   </div>
                 </div>
+              ) : isGeneratingFeedback ? (
+                /* Loading state while AI calculates comprehensive feedback */
+                <div className="flex flex-col items-center justify-center py-16 px-8">
+                  <div className="relative mb-6">
+                    <div className="w-16 h-16 rounded-full border-4 border-accent/20 border-t-accent animate-spin" />
+                    <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-accent animate-pulse" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-white mb-2">Analyzing Your Performance</h3>
+                  <p className="text-gray-400 text-center max-w-md mb-4">
+                    Our AI is evaluating your code, communication, and problem-solving approach to generate comprehensive feedback...
+                  </p>
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <Clock className="h-4 w-4" />
+                    <span>This usually takes 5-10 seconds</span>
+                  </div>
+                </div>
               ) : (
                 <>
                   <ErrorBoundary>
                     <PracticeFeedback
                       feedback={comprehensiveFeedback || ""}
-                      performanceScore={performanceScore || 0}
+                      performanceScore={performanceScore ?? 0}
                       testsPassed={testSummary.passed}
                       testsTotal={testSummary.total}
                       timeComplexity={efficiencyMetrics?.estimatedTimeComplexity}

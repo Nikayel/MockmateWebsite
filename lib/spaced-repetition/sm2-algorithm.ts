@@ -120,6 +120,18 @@ export function calculateConfidence(
  * Determine mastery level based on interval and review count
  *
  * Note: reviewCount here is the NEW count AFTER the review (so first review = 1)
+ *
+ * Mastery progression:
+ * - 'new': Never reviewed
+ * - 'learning': Short intervals (< 7 days) or failed reviews
+ * - 'reviewing': Medium intervals (7-20 days), building confidence
+ * - 'mastered': Long intervals (21+ days), consistently good performance
+ *
+ * With perfect scores, typical progression:
+ * - Review 1: 1 day → learning
+ * - Review 2: 3 days → learning
+ * - Review 3: 7-8 days → reviewing
+ * - Review 4: 20+ days → mastered (if interval >= 21)
  */
 export function determineMasteryLevel(
   interval: number,
@@ -132,8 +144,9 @@ export function determineMasteryLevel(
   // Never reviewed = new (reviewCount is post-review, so 0 means never reviewed)
   if (reviewCount === 0) return 'new';
 
-  // Based on interval thresholds
-  if (interval >= 30) return 'mastered';
+  // Based on interval thresholds (lowered from 30 to 21 for faster mastery progression)
+  // 21 days = 3 weeks of consistent good performance = reasonable mastery indicator
+  if (interval >= 21) return 'mastered';
   if (interval >= 7) return 'reviewing';
 
   // First few reviews with short intervals = still learning
