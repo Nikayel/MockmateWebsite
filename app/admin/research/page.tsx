@@ -49,55 +49,6 @@ export default function ResearchDashboard() {
 
   const totalUsers = (distribution?.sm2.total || 0) + (distribution?.fsrs.total || 0)
 
-  const eventColumns: Column<typeof recentEvents[0]>[] = [
-    {
-      key: "algorithm",
-      label: "Algorithm",
-      render: (value) => renderBadge(
-        value.toUpperCase(),
-        value === "fsrs" ? "default" : "default"
-      ),
-    },
-    { key: "pattern", label: "Pattern" },
-    {
-      key: "difficulty",
-      label: "Difficulty",
-      render: (value) => renderBadge(
-        value,
-        value === "easy" ? "success" : value === "medium" ? "warning" : "error"
-      ),
-    },
-    { key: "score", label: "Score", align: "right" },
-    { key: "interval_days", label: "Next Interval", align: "right", render: (v) => `${v}d` },
-    {
-      key: "actual_retention",
-      label: "Retention",
-      align: "center",
-      render: (value) =>
-        value ? (
-          <CheckCircle className="h-4 w-4 text-green-400 mx-auto" />
-        ) : (
-          <XCircle className="h-4 w-4 text-red-400 mx-auto" />
-        ),
-    },
-    {
-      key: "retention_as_predicted",
-      label: "Predicted",
-      align: "center",
-      render: (value) =>
-        value ? (
-          <CheckCircle className="h-4 w-4 text-[#00d9ff] mx-auto" />
-        ) : (
-          <Minus className="h-4 w-4 text-gray-500 mx-auto" />
-        ),
-    },
-    {
-      key: "timestamp",
-      label: "Time",
-      render: (value) => new Date(value).toLocaleString(),
-    },
-  ]
-
   return (
     <AdminLayout
       title="Algorithm Research"
@@ -116,9 +67,9 @@ export default function ResearchDashboard() {
             className="border-gray-700 text-gray-300 hover:bg-gray-800"
           >
             {migrating ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <Database className="h-4 w-4 mr-2" />
+              <Database className="mr-2 h-4 w-4" />
             )}
             Migrate Users
           </Button>
@@ -129,9 +80,9 @@ export default function ResearchDashboard() {
             className="border-[#00d9ff] text-[#00d9ff] hover:bg-[#00d9ff]/10"
           >
             {backfilling ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <Repeat className="h-4 w-4 mr-2" />
+              <Repeat className="mr-2 h-4 w-4" />
             )}
             Backfill Data
           </Button>
@@ -139,14 +90,16 @@ export default function ResearchDashboard() {
       }
     >
       {/* Distribution Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <AlgorithmCard
           name="SM-2 Algorithm"
           color="blue"
           total={distribution?.sm2.total || 0}
           active7d={distribution?.sm2.active_7d || 0}
           overridden={distribution?.sm2.overridden || 0}
-          percentage={totalUsers > 0 ? Math.round((distribution?.sm2.total || 0) / totalUsers * 100) : 0}
+          percentage={
+            totalUsers > 0 ? Math.round(((distribution?.sm2.total || 0) / totalUsers) * 100) : 0
+          }
         />
 
         <AlgorithmCard
@@ -155,30 +108,34 @@ export default function ResearchDashboard() {
           total={distribution?.fsrs.total || 0}
           active7d={distribution?.fsrs.active_7d || 0}
           overridden={distribution?.fsrs.overridden || 0}
-          percentage={totalUsers > 0 ? Math.round((distribution?.fsrs.total || 0) / totalUsers * 100) : 0}
+          percentage={
+            totalUsers > 0 ? Math.round(((distribution?.fsrs.total || 0) / totalUsers) * 100) : 0
+          }
         />
 
-        <Card className="bg-gray-900/50 border-gray-800">
+        <Card className="border-gray-800 bg-gray-900/50">
           <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-4">
+            <div className="mb-4 flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-[#00d9ff]" />
-              <span className="text-white font-medium">Research Status</span>
+              <span className="font-medium text-white">Research Status</span>
             </div>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Total Users in Study</span>
-                <span className="text-white font-medium">{totalUsers}</span>
+                <span className="font-medium text-white">{totalUsers}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Sample Size Status</span>
-                <span className={comp?.sufficient_sample_size ? "text-green-400" : "text-yellow-400"}>
+                <span
+                  className={comp?.sufficient_sample_size ? "text-green-400" : "text-yellow-400"}
+                >
                   {comp?.sufficient_sample_size ? "Sufficient" : "Collecting"}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Last Updated</span>
-                <span className="text-gray-300 text-xs">
-                  {data?.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : 'Never'}
+                <span className="text-xs text-gray-300">
+                  {data?.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : "Never"}
                 </span>
               </div>
             </div>
@@ -199,7 +156,7 @@ export default function ResearchDashboard() {
 
       {/* Insights Summary */}
       {insights && (
-        <Card className="bg-gradient-to-r from-gray-900/80 to-gray-800/50 border-gray-700">
+        <Card className="border-gray-700 bg-gradient-to-r from-gray-900/80 to-gray-800/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Brain className="h-5 w-5 text-[#00d9ff]" />
@@ -209,7 +166,7 @@ export default function ResearchDashboard() {
           <CardContent className="space-y-4">
             <p className="text-lg text-white">{insights.summary}</p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {insights.keyFindings.length > 0 && (
                 <InsightSection
                   title="Key Findings"
@@ -234,7 +191,7 @@ export default function ResearchDashboard() {
 
       {/* Primary Metrics Comparison */}
       {sm2Stats && fsrsStats && comp && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
           <MetricComparisonCard
             title="Retention Rate"
             sm2Value={sm2Stats.average_retention_rate}
@@ -290,15 +247,66 @@ export default function ResearchDashboard() {
           title="Recent Review Events"
           description="Latest spaced repetition reviews across both algorithms"
           data={recentEvents.slice(0, 20)}
-          columns={eventColumns}
+          columns={[
+            {
+              key: "algorithm",
+              label: "Algorithm",
+              render: (value) =>
+                renderBadge(value.toUpperCase(), value === "fsrs" ? "default" : "default"),
+            },
+            { key: "pattern", label: "Pattern" },
+            {
+              key: "difficulty",
+              label: "Difficulty",
+              render: (value) =>
+                renderBadge(
+                  value,
+                  value === "easy" ? "success" : value === "medium" ? "warning" : "error"
+                ),
+            },
+            { key: "score", label: "Score", align: "right" },
+            {
+              key: "interval_days",
+              label: "Next Interval",
+              align: "right",
+              render: (v) => `${v}d`,
+            },
+            {
+              key: "actual_retention",
+              label: "Retention",
+              align: "center",
+              render: (value) =>
+                value ? (
+                  <CheckCircle className="mx-auto h-4 w-4 text-green-400" />
+                ) : (
+                  <XCircle className="mx-auto h-4 w-4 text-red-400" />
+                ),
+            },
+            {
+              key: "retention_as_predicted",
+              label: "Predicted",
+              align: "center",
+              render: (value) =>
+                value ? (
+                  <CheckCircle className="mx-auto h-4 w-4 text-[#00d9ff]" />
+                ) : (
+                  <Minus className="mx-auto h-4 w-4 text-gray-500" />
+                ),
+            },
+            {
+              key: "timestamp",
+              label: "Time",
+              render: (value) => new Date(value).toLocaleString(),
+            },
+          ]}
           keyExtractor={(event) => event.id}
           emptyMessage="No review events recorded yet. Data will appear as users practice."
         />
       )}
 
       {/* Last Updated */}
-      <p className="text-xs text-gray-500 text-center">
-        Last updated: {data?.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : 'Unknown'}
+      <p className="text-center text-xs text-gray-500">
+        Last updated: {data?.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : "Unknown"}
       </p>
     </AdminLayout>
   )
@@ -314,33 +322,40 @@ interface AlgorithmCardProps {
   percentage: number
 }
 
-function AlgorithmCard({ name, color, total, active7d, overridden, percentage }: AlgorithmCardProps) {
+function AlgorithmCard({
+  name,
+  color,
+  total,
+  active7d,
+  overridden,
+  percentage,
+}: AlgorithmCardProps) {
   const bgColor = color === "blue" ? "bg-blue-500" : "bg-purple-500"
   const borderColor = color === "blue" ? "border-blue-500" : "border-purple-500"
   const textColor = color === "blue" ? "text-blue-400" : "text-purple-400"
 
   return (
-    <Card className="bg-gray-900/50 border-gray-800">
+    <Card className="border-gray-800 bg-gray-900/50">
       <CardContent className="pt-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 rounded-full ${bgColor}`} />
-            <span className="text-white font-medium">{name}</span>
+            <div className={`h-3 w-3 rounded-full ${bgColor}`} />
+            <span className="font-medium text-white">{name}</span>
           </div>
           <Badge variant="outline" className={`${borderColor} ${textColor}`}>
             {percentage}%
           </Badge>
         </div>
         <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="bg-gray-800/50 rounded p-2">
+          <div className="rounded bg-gray-800/50 p-2">
             <p className="text-xl font-bold text-white">{total}</p>
             <p className="text-xs text-gray-400">Total</p>
           </div>
-          <div className="bg-gray-800/50 rounded p-2">
+          <div className="rounded bg-gray-800/50 p-2">
             <p className="text-xl font-bold text-green-400">{active7d}</p>
             <p className="text-xs text-gray-400">Active 7d</p>
           </div>
-          <div className="bg-gray-800/50 rounded p-2">
+          <div className="rounded bg-gray-800/50 p-2">
             <p className="text-xl font-bold text-yellow-400">{overridden}</p>
             <p className="text-xs text-gray-400">Overridden</p>
           </div>
@@ -352,13 +367,15 @@ function AlgorithmCard({ name, color, total, active7d, overridden, percentage }:
 
 function WinnerBanner({ winner, confidence, fsrsWins, sm2Wins, sufficientSample }: any) {
   return (
-    <Card className={`border-2 ${
-      winner === 'fsrs'
-        ? 'bg-purple-500/10 border-purple-500/50'
-        : winner === 'sm2'
-        ? 'bg-blue-500/10 border-blue-500/50'
-        : 'bg-gray-800/50 border-gray-700'
-    }`}>
+    <Card
+      className={`border-2 ${
+        winner === "fsrs"
+          ? "border-purple-500/50 bg-purple-500/10"
+          : winner === "sm2"
+            ? "border-blue-500/50 bg-blue-500/10"
+            : "border-gray-700 bg-gray-800/50"
+      }`}
+    >
       <CardContent className="py-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -370,9 +387,11 @@ function WinnerBanner({ winner, confidence, fsrsWins, sm2Wins, sufficientSample 
             <div>
               {winner ? (
                 <>
-                  <Badge className={`text-lg px-4 py-1 mb-1 ${
-                    winner === 'fsrs' ? 'bg-purple-500' : 'bg-blue-500'
-                  }`}>
+                  <Badge
+                    className={`mb-1 px-4 py-1 text-lg ${
+                      winner === "fsrs" ? "bg-purple-500" : "bg-blue-500"
+                    }`}
+                  >
                     {winner.toUpperCase()} WINNING
                   </Badge>
                   <p className="text-gray-300">
@@ -390,7 +409,7 @@ function WinnerBanner({ winner, confidence, fsrsWins, sm2Wins, sufficientSample 
             </div>
           </div>
           {!sufficientSample && (
-            <div className="flex items-center gap-2 text-yellow-400 bg-yellow-500/10 px-4 py-2 rounded-lg">
+            <div className="flex items-center gap-2 rounded-lg bg-yellow-500/10 px-4 py-2 text-yellow-400">
               <AlertTriangle className="h-5 w-5" />
               <span className="text-sm">Need more users for statistical significance</span>
             </div>
@@ -406,8 +425,8 @@ function InsightSection({ title, icon: Icon, items, color }: any) {
   const iconColor = color === "green" ? "text-green-400" : "text-[#00d9ff]"
 
   return (
-    <div className="bg-gray-800/50 rounded-lg p-4">
-      <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
+    <div className="rounded-lg bg-gray-800/50 p-4">
+      <h4 className="mb-3 flex items-center gap-2 text-sm font-medium text-gray-400">
         <Icon className={`h-4 w-4 ${iconColor}`} />
         {title}
       </h4>
@@ -428,7 +447,7 @@ interface MetricComparisonCardProps {
   sm2Value: number
   fsrsValue: number
   difference: number
-  format: 'percent' | 'number' | 'days' | 'decimal'
+  format: "percent" | "number" | "days" | "decimal"
   invertBetter?: boolean
   icon: React.ReactNode
   description?: string
@@ -445,9 +464,9 @@ function MetricComparisonCard({
   description,
 }: MetricComparisonCardProps) {
   const formatValue = (val: number) => {
-    if (format === 'percent') return `${val}%`
-    if (format === 'days') return `${val}d`
-    if (format === 'decimal') return val.toFixed(1)
+    if (format === "percent") return `${val}%`
+    if (format === "days") return `${val}d`
+    if (format === "decimal") return val.toFixed(1)
     return val.toFixed(1)
   }
 
@@ -455,28 +474,29 @@ function MetricComparisonCard({
   const isEqual = Math.abs(difference) < 0.5
 
   return (
-    <Card className="bg-gray-900/50 border-gray-800">
+    <Card className="border-gray-800 bg-gray-900/50">
       <CardContent className="pt-4">
-        <div className="flex items-center gap-2 text-gray-400 mb-3">
+        <div className="mb-3 flex items-center gap-2 text-gray-400">
           {icon}
           <span className="text-sm font-medium">{title}</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <div className="text-center p-2 rounded bg-blue-500/10 border border-blue-500/20">
-            <p className="text-xs text-blue-400 mb-1">SM-2</p>
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          <div className="rounded border border-blue-500/20 bg-blue-500/10 p-2 text-center">
+            <p className="mb-1 text-xs text-blue-400">SM-2</p>
             <p className="text-lg font-bold text-white">{formatValue(sm2Value)}</p>
           </div>
-          <div className="text-center p-2 rounded bg-purple-500/10 border border-purple-500/20">
-            <p className="text-xs text-purple-400 mb-1">FSRS</p>
+          <div className="rounded border border-purple-500/20 bg-purple-500/10 p-2 text-center">
+            <p className="mb-1 text-xs text-purple-400">FSRS</p>
             <p className="text-lg font-bold text-white">{formatValue(fsrsValue)}</p>
           </div>
         </div>
 
-        <div className={`flex items-center justify-center gap-1 text-sm ${
-          isEqual ? 'text-gray-400' :
-          isFsrsBetter ? 'text-purple-400' : 'text-blue-400'
-        }`}>
+        <div
+          className={`flex items-center justify-center gap-1 text-sm ${
+            isEqual ? "text-gray-400" : isFsrsBetter ? "text-purple-400" : "text-blue-400"
+          }`}
+        >
           {isEqual ? (
             <>
               <Minus className="h-4 w-4" />
@@ -495,9 +515,7 @@ function MetricComparisonCard({
           )}
         </div>
 
-        {description && (
-          <p className="text-xs text-gray-500 text-center mt-2">{description}</p>
-        )}
+        {description && <p className="mt-2 text-center text-xs text-gray-500">{description}</p>}
       </CardContent>
     </Card>
   )

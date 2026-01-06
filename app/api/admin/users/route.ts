@@ -7,7 +7,13 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb, adminAuth } from "@/lib/firebase-admin"
-import { verifyAdminAccess, requirePermission, successResponse, unauthorizedResponse, errorResponse } from "@/lib/admin/middleware"
+import {
+  verifyAdminAccess,
+  requirePermission,
+  successResponse,
+  unauthorizedResponse,
+  errorResponse,
+} from "@/lib/admin/middleware"
 import { PERMISSIONS } from "@/lib/admin/rbac"
 import { logAdminAction } from "@/lib/admin/audit"
 import Stripe from "stripe"
@@ -25,10 +31,10 @@ const RATE_LIMIT_MAX_DELETIONS = 5 // Max 5 deletions per minute per admin
 
 // Protected emails that cannot be deleted via API
 // SECURITY: Load from environment variable instead of hardcoding in source
-const PROTECTED_EMAILS = (process.env.ADMIN_PROTECTED_EMAILS || '')
-  .split(',')
-  .map(email => email.trim().toLowerCase())
-  .filter(email => email.length > 0)
+const PROTECTED_EMAILS = (process.env.ADMIN_PROTECTED_EMAILS || "")
+  .split(",")
+  .map((email: string) => email.trim().toLowerCase())
+  .filter((email: string) => email.length > 0)
 
 function checkRateLimit(adminId: string): { allowed: boolean; retryAfter?: number } {
   const now = Date.now()
@@ -208,7 +214,7 @@ export async function DELETE(request: NextRequest) {
     const body = await request.json()
     const { userId } = body
 
-    if (!userId || typeof userId !== 'string') {
+    if (!userId || typeof userId !== "string") {
       return errorResponse("userId is required and must be a string", 400)
     }
 
@@ -245,7 +251,11 @@ export async function DELETE(request: NextRequest) {
 
     // Protected email check
     if (profileData?.email && PROTECTED_EMAILS.includes(profileData.email.toLowerCase())) {
-      logger.warn("Attempted to delete protected user", { userId, email: profileData.email, adminId })
+      logger.warn("Attempted to delete protected user", {
+        userId,
+        email: profileData.email,
+        adminId,
+      })
       return errorResponse("This user account is protected and cannot be deleted", 403)
     }
 
@@ -255,9 +265,15 @@ export async function DELETE(request: NextRequest) {
     if (profileData?.stripe_subscription_id) {
       try {
         await stripe.subscriptions.cancel(profileData.stripe_subscription_id)
-        logger.info("Cancelled Stripe subscription", { userId, subscriptionId: profileData.stripe_subscription_id })
+        logger.info("Cancelled Stripe subscription", {
+          userId,
+          subscriptionId: profileData.stripe_subscription_id,
+        })
       } catch (stripeError) {
-        logger.error("Failed to cancel Stripe subscription", { error: stripeError, subscriptionId: profileData.stripe_subscription_id })
+        logger.error("Failed to cancel Stripe subscription", {
+          error: stripeError,
+          subscriptionId: profileData.stripe_subscription_id,
+        })
       }
     }
 
@@ -277,10 +293,7 @@ export async function DELETE(request: NextRequest) {
           }
         } else if (col.field) {
           // Query and delete documents by field
-          const snapshot = await adminDb
-            .collection(col.name)
-            .where(col.field, "==", userId)
-            .get()
+          const snapshot = await adminDb.collection(col.name).where(col.field, "==", userId).get()
 
           snapshot.docs.forEach((doc) => {
             batch.delete(doc.ref)
@@ -314,10 +327,7 @@ export async function DELETE(request: NextRequest) {
           try {
             await index.namespace(namespace).deleteMany({
               filter: {
-                $or: [
-                  { userId: { $eq: userId } },
-                  { user_id: { $eq: userId } },
-                ],
+                $or: [{ userId: { $eq: userId } }, { user_id: { $eq: userId } }],
               },
             })
           } catch (nsError) {
@@ -337,7 +347,7 @@ export async function DELETE(request: NextRequest) {
       logger.info("Deleted Firebase Auth user", { userId })
     } catch (authDeleteError: any) {
       // User might already be deleted from Auth
-      if (authDeleteError.code === 'auth/user-not-found') {
+      if (authDeleteError.code === "auth/user-not-found") {
         authDeleted = true
         logger.info("Firebase Auth user already deleted", { userId })
       } else {
@@ -346,7 +356,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // 6. Log the admin action for audit trail
-    await logAdminAction(adminId, 'delete_user', {
+    await logAdminAction(adminId, "delete_user", {
       targetUserId: userId,
       targetEmail: profileData?.email,
       targetTier: profileData?.subscription_tier,
@@ -366,4 +376,3 @@ export async function DELETE(request: NextRequest) {
     return errorResponse(error.message || "Failed to delete user", 500)
   }
 }
-

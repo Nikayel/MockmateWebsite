@@ -52,10 +52,10 @@ export default function UsersPage() {
 
   // Protected emails - these users cannot be deleted
   // SECURITY: Load from environment variable (UI check only - real protection is server-side)
-  const PROTECTED_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_PROTECTED_EMAILS || '')
-    .split(',')
-    .map(email => email.trim().toLowerCase())
-    .filter(email => email.length > 0)
+  const PROTECTED_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_PROTECTED_EMAILS || "")
+    .split(",")
+    .map((email: string) => email.trim().toLowerCase())
+    .filter((email: string) => email.length > 0)
 
   const loadData = useCallback(async () => {
     if (!firebaseUser) return
@@ -157,33 +157,36 @@ export default function UsersPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
       </div>
     )
   }
 
-  const tierDistribution = metrics ? [
-    { name: "Free", value: metrics.users.byTier.free, color: "#6B7280" },
-    { name: "Pro", value: metrics.users.byTier.pro, color: "#FBBF24" },
-    { name: "Enterprise", value: metrics.users.byTier.enterprise, color: "#A855F7" },
-  ] : []
+  const tierDistribution = metrics
+    ? [
+        { name: "Free", value: metrics.users.byTier.free, color: "#6B7280" },
+        { name: "Pro", value: metrics.users.byTier.pro, color: "#FBBF24" },
+        { name: "Enterprise", value: metrics.users.byTier.enterprise, color: "#A855F7" },
+      ]
+    : []
 
-  const conversionRate = metrics && metrics.users.total > 0
-    ? ((metrics.users.byTier.pro / metrics.users.total) * 100).toFixed(1)
-    : "0"
+  const conversionRate =
+    metrics && metrics.users.total > 0
+      ? ((metrics.users.byTier.pro / metrics.users.total) * 100).toFixed(1)
+      : "0"
 
   return (
     <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-white">Users</h1>
-          <p className="text-gray-400 mt-1">User management and analytics</p>
+          <h1 className="font-heading text-3xl font-bold text-white">Users</h1>
+          <p className="mt-1 text-gray-400">User management and analytics</p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex gap-1 bg-gray-900 rounded-lg p-1">
+          <div className="flex gap-1 rounded-lg bg-gray-900 p-1">
             {["7d", "30d", "90d", "all"].map((range) => (
               <Button
                 key={range}
@@ -193,7 +196,7 @@ export default function UsersPage() {
                 className={
                   timeRange === range
                     ? "bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
-                    : "text-gray-400 hover:text-white hover:bg-gray-800"
+                    : "text-gray-400 hover:bg-gray-800 hover:text-white"
                 }
               >
                 {range === "all" ? "All" : range.toUpperCase()}
@@ -207,7 +210,7 @@ export default function UsersPage() {
             size="sm"
             className="border-gray-700 text-gray-400 hover:text-white"
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
+            <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
         </div>
@@ -216,7 +219,7 @@ export default function UsersPage() {
       {/* Key Metrics */}
       {metrics && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
             <MetricCard
               title="Total Users"
               value={metrics.users.total}
@@ -232,11 +235,7 @@ export default function UsersPage() {
               iconColor="text-yellow-400"
               valueColor="text-yellow-400"
             />
-            <MetricCard
-              title="Free Users"
-              value={metrics.users.byTier.free}
-              icon={UserPlus}
-            />
+            <MetricCard title="Free Users" value={metrics.users.byTier.free} icon={UserPlus} />
             <MetricCard
               title="Enterprise"
               value={metrics.users.byTier.enterprise}
@@ -263,7 +262,7 @@ export default function UsersPage() {
           )}
 
           {/* Distribution */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <DistributionChart
               title="User Distribution"
               data={tierDistribution}
@@ -271,7 +270,7 @@ export default function UsersPage() {
               icon={Users}
             />
 
-            <Card className="bg-gray-900/50 border-gray-800">
+            <Card className="border-gray-800 bg-gray-900/50">
               <CardHeader>
                 <CardTitle className="text-white">Tier Breakdown</CardTitle>
               </CardHeader>
@@ -286,32 +285,36 @@ export default function UsersPage() {
                       <Badge
                         className={
                           item.color === "yellow"
-                            ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
+                            ? "border-yellow-600/30 bg-yellow-600/20 text-yellow-400"
                             : item.color === "purple"
-                              ? "bg-purple-600/20 text-purple-400 border-purple-600/30"
-                              : "bg-gray-600/20 text-gray-400 border-gray-600/30"
+                              ? "border-purple-600/30 bg-purple-600/20 text-purple-400"
+                              : "border-gray-600/30 bg-gray-600/20 text-gray-400"
                         }
                       >
                         {item.tier}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-4">
-                      <span className="text-white font-semibold">{item.count}</span>
-                      <div className="w-32 h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <span className="font-semibold text-white">{item.count}</span>
+                      <div className="h-2 w-32 overflow-hidden rounded-full bg-gray-700">
                         <div
-                          className={`h-full rounded-full ${item.color === "yellow"
-                            ? "bg-yellow-400"
-                            : item.color === "purple"
-                              ? "bg-purple-400"
-                              : "bg-gray-400"
-                            }`}
+                          className={`h-full rounded-full ${
+                            item.color === "yellow"
+                              ? "bg-yellow-400"
+                              : item.color === "purple"
+                                ? "bg-purple-400"
+                                : "bg-gray-400"
+                          }`}
                           style={{
                             width: `${metrics.users.total > 0 ? (item.count / metrics.users.total) * 100 : 0}%`,
                           }}
                         />
                       </div>
-                      <span className="text-gray-500 text-sm w-12">
-                        {metrics.users.total > 0 ? ((item.count / metrics.users.total) * 100).toFixed(0) : 0}%
+                      <span className="w-12 text-sm text-gray-500">
+                        {metrics.users.total > 0
+                          ? ((item.count / metrics.users.total) * 100).toFixed(0)
+                          : 0}
+                        %
                       </span>
                     </div>
                   </div>
@@ -323,21 +326,21 @@ export default function UsersPage() {
       )}
 
       {/* User List */}
-      <Card className="bg-gray-900/50 border-gray-800">
+      <Card className="border-gray-800 bg-gray-900/50">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-white">All Users</CardTitle>
             <div className="flex items-center gap-2">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400" />
                 <Input
                   placeholder="Search users..."
                   value={searchQuery}
-                  onChange={(e) => {
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     setSearchQuery(e.target.value)
                     setPage(1)
                   }}
-                  className="pl-10 w-64 bg-gray-800 border-gray-700 text-white"
+                  className="w-64 border-gray-700 bg-gray-800 pl-10 text-white"
                 />
               </div>
               <Button
@@ -347,7 +350,7 @@ export default function UsersPage() {
                 className="border-gray-700 text-gray-400 hover:text-white"
                 disabled={usersLoading}
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${usersLoading ? "animate-spin" : ""}`} />
+                <RefreshCw className={`mr-2 h-4 w-4 ${usersLoading ? "animate-spin" : ""}`} />
                 Refresh
               </Button>
             </div>
@@ -356,63 +359,72 @@ export default function UsersPage() {
         <CardContent>
           {usersLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00d9ff]"></div>
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
             </div>
           ) : users.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">No users found</div>
+            <div className="py-12 text-center text-gray-400">No users found</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-800">
-                    <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Email</th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Name</th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Tier</th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Created</th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Status</th>
-                    <th className="text-right py-3 px-4 text-gray-400 font-medium text-sm">Actions</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Email</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Name</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Tier</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">
+                      Created
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-right text-sm font-medium text-gray-400">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((user) => {
+                  {users.map((user: UserProfile) => {
                     const protectedUser = isProtected(user.email)
                     return (
-                      <tr key={user.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                        <td className="py-3 px-4">
+                      <tr
+                        key={user.id}
+                        className="border-b border-gray-800/50 hover:bg-gray-800/30"
+                      >
+                        <td className="px-4 py-3">
                           <div className="text-white">{user.email}</div>
-                          <div className="text-xs text-gray-500 font-mono">{user.id.substring(0, 20)}...</div>
+                          <div className="font-mono text-xs text-gray-500">
+                            {user.id.substring(0, 20)}...
+                          </div>
                         </td>
-                        <td className="py-3 px-4 text-gray-300">{user.full_name || "-"}</td>
-                        <td className="py-3 px-4">
+                        <td className="px-4 py-3 text-gray-300">{user.full_name || "-"}</td>
+                        <td className="px-4 py-3">
                           <Badge
                             className={
                               user.subscription_tier === "pro"
-                                ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
+                                ? "border-yellow-600/30 bg-yellow-600/20 text-yellow-400"
                                 : user.subscription_tier === "enterprise"
-                                  ? "bg-purple-600/20 text-purple-400 border-purple-600/30"
-                                  : "bg-gray-600/20 text-gray-400 border-gray-600/30"
+                                  ? "border-purple-600/30 bg-purple-600/20 text-purple-400"
+                                  : "border-gray-600/30 bg-gray-600/20 text-gray-400"
                             }
                           >
                             {user.subscription_tier || "free"}
                           </Badge>
                         </td>
-                        <td className="py-3 px-4 text-gray-400 text-sm">
-                          {user.created_at
-                            ? new Date(user.created_at).toLocaleDateString()
-                            : "-"}
+                        <td className="px-4 py-3 text-sm text-gray-400">
+                          {user.created_at ? new Date(user.created_at).toLocaleDateString() : "-"}
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="px-4 py-3">
                           {protectedUser ? (
-                            <Badge className="bg-green-600/20 text-green-400 border-green-600/30">
+                            <Badge className="border-green-600/30 bg-green-600/20 text-green-400">
                               Protected
                             </Badge>
                           ) : (
-                            <Badge className="bg-gray-600/20 text-gray-400 border-gray-600/30">
+                            <Badge className="border-gray-600/30 bg-gray-600/20 text-gray-400">
                               {user.subscription_status || "none"}
                             </Badge>
                           )}
                         </td>
-                        <td className="py-3 px-4 text-right">
+                        <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <Button
                               variant="ghost"
@@ -421,13 +433,13 @@ export default function UsersPage() {
                                 setSelectedUserId(user.id)
                                 setProfileDrawerOpen(true)
                               }}
-                              className="text-[#00d9ff] hover:text-[#00d9ff]/80 hover:bg-[#00d9ff]/10"
+                              className="text-[#00d9ff] hover:bg-[#00d9ff]/10 hover:text-[#00d9ff]/80"
                               title="View Profile"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
                             {protectedUser ? (
-                              <span className="text-gray-500 text-sm ml-2">Protected</span>
+                              <span className="ml-2 text-sm text-gray-500">Protected</span>
                             ) : (
                               <Button
                                 variant="ghost"
@@ -436,7 +448,7 @@ export default function UsersPage() {
                                   setUserToDelete(user)
                                   setDeleteDialogOpen(true)
                                 }}
-                                className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                                className="text-red-400 hover:bg-red-900/20 hover:text-red-300"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -451,7 +463,7 @@ export default function UsersPage() {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-800">
+                <div className="mt-4 flex items-center justify-between border-t border-gray-800 pt-4">
                   <div className="text-sm text-gray-400">
                     Page {page} of {totalPages}
                   </div>
@@ -459,7 +471,7 @@ export default function UsersPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      onClick={() => setPage((p: number) => Math.max(1, p - 1))}
                       disabled={page === 1}
                       className="border-gray-700 text-gray-400 hover:text-white"
                     >
@@ -468,7 +480,7 @@ export default function UsersPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      onClick={() => setPage((p: number) => Math.min(totalPages, p + 1))}
                       disabled={page === totalPages}
                       className="border-gray-700 text-gray-400 hover:text-white"
                     >
@@ -484,15 +496,16 @@ export default function UsersPage() {
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent className="bg-gray-900 border-gray-800">
+        <AlertDialogContent className="border-gray-800 bg-gray-900">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-white">Delete User</AlertDialogTitle>
             <AlertDialogDescription className="text-gray-400">
-              Are you sure you want to delete <strong className="text-white">{userToDelete?.email}</strong>?
+              Are you sure you want to delete{" "}
+              <strong className="text-white">{userToDelete?.email}</strong>?
               <br />
               <br />
               This will permanently delete:
-              <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+              <ul className="mt-2 list-inside list-disc space-y-1 text-sm">
                 <li>User profile and all Firestore data</li>
                 <li>All interview sessions</li>
                 <li>All learning progress and mastery data</li>
@@ -505,7 +518,7 @@ export default function UsersPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700">
+            <AlertDialogCancel className="border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
