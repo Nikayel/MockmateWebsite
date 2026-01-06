@@ -62,94 +62,100 @@ export function useTestExecution({
   const [isRunning, setIsRunning] = useState(false)
   const [testResults, setTestResults] = useState<TestResult[]>([])
   const [testSummary, setTestSummary] = useState({ total: 0, passed: 0, failed: 0, passRate: 0 })
-  const [consoleLogs, setConsoleLogs] = useState<Array<{ type: string; message: string; timestamp: number }>>([])
+  const [consoleLogs, setConsoleLogs] = useState<
+    Array<{ type: string; message: string; timestamp: number }>
+  >([])
   const [efficiencyMetrics, setEfficiencyMetrics] = useState<EfficiencyMetrics | null>(null)
 
-  const analyzeEfficiency = useCallback((codeToAnalyze: string): EfficiencyMetrics => {
-    // Calculate lines of code (excluding empty lines and comments)
-    const lines = codeToAnalyze.split("\n")
-    const linesOfCode = lines.filter((line) => {
-      const trimmed = line.trim()
-      return (
-        trimmed.length > 0 &&
-        !trimmed.startsWith("//") &&
-        !trimmed.startsWith("/*") &&
-        !trimmed.startsWith("*")
-      )
-    }).length
+  const analyzeEfficiency = useCallback(
+    (codeToAnalyze: string): EfficiencyMetrics => {
+      // Calculate lines of code (excluding empty lines and comments)
+      const lines = codeToAnalyze.split("\n")
+      const linesOfCode = lines.filter((line) => {
+        const trimmed = line.trim()
+        return (
+          trimmed.length > 0 &&
+          !trimmed.startsWith("//") &&
+          !trimmed.startsWith("/*") &&
+          !trimmed.startsWith("*")
+        )
+      }).length
 
-    // Basic complexity estimation based on control structures
-    const controlStructures =
-      (codeToAnalyze.match(/\b(if|else|for|while|switch|case|catch)\b/g) || []).length
-    const complexityLevel =
-      controlStructures <= 3 ? "Low" : controlStructures <= 7 ? "Medium" : "High"
+      // Basic complexity estimation based on control structures
+      const controlStructures = (
+        codeToAnalyze.match(/\b(if|else|for|while|switch|case|catch)\b/g) || []
+      ).length
+      const complexityLevel =
+        controlStructures <= 3 ? "Low" : controlStructures <= 7 ? "Medium" : "High"
 
-    // Estimate time complexity based on nested loops
-    const nestedLoopCount =
-      (codeToAnalyze.match(/for.*{[^}]*for/g) || []).length +
-      (codeToAnalyze.match(/while.*{[^}]*while/g) || []).length
-    let estimatedTimeComplexity = "O(n)"
-    if (nestedLoopCount >= 2) {
-      estimatedTimeComplexity = "O(n³)"
-    } else if (nestedLoopCount === 1) {
-      estimatedTimeComplexity = "O(n²)"
-    } else if (codeToAnalyze.includes("sort")) {
-      estimatedTimeComplexity = "O(n log n)"
-    }
+      // Estimate time complexity based on nested loops
+      const nestedLoopCount =
+        (codeToAnalyze.match(/for.*{[^}]*for/g) || []).length +
+        (codeToAnalyze.match(/while.*{[^}]*while/g) || []).length
+      let estimatedTimeComplexity = "O(n)"
+      if (nestedLoopCount >= 2) {
+        estimatedTimeComplexity = "O(n³)"
+      } else if (nestedLoopCount === 1) {
+        estimatedTimeComplexity = "O(n²)"
+      } else if (codeToAnalyze.includes("sort")) {
+        estimatedTimeComplexity = "O(n log n)"
+      }
 
-    // Estimate space complexity based on data structures
-    const hasHashMap =
-      codeToAnalyze.includes("Map") ||
-      codeToAnalyze.includes("Set") ||
-      codeToAnalyze.includes("Object") ||
-      codeToAnalyze.includes("{}")
-    const hasArray = codeToAnalyze.includes("[") || codeToAnalyze.includes("Array")
-    let estimatedSpaceComplexity = "O(1)"
-    if (hasHashMap || hasArray) {
-      estimatedSpaceComplexity = "O(n)"
-    }
+      // Estimate space complexity based on data structures
+      const hasHashMap =
+        codeToAnalyze.includes("Map") ||
+        codeToAnalyze.includes("Set") ||
+        codeToAnalyze.includes("Object") ||
+        codeToAnalyze.includes("{}")
+      const hasArray = codeToAnalyze.includes("[") || codeToAnalyze.includes("Array")
+      let estimatedSpaceComplexity = "O(1)"
+      if (hasHashMap || hasArray) {
+        estimatedSpaceComplexity = "O(n)"
+      }
 
-    // Get optimal complexity from scenario
-    const optimalTimeComplexity = (selectedScenario as any)?.optimalComplexity?.time || "N/A"
-    const optimalSpaceComplexity = (selectedScenario as any)?.optimalComplexity?.space || "N/A"
+      // Get optimal complexity from scenario
+      const optimalTimeComplexity = (selectedScenario as any)?.optimalComplexity?.time || "N/A"
+      const optimalSpaceComplexity = (selectedScenario as any)?.optimalComplexity?.space || "N/A"
 
-    // Calculate efficiency score (0-100)
-    let efficiencyScore = 100
+      // Calculate efficiency score (0-100)
+      let efficiencyScore = 100
 
-    // Deduct points for suboptimal time complexity
-    if (optimalTimeComplexity !== "N/A" && estimatedTimeComplexity !== optimalTimeComplexity) {
-      efficiencyScore -= 20
-    }
+      // Deduct points for suboptimal time complexity
+      if (optimalTimeComplexity !== "N/A" && estimatedTimeComplexity !== optimalTimeComplexity) {
+        efficiencyScore -= 20
+      }
 
-    // Deduct points for suboptimal space complexity
-    if (optimalSpaceComplexity !== "N/A" && estimatedSpaceComplexity !== optimalSpaceComplexity) {
-      efficiencyScore -= 10
-    }
+      // Deduct points for suboptimal space complexity
+      if (optimalSpaceComplexity !== "N/A" && estimatedSpaceComplexity !== optimalSpaceComplexity) {
+        efficiencyScore -= 10
+      }
 
-    // Deduct points for excessive complexity
-    if (complexityLevel === "High") {
-      efficiencyScore -= 15
-    } else if (complexityLevel === "Medium") {
-      efficiencyScore -= 5
-    }
+      // Deduct points for excessive complexity
+      if (complexityLevel === "High") {
+        efficiencyScore -= 15
+      } else if (complexityLevel === "Medium") {
+        efficiencyScore -= 5
+      }
 
-    // Deduct points for excessive lines of code
-    if (linesOfCode > 30) {
-      efficiencyScore -= 10
-    } else if (linesOfCode > 20) {
-      efficiencyScore -= 5
-    }
+      // Deduct points for excessive lines of code
+      if (linesOfCode > 30) {
+        efficiencyScore -= 10
+      } else if (linesOfCode > 20) {
+        efficiencyScore -= 5
+      }
 
-    return {
-      linesOfCode,
-      complexity: complexityLevel,
-      estimatedTimeComplexity,
-      estimatedSpaceComplexity,
-      optimalTimeComplexity,
-      optimalSpaceComplexity,
-      efficiencyScore: Math.max(0, efficiencyScore),
-    }
-  }, [selectedScenario])
+      return {
+        linesOfCode,
+        complexity: complexityLevel,
+        estimatedTimeComplexity,
+        estimatedSpaceComplexity,
+        optimalTimeComplexity,
+        optimalSpaceComplexity,
+        efficiencyScore: Math.max(0, efficiencyScore),
+      }
+    },
+    [selectedScenario]
+  )
 
   const runTests = useCallback(async () => {
     if (!selectedScenario) return
@@ -251,13 +257,21 @@ export function useTestExecution({
         setIsRunning(false)
       }
     } catch (error) {
-      logger.error("Code execution error", { error, scenarioId: scenario?.id })
+      logger.error("Code execution error", { error, scenarioId: selectedScenario?.id })
       toast.error("Failed to run tests", {
         description: "There was a problem executing your code. Please try again.",
       })
       setIsRunning(false)
     }
-  }, [selectedScenario, code, selectedLanguage, analyzeEfficiency, onTestComplete, onTestError, playSound])
+  }, [
+    selectedScenario,
+    code,
+    selectedLanguage,
+    analyzeEfficiency,
+    onTestComplete,
+    onTestError,
+    playSound,
+  ])
 
   return {
     isRunning,

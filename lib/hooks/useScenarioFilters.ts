@@ -1,6 +1,12 @@
 import { useMemo } from "react"
 import { useInterviewStore } from "@/lib/stores"
-import { filterScenarios, scenarios, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
+import {
+  filterScenarios,
+  scenarios,
+  type ScenarioType,
+  type DifficultyLevel,
+  type Company,
+} from "@/lib/scenarios"
 
 export function useScenarioFilters() {
   const {
@@ -24,18 +30,23 @@ export function useScenarioFilters() {
     })
   }, [filterType, filterDifficulty, filterCompanies, searchQuery])
 
-  const hasActiveFilters = filterType.length > 0 || filterDifficulty.length > 0 || filterCompanies.length > 0 || searchQuery
+  const hasActiveFilters = Boolean(
+    filterType.length > 0 ||
+    filterDifficulty.length > 0 ||
+    filterCompanies.length > 0 ||
+    searchQuery
+  )
 
   const clearAllFilters = () => {
     setFilterType([])
     setFilterDifficulty([])
     setFilterCompanies([])
-    setSearchQuery('')
+    setSearchQuery("")
   }
 
   const toggleTypeFilter = (type: ScenarioType) => {
     if (filterType.includes(type)) {
-      setFilterType(filterType.filter(t => t !== type))
+      setFilterType(filterType.filter((t) => t !== type))
     } else {
       setFilterType([...filterType, type])
     }
@@ -43,7 +54,7 @@ export function useScenarioFilters() {
 
   const toggleDifficultyFilter = (difficulty: DifficultyLevel) => {
     if (filterDifficulty.includes(difficulty)) {
-      setFilterDifficulty(filterDifficulty.filter(d => d !== difficulty))
+      setFilterDifficulty(filterDifficulty.filter((d) => d !== difficulty))
     } else {
       setFilterDifficulty([...filterDifficulty, difficulty])
     }
@@ -51,22 +62,22 @@ export function useScenarioFilters() {
 
   const toggleCompanyFilter = (company: Company) => {
     if (filterCompanies.includes(company)) {
-      setFilterCompanies(filterCompanies.filter(c => c !== company))
+      setFilterCompanies(filterCompanies.filter((c) => c !== company))
     } else {
       setFilterCompanies([...filterCompanies, company])
     }
   }
 
   const removeTypeFilter = (type: ScenarioType) => {
-    setFilterType(filterType.filter(t => t !== type))
+    setFilterType(filterType.filter((t) => t !== type))
   }
 
   const removeDifficultyFilter = (difficulty: DifficultyLevel) => {
-    setFilterDifficulty(filterDifficulty.filter(d => d !== difficulty))
+    setFilterDifficulty(filterDifficulty.filter((d) => d !== difficulty))
   }
 
   const removeCompanyFilter = (company: Company) => {
-    setFilterCompanies(filterCompanies.filter(c => c !== company))
+    setFilterCompanies(filterCompanies.filter((c) => c !== company))
   }
 
   return {

@@ -146,7 +146,7 @@ export default function UsersPage() {
         alert(`Failed to delete user: ${data.error || "Unknown error"}`)
       }
     } catch (error) {
-      logger.error("Error deleting user", { error, userId: userToDelete })
+      logger.error("Error deleting user", { error, userId: userToDelete?.id })
       alert("Failed to delete user")
     } finally {
       setDeleting(false)
