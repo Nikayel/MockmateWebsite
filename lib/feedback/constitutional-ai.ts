@@ -10,10 +10,10 @@ import type {
   FeedbackCritiqueAdjustment,
   ConversationValidation,
   ScoreResult,
-  ExtendedScoreResult
-} from './types'
-import { generateAIResponse } from '@/lib/ai-providers'
-import { logger } from '@/lib/logger'
+  ExtendedScoreResult,
+} from "./types"
+import { generateAIResponse } from "@/lib/ai-providers"
+import { logger } from "@/lib/logger"
 
 // ============================================================================
 // SCORE CRITIQUE
@@ -38,8 +38,7 @@ export async function critiqueScores(
     hasBlindCopying?: boolean
   }
 ): Promise<ScoreCritiqueAdjustment> {
-
-  const silentSolution = 'silentSolution' in scores ? scores.silentSolution : false
+  const silentSolution = "silentSolution" in scores ? scores.silentSolution : false
 
   const critiquePrompt = `You are a Constitutional AI reviewer ensuring fair, helpful, and honest scoring.
 
@@ -56,9 +55,9 @@ PERFORMANCE CONTEXT:
 - Approach explained: ${context.aiValidation.approachExplained}
 - Approach quality: ${context.aiValidation.approachQuality}
 - Communication score: ${context.aiValidation.communicationScore}
-${context.codeCompleteness?.isIncomplete ? `- Code incomplete: ${context.codeCompleteness.reason}` : ''}
-${context.hasBlindCopying ? '- AI copying detected' : ''}
-${silentSolution ? '- Silent solution (no explanation)' : ''}
+${context.codeCompleteness?.isIncomplete ? `- Code incomplete: ${context.codeCompleteness.reason}` : ""}
+${context.hasBlindCopying ? "- AI copying detected" : ""}
+${silentSolution ? "- Silent solution (no explanation)" : ""}
 
 CONSTITUTIONAL PRINCIPLES - Critique against these 4 aspects:
 
@@ -118,11 +117,11 @@ If no issues found, return:
 
   try {
     const response = await generateAIResponse(
-      'You are a Constitutional AI reviewer. Return only valid JSON, no markdown.',
+      "You are a Constitutional AI reviewer. Return only valid JSON, no markdown.",
       critiquePrompt,
       [],
       {
-        complexity: 'simple',
+        complexity: "simple",
         temperature: 0.2,
         // preferredProvider: 'claude' // TODO: Switch to Claude for Constitutional AI when live (for now use Gemini to save costs)
       }
@@ -132,27 +131,52 @@ If no issues found, return:
     if (jsonMatch) {
       const result = JSON.parse(jsonMatch[0]) as ScoreCritiqueAdjustment
 
-      // Log critique decisions
-      if (result.madeChanges) {
-        logger.info('[Constitutional AI] Score adjustment made', {
+      // Validate and fix adjusted scores if present
+      if (result.madeChanges && result.adjustedScores) {
+        // Recalculate overall from components to ensure consistency
+        // Don't trust AI to do the math correctly
+        const recalculatedOverall = Math.round(
+          result.adjustedScores.understanding * 0.3 +
+            result.adjustedScores.problemSolving * 0.25 +
+            result.adjustedScores.codeQuality * 0.25 +
+            result.adjustedScores.communication * 0.2
+        )
+
+        // If AI's overall differs significantly from recalculated, use recalculated
+        const aiOverall = result.adjustedScores.overall
+        if (Math.abs(aiOverall - recalculatedOverall) > 5) {
+          logger.warn("[Constitutional AI] Overall score mismatch - recalculating", {
+            aiProvidedOverall: aiOverall,
+            recalculatedOverall,
+            components: {
+              understanding: result.adjustedScores.understanding,
+              problemSolving: result.adjustedScores.problemSolving,
+              codeQuality: result.adjustedScores.codeQuality,
+              communication: result.adjustedScores.communication,
+            },
+          })
+          result.adjustedScores.overall = recalculatedOverall
+        }
+
+        logger.info("[Constitutional AI] Score adjustment made", {
           original: scores,
           adjusted: result.adjustedScores,
           critiques: result.critiques,
-          reasoning: result.reasoning
+          reasoning: result.reasoning,
         })
       }
 
       return result
     }
   } catch (error) {
-    logger.error('[Constitutional AI] Score critique failed', { error })
+    logger.error("[Constitutional AI] Score critique failed", { error })
   }
 
   // Fallback: no changes
   return {
     critiques: [],
-    reasoning: 'Critique failed, using original scores',
-    madeChanges: false
+    reasoning: "Critique failed, using original scores",
+    madeChanges: false,
   }
 }
 
@@ -183,11 +207,10 @@ export async function critiqueFeedbackText(
     isIncomplete: boolean
   }
 ): Promise<FeedbackCritiqueAdjustment> {
-
   const critiquePrompt = `You are a Constitutional AI reviewer ensuring helpful, honest, and constructive feedback.
 
 GENERATED FEEDBACK:
-${feedback.substring(0, 1500)}${feedback.length > 1500 ? '\n[...truncated for brevity]' : ''}
+${feedback.substring(0, 1500)}${feedback.length > 1500 ? "\n[...truncated for brevity]" : ""}
 
 PERFORMANCE SCORES:
 - Overall: ${scores.overall}/100
@@ -251,11 +274,11 @@ If no issues:
 
   try {
     const response = await generateAIResponse(
-      'You are a Constitutional AI reviewer. Return only valid JSON, no markdown.',
+      "You are a Constitutional AI reviewer. Return only valid JSON, no markdown.",
       critiquePrompt,
       [],
       {
-        complexity: 'simple',
+        complexity: "simple",
         temperature: 0.2,
         // preferredProvider: 'claude' // TODO: Switch to Claude for Constitutional AI when live (for now use Gemini to save costs)
       }
@@ -266,21 +289,21 @@ If no issues:
       const result = JSON.parse(jsonMatch[0]) as FeedbackCritiqueAdjustment
 
       if (result.madeChanges) {
-        logger.info('[Constitutional AI] Feedback revision made', {
+        logger.info("[Constitutional AI] Feedback revision made", {
           critiques: result.critiques,
-          reasoning: result.reasoning
+          reasoning: result.reasoning,
         })
       }
 
       return result
     }
   } catch (error) {
-    logger.error('[Constitutional AI] Feedback critique failed', { error })
+    logger.error("[Constitutional AI] Feedback critique failed", { error })
   }
 
   return {
     critiques: [],
-    reasoning: 'Critique failed, using original feedback',
-    madeChanges: false
+    reasoning: "Critique failed, using original feedback",
+    madeChanges: false,
   }
 }
