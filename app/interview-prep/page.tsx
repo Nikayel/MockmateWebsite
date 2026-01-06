@@ -122,17 +122,36 @@ export default function InterviewPrepPage() {
         </section>
       ))}
 
-      {/* Simple CTA - not pushy */}
-      <section className="border-t border-zinc-800 py-12">
+      {/* Personalized Roadmap Value Prop */}
+      <section className="border-t border-zinc-800 py-16">
         <div className="container mx-auto px-4">
-          <div className="mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <p className="text-white font-medium">Need a study plan?</p>
-              <p className="text-sm text-zinc-500">Get a personalized roadmap based on your interview date.</p>
+          <div className="mx-auto max-w-3xl">
+            <h2 className="text-2xl font-semibold text-white mb-2">
+              Your interview. Your timeline. Your plan.
+            </h2>
+            <p className="text-zinc-400 mb-8">
+              Tell us when your interview is and we'll build a day-by-day study schedule
+              that prioritizes what matters most for your target company.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+              <div className="text-sm">
+                <div className="text-white font-medium mb-1">Interview date</div>
+                <div className="text-zinc-500">We work backwards from your deadline</div>
+              </div>
+              <div className="text-sm">
+                <div className="text-white font-medium mb-1">Your skill level</div>
+                <div className="text-zinc-500">Skip what you know, focus on gaps</div>
+              </div>
+              <div className="text-sm">
+                <div className="text-white font-medium mb-1">Company patterns</div>
+                <div className="text-zinc-500">Prioritized by what they actually ask</div>
+              </div>
             </div>
+
             <Link href="/roadmap/preview">
               <Button className="bg-white text-black hover:bg-zinc-200">
-                Create roadmap
+                Create your roadmap
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
