@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { MetricCard, TimeSeriesChart, DistributionChart } from "@/components/admin/charts"
 import { Terminal, CheckCircle, Clock, Zap, RefreshCw, TrendingUp } from "lucide-react"
+import { logger } from "@/lib/logger"
 
 export default function SessionsPage() {
   const { firebaseUser } = useAuth()
@@ -30,7 +31,7 @@ export default function SessionsPage() {
         }
       }
     } catch (error) {
-      console.error("Error loading session data:", error)
+      logger.error("Error loading session data", { error, timeRange })
     } finally {
       setLoading(false)
     }

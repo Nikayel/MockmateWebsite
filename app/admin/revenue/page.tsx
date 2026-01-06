@@ -19,6 +19,7 @@ import {
   Percent,
   Receipt,
 } from "lucide-react"
+import { logger } from "@/lib/logger"
 
 interface RevenueData {
   actual: {
@@ -107,7 +108,7 @@ export default function RevenuePage() {
         throw new Error(data.error || "Unknown error")
       }
     } catch (error) {
-      console.error("Error loading revenue data:", error)
+      logger.error("Error loading revenue data", { error, timeRange })
       setError(error instanceof Error ? error.message : "Failed to load data")
     } finally {
       setLoading(false)

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { TimeSeriesChart } from "@/components/admin/charts"
 import { AlertCircle, RefreshCw, ExternalLink, Bug, AlertTriangle } from "lucide-react"
+import { logger } from "@/lib/logger"
 
 interface ErrorEvent {
   timestamp: string
@@ -70,7 +71,7 @@ export default function ErrorsPage() {
         }
       }
     } catch (error) {
-      console.error("Error loading errors:", error)
+      logger.error("Error loading admin errors", { error, timeRange })
     } finally {
       setLoading(false)
       setRefreshing(false)

@@ -22,6 +22,7 @@ import {
   FlaskConical,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { logger } from "@/lib/logger"
 
 interface NavItem {
   name: string
@@ -80,7 +81,7 @@ export default function AdminLayout({
           setIsAdmin(false)
         }
       } catch (error) {
-        console.error("Admin check failed:", error)
+        logger.error("Admin check failed", { error, userId: firebaseUser?.uid })
         setIsAdmin(false)
       }
     }
@@ -123,7 +124,7 @@ export default function AdminLayout({
       await firebaseSignOut(auth)
       router.push("/")
     } catch (error) {
-      console.error("Sign out error:", error)
+      logger.error("Admin sign out error", { error })
     }
   }
 

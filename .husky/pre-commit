@@ -1,1 +1,5 @@
-pnpm lint-staged
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Use npx from wherever node is installed
+$(dirname $(which node))/npx lint-staged

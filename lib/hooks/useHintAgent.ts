@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { GeneratedHint, HintLevel, StruggleMetrics } from '@/lib/agents/hint-agent';
 import type { DSAPattern } from '@/lib/types/dsa-patterns';
+import { logger } from '@/lib/logger';
 
 /**
  * useHintAgent Hook
@@ -139,7 +140,7 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
       setRecommendedLevel(data.recommendedRevealLevel || 1);
       setIsPersonalized(data.personalizationApplied || false);
     } catch (err) {
-      console.error('[useHintAgent] Generate error:', err);
+      logger.error('[useHintAgent] Generate error', { error: err, problemId, userId });
       setError(err instanceof Error ? err.message : 'Failed to generate hints');
     } finally {
       setIsLoading(false);
@@ -206,7 +207,7 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
 
       return null;
     } catch (err) {
-      console.error('[useHintAgent] Get next error:', err);
+      logger.error('[useHintAgent] Get next error', { error: err, problemId, userId, currentLevel });
       setError(err instanceof Error ? err.message : 'Failed to get next hint');
       return null;
     } finally {

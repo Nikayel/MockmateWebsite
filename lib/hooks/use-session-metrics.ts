@@ -7,6 +7,7 @@
 
 import { useCallback, useRef } from 'react'
 import { useAuth } from '@/lib/auth-context'
+import { logger } from '@/lib/logger'
 
 interface SessionMetricsConfig {
   sessionId: string
@@ -62,10 +63,8 @@ export function useSessionMetrics(): UseSessionMetricsReturn {
         }),
       })
     } catch (error) {
-      // Don't fail silently in development
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[Session Metrics] Tracking error:', error)
-      }
+      // Log error with proper context
+      logger.error('[Session Metrics] Tracking error', { error, sessionId, eventType })
     }
   }, [firebaseUser])
 
@@ -97,7 +96,7 @@ export function useSessionMetrics(): UseSessionMetricsReturn {
         }),
       })
     } catch (error) {
-      console.error('[Session Metrics] Failed to start tracking:', error)
+      logger.error('[Session Metrics] Failed to start tracking', { error, sessionId: config.sessionId })
     }
   }, [firebaseUser])
 
@@ -171,7 +170,7 @@ export function useSessionMetrics(): UseSessionMetricsReturn {
 
       return null
     } catch (error) {
-      console.error('[Session Metrics] Failed to complete session:', error)
+      logger.error('[Session Metrics] Failed to complete session', { error, sessionId: sessionRef.current?.sessionId })
       return null
     }
   }, [firebaseUser])

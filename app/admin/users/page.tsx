@@ -19,6 +19,7 @@ import {
 import { MetricCard, TimeSeriesChart, DistributionChart } from "@/components/admin/charts"
 import { UserProfileDrawer } from "@/components/admin/UserProfileDrawer"
 import { Users, UserPlus, Crown, Search, RefreshCw, Trash2, X, Eye } from "lucide-react"
+import { logger } from "@/lib/logger"
 
 interface UserProfile {
   id: string
@@ -73,7 +74,7 @@ export default function UsersPage() {
         }
       }
     } catch (error) {
-      console.error("Error loading user data:", error)
+      logger.error("Error loading user data", { error, timeRange })
     } finally {
       setLoading(false)
     }
@@ -105,7 +106,7 @@ export default function UsersPage() {
         }
       }
     } catch (error) {
-      console.error("Error loading users:", error)
+      logger.error("Error loading users list", { error, search: searchQuery })
     } finally {
       setUsersLoading(false)
     }
@@ -145,7 +146,7 @@ export default function UsersPage() {
         alert(`Failed to delete user: ${data.error || "Unknown error"}`)
       }
     } catch (error) {
-      console.error("Error deleting user:", error)
+      logger.error("Error deleting user", { error, userId: userToDelete })
       alert("Failed to delete user")
     } finally {
       setDeleting(false)

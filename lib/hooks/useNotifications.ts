@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import type { InAppNotification, NotificationPreferences } from '@/lib/types/notifications'
 import type { NotificationType } from '@/lib/rag/knowledge-base/notification-knowledge'
+import { logger } from '@/lib/logger'
 
 export interface UseNotificationsOptions {
   /** Polling interval in ms (0 to disable) */
@@ -74,7 +75,7 @@ export function useNotifications(
         'Authorization': `Bearer ${token}`,
       }
     } catch (error) {
-      console.error('[useNotifications] Failed to get auth token:', error)
+      logger.error('[useNotifications] Failed to get auth token', { error })
       return null
     }
   }, [firebaseUser])
@@ -113,7 +114,7 @@ export function useNotifications(
       setNotifications(data.notifications || [])
       setUnreadCount(data.unreadCount || 0)
     } catch (err: any) {
-      console.error('[useNotifications] Error fetching notifications:', err)
+      logger.error('[useNotifications] Error fetching notifications', { error: err })
       setError(err.message || 'Failed to fetch notifications')
     } finally {
       setLoading(false)
@@ -140,7 +141,7 @@ export function useNotifications(
       const data = await response.json()
       setPreferences(data.preferences)
     } catch (err: any) {
-      console.error('Error fetching notification preferences:', err)
+      logger.error('Error fetching notification preferences', { error: err })
     }
   }, [firebaseUser, getAuthHeaders])
 

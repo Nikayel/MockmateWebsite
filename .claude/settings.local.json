@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm build:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(wc:*)",
+      "Bash(ls:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx:*)",
+      "Bash(for file in /Users/nikayeljamal/MockmateWebsite/components/dashboard/{CircularProgress,PatternMasteryBar,SkillInsightsCards,SkillInsightsAlerts,CognitiveProfile,LoadingSkeleton,SkillInsights}.tsx)",
+      "Bash(done)"
+    ]
+  }
+}

@@ -22,6 +22,7 @@ import {
   Crown,
   Zap,
 } from "lucide-react"
+import { logger } from "@/lib/logger"
 
 interface AnalyticsMetrics {
   users: {
@@ -120,7 +121,7 @@ export default function AdminDashboard() {
         }
       }
     } catch (err) {
-      console.error("Error loading metrics:", err)
+      logger.error("Error loading admin metrics", { error: err, timeRange })
       setError(err instanceof Error ? err.message : "Failed to load data")
     } finally {
       setLoading(false)

@@ -37,6 +37,7 @@ import {
   Target,
 } from "lucide-react"
 import { getProviderCostInfo, AI_BUDGET_CAPS } from "@/lib/pricing"
+import { logger } from "@/lib/logger"
 
 interface PatternUsage {
   pattern: string
@@ -129,7 +130,7 @@ export default function AIUsagePage() {
         }
       }
     } catch (error) {
-      console.error("Error loading AI usage:", error)
+      logger.error("Error loading AI usage", { error, timeRange, userFilter, detailed })
     } finally {
       setLoading(false)
     }
@@ -170,7 +171,7 @@ export default function AIUsagePage() {
         setActionError(data.error || "Failed to clear cache")
       }
     } catch (error) {
-      console.error("Error clearing cache:", error)
+      logger.error("Error clearing cache", { error })
       setActionError("Failed to clear cache")
     } finally {
       setClearingCache(false)
@@ -218,7 +219,7 @@ export default function AIUsagePage() {
         setActionError(data.error || "Failed to set budget")
       }
     } catch (error) {
-      console.error("Error setting budget:", error)
+      logger.error("Error setting budget", { error, userId: selectedUser?.userId, budget: budgetNum })
       setActionError("Failed to set budget")
     } finally {
       setSettingBudget(false)

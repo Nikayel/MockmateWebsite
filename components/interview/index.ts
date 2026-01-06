@@ -13,6 +13,11 @@ export { ProblemPanel } from "./ProblemPanel"
 export { InterviewerChat, AIChatPartner } from "./InterviewerChat"
 export { InterviewEditor } from "./InterviewEditor"
 
+// ScenarioBrowser sub-components
+export { ScenarioCard } from "./ScenarioCard"
+export { ScenarioFilters } from "./ScenarioFilters"
+export { ScenarioSearchBar } from "./ScenarioSearchBar"
+
 // Minimal AI companion for reduced distraction
 export { MinimalAICompanion } from "./MinimalAICompanion"
 

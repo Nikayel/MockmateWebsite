@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { FunnelChart, TimeSeriesChart, CohortHeatmap } from "@/components/admin/charts"
 import { TrendingUp, RefreshCw, AlertCircle, Users } from "lucide-react"
+import { logger } from "@/lib/logger"
 
 interface FunnelData {
   stages: Array<{ name: string; value: number; color?: string }>
@@ -64,7 +65,7 @@ export default function FunnelPage() {
         }
       }
     } catch (error) {
-      console.error("Error loading funnel data:", error)
+      logger.error("Error loading funnel data", { error, timeRange, cohortType })
     } finally {
       setLoading(false)
       setRefreshing(false)
