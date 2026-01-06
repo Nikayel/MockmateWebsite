@@ -189,19 +189,26 @@ Analyze and return this exact JSON structure (no markdown, no explanation):
 }
 
 VALIDATION RULES:
-- isCoherent: false ONLY if responses are complete gibberish, random words, or totally nonsensical
-- responsesRelevant: false ONLY if candidate responses have zero relation to questions asked
+- isCoherent: false if responses are gibberish, random words, or nonsensical
+- responsesRelevant: false if candidate responses don't relate to questions asked
+- approachExplained: true ONLY if they explicitly described their algorithm/strategy BEFORE or WHILE coding (e.g., "I'll use a hashmap to...", "My approach is..."). Just saying "let me try" or typing code silently does NOT count.
+- approachQuality:
+  * "none" - No explanation at all, just coded silently
+  * "poor" - Single vague sentence like "I'll loop through"
+  * "basic" - Mentioned the approach but no reasoning
+  * "good" - Explained approach with some reasoning
+  * "excellent" - Detailed explanation with trade-offs discussed
+- complexityDiscussed: true ONLY if they explicitly mentioned time/space complexity (e.g., "O(n)", "linear time")
 - complexityAccurate: ONLY true if stated complexity matches actual code complexity
-- communicationScore: Be GENEROUS when the candidate explains their thought process:
-  * 0-25: Completely incoherent or gibberish responses
-  * 40-55: Minimal communication but at least attempted to explain
-  * 55-75: Basic communication - explained their approach or answered questions
-  * 75-90: Good communication - clear thought process and engaged with interviewer
-  * 90-100: Excellent - thorough explanations and proactive communication
+- communicationScore: Be STRICT - silent coding is poor communication:
+  * 0-20: No communication - typed code without talking
+  * 20-40: Minimal - answered one question briefly, no approach explanation
+  * 40-60: Basic - explained approach OR answered questions, not both
+  * 60-80: Good - explained approach AND engaged with questions AND discussed complexity
+  * 80-100: Excellent - proactive communication, discussed trade-offs, complexity, edge cases
 
-IMPORTANT: If the candidate explained their approach AND the solution works, lean toward HIGHER scores.
-For easy problems, be MORE forgiving - quick solutions with brief explanations are acceptable.
-The goal is to encourage communication, not penalize concise but clear explanations.
+CRITICAL: If candidate message count < 3 OR average message length < 30 characters, communication score should be < 40.
+Solving a problem correctly but SILENTLY is a communication FAILURE in real interviews.
 
 Return ONLY the JSON object, nothing else.`
 
@@ -242,10 +249,11 @@ Return ONLY the JSON object, nothing else.`
 
 /**
  * Default validation when AI call fails or is skipped
+ * Defaults are CONSERVATIVE - assume no communication happened
  */
 function getDefaultValidation(): ConversationValidation {
   return {
-    isCoherent: true, // Assume coherent if we can't validate
+    isCoherent: true,
     responsesRelevant: true,
     approachExplained: false,
     approachQuality: 'none',
@@ -256,7 +264,7 @@ function getDefaultValidation(): ConversationValidation {
     questionsAnswered: 0,
     edgeCasesConsidered: false,
     alternativesDiscussed: false,
-    communicationScore: 40
+    communicationScore: 25 // Low default - must earn through actual communication
   }
 }
 
@@ -952,37 +960,48 @@ function calculateValidatedScores(
   // In real interviews, you MUST explain your approach before coding
   const isOptimalSolution = passRate >= 100 && (effScore || 0) >= 80
   const isCorrectSolution = passRate >= 100
-  const difficulty = efficiencyMetrics?.difficulty || 'medium'
-  const difficultyBonus = difficulty === 'easy' ? 5 : 0
 
-  if (aiValidation.approachExplained && aiValidation.isCoherent) {
+  // NO difficulty bonus - easy problems still require communication
+  if (aiValidation.approachExplained && aiValidation.isCoherent && aiValidation.approachQuality !== 'none') {
     // Explained approach = this is what we want
+    // But quality matters - just saying "I'll loop" isn't enough
+    const qualityBonus = {
+      'excellent': 20,
+      'good': 12,
+      'basic': 5,
+      'poor': 0,
+      'none': 0
+    }[aiValidation.approachQuality] || 0
+
     if (isOptimalSolution) {
-      // Optimal solution + explained approach = excellent communicator
-      communication = Math.max(80, Math.min(95, communication + 15 + difficultyBonus))
+      communication = Math.min(95, communication + qualityBonus)
     } else if (isCorrectSolution) {
-      // Correct solution + explained = good communicator
-      communication = Math.max(70, Math.min(90, communication + 10 + difficultyBonus))
+      communication = Math.min(85, communication + qualityBonus)
     } else {
-      // Explained but failed = at least they communicated (small boost)
-      communication = Math.min(75, communication + 5)
+      communication = Math.min(70, communication + Math.floor(qualityBonus / 2))
     }
   } else {
     // DID NOT explain approach - this is a problem even if solution is correct
     // Real interviewers care about thought process, not just the answer
     if (isCorrectSolution) {
-      // Correct but silent = poor communication, cap at 55
-      // "You got the right answer but I have no idea how you think"
-      communication = Math.min(55, communication)
+      // Correct but silent = poor communication, cap at 45
+      communication = Math.min(45, communication)
     } else {
       // Wrong AND silent = very poor communication
-      communication = Math.min(40, communication)
+      communication = Math.min(35, communication)
     }
   }
 
-  // Minimum floor only if they actually had meaningful conversation
-  if (preScreen.hasContent && preScreen.candidateMessageCount >= 3 && aiValidation.isCoherent && aiValidation.approachExplained) {
-    communication = Math.max(55, communication)
+  // Minimum floor only if they actually had substantial conversation
+  // Requires: 3+ messages, approach explained with at least basic quality
+  if (preScreen.hasContent &&
+      preScreen.candidateMessageCount >= 3 &&
+      preScreen.avgMessageLength >= 40 &&
+      aiValidation.isCoherent &&
+      aiValidation.approachExplained &&
+      aiValidation.approachQuality !== 'none' &&
+      aiValidation.approachQuality !== 'poor') {
+    communication = Math.max(50, communication)
   }
 
   // For incomplete solutions, communication can stay higher IF they discussed well
@@ -1015,6 +1034,7 @@ function calculateValidatedScores(
  * Apply score floors for correct solutions
  * A correct solution should get at least a passing grade for code quality
  * BUT communication score should NOT be boosted if they didn't explain approach
+ * Silent solutions are PENALIZED - this is an interview, not just coding
  */
 function applyScoreFloors(
   scores: ReturnType<typeof calculateValidatedScores>,
@@ -1023,34 +1043,36 @@ function applyScoreFloors(
   aiValidation: ConversationValidation
 ): ReturnType<typeof calculateValidatedScores> {
   const isOptimal = (efficiencyScore || 0) >= 80
-  // CRITICAL: Only boost communication if they actually explained their approach
-  const explainedApproach = aiValidation.approachExplained && aiValidation.isCoherent
-  const hasGoodComm = aiValidation.communicationScore >= 65 && explainedApproach
+  // Only boost if they actually explained with at least basic quality
+  const explainedApproach = aiValidation.approachExplained &&
+    aiValidation.isCoherent &&
+    aiValidation.approachQuality !== 'none' &&
+    aiValidation.approachQuality !== 'poor'
+  const hasGoodComm = aiValidation.communicationScore >= 60 && explainedApproach
 
   let overall = scores.overall
   let communication = scores.communication
 
-  // Overall score floors based on correctness
-  // But DO NOT boost communication unless approach was explained
+  // Score floors - silent solutions get LOWER floors
   if (passRate >= 100 && isOptimal && hasGoodComm) {
-    overall = Math.max(88, overall) // A range - optimal + explained
-    communication = Math.max(75, communication)
+    overall = Math.max(85, overall) // A range - optimal + explained well
+    communication = Math.max(70, communication)
   } else if (passRate >= 100 && isOptimal && explainedApproach) {
-    overall = Math.max(83, overall) // A- range - optimal + some explanation
-    communication = Math.max(65, communication)
+    overall = Math.max(78, overall) // B+ range - optimal + some explanation
+    communication = Math.max(55, communication)
   } else if (passRate >= 100 && isOptimal) {
-    // Optimal but SILENT - good code quality, but cap communication
-    overall = Math.max(78, overall) // B+ range - penalized for no communication
-    // DO NOT boost communication - they didn't explain
+    // Optimal but SILENT - penalize significantly
+    overall = Math.max(68, overall) // C+ range - good code but bad interview skills
+    // DO NOT boost communication
   } else if (passRate >= 100 && explainedApproach) {
-    overall = Math.max(75, overall) // B range - correct + explained
+    overall = Math.max(72, overall) // B- range - correct + explained
   } else if (passRate >= 100) {
-    // Correct but SILENT - lower floor
-    overall = Math.max(72, overall) // B- range - penalized for no communication
+    // Correct but SILENT - significant penalty
+    overall = Math.max(62, overall) // C range - solved it but didn't interview well
   } else if (passRate >= 90) {
-    overall = Math.max(68, overall) // C+ range
+    overall = Math.max(58, overall) // C- range
   } else if (passRate >= 80) {
-    overall = Math.max(62, overall) // C range
+    overall = Math.max(52, overall) // D range
   }
 
   return { ...scores, overall, communication }
