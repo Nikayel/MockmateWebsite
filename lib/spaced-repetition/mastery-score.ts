@@ -272,6 +272,13 @@ function calculateTimeEfficiencyScore(
 
 /**
  * Calculate independence score based on hint usage.
+ *
+ * PHILOSOPHY: Not all hints are equal. We use a progressive penalty:
+ * - First hint: Minor penalty (could be an "aha moment" nudge)
+ * - Second hint: Moderate penalty (needed more guidance)
+ * - Third+ hints: Significant penalty (struggled to understand)
+ *
+ * The ratio also matters: 1/5 hints is better than 1/2 hints
  */
 function calculateIndependenceScore(input: MasteryScoreInput): number {
   if (input.hintsTotal === 0) {
@@ -279,30 +286,38 @@ function calculateIndependenceScore(input: MasteryScoreInput): number {
     return 100
   }
 
+  if (input.hintsUsed === 0) {
+    return 100 // Perfect independence
+  }
+
   const hintRatio = input.hintsUsed / input.hintsTotal
 
-  // Scoring:
-  // 0 hints: 100
-  // 1 hint: 70-85 (depending on total)
-  // 2 hints: 50-65
-  // 3+ hints: 30-50
-  // All hints: 20
-
-  if (input.hintsUsed === 0) {
-    return 100
-  }
-
+  // Used all hints - significant penalty but not catastrophic
   if (hintRatio >= 1) {
-    return 20 // Used all hints
+    return 25
   }
 
-  // Base penalty per hint
-  const baseScore = 100 - (input.hintsUsed * 25)
+  // Progressive penalty system:
+  // First hint: -10 points (could be minor clarification)
+  // Second hint: -15 points (needed real help)
+  // Third+ hints: -20 points each (struggled significantly)
+  let score = 100
+  const hintsUsed = input.hintsUsed
 
-  // Adjust based on ratio (using 1 of 5 hints is better than 1 of 2)
-  const ratioAdjustment = (1 - hintRatio) * 15
+  if (hintsUsed >= 1) score -= 10  // First hint
+  if (hintsUsed >= 2) score -= 15  // Second hint
+  if (hintsUsed >= 3) score -= 20  // Third hint
+  if (hintsUsed >= 4) score -= 20  // Fourth hint
+  if (hintsUsed >= 5) score -= 15  // Fifth+ hints (diminishing penalty)
 
-  return Math.max(20, Math.min(85, baseScore + ratioAdjustment))
+  // Ratio bonus: using fewer of available hints shows restraint
+  // e.g., using 1 of 5 available hints is better than 1 of 2
+  const ratioBonus = (1 - hintRatio) * 10
+
+  // Apply ratio bonus but don't exceed 95 (you still used a hint)
+  score = Math.min(95, score + ratioBonus)
+
+  return Math.max(20, Math.round(score))
 }
 
 // =============================================================================

@@ -65,6 +65,68 @@ async function getUserIdFromRequest(request: NextRequest): Promise<string | null
 }
 
 /**
+ * Get guest ID from request header
+ */
+function getGuestIdFromRequest(request: NextRequest): string | null {
+  const guestId = request.headers.get('X-Guest-Id')
+  if (!guestId) return null
+
+  // Validate guest ID format
+  if (!/^guest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(guestId)) {
+    return null
+  }
+
+  return guestId
+}
+
+/**
+ * Check if guest has exceeded their free trial
+ * Server-side enforcement to prevent client-side bypass
+ */
+async function checkGuestQuota(guestId: string): Promise<{ allowed: boolean; reason?: string }> {
+  try {
+    // Query Firestore for completed sessions by this guest
+    const completedSessionsQuery = await adminDb
+      .collection('interview_sessions')
+      .where('user_id', '==', guestId)
+      .where('is_guest', '==', true)
+      .limit(5) // Only need to check if any completed sessions exist
+      .get()
+
+    // Check if any session was completed (has feedback or completed_at)
+    const hasCompletedSession = completedSessionsQuery.docs.some(
+      (doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data().completed_at || doc.data().feedback
+    )
+
+    if (hasCompletedSession) {
+      return {
+        allowed: false,
+        reason: 'Free trial already used. Sign up to continue practicing!',
+      }
+    }
+
+    // Check if they have an active (non-expired) session already
+    const hasActiveSession = completedSessionsQuery.docs.some((doc: FirebaseFirestore.QueryDocumentSnapshot) => {
+      const data = doc.data()
+      if (data.completed_at || data.feedback) return false
+
+      // Check if session is expired (48 hours)
+      const expiresAt = data.expires_at ? new Date(data.expires_at) : null
+      if (expiresAt && expiresAt < new Date()) return false
+
+      return true
+    })
+
+    // Allow if no completed session and either no active session or has one active
+    return { allowed: true }
+  } catch (error) {
+    logger.error('Failed to check guest quota', { guestId, error })
+    // Fail open for guest - don't block if check fails
+    return { allowed: true }
+  }
+}
+
+/**
  * SECURITY NOTE: We intentionally do NOT allow userId from request body
  * as this could allow users to spoof another user's identity and affect their quota.
  * All quota checks must use verified auth tokens only.
@@ -152,8 +214,52 @@ export async function checkQuota(
   // Get user ID from auth header only (never from body for security)
   const userId = await getUserIdFromRequest(request)
 
-  // If no user ID, allow request (unauthenticated users have other rate limits)
+  // If no user ID, check for guest ID and enforce guest quota
   if (!userId) {
+    const guestId = getGuestIdFromRequest(request)
+
+    // If guest ID present, check server-side guest quota
+    if (guestId) {
+      const guestQuota = await checkGuestQuota(guestId)
+
+      if (!guestQuota.allowed) {
+        const response = NextResponse.json(
+          {
+            error: 'Free trial exhausted',
+            message: guestQuota.reason || 'Free trial already used. Sign up to continue!',
+            code: 'FREE_TRIAL_EXHAUSTED',
+          },
+          { status: 403 }
+        )
+
+        logger.warn('Guest quota exceeded', { guestId })
+
+        return {
+          allowed: false,
+          userId: guestId,
+          tier: 'free',
+          sessionsUsed: 1,
+          sessionsLimit: 1,
+          budgetUsed: 0,
+          budgetLimit: 0,
+          message: guestQuota.reason,
+          response,
+        }
+      }
+
+      // Guest quota OK
+      return {
+        allowed: true,
+        userId: guestId,
+        tier: 'free',
+        sessionsUsed: 0,
+        sessionsLimit: 1,
+        budgetUsed: 0,
+        budgetLimit: 0,
+      }
+    }
+
+    // No auth and no guest ID - anonymous request, rely on rate limits only
     return {
       allowed: true,
       userId: 'anonymous',

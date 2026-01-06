@@ -69,6 +69,161 @@ interface ConversationValidation {
 }
 
 /**
+ * AI Partner code overlap analysis
+ * Detects if candidate blindly copied AI suggestions without understanding
+ */
+interface AICodeOverlapResult {
+  hasHighOverlap: boolean           // True if >70% of code matches AI suggestions
+  overlapPercentage: number         // 0-100
+  copiedSnippets: string[]          // Specific snippets that were copied
+  modificationsMade: boolean        // Did they modify the AI suggestions at all?
+}
+
+/**
+ * Extract code blocks from AI Partner conversation
+ */
+function extractCodeFromPartnerMessages(messages: Array<{ role: string; content: string }> | undefined): string[] {
+  if (!messages || !Array.isArray(messages)) return []
+
+  const codeBlocks: string[] = []
+  const codeBlockRegex = /```[\w]*\n?([\s\S]*?)```/g
+
+  for (const msg of messages) {
+    // Only look at AI Partner (model) responses
+    if (msg.role !== 'model' && msg.role !== 'assistant') continue
+
+    let match
+    while ((match = codeBlockRegex.exec(msg.content)) !== null) {
+      const code = match[1].trim()
+      if (code.length > 20) { // Ignore tiny snippets
+        codeBlocks.push(code)
+      }
+    }
+  }
+
+  return codeBlocks
+}
+
+/**
+ * Normalize code for comparison (remove whitespace, comments, variable names don't matter)
+ */
+function normalizeCode(code: string): string {
+  return code
+    .replace(/\/\/.*$/gm, '')           // Remove single-line comments
+    .replace(/\/\*[\s\S]*?\*\//g, '')   // Remove multi-line comments
+    .replace(/#.*$/gm, '')              // Remove Python comments
+    .replace(/\s+/g, ' ')               // Normalize whitespace
+    .replace(/["'`]/g, '"')             // Normalize quotes
+    .toLowerCase()
+    .trim()
+}
+
+/**
+ * Calculate similarity between two code strings using longest common subsequence
+ */
+function calculateCodeSimilarity(code1: string, code2: string): number {
+  const s1 = normalizeCode(code1)
+  const s2 = normalizeCode(code2)
+
+  if (s1.length === 0 || s2.length === 0) return 0
+
+  // Use a simple character-level LCS ratio for efficiency
+  // For longer strings, we use n-gram comparison
+  if (s1.length > 500 || s2.length > 500) {
+    // Use 4-gram comparison for longer code
+    const ngrams1 = new Set<string>()
+    const ngrams2 = new Set<string>()
+
+    for (let i = 0; i <= s1.length - 4; i++) {
+      ngrams1.add(s1.substring(i, i + 4))
+    }
+    for (let i = 0; i <= s2.length - 4; i++) {
+      ngrams2.add(s2.substring(i, i + 4))
+    }
+
+    let matches = 0
+    for (const ng of ngrams1) {
+      if (ngrams2.has(ng)) matches++
+    }
+
+    const maxSize = Math.max(ngrams1.size, ngrams2.size)
+    return maxSize > 0 ? (matches / maxSize) * 100 : 0
+  }
+
+  // For shorter code, use exact substring matching
+  const minLen = Math.min(s1.length, s2.length)
+  let matchingChars = 0
+
+  // Sliding window to find longest matching substring
+  for (let windowSize = Math.floor(minLen * 0.8); windowSize >= 10; windowSize -= 5) {
+    for (let i = 0; i <= s1.length - windowSize; i++) {
+      const substr = s1.substring(i, i + windowSize)
+      if (s2.includes(substr)) {
+        matchingChars = Math.max(matchingChars, windowSize)
+        break
+      }
+    }
+    if (matchingChars > 0) break
+  }
+
+  return (matchingChars / minLen) * 100
+}
+
+/**
+ * Analyze if candidate code heavily copies AI Partner suggestions
+ */
+function analyzeAICodeOverlap(
+  finalCode: string,
+  partnerMessages: Array<{ role: string; content: string }> | undefined
+): AICodeOverlapResult {
+  if (!finalCode || !partnerMessages || partnerMessages.length === 0) {
+    return {
+      hasHighOverlap: false,
+      overlapPercentage: 0,
+      copiedSnippets: [],
+      modificationsMade: true,
+    }
+  }
+
+  const aiCodeBlocks = extractCodeFromPartnerMessages(partnerMessages)
+  if (aiCodeBlocks.length === 0) {
+    return {
+      hasHighOverlap: false,
+      overlapPercentage: 0,
+      copiedSnippets: [],
+      modificationsMade: true,
+    }
+  }
+
+  // Calculate similarity with each AI code block
+  let maxOverlap = 0
+  const copiedSnippets: string[] = []
+
+  for (const aiCode of aiCodeBlocks) {
+    const similarity = calculateCodeSimilarity(finalCode, aiCode)
+    if (similarity > maxOverlap) {
+      maxOverlap = similarity
+    }
+    if (similarity >= 70) {
+      copiedSnippets.push(aiCode.substring(0, 100) + (aiCode.length > 100 ? '...' : ''))
+    }
+  }
+
+  // Check if any modifications were made (compare normalized lengths)
+  const normalizedFinal = normalizeCode(finalCode)
+  const allAINormalized = aiCodeBlocks.map(normalizeCode).join(' ')
+  const modificationsMade = normalizedFinal.length !== allAINormalized.length ||
+    normalizedFinal !== allAINormalized
+
+  return {
+    hasHighOverlap: maxOverlap >= 70,
+    overlapPercentage: Math.round(maxOverlap),
+    copiedSnippets,
+    modificationsMade,
+  }
+}
+
+/**
  * STEP 1: Basic algorithmic pre-screening (fast, no AI)
  * Detects obvious signals and filters out empty/minimal conversations
  */
@@ -992,16 +1147,26 @@ function calculateValidatedScores(
     }
   }
 
-  // Minimum floor only if they actually had substantial conversation
+  // Minimum floor only if they actually had MEANINGFUL conversation
   // Requires: 3+ messages, approach explained with at least basic quality
+  // NOTE: This floor is HIGHER than silent solution caps - that's intentional
+  // The difference is whether they EXPLAINED their approach, not just chatted
   if (preScreen.hasContent &&
       preScreen.candidateMessageCount >= 3 &&
-      preScreen.avgMessageLength >= 40 &&
+      preScreen.avgMessageLength >= 50 && // Raised from 40 to require more substance
       aiValidation.isCoherent &&
       aiValidation.approachExplained &&
       aiValidation.approachQuality !== 'none' &&
       aiValidation.approachQuality !== 'poor') {
-    communication = Math.max(50, communication)
+    // Only apply floor if they actually explained approach well
+    const qualityFloor = {
+      'excellent': 65,
+      'good': 55,
+      'basic': 45,
+      'poor': 35,
+      'none': 25
+    }[aiValidation.approachQuality] || 35
+    communication = Math.max(qualityFloor, communication)
   }
 
   // For incomplete solutions, communication can stay higher IF they discussed well
@@ -1017,8 +1182,9 @@ function calculateValidatedScores(
 
   // FINAL CAP: Incomplete solutions CANNOT pass (cap at 30%)
   // Even with good communication, an incomplete solution is a fail
+  // We use 30 as absolute max - but in practice components are already capped at 25
   if (isIncompleteSolution || hasOnlyBaseCasePassing) {
-    overall = Math.min(30, overall)
+    overall = Math.min(28, overall) // Hard cap at 28% - this is a failing grade
   }
 
   return {
@@ -1035,13 +1201,17 @@ function calculateValidatedScores(
  * A correct solution should get at least a passing grade for code quality
  * BUT communication score should NOT be boosted if they didn't explain approach
  * Silent solutions are PENALIZED - this is an interview, not just coding
+ *
+ * PHILOSOPHY: Real FAANG interviews require explaining your thought process.
+ * A silent optimal solution is a C at best - you solved the problem but failed
+ * to demonstrate the communication skills that interviews are designed to assess.
  */
 function applyScoreFloors(
   scores: ReturnType<typeof calculateValidatedScores>,
   passRate: number,
   efficiencyScore: number | undefined,
   aiValidation: ConversationValidation
-): ReturnType<typeof calculateValidatedScores> {
+): ReturnType<typeof calculateValidatedScores> & { silentSolution: boolean } {
   const isOptimal = (efficiencyScore || 0) >= 80
   // Only boost if they actually explained with at least basic quality
   const explainedApproach = aiValidation.approachExplained &&
@@ -1050,10 +1220,14 @@ function applyScoreFloors(
     aiValidation.approachQuality !== 'poor'
   const hasGoodComm = aiValidation.communicationScore >= 60 && explainedApproach
 
+  // Detect silent solutions - correct but no communication
+  const isSilentSolution = passRate >= 80 && !explainedApproach
+
   let overall = scores.overall
   let communication = scores.communication
 
-  // Score floors - silent solutions get LOWER floors
+  // Score floors - silent solutions get SIGNIFICANTLY LOWER floors
+  // This matches real interview expectations where communication is critical
   if (passRate >= 100 && isOptimal && hasGoodComm) {
     overall = Math.max(85, overall) // A range - optimal + explained well
     communication = Math.max(70, communication)
@@ -1062,20 +1236,23 @@ function applyScoreFloors(
     communication = Math.max(55, communication)
   } else if (passRate >= 100 && isOptimal) {
     // Optimal but SILENT - penalize significantly
-    overall = Math.max(68, overall) // C+ range - good code but bad interview skills
-    // DO NOT boost communication
+    // In real interviews, this is a major red flag - they can code but can't communicate
+    overall = Math.max(55, overall) // D+ range - good code but failed interview communication
+    // DO NOT boost communication - cap it low
+    communication = Math.min(35, communication)
   } else if (passRate >= 100 && explainedApproach) {
     overall = Math.max(72, overall) // B- range - correct + explained
   } else if (passRate >= 100) {
     // Correct but SILENT - significant penalty
-    overall = Math.max(62, overall) // C range - solved it but didn't interview well
+    overall = Math.max(52, overall) // D range - solved it but didn't interview well
+    communication = Math.min(40, communication)
   } else if (passRate >= 90) {
-    overall = Math.max(58, overall) // C- range
+    overall = Math.max(50, overall) // D range
   } else if (passRate >= 80) {
-    overall = Math.max(52, overall) // D range
+    overall = Math.max(45, overall) // D- range
   }
 
-  return { ...scores, overall, communication }
+  return { ...scores, overall, communication, silentSolution: isSilentSolution }
 }
 
 
@@ -1252,7 +1429,7 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
-    const { code, scenarioTitle, scenarioType, scenarioId, scenarioDifficulty, scenarioPattern, testResults, language, timeSpent, aiCollaborationMetrics, interactionMetrics, efficiencyMetrics, conversationTranscript, sessionId, userId } = await request.json()
+    const { code, scenarioTitle, scenarioType, scenarioId, scenarioDifficulty, scenarioPattern, testResults, language, timeSpent, aiCollaborationMetrics, interactionMetrics, efficiencyMetrics, conversationTranscript, partnerMessages, sessionId, userId } = await request.json()
 
     if (!code || !scenarioTitle) {
       return NextResponse.json({ error: "Code and scenario title are required" }, { status: 400 })
@@ -1491,6 +1668,11 @@ CODE EFFICIENCY ANALYSIS:
       aiValidation.questionsAnswered = 0
     }
 
+    // Step 2.5: AI Code Overlap Detection
+    // Check if candidate blindly copied AI Partner suggestions
+    const aiCodeOverlap = analyzeAICodeOverlap(code, partnerMessages)
+    const hasBlindCopying = aiCodeOverlap.hasHighOverlap && !aiCodeOverlap.modificationsMade
+
     // Step 3: Calculate validated scores using both algorithmic + AI signals
     // Different scoring models for different scenario types
     const validatedScores = calculateValidatedScores(
@@ -1501,6 +1683,21 @@ CODE EFFICIENCY ANALYSIS:
       scenarioType, // Pass scenario type for specialized scoring
       code // Pass code/design notes for system design blank template detection
     )
+
+    // Apply AI copying penalty if detected
+    // If they blindly copied >70% of their code from AI, penalize understanding
+    if (hasBlindCopying && scenarioType !== 'system-design') {
+      validatedScores.understanding = Math.min(
+        validatedScores.understanding,
+        Math.max(30, validatedScores.understanding - 25) // Cap at 30 or reduce by 25
+      )
+      logger.info('AI copying penalty applied', {
+        sessionId,
+        overlapPercentage: aiCodeOverlap.overlapPercentage,
+        originalUnderstanding: validatedScores.understanding + 25,
+        newUnderstanding: validatedScores.understanding,
+      })
+    }
 
     // Step 4: Apply score floors for correct solutions
     const algorithmicScores = applyScoreFloors(
@@ -1825,6 +2022,11 @@ CRITICAL INSTRUCTIONS:
       performanceScore: scores.overall,
       scores: scores, // Full score breakdown
       structured: structuredFeedback, // Full structured data
+      // Flags for frontend warnings
+      silentSolution: algorithmicScores.silentSolution || false, // True if solved correctly but didn't explain approach
+      incompleteSolution: code ? analyzeCodeCompleteness(code, language || 'python').isIncomplete : false,
+      aiCopyingDetected: hasBlindCopying, // True if >70% code copied from AI Partner
+      aiOverlapPercentage: aiCodeOverlap.overlapPercentage, // How much code matches AI suggestions
       provider: aiResponse.provider,
       latencyMs: aiResponse.latencyMs,
     })

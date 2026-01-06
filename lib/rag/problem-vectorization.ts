@@ -15,7 +15,7 @@
 import { getHybridProvider } from '@/lib/rag/embeddings/hybrid-provider'
 import { vectorDB } from '@/lib/rag/vectordb'
 import type { VectorDocument } from '@/lib/rag/types'
-import type { DSAScenario, Scenario } from '@/lib/scenarios/types'
+import type { DSAScenario, SystemDesignScenario, BugFixScenario, Scenario } from '@/lib/scenarios/types'
 import { getScenariosByType, getScenariosByPattern } from '@/lib/scenarios/index'
 import { ALL_COMPANIES, type CompanyQuestionData } from '@/lib/data/company-questions'
 import { getPatternKnowledge, patternKnowledgeToDocument } from '@/lib/rag/knowledge-base/dsa-knowledge'
@@ -28,9 +28,13 @@ export interface VectorizationResult {
   totalProblems: number
   totalCompanies: number
   totalPatternKnowledge: number
+  totalSystemDesign: number
+  totalBugFix: number
   vectorizedProblems: number
   vectorizedCompanies: number
   vectorizedPatternKnowledge: number
+  vectorizedSystemDesign: number
+  vectorizedBugFix: number
   errors: string[]
   durationMs: number
 }
@@ -75,6 +79,116 @@ function scenarioToEmbeddingText(scenario: DSAScenario): string {
     `## Complexity`,
     `Time: ${scenario.optimalComplexity.time}`,
     `Space: ${scenario.optimalComplexity.space}`,
+  ]
+
+  return parts.join('\n')
+}
+
+/**
+ * Convert System Design scenario to rich text for embedding
+ * Rich content for RAG retrieval during system design interviews
+ */
+function systemDesignToEmbeddingText(scenario: SystemDesignScenario): string {
+  const parts = [
+    `# ${scenario.title}`,
+    ``,
+    `## Overview`,
+    `Type: System Design Interview`,
+    `Difficulty: ${scenario.difficulty}`,
+    `Companies: ${scenario.companies.join(', ')}`,
+    `Estimated Time: ${scenario.estimatedTime} minutes`,
+    `Tags: ${scenario.tags.join(', ')}`,
+    ``,
+    `## Problem Statement`,
+    scenario.problemStatement,
+    ``,
+    `## Functional Requirements`,
+    ...scenario.functionalRequirements.map(req => `- ${req}`),
+    ``,
+    `## Non-Functional Requirements`,
+    ...scenario.nonFunctionalRequirements.map(req => `- ${req}`),
+    ``,
+    `## Constraints`,
+    ...scenario.constraints.map(c => `- ${c}`),
+    ``,
+    `## Key Components`,
+    ...scenario.keyComponents.map(comp => `- ${comp}`),
+    ``,
+    `## Hints for Candidates`,
+    ...scenario.hints.map(hint => `- ${hint}`),
+    ``,
+    `## Evaluation Criteria`,
+    ...scenario.evaluationCriteria.map(ec =>
+      `- ${ec.category} (${ec.weight}%): ${ec.description}`
+    ),
+    ``,
+    `## Example Solution`,
+    `### Overview`,
+    scenario.exampleSolution.overview,
+    ``,
+    `### Architecture`,
+    ...scenario.exampleSolution.architecture.map(a => `- ${a}`),
+    ``,
+    `### Data Model`,
+    ...scenario.exampleSolution.dataModel.map(dm => `- ${dm}`),
+    ``,
+    `### API Design`,
+    ...scenario.exampleSolution.apiDesign.map(api => `- ${api}`),
+    ``,
+    `### Scalability Considerations`,
+    ...scenario.exampleSolution.scalability.map(s => `- ${s}`),
+    ``,
+    `### Trade-offs`,
+    ...scenario.exampleSolution.tradeoffs.map(t => `- ${t}`),
+    ``,
+    `## Discussion Points`,
+    ...scenario.discussionPoints.map(dp => `- ${dp}`),
+  ]
+
+  return parts.join('\n')
+}
+
+/**
+ * Convert Bug Fix scenario to rich text for embedding
+ * Includes bug description, expected behavior, and debugging context
+ */
+function bugFixToEmbeddingText(scenario: BugFixScenario): string {
+  // Get a representative language for the buggy code snippet
+  const languages = Object.keys(scenario.buggyCode)
+  const primaryLang = languages.includes('python') ? 'python' : languages[0]
+  const buggyCodeSnippet = scenario.buggyCode[primaryLang] || ''
+
+  const parts = [
+    `# ${scenario.title}`,
+    ``,
+    `## Overview`,
+    `Type: Bug Fix / Debugging`,
+    `Difficulty: ${scenario.difficulty}`,
+    `Companies: ${scenario.companies.join(', ')}`,
+    `Estimated Time: ${scenario.estimatedTime} minutes`,
+    `Tags: ${scenario.tags.join(', ')}`,
+    ``,
+    `## Problem Statement`,
+    scenario.problemStatement,
+    ``,
+    `## Bug Description`,
+    scenario.bugDescription,
+    ``,
+    `## Expected Behavior`,
+    scenario.expectedBehavior,
+    ``,
+    `## Buggy Code (${primaryLang})`,
+    '```' + primaryLang,
+    buggyCodeSnippet.substring(0, 1000), // Limit code length for embedding
+    '```',
+    ``,
+    `## Debugging Hints`,
+    ...scenario.hints.map(hint => `- ${hint}`),
+    ``,
+    `## Test Cases`,
+    ...scenario.testCases.slice(0, 3).map((tc, i) =>
+      `${i + 1}. ${tc.description}: Input: ${JSON.stringify(tc.input).substring(0, 100)} → Expected: ${JSON.stringify(tc.expected).substring(0, 100)}`
+    ),
   ]
 
   return parts.join('\n')
@@ -302,6 +416,131 @@ async function vectorizeCompanyQuestions(
 }
 
 /**
+ * Vectorize System Design scenarios
+ */
+async function vectorizeSystemDesignScenarios(
+  embeddingProvider: ReturnType<typeof getHybridProvider>,
+  onProgress?: VectorizationProgressCallback
+): Promise<{ vectorized: number; errors: string[] }> {
+  const errors: string[] = []
+  let vectorized = 0
+
+  try {
+    onProgress?.('Loading System Design scenarios', 0, 1, 'Loading...')
+    const scenarios = (await getScenariosByType('system-design')) as SystemDesignScenario[]
+    onProgress?.('Loading System Design scenarios', 1, 1, `Loaded ${scenarios.length} scenarios`)
+
+    for (let i = 0; i < scenarios.length; i++) {
+      const scenario = scenarios[i]
+      onProgress?.('Vectorizing System Design', i + 1, scenarios.length, scenario.title)
+
+      try {
+        const text = systemDesignToEmbeddingText(scenario)
+        const embedding = await embeddingProvider.generateEmbedding(text)
+
+        await vectorDB.upsert([
+          {
+            id: `system-design-${scenario.id}`,
+            vector: embedding,
+            text: text,
+            metadata: {
+              type: 'system-design',
+              problemId: scenario.id,
+              title: scenario.title,
+              difficulty: scenario.difficulty,
+              companies: scenario.companies,
+              tags: scenario.tags,
+              estimatedTime: scenario.estimatedTime,
+              keyComponents: scenario.keyComponents,
+              timestamp: new Date().toISOString(),
+            },
+          },
+        ])
+
+        vectorized++
+      } catch (error) {
+        errors.push(`Failed to vectorize system-design ${scenario.id}: ${error}`)
+      }
+
+      // Small delay to avoid rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+  } catch (error) {
+    errors.push(`Failed to load system design scenarios: ${error}`)
+  }
+
+  return { vectorized, errors }
+}
+
+/**
+ * Vectorize Bug Fix scenarios
+ */
+async function vectorizeBugFixScenarios(
+  embeddingProvider: ReturnType<typeof getHybridProvider>,
+  onProgress?: VectorizationProgressCallback
+): Promise<{ vectorized: number; errors: string[] }> {
+  const errors: string[] = []
+  let vectorized = 0
+
+  try {
+    onProgress?.('Loading Bug Fix scenarios', 0, 1, 'Loading...')
+    const scenarios = (await getScenariosByType('bugfix')) as BugFixScenario[]
+    onProgress?.('Loading Bug Fix scenarios', 1, 1, `Loaded ${scenarios.length} scenarios`)
+
+    // Process in batches of 5
+    const batchSize = 5
+    const batches = Math.ceil(scenarios.length / batchSize)
+
+    for (let i = 0; i < batches; i++) {
+      const batch = scenarios.slice(i * batchSize, (i + 1) * batchSize)
+      onProgress?.('Vectorizing Bug Fix', i + 1, batches, batch.map(s => s.title).join(', '))
+
+      const documents: VectorDocument[] = []
+
+      for (const scenario of batch) {
+        try {
+          const text = bugFixToEmbeddingText(scenario)
+          const embedding = await embeddingProvider.generateEmbedding(text)
+
+          documents.push({
+            id: `bugfix-${scenario.id}`,
+            vector: embedding,
+            text: text,
+            metadata: {
+              type: 'bugfix',
+              problemId: scenario.id,
+              title: scenario.title,
+              difficulty: scenario.difficulty,
+              companies: scenario.companies,
+              tags: scenario.tags,
+              estimatedTime: scenario.estimatedTime,
+              bugDescription: scenario.bugDescription.substring(0, 200),
+              timestamp: new Date().toISOString(),
+            },
+          })
+
+          vectorized++
+        } catch (error) {
+          errors.push(`Failed to vectorize bugfix ${scenario.id}: ${error}`)
+        }
+      }
+
+      // Upsert batch to vector DB
+      if (documents.length > 0) {
+        await vectorDB.upsert(documents)
+      }
+
+      // Small delay to avoid rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+  } catch (error) {
+    errors.push(`Failed to load bug fix scenarios: ${error}`)
+  }
+
+  return { vectorized, errors }
+}
+
+/**
  * Vectorize pattern knowledge
  */
 async function vectorizePatternKnowledge(
@@ -370,6 +609,7 @@ async function vectorizePatternKnowledge(
 
 /**
  * Main vectorization function
+ * Vectorizes all content types: DSA, System Design, Bug Fix, Company data, Pattern knowledge
  */
 export async function vectorizeAllProblems(
   onProgress?: VectorizationProgressCallback
@@ -383,38 +623,62 @@ export async function vectorizeAllProblems(
   let totalProblems = 0
   let totalCompanies = ALL_COMPANIES.length
   let totalPatternKnowledge = 17 // Number of patterns
+  let totalSystemDesign = 0
+  let totalBugFix = 0
 
   try {
-    const scenarios = await getScenariosByType('dsa')
-    totalProblems = scenarios.length
+    const [dsaScenarios, systemDesignScenarios, bugFixScenarios] = await Promise.all([
+      getScenariosByType('dsa'),
+      getScenariosByType('system-design'),
+      getScenariosByType('bugfix'),
+    ])
+    totalProblems = dsaScenarios.length
+    totalSystemDesign = systemDesignScenarios.length
+    totalBugFix = bugFixScenarios.length
   } catch (e) {
-    allErrors.push(`Failed to count problems: ${e}`)
+    allErrors.push(`Failed to count scenarios: ${e}`)
   }
 
-  // Vectorize DSA problems
-  onProgress?.('Starting', 0, 3, 'DSA Problems')
+  const totalSteps = 5
+
+  // 1. Vectorize DSA problems
+  onProgress?.('Starting', 0, totalSteps, 'DSA Problems')
   const dsaResult = await vectorizeDSAProblems(embeddingProvider, onProgress)
   allErrors.push(...dsaResult.errors)
 
-  // Vectorize company data
-  onProgress?.('Starting', 1, 3, 'Company Questions')
+  // 2. Vectorize System Design scenarios
+  onProgress?.('Starting', 1, totalSteps, 'System Design Scenarios')
+  const systemDesignResult = await vectorizeSystemDesignScenarios(embeddingProvider, onProgress)
+  allErrors.push(...systemDesignResult.errors)
+
+  // 3. Vectorize Bug Fix scenarios
+  onProgress?.('Starting', 2, totalSteps, 'Bug Fix Scenarios')
+  const bugFixResult = await vectorizeBugFixScenarios(embeddingProvider, onProgress)
+  allErrors.push(...bugFixResult.errors)
+
+  // 4. Vectorize company data
+  onProgress?.('Starting', 3, totalSteps, 'Company Questions')
   const companyResult = await vectorizeCompanyQuestions(embeddingProvider, onProgress)
   allErrors.push(...companyResult.errors)
 
-  // Vectorize pattern knowledge
-  onProgress?.('Starting', 2, 3, 'Pattern Knowledge')
+  // 5. Vectorize pattern knowledge
+  onProgress?.('Starting', 4, totalSteps, 'Pattern Knowledge')
   const patternResult = await vectorizePatternKnowledge(embeddingProvider, onProgress)
   allErrors.push(...patternResult.errors)
 
-  onProgress?.('Complete', 3, 3, 'Done!')
+  onProgress?.('Complete', totalSteps, totalSteps, 'Done!')
 
   return {
     totalProblems,
     totalCompanies,
     totalPatternKnowledge,
+    totalSystemDesign,
+    totalBugFix,
     vectorizedProblems: dsaResult.vectorized,
     vectorizedCompanies: companyResult.vectorized,
     vectorizedPatternKnowledge: patternResult.vectorized,
+    vectorizedSystemDesign: systemDesignResult.vectorized,
+    vectorizedBugFix: bugFixResult.vectorized,
     errors: allErrors,
     durationMs: Date.now() - startTime,
   }
@@ -457,17 +721,21 @@ export async function getVectorizationStatus(): Promise<{
   hasProblems: boolean
   hasCompanies: boolean
   hasPatternKnowledge: boolean
+  hasSystemDesign: boolean
+  hasBugFix: boolean
   problemCount: number
   companyCount: number
   patternCount: number
+  systemDesignCount: number
+  bugFixCount: number
 }> {
   try {
     // Try to query for a known problem
     const embeddingProvider = getHybridProvider()
-    const testEmbedding = await embeddingProvider.generateEmbedding('Two Sum array hash map')
+    const testEmbedding = await embeddingProvider.generateEmbedding('Two Sum array hash map system design URL shortener bug fix')
 
     const results = await vectorDB.query(testEmbedding, {
-      topK: 100,
+      topK: 200,
       includeMetadata: true,
     })
 
@@ -476,23 +744,33 @@ export async function getVectorizationStatus(): Promise<{
       r.metadata?.type === 'company' || r.metadata?.type === 'company-question'
     ).length
     const patternCount = results.filter((r) => r.metadata?.type === 'pattern-knowledge').length
+    const systemDesignCount = results.filter((r) => r.metadata?.type === 'system-design').length
+    const bugFixCount = results.filter((r) => r.metadata?.type === 'bugfix').length
 
     return {
       hasProblems: problemCount > 0,
       hasCompanies: companyCount > 0,
       hasPatternKnowledge: patternCount > 0,
+      hasSystemDesign: systemDesignCount > 0,
+      hasBugFix: bugFixCount > 0,
       problemCount,
       companyCount,
       patternCount,
+      systemDesignCount,
+      bugFixCount,
     }
   } catch {
     return {
       hasProblems: false,
       hasCompanies: false,
       hasPatternKnowledge: false,
+      hasSystemDesign: false,
+      hasBugFix: false,
       problemCount: 0,
       companyCount: 0,
       patternCount: 0,
+      systemDesignCount: 0,
+      bugFixCount: 0,
     }
   }
 }

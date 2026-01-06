@@ -1,6 +1,16 @@
 /**
  * Scoring Algorithm for AI-Assisted Technical Interviews
  *
+ * ARCHITECTURE NOTE:
+ * This file provides types and client-side scoring estimates.
+ * The AUTHORITATIVE scoring happens server-side in /api/generate-feedback/route.ts
+ * which uses AI validation + algorithmic checks for tamper-resistant scoring.
+ *
+ * Use this file for:
+ * - InteractionMetrics type definitions
+ * - Client-side score previews (before final server scoring)
+ * - ScoreBreakdown type for displaying results
+ *
  * Philosophy:
  * This scoring system is designed to simulate real-world AI-assisted interviews
  * (Meta, Google, etc.) where candidates are graded on:
@@ -12,6 +22,9 @@
  *
  * AI usage is OPTIONAL. You are NOT penalized for NOT using AI.
  * You ARE penalized for blindly copy-pasting AI suggestions without understanding.
+ *
+ * CRITICAL: Silent solutions (correct code without explanation) are penalized.
+ * Real interviews require communication - a silent optimal solution is a C at best.
  *
  * The goal is to prepare candidates for real interviews where AI is a tool,
  * not a crutch.
@@ -177,8 +190,8 @@ export function calculateUserScore(metrics: InteractionMetrics): ScoreBreakdown 
   // Complexity analysis shows deep understanding
   if (metrics.complexityAnalysisProvided) understandingScore += 15;
 
-  // Edge cases show thorough thinking
-  const edgeCaseBonus = Math.min(15, metrics.edgeCasesIdentified * 5);
+  // Edge cases show thorough thinking - reward up to 5 edge cases
+  const edgeCaseBonus = Math.min(25, metrics.edgeCasesIdentified * 5);
   understandingScore += edgeCaseBonus;
 
   // AI understanding penalty - if you used AI but didn't understand it

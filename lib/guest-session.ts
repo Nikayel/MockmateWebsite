@@ -14,10 +14,14 @@ const GUEST_ID_KEY = 'mockmate_guest_id'
 const FREE_TRIAL_USED_KEY = 'mockmate_free_trial_used'
 const GUEST_SESSION_KEY = 'mockmate_guest_session'
 const GUEST_SESSION_DATA_KEY = 'mockmate_guest_session_data'
+const GUEST_SESSION_EXPIRY_KEY = 'mockmate_guest_session_expiry'
 
 // Cookie names (for server-side detection)
 const GUEST_ID_COOKIE = 'mockmate_guest_id'
 const FREE_TRIAL_COOKIE = 'mockmate_free_trial'
+
+// Session expiry configuration
+const GUEST_SESSION_EXPIRY_DAYS = 7 // Sessions expire after 7 days
 
 /**
  * Generate a UUID v4 for guest identification
@@ -192,6 +196,7 @@ export function saveGuestSessionData(data: Partial<GuestSessionData>): void {
 
 /**
  * Get guest session data from localStorage
+ * Automatically cleans up expired sessions (older than 7 days)
  */
 export function getGuestSessionData(): GuestSessionData | null {
   if (typeof window === 'undefined') return null
@@ -200,7 +205,21 @@ export function getGuestSessionData(): GuestSessionData | null {
   if (!data) return null
 
   try {
-    return JSON.parse(data) as GuestSessionData
+    const sessionData = JSON.parse(data) as GuestSessionData
+
+    // Check if session has expired (7 days from creation)
+    const startedAt = new Date(sessionData.startedAt)
+    const now = new Date()
+    const daysSinceStart = (now.getTime() - startedAt.getTime()) / (1000 * 60 * 60 * 24)
+
+    if (daysSinceStart > GUEST_SESSION_EXPIRY_DAYS) {
+      // Session expired - clean it up
+      clearGuestSessionData()
+      console.log(`[Guest Session] Expired session cleaned up (${Math.floor(daysSinceStart)} days old)`)
+      return null
+    }
+
+    return sessionData
   } catch {
     return null
   }
