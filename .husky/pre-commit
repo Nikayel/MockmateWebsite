@@ -1,5 +1,4 @@
 #!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
 
-# Use npx from wherever node is installed
-$(dirname $(which node))/npx lint-staged
+# Use npx with full path (works with npm instead of pnpm)
+/usr/local/bin/npx lint-staged
