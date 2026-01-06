@@ -245,3 +245,67 @@ export async function recordNotificationSentServer(
     { merge: true }
   )
 }
+
+/**
+ * Check if a notification should be sent based on preferences, quiet hours, and rate limits
+ */
+export async function shouldSendNotificationServer(
+  userId: string,
+  type: NotificationType,
+  cooldownHours: number = 24,
+  maxPerDay: number = 1
+): Promise<{ shouldSend: boolean; reason?: string }> {
+  const prefs = await getNotificationPreferencesServer(userId)
+
+  // Check global enabled
+  if (!prefs.enabled) {
+    return { shouldSend: false, reason: 'notifications_disabled' }
+  }
+
+  // Check type enabled
+  const typePref = prefs.typePreferences[type]
+  if (typePref && !typePref.enabled) {
+    return { shouldSend: false, reason: 'type_disabled' }
+  }
+
+  // Check quiet hours
+  if (prefs.quietHours?.enabled) {
+    const now = new Date()
+    const currentHour = now.getHours()
+    const { start, end } = prefs.quietHours
+
+    // Handle overnight quiet hours (e.g., 22:00 - 08:00)
+    if (start > end) {
+      if (currentHour >= start || currentHour < end) {
+        return { shouldSend: false, reason: 'quiet_hours' }
+      }
+    } else {
+      if (currentHour >= start && currentHour < end) {
+        return { shouldSend: false, reason: 'quiet_hours' }
+      }
+    }
+  }
+
+  // Check cooldown - look for recent notifications of this type
+  const analytics = await getNotificationAnalyticsServer(userId)
+  const lastSent = analytics.byType?.[type]?.lastSentAt
+  if (lastSent) {
+    const lastSentTime = new Date(lastSent).getTime()
+    const cooldownMs = cooldownHours * 60 * 60 * 1000
+    if (Date.now() - lastSentTime < cooldownMs) {
+      return { shouldSend: false, reason: 'cooldown' }
+    }
+  }
+
+  // Check daily limit
+  const today = new Date().toISOString().split('T')[0]
+  const sentToday = analytics.byType?.[type]?.lastSentAt?.startsWith(today)
+    ? (analytics.byType?.[type]?.sent || 0)
+    : 0
+
+  if (sentToday >= maxPerDay) {
+    return { shouldSend: false, reason: 'daily_limit' }
+  }
+
+  return { shouldSend: true }
+}

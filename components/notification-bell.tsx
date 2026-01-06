@@ -257,7 +257,7 @@ export function NotificationBell() {
             {notifications.length > 0 && (
               <div className="px-4 py-2 border-t border-gray-800 bg-gray-900/50">
                 <Link
-                  href="/settings/notifications"
+                  href="/account"
                   className="text-xs text-gray-500 hover:text-accent transition-colors"
                   onClick={() => setIsOpen(false)}
                 >
