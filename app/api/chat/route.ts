@@ -207,7 +207,31 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
-    const { message, context, role, userContext, workspaceContext, currentCode, isProactive, scenarioTitle, scenarioType, scenarioPattern, scenarioCompany, elapsedTime, sessionId, userId } = await request.json()
+    const {
+      message,
+      context,
+      role,
+      userContext,
+      workspaceContext,
+      currentCode,
+      isProactive,
+      scenarioTitle,
+      scenarioType,
+      scenarioPattern,
+      scenarioCompany,
+      elapsedTime,
+      sessionId,
+      userId,
+      // NEW: AI Partner usage tracking for interviewer awareness
+      partnerMessagesCount,
+      lastPartnerExchange,
+      // NEW: Nudge tracking to prevent repetitive questions
+      recentNudgeTopics,
+      // NEW: Time since last candidate message (for time-based proactive)
+      timeSinceLastMessage,
+      // NEW: Is this a wrap-up request?
+      isWrapUp,
+    } = await request.json()
 
     // For proactive messages (interviewer jumping in), message might be empty
     if (!message && !isProactive) {
@@ -648,14 +672,34 @@ GROUNDING RULES (prevent hallucination):
       // Smart proactive engagement - jump in like a real interviewer
       const hasSubstantialCode = currentCode && currentCode.trim().length > 100
       const codeLines = currentCode?.split('\n').length || 0
+      const elapsedMinutes = elapsedTime ? Math.floor(elapsedTime / 60) : 0
 
-      if (!hasSubstantialCode) {
-        // Don't interrupt if they haven't written much yet
+      // TIME-BASED TRIGGER: Check in after 2+ minutes of silence
+      // Real interviewers don't wait forever for code - they check in on thinking
+      const timeSilentSeconds = timeSinceLastMessage || 0
+      const shouldTimeBasedCheckIn = timeSilentSeconds >= 120 // 2 minutes of silence
+
+      if (!hasSubstantialCode && !shouldTimeBasedCheckIn) {
+        // Don't interrupt if they haven't written much AND haven't been silent too long
         return NextResponse.json({
           reply: null,
           skipped: true,
-          reason: "Not enough code to comment on yet"
+          reason: "Not enough code to comment on yet and not silent long enough"
         })
+      }
+
+      // If silent for too long but no code, ask about their thinking
+      if (shouldTimeBasedCheckIn && !hasSubstantialCode) {
+        fullUserMessage = `[TIME-BASED CHECK-IN] The candidate has been quiet for ${Math.floor(timeSilentSeconds / 60)} minutes without writing substantial code.
+
+Act like a real interviewer who notices someone is quiet:
+- "How are you thinking about this problem?"
+- "What's going through your mind?"
+- "Would it help to talk through your approach?"
+- "Are you stuck on something specific?"
+
+Pick ONE natural response (under 20 words). Don't be pushy - they might be thinking.`
+        // Continue to generate response below
       }
 
       // Determine the best proactive response based on context
@@ -675,17 +719,63 @@ GROUNDING RULES (prevent hallucination):
         ? `Based on the ${scenarioPattern} pattern, ask a relevant question about their approach or potential issues.`
         : ''
 
+      // AI Partner usage awareness - alert interviewer if candidate is heavily using AI
+      const aiPartnerContext = partnerMessagesCount && partnerMessagesCount > 0
+        ? `
+AI PARTNER USAGE ALERT:
+- Candidate has used AI Partner ${partnerMessagesCount} times this session
+${lastPartnerExchange ? `- Last AI interaction: "${lastPartnerExchange.slice(0, 200)}..."` : ''}
+${partnerMessagesCount >= 5 ? `- HIGH AI USAGE: Consider asking them to explain their understanding of the AI suggestions` : ''}
+${partnerMessagesCount >= 3 ? `- When they explain code, verify they understand it vs. blindly copied it` : ''}
+`
+        : ''
+
+      // Nudge topic tracking to avoid repetitive questions
+      const nudgeAvoidance = recentNudgeTopics && recentNudgeTopics.length > 0
+        ? `
+AVOID REPEATING THESE TOPICS (already asked about):
+${recentNudgeTopics.slice(-3).map((t: string) => `- ${t}`).join('\n')}
+If they're still stuck on these, give a CONCRETE hint instead of asking again.
+`
+        : ''
+
       // Keep proactive message SHORT and natural - like a real interviewer jumping in
       fullUserMessage = `[NATURAL CHECK-IN] The candidate has been working on code. Act like a real interviewer who just noticed something interesting or wants to understand their thinking.
 
 ${currentCodeContext}
-
+${aiPartnerContext}
 ${patternSpecificQuestion}
+${nudgeAvoidance}
 
 Options for how to engage:
 ${proactivePrompts.slice(0, 3).map(p => `- "${p}"`).join('\n')}
 
 Pick ONE natural response (or create your own). Keep it under 20 words. Sound like a real person in the room, not a robot.`
+    } else if (isWrapUp && role === "interviewer") {
+      // WRAP-UP: Interview is ending, provide retrospective feedback
+      const passedTests = message?.testsPassed || 0
+      const totalTests = message?.testsTotal || 0
+      const passRate = totalTests > 0 ? (passedTests / totalTests) * 100 : 0
+
+      fullUserMessage = `[INTERVIEW WRAP-UP] The candidate is ending the interview. Provide a brief retrospective.
+
+FINAL STATE:
+${currentCodeContext}
+
+TEST RESULTS: ${passedTests}/${totalTests} tests passed (${Math.round(passRate)}%)
+
+${partnerMessagesCount ? `AI Partner Usage: ${partnerMessagesCount} interactions` : 'No AI Partner usage'}
+
+Provide a 2-3 sentence wrap-up that:
+1. Acknowledges their effort (briefly)
+2. Mentions ONE thing they did well (be specific)
+3. Mentions ONE area for improvement (be constructive)
+4. If tests passed: ask about complexity. If tests failed: encourage them to keep practicing.
+
+Example good wrap-up:
+"Nice work getting through this. You had good intuition using a hash map, though the initial key-value confusion slowed you down. What's the time complexity of your solution?"
+
+Keep it under 50 words. Be encouraging but honest.`
     } else {
       // Regular message
       fullUserMessage = message
