@@ -1397,7 +1397,7 @@ If no issues found, return:
       {
         complexity: 'simple',
         temperature: 0.2,
-        preferredProvider: 'claude' // Use Claude for Constitutional AI critique
+        // preferredProvider: 'claude' // TODO: Switch to Claude for Constitutional AI when live (for now use Gemini to save costs)
       }
     )
 
@@ -1526,7 +1526,7 @@ If no issues:
       {
         complexity: 'simple',
         temperature: 0.2,
-        preferredProvider: 'claude' // Use Claude for Constitutional AI critique
+        // preferredProvider: 'claude' // TODO: Switch to Claude for Constitutional AI when live (for now use Gemini to save costs)
       }
     )
 
