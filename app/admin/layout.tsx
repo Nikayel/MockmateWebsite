@@ -20,6 +20,7 @@ import {
   LogOut,
   Shield,
   FlaskConical,
+  Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { logger } from "@/lib/logger"
@@ -38,16 +39,13 @@ const navigation: NavItem[] = [
   { name: "Sessions", href: "/admin/sessions", icon: Activity },
   { name: "Funnel", href: "/admin/funnel", icon: TrendingUp },
   { name: "AI Usage", href: "/admin/ai-usage", icon: Cpu },
+  { name: "RAG", href: "/admin/rag", icon: Search },
   { name: "Research", href: "/admin/research", icon: FlaskConical, badge: "A/B" },
   { name: "Errors", href: "/admin/errors", icon: AlertCircle },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ]
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const { firebaseUser, loading: authLoading } = useAuth()
@@ -91,19 +89,19 @@ export default function AdminLayout({
 
   if (authLoading || isAdmin === null) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0a0f]">
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
       </div>
     )
   }
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
-        <div className="bg-gray-900/50 border border-red-500/30 rounded-lg p-8 max-w-md text-center">
-          <Shield className="h-12 w-12 text-red-400 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-white mb-2">Access Denied</h1>
-          <p className="text-gray-400 mb-6">
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0a0f]">
+        <div className="max-w-md rounded-lg border border-red-500/30 bg-gray-900/50 p-8 text-center">
+          <Shield className="mx-auto mb-4 h-12 w-12 text-red-400" />
+          <h1 className="mb-2 text-xl font-bold text-white">Access Denied</h1>
+          <p className="mb-6 text-gray-400">
             You don't have permission to access the admin dashboard.
           </p>
           <Button
@@ -129,19 +127,19 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] flex">
+    <div className="flex min-h-screen bg-[#0a0a0f]">
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-40 h-screen bg-gray-900/95 border-r border-gray-800 transition-all duration-300",
+          "fixed top-0 left-0 z-40 h-screen border-r border-gray-800 bg-gray-900/95 transition-all duration-300",
           collapsed ? "w-16" : "w-64"
         )}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-800">
+        <div className="flex h-16 items-center justify-between border-b border-gray-800 px-4">
           {!collapsed && (
             <Link href="/admin" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-[#00d9ff] to-[#00ff88] rounded-lg flex items-center justify-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#00d9ff] to-[#00ff88]">
                 <Shield className="h-5 w-5 text-black" />
               </div>
               <span className="font-heading font-bold text-white">Admin</span>
@@ -149,31 +147,27 @@ export default function AdminLayout({
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"
+            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
           >
-            {collapsed ? (
-              <ChevronRight className="h-5 w-5" />
-            ) : (
-              <ChevronLeft className="h-5 w-5" />
-            )}
+            {collapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
+        <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-4">
           {navigation.map((item) => {
-            const isActive = pathname === item.href ||
-              (item.href !== "/admin" && pathname.startsWith(item.href))
+            const isActive =
+              pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href))
 
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
                   isActive
-                    ? "bg-[#00d9ff]/10 text-[#00d9ff] border border-[#00d9ff]/20"
-                    : "text-gray-400 hover:text-white hover:bg-gray-800"
+                    ? "border border-[#00d9ff]/20 bg-[#00d9ff]/10 text-[#00d9ff]"
+                    : "text-gray-400 hover:bg-gray-800 hover:text-white"
                 )}
               >
                 <item.icon className={cn("h-5 w-5 flex-shrink-0", isActive && "text-[#00d9ff]")} />
@@ -181,7 +175,7 @@ export default function AdminLayout({
                   <>
                     <span>{item.name}</span>
                     {item.badge && (
-                      <span className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                      <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-xs text-white">
                         {item.badge}
                       </span>
                     )}
@@ -195,16 +189,14 @@ export default function AdminLayout({
         {/* User section */}
         <div className="border-t border-gray-800 p-4">
           {!collapsed && firebaseUser && (
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#00d9ff] to-[#00ff88] flex items-center justify-center">
-                <span className="text-black font-bold text-sm">
+            <div className="mb-3 flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#00d9ff] to-[#00ff88]">
+                <span className="text-sm font-bold text-black">
                   {firebaseUser.email?.[0].toUpperCase()}
                 </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">
-                  {firebaseUser.email}
-                </p>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-white">{firebaseUser.email}</p>
                 <p className="text-xs text-gray-500">Super Admin</p>
               </div>
             </div>
@@ -212,7 +204,7 @@ export default function AdminLayout({
           <button
             onClick={handleSignOut}
             className={cn(
-              "flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors",
+              "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-white",
               collapsed && "justify-center"
             )}
           >
@@ -223,12 +215,7 @@ export default function AdminLayout({
       </aside>
 
       {/* Main content */}
-      <main
-        className={cn(
-          "flex-1 transition-all duration-300",
-          collapsed ? "ml-16" : "ml-64"
-        )}
-      >
+      <main className={cn("flex-1 transition-all duration-300", collapsed ? "ml-16" : "ml-64")}>
         <div className="p-6 lg:p-8">{children}</div>
       </main>
     </div>
