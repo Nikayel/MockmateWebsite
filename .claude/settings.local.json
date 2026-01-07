@@ -12,7 +12,17 @@
       "Bash(for file in /Users/nikayeljamal/MockmateWebsite/components/dashboard/{CircularProgress,PatternMasteryBar,SkillInsightsCards,SkillInsightsAlerts,CognitiveProfile,LoadingSkeleton,SkillInsights}.tsx)",
       "Bash(done)",
       "Bash(git show:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(cat:*)",
+      "Bash(test:*)",
+      "Bash(git config:*)",
+      "Bash(npm ls:*)",
+      "Bash(pnpm ls:*)",
+      "Bash(find:*)",
+      "Bash(rm:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(git restore:*)"
     ]
   }
 }
