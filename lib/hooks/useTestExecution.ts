@@ -102,14 +102,32 @@ export function useTestExecution({
       }
 
       // Estimate space complexity based on data structures
-      const hasHashMap =
-        codeToAnalyze.includes("Map") ||
-        codeToAnalyze.includes("Set") ||
-        codeToAnalyze.includes("Object") ||
-        codeToAnalyze.includes("{}")
-      const hasArray = codeToAnalyze.includes("[") || codeToAnalyze.includes("Array")
+      // Only count CREATION of new data structures, not access/indexing
+      const hasHashMapCreation =
+        /new\s+Map\s*\(/.test(codeToAnalyze) || // new Map()
+        /new\s+Set\s*\(/.test(codeToAnalyze) || // new Set()
+        /=\s*\{\s*\}/.test(codeToAnalyze) || // = {} (empty object literal)
+        /dict\s*\(\s*\)/.test(codeToAnalyze) || // dict() in Python
+        /set\s*\(\s*\)/.test(codeToAnalyze) || // set() in Python
+        /defaultdict\s*\(/.test(codeToAnalyze) || // defaultdict in Python
+        /Counter\s*\(/.test(codeToAnalyze) // Counter in Python
+
+      // Detect array CREATION, not just indexing
+      // Creation patterns: [], Array(), list(), .split(), .slice() returning new array
+      const hasArrayCreation =
+        /=\s*\[\s*\]/.test(codeToAnalyze) || // = [] (empty array literal)
+        /=\s*\[[^\]]+\](?!\s*=)/.test(codeToAnalyze) || // = [items] (array literal with items, not destructuring)
+        /new\s+Array\s*\(/.test(codeToAnalyze) || // new Array()
+        /Array\s*\.\s*from\s*\(/.test(codeToAnalyze) || // Array.from()
+        /list\s*\(\s*\)/.test(codeToAnalyze) || // list() in Python
+        /\.split\s*\(/.test(codeToAnalyze) || // .split() creates new array
+        /\.slice\s*\(/.test(codeToAnalyze) || // .slice() creates new array
+        /\.map\s*\(/.test(codeToAnalyze) || // .map() creates new array
+        /\.filter\s*\(/.test(codeToAnalyze) || // .filter() creates new array
+        /\[\s*for\s+/.test(codeToAnalyze) // [x for x in ...] list comprehension
+
       let estimatedSpaceComplexity = "O(1)"
-      if (hasHashMap || hasArray) {
+      if (hasHashMapCreation || hasArrayCreation) {
         estimatedSpaceComplexity = "O(n)"
       }
 
