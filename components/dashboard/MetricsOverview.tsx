@@ -12,35 +12,40 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  Clock,
   Target,
   Brain,
   ArrowRight,
   Flame,
   Sparkles,
+  HelpCircle,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react"
 
 interface QuickMetrics {
   totalSessions: number
   totalPracticeHours: number
-  averageScore: number
+  averageScore: number // Overall (includes communication)
+  averageTechnicalScore: number // Technical (code-focused, excludes communication)
   weeklyAverage: number
-  trend: 'improving' | 'stable' | 'declining'
+  trend: "improving" | "stable" | "declining"
   topPattern?: {
     name: string
     score: number
+    technicalScore: number
     proficiency: string
   }
   weakestPattern?: {
     name: string
     score: number
+    technicalScore: number
   }
   // Score breakdown from the 4 weighted categories
   scoreBreakdown?: {
-    codeQuality: number      // 30%
-    problemSolving: number   // 25%
-    understanding: number    // 25%
-    communication: number    // 20%
+    codeQuality: number // 30%
+    problemSolving: number // 25%
+    understanding: number // 25%
+    communication: number // 20%
   }
 }
 
@@ -48,6 +53,7 @@ export function MetricsOverview() {
   const { firebaseUser } = useAuth()
   const [metrics, setMetrics] = useState<QuickMetrics | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showOverallScore, setShowOverallScore] = useState(false) // Default to technical score
 
   useEffect(() => {
     const loadMetrics = async () => {
@@ -67,8 +73,12 @@ export function MetricsOverview() {
           if (data.success) {
             const { overview, patterns, trends } = data.data
 
-            // Find strongest and weakest patterns
-            const sortedPatterns = [...patterns].sort((a: any, b: any) => b.averageScore - a.averageScore)
+            // Find strongest and weakest patterns (use technical score for ranking)
+            const sortedPatterns = [...patterns].sort(
+              (a: any, b: any) =>
+                (b.averageTechnicalScore || b.averageScore) -
+                (a.averageTechnicalScore || a.averageScore)
+            )
             const topPattern = sortedPatterns[0]
             const weakestPattern = sortedPatterns[sortedPatterns.length - 1]
 
@@ -76,17 +86,26 @@ export function MetricsOverview() {
               totalSessions: overview.totalSessions,
               totalPracticeHours: overview.totalPracticeHours,
               averageScore: overview.averageScore,
+              averageTechnicalScore: overview.averageTechnicalScore || overview.averageScore,
               weeklyAverage: trends.weeklyAverage,
               trend: trends.trend,
-              topPattern: topPattern ? {
-                name: topPattern.displayName,
-                score: topPattern.averageScore,
-                proficiency: topPattern.proficiency,
-              } : undefined,
-              weakestPattern: weakestPattern && weakestPattern !== topPattern ? {
-                name: weakestPattern.displayName,
-                score: weakestPattern.averageScore,
-              } : undefined,
+              topPattern: topPattern
+                ? {
+                    name: topPattern.displayName,
+                    score: topPattern.averageScore,
+                    technicalScore: topPattern.averageTechnicalScore || topPattern.averageScore,
+                    proficiency: topPattern.proficiency,
+                  }
+                : undefined,
+              weakestPattern:
+                weakestPattern && weakestPattern !== topPattern
+                  ? {
+                      name: weakestPattern.displayName,
+                      score: weakestPattern.averageScore,
+                      technicalScore:
+                        weakestPattern.averageTechnicalScore || weakestPattern.averageScore,
+                    }
+                  : undefined,
               scoreBreakdown: data.data.scoreBreakdown || undefined,
             })
           }
@@ -103,18 +122,18 @@ export function MetricsOverview() {
 
   if (loading) {
     return (
-      <Card className="bg-gray-900/50 border-gray-700">
+      <Card className="border-gray-700 bg-gray-900/50">
         <CardHeader className="pb-3">
-          <CardTitle className="text-white text-sm font-medium flex items-center">
-            <BarChart3 className="h-4 w-4 mr-2" />
+          <CardTitle className="flex items-center text-sm font-medium text-white">
+            <BarChart3 className="mr-2 h-4 w-4" />
             Performance Insights
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="animate-pulse space-y-3">
-            <div className="h-4 bg-gray-800 rounded w-3/4"></div>
-            <div className="h-4 bg-gray-800 rounded w-1/2"></div>
-            <div className="h-4 bg-gray-800 rounded w-2/3"></div>
+            <div className="h-4 w-3/4 rounded bg-gray-800"></div>
+            <div className="h-4 w-1/2 rounded bg-gray-800"></div>
+            <div className="h-4 w-2/3 rounded bg-gray-800"></div>
           </div>
         </CardContent>
       </Card>
@@ -123,19 +142,19 @@ export function MetricsOverview() {
 
   if (!metrics || metrics.totalSessions === 0) {
     return (
-      <Card className="bg-gray-900/50 border-gray-700">
+      <Card className="border-gray-700 bg-gray-900/50">
         <CardHeader className="pb-3">
-          <CardTitle className="text-white text-sm font-medium flex items-center">
-            <BarChart3 className="h-4 w-4 mr-2" />
+          <CardTitle className="flex items-center text-sm font-medium text-white">
+            <BarChart3 className="mr-2 h-4 w-4" />
             Performance Insights
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-4">
-            <Sparkles className="h-8 w-8 text-gray-600 mx-auto mb-2" />
-            <p className="text-gray-400 text-sm mb-3">Start practicing to see your insights</p>
+          <div className="py-4 text-center">
+            <Sparkles className="mx-auto mb-2 h-8 w-8 text-gray-600" />
+            <p className="mb-3 text-sm text-gray-400">Start practicing to see your insights</p>
             <Link href="/interview">
-              <Button size="sm" className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
+              <Button size="sm" className="bg-[#00d9ff] text-white hover:bg-[#00d9ff]/80">
                 Begin Practice
               </Button>
             </Link>
@@ -145,23 +164,31 @@ export function MetricsOverview() {
     )
   }
 
-  const TrendIcon = metrics.trend === 'improving' ? TrendingUp :
-                    metrics.trend === 'declining' ? TrendingDown : Minus
-  const trendColor = metrics.trend === 'improving' ? 'text-green-400' :
-                     metrics.trend === 'declining' ? 'text-red-400' : 'text-gray-400'
+  const TrendIcon =
+    metrics.trend === "improving"
+      ? TrendingUp
+      : metrics.trend === "declining"
+        ? TrendingDown
+        : Minus
+  const trendColor =
+    metrics.trend === "improving"
+      ? "text-green-400"
+      : metrics.trend === "declining"
+        ? "text-red-400"
+        : "text-gray-400"
 
   return (
-    <Card className="bg-gray-900/50 border-gray-700">
+    <Card className="border-gray-700 bg-gray-900/50">
       <CardHeader className="pb-3">
-        <CardTitle className="text-white text-sm font-medium flex items-center justify-between">
+        <CardTitle className="flex items-center justify-between text-sm font-medium text-white">
           <span className="flex items-center">
-            <BarChart3 className="h-4 w-4 mr-2" />
+            <BarChart3 className="mr-2 h-4 w-4" />
             Performance Insights
           </span>
           <Link href="/metrics">
-            <Button variant="ghost" size="sm" className="text-[#00d9ff] hover:text-white h-6 px-2">
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-[#00d9ff] hover:text-white">
               View All
-              <ArrowRight className="h-3 w-3 ml-1" />
+              <ArrowRight className="ml-1 h-3 w-3" />
             </Button>
           </Link>
         </CardTitle>
@@ -178,7 +205,9 @@ export function MetricsOverview() {
             <div className="text-xs text-gray-400">Practice</div>
           </div>
           <div>
-            <div className={`text-2xl font-bold flex items-center justify-center gap-1 ${trendColor}`}>
+            <div
+              className={`flex items-center justify-center gap-1 text-2xl font-bold ${trendColor}`}
+            >
               {metrics.weeklyAverage}%
               <TrendIcon className="h-4 w-4" />
             </div>
@@ -186,48 +215,90 @@ export function MetricsOverview() {
           </div>
         </div>
 
-        {/* Average Score Progress */}
+        {/* Average Score Progress with Toggle */}
         <div>
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-xs text-gray-400 flex items-center">
-              <Target className="h-3 w-3 mr-1" />
-              Average Score
+          <div className="mb-1 flex items-center justify-between">
+            <span className="flex items-center gap-1 text-xs text-gray-400">
+              <Target className="h-3 w-3" />
+              {showOverallScore ? "Interview Score" : "Technical Score"}
+              <button
+                onClick={() => setShowOverallScore(!showOverallScore)}
+                className="ml-1 text-gray-500 transition-colors hover:text-[#00d9ff]"
+                title={
+                  showOverallScore
+                    ? "Interview Score: Includes communication (20%). Click to see Technical Score."
+                    : "Technical Score: Code quality + problem solving + understanding. Click to see Interview Score (includes communication)."
+                }
+              >
+                <HelpCircle className="h-3 w-3" />
+              </button>
             </span>
-            <span className="text-sm font-mono text-white">{metrics.averageScore}%</span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-sm text-white">
+                {showOverallScore ? metrics.averageScore : metrics.averageTechnicalScore}%
+              </span>
+              <button
+                onClick={() => setShowOverallScore(!showOverallScore)}
+                className="text-gray-500 transition-colors hover:text-[#00d9ff]"
+                title="Toggle score type"
+              >
+                {showOverallScore ? (
+                  <ToggleRight className="h-4 w-4 text-[#00d9ff]" />
+                ) : (
+                  <ToggleLeft className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
-          <Progress value={metrics.averageScore} className="h-2" />
+          <Progress
+            value={showOverallScore ? metrics.averageScore : metrics.averageTechnicalScore}
+            className="h-2"
+          />
+          <div className="mt-1 text-[10px] text-gray-500">
+            {showOverallScore
+              ? "Overall interview performance (includes communication 20%)"
+              : "Code-focused score (understanding, problem solving, code quality)"}
+          </div>
         </div>
 
         {/* Score Breakdown - 4 weighted categories */}
         {metrics.scoreBreakdown && (
           <div className="space-y-2">
-            <div className="text-xs text-gray-400 font-medium mb-2">Skill Breakdown</div>
+            <div className="mb-2 text-xs font-medium text-gray-400">Skill Breakdown</div>
             <div className="grid grid-cols-2 gap-2">
-              <div className="p-2 bg-gray-800/50 rounded">
-                <div className="flex justify-between items-center mb-1">
+              <div className="rounded bg-gray-800/50 p-2">
+                <div className="mb-1 flex items-center justify-between">
                   <span className="text-xs text-gray-400">Code Quality</span>
-                  <span className="text-xs font-mono text-white">{metrics.scoreBreakdown.codeQuality}%</span>
+                  <span className="font-mono text-xs text-white">
+                    {metrics.scoreBreakdown.codeQuality}%
+                  </span>
                 </div>
                 <Progress value={metrics.scoreBreakdown.codeQuality} className="h-1" />
               </div>
-              <div className="p-2 bg-gray-800/50 rounded">
-                <div className="flex justify-between items-center mb-1">
+              <div className="rounded bg-gray-800/50 p-2">
+                <div className="mb-1 flex items-center justify-between">
                   <span className="text-xs text-gray-400">Problem Solving</span>
-                  <span className="text-xs font-mono text-white">{metrics.scoreBreakdown.problemSolving}%</span>
+                  <span className="font-mono text-xs text-white">
+                    {metrics.scoreBreakdown.problemSolving}%
+                  </span>
                 </div>
                 <Progress value={metrics.scoreBreakdown.problemSolving} className="h-1" />
               </div>
-              <div className="p-2 bg-gray-800/50 rounded">
-                <div className="flex justify-between items-center mb-1">
+              <div className="rounded bg-gray-800/50 p-2">
+                <div className="mb-1 flex items-center justify-between">
                   <span className="text-xs text-gray-400">Understanding</span>
-                  <span className="text-xs font-mono text-white">{metrics.scoreBreakdown.understanding}%</span>
+                  <span className="font-mono text-xs text-white">
+                    {metrics.scoreBreakdown.understanding}%
+                  </span>
                 </div>
                 <Progress value={metrics.scoreBreakdown.understanding} className="h-1" />
               </div>
-              <div className="p-2 bg-gray-800/50 rounded">
-                <div className="flex justify-between items-center mb-1">
+              <div className="rounded bg-gray-800/50 p-2">
+                <div className="mb-1 flex items-center justify-between">
                   <span className="text-xs text-gray-400">Communication</span>
-                  <span className="text-xs font-mono text-white">{metrics.scoreBreakdown.communication}%</span>
+                  <span className="font-mono text-xs text-white">
+                    {metrics.scoreBreakdown.communication}%
+                  </span>
                 </div>
                 <Progress value={metrics.scoreBreakdown.communication} className="h-1" />
               </div>
@@ -235,33 +306,36 @@ export function MetricsOverview() {
           </div>
         )}
 
-        {/* Pattern Highlights */}
+        {/* Pattern Highlights - uses technical score by default */}
         {metrics.topPattern && (
-          <div className="flex items-center justify-between p-2 bg-green-500/10 rounded-lg border border-green-500/20">
+          <div className="flex items-center justify-between rounded-lg border border-green-500/20 bg-green-500/10 p-2">
             <div className="flex items-center gap-2">
               <Brain className="h-4 w-4 text-green-400" />
               <div>
-                <div className="text-xs text-green-400 font-medium">Strongest</div>
+                <div className="text-xs font-medium text-green-400">Strongest</div>
                 <div className="text-sm text-white">{metrics.topPattern.name}</div>
               </div>
             </div>
-            <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">
-              {metrics.topPattern.score}%
+            <Badge className="border-green-500/30 bg-green-500/20 text-xs text-green-400">
+              {showOverallScore ? metrics.topPattern.score : metrics.topPattern.technicalScore}%
             </Badge>
           </div>
         )}
 
         {metrics.weakestPattern && (
-          <div className="flex items-center justify-between p-2 bg-orange-500/10 rounded-lg border border-orange-500/20">
+          <div className="flex items-center justify-between rounded-lg border border-orange-500/20 bg-orange-500/10 p-2">
             <div className="flex items-center gap-2">
               <Flame className="h-4 w-4 text-orange-400" />
               <div>
-                <div className="text-xs text-orange-400 font-medium">Focus Area</div>
+                <div className="text-xs font-medium text-orange-400">Focus Area</div>
                 <div className="text-sm text-white">{metrics.weakestPattern.name}</div>
               </div>
             </div>
-            <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 text-xs">
-              {metrics.weakestPattern.score}%
+            <Badge className="border-orange-500/30 bg-orange-500/20 text-xs text-orange-400">
+              {showOverallScore
+                ? metrics.weakestPattern.score
+                : metrics.weakestPattern.technicalScore}
+              %
             </Badge>
           </div>
         )}
