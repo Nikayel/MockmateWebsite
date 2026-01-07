@@ -2421,8 +2421,39 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
         const data = await response.json()
 
+        // Check if conversation has ended (AI already said goodbye)
+        if (data.conversationEnded) {
+          // Show end session prompt instead of continuing conversation
+          toast.info(
+            data.endMessage || "Session complete! Click 'End Session' to see your feedback.",
+            {
+              duration: 5000,
+              action: {
+                label: "End Session",
+                onClick: proceedToFinalFeedback,
+              },
+            }
+          )
+          // Don't add any message - just prompt to end
+          return
+        }
+
         if (data.reply) {
           setMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+
+          // Check if this is the final farewell response
+          if (data.conversationEnded === true) {
+            // Show prompt to end session after the final message
+            setTimeout(() => {
+              toast.info("Click 'End Session' to see your detailed feedback and score.", {
+                duration: 8000,
+                action: {
+                  label: "End Session",
+                  onClick: proceedToFinalFeedback,
+                },
+              })
+            }, 1500) // Wait for message to appear first
+          }
 
           // For system design interviews, store design notes when session ends
           const isSystemDesign = selectedScenario?.type === "system-design"

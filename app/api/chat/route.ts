@@ -894,6 +894,27 @@ IMPORTANT: After this wrap-up, if the candidate says goodbye or acknowledges, gi
           msg.message?.toLowerCase().includes("practice")
       )
 
+      // Check if AI already said goodbye in a recent message (interview is over)
+      const aiAlreadySaidGoodbye = recentMessages.some(
+        (msg: { message: string; type?: string }) =>
+          msg.type !== "user" &&
+          (msg.message?.toLowerCase().includes("good luck") ||
+            msg.message?.toLowerCase().includes("take care") ||
+            msg.message?.toLowerCase().includes("best of luck") ||
+            msg.message?.toLowerCase().includes("goodbye"))
+      )
+
+      if (aiAlreadySaidGoodbye && role === "interviewer") {
+        // Interview is OVER - don't respond to any more messages
+        // Return early with a flag indicating conversation ended
+        return NextResponse.json({
+          reply: null,
+          conversationEnded: true,
+          endMessage:
+            "The interview session has ended. Click 'End Session' to see your detailed feedback and score breakdown.",
+        })
+      }
+
       if (isFarewell && hasRecentWrapUp && role === "interviewer") {
         // Final response - end the conversation gracefully
         fullUserMessage = `[FINAL RESPONSE - CONVERSATION ENDING]
@@ -920,6 +941,9 @@ After this response, the conversation is OVER. Do not respond to any further mes
         }
       }
     }
+
+    // Track if this is a final farewell response
+    const isConversationEnding = fullUserMessage.includes("[FINAL RESPONSE - CONVERSATION ENDING]")
 
     // Determine task complexity for provider selection
     const complexity: TaskComplexity = isProactive ? "standard" : "simple"
@@ -956,6 +980,10 @@ After this response, the conversation is OVER. Do not respond to any further mes
       reply: aiResponse.text,
       provider: aiResponse.provider, // Include provider for debugging
       latencyMs: aiResponse.latencyMs,
+      conversationEnded: isConversationEnding,
+      ...(isConversationEnding && {
+        endMessage: "Click 'End Session' to see your detailed feedback and score breakdown.",
+      }),
     })
   } catch (error: any) {
     logger.error("Chat API error", {
