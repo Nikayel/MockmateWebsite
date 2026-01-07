@@ -35,6 +35,13 @@ import type {
   NotificationChannel,
   InAppNotification,
 } from '@/lib/types/notifications'
+import {
+  sendSpacedRepetitionEmail,
+  sendMilestoneEmail,
+  sendInactivityEmail,
+  sendInterviewCountdownEmail,
+  sendDailyRoadmapEmail,
+} from '@/lib/email/notifications'
 
 // ============================================================================
 // MESSAGE GENERATION
@@ -370,9 +377,22 @@ export async function sendNotification(
           break
 
         case 'email':
-          // Email service would be implemented here
-          // For now, mark as pending integration
-          result.channels.email = { success: false, error: 'Email not yet integrated' }
+          // Send email based on notification type
+          try {
+            const emailResult = await sendNotificationEmail(
+              type,
+              prefs.userId || userId,
+              title,
+              body,
+              variables
+            )
+            result.channels.email = emailResult
+          } catch (emailError: any) {
+            result.channels.email = {
+              success: false,
+              error: emailError.message || 'Email sending failed'
+            }
+          }
           break
       }
     }
@@ -387,6 +407,110 @@ export async function sendNotification(
       error: error.message || 'Unknown error',
       channels: {},
     }
+  }
+}
+
+/**
+ * Send email notification based on type
+ * Routes to the appropriate email template and sender
+ */
+async function sendNotificationEmail(
+  type: NotificationType,
+  userId: string,
+  title: string,
+  body: string,
+  variables: Record<string, any>
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  // Get user email from Firestore
+  const { adminDb } = await import('@/lib/firebase-admin')
+  const profileDoc = await adminDb.collection('profiles').doc(userId).get()
+
+  if (!profileDoc.exists) {
+    return { success: false, error: 'User profile not found' }
+  }
+
+  const profile = profileDoc.data()
+  const email = profile?.email
+  const userName = profile?.full_name || ''
+
+  if (!email) {
+    return { success: false, error: 'User has no email address' }
+  }
+
+  try {
+    let result: { success: boolean; messageId?: string; error?: string }
+
+    switch (type) {
+      case 'spaced_repetition_review':
+        result = await sendSpacedRepetitionEmail(email, {
+          userName,
+          userEmail: email,
+          topic: variables.problemName || 'your problem',
+          pattern: variables.pattern || 'DSA',
+          daysSinceReview: variables.daysSince || 0,
+          lastScore: variables.retention || 70,
+          reviewCount: variables.reviewCount || 1,
+          scenarioId: variables.problemId,
+        })
+        break
+
+      case 'milestone_celebration':
+        result = await sendMilestoneEmail(email, {
+          userName,
+          userEmail: email,
+          milestoneType: variables.milestoneType || 'problems',
+          value: variables.problemCount || variables.streakDays || variables.pattern || 0,
+        })
+        break
+
+      case 'interview_countdown':
+        result = await sendInterviewCountdownEmail(email, {
+          userName,
+          userEmail: email,
+          targetCompany: variables.companyName || 'your target company',
+          daysUntilInterview: variables.daysRemaining || 7,
+          questionsCompleted: variables.questionsCompleted || 0,
+          totalQuestions: variables.totalQuestions || 50,
+          patternsToFocus: variables.patternsToFocus || [],
+        })
+        break
+
+      case 'daily_practice_reminder':
+        result = await sendDailyRoadmapEmail(email, {
+          userName,
+          userEmail: email,
+          targetCompany: variables.companyName || 'your target company',
+          daysUntilInterview: variables.daysRemaining || 14,
+          todaysQuestions: [],
+          questionsCompleted: variables.questionsCompleted || 0,
+          totalQuestions: variables.totalQuestions || 50,
+          isOnTrack: true,
+        })
+        break
+
+      case 'streak_maintenance':
+      case 'weak_pattern_focus':
+      case 'pattern_decay_alert':
+      case 'roadmap_behind':
+        // These are primarily in-app notifications
+        // Send a generic inactivity-style email as fallback
+        result = await sendInactivityEmail(email, {
+          userName,
+          userEmail: email,
+          hoursSinceLastSession: 24,
+          lastTopic: variables.pattern || variables.todayPattern,
+          streakDays: variables.streakDays || 0,
+        })
+        break
+
+      default:
+        // For other notification types, skip email
+        return { success: true }
+    }
+
+    return result
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Email sending failed' }
   }
 }
 
