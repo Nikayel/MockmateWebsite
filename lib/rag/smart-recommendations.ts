@@ -12,12 +12,16 @@
  * - Confidence indicators
  */
 
-import type { DSAPattern } from '@/lib/types/dsa-patterns'
-import type { CompanyId } from '@/lib/data/company-questions/types'
-import { getEnhancedProfileService, type EnhancedUserProfile, type UserInsight } from './enhanced-user-profile'
-import { getMisconceptionTracker } from './misconception-detection'
-import { getUserPerformanceRAG } from './user-performance-rag'
-import { getPatternKnowledge } from './knowledge-base/dsa-knowledge'
+import type { DSAPattern } from "@/lib/types/dsa-patterns"
+import type { CompanyId } from "@/lib/data/company-questions/types"
+import {
+  getEnhancedProfileService,
+  type EnhancedUserProfile,
+  type UserInsight,
+} from "./enhanced-user-profile"
+import { getMisconceptionTracker } from "./misconception-detection"
+import { getUserPerformanceRAG } from "./user-performance-rag"
+import { getPatternKnowledge } from "./knowledge-base/dsa-knowledge"
 
 // ============================================================================
 // TYPES
@@ -27,25 +31,25 @@ import { getPatternKnowledge } from './knowledge-base/dsa-knowledge'
  * Recommendation symbol with visual indicator
  */
 export interface RecommendationSymbol {
-  icon: string           // Emoji icon
-  label: string          // Short label
-  color: string          // Tailwind color class
-  priority: number       // For sorting (lower = higher priority)
+  icon: string // Emoji icon
+  label: string // Short label
+  color: string // Tailwind color class
+  priority: number // For sorting (lower = higher priority)
 }
 
 /**
  * Rich explanation for why a problem is recommended
  */
 export interface RecommendationExplanation {
-  headline: string                    // One-line summary
-  reasoning: string[]                 // Bullet points of reasoning
-  evidence: ExplanationEvidence[]     // Data-backed evidence
-  confidence: number                  // 0-100 confidence in recommendation
-  alternativeAction?: string          // What to do if they don't want this
+  headline: string // One-line summary
+  reasoning: string[] // Bullet points of reasoning
+  evidence: ExplanationEvidence[] // Data-backed evidence
+  confidence: number // 0-100 confidence in recommendation
+  alternativeAction?: string // What to do if they don't want this
 }
 
 export interface ExplanationEvidence {
-  type: 'performance' | 'timing' | 'pattern' | 'interview' | 'misconception' | 'decay'
+  type: "performance" | "timing" | "pattern" | "interview" | "misconception" | "decay"
   icon: string
   text: string
   value?: number | string
@@ -60,7 +64,7 @@ export interface SmartRecommendation {
   problemId: string
   title: string
   pattern: DSAPattern
-  difficulty: 'easy' | 'medium' | 'hard'
+  difficulty: "easy" | "medium" | "hard"
 
   // Visual elements
   symbol: RecommendationSymbol
@@ -70,9 +74,9 @@ export interface SmartRecommendation {
   explanation: RecommendationExplanation
 
   // Scoring
-  score: number                       // 0-100 overall score
-  userReadiness: number               // 0-100 how ready user is
-  interviewRelevance: number          // 0-100 how relevant to interviews
+  score: number // 0-100 overall score
+  userReadiness: number // 0-100 how ready user is
+  interviewRelevance: number // 0-100 how relevant to interviews
 
   // Time estimates
   estimatedMinutes: number
@@ -98,7 +102,7 @@ export interface SmartRecommendationRequest {
   userId: string
   targetCompany?: CompanyId
   availableMinutes?: number
-  sessionGoal?: 'warmup' | 'practice' | 'challenge' | 'review' | 'interview-prep'
+  sessionGoal?: "warmup" | "practice" | "challenge" | "review" | "interview-prep"
   excludeIds?: string[]
   limit?: number
 }
@@ -112,8 +116,8 @@ export interface SmartRecommendationResponse {
   userSummary: UserSummary
   meta: {
     generatedAt: Date
-    personalizationLevel: 'full' | 'partial' | 'basic'
-    confidenceLevel: 'high' | 'medium' | 'low'
+    personalizationLevel: "full" | "partial" | "basic"
+    confidenceLevel: "high" | "medium" | "low"
   }
 }
 
@@ -126,12 +130,12 @@ export interface SessionInsight {
 }
 
 export interface UserSummary {
-  level: 'beginner' | 'intermediate' | 'advanced'
+  level: "beginner" | "intermediate" | "advanced"
   interviewReadiness: number
   strengths: { pattern: DSAPattern; score: number }[]
   focusAreas: { pattern: DSAPattern; reason: string }[]
   streak: number
-  trend: 'improving' | 'stable' | 'declining'
+  trend: "improving" | "stable" | "declining"
 }
 
 // ============================================================================
@@ -140,64 +144,64 @@ export interface UserSummary {
 
 export const RECOMMENDATION_SYMBOLS: Record<string, RecommendationSymbol> = {
   // Priority symbols
-  'critical-weakness': {
-    icon: '🔴',
-    label: 'Critical Gap',
-    color: 'text-red-600 bg-red-50 border-red-200',
+  "critical-weakness": {
+    icon: "🔴",
+    label: "Critical Gap",
+    color: "text-red-600 bg-red-50 border-red-200",
     priority: 1,
   },
-  'skill-decay': {
-    icon: '📉',
-    label: 'Skill Fading',
-    color: 'text-orange-600 bg-orange-50 border-orange-200',
+  "skill-decay": {
+    icon: "📉",
+    label: "Skill Fading",
+    color: "text-orange-600 bg-orange-50 border-orange-200",
     priority: 2,
   },
-  'misconception': {
-    icon: '⚠️',
-    label: 'Fix Mistake',
-    color: 'text-amber-600 bg-amber-50 border-amber-200',
+  misconception: {
+    icon: "⚠️",
+    label: "Fix Mistake",
+    color: "text-amber-600 bg-amber-50 border-amber-200",
     priority: 3,
   },
-  'interview-hot': {
-    icon: '🔥',
-    label: 'Interview Hot',
-    color: 'text-red-500 bg-red-50 border-red-200',
+  "interview-hot": {
+    icon: "🔥",
+    label: "Interview Hot",
+    color: "text-red-500 bg-red-50 border-red-200",
     priority: 4,
   },
-  'weakness-practice': {
-    icon: '🎯',
-    label: 'Focus Area',
-    color: 'text-blue-600 bg-blue-50 border-blue-200',
+  "weakness-practice": {
+    icon: "🎯",
+    label: "Focus Area",
+    color: "text-blue-600 bg-blue-50 border-blue-200",
     priority: 5,
   },
-  'spaced-review': {
-    icon: '🔄',
-    label: 'Review Time',
-    color: 'text-purple-600 bg-purple-50 border-purple-200',
+  "spaced-review": {
+    icon: "🔄",
+    label: "Review Time",
+    color: "text-purple-600 bg-purple-50 border-purple-200",
     priority: 6,
   },
-  'strength-challenge': {
-    icon: '💪',
-    label: 'Challenge',
-    color: 'text-green-600 bg-green-50 border-green-200',
+  "strength-challenge": {
+    icon: "💪",
+    label: "Challenge",
+    color: "text-green-600 bg-green-50 border-green-200",
     priority: 7,
   },
-  'new-pattern': {
-    icon: '✨',
-    label: 'New Pattern',
-    color: 'text-indigo-600 bg-indigo-50 border-indigo-200',
+  "new-pattern": {
+    icon: "✨",
+    label: "New Pattern",
+    color: "text-indigo-600 bg-indigo-50 border-indigo-200",
     priority: 8,
   },
-  'warmup': {
-    icon: '☀️',
-    label: 'Warmup',
-    color: 'text-yellow-600 bg-yellow-50 border-yellow-200',
+  warmup: {
+    icon: "☀️",
+    label: "Warmup",
+    color: "text-yellow-600 bg-yellow-50 border-yellow-200",
     priority: 9,
   },
-  'daily-practice': {
-    icon: '📚',
-    label: 'Daily Practice',
-    color: 'text-gray-600 bg-gray-50 border-gray-200',
+  "daily-practice": {
+    icon: "📚",
+    label: "Daily Practice",
+    color: "text-gray-600 bg-gray-50 border-gray-200",
     priority: 10,
   },
 }
@@ -217,16 +221,16 @@ function generateExplanation(
 ): RecommendationExplanation {
   const evidence: ExplanationEvidence[] = []
   const reasoning: string[] = []
-  let headline = ''
+  let headline = ""
   let confidence = 70
 
   // Get pattern proficiency
-  const patternProf = profile.knowledgeGraph.concepts.find(c => c.parentPattern === pattern)
-  const misconceptionData = profile.knowledgeGraph.misconceptions.find(m => m.pattern === pattern)
-  const decayData = profile.temporal.skillDecay.find(sd => sd.pattern === pattern)
+  const patternProf = profile.knowledgeGraph.concepts.find((c) => c.parentPattern === pattern)
+  const misconceptionData = profile.knowledgeGraph.misconceptions.find((m) => m.pattern === pattern)
+  const decayData = profile.temporal.skillDecay.find((sd) => sd.pattern === pattern)
 
   switch (recommendationType) {
-    case 'critical-weakness':
+    case "critical-weakness":
       headline = `Critical gap in ${formatPattern(pattern)} needs immediate attention`
       reasoning.push(
         `Your ${formatPattern(pattern)} proficiency is below interview threshold`,
@@ -235,64 +239,64 @@ function generateExplanation(
       )
       if (patternProf) {
         evidence.push({
-          type: 'performance',
-          icon: '📊',
-          text: 'Current mastery level',
+          type: "performance",
+          icon: "📊",
+          text: "Current mastery level",
           value: `${Math.round(patternProf.predictedMastery)}%`,
         })
       }
       confidence = 90
       break
 
-    case 'skill-decay':
+    case "skill-decay":
       headline = `Your ${formatPattern(pattern)} skills are fading - time to refresh`
       reasoning.push(
-        `It's been ${decayData?.daysSincePractice || 'many'} days since you practiced this`,
+        `It's been ${decayData?.daysSincePractice || "many"} days since you practiced this`,
         `Skills decay without regular practice`,
         `A quick review will restore your proficiency`
       )
       if (decayData) {
         evidence.push({
-          type: 'decay',
-          icon: '📅',
-          text: 'Days since practice',
+          type: "decay",
+          icon: "📅",
+          text: "Days since practice",
           value: decayData.daysSincePractice,
         })
         evidence.push({
-          type: 'decay',
-          icon: '📉',
-          text: 'Estimated skill decay',
+          type: "decay",
+          icon: "📉",
+          text: "Estimated skill decay",
           value: `${Math.round(decayData.estimatedDecay)}%`,
         })
       }
       confidence = 85
       break
 
-    case 'misconception':
+    case "misconception":
       headline = `Address your common mistake with ${formatPattern(pattern)}`
       reasoning.push(
-        `You've made ${misconceptionData?.misconceptionType || 'errors'} mistakes in this area`,
+        `You've made ${misconceptionData?.misconceptionType || "errors"} mistakes in this area`,
         `Fixing this misconception will prevent future errors`,
         `Targeted practice is more effective than general practice`
       )
       if (misconceptionData) {
         evidence.push({
-          type: 'misconception',
-          icon: '⚠️',
-          text: 'Error type',
+          type: "misconception",
+          icon: "⚠️",
+          text: "Error type",
           value: formatMisconceptionType(misconceptionData.misconceptionType),
         })
         evidence.push({
-          type: 'misconception',
-          icon: '🔢',
-          text: 'Times occurred',
+          type: "misconception",
+          icon: "🔢",
+          text: "Times occurred",
           value: misconceptionData.frequency,
         })
       }
       confidence = 88
       break
 
-    case 'interview-hot':
+    case "interview-hot":
       headline = `Frequently asked in interviews - master this pattern`
       reasoning.push(
         `This problem type appears often in real interviews`,
@@ -300,15 +304,15 @@ function generateExplanation(
         `Mastering this will directly improve your interview performance`
       )
       evidence.push({
-        type: 'interview',
-        icon: '🏢',
-        text: 'Interview frequency',
-        value: 'High',
+        type: "interview",
+        icon: "🏢",
+        text: "Interview frequency",
+        value: "High",
       })
       confidence = 82
       break
 
-    case 'weakness-practice':
+    case "weakness-practice":
       headline = `Build your ${formatPattern(pattern)} foundation`
       reasoning.push(
         `This is one of your identified focus areas`,
@@ -317,35 +321,35 @@ function generateExplanation(
       )
       if (patternProf) {
         evidence.push({
-          type: 'performance',
-          icon: '📊',
-          text: 'Current level',
-          value: patternProf.masteryLevel < 40 ? 'Learning' : 'Practicing',
+          type: "performance",
+          icon: "📊",
+          text: "Current level",
+          value: patternProf.masteryLevel < 40 ? "Learning" : "Practicing",
         })
       }
       confidence = 80
       break
 
-    case 'spaced-review':
+    case "spaced-review":
       headline = `Perfect timing for ${formatPattern(pattern)} review`
       reasoning.push(
         `Spaced repetition shows this is optimal review time`,
         `Reviewing now maximizes long-term retention`,
         `This is based on your personal retention patterns`
       )
-      const reviewData = profile.temporal.reviewSchedule.find(r => r.pattern === pattern)
+      const reviewData = profile.temporal.reviewSchedule.find((r) => r.pattern === pattern)
       if (reviewData) {
         evidence.push({
-          type: 'timing',
-          icon: '⏰',
-          text: 'Optimal review window',
-          value: 'Now',
+          type: "timing",
+          icon: "⏰",
+          text: "Optimal review window",
+          value: "Now",
         })
       }
       confidence = 78
       break
 
-    case 'strength-challenge':
+    case "strength-challenge":
       headline = `You're ready to level up in ${formatPattern(pattern)}`
       reasoning.push(
         `You've mastered the basics of this pattern`,
@@ -354,16 +358,16 @@ function generateExplanation(
       )
       if (patternProf) {
         evidence.push({
-          type: 'performance',
-          icon: '⭐',
-          text: 'Your proficiency',
+          type: "performance",
+          icon: "⭐",
+          text: "Your proficiency",
           value: `${Math.round(patternProf.masteryLevel)}% (Strong)`,
         })
       }
       confidence = 75
       break
 
-    case 'new-pattern':
+    case "new-pattern":
       headline = `Learn a new pattern: ${formatPattern(pattern)}`
       reasoning.push(
         `Expanding your pattern knowledge increases versatility`,
@@ -371,15 +375,15 @@ function generateExplanation(
         `Starting with an easy problem makes learning smoother`
       )
       evidence.push({
-        type: 'pattern',
-        icon: '🆕',
-        text: 'New to your repertoire',
-        value: 'First time',
+        type: "pattern",
+        icon: "🆕",
+        text: "New to your repertoire",
+        value: "First time",
       })
       confidence = 72
       break
 
-    case 'warmup':
+    case "warmup":
       headline = `Quick warmup to get you in the zone`
       reasoning.push(
         `Starting with an easier problem builds momentum`,
@@ -387,10 +391,10 @@ function generateExplanation(
         `Based on your best performance time patterns`
       )
       evidence.push({
-        type: 'timing',
-        icon: '☀️',
-        text: 'Session type',
-        value: 'Warmup',
+        type: "timing",
+        icon: "☀️",
+        text: "Session type",
+        value: "Warmup",
       })
       confidence = 70
       break
@@ -405,11 +409,15 @@ function generateExplanation(
   }
 
   // Add interview relevance if applicable
-  if (profile.interviewReadiness.overall < 70 && problemData.interviewRelevance && problemData.interviewRelevance > 70) {
+  if (
+    profile.interviewReadiness.overall < 70 &&
+    problemData.interviewRelevance &&
+    problemData.interviewRelevance > 70
+  ) {
     evidence.push({
-      type: 'interview',
-      icon: '🎯',
-      text: 'Interview relevance',
+      type: "interview",
+      icon: "🎯",
+      text: "Interview relevance",
       value: `${problemData.interviewRelevance}%`,
     })
   }
@@ -417,9 +425,9 @@ function generateExplanation(
   // Add readiness indicator
   if (problemData.userReadiness !== undefined) {
     evidence.push({
-      type: 'performance',
-      icon: problemData.userReadiness > 70 ? '✅' : problemData.userReadiness > 40 ? '🔶' : '🔸',
-      text: 'Your readiness',
+      type: "performance",
+      icon: problemData.userReadiness > 70 ? "✅" : problemData.userReadiness > 40 ? "🔶" : "🔸",
+      text: "Your readiness",
       value: `${problemData.userReadiness}%`,
     })
   }
@@ -435,49 +443,49 @@ function generateExplanation(
 
 function formatPattern(pattern: DSAPattern): string {
   const names: Record<string, string> = {
-    'arrays-hashing': 'Arrays & Hashing',
-    'two-pointers': 'Two Pointers',
-    'sliding-window': 'Sliding Window',
-    'stack': 'Stack',
-    'binary-search': 'Binary Search',
-    'linked-list': 'Linked List',
-    'trees': 'Trees',
-    'heap': 'Heap/Priority Queue',
-    'backtracking': 'Backtracking',
-    'graphs': 'Graphs',
-    'dp-1d': '1D Dynamic Programming',
-    'dp-2d': '2D Dynamic Programming',
-    'greedy': 'Greedy',
-    'intervals': 'Intervals',
-    'bit-manipulation': 'Bit Manipulation',
-    'trie': 'Trie',
-    'union-find': 'Union Find',
+    "arrays-hashing": "Arrays & Hashing",
+    "two-pointers": "Two Pointers",
+    "sliding-window": "Sliding Window",
+    stack: "Stack",
+    "binary-search": "Binary Search",
+    "linked-list": "Linked List",
+    trees: "Trees",
+    heap: "Heap/Priority Queue",
+    backtracking: "Backtracking",
+    graphs: "Graphs",
+    "dp-1d": "1D Dynamic Programming",
+    "dp-2d": "2D Dynamic Programming",
+    greedy: "Greedy",
+    intervals: "Intervals",
+    "bit-manipulation": "Bit Manipulation",
+    trie: "Trie",
+    "union-find": "Union Find",
   }
   return names[pattern] || pattern
 }
 
 function formatMisconceptionType(type: string): string {
   const names: Record<string, string> = {
-    'off-by-one': 'Off-by-one errors',
-    'wrong-data-structure': 'Data structure choice',
-    'incorrect-complexity': 'Time complexity',
-    'missing-edge-case': 'Edge case handling',
-    'wrong-algorithm': 'Algorithm selection',
-    'logic-error': 'Logic errors',
-    'boundary-confusion': 'Boundary conditions',
+    "off-by-one": "Off-by-one errors",
+    "wrong-data-structure": "Data structure choice",
+    "incorrect-complexity": "Time complexity",
+    "missing-edge-case": "Edge case handling",
+    "wrong-algorithm": "Algorithm selection",
+    "logic-error": "Logic errors",
+    "boundary-confusion": "Boundary conditions",
   }
   return names[type] || type
 }
 
 function getAlternativeAction(type: string): string {
   const alternatives: Record<string, string> = {
-    'critical-weakness': 'Skip for now and try a review problem instead',
-    'skill-decay': 'Skip if you remember this well - try something new',
-    'misconception': 'Skip if you feel confident about this concept now',
-    'strength-challenge': 'Try an easier problem if you want to warm up first',
-    'new-pattern': 'Review fundamentals first if this feels too new',
+    "critical-weakness": "Skip for now and try a review problem instead",
+    "skill-decay": "Skip if you remember this well - try something new",
+    misconception: "Skip if you feel confident about this concept now",
+    "strength-challenge": "Try an easier problem if you want to warm up first",
+    "new-pattern": "Review fundamentals first if this feels too new",
   }
-  return alternatives[type] || 'Skip and see other recommendations'
+  return alternatives[type] || "Skip and see other recommendations"
 }
 
 // ============================================================================
@@ -489,64 +497,64 @@ function getAlternativeAction(type: string): string {
  */
 function determineRecommendationType(
   pattern: DSAPattern,
-  difficulty: 'easy' | 'medium' | 'hard',
+  difficulty: "easy" | "medium" | "hard",
   profile: EnhancedUserProfile,
   request: SmartRecommendationRequest
 ): string {
   // Check for critical weakness
-  const concept = profile.knowledgeGraph.concepts.find(c => c.parentPattern === pattern)
+  const concept = profile.knowledgeGraph.concepts.find((c) => c.parentPattern === pattern)
   if (concept && concept.predictedMastery < 30) {
-    return 'critical-weakness'
+    return "critical-weakness"
   }
 
   // Check for skill decay
-  const decay = profile.temporal.skillDecay.find(sd => sd.pattern === pattern)
-  if (decay && decay.urgency === 'high') {
-    return 'skill-decay'
+  const decay = profile.temporal.skillDecay.find((sd) => sd.pattern === pattern)
+  if (decay && decay.urgency === "high") {
+    return "skill-decay"
   }
 
   // Check for misconception
   const misconception = profile.knowledgeGraph.misconceptions.find(
-    m => m.pattern === pattern && m.status === 'active'
+    (m) => m.pattern === pattern && m.status === "active"
   )
   if (misconception && misconception.frequency > 1) {
-    return 'misconception'
+    return "misconception"
   }
 
   // Check for scheduled review
-  const review = profile.temporal.reviewSchedule.find(r => r.pattern === pattern)
-  if (review && review.priority === 'critical') {
-    return 'spaced-review'
+  const review = profile.temporal.reviewSchedule.find((r) => r.pattern === pattern)
+  if (review && review.priority === "critical") {
+    return "spaced-review"
   }
 
   // Check for weakness
   const isWeakness = profile.interviewReadiness.criticalGaps.includes(pattern)
   if (isWeakness) {
-    return 'weakness-practice'
+    return "weakness-practice"
   }
 
   // Check for strength challenge
   const isStrength = profile.interviewReadiness.strongestAreas.includes(pattern)
-  if (isStrength && difficulty === 'hard') {
-    return 'strength-challenge'
+  if (isStrength && difficulty === "hard") {
+    return "strength-challenge"
   }
 
   // Check for new pattern
   if (!concept || concept.practiceCount === 0) {
-    return 'new-pattern'
+    return "new-pattern"
   }
 
   // Warmup for session start
-  if (request.sessionGoal === 'warmup' && difficulty === 'easy') {
-    return 'warmup'
+  if (request.sessionGoal === "warmup" && difficulty === "easy") {
+    return "warmup"
   }
 
   // Interview prep
-  if (request.sessionGoal === 'interview-prep' || request.targetCompany) {
-    return 'interview-hot'
+  if (request.sessionGoal === "interview-prep" || request.targetCompany) {
+    return "interview-hot"
   }
 
-  return 'daily-practice'
+  return "daily-practice"
 }
 
 /**
@@ -554,7 +562,7 @@ function determineRecommendationType(
  */
 function generateTags(
   pattern: DSAPattern,
-  difficulty: 'easy' | 'medium' | 'hard',
+  difficulty: "easy" | "medium" | "hard",
   profile: EnhancedUserProfile,
   type: string
 ): RecommendationTag[] {
@@ -562,9 +570,9 @@ function generateTags(
 
   // Difficulty tag
   const difficultyColors = {
-    easy: 'bg-green-100 text-green-700',
-    medium: 'bg-yellow-100 text-yellow-700',
-    hard: 'bg-red-100 text-red-700',
+    easy: "bg-green-100 text-green-700",
+    medium: "bg-yellow-100 text-yellow-700",
+    hard: "bg-red-100 text-red-700",
   }
   tags.push({
     text: difficulty.charAt(0).toUpperCase() + difficulty.slice(1),
@@ -574,39 +582,39 @@ function generateTags(
   // Pattern tag
   tags.push({
     text: formatPattern(pattern),
-    color: 'bg-blue-100 text-blue-700',
+    color: "bg-blue-100 text-blue-700",
   })
 
   // Special tags based on type
-  if (type === 'interview-hot') {
+  if (type === "interview-hot") {
     tags.push({
-      text: 'Interview Favorite',
-      color: 'bg-red-100 text-red-700',
-      icon: '🔥',
+      text: "Interview Favorite",
+      color: "bg-red-100 text-red-700",
+      icon: "🔥",
     })
   }
 
-  if (type === 'critical-weakness') {
+  if (type === "critical-weakness") {
     tags.push({
-      text: 'Priority',
-      color: 'bg-purple-100 text-purple-700',
-      icon: '⚡',
+      text: "Priority",
+      color: "bg-purple-100 text-purple-700",
+      icon: "⚡",
     })
   }
 
   // Prerequisite warning
   const knowledge = getPatternKnowledge(pattern)
   if (knowledge?.prerequisites) {
-    const prereqsMet = knowledge.prerequisites.every(prereq =>
+    const prereqsMet = knowledge.prerequisites.every((prereq) =>
       profile.knowledgeGraph.concepts.some(
-        c => c.parentPattern === prereq && c.predictedMastery > 50
+        (c) => c.parentPattern === prereq && c.predictedMastery > 50
       )
     )
     if (!prereqsMet) {
       tags.push({
-        text: 'Has Prerequisites',
-        color: 'bg-orange-100 text-orange-700',
-        icon: '📋',
+        text: "Has Prerequisites",
+        color: "bg-orange-100 text-orange-700",
+        icon: "📋",
       })
     }
   }
@@ -619,13 +627,13 @@ function generateTags(
  */
 function calculateReadiness(
   pattern: DSAPattern,
-  difficulty: 'easy' | 'medium' | 'hard',
+  difficulty: "easy" | "medium" | "hard",
   profile: EnhancedUserProfile
 ): number {
   let readiness = 50
 
   // Base on pattern mastery
-  const concept = profile.knowledgeGraph.concepts.find(c => c.parentPattern === pattern)
+  const concept = profile.knowledgeGraph.concepts.find((c) => c.parentPattern === pattern)
   if (concept) {
     readiness = concept.predictedMastery
   }
@@ -638,7 +646,7 @@ function calculateReadiness(
   const knowledge = getPatternKnowledge(pattern)
   if (knowledge?.prerequisites) {
     for (const prereq of knowledge.prerequisites) {
-      const prereqConcept = profile.knowledgeGraph.concepts.find(c => c.parentPattern === prereq)
+      const prereqConcept = profile.knowledgeGraph.concepts.find((c) => c.parentPattern === prereq)
       if (!prereqConcept || prereqConcept.predictedMastery < 50) {
         readiness -= 15
       }
@@ -646,7 +654,7 @@ function calculateReadiness(
   }
 
   // Boost for recent practice
-  const decay = profile.temporal.skillDecay.find(sd => sd.pattern === pattern)
+  const decay = profile.temporal.skillDecay.find((sd) => sd.pattern === pattern)
   if (decay && decay.daysSincePractice < 3) {
     readiness += 10
   }
@@ -659,14 +667,14 @@ function calculateReadiness(
  */
 function estimateTime(
   pattern: DSAPattern,
-  difficulty: 'easy' | 'medium' | 'hard',
+  difficulty: "easy" | "medium" | "hard",
   profile: EnhancedUserProfile
 ): number {
   const baseTimes = { easy: 15, medium: 30, hard: 45 }
   let time = baseTimes[difficulty]
 
   // Adjust based on pattern familiarity
-  const concept = profile.knowledgeGraph.concepts.find(c => c.parentPattern === pattern)
+  const concept = profile.knowledgeGraph.concepts.find((c) => c.parentPattern === pattern)
   if (concept) {
     if (concept.predictedMastery > 70) {
       time *= 0.8 // Faster if familiar
@@ -676,9 +684,9 @@ function estimateTime(
   }
 
   // Adjust for learning pace
-  if (profile.cognitive.patternRecognition.speed === 'fast') {
+  if (profile.cognitive.patternRecognition.speed === "fast") {
     time *= 0.85
-  } else if (profile.cognitive.patternRecognition.speed === 'slow') {
+  } else if (profile.cognitive.patternRecognition.speed === "slow") {
     time *= 1.15
   }
 
@@ -702,7 +710,7 @@ export class SmartRecommendationService {
       id: string
       title: string
       pattern: DSAPattern
-      difficulty: 'easy' | 'medium' | 'hard'
+      difficulty: "easy" | "medium" | "hard"
       company?: CompanyId
       frequency?: number
     }>
@@ -713,24 +721,24 @@ export class SmartRecommendationService {
     const profile = await this.profileService.getEnhancedProfile(request.userId)
 
     // Filter excluded problems
-    let problems = availableProblems.filter(p => !request.excludeIds?.includes(p.id))
+    let problems = availableProblems.filter((p) => !request.excludeIds?.includes(p.id))
 
     // Filter by available time
     if (request.availableMinutes) {
-      problems = problems.filter(p =>
-        estimateTime(p.pattern, p.difficulty, profile) <= request.availableMinutes!
+      problems = problems.filter(
+        (p) => estimateTime(p.pattern, p.difficulty, profile) <= request.availableMinutes!
       )
     }
 
     // Score and rank problems
-    const scoredProblems = problems.map(problem => {
+    const scoredProblems = problems.map((problem) => {
       const type = determineRecommendationType(
         problem.pattern,
         problem.difficulty,
         profile,
         request
       )
-      const symbol = RECOMMENDATION_SYMBOLS[type] || RECOMMENDATION_SYMBOLS['daily-practice']
+      const symbol = RECOMMENDATION_SYMBOLS[type] || RECOMMENDATION_SYMBOLS["daily-practice"]
       const tags = generateTags(problem.pattern, problem.difficulty, profile, type)
       const userReadiness = calculateReadiness(problem.pattern, problem.difficulty, profile)
       const estimatedMinutes = estimateTime(problem.pattern, problem.difficulty, profile)
@@ -751,14 +759,25 @@ export class SmartRecommendationService {
       score += interviewRelevance * 0.2
 
       // Boost for matching session goal
-      if (request.sessionGoal === 'warmup' && problem.difficulty === 'easy') score += 20
-      if (request.sessionGoal === 'challenge' && problem.difficulty === 'hard') score += 20
-      if (request.sessionGoal === 'review' && type === 'spaced-review') score += 25
+      if (request.sessionGoal === "warmup" && problem.difficulty === "easy") score += 20
+      if (request.sessionGoal === "challenge" && problem.difficulty === "hard") score += 20
+      if (request.sessionGoal === "review" && type === "spaced-review") score += 25
 
       const explanation = generateExplanation(type, problem.pattern, profile, {
         userReadiness,
         interviewRelevance,
       })
+
+      // Properly validate prerequisites instead of using readiness heuristic
+      let prerequisitesMet = true
+      const patternKnowledge = getPatternKnowledge(problem.pattern)
+      if (patternKnowledge?.prerequisites && patternKnowledge.prerequisites.length > 0) {
+        prerequisitesMet = patternKnowledge.prerequisites.every((prereq) =>
+          profile.knowledgeGraph.concepts.some(
+            (c) => c.parentPattern === prereq && c.predictedMastery >= 50
+          )
+        )
+      }
 
       return {
         id: `rec-${problem.id}`,
@@ -773,11 +792,14 @@ export class SmartRecommendationService {
         userReadiness,
         interviewRelevance: Math.min(100, interviewRelevance),
         estimatedMinutes,
-        optimalTimeOfDay: profile.behavioral.motivation.peakMotivationDay === 'any'
-          ? undefined
-          : profile.behavioral.motivation.peakMotivationDay,
-        prerequisitesMet: userReadiness > 40,
-        companyFrequency: problem.company ? [{ company: problem.company, frequency: problem.frequency || 50 }] : undefined,
+        optimalTimeOfDay:
+          profile.behavioral.motivation.peakMotivationDay === "any"
+            ? undefined
+            : profile.behavioral.motivation.peakMotivationDay,
+        prerequisitesMet,
+        companyFrequency: problem.company
+          ? [{ company: problem.company, frequency: problem.frequency || 50 }]
+          : undefined,
       } as SmartRecommendation
     })
 
@@ -804,10 +826,18 @@ export class SmartRecommendationService {
       userSummary,
       meta: {
         generatedAt: new Date(),
-        personalizationLevel: profile.knowledgeGraph.concepts.length > 5 ? 'full' :
-          profile.knowledgeGraph.concepts.length > 0 ? 'partial' : 'basic',
-        confidenceLevel: profile.knowledgeGraph.concepts.length > 10 ? 'high' :
-          profile.knowledgeGraph.concepts.length > 3 ? 'medium' : 'low',
+        personalizationLevel:
+          profile.knowledgeGraph.concepts.length > 5
+            ? "full"
+            : profile.knowledgeGraph.concepts.length > 0
+              ? "partial"
+              : "basic",
+        confidenceLevel:
+          profile.knowledgeGraph.concepts.length > 10
+            ? "high"
+            : profile.knowledgeGraph.concepts.length > 3
+              ? "medium"
+              : "low",
       },
     }
   }
@@ -822,21 +852,21 @@ export class SmartRecommendationService {
     const insights: SessionInsight[] = []
 
     // Fatigue warning
-    if (profile.behavioral.fatigue.currentLevel === 'high') {
+    if (profile.behavioral.fatigue.currentLevel === "high") {
       insights.push({
-        icon: '😴',
-        title: 'Consider a break',
-        description: 'Your recent performance suggests fatigue. Quality > quantity.',
+        icon: "😴",
+        title: "Consider a break",
+        description: "Your recent performance suggests fatigue. Quality > quantity.",
         actionable: true,
-        action: 'Take a 1-2 day break',
+        action: "Take a 1-2 day break",
       })
     }
 
     // Streak celebration
     if (profile.behavioral.motivation.consistency > 80) {
       insights.push({
-        icon: '🔥',
-        title: 'Great consistency!',
+        icon: "🔥",
+        title: "Great consistency!",
         description: `You're in the top tier for practice consistency. Keep it up!`,
         actionable: false,
       })
@@ -846,50 +876,54 @@ export class SmartRecommendationService {
     if (request.targetCompany) {
       const readiness = profile.interviewReadiness.overall
       insights.push({
-        icon: readiness > 70 ? '✅' : readiness > 40 ? '📈' : '🎯',
+        icon: readiness > 70 ? "✅" : readiness > 40 ? "📈" : "🎯",
         title: `Interview Readiness: ${readiness}%`,
-        description: readiness > 70
-          ? 'You\'re well-prepared. Focus on edge cases and hard problems.'
-          : 'Focus on your weak patterns to boost readiness.',
+        description:
+          readiness > 70
+            ? "You're well-prepared. Focus on edge cases and hard problems."
+            : "Focus on your weak patterns to boost readiness.",
         actionable: true,
-        action: readiness > 70 ? 'Try mock interviews' : 'Practice fundamentals',
+        action: readiness > 70 ? "Try mock interviews" : "Practice fundamentals",
       })
     }
 
     // Decay warning
-    const urgentDecay = profile.temporal.skillDecay.filter(sd => sd.urgency === 'high')
+    const urgentDecay = profile.temporal.skillDecay.filter((sd) => sd.urgency === "high")
     if (urgentDecay.length > 0) {
       insights.push({
-        icon: '📉',
-        title: `${urgentDecay.length} skill${urgentDecay.length > 1 ? 's' : ''} fading`,
-        description: `${urgentDecay.map(sd => formatPattern(sd.pattern)).join(', ')} need review`,
+        icon: "📉",
+        title: `${urgentDecay.length} skill${urgentDecay.length > 1 ? "s" : ""} fading`,
+        description: `${urgentDecay.map((sd) => formatPattern(sd.pattern)).join(", ")} need review`,
         actionable: true,
-        action: 'Include a review problem today',
+        action: "Include a review problem today",
       })
     }
 
     // Misconception alert
-    const activeMisconceptions = profile.knowledgeGraph.misconceptions.filter(m => m.status === 'active')
+    const activeMisconceptions = profile.knowledgeGraph.misconceptions.filter(
+      (m) => m.status === "active"
+    )
     if (activeMisconceptions.length > 0) {
       insights.push({
-        icon: '⚠️',
-        title: 'Common mistakes detected',
+        icon: "⚠️",
+        title: "Common mistakes detected",
         description: `You tend to make ${activeMisconceptions[0].misconceptionType} errors. Targeted practice can help.`,
         actionable: true,
-        action: 'Try a focused exercise',
+        action: "Try a focused exercise",
       })
     }
 
     // Optimal time suggestion
-    if (profile.behavioral.motivation.peakMotivationDay !== 'any') {
+    if (profile.behavioral.motivation.peakMotivationDay !== "any") {
       const now = new Date()
       const isWeekend = now.getDay() === 0 || now.getDay() === 6
-      const isOptimalTime = (profile.behavioral.motivation.peakMotivationDay === 'weekend') === isWeekend
+      const isOptimalTime =
+        (profile.behavioral.motivation.peakMotivationDay === "weekend") === isWeekend
 
       if (!isOptimalTime) {
         insights.push({
-          icon: '⏰',
-          title: 'Timing tip',
+          icon: "⏰",
+          title: "Timing tip",
           description: `You perform best on ${profile.behavioral.motivation.peakMotivationDay}s. Consider a lighter session today.`,
           actionable: false,
         })
@@ -904,29 +938,35 @@ export class SmartRecommendationService {
    */
   private generateUserSummary(profile: EnhancedUserProfile): UserSummary {
     // Determine level
-    const avgMastery = profile.knowledgeGraph.concepts.length > 0
-      ? profile.knowledgeGraph.concepts.reduce((sum, c) => sum + c.predictedMastery, 0) / profile.knowledgeGraph.concepts.length
-      : 0
+    const avgMastery =
+      profile.knowledgeGraph.concepts.length > 0
+        ? profile.knowledgeGraph.concepts.reduce((sum, c) => sum + c.predictedMastery, 0) /
+          profile.knowledgeGraph.concepts.length
+        : 0
 
-    const level = avgMastery > 70 ? 'advanced' : avgMastery > 40 ? 'intermediate' : 'beginner'
+    const level = avgMastery > 70 ? "advanced" : avgMastery > 40 ? "intermediate" : "beginner"
 
     // Get strengths with scores
-    const strengths = profile.interviewReadiness.strongestAreas.slice(0, 3).map(pattern => {
-      const concept = profile.knowledgeGraph.concepts.find(c => c.parentPattern === pattern)
+    const strengths = profile.interviewReadiness.strongestAreas.slice(0, 3).map((pattern) => {
+      const concept = profile.knowledgeGraph.concepts.find((c) => c.parentPattern === pattern)
       return { pattern, score: concept?.predictedMastery || 70 }
     })
 
     // Get focus areas with reasons
-    const focusAreas = profile.knowledgeGraph.gaps.slice(0, 3).map(gap => ({
+    const focusAreas = profile.knowledgeGraph.gaps.slice(0, 3).map((gap) => ({
       pattern: gap.pattern,
-      reason: gap.impact === 'blocking' ? 'Blocking progress' :
-        gap.impact === 'slowing' ? 'Slowing learning' : 'Could improve',
+      reason:
+        gap.impact === "blocking"
+          ? "Blocking progress"
+          : gap.impact === "slowing"
+            ? "Slowing learning"
+            : "Could improve",
     }))
 
     // Add decay-based focus areas
-    const urgentDecay = profile.temporal.skillDecay.filter(sd => sd.urgency === 'high')
+    const urgentDecay = profile.temporal.skillDecay.filter((sd) => sd.urgency === "high")
     for (const sd of urgentDecay.slice(0, 2)) {
-      if (!focusAreas.some(fa => fa.pattern === sd.pattern)) {
+      if (!focusAreas.some((fa) => fa.pattern === sd.pattern)) {
         focusAreas.push({
           pattern: sd.pattern,
           reason: `Not practiced in ${sd.daysSincePractice} days`,
@@ -940,8 +980,11 @@ export class SmartRecommendationService {
       strengths,
       focusAreas: focusAreas.slice(0, 3),
       streak: Math.round(profile.behavioral.motivation.consistency),
-      trend: profile.temporal.growth.accelerating ? 'improving' :
-        profile.temporal.growth.currentVelocity < 0 ? 'declining' : 'stable',
+      trend: profile.temporal.growth.accelerating
+        ? "improving"
+        : profile.temporal.growth.currentVelocity < 0
+          ? "declining"
+          : "stable",
     }
   }
 }
@@ -963,7 +1006,7 @@ export async function getSmartRecommendations(
     id: string
     title: string
     pattern: DSAPattern
-    difficulty: 'easy' | 'medium' | 'hard'
+    difficulty: "easy" | "medium" | "hard"
     company?: CompanyId
     frequency?: number
   }>
