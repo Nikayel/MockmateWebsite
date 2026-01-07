@@ -267,7 +267,8 @@ export async function completeSessionWithMastery(
     title: string;
     pattern: DSAPattern;
     difficulty: Difficulty;
-    performanceScore: number;
+    performanceScore: number; // Full interview score (includes communication)
+    masteryScore?: number; // Technical-only score for spaced repetition
     timeSpentMinutes?: number;
     hintsUsed?: number;
     completedAt?: string;
@@ -310,18 +311,50 @@ export async function completeSessionWithMastery(
 
     const lastReviewAt = new Date(existingMastery.last_reviewed_at);
     const nextReviewAt = new Date(existingMastery.next_review_at);
-    const daysSinceLastReview = Math.floor(
-      (now.getTime() - lastReviewAt.getTime()) / (1000 * 60 * 60 * 24)
-    );
+    const hoursSinceLastReview = (now.getTime() - lastReviewAt.getTime()) / (1000 * 60 * 60);
+    const daysSinceLastReview = Math.floor(hoursSinceLastReview / 24);
     const daysOverdue = nextReviewAt < now
       ? Math.floor((now.getTime() - nextReviewAt.getTime()) / (1000 * 60 * 60 * 24))
       : 0;
     const isEarlyReview = nextReviewAt > now;
 
+    // MASSED PRACTICE DETECTION: Reviews < 12 hours apart don't count for SR
+    // Cramming doesn't improve long-term retention (Ebbinghaus, 1885)
+    const isMassedPractice = hoursSinceLastReview < 12;
+    if (isMassedPractice) {
+      logger.info("Massed practice detected - updating score only, not interval", {
+        userId,
+        problemId: sessionData.scenarioId,
+        hoursSinceLastReview: hoursSinceLastReview.toFixed(2),
+        lastReviewAt: lastReviewAt.toISOString(),
+      });
+
+      // Update score but don't change interval (massed practice doesn't help retention)
+      masteryResult = await updateProblemMastery(userId, sessionData.scenarioId, {
+        performance_score: sessionData.masteryScore ?? sessionData.performanceScore,
+        time_spent_minutes: sessionData.timeSpentMinutes,
+        hints_used: sessionData.hintsUsed,
+        // Keep existing interval/ease - don't increment review count
+        increment_review_count: false,
+      });
+
+      // Return current schedule unchanged
+      return {
+        nextReviewAt: existingMastery.next_review_at,
+        intervalDays: existingMastery.interval_days,
+        masteryLevel: existingMastery.mastery_level,
+        streakDays,
+      };
+    }
+
+    // Use masteryScore for SM-2 calculation (technical proficiency only)
+    // Fall back to performanceScore for backwards compatibility
+    const scoreForSR = sessionData.masteryScore ?? sessionData.performanceScore;
+
     const sm2Result = calculateNextInterval({
       previousInterval: existingMastery.interval_days,
       previousEaseFactor: existingMastery.ease_factor,
-      performanceScore: sessionData.performanceScore,
+      performanceScore: scoreForSR, // Use mastery score for technical proficiency
       reviewCount: existingMastery.review_count,
       lastReviewDate: lastReviewAt,
       problemDifficulty: sessionData.difficulty,
@@ -361,9 +394,9 @@ export async function completeSessionWithMastery(
         scenarioId: sessionData.scenarioId,
         pattern: sessionData.pattern,
         difficulty: sessionData.difficulty,
-        score: sessionData.performanceScore,
-        masteryScore: sessionData.performanceScore, // Fallback: use performance score when detailed metrics unavailable
-        qualityRating: mapScoreToQuality(sessionData.performanceScore),
+        score: sessionData.performanceScore, // Full interview score
+        masteryScore: sessionData.masteryScore ?? sessionData.performanceScore, // Use actual mastery score when available
+        qualityRating: mapScoreToQuality(scoreForSR), // Use mastery score for quality rating
         timeSpentMinutes: sessionData.timeSpentMinutes || 0,
         hintsUsed: sessionData.hintsUsed || 0,
         preReviewState: {
@@ -389,19 +422,22 @@ export async function completeSessionWithMastery(
     }
   } else {
     // Initialize new problem mastery
+    // Use masteryScore for SR calculation (technical proficiency only)
+    const scoreForSR = sessionData.masteryScore ?? sessionData.performanceScore;
+
     masteryResult = await initializeProblemMasteryFromSession(userId, {
       scenario_id: sessionData.scenarioId,
       title: sessionData.title,
       pattern: sessionData.pattern,
       difficulty: sessionData.difficulty,
-      performance_score: sessionData.performanceScore,
+      performance_score: scoreForSR, // Use mastery score for initial SR setup
       time_spent_minutes: sessionData.timeSpentMinutes,
       hints_used: sessionData.hintsUsed,
     });
 
     // Record research event for first review
     try {
-      const qualityRating = mapScoreToQuality(sessionData.performanceScore);
+      const qualityRating = mapScoreToQuality(scoreForSR); // Use mastery score for quality rating
 
       await recordReviewEvent({
         userId,
@@ -409,8 +445,8 @@ export async function completeSessionWithMastery(
         scenarioId: sessionData.scenarioId,
         pattern: sessionData.pattern,
         difficulty: sessionData.difficulty,
-        score: sessionData.performanceScore,
-        masteryScore: sessionData.performanceScore, // Fallback: use performance score when detailed metrics unavailable
+        score: sessionData.performanceScore, // Full interview score
+        masteryScore: sessionData.masteryScore ?? sessionData.performanceScore, // Use actual mastery score when available
         qualityRating,
         timeSpentMinutes: sessionData.timeSpentMinutes || 0,
         hintsUsed: sessionData.hintsUsed || 0,

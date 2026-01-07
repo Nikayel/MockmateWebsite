@@ -8,6 +8,8 @@ import { completeSessionWithMastery } from "@/lib/learning-state"
 import { analyzeAndTrackMisconceptions } from "@/lib/rag/misconception-detection"
 import { logger } from "@/lib/logger"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
+import { calculateMasteryScore } from "@/lib/spaced-repetition/mastery-score"
+import type { Difficulty } from "@/lib/spaced-repetition/types"
 
 // Import feedback system modules
 import {
@@ -675,6 +677,20 @@ CRITICAL INSTRUCTIONS:
           | "medium"
           | "hard"
 
+        // Calculate mastery score (technical proficiency only, excludes communication)
+        // This is critical for spaced repetition - we need to measure code mastery, not interview skills
+        const masteryScoreResult = calculateMasteryScore({
+          testCasesPassed: testsPassed,
+          testCasesTotal: testsTotal,
+          timeSpentMinutes: timeSpent ? Math.round(timeSpent / 60) : 0,
+          hintsUsed: interactionMetrics?.hintsUsed || 0,
+          hintsTotal: 5, // Standard hint limit
+          problemDifficulty: difficulty as Difficulty,
+          approachExplained: aiValidation.approachExplained,
+          complexityDiscussed: aiValidation.complexityDiscussed,
+          interviewerMessagesCount: aiValidation.questionsAsked || 0,
+        })
+
         logger.info("SR update starting", {
           userId,
           scenarioId,
@@ -682,15 +698,19 @@ CRITICAL INSTRUCTIONS:
           pattern,
           difficulty,
           performanceScore: scores.overall,
+          masteryScore: masteryScoreResult.masteryScore,
+          scoreDifference: scores.overall - masteryScoreResult.masteryScore,
         })
 
         // Update both topic-level (legacy) and problem-level mastery
+        // CRITICAL: Pass BOTH performance score (interview) AND mastery score (technical)
         await completeSessionWithMastery(userId, {
           scenarioId: scenarioId,
           title: scenarioTitle,
           pattern,
           difficulty,
-          performanceScore: scores.overall,
+          performanceScore: scores.overall, // Full interview score (includes communication 20%)
+          masteryScore: masteryScoreResult.masteryScore, // Technical-only score for SR algorithm
           timeSpentMinutes: timeSpent ? Math.round(timeSpent / 60) : undefined,
           hintsUsed: interactionMetrics?.hintsUsed || 0,
           completedAt: new Date().toISOString(),

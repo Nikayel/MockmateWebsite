@@ -76,8 +76,10 @@ export const DEFAULT_FSRS_WEIGHTS: number[] = [
 export const DEFAULT_FSRS_CONFIG: FSRSConfig = {
   desiredRetention: 0.90,
   maximumInterval: 365,
-  learningSteps: [1, 10], // 1 minute, 10 minutes
-  relearningSteps: [10],  // 10 minutes
+  // Learning steps for coding problems (not flashcards!)
+  // Coding takes 10-30 minutes to solve, so review after meaningful time gaps
+  learningSteps: [720, 1440], // 12 hours, 1 day (realistic for coding review)
+  relearningSteps: [1440],  // 1 day (re-learning after forgetting)
   weights: DEFAULT_FSRS_WEIGHTS,
 };
 
