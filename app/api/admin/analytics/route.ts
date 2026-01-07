@@ -9,7 +9,16 @@ import {
 import { verifyAdminAccess, parseAdminQueryParams } from "@/lib/admin/middleware"
 import { calculateMRR, calculateARR, getMonthlyPrice } from "@/lib/pricing"
 import { adminCache, getCacheKey, CACHE_TTL } from "@/lib/admin/cache"
-import { format, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfDay, startOfWeek, startOfMonth, parseISO } from "date-fns"
+import {
+  format,
+  eachDayOfInterval,
+  eachWeekOfInterval,
+  eachMonthOfInterval,
+  startOfDay,
+  startOfWeek,
+  startOfMonth,
+  parseISO,
+} from "date-fns"
 
 /**
  * Generate time-series data for charts
@@ -51,7 +60,10 @@ async function generateTimeSeriesData(
   }
 
   // Initialize data structures
-  const usersByDate: Record<string, { total: number; free: number; pro: number; enterprise: number }> = {}
+  const usersByDate: Record<
+    string,
+    { total: number; free: number; pro: number; enterprise: number }
+  > = {}
   const sessionsByDate: Record<string, { total: number; completed: number }> = {}
 
   // Initialize all intervals
@@ -69,9 +81,10 @@ async function generateTimeSeriesData(
 
       if (createdAt) {
         try {
-          const date = typeof createdAt === "string"
-            ? parseISO(createdAt)
-            : createdAt.toDate?.() || new Date(createdAt)
+          const date =
+            typeof createdAt === "string"
+              ? parseISO(createdAt)
+              : createdAt.toDate?.() || new Date(createdAt)
 
           const intervalStart = getIntervalStart(date)
           const key = format(intervalStart, "yyyy-MM-dd")
@@ -98,9 +111,10 @@ async function generateTimeSeriesData(
 
       if (startedAt) {
         try {
-          const date = typeof startedAt === "string"
-            ? parseISO(startedAt)
-            : startedAt.toDate?.() || new Date(startedAt)
+          const date =
+            typeof startedAt === "string"
+              ? parseISO(startedAt)
+              : startedAt.toDate?.() || new Date(startedAt)
 
           const intervalStart = getIntervalStart(date)
           const key = format(intervalStart, "yyyy-MM-dd")
@@ -119,7 +133,7 @@ async function generateTimeSeriesData(
   }
 
   // Convert to arrays with cumulative counts for users
-  let cumulativeUsers = { total: 0, free: 0, pro: 0, enterprise: 0 }
+  const cumulativeUsers = { total: 0, free: 0, pro: 0, enterprise: 0 }
   const users = intervals.map((date) => {
     const key = format(date, "yyyy-MM-dd")
     const data = usersByDate[key] || { total: 0, free: 0, pro: 0, enterprise: 0 }
@@ -158,7 +172,6 @@ async function generateTimeSeriesData(
   return { users, sessions, revenue }
 }
 
-
 /**
  * Admin Analytics API
  * Returns aggregate metrics for admin dashboard
@@ -173,7 +186,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Firebase Admin SDK not initialized. Check server configuration."
+          error: "Firebase Admin SDK not initialized. Check server configuration.",
         },
         { status: 500 }
       )
@@ -192,7 +205,7 @@ export async function GET(request: NextRequest) {
     const { timeRange, startDate } = parseAdminQueryParams(request)
 
     // Check cache first
-    const cacheKey = getCacheKey('analytics', { timeRange })
+    const cacheKey = getCacheKey("analytics", { timeRange })
     const cachedResponse = adminCache.get<any>(cacheKey)
     if (cachedResponse) {
       return NextResponse.json({
@@ -275,9 +288,8 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const avgPerformanceScore = sessionsWithScore > 0
-      ? Math.round(totalPerformanceScore / sessionsWithScore)
-      : 0
+    const avgPerformanceScore =
+      sessionsWithScore > 0 ? Math.round(totalPerformanceScore / sessionsWithScore) : 0
 
     // Fetch analytics events
     let eventsSnapshot
@@ -314,9 +326,8 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const codeExecutionPassRate = totalCodeExecutions > 0
-      ? Math.round((passedCodeExecutions / totalCodeExecutions) * 100)
-      : 0
+    const codeExecutionPassRate =
+      totalCodeExecutions > 0 ? Math.round((passedCodeExecutions / totalCodeExecutions) * 100) : 0
 
     // Calculate revenue metrics using centralized pricing
     const mrr = calculateMRR(tierCounts)
@@ -338,7 +349,7 @@ export async function GET(request: NextRequest) {
         .limit(100)
         .get()
 
-      recentErrors = errorsSnapshot.docs.map(doc => {
+      recentErrors = errorsSnapshot.docs.map((doc) => {
         const data = doc.data()
         return {
           timestamp: data.timestamp,
@@ -359,7 +370,7 @@ export async function GET(request: NextRequest) {
           .get()
 
         recentErrors = errorsSnapshot.docs
-          .map(doc => {
+          .map((doc) => {
             const data = doc.data()
             return {
               timestamp: data.timestamp,
@@ -388,7 +399,15 @@ export async function GET(request: NextRequest) {
     const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : timeRange === "90d" ? 90 : 365
     const firebaseAnalytics = await getFirebaseAnalyticsOverview(days)
     const firebaseEvents = await getFirebaseAnalyticsEvents(
-      ["sign_up", "login", "session_start", "session_complete", "purchase", "code_execution", "ai_interaction"],
+      [
+        "sign_up",
+        "login",
+        "session_start",
+        "session_complete",
+        "purchase",
+        "code_execution",
+        "ai_interaction",
+      ],
       days
     )
     const firebaseAcquisition = await getFirebaseAnalyticsAcquisition(days)
@@ -428,18 +447,20 @@ export async function GET(request: NextRequest) {
           recent: recentErrors,
         },
         // Firebase Analytics data (if available)
-        firebaseAnalytics: firebaseAnalytics ? {
-          activeUsers: firebaseAnalytics.activeUsers,
-          newUsers: firebaseAnalytics.newUsers,
-          pageViews: firebaseAnalytics.pageViews,
-          sessions: firebaseAnalytics.sessions,
-          avgSessionDuration: firebaseAnalytics.avgSessionDuration,
-          bounceRate: firebaseAnalytics.bounceRate,
-          engagementRate: firebaseAnalytics.engagementRate,
-          eventsByType: firebaseAnalytics.eventsByType,
-          acquisition: firebaseAcquisition || [],
-          conversions: firebaseConversions || {},
-        } : null,
+        firebaseAnalytics: firebaseAnalytics
+          ? {
+              activeUsers: firebaseAnalytics.activeUsers,
+              newUsers: firebaseAnalytics.newUsers,
+              pageViews: firebaseAnalytics.pageViews,
+              sessions: firebaseAnalytics.sessions,
+              avgSessionDuration: firebaseAnalytics.avgSessionDuration,
+              bounceRate: firebaseAnalytics.bounceRate,
+              engagementRate: firebaseAnalytics.engagementRate,
+              eventsByType: firebaseAnalytics.eventsByType,
+              acquisition: firebaseAcquisition || [],
+              conversions: firebaseConversions || {},
+            }
+          : null,
         // Time-series data for charts
         timeSeries,
       },
@@ -458,7 +479,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error: errorMessage,
-        details: process.env.NODE_ENV === "development" ? errorStack : undefined
+        details: process.env.NODE_ENV === "development" ? errorStack : undefined,
       },
       { status: 500 }
     )

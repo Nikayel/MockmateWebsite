@@ -3,10 +3,10 @@
  * Mocks external dependencies for unit tests
  */
 
-import { vi } from 'vitest'
+import { vi } from "vitest"
 
 // Mock Next.js server components
-vi.mock('next/server', () => ({
+vi.mock("next/server", () => ({
   NextRequest: class MockNextRequest {
     headers: Map<string, string>
     url: string
@@ -30,7 +30,7 @@ vi.mock('next/server', () => ({
 }))
 
 // Mock Firebase (client-side)
-vi.mock('./lib/firebase', () => ({
+vi.mock("./lib/firebase", () => ({
   db: {
     collection: vi.fn(),
     doc: vi.fn(),
@@ -41,20 +41,22 @@ vi.mock('./lib/firebase', () => ({
 }))
 
 // Mock Firebase Admin (server-side)
-vi.mock('./lib/firebase-admin', () => ({
+vi.mock("./lib/firebase-admin", () => ({
   adminDb: {
     collection: vi.fn(() => ({
       doc: vi.fn(() => ({
         get: vi.fn(() => Promise.resolve({ exists: false, data: () => null })),
         set: vi.fn(() => Promise.resolve()),
       })),
-      add: vi.fn(() => Promise.resolve({ id: 'mock-id' })),
+      add: vi.fn(() => Promise.resolve({ id: "mock-id" })),
     })),
-    runTransaction: vi.fn((fn: (t: unknown) => Promise<unknown>) => fn({
-      get: vi.fn(),
-      set: vi.fn(),
-      update: vi.fn(),
-    })),
+    runTransaction: vi.fn((fn: (t: unknown) => Promise<unknown>) =>
+      fn({
+        get: vi.fn(),
+        set: vi.fn(),
+        update: vi.fn(),
+      })
+    ),
   },
   adminAuth: {
     verifyIdToken: vi.fn(),
@@ -62,5 +64,5 @@ vi.mock('./lib/firebase-admin', () => ({
 }))
 
 // Mock environment variables
-Object.defineProperty(process.env, 'NODE_ENV', { value: 'test', writable: true })
-process.env.STRIPE_SECRET_KEY = 'sk_test_mock'
+process.env.NODE_ENV = "test"
+process.env.STRIPE_SECRET_KEY = "sk_test_mock"
