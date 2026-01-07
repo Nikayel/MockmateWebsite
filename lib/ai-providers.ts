@@ -18,14 +18,20 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai"
-import { generateCacheKey, getCachedResponse, setCachedResponse } from './ai-cache'
-import { trackUsageEvent, calculateCost, PROVIDER_COSTS } from './usage-tracking'
-import { checkRateLimit, recordRequestStart, recordRequestEnd, updateTokenCount, RateLimitTier } from './rate-limiter'
-import { logger } from './logger'
+import { generateCacheKey, getCachedResponse, setCachedResponse } from "./ai-cache"
+import { trackUsageEvent, calculateCost, PROVIDER_COSTS } from "./usage-tracking"
+import {
+  checkRateLimit,
+  recordRequestStart,
+  recordRequestEnd,
+  updateTokenCount,
+  RateLimitTier,
+} from "./rate-limiter"
+import { logger } from "./logger"
 
 // Provider types
-export type AIProvider = 'gemini' | 'deepseek' | 'claude'
-export type TaskComplexity = 'simple' | 'standard' | 'complex'
+export type AIProvider = "gemini" | "gemini-lite" | "deepseek" | "claude"
+export type TaskComplexity = "simple" | "standard" | "complex"
 
 // Response structure
 export interface AIResponse {
@@ -48,33 +54,42 @@ interface ProviderConfig {
 }
 
 // Provider configurations - Updated Dec 2025 pricing
-// Strategy: Gemini Flash primary (cheapest + good), Deepseek fallback, Claude premium
+// Strategy: Gemini Flash Lite for simple/chat (cheapest), Flash for standard, Deepseek for critique
 const PROVIDERS: Record<AIProvider, ProviderConfig> = {
   gemini: {
-    name: 'gemini',
+    name: "gemini",
     enabled: true,
     apiKey: process.env.GEMINI_API_KEY,
-    model: 'gemini-2.5-flash', // Best value: $0.075/1M input, $0.30/1M output
+    model: "gemini-2.5-flash", // Best value: $0.075/1M input, $0.30/1M output
     maxTokens: 1024,
     temperature: 0.7,
     costPer1kTokens: 0.000188, // Averaged (input + output) / 2
   },
-  deepseek: {
-    name: 'deepseek',
-    enabled: !!process.env.DEEPSEEK_API_KEY,
-    apiKey: process.env.DEEPSEEK_API_KEY,
-    baseUrl: 'https://api.deepseek.com/v1',
-    model: 'deepseek-chat', // $0.14/1M input, $0.28/1M output - excellent fallback
+  "gemini-lite": {
+    name: "gemini-lite",
+    enabled: true,
+    apiKey: process.env.GEMINI_API_KEY, // Same API key as gemini
+    model: "gemini-2.5-flash", // Use 2.5 Flash - free tier up to 1M tokens!
     maxTokens: 1024,
     temperature: 0.7,
-    costPer1kTokens: 0.00021, // Averaged
+    costPer1kTokens: 0, // Free tier - no cost until 1M tokens
+  },
+  deepseek: {
+    name: "deepseek",
+    enabled: !!process.env.DEEPSEEK_API_KEY,
+    apiKey: process.env.DEEPSEEK_API_KEY,
+    baseUrl: "https://api.deepseek.com/v1",
+    model: "deepseek-reasoner", // R1 model - $0.55/1M input, $2.19/1M output - best for critique/reasoning
+    maxTokens: 1024,
+    temperature: 0.7,
+    costPer1kTokens: 0.00137, // Averaged - only used for Constitutional AI critique (~$0.003/critique)
   },
   claude: {
-    name: 'claude',
+    name: "claude",
     enabled: !!process.env.ANTHROPIC_API_KEY,
     apiKey: process.env.ANTHROPIC_API_KEY,
-    baseUrl: 'https://api.anthropic.com/v1',
-    model: 'claude-3-5-haiku-latest', // $0.80/1M input, $4.00/1M output - quality fallback
+    baseUrl: "https://api.anthropic.com/v1",
+    model: "claude-3-5-haiku-latest", // $0.80/1M input, $4.00/1M output - quality fallback
     maxTokens: 1024,
     temperature: 0.7,
     costPer1kTokens: 0.0024, // Averaged - more expensive but best quality
@@ -82,11 +97,11 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
 }
 
 // Fallback order based on task complexity
-// Cost-optimized: Gemini first (best value), Deepseek second (cheap), Claude last (quality)
+// Cost-optimized: Flash Lite for simple (cheapest), Flash for standard, Claude for complex quality
 const FALLBACK_ORDER: Record<TaskComplexity, AIProvider[]> = {
-  simple: ['gemini', 'deepseek', 'claude'],   // Chat, hints - cheapest path
-  standard: ['gemini', 'deepseek', 'claude'], // Interview interactions
-  complex: ['gemini', 'claude', 'deepseek'],  // Feedback generation - quality matters
+  simple: ["gemini-lite", "gemini", "deepseek", "claude"], // Chat, hints - cheapest path (Flash Lite)
+  standard: ["gemini", "gemini-lite", "deepseek", "claude"], // Interview interactions - balanced
+  complex: ["gemini", "claude", "deepseek"], // Feedback generation - quality matters
 }
 
 // Retry configuration
@@ -99,16 +114,16 @@ const RETRY_DELAYS = [1000, 2000, 4000] // Exponential backoff
  */
 function isRetryableError(error: any): boolean {
   const status = error?.status || error?.response?.status
-  const message = (error?.message || '').toLowerCase()
+  const message = (error?.message || "").toLowerCase()
   const errorString = JSON.stringify(error || {}).toLowerCase()
 
   // Quota errors should NOT be retried - fallback immediately
   if (
-    message.includes('quota exceeded') ||
-    message.includes('quota') ||
-    errorString.includes('quota exceeded') ||
-    errorString.includes('quota') ||
-    message.includes('limit: 20') // Gemini free tier limit
+    message.includes("quota exceeded") ||
+    message.includes("quota") ||
+    errorString.includes("quota exceeded") ||
+    errorString.includes("quota") ||
+    message.includes("limit: 20") // Gemini free tier limit
   ) {
     return false
   }
@@ -117,11 +132,11 @@ function isRetryableError(error: any): boolean {
     status === 503 ||
     status === 429 ||
     status === 500 ||
-    message.includes('503') ||
-    message.includes('service unavailable') ||
-    message.includes('overloaded') ||
-    message.includes('rate limit') ||
-    message.includes('timeout')
+    message.includes("503") ||
+    message.includes("service unavailable") ||
+    message.includes("overloaded") ||
+    message.includes("rate limit") ||
+    message.includes("timeout")
   )
 }
 
@@ -131,18 +146,18 @@ function isRetryableError(error: any): boolean {
 async function callGemini(
   systemPrompt: string,
   userMessage: string,
-  history: Array<{ role: 'user' | 'model'; content: string }>,
+  history: Array<{ role: "user" | "model"; content: string }>,
   config: ProviderConfig
 ): Promise<string> {
   try {
-    const genAI = new GoogleGenerativeAI(config.apiKey || '')
+    const genAI = new GoogleGenerativeAI(config.apiKey || "")
     const model = genAI.getGenerativeModel({
       model: config.model,
       systemInstruction: systemPrompt,
     })
 
-    const geminiHistory = history.map(msg => ({
-      role: msg.role as 'user' | 'model',
+    const geminiHistory = history.map((msg) => ({
+      role: msg.role as "user" | "model",
       parts: [{ text: msg.content }],
     }))
 
@@ -159,23 +174,23 @@ async function callGemini(
     return response.text()
   } catch (error: any) {
     // Extract error message from Gemini SDK error structure
-    const errorMessage = error?.message || error?.toString() || 'Unknown error'
+    const errorMessage = error?.message || error?.toString() || "Unknown error"
     const errorDetails = error?.cause || error
     const errorString = JSON.stringify(errorDetails || {}).toLowerCase()
 
     // Check if it's a quota error (comprehensive detection)
     const isQuotaError =
-      errorMessage.toLowerCase().includes('quota exceeded') ||
-      errorMessage.toLowerCase().includes('quota') ||
-      errorMessage.toLowerCase().includes('limit: 20') ||
-      errorMessage.toLowerCase().includes('free_tier_requests') ||
-      errorString.includes('quota') ||
-      errorString.includes('limit: 20') ||
-      errorString.includes('free_tier_requests') ||
-      errorString.includes('quotafailure')
+      errorMessage.toLowerCase().includes("quota exceeded") ||
+      errorMessage.toLowerCase().includes("quota") ||
+      errorMessage.toLowerCase().includes("limit: 20") ||
+      errorMessage.toLowerCase().includes("free_tier_requests") ||
+      errorString.includes("quota") ||
+      errorString.includes("limit: 20") ||
+      errorString.includes("free_tier_requests") ||
+      errorString.includes("quotafailure")
 
     if (isQuotaError) {
-      logger.warn('[Gemini] Quota error detected', { message: errorMessage.substring(0, 200) })
+      logger.warn("[Gemini] Quota error detected", { message: errorMessage.substring(0, 200) })
       throw {
         status: 429,
         message: errorMessage,
@@ -199,30 +214,30 @@ async function callGemini(
 async function callDeepseek(
   systemPrompt: string,
   userMessage: string,
-  history: Array<{ role: 'user' | 'model'; content: string }>,
+  history: Array<{ role: "user" | "model"; content: string }>,
   config: ProviderConfig
 ): Promise<string> {
   try {
     if (!config.apiKey) {
-      throw new Error('DeepSeek API key is not configured')
+      throw new Error("DeepSeek API key is not configured")
     }
 
     const messages = [
-      { role: 'system', content: systemPrompt },
-      ...history.map(msg => ({
-        role: msg.role === 'model' ? 'assistant' : 'user',
+      { role: "system", content: systemPrompt },
+      ...history.map((msg) => ({
+        role: msg.role === "model" ? "assistant" : "user",
         content: msg.content,
       })),
-      { role: 'user', content: userMessage },
+      { role: "user", content: userMessage },
     ]
 
-    logger.debug('[DeepSeek] Calling API', { model: config.model, messageCount: messages.length })
+    logger.debug("[DeepSeek] Calling API", { model: config.model, messageCount: messages.length })
 
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.apiKey}`,
       },
       body: JSON.stringify({
         model: config.model,
@@ -242,7 +257,11 @@ async function callDeepseek(
       }
 
       const errorMessage = errorData.error?.message || errorData.message || response.statusText
-      logger.error('[DeepSeek] API error', { status: response.status, message: errorMessage, fullResponse: errorText })
+      logger.error("[DeepSeek] API error", {
+        status: response.status,
+        message: errorMessage,
+        fullResponse: errorText,
+      })
 
       throw {
         status: response.status,
@@ -252,18 +271,18 @@ async function callDeepseek(
     }
 
     const data = await response.json()
-    const content = data.choices[0]?.message?.content || ''
+    const content = data.choices[0]?.message?.content || ""
 
     if (!content) {
-      logger.error('[DeepSeek] Empty response', { data })
+      logger.error("[DeepSeek] Empty response", { data })
       throw {
         status: 500,
-        message: 'DeepSeek returned empty response',
+        message: "DeepSeek returned empty response",
         originalResponse: data,
       }
     }
 
-    logger.debug('[DeepSeek] Success', { responseLength: content.length })
+    logger.debug("[DeepSeek] Success", { responseLength: content.length })
     return content
   } catch (error: any) {
     // Re-throw with better context
@@ -272,7 +291,7 @@ async function callDeepseek(
     }
     throw {
       status: 500,
-      message: `DeepSeek API call failed: ${error?.message || 'Unknown error'}`,
+      message: `DeepSeek API call failed: ${error?.message || "Unknown error"}`,
       originalError: error,
     }
   }
@@ -284,23 +303,23 @@ async function callDeepseek(
 async function callClaude(
   systemPrompt: string,
   userMessage: string,
-  history: Array<{ role: 'user' | 'model'; content: string }>,
+  history: Array<{ role: "user" | "model"; content: string }>,
   config: ProviderConfig
 ): Promise<string> {
   const messages = [
-    ...history.map(msg => ({
-      role: msg.role === 'model' ? 'assistant' as const : 'user' as const,
+    ...history.map((msg) => ({
+      role: msg.role === "model" ? ("assistant" as const) : ("user" as const),
       content: msg.content,
     })),
-    { role: 'user' as const, content: userMessage },
+    { role: "user" as const, content: userMessage },
   ]
 
   const response = await fetch(`${config.baseUrl}/messages`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': config.apiKey || '',
-      'anthropic-version': '2023-06-01',
+      "Content-Type": "application/json",
+      "x-api-key": config.apiKey || "",
+      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
       model: config.model,
@@ -316,7 +335,7 @@ async function callClaude(
   }
 
   const data = await response.json()
-  return data.content[0]?.text || ''
+  return data.content[0]?.text || ""
 }
 
 /**
@@ -326,7 +345,7 @@ async function callProvider(
   provider: AIProvider,
   systemPrompt: string,
   userMessage: string,
-  history: Array<{ role: 'user' | 'model'; content: string }>,
+  history: Array<{ role: "user" | "model"; content: string }>,
   temperatureOverride?: number
 ): Promise<string> {
   const config = { ...PROVIDERS[provider] }
@@ -341,11 +360,12 @@ async function callProvider(
   }
 
   switch (provider) {
-    case 'gemini':
+    case "gemini":
+    case "gemini-lite":
       return callGemini(systemPrompt, userMessage, history, config)
-    case 'deepseek':
+    case "deepseek":
       return callDeepseek(systemPrompt, userMessage, history, config)
-    case 'claude':
+    case "claude":
       return callClaude(systemPrompt, userMessage, history, config)
     default:
       throw new Error(`Unknown provider: ${provider}`)
@@ -359,7 +379,7 @@ async function callProvider(
 export async function generateAIResponse(
   systemPrompt: string,
   userMessage: string,
-  history: Array<{ role: 'user' | 'model'; content: string }> = [],
+  history: Array<{ role: "user" | "model"; content: string }> = [],
   options: {
     complexity?: TaskComplexity
     preferredProvider?: AIProvider
@@ -370,21 +390,21 @@ export async function generateAIResponse(
     userTier?: RateLimitTier
     sessionId?: string
     scenarioId?: string
-    eventType?: 'chat_message' | 'feedback_generation' | 'hint_request'
+    eventType?: "chat_message" | "feedback_generation" | "hint_request"
     skipCache?: boolean
     skipRateLimit?: boolean
   } = {}
 ): Promise<AIResponse> {
   const {
-    complexity = 'standard',
+    complexity = "standard",
     preferredProvider,
     maxRetries = MAX_RETRIES,
     temperature,
     userId,
-    userTier = 'free',
+    userTier = "free",
     sessionId,
     scenarioId,
-    eventType = 'chat_message',
+    eventType = "chat_message",
     skipCache = false,
     skipRateLimit = false,
   } = options
@@ -395,7 +415,7 @@ export async function generateAIResponse(
   if (userId && !skipRateLimit) {
     const rateLimitCheck = await checkRateLimit(userId, userTier)
     if (!rateLimitCheck.allowed) {
-      throw new Error(rateLimitCheck.message || 'Rate limit exceeded')
+      throw new Error(rateLimitCheck.message || "Rate limit exceeded")
     }
   }
 
@@ -405,13 +425,12 @@ export async function generateAIResponse(
       type: eventType,
       systemPrompt,
       userMessage,
-      context: history.map(h => h.content).join('|'),
+      context: history.map((h) => h.content).join("|"),
       scenarioId,
     })
 
     const cached = await getCachedResponse(cacheKey)
     if (cached.hit && cached.response) {
-
       // Track cached usage (no cost) - fire-and-forget
       if (userId) {
         trackUsageEvent({
@@ -428,7 +447,7 @@ export async function generateAIResponse(
 
       return {
         text: cached.response,
-        provider: 'gemini', // Indicate it was from cache
+        provider: "gemini", // Indicate it was from cache
         latencyMs: Date.now() - startTime,
         tokensUsed: 0,
       }
@@ -443,47 +462,68 @@ export async function generateAIResponse(
   // Determine provider order
   let providerOrder: AIProvider[]
   if (preferredProvider) {
-    providerOrder = [preferredProvider, ...FALLBACK_ORDER[complexity].filter(p => p !== preferredProvider)]
+    providerOrder = [
+      preferredProvider,
+      ...FALLBACK_ORDER[complexity].filter((p) => p !== preferredProvider),
+    ]
   } else {
     providerOrder = FALLBACK_ORDER[complexity]
   }
 
   // Filter to only enabled providers
-  const enabledProviders = providerOrder.filter(p => PROVIDERS[p].enabled)
-  const disabledProviders = providerOrder.filter(p => !PROVIDERS[p].enabled)
+  const enabledProviders = providerOrder.filter((p) => PROVIDERS[p].enabled)
+  const disabledProviders = providerOrder.filter((p) => !PROVIDERS[p].enabled)
 
   // Log provider status for debugging (only in development)
   const providerStatuses = Object.fromEntries(
-    providerOrder.map(p => [p, PROVIDERS[p].enabled ? 'enabled' : 'disabled'])
+    providerOrder.map((p) => [p, PROVIDERS[p].enabled ? "enabled" : "disabled"])
   )
-  logger.debug('[AI Provider] Provider status check', { providers: providerStatuses })
+  logger.debug("[AI Provider] Provider status check", { providers: providerStatuses })
 
   if (disabledProviders.length > 0) {
-    logger.debug('[AI Provider] Disabled providers will be skipped', { providers: disabledProviders })
+    logger.debug("[AI Provider] Disabled providers will be skipped", {
+      providers: disabledProviders,
+    })
   }
-  logger.debug('[AI Provider] Provider order', { order: enabledProviders })
+  logger.debug("[AI Provider] Provider order", { order: enabledProviders })
 
   providerOrder = enabledProviders
 
   if (providerOrder.length === 0) {
     if (userId) recordRequestEnd(userId)
-    const missingKeys = disabledProviders.map(p => {
-      const keyName = p === 'gemini' ? 'GEMINI_API_KEY' : p === 'deepseek' ? 'DEEPSEEK_API_KEY' : 'ANTHROPIC_API_KEY'
-      return `${keyName} (for ${p})`
-    }).join(', ')
-    throw new Error(`No AI providers are configured. Please set at least one API key: ${missingKeys}`)
+    const missingKeys = disabledProviders
+      .map((p) => {
+        const keyName =
+          p === "gemini" || p === "gemini-lite"
+            ? "GEMINI_API_KEY"
+            : p === "deepseek"
+              ? "DEEPSEEK_API_KEY"
+              : "ANTHROPIC_API_KEY"
+        return `${keyName} (for ${p})`
+      })
+      .join(", ")
+    throw new Error(
+      `No AI providers are configured. Please set at least one API key: ${missingKeys}`
+    )
   }
 
   let lastError: any = null
 
   // Try each provider in order
   for (const provider of providerOrder) {
-    logger.debug('[AI Provider] Attempting provider', { provider, model: PROVIDERS[provider].model })
+    logger.debug("[AI Provider] Attempting provider", {
+      provider,
+      model: PROVIDERS[provider].model,
+    })
     // Retry loop for each provider
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         if (attempt > 0) {
-          logger.debug('[AI Provider] Retry attempt', { attempt: attempt + 1, maxRetries, provider })
+          logger.debug("[AI Provider] Retry attempt", {
+            attempt: attempt + 1,
+            maxRetries,
+            provider,
+          })
         }
 
         const text = await callProvider(provider, systemPrompt, userMessage, history, temperature)
@@ -491,7 +531,12 @@ export async function generateAIResponse(
         const latencyMs = Date.now() - startTime
 
         // Estimate tokens (rough estimate: 4 chars per token)
-        const inputTokens = Math.ceil((systemPrompt.length + userMessage.length + history.reduce((sum, h) => sum + h.content.length, 0)) / 4)
+        const inputTokens = Math.ceil(
+          (systemPrompt.length +
+            userMessage.length +
+            history.reduce((sum, h) => sum + h.content.length, 0)) /
+            4
+        )
         const outputTokens = Math.ceil(text.length / 4)
         const totalTokens = inputTokens + outputTokens
         const cost = calculateCost(inputTokens, outputTokens, provider)
@@ -526,7 +571,7 @@ export async function generateAIResponse(
             type: eventType,
             systemPrompt,
             userMessage,
-            context: history.map(h => h.content).join('|'),
+            context: history.map((h) => h.content).join("|"),
             scenarioId,
           })
           // Fire-and-forget cache write - errors are non-critical
@@ -535,7 +580,7 @@ export async function generateAIResponse(
           })
         }
 
-        logger.info('[AI Provider] Success', { provider, latencyMs, tokens: totalTokens })
+        logger.info("[AI Provider] Success", { provider, latencyMs, tokens: totalTokens })
         return {
           text,
           provider,
@@ -546,9 +591,9 @@ export async function generateAIResponse(
         lastError = error
 
         // Log error details for debugging
-        const errorMessage = error?.message || error?.toString() || 'Unknown error'
-        const errorStatus = error?.status || 'unknown'
-        logger.warn('[AI Provider] Provider failed', {
+        const errorMessage = error?.message || error?.toString() || "Unknown error"
+        const errorStatus = error?.status || "unknown"
+        logger.warn("[AI Provider] Provider failed", {
           provider,
           attempt: attempt + 1,
           maxRetries,
@@ -565,24 +610,24 @@ export async function generateAIResponse(
         // Comprehensive quota error detection
         const isQuotaError =
           error?.quotaExceeded ||
-          errorMessage.toLowerCase().includes('quota exceeded') ||
-          errorMessage.toLowerCase().includes('quota') ||
-          errorMessage.toLowerCase().includes('limit: 20') || // Gemini free tier limit
-          errorMessage.toLowerCase().includes('free_tier_requests') ||
-          errorMessage.toLowerCase().includes('quota failure') ||
-          errorString.includes('quota') ||
-          errorString.includes('limit: 20') ||
-          errorString.includes('free_tier_requests') ||
-          errorString.includes('quotafailure') ||
-          errorCause.includes('quota') ||
-          errorCause.includes('limit: 20') ||
-          errorOriginal.includes('quota') ||
-          errorOriginal.includes('limit: 20')
+          errorMessage.toLowerCase().includes("quota exceeded") ||
+          errorMessage.toLowerCase().includes("quota") ||
+          errorMessage.toLowerCase().includes("limit: 20") || // Gemini free tier limit
+          errorMessage.toLowerCase().includes("free_tier_requests") ||
+          errorMessage.toLowerCase().includes("quota failure") ||
+          errorString.includes("quota") ||
+          errorString.includes("limit: 20") ||
+          errorString.includes("free_tier_requests") ||
+          errorString.includes("quotafailure") ||
+          errorCause.includes("quota") ||
+          errorCause.includes("limit: 20") ||
+          errorOriginal.includes("quota") ||
+          errorOriginal.includes("limit: 20")
 
         if (isQuotaError) {
           // Quota errors should immediately fallback - don't retry
           const remainingProviders = providerOrder.slice(providerOrder.indexOf(provider) + 1)
-          logger.warn('[AI Provider] Quota exceeded, falling back', {
+          logger.warn("[AI Provider] Quota exceeded, falling back", {
             provider,
             message: errorMessage.substring(0, 300),
             fallbackProviders: remainingProviders,
@@ -593,7 +638,7 @@ export async function generateAIResponse(
         // Only retry if it's a retryable error
         if (isRetryableError(error) && attempt < maxRetries - 1) {
           const delay = RETRY_DELAYS[attempt] || RETRY_DELAYS[RETRY_DELAYS.length - 1]
-          await new Promise(resolve => setTimeout(resolve, delay))
+          await new Promise((resolve) => setTimeout(resolve, delay))
         } else {
           // Move to next provider
           break
@@ -606,28 +651,35 @@ export async function generateAIResponse(
   if (userId) recordRequestEnd(userId)
 
   // Build helpful error message
-  const isQuotaError = lastError?.quotaExceeded ||
-    (lastError?.message || '').toLowerCase().includes('quota')
+  const isQuotaError =
+    lastError?.quotaExceeded || (lastError?.message || "").toLowerCase().includes("quota")
 
   let errorMessage = `All AI providers failed.`
 
   if (isQuotaError && disabledProviders.length > 0) {
-    const missingProviders = disabledProviders.map(p => {
-      const keyName = p === 'gemini' ? 'GEMINI_API_KEY' :
-        p === 'deepseek' ? 'DEEPSEEK_API_KEY' :
-          'ANTHROPIC_API_KEY'
-      return `${keyName} (for ${p})`
-    }).join(', ')
+    const missingProviders = disabledProviders
+      .map((p) => {
+        const keyName =
+          p === "gemini" || p === "gemini-lite"
+            ? "GEMINI_API_KEY"
+            : p === "deepseek"
+              ? "DEEPSEEK_API_KEY"
+              : "ANTHROPIC_API_KEY"
+        return `${keyName} (for ${p})`
+      })
+      .join(", ")
 
-    errorMessage = `Primary provider quota exceeded and no fallback providers available.\n\n` +
+    errorMessage =
+      `Primary provider quota exceeded and no fallback providers available.\n\n` +
       `To enable fallback providers, add these environment variables to your .env.local file:\n` +
       `${missingProviders}\n\n` +
-      `Last error: ${lastError?.message?.substring(0, 200) || 'Unknown error'}`
+      `Last error: ${lastError?.message?.substring(0, 200) || "Unknown error"}`
   } else if (isQuotaError) {
-    errorMessage = `All AI providers exceeded their quota limits. Please wait before retrying.\n\n` +
-      `Last error: ${lastError?.message?.substring(0, 200) || 'Unknown error'}`
+    errorMessage =
+      `All AI providers exceeded their quota limits. Please wait before retrying.\n\n` +
+      `Last error: ${lastError?.message?.substring(0, 200) || "Unknown error"}`
   } else {
-    errorMessage = `All AI providers failed. Last error: ${lastError?.message?.substring(0, 300) || 'Unknown error'}`
+    errorMessage = `All AI providers failed. Last error: ${lastError?.message?.substring(0, 300) || "Unknown error"}`
   }
 
   throw new Error(errorMessage)
@@ -639,9 +691,9 @@ export async function generateAIResponse(
 export async function generateChatResponse(
   systemPrompt: string,
   userMessage: string,
-  history: Array<{ role: 'user' | 'model'; content: string }> = []
+  history: Array<{ role: "user" | "model"; content: string }> = []
 ): Promise<AIResponse> {
-  return generateAIResponse(systemPrompt, userMessage, history, { complexity: 'simple' })
+  return generateAIResponse(systemPrompt, userMessage, history, { complexity: "simple" })
 }
 
 /**
@@ -650,9 +702,9 @@ export async function generateChatResponse(
 export async function generateInterviewResponse(
   systemPrompt: string,
   userMessage: string,
-  history: Array<{ role: 'user' | 'model'; content: string }> = []
+  history: Array<{ role: "user" | "model"; content: string }> = []
 ): Promise<AIResponse> {
-  return generateAIResponse(systemPrompt, userMessage, history, { complexity: 'standard' })
+  return generateAIResponse(systemPrompt, userMessage, history, { complexity: "standard" })
 }
 
 /**
@@ -662,10 +714,10 @@ export async function generateInterviewResponse(
 export async function generateFeedbackResponse(
   systemPrompt: string,
   userMessage: string,
-  history: Array<{ role: 'user' | 'model'; content: string }> = []
+  history: Array<{ role: "user" | "model"; content: string }> = []
 ): Promise<AIResponse> {
   return generateAIResponse(systemPrompt, userMessage, history, {
-    complexity: 'complex',
+    complexity: "complex",
     temperature: 0.3, // Lower temperature for consistent, data-driven feedback
   })
 }
@@ -676,21 +728,25 @@ export async function generateFeedbackResponse(
 export function getProviderStatus(): Record<AIProvider, { enabled: boolean; model: string }> {
   return {
     gemini: { enabled: PROVIDERS.gemini.enabled, model: PROVIDERS.gemini.model },
+    "gemini-lite": {
+      enabled: PROVIDERS["gemini-lite"].enabled,
+      model: PROVIDERS["gemini-lite"].model,
+    },
     deepseek: { enabled: PROVIDERS.deepseek.enabled, model: PROVIDERS.deepseek.model },
     claude: { enabled: PROVIDERS.claude.enabled, model: PROVIDERS.claude.model },
   }
 }
 
 // Log provider status on module load (server-side only, development only via logger)
-if (typeof window === 'undefined') {
+if (typeof window === "undefined") {
   const status = getProviderStatus()
-  logger.info('[AI Providers] Configuration status', {
+  logger.info("[AI Providers] Configuration status", {
     providers: Object.fromEntries(
       Object.entries(status).map(([provider, config]) => [
         provider,
-        { enabled: config.enabled, model: config.model }
+        { enabled: config.enabled, model: config.model },
       ])
-    )
+    ),
   })
 }
 
@@ -710,7 +766,7 @@ export function validateResponseRelevance(
 
   // Check if response is too short (likely an error or non-answer)
   if (response.length < 20) {
-    issues.push('Response too short')
+    issues.push("Response too short")
     relevanceScore -= 50
   }
 
@@ -718,15 +774,15 @@ export function validateResponseRelevance(
   if (problemContext.title) {
     const titleWords = problemContext.title.toLowerCase().split(/\s+/)
     const responseWords = response.toLowerCase()
-    const titleMatches = titleWords.filter(word =>
-      word.length > 3 && responseWords.includes(word)
+    const titleMatches = titleWords.filter(
+      (word) => word.length > 3 && responseWords.includes(word)
     ).length
 
     if (titleMatches === 0 && titleWords.length > 0) {
       // Only flag if we have a meaningful title to check
-      const meaningfulWords = titleWords.filter(w => w.length > 3)
+      const meaningfulWords = titleWords.filter((w) => w.length > 3)
       if (meaningfulWords.length > 0) {
-        issues.push('Response may not be relevant to the problem')
+        issues.push("Response may not be relevant to the problem")
         relevanceScore -= 20
       }
     }
@@ -743,22 +799,20 @@ export function validateResponseRelevance(
 
   for (const pattern of hallucinations) {
     if (pattern.test(response)) {
-      issues.push('Response contains potential refusal/hallucination pattern')
+      issues.push("Response contains potential refusal/hallucination pattern")
       relevanceScore -= 30
       break
     }
   }
 
   // Check for code-related keywords if it's a coding problem
-  if (problemContext.type === 'dsa' || problemContext.type === 'bugfix') {
-    const codeKeywords = ['function', 'return', 'algorithm', 'complexity', 'approach', 'solution']
-    const hasCodeContext = codeKeywords.some(keyword =>
-      response.toLowerCase().includes(keyword)
-    )
+  if (problemContext.type === "dsa" || problemContext.type === "bugfix") {
+    const codeKeywords = ["function", "return", "algorithm", "complexity", "approach", "solution"]
+    const hasCodeContext = codeKeywords.some((keyword) => response.toLowerCase().includes(keyword))
 
     // If no code-related keywords in a long response, might be off-topic
     if (!hasCodeContext && response.length > 200) {
-      issues.push('Response lacks code/algorithm context for technical problem')
+      issues.push("Response lacks code/algorithm context for technical problem")
       relevanceScore -= 15
     }
   }

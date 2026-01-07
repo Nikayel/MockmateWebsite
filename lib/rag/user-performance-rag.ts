@@ -10,13 +10,13 @@
  * - Progress analytics
  */
 
-import type { DSAPattern } from '@/lib/types/dsa-patterns'
-import type { CompanyId } from '@/lib/data/company-questions/types'
-import { getHybridProvider } from './embeddings/hybrid-provider'
-import { vectorDB } from './vectordb'
-import { adminDb } from '@/lib/firebase-admin'
-import { Timestamp } from 'firebase-admin/firestore'
-import type { VectorDocument } from './types'
+import type { DSAPattern } from "@/lib/types/dsa-patterns"
+import type { CompanyId } from "@/lib/data/company-questions/types"
+import { getHybridProvider } from "./embeddings/hybrid-provider"
+import { vectorDB } from "./vectordb"
+import { adminDb } from "@/lib/firebase-admin"
+import { Timestamp } from "firebase-admin/firestore"
+import type { VectorDocument } from "./types"
 
 /**
  * User performance profile
@@ -42,8 +42,8 @@ export interface UserPerformanceProfile {
   }
 
   // Trend analysis
-  recentTrend: 'improving' | 'stable' | 'declining'
-  weeklyProgress: number[]  // Last 4 weeks scores
+  recentTrend: "improving" | "stable" | "declining"
+  weeklyProgress: number[] // Last 4 weeks scores
 
   // Strengths and weaknesses
   strengths: DSAPattern[]
@@ -51,9 +51,9 @@ export interface UserPerformanceProfile {
   focusAreas: string[]
 
   // Learning style indicators
-  preferredSessionLength: number  // minutes
-  bestPerformanceTime: string     // e.g., "morning", "evening"
-  learningPace: 'slow' | 'moderate' | 'fast'
+  preferredSessionLength: number // minutes
+  bestPerformanceTime: string // e.g., "morning", "evening"
+  learningPace: "slow" | "moderate" | "fast"
 }
 
 /**
@@ -65,8 +65,8 @@ export interface PatternProficiency {
   problemsSolved: number
   averageScore: number
   lastPracticed: Date | null
-  proficiencyLevel: 'novice' | 'learning' | 'practicing' | 'proficient' | 'expert'
-  improvementTrend: 'improving' | 'stable' | 'declining' | 'not_enough_data'
+  proficiencyLevel: "novice" | "learning" | "practicing" | "proficient" | "expert"
+  improvementTrend: "improving" | "stable" | "declining" | "not_enough_data"
 }
 
 /**
@@ -77,8 +77,8 @@ export interface SessionAnalysis {
   userId: string
   scenarioId: string
   pattern: DSAPattern
-  difficulty: 'easy' | 'medium' | 'hard'
-  score: number            // MASTERY score for technical analysis
+  difficulty: "easy" | "medium" | "hard"
+  score: number // MASTERY score for technical analysis
   performanceScore: number // PERFORMANCE score for interview readiness
   duration: number
   hintsUsed: number
@@ -92,10 +92,10 @@ export interface SessionAnalysis {
  * Personalized recommendation
  */
 export interface PersonalizedRecommendation {
-  type: 'practice' | 'review' | 'challenge' | 'rest'
-  priority: 'high' | 'medium' | 'low'
+  type: "practice" | "review" | "challenge" | "rest"
+  priority: "high" | "medium" | "low"
   pattern?: DSAPattern
-  difficulty?: 'easy' | 'medium' | 'hard'
+  difficulty?: "easy" | "medium" | "hard"
   reason: string
   estimatedBenefit: string
   suggestedScenarioIds?: string[]
@@ -113,7 +113,7 @@ export class UserPerformanceRAG {
   async getPerformanceProfile(userId: string): Promise<UserPerformanceProfile> {
     try {
       // Check for cached profile
-      const profileDoc = await adminDb.collection('user_performance_profiles').doc(userId).get()
+      const profileDoc = await adminDb.collection("user_performance_profiles").doc(userId).get()
 
       if (profileDoc.exists) {
         const data = profileDoc.data()!
@@ -128,9 +128,8 @@ export class UserPerformanceRAG {
 
       // Build fresh profile
       return await this.buildPerformanceProfile(userId)
-
     } catch (error) {
-      console.error('[UserPerformanceRAG] Error getting profile:', error)
+      console.error("[UserPerformanceRAG] Error getting profile:", error)
       return this.createEmptyProfile(userId)
     }
   }
@@ -142,10 +141,10 @@ export class UserPerformanceRAG {
     try {
       // Get all user sessions from session_summaries subcollection
       const sessionsSnapshot = await adminDb
-        .collection('users')
+        .collection("users")
         .doc(userId)
-        .collection('session_summaries')
-        .orderBy('completedAt', 'desc')
+        .collection("session_summaries")
+        .orderBy("completedAt", "desc")
         .limit(100)
         .get()
 
@@ -153,22 +152,21 @@ export class UserPerformanceRAG {
         return this.createEmptyProfile(userId)
       }
 
-      const sessions = sessionsSnapshot.docs.map(doc => ({
+      const sessions = sessionsSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as Array<{ id: string; performanceScore?: number; [key: string]: unknown }>
 
       // Analyze sessions (session_summaries are all completed)
       const analyses = sessions
-        .filter(s => s.performanceScore !== undefined)
-        .map(s => this.analyzeSession(s))
+        .filter((s) => s.performanceScore !== undefined)
+        .map((s) => this.analyzeSession(s))
 
       // Calculate overall metrics
       const totalSessions = sessions.length
       const completedSessions = analyses.length
-      const averageScore = analyses.length > 0
-        ? analyses.reduce((sum, a) => sum + a.score, 0) / analyses.length
-        : 0
+      const averageScore =
+        analyses.length > 0 ? analyses.reduce((sum, a) => sum + a.score, 0) / analyses.length : 0
       const totalPracticeHours = analyses.reduce((sum, a) => sum + a.duration / 3600, 0)
 
       // Calculate pattern proficiency
@@ -218,9 +216,8 @@ export class UserPerformanceRAG {
       await this.storePerformanceEmbedding(profile)
 
       return profile
-
     } catch (error) {
-      console.error('[UserPerformanceRAG] Error building profile:', error)
+      console.error("[UserPerformanceRAG] Error building profile:", error)
       return this.createEmptyProfile(userId)
     }
   }
@@ -237,33 +234,35 @@ export class UserPerformanceRAG {
 
     // Validate pattern - don't silently corrupt data with wrong defaults
     let pattern: DSAPattern
-    if (session.pattern && typeof session.pattern === 'string') {
+    if (session.pattern && typeof session.pattern === "string") {
       pattern = session.pattern as DSAPattern
     } else {
       // Log warning when pattern is missing - this indicates upstream data issue
-      console.warn(`[UserPerformanceRAG] Session ${session.sessionId || session.id} missing pattern field. This should be investigated.`)
+      console.warn(
+        `[UserPerformanceRAG] Session ${session.sessionId || session.id} missing pattern field. This should be investigated.`
+      )
       // Use a safe default but flag it for review
-      pattern = 'arrays-hashing'
+      pattern = "arrays-hashing"
     }
 
     // Use MASTERY score for technical proficiency (if available), fallback to performance score
-    const masteryScore = (session.masteryScore as number)
-      || (session.performanceScore as number)
-      || (scoreBreakdown?.overallScore as number)
-      || 0
+    const masteryScore =
+      (session.masteryScore as number) ||
+      (session.performanceScore as number) ||
+      (scoreBreakdown?.overallScore as number) ||
+      0
 
-    const performanceScore = (session.performanceScore as number)
-      || (scoreBreakdown?.overallScore as number)
-      || 0
+    const performanceScore =
+      (session.performanceScore as number) || (scoreBreakdown?.overallScore as number) || 0
 
     return {
-      sessionId: session.sessionId as string || session.id as string,
+      sessionId: (session.sessionId as string) || (session.id as string),
       userId: session.userId as string,
       scenarioId: session.scenarioId as string,
       pattern,
-      difficulty: (session.difficulty || 'medium') as 'easy' | 'medium' | 'hard',
-      score: masteryScore,  // Use MASTERY score for technical proficiency analysis
-      performanceScore,     // Separate field for interview readiness
+      difficulty: (session.difficulty || "medium") as "easy" | "medium" | "hard",
+      score: masteryScore, // Use MASTERY score for technical proficiency analysis
+      performanceScore, // Separate field for interview readiness
       duration: ((session.durationMinutes as number) || 0) * 60, // Convert to seconds
       hintsUsed: (interactionMetrics?.hintsUsed as number) || 0,
       testsRun: (interactionMetrics?.codeExecutions as number) || 0,
@@ -295,36 +294,52 @@ export class UserPerformanceRAG {
       )
 
       const problemsAttempted = sessions.length
-      const problemsSolved = sessions.filter(s => s.score >= 70).length
+      const problemsSolved = sessions.filter((s) => s.score >= 70).length
       const averageScore = sessions.reduce((sum, s) => sum + s.score, 0) / sessions.length
       const lastPracticed = sortedSessions[0]?.timestamp || null
 
       // Calculate proficiency level
-      let proficiencyLevel: PatternProficiency['proficiencyLevel']
+      let proficiencyLevel: PatternProficiency["proficiencyLevel"]
       if (problemsAttempted < 3) {
-        proficiencyLevel = 'novice'
+        proficiencyLevel = "novice"
       } else if (averageScore < 40) {
-        proficiencyLevel = 'learning'
+        proficiencyLevel = "learning"
       } else if (averageScore < 60) {
-        proficiencyLevel = 'practicing'
+        proficiencyLevel = "practicing"
       } else if (averageScore < 80) {
-        proficiencyLevel = 'proficient'
+        proficiencyLevel = "proficient"
       } else {
-        proficiencyLevel = 'expert'
+        proficiencyLevel = "expert"
       }
 
       // Calculate improvement trend
-      let improvementTrend: PatternProficiency['improvementTrend'] = 'not_enough_data'
-      if (sessions.length >= 3) {
-        const recentAvg = sortedSessions.slice(0, 3).reduce((sum, s) => sum + s.score, 0) / 3
-        const olderAvg = sortedSessions.slice(-3).reduce((sum, s) => sum + s.score, 0) / 3
+      // Requires at least 6 sessions to avoid overlapping data slices
+      let improvementTrend: PatternProficiency["improvementTrend"] = "not_enough_data"
+      if (sessions.length >= 6) {
+        const midpoint = Math.floor(sessions.length / 2)
+        const recentSessions = sortedSessions.slice(0, midpoint)
+        const olderSessions = sortedSessions.slice(midpoint)
+        const recentAvg =
+          recentSessions.reduce((sum, s) => sum + s.score, 0) / recentSessions.length
+        const olderAvg = olderSessions.reduce((sum, s) => sum + s.score, 0) / olderSessions.length
 
         if (recentAvg > olderAvg + 10) {
-          improvementTrend = 'improving'
+          improvementTrend = "improving"
         } else if (recentAvg < olderAvg - 10) {
-          improvementTrend = 'declining'
+          improvementTrend = "declining"
         } else {
-          improvementTrend = 'stable'
+          improvementTrend = "stable"
+        }
+      } else if (sessions.length >= 3) {
+        // For 3-5 sessions, provide a simpler trend based on first vs last
+        const firstScore = sortedSessions[sortedSessions.length - 1].score
+        const lastScore = sortedSessions[0].score
+        if (lastScore > firstScore + 15) {
+          improvementTrend = "improving"
+        } else if (lastScore < firstScore - 15) {
+          improvementTrend = "declining"
+        } else {
+          improvementTrend = "stable"
         }
       }
 
@@ -347,29 +362,32 @@ export class UserPerformanceRAG {
    */
   private calculateDifficultyPerformance(analyses: SessionAnalysis[]) {
     const byDifficulty = {
-      easy: analyses.filter(a => a.difficulty === 'easy'),
-      medium: analyses.filter(a => a.difficulty === 'medium'),
-      hard: analyses.filter(a => a.difficulty === 'hard'),
+      easy: analyses.filter((a) => a.difficulty === "easy"),
+      medium: analyses.filter((a) => a.difficulty === "medium"),
+      hard: analyses.filter((a) => a.difficulty === "hard"),
     }
 
     return {
       easy: {
         attempted: byDifficulty.easy.length,
-        avgScore: byDifficulty.easy.length > 0
-          ? byDifficulty.easy.reduce((sum, a) => sum + a.score, 0) / byDifficulty.easy.length
-          : 0,
+        avgScore:
+          byDifficulty.easy.length > 0
+            ? byDifficulty.easy.reduce((sum, a) => sum + a.score, 0) / byDifficulty.easy.length
+            : 0,
       },
       medium: {
         attempted: byDifficulty.medium.length,
-        avgScore: byDifficulty.medium.length > 0
-          ? byDifficulty.medium.reduce((sum, a) => sum + a.score, 0) / byDifficulty.medium.length
-          : 0,
+        avgScore:
+          byDifficulty.medium.length > 0
+            ? byDifficulty.medium.reduce((sum, a) => sum + a.score, 0) / byDifficulty.medium.length
+            : 0,
       },
       hard: {
         attempted: byDifficulty.hard.length,
-        avgScore: byDifficulty.hard.length > 0
-          ? byDifficulty.hard.reduce((sum, a) => sum + a.score, 0) / byDifficulty.hard.length
-          : 0,
+        avgScore:
+          byDifficulty.hard.length > 0
+            ? byDifficulty.hard.reduce((sum, a) => sum + a.score, 0) / byDifficulty.hard.length
+            : 0,
       },
     }
   }
@@ -377,16 +395,16 @@ export class UserPerformanceRAG {
   /**
    * Calculate overall trend
    */
-  private calculateTrend(analyses: SessionAnalysis[]): 'improving' | 'stable' | 'declining' {
-    if (analyses.length < 5) return 'stable'
+  private calculateTrend(analyses: SessionAnalysis[]): "improving" | "stable" | "declining" {
+    if (analyses.length < 5) return "stable"
 
     const sorted = [...analyses].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
     const recent = sorted.slice(0, 5).reduce((sum, a) => sum + a.score, 0) / 5
     const older = sorted.slice(-5).reduce((sum, a) => sum + a.score, 0) / 5
 
-    if (recent > older + 10) return 'improving'
-    if (recent < older - 10) return 'declining'
-    return 'stable'
+    if (recent > older + 10) return "improving"
+    if (recent < older - 10) return "declining"
+    return "stable"
   }
 
   /**
@@ -396,18 +414,20 @@ export class UserPerformanceRAG {
     const now = Date.now()
     const weekMs = 7 * 24 * 60 * 60 * 1000
 
-    return [0, 1, 2, 3].map(weekOffset => {
-      const weekStart = now - (weekOffset + 1) * weekMs
-      const weekEnd = now - weekOffset * weekMs
+    return [0, 1, 2, 3]
+      .map((weekOffset) => {
+        const weekStart = now - (weekOffset + 1) * weekMs
+        const weekEnd = now - weekOffset * weekMs
 
-      const weekSessions = analyses.filter(a =>
-        a.timestamp.getTime() >= weekStart && a.timestamp.getTime() < weekEnd
-      )
+        const weekSessions = analyses.filter(
+          (a) => a.timestamp.getTime() >= weekStart && a.timestamp.getTime() < weekEnd
+        )
 
-      return weekSessions.length > 0
-        ? weekSessions.reduce((sum, a) => sum + a.score, 0) / weekSessions.length
-        : 0
-    }).reverse()
+        return weekSessions.length > 0
+          ? weekSessions.reduce((sum, a) => sum + a.score, 0) / weekSessions.length
+          : 0
+      })
+      .reverse()
   }
 
   /**
@@ -417,19 +437,19 @@ export class UserPerformanceRAG {
     strengths: DSAPattern[]
     weaknesses: DSAPattern[]
   } {
-    const withEnoughData = proficiencies.filter(p => p.problemsAttempted >= 3)
+    const withEnoughData = proficiencies.filter((p) => p.problemsAttempted >= 3)
 
     const strengths = withEnoughData
-      .filter(p => p.averageScore >= 70 && p.proficiencyLevel !== 'novice')
+      .filter((p) => p.averageScore >= 70 && p.proficiencyLevel !== "novice")
       .sort((a, b) => b.averageScore - a.averageScore)
       .slice(0, 3)
-      .map(p => p.pattern)
+      .map((p) => p.pattern)
 
     const weaknesses = withEnoughData
-      .filter(p => p.averageScore < 60 || p.improvementTrend === 'declining')
+      .filter((p) => p.averageScore < 60 || p.improvementTrend === "declining")
       .sort((a, b) => a.averageScore - b.averageScore)
       .slice(0, 3)
-      .map(p => p.pattern)
+      .map((p) => p.pattern)
 
     return { strengths, weaknesses }
   }
@@ -439,30 +459,28 @@ export class UserPerformanceRAG {
    */
   private generateFocusAreas(
     proficiencies: PatternProficiency[],
-    difficultyPerformance: UserPerformanceProfile['difficultyPerformance']
+    difficultyPerformance: UserPerformanceProfile["difficultyPerformance"]
   ): string[] {
     const areas: string[] = []
 
     // Pattern-based focus areas
-    const needsWork = proficiencies.filter(
-      p => p.problemsAttempted >= 2 && p.averageScore < 60
-    )
+    const needsWork = proficiencies.filter((p) => p.problemsAttempted >= 2 && p.averageScore < 60)
     if (needsWork.length > 0) {
       areas.push(`Improve ${needsWork[0].pattern} pattern understanding`)
     }
 
     // Difficulty-based focus areas
     if (difficultyPerformance.medium.avgScore < 50) {
-      areas.push('Focus on medium difficulty problems')
+      areas.push("Focus on medium difficulty problems")
     } else if (difficultyPerformance.hard.attempted < 3) {
-      areas.push('Challenge yourself with hard problems')
+      areas.push("Challenge yourself with hard problems")
     }
 
     // Consistency focus
-    const notRecentlyPracticed = proficiencies.filter(p => {
+    const notRecentlyPracticed = proficiencies.filter((p) => {
       if (!p.lastPracticed) return true
       const daysSince = (Date.now() - p.lastPracticed.getTime()) / (24 * 60 * 60 * 1000)
-      return daysSince > 14 && p.proficiencyLevel !== 'expert'
+      return daysSince > 14 && p.proficiencyLevel !== "expert"
     })
     if (notRecentlyPracticed.length > 0) {
       areas.push(`Review ${notRecentlyPracticed[0].pattern} (not practiced recently)`)
@@ -477,24 +495,25 @@ export class UserPerformanceRAG {
   private calculatePreferredSessionLength(analyses: SessionAnalysis[]): number {
     if (analyses.length < 3) return 45
 
-    const successfulSessions = analyses.filter(a => a.score >= 70)
+    const successfulSessions = analyses.filter((a) => a.score >= 70)
     if (successfulSessions.length === 0) return 45
 
-    const avgDuration = successfulSessions.reduce((sum, a) => sum + a.duration, 0) / successfulSessions.length
-    return Math.round(avgDuration / 60)  // Convert to minutes
+    const avgDuration =
+      successfulSessions.reduce((sum, a) => sum + a.duration, 0) / successfulSessions.length
+    return Math.round(avgDuration / 60) // Convert to minutes
   }
 
   /**
    * Analyze best performance time
    */
   private analyzeBestPerformanceTime(analyses: SessionAnalysis[]): string {
-    if (analyses.length < 5) return 'any'
+    if (analyses.length < 5) return "any"
 
     const byTimeOfDay = {
-      morning: [] as number[],    // 6-12
-      afternoon: [] as number[],  // 12-18
-      evening: [] as number[],    // 18-24
-      night: [] as number[],      // 0-6
+      morning: [] as number[], // 6-12
+      afternoon: [] as number[], // 12-18
+      evening: [] as number[], // 18-24
+      night: [] as number[], // 0-6
     }
 
     for (const analysis of analyses) {
@@ -513,28 +532,29 @@ export class UserPerformanceRAG {
       }))
       .sort((a, b) => b.avg - a.avg)
 
-    return averages.length > 0 ? averages[0].time : 'any'
+    return averages.length > 0 ? averages[0].time : "any"
   }
 
   /**
    * Analyze learning pace
    */
-  private analyzeLearningPace(analyses: SessionAnalysis[]): 'slow' | 'moderate' | 'fast' {
-    if (analyses.length < 10) return 'moderate'
+  private analyzeLearningPace(analyses: SessionAnalysis[]): "slow" | "moderate" | "fast" {
+    if (analyses.length < 10) return "moderate"
 
     // Calculate average improvement rate per pattern
-    const improvements = this.calculatePatternProficiency(analyses)
-      .filter(p => p.improvementTrend !== 'not_enough_data')
+    const improvements = this.calculatePatternProficiency(analyses).filter(
+      (p) => p.improvementTrend !== "not_enough_data"
+    )
 
-    const improvingCount = improvements.filter(p => p.improvementTrend === 'improving').length
+    const improvingCount = improvements.filter((p) => p.improvementTrend === "improving").length
     const totalWithData = improvements.length
 
-    if (totalWithData === 0) return 'moderate'
+    if (totalWithData === 0) return "moderate"
 
     const improvementRate = improvingCount / totalWithData
-    if (improvementRate > 0.6) return 'fast'
-    if (improvementRate < 0.3) return 'slow'
-    return 'moderate'
+    if (improvementRate > 0.6) return "fast"
+    if (improvementRate < 0.3) return "slow"
+    return "moderate"
   }
 
   /**
@@ -547,48 +567,46 @@ export class UserPerformanceRAG {
     // Weakness-based recommendations
     for (const weakness of profile.weaknesses.slice(0, 2)) {
       recommendations.push({
-        type: 'practice',
-        priority: 'high',
+        type: "practice",
+        priority: "high",
         pattern: weakness,
-        difficulty: 'easy',
+        difficulty: "easy",
         reason: `Your ${weakness} scores need improvement`,
-        estimatedBenefit: 'Build stronger foundation in this pattern',
+        estimatedBenefit: "Build stronger foundation in this pattern",
       })
     }
 
     // Review recommendations for declining patterns
-    const declining = profile.patternProficiency.filter(
-      p => p.improvementTrend === 'declining'
-    )
+    const declining = profile.patternProficiency.filter((p) => p.improvementTrend === "declining")
     for (const pattern of declining.slice(0, 1)) {
       recommendations.push({
-        type: 'review',
-        priority: 'high',
+        type: "review",
+        priority: "high",
         pattern: pattern.pattern,
         reason: `Your ${pattern.pattern} performance is declining`,
-        estimatedBenefit: 'Prevent skill regression',
+        estimatedBenefit: "Prevent skill regression",
       })
     }
 
     // Challenge recommendations for strong areas
     if (profile.strengths.length > 0 && profile.difficultyPerformance.hard.attempted < 5) {
       recommendations.push({
-        type: 'challenge',
-        priority: 'medium',
+        type: "challenge",
+        priority: "medium",
         pattern: profile.strengths[0],
-        difficulty: 'hard',
+        difficulty: "hard",
         reason: `You're strong at ${profile.strengths[0]} - challenge yourself`,
-        estimatedBenefit: 'Develop advanced problem-solving skills',
+        estimatedBenefit: "Develop advanced problem-solving skills",
       })
     }
 
     // Rest recommendation if practicing a lot
     if (profile.weeklyProgress.slice(-1)[0] > 0 && profile.totalPracticeHours > 50) {
       recommendations.push({
-        type: 'rest',
-        priority: 'low',
-        reason: 'You\'ve been practicing consistently - consider a break',
-        estimatedBenefit: 'Mental recovery improves retention',
+        type: "rest",
+        priority: "low",
+        reason: "You've been practicing consistently - consider a break",
+        estimatedBenefit: "Mental recovery improves retention",
       })
     }
 
@@ -605,11 +623,11 @@ export class UserPerformanceRAG {
 User performance profile:
 Average score: ${profile.averageScore}
 Total sessions: ${profile.totalSessions}
-Strengths: ${profile.strengths.join(', ')}
-Weaknesses: ${profile.weaknesses.join(', ')}
+Strengths: ${profile.strengths.join(", ")}
+Weaknesses: ${profile.weaknesses.join(", ")}
 Learning pace: ${profile.learningPace}
 Trend: ${profile.recentTrend}
-Pattern proficiencies: ${profile.patternProficiency.map(p => `${p.pattern}:${p.proficiencyLevel}`).join(', ')}
+Pattern proficiencies: ${profile.patternProficiency.map((p) => `${p.pattern}:${p.proficiencyLevel}`).join(", ")}
       `.trim()
 
       const embedding = await this.embeddingProvider.generateEmbedding(profileText)
@@ -619,7 +637,7 @@ Pattern proficiencies: ${profile.patternProficiency.map(p => `${p.pattern}:${p.p
         vector: embedding,
         text: profileText,
         metadata: {
-          type: 'user-performance',
+          type: "user-performance",
           userId: profile.userId,
           user_id: profile.userId,
           averageScore: profile.averageScore,
@@ -633,7 +651,7 @@ Pattern proficiencies: ${profile.patternProficiency.map(p => `${p.pattern}:${p.p
 
       await vectorDB.upsert([vectorDoc])
     } catch (error) {
-      console.error('[UserPerformanceRAG] Error storing performance embedding:', error)
+      console.error("[UserPerformanceRAG] Error storing performance embedding:", error)
     }
   }
 
@@ -646,8 +664,8 @@ Pattern proficiencies: ${profile.patternProficiency.map(p => `${p.pattern}:${p.p
 
       const profileText = `
 Average score: ${profile.averageScore}
-Strengths: ${profile.strengths.join(', ')}
-Weaknesses: ${profile.weaknesses.join(', ')}
+Strengths: ${profile.strengths.join(", ")}
+Weaknesses: ${profile.weaknesses.join(", ")}
 Learning pace: ${profile.learningPace}
       `.trim()
 
@@ -656,18 +674,18 @@ Learning pace: ${profile.learningPace}
       const results = await vectorDB.query(embedding, {
         topK: limit + 1,
         filter: {
-          type: 'user-performance' as 'problem' | 'solution' | 'hint' | 'feedback' | 'onboarding',
+          type: "user-performance" as "problem" | "solution" | "hint" | "feedback" | "onboarding",
           excludeIds: [`user-performance-${userId}`],
         },
         includeMetadata: true,
       })
 
       return results
-        .filter(r => r.metadata?.userId !== userId)
-        .map(r => r.metadata?.userId as string)
+        .filter((r) => r.metadata?.userId !== userId)
+        .map((r) => r.metadata?.userId as string)
         .filter(Boolean)
     } catch (error) {
-      console.error('[UserPerformanceRAG] Error finding similar users:', error)
+      console.error("[UserPerformanceRAG] Error finding similar users:", error)
       return []
     }
   }
@@ -676,14 +694,17 @@ Learning pace: ${profile.learningPace}
    * Save profile to Firestore
    */
   private async saveProfile(profile: UserPerformanceProfile): Promise<void> {
-    await adminDb.collection('user_performance_profiles').doc(profile.userId).set({
-      ...profile,
-      lastUpdated: Timestamp.fromDate(profile.lastUpdated),
-      patternProficiency: profile.patternProficiency.map(p => ({
-        ...p,
-        lastPracticed: p.lastPracticed ? Timestamp.fromDate(p.lastPracticed) : null,
-      })),
-    })
+    await adminDb
+      .collection("user_performance_profiles")
+      .doc(profile.userId)
+      .set({
+        ...profile,
+        lastUpdated: Timestamp.fromDate(profile.lastUpdated),
+        patternProficiency: profile.patternProficiency.map((p) => ({
+          ...p,
+          lastPracticed: p.lastPracticed ? Timestamp.fromDate(p.lastPracticed) : null,
+        })),
+      })
   }
 
   /**
@@ -697,19 +718,20 @@ Learning pace: ${profile.learningPace}
       completedSessions: data.completedSessions as number,
       averageScore: data.averageScore as number,
       totalPracticeHours: data.totalPracticeHours as number,
-      patternProficiency: (data.patternProficiency as Record<string, unknown>[]).map(p => ({
+      patternProficiency: (data.patternProficiency as Record<string, unknown>[]).map((p) => ({
         ...p,
         lastPracticed: p.lastPracticed ? (p.lastPracticed as Timestamp).toDate() : null,
       })) as PatternProficiency[],
-      difficultyPerformance: data.difficultyPerformance as UserPerformanceProfile['difficultyPerformance'],
-      recentTrend: data.recentTrend as 'improving' | 'stable' | 'declining',
+      difficultyPerformance:
+        data.difficultyPerformance as UserPerformanceProfile["difficultyPerformance"],
+      recentTrend: data.recentTrend as "improving" | "stable" | "declining",
       weeklyProgress: data.weeklyProgress as number[],
       strengths: data.strengths as DSAPattern[],
       weaknesses: data.weaknesses as DSAPattern[],
       focusAreas: data.focusAreas as string[],
       preferredSessionLength: data.preferredSessionLength as number,
       bestPerformanceTime: data.bestPerformanceTime as string,
-      learningPace: data.learningPace as 'slow' | 'moderate' | 'fast',
+      learningPace: data.learningPace as "slow" | "moderate" | "fast",
     }
   }
 
@@ -730,14 +752,14 @@ Learning pace: ${profile.learningPace}
         medium: { attempted: 0, avgScore: 0 },
         hard: { attempted: 0, avgScore: 0 },
       },
-      recentTrend: 'stable',
+      recentTrend: "stable",
       weeklyProgress: [0, 0, 0, 0],
       strengths: [],
       weaknesses: [],
-      focusAreas: ['Start practicing to build your profile!'],
+      focusAreas: ["Start practicing to build your profile!"],
       preferredSessionLength: 45,
-      bestPerformanceTime: 'any',
-      learningPace: 'moderate',
+      bestPerformanceTime: "any",
+      learningPace: "moderate",
     }
   }
 }
@@ -761,6 +783,8 @@ export async function getUserPerformanceProfile(userId: string): Promise<UserPer
   return getUserPerformanceRAG().getPerformanceProfile(userId)
 }
 
-export async function getUserRecommendations(userId: string): Promise<PersonalizedRecommendation[]> {
+export async function getUserRecommendations(
+  userId: string
+): Promise<PersonalizedRecommendation[]> {
   return getUserPerformanceRAG().getRecommendations(userId)
 }

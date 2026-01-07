@@ -34,7 +34,7 @@ interface MetricsData {
     sessions: number
     averageScore: number
     bestScore: number
-    proficiency: 'novice' | 'learning' | 'practicing' | 'proficient' | 'expert'
+    proficiency: "novice" | "learning" | "practicing" | "proficient" | "expert"
   }>
   difficulty: Array<{
     difficulty: string
@@ -44,7 +44,7 @@ interface MetricsData {
   trends: {
     daily: Array<{ date: string; score: number; sessions: number }>
     weeklyAverage: number
-    trend: 'improving' | 'stable' | 'declining'
+    trend: "improving" | "stable" | "declining"
     trendDescription: string
   }
   recentSessions: Array<{
@@ -66,7 +66,7 @@ interface MetricsData {
 }
 
 // Mini sparkline component for trends
-function Sparkline({ data, color = "#fff" }: { data: number[], color?: string }) {
+function Sparkline({ data, color = "#fff" }: { data: number[]; color?: string }) {
   if (data.length === 0) return null
 
   const max = Math.max(...data, 1)
@@ -74,41 +74,43 @@ function Sparkline({ data, color = "#fff" }: { data: number[], color?: string })
   const range = max - min || 1
   const width = 80
   const height = 24
-  const points = data.map((val, i) => {
-    const x = (i / (data.length - 1 || 1)) * width
-    const y = height - ((val - min) / range) * height
-    return `${x},${y}`
-  }).join(' ')
+  const points = data
+    .map((val, i) => {
+      const x = (i / (data.length - 1 || 1)) * width
+      const y = height - ((val - min) / range) * height
+      return `${x},${y}`
+    })
+    .join(" ")
 
   return (
     <svg width={width} height={height} className="opacity-60">
-      <polyline
-        fill="none"
-        stroke={color}
-        strokeWidth="1.5"
-        points={points}
-      />
+      <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} />
     </svg>
   )
 }
 
 // Activity heatmap inspired by GitHub
-function ActivityHeatmap({ sessions }: { sessions: Array<{ completedAt: string; performanceScore: number }> }) {
+function ActivityHeatmap({
+  sessions,
+}: {
+  sessions: Array<{ completedAt: string; performanceScore: number }>
+}) {
   const today = new Date()
   const weeks = 12
   const days = weeks * 7
 
   // Create a map of date -> session data
   const sessionMap = useMemo(() => {
-    const map = new Map<string, { count: number; avgScore: number }>()
-    sessions.forEach(s => {
-      const date = new Date(s.completedAt).toISOString().split('T')[0]
+    const map = new Map<string, { count: number; totalScore: number; avgScore: number }>()
+    sessions.forEach((s) => {
+      const date = new Date(s.completedAt).toISOString().split("T")[0]
       const existing = map.get(date)
       if (existing) {
         existing.count++
-        existing.avgScore = (existing.avgScore + s.performanceScore) / 2
+        existing.totalScore += s.performanceScore
+        existing.avgScore = Math.round(existing.totalScore / existing.count)
       } else {
-        map.set(date, { count: 1, avgScore: s.performanceScore })
+        map.set(date, { count: 1, totalScore: s.performanceScore, avgScore: s.performanceScore })
       }
     })
     return map
@@ -118,7 +120,7 @@ function ActivityHeatmap({ sessions }: { sessions: Array<{ completedAt: string; 
   for (let i = days - 1; i >= 0; i--) {
     const date = new Date(today)
     date.setDate(date.getDate() - i)
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = date.toISOString().split("T")[0]
     const session = sessionMap.get(dateStr)
 
     let intensity = 0
@@ -127,18 +129,22 @@ function ActivityHeatmap({ sessions }: { sessions: Array<{ completedAt: string; 
     }
 
     const colors = [
-      'bg-zinc-800/50',
-      'bg-emerald-900/60',
-      'bg-emerald-700/70',
-      'bg-emerald-500/80',
-      'bg-emerald-400'
+      "bg-zinc-800/50",
+      "bg-emerald-900/60",
+      "bg-emerald-700/70",
+      "bg-emerald-500/80",
+      "bg-emerald-400",
     ]
 
     cells.push(
       <div
         key={dateStr}
-        className={`w-2.5 h-2.5 rounded-sm ${colors[intensity]} transition-colors hover:ring-1 hover:ring-white/30`}
-        title={session ? `${dateStr}: ${session.count} session(s), avg ${Math.round(session.avgScore)}%` : dateStr}
+        className={`h-2.5 w-2.5 rounded-sm ${colors[intensity]} transition-colors hover:ring-1 hover:ring-white/30`}
+        title={
+          session
+            ? `${dateStr}: ${session.count} session(s), avg ${Math.round(session.avgScore)}%`
+            : dateStr
+        }
       />
     )
   }
@@ -158,9 +164,9 @@ function ScoreRing({ score, size = 120, label }: { score: number; size?: number;
   const remaining = circumference - progress
 
   const getScoreColor = (s: number) => {
-    if (s >= 80) return '#22c55e'
-    if (s >= 60) return '#eab308'
-    return '#ef4444'
+    if (s >= 80) return "#22c55e"
+    if (s >= 60) return "#eab308"
+    return "#ef4444"
   }
 
   return (
@@ -187,18 +193,18 @@ function ScoreRing({ score, size = 120, label }: { score: number; size?: number;
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-2xl font-bold text-white">{score}%</span>
-        <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{label}</span>
+        <span className="text-[10px] tracking-wider text-zinc-500 uppercase">{label}</span>
       </div>
     </div>
   )
 }
 
 const proficiencyConfig: Record<string, { label: string; color: string; bg: string }> = {
-  novice: { label: 'Novice', color: 'text-zinc-400', bg: 'bg-zinc-700' },
-  learning: { label: 'Learning', color: 'text-sky-400', bg: 'bg-sky-500/20' },
-  practicing: { label: 'Practicing', color: 'text-amber-400', bg: 'bg-amber-500/20' },
-  proficient: { label: 'Proficient', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
-  expert: { label: 'Expert', color: 'text-violet-400', bg: 'bg-violet-500/20' },
+  novice: { label: "Novice", color: "text-zinc-400", bg: "bg-zinc-700" },
+  learning: { label: "Learning", color: "text-sky-400", bg: "bg-sky-500/20" },
+  practicing: { label: "Practicing", color: "text-amber-400", bg: "bg-amber-500/20" },
+  proficient: { label: "Proficient", color: "text-emerald-400", bg: "bg-emerald-500/20" },
+  expert: { label: "Expert", color: "text-violet-400", bg: "bg-violet-500/20" },
 }
 
 export default function MetricsPage() {
@@ -246,11 +252,11 @@ export default function MetricsPage() {
 
   if (authLoading || !initialized || loading) {
     return (
-      <main className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <main className="flex min-h-screen items-center justify-center bg-zinc-950">
         <div className="flex items-center gap-3">
-          <div className="w-2 h-2 bg-zinc-600 rounded-full animate-pulse" />
-          <div className="w-2 h-2 bg-zinc-500 rounded-full animate-pulse delay-75" />
-          <div className="w-2 h-2 bg-zinc-400 rounded-full animate-pulse delay-150" />
+          <div className="h-2 w-2 animate-pulse rounded-full bg-zinc-600" />
+          <div className="h-2 w-2 animate-pulse rounded-full bg-zinc-500 delay-75" />
+          <div className="h-2 w-2 animate-pulse rounded-full bg-zinc-400 delay-150" />
         </div>
       </main>
     )
@@ -261,10 +267,14 @@ export default function MetricsPage() {
       <main className="min-h-screen bg-zinc-950">
         <Header />
         <div className="pt-24 pb-16">
-          <div className="container mx-auto px-4 max-w-5xl">
-            <div className="text-center py-16">
-              <p className="text-red-400 mb-4 font-mono text-sm">{error}</p>
-              <Button onClick={() => window.location.reload()} variant="outline" className="border-zinc-700">
+          <div className="container mx-auto max-w-5xl px-4">
+            <div className="py-16 text-center">
+              <p className="mb-4 font-mono text-sm text-red-400">{error}</p>
+              <Button
+                onClick={() => window.location.reload()}
+                variant="outline"
+                className="border-zinc-700"
+              >
                 Retry
               </Button>
             </div>
@@ -278,32 +288,31 @@ export default function MetricsPage() {
   const hasData = metrics && metrics.overview.totalSessions > 0
 
   // Calculate trend data for sparkline
-  const trendScores = metrics?.trends.daily.map(d => d.score) || []
+  const trendScores = metrics?.trends.daily.map((d) => d.score) || []
 
   // Get difficulty breakdown
-  const easyData = metrics?.difficulty.find(d => d.difficulty === 'easy')
-  const mediumData = metrics?.difficulty.find(d => d.difficulty === 'medium')
-  const hardData = metrics?.difficulty.find(d => d.difficulty === 'hard')
+  const easyData = metrics?.difficulty.find((d) => d.difficulty === "easy")
+  const mediumData = metrics?.difficulty.find((d) => d.difficulty === "medium")
+  const hardData = metrics?.difficulty.find((d) => d.difficulty === "hard")
 
   return (
     <main className="min-h-screen bg-zinc-950">
       <Header />
 
       <div className="pt-24 pb-16">
-        <div className="container mx-auto px-4 max-w-6xl">
-
+        <div className="container mx-auto max-w-6xl px-4">
           {!hasData ? (
             /* Empty State - Minimal */
-            <div className="max-w-lg mx-auto text-center py-24">
-              <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-6">
-                <Activity className="w-8 h-8 text-zinc-600" />
+            <div className="mx-auto max-w-lg py-24 text-center">
+              <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900">
+                <Activity className="h-8 w-8 text-zinc-600" />
               </div>
-              <h1 className="text-2xl font-semibold text-white mb-3">No sessions yet</h1>
-              <p className="text-zinc-500 mb-8 leading-relaxed">
+              <h1 className="mb-3 text-2xl font-semibold text-white">No sessions yet</h1>
+              <p className="mb-8 leading-relaxed text-zinc-500">
                 Complete your first practice session to see your performance analytics.
               </p>
               <Link href="/interview">
-                <Button className="bg-white hover:bg-zinc-200 text-zinc-900 font-medium">
+                <Button className="bg-white font-medium text-zinc-900 hover:bg-zinc-200">
                   Start practicing
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -313,87 +322,93 @@ export default function MetricsPage() {
             <>
               {/* Header - Compact */}
               <div className="mb-12">
-                <div className="flex items-center gap-2 text-zinc-500 text-sm mb-2">
-                  <Activity className="w-4 h-4" />
+                <div className="mb-2 flex items-center gap-2 text-sm text-zinc-500">
+                  <Activity className="h-4 w-4" />
                   <span>Performance Analytics</span>
                 </div>
                 <h1 className="text-3xl font-semibold text-white">Your Progress</h1>
               </div>
 
               {/* Main Stats - Bento Grid */}
-              <div className="grid grid-cols-12 gap-4 mb-8">
-
+              <div className="mb-8 grid grid-cols-12 gap-4">
                 {/* Big Number - Sessions */}
-                <div className="col-span-12 md:col-span-4 bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <span className="text-zinc-500 text-sm">Total Sessions</span>
-                    <span className="text-zinc-600 font-mono text-xs">30d</span>
+                <div className="col-span-12 rounded-2xl border border-zinc-800/50 bg-zinc-900/50 p-6 md:col-span-4">
+                  <div className="mb-4 flex items-start justify-between">
+                    <span className="text-sm text-zinc-500">Total Sessions</span>
+                    <span className="font-mono text-xs text-zinc-600">30d</span>
                   </div>
                   <div className="flex items-end gap-4">
-                    <span className="text-5xl font-light text-white tracking-tight">
+                    <span className="text-5xl font-light tracking-tight text-white">
                       {metrics.overview.totalSessions}
                     </span>
                     <div className="pb-2">
-                      <Sparkline data={metrics.trends.daily.map(d => d.sessions)} color="#71717a" />
+                      <Sparkline
+                        data={metrics.trends.daily.map((d) => d.sessions)}
+                        color="#71717a"
+                      />
                     </div>
                   </div>
                 </div>
 
                 {/* Score Ring */}
-                <div className="col-span-6 md:col-span-4 bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-6 flex flex-col items-center justify-center">
+                <div className="col-span-6 flex flex-col items-center justify-center rounded-2xl border border-zinc-800/50 bg-zinc-900/50 p-6 md:col-span-4">
                   <ScoreRing score={metrics.overview.averageScore} label="avg score" />
                 </div>
 
                 {/* Trend + Practice Time Stack */}
-                <div className="col-span-6 md:col-span-4 flex flex-col gap-4">
+                <div className="col-span-6 flex flex-col gap-4 md:col-span-4">
                   {/* Trend */}
-                  <div className="flex-1 bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-5">
-                    <span className="text-zinc-500 text-sm">Weekly Trend</span>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="text-2xl font-light text-white">{metrics.trends.weeklyAverage}%</span>
-                      {metrics.trends.trend === 'improving' && (
-                        <span className="flex items-center text-emerald-500 text-sm">
-                          <ArrowUpRight className="w-4 h-4" />
+                  <div className="flex-1 rounded-2xl border border-zinc-800/50 bg-zinc-900/50 p-5">
+                    <span className="text-sm text-zinc-500">Weekly Trend</span>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-2xl font-light text-white">
+                        {metrics.trends.weeklyAverage}%
+                      </span>
+                      {metrics.trends.trend === "improving" && (
+                        <span className="flex items-center text-sm text-emerald-500">
+                          <ArrowUpRight className="h-4 w-4" />
                         </span>
                       )}
-                      {metrics.trends.trend === 'declining' && (
-                        <span className="flex items-center text-red-500 text-sm">
-                          <ArrowDownRight className="w-4 h-4" />
+                      {metrics.trends.trend === "declining" && (
+                        <span className="flex items-center text-sm text-red-500">
+                          <ArrowDownRight className="h-4 w-4" />
                         </span>
                       )}
-                      {metrics.trends.trend === 'stable' && (
-                        <span className="flex items-center text-zinc-500 text-sm">
-                          <Minus className="w-4 h-4" />
+                      {metrics.trends.trend === "stable" && (
+                        <span className="flex items-center text-sm text-zinc-500">
+                          <Minus className="h-4 w-4" />
                         </span>
                       )}
                     </div>
                   </div>
 
                   {/* Practice Time */}
-                  <div className="flex-1 bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-5">
-                    <span className="text-zinc-500 text-sm">Practice Time</span>
-                    <div className="flex items-baseline gap-1 mt-2">
-                      <span className="text-2xl font-light text-white">{metrics.overview.totalPracticeHours}</span>
-                      <span className="text-zinc-500 text-sm">hours</span>
+                  <div className="flex-1 rounded-2xl border border-zinc-800/50 bg-zinc-900/50 p-5">
+                    <span className="text-sm text-zinc-500">Practice Time</span>
+                    <div className="mt-2 flex items-baseline gap-1">
+                      <span className="text-2xl font-light text-white">
+                        {metrics.overview.totalPracticeHours}
+                      </span>
+                      <span className="text-sm text-zinc-500">hours</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Activity Heatmap */}
-                <div className="col-span-12 bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-zinc-500 text-sm">Activity</span>
-                    <span className="text-zinc-600 text-xs">Last 12 weeks</span>
+                <div className="col-span-12 rounded-2xl border border-zinc-800/50 bg-zinc-900/50 p-6">
+                  <div className="mb-4 flex items-center justify-between">
+                    <span className="text-sm text-zinc-500">Activity</span>
+                    <span className="text-xs text-zinc-600">Last 12 weeks</span>
                   </div>
                   <ActivityHeatmap sessions={metrics.recentSessions} />
-                  <div className="flex items-center gap-2 mt-4 text-xs text-zinc-600">
+                  <div className="mt-4 flex items-center gap-2 text-xs text-zinc-600">
                     <span>Less</span>
                     <div className="flex gap-0.5">
-                      <div className="w-2.5 h-2.5 rounded-sm bg-zinc-800/50" />
-                      <div className="w-2.5 h-2.5 rounded-sm bg-emerald-900/60" />
-                      <div className="w-2.5 h-2.5 rounded-sm bg-emerald-700/70" />
-                      <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500/80" />
-                      <div className="w-2.5 h-2.5 rounded-sm bg-emerald-400" />
+                      <div className="h-2.5 w-2.5 rounded-sm bg-zinc-800/50" />
+                      <div className="h-2.5 w-2.5 rounded-sm bg-emerald-900/60" />
+                      <div className="h-2.5 w-2.5 rounded-sm bg-emerald-700/70" />
+                      <div className="h-2.5 w-2.5 rounded-sm bg-emerald-500/80" />
+                      <div className="h-2.5 w-2.5 rounded-sm bg-emerald-400" />
                     </div>
                     <span>More</span>
                   </div>
@@ -403,27 +418,32 @@ export default function MetricsPage() {
               {/* Trend Message - Inline */}
               {metrics.trends.trendDescription && (
                 <div className="mb-8 flex items-center gap-3 text-sm">
-                  <div className={`w-1.5 h-1.5 rounded-full ${
-                    metrics.trends.trend === 'improving' ? 'bg-emerald-500' :
-                    metrics.trends.trend === 'declining' ? 'bg-red-500' :
-                    'bg-zinc-500'
-                  }`} />
+                  <div
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      metrics.trends.trend === "improving"
+                        ? "bg-emerald-500"
+                        : metrics.trends.trend === "declining"
+                          ? "bg-red-500"
+                          : "bg-zinc-500"
+                    }`}
+                  />
                   <span className="text-zinc-400">{metrics.trends.trendDescription}</span>
                 </div>
               )}
 
               {/* Two Column Layout */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-
+              <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
                 {/* Pattern Mastery */}
-                <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl">
-                  <div className="p-5 border-b border-zinc-800/50 flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-zinc-600" />
+                <div className="rounded-2xl border border-zinc-800/50 bg-zinc-900/50">
+                  <div className="flex items-center gap-2 border-b border-zinc-800/50 p-5">
+                    <Layers className="h-4 w-4 text-zinc-600" />
                     <span className="text-sm font-medium text-zinc-300">Pattern Mastery</span>
                   </div>
                   <div className="p-4">
                     {metrics.patterns.length === 0 ? (
-                      <p className="text-zinc-600 text-sm p-4">Complete sessions to track patterns</p>
+                      <p className="p-4 text-sm text-zinc-600">
+                        Complete sessions to track patterns
+                      </p>
                     ) : (
                       <div className="space-y-1">
                         {metrics.patterns.slice(0, 6).map((pattern) => {
@@ -431,17 +451,23 @@ export default function MetricsPage() {
                           return (
                             <div
                               key={pattern.pattern}
-                              className="flex items-center justify-between p-3 rounded-lg hover:bg-zinc-800/30 transition-colors group"
+                              className="group flex items-center justify-between rounded-lg p-3 transition-colors hover:bg-zinc-800/30"
                             >
                               <div className="flex items-center gap-3">
                                 <span className="text-sm text-white">{pattern.displayName}</span>
-                                <span className={`text-xs px-2 py-0.5 rounded ${config.bg} ${config.color}`}>
+                                <span
+                                  className={`rounded px-2 py-0.5 text-xs ${config.bg} ${config.color}`}
+                                >
                                   {config.label}
                                 </span>
                               </div>
                               <div className="flex items-center gap-4">
-                                <span className="text-xs text-zinc-500">{pattern.sessions} sessions</span>
-                                <span className="text-sm font-mono text-zinc-300 w-12 text-right">{pattern.averageScore}%</span>
+                                <span className="text-xs text-zinc-500">
+                                  {pattern.sessions} sessions
+                                </span>
+                                <span className="w-12 text-right font-mono text-sm text-zinc-300">
+                                  {pattern.averageScore}%
+                                </span>
                               </div>
                             </div>
                           )
@@ -452,39 +478,35 @@ export default function MetricsPage() {
                 </div>
 
                 {/* Difficulty Breakdown */}
-                <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl">
-                  <div className="p-5 border-b border-zinc-800/50 flex items-center gap-2">
-                    <Crosshair className="w-4 h-4 text-zinc-600" />
+                <div className="rounded-2xl border border-zinc-800/50 bg-zinc-900/50">
+                  <div className="flex items-center gap-2 border-b border-zinc-800/50 p-5">
+                    <Crosshair className="h-4 w-4 text-zinc-600" />
                     <span className="text-sm font-medium text-zinc-300">By Difficulty</span>
                   </div>
                   <div className="p-5">
                     <div className="grid grid-cols-3 gap-4">
                       {[
-                        { key: 'easy', label: 'Easy', data: easyData, color: 'emerald' },
-                        { key: 'medium', label: 'Medium', data: mediumData, color: 'amber' },
-                        { key: 'hard', label: 'Hard', data: hardData, color: 'red' },
+                        { key: "easy", label: "Easy", data: easyData, color: "emerald" },
+                        { key: "medium", label: "Medium", data: mediumData, color: "amber" },
+                        { key: "hard", label: "Hard", data: hardData, color: "red" },
                       ].map(({ key, label, data, color }) => (
                         <div key={key} className="text-center">
-                          <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium mb-3
-                            ${color === 'emerald' ? 'bg-emerald-500/10 text-emerald-500' : ''}
-                            ${color === 'amber' ? 'bg-amber-500/10 text-amber-500' : ''}
-                            ${color === 'red' ? 'bg-red-500/10 text-red-500' : ''}
-                          `}>
+                          <div
+                            className={`mb-3 inline-block rounded-full px-3 py-1 text-xs font-medium ${color === "emerald" ? "bg-emerald-500/10 text-emerald-500" : ""} ${color === "amber" ? "bg-amber-500/10 text-amber-500" : ""} ${color === "red" ? "bg-red-500/10 text-red-500" : ""} `}
+                          >
                             {label}
                           </div>
                           {data ? (
                             <>
-                              <div className={`text-3xl font-light mb-1
-                                ${color === 'emerald' ? 'text-emerald-400' : ''}
-                                ${color === 'amber' ? 'text-amber-400' : ''}
-                                ${color === 'red' ? 'text-red-400' : ''}
-                              `}>
+                              <div
+                                className={`mb-1 text-3xl font-light ${color === "emerald" ? "text-emerald-400" : ""} ${color === "amber" ? "text-amber-400" : ""} ${color === "red" ? "text-red-400" : ""} `}
+                              >
                                 {data.averageScore}%
                               </div>
                               <div className="text-xs text-zinc-500">{data.sessions} sessions</div>
                             </>
                           ) : (
-                            <div className="text-zinc-600 text-sm">—</div>
+                            <div className="text-sm text-zinc-600">—</div>
                           )}
                         </div>
                       ))}
@@ -494,53 +516,56 @@ export default function MetricsPage() {
               </div>
 
               {/* Recent Sessions - List Style */}
-              <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl mb-8">
-                <div className="p-5 border-b border-zinc-800/50 flex items-center justify-between">
+              <div className="mb-8 rounded-2xl border border-zinc-800/50 bg-zinc-900/50">
+                <div className="flex items-center justify-between border-b border-zinc-800/50 p-5">
                   <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-zinc-600" />
+                    <Clock className="h-4 w-4 text-zinc-600" />
                     <span className="text-sm font-medium text-zinc-300">Recent Sessions</span>
                   </div>
-                  <span className="text-xs text-zinc-600">{metrics.recentSessions.length} total</span>
+                  <span className="text-xs text-zinc-600">
+                    {metrics.recentSessions.length} total
+                  </span>
                 </div>
                 <div>
                   {metrics.recentSessions.length === 0 ? (
-                    <p className="text-zinc-600 text-sm p-6">No sessions yet</p>
+                    <p className="p-6 text-sm text-zinc-600">No sessions yet</p>
                   ) : (
                     <div className="divide-y divide-zinc-800/50">
                       {metrics.recentSessions.slice(0, 5).map((session) => (
                         <Link
                           key={session.id}
                           href={`/sessions/${session.id}`}
-                          className="flex items-center justify-between p-4 hover:bg-zinc-800/30 transition-colors group"
+                          className="group flex items-center justify-between p-4 transition-colors hover:bg-zinc-800/30"
                         >
                           <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-mono text-sm
-                              ${session.performanceScore >= 80 ? 'bg-emerald-500/10 text-emerald-400' : ''}
-                              ${session.performanceScore >= 60 && session.performanceScore < 80 ? 'bg-amber-500/10 text-amber-400' : ''}
-                              ${session.performanceScore < 60 ? 'bg-red-500/10 text-red-400' : ''}
-                            `}>
+                            <div
+                              className={`flex h-10 w-10 items-center justify-center rounded-lg font-mono text-sm ${session.performanceScore >= 80 ? "bg-emerald-500/10 text-emerald-400" : ""} ${session.performanceScore >= 60 && session.performanceScore < 80 ? "bg-amber-500/10 text-amber-400" : ""} ${session.performanceScore < 60 ? "bg-red-500/10 text-red-400" : ""} `}
+                            >
                               {session.performanceScore}
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="text-sm text-white capitalize">
-                                  {(session.pattern || 'unknown').replace(/-/g, ' ')}
+                                  {(session.pattern || "unknown").replace(/-/g, " ")}
                                 </span>
-                                <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded
-                                  ${session.difficulty === 'easy' ? 'text-emerald-500' : ''}
-                                  ${session.difficulty === 'medium' ? 'text-amber-500' : ''}
-                                  ${session.difficulty === 'hard' ? 'text-red-500' : ''}
-                                `}>
+                                <span
+                                  className={`rounded px-1.5 py-0.5 text-[10px] tracking-wider uppercase ${session.difficulty === "easy" ? "text-emerald-500" : ""} ${session.difficulty === "medium" ? "text-amber-500" : ""} ${session.difficulty === "hard" ? "text-red-500" : ""} `}
+                                >
                                   {session.difficulty}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-3 text-xs text-zinc-500 mt-0.5">
+                              <div className="mt-0.5 flex items-center gap-3 text-xs text-zinc-500">
                                 <span>{session.durationMinutes} min</span>
-                                <span>{new Date(session.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                <span>
+                                  {new Date(session.completedAt).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
+                                </span>
                               </div>
                             </div>
                           </div>
-                          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+                          <ChevronRight className="h-4 w-4 text-zinc-600 transition-colors group-hover:text-zinc-400" />
                         </Link>
                       ))}
                     </div>
@@ -549,13 +574,18 @@ export default function MetricsPage() {
               </div>
 
               {/* CTA - Minimal */}
-              <div className="flex items-center justify-between p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-2xl">
+              <div className="flex items-center justify-between rounded-2xl border border-zinc-800/50 bg-zinc-900/30 p-6">
                 <div>
-                  <h3 className="text-white font-medium mb-1">Ready for more practice?</h3>
-                  <p className="text-sm text-zinc-500">Keep building your skills with targeted sessions.</p>
+                  <h3 className="mb-1 font-medium text-white">Ready for more practice?</h3>
+                  <p className="text-sm text-zinc-500">
+                    Keep building your skills with targeted sessions.
+                  </p>
                 </div>
                 <Link href="/interview">
-                  <Button variant="outline" className="border-zinc-700 hover:bg-zinc-800 text-white">
+                  <Button
+                    variant="outline"
+                    className="border-zinc-700 text-white hover:bg-zinc-800"
+                  >
                     Practice now
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>

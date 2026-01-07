@@ -1,8 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import Link from "next/link"
-import { ChevronDown, ChevronUp, AlertTriangle, Play, Zap, Brain } from "lucide-react"
+import {
+  ChevronDown,
+  ChevronRight,
+  AlertTriangle,
+  Play,
+  Zap,
+  Brain,
+  Calendar,
+  Clock,
+  Archive,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DueItem, Algorithm } from "@/lib/hooks"
 import { ReviewCard } from "./ReviewCard"
@@ -24,6 +34,57 @@ interface ReviewSectionsProps {
   markingReviewedId: string | null
 }
 
+// Collapsible section component for better UX
+function CollapsibleSection({
+  title,
+  count,
+  children,
+  defaultExpanded = true,
+  icon: Icon,
+  iconColor = "text-gray-500",
+  badge,
+  subtitle,
+}: {
+  title: string
+  count: number
+  children: React.ReactNode
+  defaultExpanded?: boolean
+  icon?: React.ComponentType<{ className?: string }>
+  iconColor?: string
+  badge?: React.ReactNode
+  subtitle?: string
+}) {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded)
+
+  if (count === 0) return null
+
+  return (
+    <div className="mb-4">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="mb-2 flex w-full items-center gap-2 text-xs font-medium tracking-wider uppercase transition-colors hover:text-gray-300"
+      >
+        {isExpanded ? (
+          <ChevronDown className="h-3 w-3 text-gray-500" />
+        ) : (
+          <ChevronRight className="h-3 w-3 text-gray-500" />
+        )}
+        {Icon && <Icon className={`h-3 w-3 ${iconColor}`} />}
+        <span className="text-gray-400">{title}</span>
+        <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+          {count}
+        </span>
+        {badge}
+        <span className="flex-1" />
+      </button>
+      {subtitle && !isExpanded && (
+        <p className="-mt-1 mb-2 ml-5 text-xs text-gray-600">{subtitle}</p>
+      )}
+      {isExpanded && <div className="divide-y divide-white/5">{children}</div>}
+    </div>
+  )
+}
+
 export function ReviewSections({
   dueInMinutes,
   dueNow,
@@ -34,12 +95,14 @@ export function ReviewSections({
   totalDue,
   userAlgorithm,
   isUpcomingExpanded,
-  onToggleUpcoming,
+  onToggleUpcoming: _onToggleUpcoming,
   onSkip,
   onMarkReviewed,
   skippingId,
   markingReviewedId,
 }: ReviewSectionsProps) {
+  const [showAllScheduled, setShowAllScheduled] = useState(false)
+
   // Wrap callbacks to ensure they return promises
   const handleSkip = onSkip
     ? async (id: string) => {
@@ -53,13 +116,46 @@ export function ReviewSections({
       }
     : undefined
 
+  // Sort all upcoming by due date (soonest first)
+  const sortedUpcoming = useMemo(() => {
+    return [...upcoming].sort(
+      (a, b) => new Date(a.next_review_at).getTime() - new Date(b.next_review_at).getTime()
+    )
+  }, [upcoming])
+
+  // Split into "Due Soon" (within 7 days) and "Later" (beyond 7 days)
+  const { dueSoon, dueLater } = useMemo(() => {
+    const now = new Date()
+    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+
+    const dueSoon: DueItem[] = []
+    const dueLater: DueItem[] = []
+
+    sortedUpcoming.forEach((item) => {
+      const dueDate = new Date(item.next_review_at)
+      if (dueDate <= sevenDaysFromNow) {
+        dueSoon.push(item)
+      } else {
+        dueLater.push(item)
+      }
+    })
+
+    return { dueSoon, dueLater }
+  }, [sortedUpcoming])
+
+  // Calculate totals
+  const totalUpcoming = upcoming.length
+
   return (
     <div>
       {/* Header with Algorithm Indicator */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h3 className="text-lg font-medium text-white">Due for Review</h3>
-          {totalDue > 0 && <span className="text-sm text-gray-500">{totalDue} problems</span>}
+          {totalDue > 0 && <span className="text-sm text-gray-500">{totalDue} due now</span>}
+          {totalUpcoming > 0 && (
+            <span className="text-sm text-gray-600">· {totalUpcoming} scheduled</span>
+          )}
           {/* Algorithm transparency indicator */}
           {userAlgorithm && (
             <span
@@ -70,8 +166,8 @@ export function ReviewSections({
               }`}
               title={
                 userAlgorithm === "fsrs"
-                  ? "FSRS: ML-optimized algorithm with 90% retention target. Uses learning steps (1min → 10min → 1day) for new items."
-                  : "SM-2: Classic spaced repetition algorithm. Intervals: 1d → 3d → expanding based on ease factor."
+                  ? "FSRS: ML-optimized algorithm with 90% retention target. Schedules based on your mastery score."
+                  : "SM-2: Classic spaced repetition algorithm. Intervals expand based on ease factor."
               }
             >
               {userAlgorithm === "fsrs" ? (
@@ -101,125 +197,140 @@ export function ReviewSections({
         </div>
       )}
 
-      {/* FSRS Learning Steps - Due in Minutes (Critical for FSRS users) */}
-      {dueInMinutes.length > 0 && (
-        <div className="mb-6">
-          <h4 className="mb-2 flex items-center gap-2 text-xs font-medium tracking-wider text-purple-400 uppercase">
-            <Zap className="h-3 w-3" />
-            Learning Steps - Review Now
-          </h4>
-          <p className="mb-3 text-xs text-gray-500">
-            Complete these quick reviews to progress through the learning phase
-          </p>
-          <div className="divide-y divide-white/5">
-            {dueInMinutes.map((item) => (
-              <ReviewCard
-                key={item.problem_id}
-                item={item}
-                onSkip={handleSkip}
-                onMarkReviewed={handleMarkReviewed}
-                isSkipping={skippingId === item.problem_id}
-                isMarkingReviewed={markingReviewedId === item.problem_id}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+      {/* FSRS Learning Steps - Due in Minutes */}
+      <CollapsibleSection
+        title="Learning Steps"
+        count={dueInMinutes.length}
+        icon={Zap}
+        iconColor="text-purple-400"
+        badge={
+          <span className="ml-1 text-[10px] font-normal text-purple-400 normal-case">
+            Review now
+          </span>
+        }
+      >
+        <p className="-mt-1 mb-3 text-xs text-gray-600">
+          Complete these quick reviews to progress through the learning phase
+        </p>
+        {dueInMinutes.map((item) => (
+          <ReviewCard
+            key={item.problem_id}
+            item={item}
+            onSkip={handleSkip}
+            onMarkReviewed={handleMarkReviewed}
+            isSkipping={skippingId === item.problem_id}
+            isMarkingReviewed={markingReviewedId === item.problem_id}
+          />
+        ))}
+      </CollapsibleSection>
 
       {/* Overdue */}
-      {dueNow.length > 0 && (
-        <div className="mb-6">
-          <h4 className="mb-2 text-xs font-medium tracking-wider text-gray-500 uppercase">
-            Overdue
-          </h4>
-          <div className="divide-y divide-white/5">
-            {dueNow.map((item) => (
-              <ReviewCard
-                key={item.problem_id}
-                item={item}
-                onSkip={handleSkip}
-                onMarkReviewed={handleMarkReviewed}
-                isSkipping={skippingId === item.problem_id}
-                isMarkingReviewed={markingReviewedId === item.problem_id}
-                showOverdue
-              />
-            ))}
-          </div>
-        </div>
-      )}
+      <CollapsibleSection
+        title="Overdue"
+        count={dueNow.length}
+        icon={AlertTriangle}
+        iconColor="text-rose-400"
+      >
+        {dueNow.map((item) => (
+          <ReviewCard
+            key={item.problem_id}
+            item={item}
+            onSkip={handleSkip}
+            onMarkReviewed={handleMarkReviewed}
+            isSkipping={skippingId === item.problem_id}
+            isMarkingReviewed={markingReviewedId === item.problem_id}
+            showOverdue
+          />
+        ))}
+      </CollapsibleSection>
 
       {/* Due Today */}
-      {dueToday.length > 0 && (
-        <div className="mb-6">
-          <h4 className="mb-2 text-xs font-medium tracking-wider text-gray-500 uppercase">
-            Due Today
-          </h4>
-          <div className="divide-y divide-white/5">
-            {dueToday.map((item) => (
-              <ReviewCard
-                key={item.problem_id}
-                item={item}
-                onSkip={handleSkip}
-                onMarkReviewed={handleMarkReviewed}
-                isSkipping={skippingId === item.problem_id}
-                isMarkingReviewed={markingReviewedId === item.problem_id}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+      <CollapsibleSection
+        title="Due Today"
+        count={dueToday.length}
+        icon={Clock}
+        iconColor="text-amber-400"
+      >
+        {dueToday.map((item) => (
+          <ReviewCard
+            key={item.problem_id}
+            item={item}
+            onSkip={handleSkip}
+            onMarkReviewed={handleMarkReviewed}
+            isSkipping={skippingId === item.problem_id}
+            isMarkingReviewed={markingReviewedId === item.problem_id}
+          />
+        ))}
+      </CollapsibleSection>
 
-      {/* Upcoming - Show exact dates */}
-      {upcoming.length > 0 && (
-        <div>
+      {/* Due Soon (Within 7 days) - Always visible */}
+      <CollapsibleSection
+        title="Coming Up"
+        count={dueSoon.length}
+        icon={Calendar}
+        iconColor="text-blue-400"
+        defaultExpanded={isUpcomingExpanded}
+        subtitle="Due within the next 7 days"
+        badge={
+          dueSoon.length > 0 && (
+            <span className="ml-1 text-[10px] font-normal text-gray-500 normal-case">
+              Next 7 days
+            </span>
+          )
+        }
+      >
+        {dueSoon.map((item) => (
+          <ReviewCard key={item.problem_id} item={item} showUpcomingDate isUpcoming />
+        ))}
+      </CollapsibleSection>
+
+      {/* All Scheduled (Everything including 1 year out) */}
+      {dueLater.length > 0 && (
+        <div className="mt-2 border-t border-white/5 pt-4">
           <button
-            onClick={onToggleUpcoming}
-            className="mb-2 flex w-full items-center gap-2 text-xs font-medium tracking-wider text-gray-500 uppercase transition-colors hover:text-gray-400"
+            onClick={() => setShowAllScheduled(!showAllScheduled)}
+            className="mb-2 flex w-full items-center gap-2 text-xs font-medium tracking-wider uppercase transition-colors hover:text-gray-300"
           >
-            <span>
-              Coming Up ({upcoming.length})
-              {upcoming.length > 0 && (
-                <span className="ml-1 font-normal text-gray-400 normal-case">
-                  ·{" "}
-                  {(() => {
-                    // Show date range for upcoming reviews
-                    const dates = upcoming.map((item) => new Date(item.next_review_at))
-                    const earliest = new Date(Math.min(...dates.map((d) => d.getTime())))
-                    const latest = new Date(Math.max(...dates.map((d) => d.getTime())))
-                    const formatDate = (d: Date) =>
-                      d.toLocaleDateString("en-US", {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                      })
-
-                    if (earliest.toDateString() === latest.toDateString()) {
-                      return formatDate(earliest)
-                    }
-                    return `${formatDate(earliest)} – ${formatDate(latest)}`
-                  })()}
-                </span>
-              )}
+            {showAllScheduled ? (
+              <ChevronDown className="h-3 w-3 text-gray-500" />
+            ) : (
+              <ChevronRight className="h-3 w-3 text-gray-500" />
+            )}
+            <Archive className="h-3 w-3 text-gray-500" />
+            <span className="text-gray-400">All Scheduled</span>
+            <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+              {dueLater.length}
+            </span>
+            <span className="ml-1 text-[10px] font-normal text-gray-600 normal-case">
+              Mastered problems with longer intervals
             </span>
             <span className="flex-1" />
-            {isUpcomingExpanded ? (
-              <ChevronUp className="h-3 w-3" />
-            ) : (
-              <ChevronDown className="h-3 w-3" />
-            )}
           </button>
-          {!isUpcomingExpanded && (
-            <p className="-mt-1 mb-2 text-xs text-gray-600">
-              Intervals based on your performance — expand for details
+
+          {!showAllScheduled && (
+            <p className="-mt-1 mb-2 ml-5 text-xs text-gray-600">
+              {dueLater.length} problem{dueLater.length !== 1 ? "s" : ""} scheduled beyond 7 days
             </p>
           )}
-          {isUpcomingExpanded && (
+
+          {showAllScheduled && (
             <div className="divide-y divide-white/5">
-              {upcoming.map((item) => (
+              {dueLater.map((item) => (
                 <ReviewCard key={item.problem_id} item={item} showUpcomingDate isUpcoming />
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {allDue.length === 0 && dueSoon.length === 0 && dueLater.length === 0 && (
+        <div className="rounded-lg border border-white/5 bg-white/5 p-8 text-center">
+          <Calendar className="mx-auto mb-3 h-8 w-8 text-gray-600" />
+          <p className="text-sm text-gray-400">No problems scheduled for review</p>
+          <p className="mt-1 text-xs text-gray-600">
+            Complete some practice sessions to build your review queue
+          </p>
         </div>
       )}
     </div>
