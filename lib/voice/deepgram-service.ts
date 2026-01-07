@@ -12,7 +12,7 @@
 export interface DeepgramConfig {
   apiKey?: string
   language?: string
-  model?: 'nova-2' | 'nova' | 'enhanced' | 'base'
+  model?: "nova-2" | "nova" | "enhanced" | "base"
   punctuate?: boolean
   interimResults?: boolean
   smartFormat?: boolean
@@ -22,7 +22,7 @@ export interface DeepgramConfig {
 }
 
 export interface TranscriptEvent {
-  type: 'transcript'
+  type: "transcript"
   channel: {
     alternatives: Array<{
       transcript: string
@@ -51,7 +51,7 @@ export interface DeepgramConnection {
 
 type TranscriptCallback = (transcript: string, isFinal: boolean) => void
 type ErrorCallback = (error: Error) => void
-type StatusCallback = (status: 'connecting' | 'connected' | 'disconnected' | 'error') => void
+type StatusCallback = (status: "connecting" | "connected" | "disconnected" | "error") => void
 type UtteranceEndCallback = (transcript: string) => void
 
 /**
@@ -66,16 +66,16 @@ export class DeepgramVoiceService {
   private onError: ErrorCallback | null = null
   private onStatus: StatusCallback | null = null
   private onUtteranceEnd: UtteranceEndCallback | null = null
-  private accumulatedTranscript: string = ''
+  private accumulatedTranscript: string = ""
   private keepAliveInterval: ReturnType<typeof setInterval> | null = null
-  private utteranceBuffer: string = ''
-  private lastSentTranscript: string = ''
+  private utteranceBuffer: string = ""
+  private lastSentTranscript: string = ""
 
   constructor(config: DeepgramConfig = {}) {
     this.config = {
-      apiKey: config.apiKey || process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY || '',
-      language: config.language || 'en-US',
-      model: config.model || 'nova-2',
+      apiKey: config.apiKey || process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY || "",
+      language: config.language || "en-US",
+      model: config.model || "nova-2",
       punctuate: config.punctuate !== false,
       interimResults: config.interimResults !== false,
       smartFormat: config.smartFormat !== false,
@@ -135,8 +135,8 @@ export class DeepgramVoiceService {
    */
   private buildWebSocketUrl(): string {
     const params = new URLSearchParams({
-      model: this.config.model || 'nova-2',
-      language: this.config.language || 'en-US',
+      model: this.config.model || "nova-2",
+      language: this.config.language || "en-US",
       punctuate: String(this.config.punctuate),
       interim_results: String(this.config.interimResults),
       smart_format: String(this.config.smartFormat),
@@ -145,7 +145,7 @@ export class DeepgramVoiceService {
     })
 
     if (this.config.endpointing !== false) {
-      params.set('endpointing', String(this.config.endpointing))
+      params.set("endpointing", String(this.config.endpointing))
     }
 
     return `wss://api.deepgram.com/v1/listen?${params.toString()}`
@@ -156,15 +156,15 @@ export class DeepgramVoiceService {
    */
   async startTranscription(): Promise<void> {
     if (!this.isConfigured()) {
-      throw new Error('Deepgram API key not configured')
+      throw new Error("Deepgram API key not configured")
     }
 
     if (this.connection.isRecording) {
-      console.warn('[Deepgram] Already recording')
+      console.warn("[Deepgram] Already recording")
       return
     }
 
-    this.onStatus?.('connecting')
+    this.onStatus?.("connecting")
 
     try {
       // Request microphone access
@@ -174,19 +174,29 @@ export class DeepgramVoiceService {
           sampleRate: 16000,
           echoCancellation: true,
           noiseSuppression: true,
-        }
+        },
       })
 
       this.connection.mediaStream = stream
 
+      // Listen for stream/track ending (e.g., mic unplugged, permission revoked)
+      stream.getTracks().forEach((track) => {
+        track.onended = () => {
+          console.warn("[Deepgram] Audio track ended unexpectedly")
+          this.onError?.(new Error("Microphone disconnected. Please reconnect and try again."))
+          this.cleanup()
+          this.onStatus?.("disconnected")
+        }
+      })
+
       // Create WebSocket connection to Deepgram
-      const ws = new WebSocket(this.buildWebSocketUrl(), ['token', this.config.apiKey!])
+      const ws = new WebSocket(this.buildWebSocketUrl(), ["token", this.config.apiKey!])
 
       ws.onopen = () => {
-        console.log('[Deepgram] WebSocket connected')
+        console.log("[Deepgram] WebSocket connected")
         this.connection.isConnected = true
         this.connection.isRecording = true
-        this.onStatus?.('connected')
+        this.onStatus?.("connected")
 
         // Start sending audio data
         this.startAudioCapture(stream, ws)
@@ -194,7 +204,7 @@ export class DeepgramVoiceService {
         // Keep-alive ping every 8 seconds
         this.keepAliveInterval = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'KeepAlive' }))
+            ws.send(JSON.stringify({ type: "KeepAlive" }))
           }
         }, 8000)
       }
@@ -203,28 +213,35 @@ export class DeepgramVoiceService {
         try {
           const data = JSON.parse(event.data)
 
-          if (data.type === 'Results' || data.channel) {
-            const transcript = data.channel?.alternatives?.[0]?.transcript || ''
+          if (data.type === "Results" || data.channel) {
+            const transcript = data.channel?.alternatives?.[0]?.transcript || ""
             const isFinal = data.is_final || data.speech_final
 
             if (transcript) {
               if (isFinal) {
-                this.accumulatedTranscript += (this.accumulatedTranscript ? ' ' : '') + transcript
+                this.accumulatedTranscript += (this.accumulatedTranscript ? " " : "") + transcript
                 // Track what's new since last utterance end
-                this.utteranceBuffer = this.accumulatedTranscript.substring(this.lastSentTranscript.length).trim()
+                this.utteranceBuffer = this.accumulatedTranscript
+                  .substring(this.lastSentTranscript.length)
+                  .trim()
                 this.onTranscript?.(this.accumulatedTranscript, true)
               } else {
                 // Show interim result with accumulated + current
-                const fullTranscript = this.accumulatedTranscript +
-                  (this.accumulatedTranscript ? ' ' : '') + transcript
+                const fullTranscript =
+                  this.accumulatedTranscript + (this.accumulatedTranscript ? " " : "") + transcript
                 this.onTranscript?.(fullTranscript, false)
               }
             }
-          } else if (data.type === 'UtteranceEnd') {
+          } else if (data.type === "UtteranceEnd") {
             // Speech pause detected - this is the key event for live mode auto-send
-            console.log('[Deepgram] Utterance end detected')
-            if (this.accumulatedTranscript && this.accumulatedTranscript !== this.lastSentTranscript) {
-              const newContent = this.accumulatedTranscript.substring(this.lastSentTranscript.length).trim()
+            console.log("[Deepgram] Utterance end detected")
+            if (
+              this.accumulatedTranscript &&
+              this.accumulatedTranscript !== this.lastSentTranscript
+            ) {
+              const newContent = this.accumulatedTranscript
+                .substring(this.lastSentTranscript.length)
+                .trim()
               if (newContent) {
                 // Call utterance end callback with the full accumulated transcript
                 this.onUtteranceEnd?.(this.accumulatedTranscript)
@@ -235,28 +252,27 @@ export class DeepgramVoiceService {
             }
           }
         } catch (error) {
-          console.error('[Deepgram] Error parsing message:', error)
+          console.error("[Deepgram] Error parsing message:", error)
         }
       }
 
       ws.onerror = (event) => {
-        console.error('[Deepgram] WebSocket error:', event)
-        this.onStatus?.('error')
-        this.onError?.(new Error('WebSocket connection error'))
+        console.error("[Deepgram] WebSocket error:", event)
+        this.onStatus?.("error")
+        this.onError?.(new Error("WebSocket connection error"))
       }
 
       ws.onclose = (event) => {
-        console.log('[Deepgram] WebSocket closed:', event.code, event.reason)
+        console.log("[Deepgram] WebSocket closed:", event.code, event.reason)
         this.cleanup()
-        this.onStatus?.('disconnected')
+        this.onStatus?.("disconnected")
       }
 
       this.connection.socket = ws
-
     } catch (error) {
-      console.error('[Deepgram] Error starting transcription:', error)
+      console.error("[Deepgram] Error starting transcription:", error)
       this.cleanup()
-      this.onStatus?.('error')
+      this.onStatus?.("error")
       throw error
     }
   }
@@ -266,23 +282,51 @@ export class DeepgramVoiceService {
    */
   private startAudioCapture(stream: MediaStream, ws: WebSocket): void {
     try {
-      // Check if stream is active
+      // Check if stream is active - this can happen if mic permission was revoked
+      // or if there's a hardware issue
       if (!stream || stream.active === false) {
-        throw new Error('MediaStream is not active')
+        console.warn("[Deepgram] MediaStream became inactive - requesting new stream")
+        // Don't throw - let the caller handle reconnection
+        this.onError?.(
+          new Error(
+            "Microphone stream became inactive. Please check your microphone permissions and try again."
+          )
+        )
+        this.onStatus?.("error")
+        return
       }
 
+      // Verify we have audio tracks
+      const audioTracks = stream.getAudioTracks()
+      if (audioTracks.length === 0) {
+        console.warn("[Deepgram] No audio tracks in MediaStream")
+        this.onError?.(
+          new Error("No microphone detected. Please ensure a microphone is connected.")
+        )
+        this.onStatus?.("error")
+        return
+      }
+
+      // Log track status for debugging
+      console.log(
+        "[Deepgram] Audio track status:",
+        audioTracks[0].readyState,
+        "enabled:",
+        audioTracks[0].enabled
+      )
+
       // Check if MediaRecorder is supported
-      if (typeof MediaRecorder === 'undefined') {
-        throw new Error('MediaRecorder is not supported in this browser')
+      if (typeof MediaRecorder === "undefined") {
+        throw new Error("MediaRecorder is not supported in this browser")
       }
 
       // Find a supported mime type
       const supportedTypes = [
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/ogg;codecs=opus',
-        'audio/mp4',
-        'audio/mpeg',
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/ogg;codecs=opus",
+        "audio/mp4",
+        "audio/mpeg",
       ]
 
       let mimeType: string | undefined
@@ -294,7 +338,7 @@ export class DeepgramVoiceService {
       }
 
       if (!mimeType) {
-        throw new Error('No supported audio mime type found')
+        throw new Error("No supported audio mime type found")
       }
 
       // Create MediaRecorder with error handling
@@ -306,7 +350,10 @@ export class DeepgramVoiceService {
         })
       } catch (error) {
         // Fallback: try without options
-        console.warn('[Deepgram] Failed to create MediaRecorder with options, trying without:', error)
+        console.warn(
+          "[Deepgram] Failed to create MediaRecorder with options, trying without:",
+          error
+        )
         mediaRecorder = new MediaRecorder(stream)
       }
 
@@ -317,13 +364,13 @@ export class DeepgramVoiceService {
       }
 
       mediaRecorder.onerror = (event) => {
-        console.error('[Deepgram] MediaRecorder error:', event)
-        this.onError?.(new Error('MediaRecorder error occurred'))
+        console.error("[Deepgram] MediaRecorder error:", event)
+        this.onError?.(new Error("MediaRecorder error occurred"))
       }
 
       // Check MediaRecorder state before starting
-      if (mediaRecorder.state === 'recording') {
-        console.warn('[Deepgram] MediaRecorder already recording')
+      if (mediaRecorder.state === "recording") {
+        console.warn("[Deepgram] MediaRecorder already recording")
         return
       }
 
@@ -333,15 +380,15 @@ export class DeepgramVoiceService {
         mediaRecorder.start(100)
       } catch (error) {
         // Fallback: start without timeslice
-        console.warn('[Deepgram] Failed to start with timeslice, trying without:', error)
+        console.warn("[Deepgram] Failed to start with timeslice, trying without:", error)
         mediaRecorder.start()
       }
 
       this.connection.mediaRecorder = mediaRecorder
-      console.log('[Deepgram] Audio capture started with mime type:', mimeType)
+      console.log("[Deepgram] Audio capture started with mime type:", mimeType)
     } catch (error) {
-      console.error('[Deepgram] Error starting audio capture:', error)
-      this.onError?.(error instanceof Error ? error : new Error('Failed to start audio capture'))
+      console.error("[Deepgram] Error starting audio capture:", error)
+      this.onError?.(error instanceof Error ? error : new Error("Failed to start audio capture"))
       throw error
     }
   }
@@ -350,19 +397,19 @@ export class DeepgramVoiceService {
    * Stop transcription
    */
   stopTranscription(): string {
-    console.log('[Deepgram] Stopping transcription')
+    console.log("[Deepgram] Stopping transcription")
 
     // Send close stream message
     if (this.connection.socket?.readyState === WebSocket.OPEN) {
-      this.connection.socket.send(JSON.stringify({ type: 'CloseStream' }))
+      this.connection.socket.send(JSON.stringify({ type: "CloseStream" }))
     }
 
     this.cleanup()
 
     const finalTranscript = this.accumulatedTranscript
-    this.accumulatedTranscript = ''
-    this.utteranceBuffer = ''
-    this.lastSentTranscript = ''
+    this.accumulatedTranscript = ""
+    this.utteranceBuffer = ""
+    this.lastSentTranscript = ""
 
     return finalTranscript
   }
@@ -373,16 +420,16 @@ export class DeepgramVoiceService {
    */
   clearSentTracker(): void {
     this.lastSentTranscript = this.accumulatedTranscript
-    this.utteranceBuffer = ''
+    this.utteranceBuffer = ""
   }
 
   /**
    * Reset accumulated transcript
    */
   resetTranscript(): void {
-    this.accumulatedTranscript = ''
-    this.utteranceBuffer = ''
-    this.lastSentTranscript = ''
+    this.accumulatedTranscript = ""
+    this.utteranceBuffer = ""
+    this.lastSentTranscript = ""
   }
 
   /**
@@ -410,7 +457,7 @@ export class DeepgramVoiceService {
     }
 
     // Stop media recorder
-    if (this.connection.mediaRecorder?.state !== 'inactive') {
+    if (this.connection.mediaRecorder?.state !== "inactive") {
       try {
         this.connection.mediaRecorder?.stop()
       } catch {}
@@ -418,11 +465,11 @@ export class DeepgramVoiceService {
     this.connection.mediaRecorder = null
 
     // Stop media stream tracks
-    this.connection.mediaStream?.getTracks().forEach(track => track.stop())
+    this.connection.mediaStream?.getTracks().forEach((track) => track.stop())
     this.connection.mediaStream = null
 
     // Close audio context
-    if (this.connection.audioContext?.state !== 'closed') {
+    if (this.connection.audioContext?.state !== "closed") {
       try {
         this.connection.audioContext?.close()
       } catch {}

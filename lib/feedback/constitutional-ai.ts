@@ -116,6 +116,9 @@ If no issues found, return:
 }`
 
   try {
+    // Use a DIFFERENT provider than the main scoring to ensure independent critique
+    // If main scoring uses Gemini, use Claude here (and vice versa)
+    // This prevents the model from agreeing with itself
     const response = await generateAIResponse(
       "You are a Constitutional AI reviewer. Return only valid JSON, no markdown.",
       critiquePrompt,
@@ -123,7 +126,7 @@ If no issues found, return:
       {
         complexity: "simple",
         temperature: 0.2,
-        // preferredProvider: 'claude' // TODO: Switch to Claude for Constitutional AI when live (for now use Gemini to save costs)
+        preferredProvider: "claude", // IMPORTANT: Use different provider than main scoring for true Constitutional AI
       }
     )
 
@@ -273,6 +276,9 @@ If no issues:
 }`
 
   try {
+    // Use a DIFFERENT provider than the main scoring to ensure independent critique
+    // If main scoring uses Gemini, use Claude here (and vice versa)
+    // This prevents the model from agreeing with itself
     const response = await generateAIResponse(
       "You are a Constitutional AI reviewer. Return only valid JSON, no markdown.",
       critiquePrompt,
@@ -280,7 +286,7 @@ If no issues:
       {
         complexity: "simple",
         temperature: 0.2,
-        // preferredProvider: 'claude' // TODO: Switch to Claude for Constitutional AI when live (for now use Gemini to save costs)
+        preferredProvider: "claude", // IMPORTANT: Use different provider than main scoring for true Constitutional AI
       }
     )
 
