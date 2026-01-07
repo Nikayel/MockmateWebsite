@@ -84,7 +84,9 @@ export async function recordReviewEvent(params: {
   // Create the research event
   const eventId = `${params.userId}_${params.problemId}_${now.getTime()}`
   const masteryChanged = params.preReviewState.masteryLevel !== params.postReviewState.masteryLevel
-  const actualRetention = params.score >= 56
+  // Use masteryScore for retention calculation - this measures CODE CORRECTNESS
+  // Interview score includes communication, which doesn't indicate pattern mastery
+  const actualRetention = params.masteryScore >= 56
   const retentionAsPredicted =
     (params.preReviewState.predictedRetention >= 50) === actualRetention
 
