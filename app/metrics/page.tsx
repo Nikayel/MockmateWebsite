@@ -16,6 +16,9 @@ import {
   Activity,
   Layers,
   Crosshair,
+  HelpCircle,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -25,7 +28,8 @@ interface MetricsData {
     totalSessions: number
     totalPracticeMinutes: number
     totalPracticeHours: number
-    averageScore: number
+    averageScore: number // Overall (includes communication)
+    averageTechnicalScore: number // Technical (code-focused)
     lastSessionAt: string | null
   }
   patterns: Array<{
@@ -33,6 +37,7 @@ interface MetricsData {
     displayName: string
     sessions: number
     averageScore: number
+    averageTechnicalScore: number
     bestScore: number
     proficiency: "novice" | "learning" | "practicing" | "proficient" | "expert"
   }>
@@ -40,6 +45,7 @@ interface MetricsData {
     difficulty: string
     sessions: number
     averageScore: number
+    averageTechnicalScore: number
   }>
   trends: {
     daily: Array<{ date: string; score: number; sessions: number }>
@@ -213,6 +219,7 @@ export default function MetricsPage() {
   const [metrics, setMetrics] = useState<MetricsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showOverallScore, setShowOverallScore] = useState(false) // Default to technical score
 
   useEffect(() => {
     const loadMetrics = async () => {
@@ -350,9 +357,35 @@ export default function MetricsPage() {
                   </div>
                 </div>
 
-                {/* Score Ring */}
+                {/* Score Ring with Toggle */}
                 <div className="col-span-6 flex flex-col items-center justify-center rounded-2xl border border-zinc-800/50 bg-zinc-900/50 p-6 md:col-span-4">
-                  <ScoreRing score={metrics.overview.averageScore} label="avg score" />
+                  <ScoreRing
+                    score={
+                      showOverallScore
+                        ? metrics.overview.averageScore
+                        : metrics.overview.averageTechnicalScore
+                    }
+                    label={showOverallScore ? "interview" : "technical"}
+                  />
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      onClick={() => setShowOverallScore(!showOverallScore)}
+                      className="flex items-center gap-1.5 text-xs text-zinc-500 transition-colors hover:text-zinc-300"
+                      title={
+                        showOverallScore
+                          ? "Interview Score: Includes communication (20%). Click for Technical Score."
+                          : "Technical Score: Code quality + problem solving + understanding. Click for Interview Score."
+                      }
+                    >
+                      {showOverallScore ? (
+                        <ToggleRight className="h-4 w-4 text-[#00d9ff]" />
+                      ) : (
+                        <ToggleLeft className="h-4 w-4" />
+                      )}
+                      <span>{showOverallScore ? "Interview" : "Technical"}</span>
+                      <HelpCircle className="h-3 w-3" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Trend + Practice Time Stack */}
@@ -466,7 +499,10 @@ export default function MetricsPage() {
                                   {pattern.sessions} sessions
                                 </span>
                                 <span className="w-12 text-right font-mono text-sm text-zinc-300">
-                                  {pattern.averageScore}%
+                                  {showOverallScore
+                                    ? pattern.averageScore
+                                    : pattern.averageTechnicalScore || pattern.averageScore}
+                                  %
                                 </span>
                               </div>
                             </div>
@@ -501,7 +537,10 @@ export default function MetricsPage() {
                               <div
                                 className={`mb-1 text-3xl font-light ${color === "emerald" ? "text-emerald-400" : ""} ${color === "amber" ? "text-amber-400" : ""} ${color === "red" ? "text-red-400" : ""} `}
                               >
-                                {data.averageScore}%
+                                {showOverallScore
+                                  ? data.averageScore
+                                  : data.averageTechnicalScore || data.averageScore}
+                                %
                               </div>
                               <div className="text-xs text-zinc-500">{data.sessions} sessions</div>
                             </>
