@@ -391,25 +391,29 @@ export function quickMasteryScore(params: {
   }
 
   // Fallback when no test data: derive mastery from performance score
-  // But we need to ACTUALLY remove the communication component
+  // IMPORTANT: Properly extract technical portion by removing communication component
 
   // Interview score breakdown (from scoring-algorithms.ts):
   // - Understanding: 30% (technical)
   // - Problem-Solving: 25% (technical)
   // - Code Quality: 25% (technical)
   // - Communication: 20% (NON-technical - exclude this for mastery)
+  //
+  // Formula: performance = 0.30*U + 0.25*PS + 0.25*CQ + 0.20*C
+  // Technical = 0.30*U + 0.25*PS + 0.25*CQ (80% of components)
+  //
+  // To extract technical score, we:
+  // 1. Assume communication was average (50/100 = 0.50 normalized)
+  // 2. Communication contributes: 0.20 * 50 = 10 points to performance score
+  // 3. Technical contribution: performanceScore - 10
+  // 4. Rescale from 80-point scale to 100-point scale: (technical / 0.80)
 
-  // Estimate the technical-only portion (80% of interview score)
-  // Then rescale to 0-100 range
-  // Formula: (performance_score * 0.80) / 0.80 would be same, so instead:
-  // We estimate technical score by assuming communication was average (50/100)
-  // If performance = 0.30*U + 0.25*PS + 0.25*CQ + 0.20*C
-  // Technical = 0.30*U + 0.25*PS + 0.25*CQ = performance - 0.20*C
-  // If C=50 (average), technical = performance - 10, rescaled = (performance - 10) / 0.80
+  const assumedCommunicationScore = 50 // Average communication performance
+  const communicationContribution = 0.20 * assumedCommunicationScore // 10 points
+  const technicalPoints = performanceScore - communicationContribution
 
-  // But simpler approach: use pass rate as primary signal, performance as modifier
-  // Since we don't have test data, assume ~70% correlation with performance
-  const baseScore = performanceScore * 0.85 // Technical portion (slightly less than full)
+  // Rescale from 80-point max to 100-point scale
+  const baseScore = technicalPoints / 0.80
 
   // Apply hint penalty - heavier for spaced repetition
   // Each hint indicates they needed help understanding the pattern

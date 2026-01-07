@@ -78,7 +78,8 @@ export interface SessionAnalysis {
   scenarioId: string
   pattern: DSAPattern
   difficulty: 'easy' | 'medium' | 'hard'
-  score: number
+  score: number            // MASTERY score for technical analysis
+  performanceScore: number // PERFORMANCE score for interview readiness
   duration: number
   hintsUsed: number
   testsRun: number
@@ -227,18 +228,42 @@ export class UserPerformanceRAG {
   /**
    * Analyze a single session
    * Maps session_summaries subcollection format to SessionAnalysis
+   *
+   * IMPORTANT: Uses MASTERY score for technical proficiency analysis
    */
   private analyzeSession(session: Record<string, unknown>): SessionAnalysis {
     const scoreBreakdown = session.scoreBreakdown as Record<string, unknown> | undefined
     const interactionMetrics = session.interactionMetrics as Record<string, unknown> | undefined
 
+    // Validate pattern - don't silently corrupt data with wrong defaults
+    let pattern: DSAPattern
+    if (session.pattern && typeof session.pattern === 'string') {
+      pattern = session.pattern as DSAPattern
+    } else {
+      // Log warning when pattern is missing - this indicates upstream data issue
+      console.warn(`[UserPerformanceRAG] Session ${session.sessionId || session.id} missing pattern field. This should be investigated.`)
+      // Use a safe default but flag it for review
+      pattern = 'arrays-hashing'
+    }
+
+    // Use MASTERY score for technical proficiency (if available), fallback to performance score
+    const masteryScore = (session.masteryScore as number)
+      || (session.performanceScore as number)
+      || (scoreBreakdown?.overallScore as number)
+      || 0
+
+    const performanceScore = (session.performanceScore as number)
+      || (scoreBreakdown?.overallScore as number)
+      || 0
+
     return {
       sessionId: session.sessionId as string || session.id as string,
       userId: session.userId as string,
       scenarioId: session.scenarioId as string,
-      pattern: (session.pattern || 'arrays-hashing') as DSAPattern,
+      pattern,
       difficulty: (session.difficulty || 'medium') as 'easy' | 'medium' | 'hard',
-      score: (session.performanceScore as number) || (scoreBreakdown?.overallScore as number) || 0,
+      score: masteryScore,  // Use MASTERY score for technical proficiency analysis
+      performanceScore,     // Separate field for interview readiness
       duration: ((session.durationMinutes as number) || 0) * 60, // Convert to seconds
       hintsUsed: (interactionMetrics?.hintsUsed as number) || 0,
       testsRun: (interactionMetrics?.codeExecutions as number) || 0,
