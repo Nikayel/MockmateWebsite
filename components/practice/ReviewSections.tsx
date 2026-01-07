@@ -85,19 +85,6 @@ function CollapsibleSection({
   )
 }
 
-// Format relative date
-function formatRelativeDate(dateStr: string): string {
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diffDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-
-  if (diffDays === 0) return "Today"
-  if (diffDays === 1) return "Tomorrow"
-  if (diffDays < 7) return date.toLocaleDateString("en-US", { weekday: "long" })
-  if (diffDays < 14) return "Next " + date.toLocaleDateString("en-US", { weekday: "long" })
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-}
-
 export function ReviewSections({
   dueInMinutes,
   dueNow,
@@ -108,7 +95,7 @@ export function ReviewSections({
   totalDue,
   userAlgorithm,
   isUpcomingExpanded,
-  onToggleUpcoming,
+  onToggleUpcoming: _onToggleUpcoming,
   onSkip,
   onMarkReviewed,
   skippingId,
