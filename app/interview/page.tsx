@@ -52,53 +52,85 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/lib/auth-context"
-import { checkUsageLimit, recordSessionStart, getUserProfile, createInterviewSession, updateInterviewSession, checkSessionCost, saveSessionState, getSessionState } from "@/lib/firestore-helpers"
-import { getOrCreateGuestId, getGuestId, canStartFreeTrial, markFreeTrialUsed, saveGuestSessionData, isGuestId } from "@/lib/guest-session"
+import {
+  checkUsageLimit,
+  recordSessionStart,
+  getUserProfile,
+  createInterviewSession,
+  updateInterviewSession,
+  checkSessionCost,
+  saveSessionState,
+  getSessionState,
+} from "@/lib/firestore-helpers"
+import {
+  getOrCreateGuestId,
+  getGuestId,
+  canStartFreeTrial,
+  markFreeTrialUsed,
+  saveGuestSessionData,
+  isGuestId,
+} from "@/lib/guest-session"
 import { SignupPrompt } from "@/components/SignupPrompt"
 import { useRoadmapStore } from "@/lib/stores/roadmap-store"
-import { scenarios, filterScenarios, getScenarioById, type Scenario, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
-import { extractProtectedElements, validateCodeProtection, enforceCodeProtection } from "@/lib/code-protection"
+import {
+  scenarios,
+  filterScenarios,
+  getScenarioById,
+  type Scenario,
+  type ScenarioType,
+  type DifficultyLevel,
+  type Company,
+} from "@/lib/scenarios"
+import {
+  extractProtectedElements,
+  validateCodeProtection,
+  enforceCodeProtection,
+} from "@/lib/code-protection"
 import { toast } from "sonner"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
-  () => import("@/components/interview").then(mod => ({ default: mod.ScenarioBrowser })),
+  () => import("@/components/interview").then((mod) => ({ default: mod.ScenarioBrowser })),
   {
     ssr: false,
     loading: () => (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex min-h-[400px] items-center justify-center">
         <div className="text-gray-400">Loading scenarios...</div>
       </div>
-    )
+    ),
   }
 )
 
 const VoiceModeToggle = nextDynamic(
-  () => import("@/components/interview").then(mod => ({ default: mod.VoiceModeToggle })),
+  () => import("@/components/interview").then((mod) => ({ default: mod.VoiceModeToggle })),
   { ssr: false }
 )
 
 const CodeViewerSidePanel = nextDynamic(
-  () => import("@/components/CodeViewerSidePanel").then(mod => ({ default: mod.CodeViewerSidePanel })),
+  () =>
+    import("@/components/CodeViewerSidePanel").then((mod) => ({
+      default: mod.CodeViewerSidePanel,
+    })),
   { ssr: false }
 )
 
 const GradingCriteriaTooltip = nextDynamic(
-  () => import("@/components/GradingCriteria").then(mod => ({ default: mod.GradingCriteriaTooltip })),
+  () =>
+    import("@/components/GradingCriteria").then((mod) => ({ default: mod.GradingCriteriaTooltip })),
   { ssr: false }
 )
 
 const CodeConsole = nextDynamic(
-  () => import("@/components/interview/CodeConsole").then(mod => ({ default: mod.CodeConsole })),
+  () => import("@/components/interview/CodeConsole").then((mod) => ({ default: mod.CodeConsole })),
   { ssr: false }
 )
 
 // Inline error fallback for components that fail to load
 function ComponentErrorFallback({ componentName }: { componentName: string }) {
   return (
-    <div className="flex items-center justify-center h-full bg-gray-900/50 p-4">
+    <div className="flex h-full items-center justify-center bg-gray-900/50 p-4">
       <div className="text-center">
-        <div className="text-red-400 text-sm mb-2">Failed to load {componentName}</div>
+        <div className="mb-2 text-sm text-red-400">Failed to load {componentName}</div>
         <button
           onClick={() => window.location.reload()}
           className="text-xs text-[#00d9ff] hover:underline"
@@ -113,36 +145,33 @@ function ComponentErrorFallback({ componentName }: { componentName: string }) {
 // Dynamically import heavy components to reduce initial bundle size
 // CodeMirror 6 is used instead of Monaco for ~95% smaller bundle
 const CodeEditor = nextDynamic(
-  () => import("@/components/editor").then(mod => mod.CodeMirrorEditor),
+  () => import("@/components/editor").then((mod) => mod.CodeMirrorEditor),
   {
     ssr: false,
     loading: () => (
-      <div className="flex items-center justify-center h-full bg-[#1e1e1e]">
-        <div className="text-gray-400 text-sm">Loading editor...</div>
+      <div className="flex h-full items-center justify-center bg-[#1e1e1e]">
+        <div className="text-sm text-gray-400">Loading editor...</div>
       </div>
-    )
+    ),
   }
 )
 
-const PracticeFeedback = nextDynamic(
-  () => import("@/components/PracticeFeedback"),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-gray-400 text-sm">Loading feedback...</div>
-      </div>
-    )
-  }
-)
+const PracticeFeedback = nextDynamic(() => import("@/components/PracticeFeedback"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center p-8">
+      <div className="text-sm text-gray-400">Loading feedback...</div>
+    </div>
+  ),
+})
 
 // Supported languages for code execution
 // JavaScript and Python are fully supported; others are coming soon
 const SUPPORTED_LANGUAGES = ["javascript", "typescript", "python"] as const
 const COMING_SOON_LANGUAGES = ["java", "cpp", "csharp", "go", "rust"] as const
 
-type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number]
-type ComingSoonLanguage = typeof COMING_SOON_LANGUAGES[number]
+type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
+type ComingSoonLanguage = (typeof COMING_SOON_LANGUAGES)[number]
 
 const isLanguageSupported = (lang: string): lang is SupportedLanguage => {
   return SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage)
@@ -182,7 +211,9 @@ function InterviewPageContent() {
   const [isGeneratingDiscussion, setIsGeneratingDiscussion] = useState(false)
   const [showCodeInDiscussion, setShowCodeInDiscussion] = useState(false)
   const [code, setCode] = useState("")
-  const [selectedLanguage, setSelectedLanguage] = useState<"javascript" | "typescript" | "python" | "java" | "cpp" | "csharp" | "go" | "rust">("javascript")
+  const [selectedLanguage, setSelectedLanguage] = useState<
+    "javascript" | "typescript" | "python" | "java" | "cpp" | "csharp" | "go" | "rust"
+  >("javascript")
 
   // Filters (handled inside ScenarioBrowser now)
   const [completedProblems, setCompletedProblems] = useState<string[]>([])
@@ -201,7 +232,10 @@ function InterviewPageContent() {
   const [isLoadingInterviewer, setIsLoadingInterviewer] = useState(false)
 
   // Track pending auto-send to avoid duplicate sends
-  const pendingAutoSendRef = useRef<{ interviewer: boolean; partner: boolean }>({ interviewer: false, partner: false })
+  const pendingAutoSendRef = useRef<{ interviewer: boolean; partner: boolean }>({
+    interviewer: false,
+    partner: false,
+  })
 
   // Voice recording - using Deepgram with Web Speech API fallback
   const interviewerVoice = useVoiceInput({
@@ -212,8 +246,15 @@ function InterviewPageContent() {
     onUtteranceEnd: (transcript) => {
       // Auto-send when user stops speaking in live mode
       // Use ref to get current value (avoids stale closure issue)
-      if (voiceModeLiveRef.current && transcript.trim() && !pendingAutoSendRef.current.interviewer) {
-        console.log('[Live Mode] Utterance end detected, auto-sending:', transcript.substring(0, 50))
+      if (
+        voiceModeLiveRef.current &&
+        transcript.trim() &&
+        !pendingAutoSendRef.current.interviewer
+      ) {
+        console.log(
+          "[Live Mode] Utterance end detected, auto-sending:",
+          transcript.substring(0, 50)
+        )
         pendingAutoSendRef.current.interviewer = true
         setInterviewerInput(transcript)
         // Small delay to ensure state is updated
@@ -236,7 +277,10 @@ function InterviewPageContent() {
       // Auto-send when user stops speaking in live mode
       // Use ref to get current value (avoids stale closure issue)
       if (voiceModeLiveRef.current && transcript.trim() && !pendingAutoSendRef.current.partner) {
-        console.log('[Live Mode] Utterance end detected for partner, auto-sending:', transcript.substring(0, 50))
+        console.log(
+          "[Live Mode] Utterance end detected for partner, auto-sending:",
+          transcript.substring(0, 50)
+        )
         pendingAutoSendRef.current.partner = true
         setChatInput(transcript)
         setTimeout(() => {
@@ -267,7 +311,9 @@ function InterviewPageContent() {
 
   // Test states
   const [testResults, setTestResults] = useState<TestResult[]>([])
-  const [consoleLogs, setConsoleLogs] = useState<Array<{ type: string; message: string; timestamp: number }>>([])
+  const [consoleLogs, setConsoleLogs] = useState<
+    Array<{ type: string; message: string; timestamp: number }>
+  >([])
   const [isRunningTests, setIsRunningTests] = useState(false)
   const [testSummary, setTestSummary] = useState({ total: 0, passed: 0, failed: 0, passRate: 0 })
   const [efficiencyMetrics, setEfficiencyMetrics] = useState<{
@@ -289,10 +335,16 @@ function InterviewPageContent() {
   const [hintTimers, setHintTimers] = useState<number[]>([])
 
   // Workspace context
-  const [workspaceContext, setWorkspaceContext] = useState<Array<{ path: string; content: string }>>([])
+  const [workspaceContext, setWorkspaceContext] = useState<
+    Array<{ path: string; content: string }>
+  >([])
   const lastCodeHashRef = useRef<string>("")
   const [proactiveTimer, setProactiveTimer] = useState<NodeJS.Timeout | null>(null)
-  const [usageLimit, setUsageLimit] = useState<{ used: number; limit: number; allowed: boolean } | null>(null)
+  const [usageLimit, setUsageLimit] = useState<{
+    used: number
+    limit: number
+    allowed: boolean
+  } | null>(null)
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
 
   // Code viewer dialog state
@@ -312,7 +364,7 @@ function InterviewPageContent() {
   // Research: WCAG 2.1 recommends letting users manage time on their terms
   const [hideTimer, setHideTimer] = useState(false)
   // Mobile panel switcher - only one visible at a time (Miller's Law)
-  const [activePanel, setActivePanel] = useState<'problem' | 'editor' | 'chat'>('editor')
+  const [activePanel, setActivePanel] = useState<"problem" | "editor" | "chat">("editor")
 
   // State for focus mode problem peek overlay
   const [showProblemPeek, setShowProblemPeek] = useState(false)
@@ -320,26 +372,28 @@ function InterviewPageContent() {
   // Toggle calm mode on document for CSS cascade
   useEffect(() => {
     if (calmMode) {
-      document.documentElement.classList.add('calm')
+      document.documentElement.classList.add("calm")
     } else {
-      document.documentElement.classList.remove('calm')
+      document.documentElement.classList.remove("calm")
     }
-    return () => document.documentElement.classList.remove('calm')
+    return () => document.documentElement.classList.remove("calm")
   }, [calmMode])
 
   // Toggle focus mode class on document for CSS cascade
   useEffect(() => {
     if (focusMode) {
-      document.documentElement.classList.add('focus-mode-active')
+      document.documentElement.classList.add("focus-mode-active")
     } else {
-      document.documentElement.classList.remove('focus-mode-active')
+      document.documentElement.classList.remove("focus-mode-active")
       setShowProblemPeek(false) // Close peek when exiting focus mode
     }
-    return () => document.documentElement.classList.remove('focus-mode-active')
+    return () => document.documentElement.classList.remove("focus-mode-active")
   }, [focusMode])
 
   // Code protection state
-  const [protectedElements, setProtectedElements] = useState<ReturnType<typeof extractProtectedElements> | null>(null)
+  const [protectedElements, setProtectedElements] = useState<ReturnType<
+    typeof extractProtectedElements
+  > | null>(null)
   const [starterCode, setStarterCode] = useState<string>("")
 
   // Roadmap tracking
@@ -353,11 +407,16 @@ function InterviewPageContent() {
 
   // Update URL when interview starts (for refresh persistence)
   useEffect(() => {
-    if (isInterviewStarted && selectedScenario && currentSessionId && typeof window !== 'undefined') {
+    if (
+      isInterviewStarted &&
+      selectedScenario &&
+      currentSessionId &&
+      typeof window !== "undefined"
+    ) {
       const url = new URL(window.location.href)
-      url.searchParams.set('session', currentSessionId)
-      url.searchParams.set('scenario', selectedScenario.id)
-      window.history.replaceState({}, '', url.toString())
+      url.searchParams.set("session", currentSessionId)
+      url.searchParams.set("scenario", selectedScenario.id)
+      window.history.replaceState({}, "", url.toString())
     }
   }, [isInterviewStarted, selectedScenario, currentSessionId])
 
@@ -367,12 +426,12 @@ function InterviewPageContent() {
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault()
-      e.returnValue = 'You have an active interview session. Are you sure you want to leave?'
+      e.returnValue = "You have an active interview session. Are you sure you want to leave?"
       return e.returnValue
     }
 
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
   }, [isInterviewStarted, showFeedback])
 
   // Separate effect to handle auth check with delay to prevent race condition on refresh
@@ -406,9 +465,7 @@ function InterviewPageContent() {
           const data = doc.data() as any
           if (!data.scenario_id) return
 
-          const isCompleted =
-            !!data.completed_at ||
-            typeof data.performance_score === "number"
+          const isCompleted = !!data.completed_at || typeof data.performance_score === "number"
 
           if (isCompleted) {
             completedSet.add(data.scenario_id)
@@ -473,16 +530,18 @@ function InterviewPageContent() {
 
           // Check if there's saved session state to determine if this is a true resume
           const savedState = await getSessionState(sessionId)
-          const hasExistingProgress = savedState && (
-            savedState.interviewerMessages && savedState.interviewerMessages.length > 1 ||
-            savedState.chatMessages && savedState.chatMessages.length > 1 ||
-            savedState.elapsedTime && savedState.elapsedTime > 60
-          )
+          const hasExistingProgress =
+            savedState &&
+            ((savedState.interviewerMessages && savedState.interviewerMessages.length > 1) ||
+              (savedState.chatMessages && savedState.chatMessages.length > 1) ||
+              (savedState.elapsedTime && savedState.elapsedTime > 60))
 
           // Initialize code based on scenario type
           let initialCode: string
-          if (scenario.type === 'bugfix') {
-            initialCode = (scenario as any).buggyCode?.[selectedLanguage] || `// Bug fix code not available for ${selectedLanguage}`
+          if (scenario.type === "bugfix") {
+            initialCode =
+              (scenario as any).buggyCode?.[selectedLanguage] ||
+              `// Bug fix code not available for ${selectedLanguage}`
             const codebaseFiles = (scenario as any).codebaseFiles?.[selectedLanguage] || []
             if (codebaseFiles.length > 0) {
               const contextFiles = codebaseFiles.map((file: any) => ({
@@ -491,7 +550,7 @@ function InterviewPageContent() {
               }))
               setWorkspaceContext(contextFiles)
             }
-          } else if (scenario.type === 'system-design') {
+          } else if (scenario.type === "system-design") {
             // For system design, provide a design notes template
             initialCode = `// DESIGN NOTES: ${scenario.title}
 // Use this space to document your design decisions
@@ -534,7 +593,9 @@ function InterviewPageContent() {
 // -
 `
           } else {
-            initialCode = (scenario as any).starterCode?.[selectedLanguage] || `function solution() {
+            initialCode =
+              (scenario as any).starterCode?.[selectedLanguage] ||
+              `function solution() {
   // Write your solution here
 
 }`
@@ -551,9 +612,12 @@ function InterviewPageContent() {
           }
 
           // Initialize interviewer with appropriate message based on progress
-          const problemType = scenario.type === 'bugfix' ? 'BUG FIX' :
-            scenario.type === 'add-functionality' ? 'ADD FUNCTIONALITY' :
-              scenario.type.toUpperCase()
+          const problemType =
+            scenario.type === "bugfix"
+              ? "BUG FIX"
+              : scenario.type === "add-functionality"
+                ? "ADD FUNCTIONALITY"
+                : scenario.type.toUpperCase()
 
           let initialMessage: string
           if (hasExistingProgress) {
@@ -569,22 +633,28 @@ Let's continue!`
 
             // Restore previous messages if available
             if (savedState?.interviewerMessages && savedState.interviewerMessages.length > 0) {
-              setInterviewerMessages(savedState.interviewerMessages as Array<{ type: "ai" | "user"; message: string }>)
+              setInterviewerMessages(
+                savedState.interviewerMessages as Array<{ type: "ai" | "user"; message: string }>
+              )
             } else {
               setInterviewerMessages([{ type: "ai", message: initialMessage }])
             }
             if (savedState?.chatMessages && savedState.chatMessages.length > 0) {
-              setChatMessages(savedState.chatMessages as Array<{ type: "ai" | "user"; message: string }>)
+              setChatMessages(
+                savedState.chatMessages as Array<{ type: "ai" | "user"; message: string }>
+              )
             } else {
-              setChatMessages([{
-                type: "ai",
-                message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
-              }])
+              setChatMessages([
+                {
+                  type: "ai",
+                  message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
+                },
+              ])
             }
             toast.success("Session resumed")
           } else {
             // Fresh start - no previous progress
-            const isDSAScenario = scenario.type === 'dsa'
+            const isDSAScenario = scenario.type === "dsa"
             initialMessage = isDSAScenario
               ? `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${scenario.title}**, a ${scenario.difficulty} ${problemType} problem.
 
@@ -605,10 +675,12 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
             setInterviewerMessages([{ type: "ai", message: initialMessage }])
             if (!isDSAScenario) {
-              setChatMessages([{
-                type: "ai",
-                message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
-              }])
+              setChatMessages([
+                {
+                  type: "ai",
+                  message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
+                },
+              ])
             } else {
               setChatMessages([]) // No AI partner for DSA
             }
@@ -668,7 +740,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
   }, [elapsedTime, isInterviewStarted, selectedScenario, showFeedback, revealedHints])
 
   // Sound effects - disabled in calm mode for reduced stimulation
-  const playSound = (type: 'hint' | 'success' | 'fail' | 'milestone') => {
+  const playSound = (type: "hint" | "success" | "fail" | "milestone") => {
     // Skip sounds in calm mode - reduces anxiety triggers
     if (calmMode) return
 
@@ -705,7 +777,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
   useEffect(() => {
     if (interviewerEndRef.current) {
-      interviewerEndRef.current.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" })
+      interviewerEndRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "nearest",
+      })
     }
   }, [interviewerMessages])
 
@@ -717,14 +793,20 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
   useEffect(() => {
     if (selectedScenario && !isInterviewStarted && !code) {
       let initialCode: string
-      if (selectedScenario.type === 'bugfix') {
-        initialCode = (selectedScenario as any).buggyCode?.[selectedLanguage] || `// Bug fix code not available for ${selectedLanguage}`
-      } else if (selectedScenario.type === 'add-functionality') {
-        initialCode = (selectedScenario as any).existingCode?.[selectedLanguage] || `// Add functionality code not available for ${selectedLanguage}`
-      } else if (selectedScenario.type === 'system-design') {
+      if (selectedScenario.type === "bugfix") {
+        initialCode =
+          (selectedScenario as any).buggyCode?.[selectedLanguage] ||
+          `// Bug fix code not available for ${selectedLanguage}`
+      } else if (selectedScenario.type === "add-functionality") {
+        initialCode =
+          (selectedScenario as any).existingCode?.[selectedLanguage] ||
+          `// Add functionality code not available for ${selectedLanguage}`
+      } else if (selectedScenario.type === "system-design") {
         initialCode = `// DESIGN NOTES: ${selectedScenario.title}\n// Use this space to document your design decisions\n`
       } else {
-        initialCode = (selectedScenario as any).starterCode?.[selectedLanguage] || `function solution() {\n  // Write your solution here\n\n}`
+        initialCode =
+          (selectedScenario as any).starterCode?.[selectedLanguage] ||
+          `function solution() {\n  // Write your solution here\n\n}`
       }
       setCode(initialCode)
     }
@@ -737,16 +819,22 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       let codebaseFiles: any[] = []
 
       // For bug fix scenarios, use buggyCode
-      if (selectedScenario.type === 'bugfix') {
-        newCode = (selectedScenario as any).buggyCode?.[selectedLanguage] || `// Bug fix code not available for ${selectedLanguage}`
+      if (selectedScenario.type === "bugfix") {
+        newCode =
+          (selectedScenario as any).buggyCode?.[selectedLanguage] ||
+          `// Bug fix code not available for ${selectedLanguage}`
         codebaseFiles = (selectedScenario as any).codebaseFiles?.[selectedLanguage] || []
-      } else if (selectedScenario.type === 'add-functionality') {
+      } else if (selectedScenario.type === "add-functionality") {
         // For Add Functionality scenarios, use existingCode
-        newCode = (selectedScenario as any).existingCode?.[selectedLanguage] || `// Add functionality code not available for ${selectedLanguage}`
+        newCode =
+          (selectedScenario as any).existingCode?.[selectedLanguage] ||
+          `// Add functionality code not available for ${selectedLanguage}`
         codebaseFiles = (selectedScenario as any).codebaseFiles?.[selectedLanguage] || []
       } else {
         // For DSA scenarios, use starterCode
-        newCode = (selectedScenario as any).starterCode?.[selectedLanguage] || `function solution() {
+        newCode =
+          (selectedScenario as any).starterCode?.[selectedLanguage] ||
+          `function solution() {
   // Write your solution here
 
 }`
@@ -762,15 +850,21 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         }))
         setWorkspaceContext(contextFiles)
         toast.success(`Loaded ${contextFiles.length} codebase file(s) for ${selectedLanguage}`)
-      } else if (selectedScenario.type === 'bugfix' || selectedScenario.type === 'add-functionality') {
+      } else if (
+        selectedScenario.type === "bugfix" ||
+        selectedScenario.type === "add-functionality"
+      ) {
         // Clear workspace context if no codebase files for this language
         setWorkspaceContext([])
-        toast.warning(`No codebase files available for ${selectedLanguage}. Consider using JavaScript or Python.`)
+        toast.warning(
+          `No codebase files available for ${selectedLanguage}. Consider using JavaScript or Python.`
+        )
       }
 
       // Only update main code if it's still the starter/default code
       const currentCodeTrimmed = code.trim()
-      const isEmptyOrStarter = currentCodeTrimmed === "" ||
+      const isEmptyOrStarter =
+        currentCodeTrimmed === "" ||
         currentCodeTrimmed.includes("Write your solution here") ||
         currentCodeTrimmed.includes("BUG:") ||
         currentCodeTrimmed.includes("TODO:") ||
@@ -842,7 +936,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     // Users can choose to communicate when they want to
 
     // Still track for metrics purposes
-    const userMessages = interviewerMessages.filter(m => m.type === 'user')
+    const userMessages = interviewerMessages.filter((m) => m.type === "user")
     if (userMessages.length > 0) {
       lastInterviewerMessageRef.current = Date.now()
       hasTriggeredSilenceRef.current = false
@@ -853,7 +947,13 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         clearInterval(silenceTimerRef.current)
       }
     }
-  }, [isInterviewStarted, showFeedback, showPostInterviewDiscussion, interviewerMessages, elapsedTime])
+  }, [
+    isInterviewStarted,
+    showFeedback,
+    showPostInterviewDiscussion,
+    interviewerMessages,
+    elapsedTime,
+  ])
 
   // Cleanup all proactive timers on unmount
   useEffect(() => {
@@ -906,9 +1006,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
           // Also save state to Firestore via API (for session recovery)
           if (currentSessionId) {
-            await fetch('/api/guest-session', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
+            await fetch("/api/guest-session", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 sessionId: currentSessionId,
                 guestId,
@@ -933,7 +1033,21 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     return () => {
       clearInterval(autoSaveInterval)
     }
-  }, [isInterviewStarted, selectedScenario, firebaseUser, isGuestMode, guestId, code, chatMessages, interviewerMessages, selectedLanguage, elapsedTime, testResults, workspaceContext, currentSessionId])
+  }, [
+    isInterviewStarted,
+    selectedScenario,
+    firebaseUser,
+    isGuestMode,
+    guestId,
+    code,
+    chatMessages,
+    interviewerMessages,
+    selectedLanguage,
+    elapsedTime,
+    testResults,
+    workspaceContext,
+    currentSessionId,
+  ])
 
   // Track when code value changes
   useEffect(() => {
@@ -972,7 +1086,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           }
 
           // Check Firestore if we have a session ID in URL
-          const sessionIdFromUrl = searchParams?.get('session')
+          const sessionIdFromUrl = searchParams?.get("session")
           if (sessionIdFromUrl) {
             const firestoreState = await getSessionState(sessionIdFromUrl)
             if (firestoreState?.savedAt) {
@@ -999,10 +1113,12 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           }
 
           // Check API for saved session state
-          const sessionIdFromUrl = searchParams?.get('session')
+          const sessionIdFromUrl = searchParams?.get("session")
           if (sessionIdFromUrl) {
             try {
-              const response = await fetch(`/api/guest-session?sessionId=${sessionIdFromUrl}&guestId=${guestId}`)
+              const response = await fetch(
+                `/api/guest-session?sessionId=${sessionIdFromUrl}&guestId=${guestId}`
+              )
               if (response.ok) {
                 const data = await response.json()
                 if (data.session?.session_state) {
@@ -1083,11 +1199,13 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           message: codeAnalysis ? `[CONTEXT ANALYSIS]\n${codeAnalysis}` : "",
           context: interviewerMessages,
           role: "interviewer",
-          userContext: userProfile ? {
-            email: user?.email,
-            subscription_tier: userProfile.subscription_tier,
-            sessions_used: usageLimit?.used || 0,
-          } : undefined,
+          userContext: userProfile
+            ? {
+                email: user?.email,
+                subscription_tier: userProfile.subscription_tier,
+                sessions_used: usageLimit?.used || 0,
+              }
+            : undefined,
           workspaceContext: workspaceContext,
           currentCode: code,
           scenarioTitle: selectedScenario?.title,
@@ -1197,11 +1315,13 @@ Interviews are conversations, not just coding exercises.`
           message: contextPrompt,
           context: interviewerMessages,
           role: "interviewer",
-          userContext: userProfile ? {
-            email: user?.email,
-            subscription_tier: userProfile.subscription_tier,
-            sessions_used: usageLimit?.used || 0,
-          } : undefined,
+          userContext: userProfile
+            ? {
+                email: user?.email,
+                subscription_tier: userProfile.subscription_tier,
+                sessions_used: usageLimit?.used || 0,
+              }
+            : undefined,
           workspaceContext: workspaceContext,
           currentCode: code,
           scenarioTitle: selectedScenario?.title,
@@ -1277,7 +1397,9 @@ Interviews are conversations, not just coding exercises.`
     }
 
     if (code.match(/Map|Set|HashMap|HashSet/)) {
-      observations.push("Candidate is using hash-based data structures - ASK if they understand the space tradeoff")
+      observations.push(
+        "Candidate is using hash-based data structures - ASK if they understand the space tradeoff"
+      )
     }
 
     if (code.match(/recursion|function.*\(.*\)\s*{[\s\S]*function\s*\(/)) {
@@ -1299,7 +1421,9 @@ Interviews are conversations, not just coding exercises.`
     // Time-based context
     const minutesSpent = Math.floor(elapsedTime / 60)
     if (minutesSpent > 10 && code.length < 100) {
-      observations.push(`Candidate has been working for ${minutesSpent} minutes but code is still minimal - might need guidance`)
+      observations.push(
+        `Candidate has been working for ${minutesSpent} minutes but code is still minimal - might need guidance`
+      )
     }
 
     // Build the context prompt for the interviewer
@@ -1379,16 +1503,16 @@ Ask ONE focused question based on these observations.`)
           // Prepare conversation transcript for content-based evaluation
           // This allows the AI to evaluate WHAT was said, not just message counts
           const conversationTranscript = [
-            ...interviewerMessages.map(m => ({
-              role: m.type === 'user' ? 'candidate' : 'interviewer',
+            ...interviewerMessages.map((m) => ({
+              role: m.type === "user" ? "candidate" : "interviewer",
               content: m.message,
-              timestamp: m.timestamp
+              timestamp: m.timestamp,
             })),
-            ...chatMessages.map(m => ({
-              role: m.type === 'user' ? 'candidate' : 'ai_partner',
+            ...chatMessages.map((m) => ({
+              role: m.type === "user" ? "candidate" : "ai_partner",
               content: m.message,
-              timestamp: m.timestamp
-            }))
+              timestamp: m.timestamp,
+            })),
           ].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
 
           const feedbackResponse = await fetch("/api/generate-feedback", {
@@ -1469,11 +1593,13 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           message: discussionPrompt,
           context: interviewerMessages,
           role: "interviewer",
-          userContext: userProfile ? {
-            email: user?.email,
-            subscription_tier: userProfile.subscription_tier,
-            sessions_used: usageLimit?.used || 0,
-          } : undefined,
+          userContext: userProfile
+            ? {
+                email: user?.email,
+                subscription_tier: userProfile.subscription_tier,
+                sessions_used: usageLimit?.used || 0,
+              }
+            : undefined,
           workspaceContext: workspaceContext,
           currentCode: code,
           scenarioTitle: selectedScenario?.title,
@@ -1493,19 +1619,14 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         try {
           // performanceScore is now 0-100, save directly
           const scoreToSave = calculatedPerformanceScore
-          await updateInterviewSession(
-            currentSessionId,
-            scoreToSave,
-            comprehensiveFeedback,
-            {
-              code,
-              language: selectedLanguage,
-              testResults,
-              timeComplexity: efficiencyData?.estimatedTimeComplexity,
-              spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
-              efficiencyScore: efficiencyData?.efficiencyScore,
-            }
-          )
+          await updateInterviewSession(currentSessionId, scoreToSave, comprehensiveFeedback, {
+            code,
+            language: selectedLanguage,
+            testResults,
+            timeComplexity: efficiencyData?.estimatedTimeComplexity,
+            spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
+            efficiencyScore: efficiencyData?.efficiencyScore,
+          })
 
           // Track session completion for user stats (async, non-blocking)
           trackSessionCompletion({
@@ -1515,7 +1636,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             testsPassed: summary.passed,
             testsTotal: summary.total,
             efficiencyScore: efficiencyData?.efficiencyScore || 50,
-          }).catch(err => console.error("Session metrics tracking failed:", err))
+          }).catch((err) => console.error("Session metrics tracking failed:", err))
 
           // Mark question complete in roadmap if user came from roadmap
           if (isFromRoadmap && selectedScenario && activeRoadmap) {
@@ -1530,7 +1651,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
           // Store solution for RAG (async, non-blocking)
           // For system design, store design notes even if empty (chat-only submission)
-          const isSystemDesign = selectedScenario?.type === 'system-design'
+          const isSystemDesign = selectedScenario?.type === "system-design"
           const shouldStore = selectedScenario?.id && (code.trim() || isSystemDesign)
 
           if (shouldStore) {
@@ -1542,7 +1663,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                 userId: user.id,
                 problemId: selectedScenario.id,
                 problemTitle: selectedScenario.title,
-                solutionCode: code || (isSystemDesign ? '// Design discussion completed via chat' : ''),
+                solutionCode:
+                  code || (isSystemDesign ? "// Design discussion completed via chat" : ""),
                 language: selectedLanguage,
                 passed: isSystemDesign ? true : summary.passed === summary.total, // System design has no tests
                 score: calculatedPerformanceScore,
@@ -1570,7 +1692,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
               interactionMetrics,
               efficiencyMetrics: efficiencyData,
               scores: {
-                correctness: (testResults.filter((t: TestResult) => t.passed).length / testResults.length) * 100,
+                correctness:
+                  (testResults.filter((t: TestResult) => t.passed).length / testResults.length) *
+                  100,
                 efficiency: efficiencyData.efficiencyScore,
                 codeQuality: 70, // Default, would need more analysis
                 reasoningExplanation: aiCollaborationMetrics.partnerMessagesSent > 0 ? 50 : 0,
@@ -1585,15 +1709,16 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           console.error("Error updating session on completion:", error)
           // Non-critical error - session state saved to cloud but local UI continues
           toast.warning("Session progress may not be fully saved", {
-            description: "Your feedback is still available, but progress tracking may be incomplete.",
+            description:
+              "Your feedback is still available, but progress tracking may be incomplete.",
           })
         }
       } else if (currentSessionId && isGuestMode && guestId) {
         // Guest user - save completion data via API
         try {
-          await fetch('/api/guest-session', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+          await fetch("/api/guest-session", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               sessionId: currentSessionId,
               guestId,
@@ -1628,7 +1753,10 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
-      if (file.type.startsWith("text/") || file.name.match(/\.(js|ts|jsx|tsx|py|java|cpp|c|h|json|md|txt)$/i)) {
+      if (
+        file.type.startsWith("text/") ||
+        file.name.match(/\.(js|ts|jsx|tsx|py|java|cpp|c|h|json|md|txt)$/i)
+      ) {
         try {
           const content = await file.text()
           if (content.length < 50000) {
@@ -1664,7 +1792,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     }
 
     // Check usage limit before starting - redirect to limit page (skip for DSA questions)
-    if (user && usageLimit && !usageLimit.allowed && scenario.type !== 'dsa') {
+    if (user && usageLimit && !usageLimit.allowed && scenario.type !== "dsa") {
       router.push("/limit-reached")
       return
     }
@@ -1675,7 +1803,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       try {
         // Create session document first
         // Include pattern for stats aggregation (used by dashboard Performance Insights)
-        const scenarioPattern = ('pattern' in scenario ? scenario.pattern : scenario.type) || 'unknown'
+        const scenarioPattern =
+          ("pattern" in scenario ? scenario.pattern : scenario.type) || "unknown"
         const sessionId = await createInterviewSession(
           user.id,
           scenario.title,
@@ -1701,13 +1830,13 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
               data: {
                 scenarioId: scenario.id,
                 scenarioTitle: scenario.title,
-                pattern: ('pattern' in scenario ? scenario.pattern : scenario.type) || 'unknown',
+                pattern: ("pattern" in scenario ? scenario.pattern : scenario.type) || "unknown",
                 difficulty: scenario.difficulty,
                 scenarioType: scenario.type,
                 hintsTotal: (scenario as any).hints?.length || 3,
               },
             }),
-          }).catch(err => console.error("Session metrics init failed:", err))
+          }).catch((err) => console.error("Session metrics init failed:", err))
         }
 
         // Record session start (uses free opens or consumes 1 usage)
@@ -1727,11 +1856,12 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     } else if (isGuestMode && guestId) {
       // Guest user - create session via API
       try {
-        const scenarioPattern = ('pattern' in scenario ? scenario.pattern : scenario.type) || 'unknown'
-        const response = await fetch('/api/guest-session', {
-          method: 'POST',
+        const scenarioPattern =
+          ("pattern" in scenario ? scenario.pattern : scenario.type) || "unknown"
+        const response = await fetch("/api/guest-session", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             guestId,
@@ -1746,7 +1876,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         const data = await response.json()
 
         if (!response.ok) {
-          if (data.code === 'FREE_TRIAL_EXHAUSTED') {
+          if (data.code === "FREE_TRIAL_EXHAUSTED") {
             toast.error("Free trial already used", {
               description: "Sign up to continue practicing!",
             })
@@ -1754,7 +1884,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             router.push("/login?redirect=interview")
             return
           }
-          throw new Error(data.error || 'Failed to create session')
+          throw new Error(data.error || "Failed to create session")
         }
 
         setCurrentSessionId(data.sessionId)
@@ -1796,9 +1926,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
     // Initialize code based on scenario type
     let initialCode: string
-    if (scenario.type === 'bugfix') {
+    if (scenario.type === "bugfix") {
       // For bug fixes, load buggy code
-      initialCode = (scenario as any).buggyCode?.[selectedLanguage] || `// Bug fix code not available for ${selectedLanguage}`
+      initialCode =
+        (scenario as any).buggyCode?.[selectedLanguage] ||
+        `// Bug fix code not available for ${selectedLanguage}`
 
       // Auto-load codebase files into workspace context for bug fixes
       const codebaseFiles = (scenario as any).codebaseFiles?.[selectedLanguage] || []
@@ -1810,9 +1942,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         setWorkspaceContext(contextFiles)
         toast.success(`Loaded ${contextFiles.length} codebase file(s) for context`)
       }
-    } else if (scenario.type === 'add-functionality') {
+    } else if (scenario.type === "add-functionality") {
       // For Add Functionality scenarios, load existing code to extend
-      initialCode = (scenario as any).existingCode?.[selectedLanguage] || `// Add functionality to the existing codebase`
+      initialCode =
+        (scenario as any).existingCode?.[selectedLanguage] ||
+        `// Add functionality to the existing codebase`
 
       // Auto-load codebase files into workspace context
       const codebaseFiles = (scenario as any).codebaseFiles?.[selectedLanguage] || []
@@ -1823,9 +1957,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           description: file.description,
         }))
         setWorkspaceContext(contextFiles)
-        toast.success(`Loaded ${contextFiles.length} codebase file(s) - review them to understand the existing code`)
+        toast.success(
+          `Loaded ${contextFiles.length} codebase file(s) - review them to understand the existing code`
+        )
       }
-    } else if (scenario.type === 'system-design') {
+    } else if (scenario.type === "system-design") {
       // For system design, provide a design notes template
       initialCode = `// DESIGN NOTES: ${scenario.title}
 // Use this space to document your design decisions
@@ -1869,7 +2005,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 `
     } else {
       // For DSA problems, load starter code
-      initialCode = (scenario as any).starterCode?.[selectedLanguage] || `function solution() {
+      initialCode =
+        (scenario as any).starterCode?.[selectedLanguage] ||
+        `function solution() {
   // Write your solution here
 
 }`
@@ -1882,11 +2020,14 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setProtectedElements(protectedElementsData)
 
     // Initialize interviewer with welcome message (problem details are now in left panel)
-    const problemType = scenario.type === 'bugfix' ? 'BUG FIX' :
-      scenario.type === 'add-functionality' ? 'ADD FUNCTIONALITY' :
-        scenario.type.toUpperCase()
+    const problemType =
+      scenario.type === "bugfix"
+        ? "BUG FIX"
+        : scenario.type === "add-functionality"
+          ? "ADD FUNCTIONALITY"
+          : scenario.type.toUpperCase()
     // Different initial message for DSA vs other scenarios
-    const isDSA = scenario.type === 'dsa'
+    const isDSA = scenario.type === "dsa"
     const initialMessage = isDSA
       ? `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${scenario.title}**, a ${scenario.difficulty} ${problemType} problem.
 
@@ -1908,10 +2049,12 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     setInterviewerMessages([{ type: "ai", message: initialMessage }])
     // Only set chat messages for non-DSA scenarios (DSA has no AI partner)
     if (!isDSA) {
-      setChatMessages([{
-        type: "ai",
-        message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
-      }])
+      setChatMessages([
+        {
+          type: "ai",
+          message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
+        },
+      ])
     } else {
       setChatMessages([]) // Clear chat messages for DSA
     }
@@ -1922,31 +2065,31 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
   const resetInterview = async () => {
     // Update session if it exists and was completed
-    const isSystemDesign = selectedScenario?.type === 'system-design'
+    const isSystemDesign = selectedScenario?.type === "system-design"
     const hasTests = testSummary.total > 0
-    const shouldUpdate = currentSessionId && (showFeedback || showPostInterviewDiscussion) && (hasTests || isSystemDesign)
+    const shouldUpdate =
+      currentSessionId &&
+      (showFeedback || showPostInterviewDiscussion) &&
+      (hasTests || isSystemDesign)
 
     if (shouldUpdate) {
       try {
         // Use performance score if available (already 0-100), otherwise use pass rate
-        const scoreToSave = performanceScore !== null ? performanceScore : (hasTests ? testSummary.passRate : 0)
+        const scoreToSave =
+          performanceScore !== null ? performanceScore : hasTests ? testSummary.passRate : 0
         const feedbackText = isSystemDesign
           ? comprehensiveFeedback || `Completed system design interview: ${selectedScenario?.title}`
-          : comprehensiveFeedback || `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
+          : comprehensiveFeedback ||
+            `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
 
-        await updateInterviewSession(
-          currentSessionId,
-          scoreToSave,
-          feedbackText,
-          {
-            code: code || (isSystemDesign ? '// Design notes' : ''),
-            language: isSystemDesign ? 'notes' : selectedLanguage,
-            testResults: hasTests ? testResults : undefined,
-            timeComplexity: efficiencyMetrics?.estimatedTimeComplexity,
-            spaceComplexity: efficiencyMetrics?.estimatedSpaceComplexity,
-            efficiencyScore: efficiencyMetrics?.efficiencyScore,
-          }
-        )
+        await updateInterviewSession(currentSessionId, scoreToSave, feedbackText, {
+          code: code || (isSystemDesign ? "// Design notes" : ""),
+          language: isSystemDesign ? "notes" : selectedLanguage,
+          testResults: hasTests ? testResults : undefined,
+          timeComplexity: efficiencyMetrics?.estimatedTimeComplexity,
+          spaceComplexity: efficiencyMetrics?.estimatedSpaceComplexity,
+          efficiencyScore: efficiencyMetrics?.efficiencyScore,
+        })
 
         // Store system design notes if not already stored
         if (isSystemDesign && selectedScenario?.id && user) {
@@ -1958,11 +2101,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               userId: user.id,
               problemId: selectedScenario.id,
               problemTitle: selectedScenario.title,
-              solutionCode: code.trim() || '// Design discussion completed via chat',
-              language: 'notes',
+              solutionCode: code.trim() || "// Design discussion completed via chat",
+              language: "notes",
               passed: true,
               score: scoreToSave,
-              problemType: 'system-design',
+              problemType: "system-design",
             }),
           }).catch((err) => {
             console.error("System design solution storage error (non-blocking):", err)
@@ -1977,11 +2120,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     // CodeMirror 6 handles cleanup automatically through React lifecycle
 
     // Clear URL params when resetting
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       const url = new URL(window.location.href)
-      url.searchParams.delete('session')
-      url.searchParams.delete('scenario')
-      window.history.replaceState({}, '', url.toString())
+      url.searchParams.delete("session")
+      url.searchParams.delete("scenario")
+      window.history.replaceState({}, "", url.toString())
     }
 
     // Clear auto-save data to prevent "session restored" toast on next visit
@@ -2110,25 +2253,29 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
   const aiUsageTips = [
     {
       title: "Ask Strategic Questions",
-      description: "Don't ask the AI to solve the problem. Instead, ask about specific concepts: 'What data structure is best for O(1) lookups?' or 'How does the two-pointer technique work?'",
+      description:
+        "Don't ask the AI to solve the problem. Instead, ask about specific concepts: 'What data structure is best for O(1) lookups?' or 'How does the two-pointer technique work?'",
       good: "What's the time complexity of using a hash map vs array for lookups?",
       bad: "Can you solve this two-sum problem for me?",
     },
     {
       title: "Explain Your Thinking",
-      description: "Share your approach before asking for help. This shows the interviewer you're thinking, and helps the AI give more relevant hints.",
+      description:
+        "Share your approach before asking for help. This shows the interviewer you're thinking, and helps the AI give more relevant hints.",
       good: "I'm thinking of using nested loops but worried about O(n²). Is there a better approach?",
       bad: "What should I do?",
     },
     {
       title: "Debug with Context",
-      description: "When debugging, provide specific context about what's failing and what you've tried.",
+      description:
+        "When debugging, provide specific context about what's failing and what you've tried.",
       good: "My code returns [1,2] but expected [2,1]. I think the issue is in my sorting logic. Can you help me trace through it?",
       bad: "Why isn't my code working?",
     },
     {
       title: "Verify Understanding",
-      description: "After getting a hint, explain it back in your own words. This shows the interviewer you understand, not just copy.",
+      description:
+        "After getting a hint, explain it back in your own words. This shows the interviewer you understand, not just copy.",
       good: "So you're suggesting I use a hash map because lookup is O(1)? Let me implement that.",
       bad: "*copies suggestion without explanation*",
     },
@@ -2164,26 +2311,26 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         // Start recording
         // Reset the transcript before starting
         voice.resetTranscript()
-        setInput('')
+        setInput("")
         await voice.startRecording()
         // Always show simplified voice feedback
         toast.success("Speak now - sends automatically when you pause", {
           duration: 2000,
-          icon: '🎙️',
+          icon: "🎙️",
         })
         // Removed manual mode branch - always auto-send now
         if (false) {
           toast.success("Recording... Click mic again to stop", {
             duration: 2000,
-            icon: '🎤',
+            icon: "🎤",
           })
         }
       }
     } catch (err: any) {
-      console.error('Voice recording error:', err)
-      if (err.message?.includes('denied') || err.message?.includes('NotAllowed')) {
+      console.error("Voice recording error:", err)
+      if (err.message?.includes("denied") || err.message?.includes("NotAllowed")) {
         toast.error("Microphone access denied. Please allow microphone access in your browser.")
-      } else if (err.message?.includes('NotFound')) {
+      } else if (err.message?.includes("NotFound")) {
         toast.error("No microphone found. Please connect a microphone and try again.")
       } else {
         toast.error("Voice input error. Please try again.")
@@ -2206,11 +2353,25 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
       // Check if user wants to end the session
       const conclusionSignals = [
-        "no thanks", "no thank", "no, thanks", "i'm done", "im done", "done",
-        "conclude", "end session", "that's all", "thats all", "nothing else",
-        "no questions", "i'm good", "im good", "all good", "let's wrap", "lets wrap"
+        "no thanks",
+        "no thank",
+        "no, thanks",
+        "i'm done",
+        "im done",
+        "done",
+        "conclude",
+        "end session",
+        "that's all",
+        "thats all",
+        "nothing else",
+        "no questions",
+        "i'm good",
+        "im good",
+        "all good",
+        "let's wrap",
+        "lets wrap",
       ]
-      const isEndingSession = conclusionSignals.some(signal =>
+      const isEndingSession = conclusionSignals.some((signal) =>
         input.toLowerCase().includes(signal)
       )
 
@@ -2219,7 +2380,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         const userProfile = user ? await getUserProfile(user.id) : null
 
         // Extract name for personalization
-        let userName = user?.user_metadata?.full_name || userProfile?.full_name || user?.email?.split("@")[0] || ""
+        const userName =
+          user?.user_metadata?.full_name ||
+          userProfile?.full_name ||
+          user?.email?.split("@")[0] ||
+          ""
 
         // Add post-interview context if in that phase
         let additionalContext = ""
@@ -2236,12 +2401,14 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             message: input + additionalContext,
             context: messages,
             role: isInterviewer ? "interviewer" : "partner",
-            userContext: userProfile ? {
-              email: user?.email,
-              full_name: userName,
-              subscription_tier: userProfile.subscription_tier,
-              sessions_used: usageLimit?.used || 0,
-            } : undefined,
+            userContext: userProfile
+              ? {
+                  email: user?.email,
+                  full_name: userName,
+                  subscription_tier: userProfile.subscription_tier,
+                  sessions_used: usageLimit?.used || 0,
+                }
+              : undefined,
             workspaceContext: workspaceContext,
             currentCode: code,
             scenarioTitle: selectedScenario?.title,
@@ -2254,11 +2421,42 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
         const data = await response.json()
 
+        // Check if conversation has ended (AI already said goodbye)
+        if (data.conversationEnded) {
+          // Show end session prompt instead of continuing conversation
+          toast.info(
+            data.endMessage || "Session complete! Click 'End Session' to see your feedback.",
+            {
+              duration: 5000,
+              action: {
+                label: "End Session",
+                onClick: proceedToFinalFeedback,
+              },
+            }
+          )
+          // Don't add any message - just prompt to end
+          return
+        }
+
         if (data.reply) {
           setMessages((prev) => [...prev, { type: "ai", message: data.reply }])
 
+          // Check if this is the final farewell response
+          if (data.conversationEnded === true) {
+            // Show prompt to end session after the final message
+            setTimeout(() => {
+              toast.info("Click 'End Session' to see your detailed feedback and score.", {
+                duration: 8000,
+                action: {
+                  label: "End Session",
+                  onClick: proceedToFinalFeedback,
+                },
+              })
+            }, 1500) // Wait for message to appear first
+          }
+
           // For system design interviews, store design notes when session ends
-          const isSystemDesign = selectedScenario?.type === 'system-design'
+          const isSystemDesign = selectedScenario?.type === "system-design"
           if (isSystemDesign && isEndingSession && selectedScenario?.id && user) {
             // Store design notes (even if empty - chat-only submission)
             fetch("/api/rag", {
@@ -2269,11 +2467,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 userId: user.id,
                 problemId: selectedScenario.id,
                 problemTitle: selectedScenario.title,
-                solutionCode: code.trim() || '// Design discussion completed via chat',
-                language: 'notes',
+                solutionCode: code.trim() || "// Design discussion completed via chat",
+                language: "notes",
                 passed: true, // System design has no tests
                 score: 0, // Will be calculated by feedback system
-                problemType: 'system-design',
+                problemType: "system-design",
               }),
             }).catch((err) => {
               console.error("System design solution storage error (non-blocking):", err)
@@ -2287,7 +2485,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         }
       } catch (error) {
         console.error("Chat error:", error)
-        setMessages((prev) => [...prev, { type: "ai", message: "Sorry, I couldn't process that. Please try again." }])
+        setMessages((prev) => [
+          ...prev,
+          { type: "ai", message: "Sorry, I couldn't process that. Please try again." },
+        ])
         toast.error("Failed to send message", {
           description: "Network error. Please check your connection and try again.",
           action: {
@@ -2303,18 +2504,26 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
   const analyzeCodeEfficiency = (code: string) => {
     // Calculate lines of code (excluding empty lines and comments)
-    const lines = code.split('\n')
-    const linesOfCode = lines.filter(line => {
+    const lines = code.split("\n")
+    const linesOfCode = lines.filter((line) => {
       const trimmed = line.trim()
-      return trimmed.length > 0 && !trimmed.startsWith('//') && !trimmed.startsWith('/*') && !trimmed.startsWith('*')
+      return (
+        trimmed.length > 0 &&
+        !trimmed.startsWith("//") &&
+        !trimmed.startsWith("/*") &&
+        !trimmed.startsWith("*")
+      )
     }).length
 
     // Basic complexity estimation based on control structures
-    const controlStructures = (code.match(/\b(if|else|for|while|switch|case|catch)\b/g) || []).length
-    const complexityLevel = controlStructures <= 3 ? "Low" : controlStructures <= 7 ? "Medium" : "High"
+    const controlStructures = (code.match(/\b(if|else|for|while|switch|case|catch)\b/g) || [])
+      .length
+    const complexityLevel =
+      controlStructures <= 3 ? "Low" : controlStructures <= 7 ? "Medium" : "High"
 
     // Estimate time complexity based on nested loops
-    const nestedLoopCount = (code.match(/for.*{[^}]*for/g) || []).length +
+    const nestedLoopCount =
+      (code.match(/for.*{[^}]*for/g) || []).length +
       (code.match(/while.*{[^}]*while/g) || []).length
     let estimatedTimeComplexity = "O(n)"
     if (nestedLoopCount >= 2) {
@@ -2326,10 +2535,31 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     }
 
     // Estimate space complexity based on data structures
-    const hasHashMap = code.includes("Map") || code.includes("Set") || code.includes("Object") || code.includes("{}")
-    const hasArray = code.includes("[") || code.includes("Array")
+    // Only count CREATION of new data structures, not access/indexing
+    const hasHashMapCreation =
+      /new\s+Map\s*\(/.test(code) || // new Map()
+      /new\s+Set\s*\(/.test(code) || // new Set()
+      /=\s*\{\s*\}/.test(code) || // = {} (empty object literal)
+      /dict\s*\(\s*\)/.test(code) || // dict() in Python
+      /set\s*\(\s*\)/.test(code) || // set() in Python
+      /defaultdict\s*\(/.test(code) || // defaultdict in Python
+      /Counter\s*\(/.test(code) // Counter in Python
+
+    // Detect array CREATION, not just indexing
+    const hasArrayCreation =
+      /=\s*\[\s*\]/.test(code) || // = [] (empty array literal)
+      /=\s*\[[^\]]+\](?!\s*=)/.test(code) || // = [items] (array literal with items)
+      /new\s+Array\s*\(/.test(code) || // new Array()
+      /Array\s*\.\s*from\s*\(/.test(code) || // Array.from()
+      /list\s*\(\s*\)/.test(code) || // list() in Python
+      /\.split\s*\(/.test(code) || // .split() creates new array
+      /\.slice\s*\(/.test(code) || // .slice() creates new array
+      /\.map\s*\(/.test(code) || // .map() creates new array
+      /\.filter\s*\(/.test(code) || // .filter() creates new array
+      /\[\s*for\s+/.test(code) // [x for x in ...] list comprehension
+
     let estimatedSpaceComplexity = "O(1)"
-    if (hasHashMap || hasArray) {
+    if (hasHashMapCreation || hasArrayCreation) {
       estimatedSpaceComplexity = "O(n)"
     }
 
@@ -2376,7 +2606,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
   }
 
   const submitSystemDesign = async () => {
-    if (!selectedScenario || selectedScenario.type !== 'system-design') return
+    if (!selectedScenario || selectedScenario.type !== "system-design") return
 
     setIsRunningTests(true) // Reuse this state for loading indicator
 
@@ -2385,7 +2615,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       await triggerSystemDesignFeedback()
 
       // Show success feedback
-      playSound('success')
+      playSound("success")
       toast.success("Design submitted!", {
         description: "Your design notes have been saved. Review your feedback below.",
       })
@@ -2407,7 +2637,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     setIsGeneratingDiscussion(true)
 
     try {
-      if (!selectedScenario || selectedScenario.type !== 'system-design') {
+      if (!selectedScenario || selectedScenario.type !== "system-design") {
         return
       }
 
@@ -2455,16 +2685,16 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       // Prepare conversation transcript for content-based evaluation
       // This allows the AI to evaluate WHAT was said, not just message counts
       const conversationTranscript = [
-        ...interviewerMessages.map(m => ({
-          role: m.type === 'user' ? 'candidate' : 'interviewer',
+        ...interviewerMessages.map((m) => ({
+          role: m.type === "user" ? "candidate" : "interviewer",
           content: m.message,
-          timestamp: m.timestamp
+          timestamp: m.timestamp,
         })),
-        ...chatMessages.map(m => ({
-          role: m.type === 'user' ? 'candidate' : 'ai_partner',
+        ...chatMessages.map((m) => ({
+          role: m.type === "user" ? "candidate" : "ai_partner",
           content: m.message,
-          timestamp: m.timestamp
-        }))
+          timestamp: m.timestamp,
+        })),
       ].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
 
       // Generate feedback using the feedback API
@@ -2472,14 +2702,14 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          code: code || '// Design notes completed via discussion',
+          code: code || "// Design notes completed via discussion",
           scenarioTitle: selectedScenario.title,
           scenarioType: selectedScenario.type,
           scenarioId: selectedScenario.id,
           scenarioDifficulty: selectedScenario.difficulty,
           scenarioPattern: (selectedScenario as any)?.pattern,
           testResults: [], // No tests for system design
-          language: 'notes',
+          language: "notes",
           timeSpent: elapsedTime,
           aiCollaborationMetrics,
           interactionMetrics,
@@ -2507,8 +2737,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             calculatedPerformanceScore,
             comprehensiveFeedback,
             {
-              code: code || '// Design notes',
-              language: 'notes',
+              code: code || "// Design notes",
+              language: "notes",
               testResults: [],
             }
           )
@@ -2516,16 +2746,16 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           // Track session completion for user stats (async, non-blocking)
           trackSessionCompletion({
             sessionId: currentSessionId,
-            finalCode: code || '// Design notes',
-            language: 'notes',
+            finalCode: code || "// Design notes",
+            language: "notes",
             testsPassed: 1, // System design counts as passed
             testsTotal: 1,
             efficiencyScore: 50, // Not applicable for system design
             communicationScore: calculatedPerformanceScore,
-          }).catch(err => console.error("Session metrics tracking failed:", err))
+          }).catch((err) => console.error("Session metrics tracking failed:", err))
 
           // Mark question complete in roadmap if user came from roadmap
-          const isFromRoadmap = searchParams.get('from') === 'roadmap'
+          const isFromRoadmap = searchParams.get("from") === "roadmap"
           if (isFromRoadmap && selectedScenario && activeRoadmap) {
             markQuestionCompleted(selectedScenario.id, calculatedPerformanceScore)
             const minutesSpent = Math.round(elapsedTime / 60)
@@ -2545,11 +2775,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 userId: user.id,
                 problemId: selectedScenario.id,
                 problemTitle: selectedScenario.title,
-                solutionCode: code.trim() || '// Design discussion completed',
-                language: 'notes',
+                solutionCode: code.trim() || "// Design discussion completed",
+                language: "notes",
                 passed: true,
                 score: calculatedPerformanceScore,
-                problemType: 'system-design',
+                problemType: "system-design",
               }),
             }).catch((err) => {
               console.error("Solution storage error (non-blocking):", err)
@@ -2561,16 +2791,16 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       } else if (currentSessionId && isGuestMode && guestId) {
         // Guest user - save completion data via API
         try {
-          await fetch('/api/guest-session', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+          await fetch("/api/guest-session", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               sessionId: currentSessionId,
               guestId,
               performanceScore: calculatedPerformanceScore,
               feedback: comprehensiveFeedback,
-              finalCode: code || '// Design notes',
-              language: 'notes',
+              finalCode: code || "// Design notes",
+              language: "notes",
               testResults: [],
             }),
           })
@@ -2592,10 +2822,12 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           message: finalMessage,
           context: interviewerMessages,
           role: "interviewer",
-          userContext: user ? {
-            email: user.email,
-            full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "",
-          } : undefined,
+          userContext: user
+            ? {
+                email: user.email,
+                full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "",
+              }
+            : undefined,
           currentCode: code,
           scenarioTitle: selectedScenario?.title,
           scenarioType: selectedScenario?.type,
@@ -2648,23 +2880,30 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         const errorMessage = data.error || `Server error (${response.status})`
 
         // Show error in console instead of just toast
-        setConsoleLogs([{ type: 'error', message: `❌ Execution Error: ${errorMessage}`, timestamp: Date.now() }])
-        setTestResults([{
-          description: "Execution Error",
-          passed: false,
-          error: errorMessage,
-          input: "",
-          expected: "",
-          actual: ""
-        }])
+        setConsoleLogs([
+          { type: "error", message: `❌ Execution Error: ${errorMessage}`, timestamp: Date.now() },
+        ])
+        setTestResults([
+          {
+            description: "Execution Error",
+            passed: false,
+            error: errorMessage,
+            input: "",
+            expected: "",
+            actual: "",
+          },
+        ])
 
         // Add interviewer message about the error
-        setInterviewerMessages(prev => [...prev, {
-          type: 'ai',
-          message: `There was a problem running your code: ${errorMessage}. Check that your function name matches what the problem expects, and try again.`
-        }])
+        setInterviewerMessages((prev) => [
+          ...prev,
+          {
+            type: "ai",
+            message: `There was a problem running your code: ${errorMessage}. Check that your function name matches what the problem expects, and try again.`,
+          },
+        ])
 
-        playSound('fail')
+        playSound("fail")
         setIsRunningTests(false)
         return
       }
@@ -2687,37 +2926,40 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           const firstError = errorResults[0].error
 
           // Check if it's a syntax or compilation error
-          const isSyntaxError = firstError && (
-            firstError.includes('SyntaxError') ||
-            firstError.includes('Compilation error') ||
-            firstError.includes('Unexpected token') ||
-            firstError.includes('unexpected token') ||
-            firstError.includes('Parse error') ||
-            firstError.includes('IndentationError') ||
-            firstError.includes('invalid syntax')
-          )
+          const isSyntaxError =
+            firstError &&
+            (firstError.includes("SyntaxError") ||
+              firstError.includes("Compilation error") ||
+              firstError.includes("Unexpected token") ||
+              firstError.includes("unexpected token") ||
+              firstError.includes("Parse error") ||
+              firstError.includes("IndentationError") ||
+              firstError.includes("invalid syntax"))
 
           // Keep user in editing mode so they can fix the error
           // Console panel will show the error - no need for toast
-          playSound('fail')
+          playSound("fail")
           setIsRunningTests(false)
 
           // Add a helpful message from the interviewer about the error
-          setInterviewerMessages(prev => [...prev, {
-            type: 'ai',
-            message: `I see there's ${isSyntaxError ? 'a syntax error' : 'an error'} in your code. Check the console below the editor - it shows exactly what went wrong. Let me know if you'd like help understanding the error.`
-          }])
+          setInterviewerMessages((prev) => [
+            ...prev,
+            {
+              type: "ai",
+              message: `I see there's ${isSyntaxError ? "a syntax error" : "an error"} in your code. Check the console below the editor - it shows exactly what went wrong. Let me know if you'd like help understanding the error.`,
+            },
+          ])
 
           return // Don't proceed to post-interview discussion
         }
 
         // Play sound based on results
         if (data.summary.passRate === 100) {
-          playSound('success')
+          playSound("success")
         } else if (data.summary.passRate >= 50) {
-          playSound('milestone')
+          playSound("milestone")
         } else {
-          playSound('fail')
+          playSound("fail")
         }
 
         // Just show results - don't auto-trigger submission
@@ -2768,22 +3010,29 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         const errorMessage = data.error || `Server error (${response.status})`
 
         // Show error in console instead of just toast
-        setConsoleLogs([{ type: 'error', message: `❌ Execution Error: ${errorMessage}`, timestamp: Date.now() }])
-        setTestResults([{
-          description: "Execution Error",
-          passed: false,
-          error: errorMessage,
-          input: "",
-          expected: "",
-          actual: ""
-        }])
+        setConsoleLogs([
+          { type: "error", message: `❌ Execution Error: ${errorMessage}`, timestamp: Date.now() },
+        ])
+        setTestResults([
+          {
+            description: "Execution Error",
+            passed: false,
+            error: errorMessage,
+            input: "",
+            expected: "",
+            actual: "",
+          },
+        ])
 
-        setInterviewerMessages(prev => [...prev, {
-          type: 'ai',
-          message: `There was a problem running your code: ${errorMessage}. Check that your function name matches what the problem expects, and try again.`
-        }])
+        setInterviewerMessages((prev) => [
+          ...prev,
+          {
+            type: "ai",
+            message: `There was a problem running your code: ${errorMessage}. Check that your function name matches what the problem expects, and try again.`,
+          },
+        ])
 
-        playSound('fail')
+        playSound("fail")
         setIsRunningTests(false)
         return
       }
@@ -2803,31 +3052,33 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
         if (allFailed && errorResults.length > 0) {
           const firstError = errorResults[0].error
-          const isSyntaxError = firstError && (
-            firstError.includes('SyntaxError') ||
-            firstError.includes('Compilation error') ||
-            firstError.includes('Unexpected token') ||
-            firstError.includes('unexpected token') ||
-            firstError.includes('Parse error') ||
-            firstError.includes('IndentationError') ||
-            firstError.includes('invalid syntax')
-          )
+          const isSyntaxError =
+            firstError &&
+            (firstError.includes("SyntaxError") ||
+              firstError.includes("Compilation error") ||
+              firstError.includes("Unexpected token") ||
+              firstError.includes("unexpected token") ||
+              firstError.includes("Parse error") ||
+              firstError.includes("IndentationError") ||
+              firstError.includes("invalid syntax"))
 
-          playSound('fail')
+          playSound("fail")
           setIsRunningTests(false)
           toast.error("Fix errors before submitting", {
-            description: isSyntaxError ? "There's a syntax error in your code." : "Your code has errors that need to be fixed.",
+            description: isSyntaxError
+              ? "There's a syntax error in your code."
+              : "Your code has errors that need to be fixed.",
           })
           return
         }
 
         // Play sound based on results
         if (data.summary.passRate === 100) {
-          playSound('success')
+          playSound("success")
         } else if (data.summary.passRate >= 50) {
-          playSound('milestone')
+          playSound("milestone")
         } else {
-          playSound('fail')
+          playSound("fail")
         }
 
         // Proceed to post-interview discussion
@@ -2853,8 +3104,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+      <main className="flex min-h-screen items-center justify-center bg-black">
+        <div className="text-xl text-white">Loading...</div>
       </main>
     )
   }
@@ -2874,11 +3125,13 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
       {/* Guest Mode Banner - Sticky below header */}
       {isGuestMode && !showFeedback && (
-        <div className="fixed top-[64px] left-0 right-0 z-40 bg-gradient-to-r from-accent/20 to-purple-600/20 border-b border-accent/30 backdrop-blur-sm">
-          <div className="container mx-auto px-4 py-2 flex items-center justify-between text-sm">
+        <div className="from-accent/20 border-accent/30 fixed top-[64px] right-0 left-0 z-40 border-b bg-gradient-to-r to-purple-600/20 backdrop-blur-sm">
+          <div className="container mx-auto flex items-center justify-between px-4 py-2 text-sm">
             <div className="flex items-center gap-2">
               <span className="text-accent font-medium">Free Trial</span>
-              <span className="text-muted-foreground hidden sm:inline">Complete this interview to see your AI-powered feedback</span>
+              <span className="text-muted-foreground hidden sm:inline">
+                Complete this interview to see your AI-powered feedback
+              </span>
             </div>
             <button
               onClick={() => router.push("/login?redirect=interview")}
@@ -2906,22 +3159,34 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       {/* Interview Interface */}
       {!showScenarioBrowser && (
         <section
-          className={`pt-2 pb-2 bg-gradient-to-b from-gray-900 to-black flex flex-col ${isResultView ? "min-h-screen overflow-x-hidden overflow-y-auto" : "h-screen overflow-hidden"
-            }`}
+          className={`flex flex-col bg-gradient-to-b from-gray-900 to-black pt-2 pb-2 ${
+            isResultView
+              ? "min-h-screen overflow-x-hidden overflow-y-auto"
+              : "h-screen overflow-hidden"
+          }`}
         >
-          <div className={`container mx-auto px-2 flex-1 flex flex-col ${isResultView ? "overflow-visible" : "overflow-hidden"}`}>
-            <div className={`w-full mx-auto flex-1 flex flex-col gap-1 ${isResultView ? "overflow-visible" : "overflow-hidden"}`}>
+          <div
+            className={`container mx-auto flex flex-1 flex-col px-2 ${isResultView ? "overflow-visible" : "overflow-hidden"}`}
+          >
+            <div
+              className={`mx-auto flex w-full flex-1 flex-col gap-1 ${isResultView ? "overflow-visible" : "overflow-hidden"}`}
+            >
               {/* Compact Top Bar - Cognitive Load Optimized */}
-              <div className="flex items-center justify-between flex-shrink-0 pt-2 gap-2">
+              <div className="flex flex-shrink-0 items-center justify-between gap-2 pt-2">
                 {/* Left: Problem info */}
-                <div className="flex items-center space-x-2 min-w-0 flex-1">
-                  <h2 className="text-white text-sm font-semibold truncate max-w-[200px] sm:max-w-md">
+                <div className="flex min-w-0 flex-1 items-center space-x-2">
+                  <h2 className="max-w-[200px] truncate text-sm font-semibold text-white sm:max-w-md">
                     {selectedScenario?.title}
                   </h2>
-                  <Badge className={`${selectedScenario?.difficulty === "easy" ? "bg-green-600/20 text-green-400" :
-                    selectedScenario?.difficulty === "medium" ? "bg-yellow-600/20 text-yellow-400" :
-                      "bg-red-600/20 text-red-400"
-                    } text-xs shrink-0`}>
+                  <Badge
+                    className={`${
+                      selectedScenario?.difficulty === "easy"
+                        ? "bg-green-600/20 text-green-400"
+                        : selectedScenario?.difficulty === "medium"
+                          ? "bg-yellow-600/20 text-yellow-400"
+                          : "bg-red-600/20 text-red-400"
+                    } shrink-0 text-xs`}
+                  >
                     {selectedScenario?.difficulty?.toUpperCase()}
                   </Badge>
                   {/* Language Selector - hidden on mobile */}
@@ -2932,12 +3197,13 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       setSelectedLanguage(newLang)
                       if (!isLanguageSupported(newLang)) {
                         toast.warning(`${newLang.toUpperCase()} execution coming soon`, {
-                          description: "You can write code, but tests won't run. Use JavaScript or Python for full support.",
+                          description:
+                            "You can write code, but tests won't run. Use JavaScript or Python for full support.",
                           duration: 5000,
                         })
                       }
                     }}
-                    className="hidden sm:block bg-gray-800 border border-gray-600 text-white rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#00d9ff]"
+                    className="hidden rounded-md border border-gray-600 bg-gray-800 px-2 py-1 text-xs text-white focus:ring-2 focus:ring-[#00d9ff] focus:outline-none sm:block"
                   >
                     <option value="javascript">JavaScript</option>
                     <option value="typescript">TypeScript</option>
@@ -2951,33 +3217,36 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 </div>
 
                 {/* Center: Mobile Panel Switcher (visible only on mobile/tablet) */}
-                <div className="flex lg:hidden items-center gap-1 bg-gray-800/50 rounded-lg p-0.5">
+                <div className="flex items-center gap-1 rounded-lg bg-gray-800/50 p-0.5 lg:hidden">
                   <button
-                    onClick={() => setActivePanel('problem')}
-                    className={`px-2.5 py-1 rounded text-[10px] font-medium transition-all ${activePanel === 'problem'
-                        ? 'bg-accent text-accent-foreground'
-                        : 'text-muted-foreground hover:text-foreground'
-                      }`}
+                    onClick={() => setActivePanel("problem")}
+                    className={`rounded px-2.5 py-1 text-[10px] font-medium transition-all ${
+                      activePanel === "problem"
+                        ? "bg-accent text-accent-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
                     title="Problem"
                   >
                     <Target className="h-3 w-3" />
                   </button>
                   <button
-                    onClick={() => setActivePanel('editor')}
-                    className={`px-2.5 py-1 rounded text-[10px] font-medium transition-all ${activePanel === 'editor'
-                        ? 'bg-accent text-accent-foreground'
-                        : 'text-muted-foreground hover:text-foreground'
-                      }`}
+                    onClick={() => setActivePanel("editor")}
+                    className={`rounded px-2.5 py-1 text-[10px] font-medium transition-all ${
+                      activePanel === "editor"
+                        ? "bg-accent text-accent-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
                     title="Code Editor"
                   >
                     <Code className="h-3 w-3" />
                   </button>
                   <button
-                    onClick={() => setActivePanel('chat')}
-                    className={`px-2.5 py-1 rounded text-[10px] font-medium transition-all ${activePanel === 'chat'
-                        ? 'bg-accent text-accent-foreground'
-                        : 'text-muted-foreground hover:text-foreground'
-                      }`}
+                    onClick={() => setActivePanel("chat")}
+                    className={`rounded px-2.5 py-1 text-[10px] font-medium transition-all ${
+                      activePanel === "chat"
+                        ? "bg-accent text-accent-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
                     title="Interview Chat"
                   >
                     <Brain className="h-3 w-3" />
@@ -2985,22 +3254,28 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 </div>
 
                 {/* Right: Actions - Research-backed controls for cognitive load reduction */}
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex shrink-0 items-center gap-1.5">
                   {/* Timer with hide toggle - WCAG 2.1: Let users manage time on their terms */}
                   {isInterviewStarted && (
-                    <div className="flex items-center bg-secondary/50 rounded-lg overflow-hidden">
+                    <div className="bg-secondary/50 flex items-center overflow-hidden rounded-lg">
                       {!hideTimer && (
                         <div className="flex items-center space-x-1.5 px-2 py-1">
-                          <Clock className="h-3 w-3 text-accent" />
-                          <span className="text-xs font-mono text-foreground">{formatTime(elapsedTime)}</span>
+                          <Clock className="text-accent h-3 w-3" />
+                          <span className="text-foreground font-mono text-xs">
+                            {formatTime(elapsedTime)}
+                          </span>
                         </div>
                       )}
                       <button
                         onClick={() => setHideTimer(!hideTimer)}
-                        className="px-1.5 py-1 hover:bg-secondary/80 transition-colors"
+                        className="hover:bg-secondary/80 px-1.5 py-1 transition-colors"
                         title={hideTimer ? "Show timer" : "Hide timer (reduce time pressure)"}
                       >
-                        {hideTimer ? <EyeOff className="h-3 w-3 text-muted-foreground" /> : <Eye className="h-3 w-3 text-muted-foreground" />}
+                        {hideTimer ? (
+                          <EyeOff className="text-muted-foreground h-3 w-3" />
+                        ) : (
+                          <Eye className="text-muted-foreground h-3 w-3" />
+                        )}
                       </button>
                     </div>
                   )}
@@ -3008,14 +3283,15 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   {/* Calm Mode Toggle - Research: Muted colors reduce anxiety */}
                   <button
                     onClick={() => setCalmMode(!calmMode)}
-                    className={`hidden sm:flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all ${calmMode
-                        ? 'bg-neural/20 text-neural border border-neural/30'
-                        : 'bg-secondary/50 text-muted-foreground hover:text-foreground'
-                      }`}
+                    className={`hidden items-center gap-1 rounded-lg px-2 py-1 text-xs transition-all sm:flex ${
+                      calmMode
+                        ? "bg-neural/20 text-neural border-neural/30 border"
+                        : "bg-secondary/50 text-muted-foreground hover:text-foreground"
+                    }`}
                     title={calmMode ? "Exit Calm Mode" : "Calm Mode (muted colors for focus)"}
                   >
                     <Leaf className="h-3 w-3" />
-                    <span className="hidden lg:inline">{calmMode ? 'Calm' : 'Calm'}</span>
+                    <span className="hidden lg:inline">{calmMode ? "Calm" : "Calm"}</span>
                   </button>
 
                   {/* Focus Mode Toggle - Desktop only */}
@@ -3028,21 +3304,26 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         setCalmMode(true)
                       }
                     }}
-                    className={`hidden lg:flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all ${focusMode
-                        ? 'bg-accent text-accent-foreground'
-                        : 'bg-secondary/50 text-muted-foreground hover:text-foreground'
-                      }`}
+                    className={`hidden items-center gap-1 rounded-lg px-2 py-1 text-xs transition-all lg:flex ${
+                      focusMode
+                        ? "bg-accent text-accent-foreground"
+                        : "bg-secondary/50 text-muted-foreground hover:text-foreground"
+                    }`}
                     title={focusMode ? "Exit Focus Mode" : "Focus Mode (editor only + calm colors)"}
                   >
-                    {focusMode ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
-                    <span className="hidden xl:inline">{focusMode ? 'Exit Focus' : 'Focus'}</span>
+                    {focusMode ? (
+                      <Minimize2 className="h-3 w-3" />
+                    ) : (
+                      <Maximize2 className="h-3 w-3" />
+                    )}
+                    <span className="hidden xl:inline">{focusMode ? "Exit Focus" : "Focus"}</span>
                   </button>
 
                   <Button
                     onClick={() => setShowCloseDialog(true)}
                     variant="outline"
                     size="sm"
-                    className="border-border text-muted-foreground hover:bg-secondary bg-transparent h-7 text-xs"
+                    className="border-border text-muted-foreground hover:bg-secondary h-7 bg-transparent text-xs"
                   >
                     <ArrowLeft className="mr-1 h-3 w-3" />
                     <span className="hidden sm:inline">Close</span>
@@ -3063,56 +3344,76 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               ═══════════════════════════════════════════════════════════════ */}
               {!showFeedback && !showPostInterviewDiscussion ? (
                 <div
-                  className={`relative grid gap-1.5 sm:gap-2 flex-1 min-h-0 overflow-hidden transition-all duration-300 ${focusMode
-                      ? 'grid-cols-1' // Focus mode: editor only
-                      : 'grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_260px] xl:grid-cols-[320px_minmax(0,1fr)_300px] 2xl:grid-cols-[380px_minmax(0,1fr)_340px]'
-                    }`}
+                  className={`relative grid min-h-0 flex-1 gap-1.5 overflow-hidden transition-all duration-300 sm:gap-2 ${
+                    focusMode
+                      ? "grid-cols-1" // Focus mode: editor only
+                      : "grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_260px] xl:grid-cols-[320px_minmax(0,1fr)_300px] 2xl:grid-cols-[380px_minmax(0,1fr)_340px]"
+                  }`}
                 >
                   {/* Focus Mode: Floating problem peek button */}
                   {focusMode && selectedScenario && (
                     <button
                       onClick={() => setShowProblemPeek(!showProblemPeek)}
-                      className={`fixed top-20 left-4 z-50 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all shadow-lg ${
+                      className={`fixed top-20 left-4 z-50 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium shadow-lg transition-all ${
                         showProblemPeek
-                          ? 'bg-accent text-accent-foreground'
-                          : 'bg-gray-800/90 text-gray-300 hover:bg-gray-700/90 border border-gray-600'
+                          ? "bg-accent text-accent-foreground"
+                          : "border border-gray-600 bg-gray-800/90 text-gray-300 hover:bg-gray-700/90"
                       }`}
                       title="Peek at problem description"
                     >
                       <Target className="h-3.5 w-3.5" />
-                      <span>{showProblemPeek ? 'Hide Problem' : 'Show Problem'}</span>
+                      <span>{showProblemPeek ? "Hide Problem" : "Show Problem"}</span>
                     </button>
                   )}
 
                   {/* Focus Mode: Problem peek overlay */}
                   {focusMode && showProblemPeek && selectedScenario && (
-                    <div className="fixed top-32 left-4 z-40 w-96 max-h-[60vh] bg-gray-900/95 backdrop-blur-sm border border-gray-700 rounded-xl shadow-2xl overflow-hidden">
-                      <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+                    <div className="fixed top-32 left-4 z-40 max-h-[60vh] w-96 overflow-hidden rounded-xl border border-gray-700 bg-gray-900/95 shadow-2xl backdrop-blur-sm">
+                      <div className="flex items-center justify-between border-b border-gray-700 p-4">
                         <div className="flex items-center gap-2">
-                          <Target className="h-4 w-4 text-accent" />
-                          <span className="font-semibold text-white text-sm">{selectedScenario.title}</span>
+                          <Target className="text-accent h-4 w-4" />
+                          <span className="text-sm font-semibold text-white">
+                            {selectedScenario.title}
+                          </span>
                         </div>
-                        <Badge className={`text-xs ${
-                          selectedScenario.difficulty === 'easy' ? 'bg-green-500/20 text-green-400' :
-                          selectedScenario.difficulty === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
-                          'bg-red-500/20 text-red-400'
-                        }`}>
+                        <Badge
+                          className={`text-xs ${
+                            selectedScenario.difficulty === "easy"
+                              ? "bg-green-500/20 text-green-400"
+                              : selectedScenario.difficulty === "medium"
+                                ? "bg-yellow-500/20 text-yellow-400"
+                                : "bg-red-500/20 text-red-400"
+                          }`}
+                        >
                           {selectedScenario.difficulty}
                         </Badge>
                       </div>
-                      <div className="p-4 overflow-y-auto max-h-[calc(60vh-60px)]">
-                        <p className="text-gray-200 text-sm leading-relaxed">{selectedScenario.problemStatement}</p>
-                        {selectedScenario.type === 'dsa' && selectedScenario.examples && selectedScenario.examples.length > 0 && (
-                          <div className="mt-4 space-y-3">
-                            <h4 className="text-accent text-xs font-semibold uppercase tracking-wide">Examples</h4>
-                            {selectedScenario.examples.slice(0, 2).map((ex, idx) => (
-                              <div key={idx} className="bg-gray-800/50 rounded-lg p-3 text-xs font-mono">
-                                <div className="text-gray-400">Input: <span className="text-blue-300">{ex.input}</span></div>
-                                <div className="text-gray-400">Output: <span className="text-green-300">{ex.output}</span></div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                      <div className="max-h-[calc(60vh-60px)] overflow-y-auto p-4">
+                        <p className="text-sm leading-relaxed text-gray-200">
+                          {selectedScenario.problemStatement}
+                        </p>
+                        {selectedScenario.type === "dsa" &&
+                          selectedScenario.examples &&
+                          selectedScenario.examples.length > 0 && (
+                            <div className="mt-4 space-y-3">
+                              <h4 className="text-accent text-xs font-semibold tracking-wide uppercase">
+                                Examples
+                              </h4>
+                              {selectedScenario.examples.slice(0, 2).map((ex, idx) => (
+                                <div
+                                  key={idx}
+                                  className="rounded-lg bg-gray-800/50 p-3 font-mono text-xs"
+                                >
+                                  <div className="text-gray-400">
+                                    Input: <span className="text-blue-300">{ex.input}</span>
+                                  </div>
+                                  <div className="text-gray-400">
+                                    Output: <span className="text-green-300">{ex.output}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                       </div>
                     </div>
                   )}
@@ -3120,190 +3421,235 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       - Hidden in focus mode (desktop)
                       - Only visible when activePanel === 'problem' (mobile)
                   */}
-                  <Card className={`bg-gray-900/50 border-gray-700 glass-effect flex-col h-full overflow-hidden order-1 ${focusMode ? 'hidden' : '' // Hide in focus mode
-                    } ${activePanel === 'problem' ? 'flex' : 'hidden lg:flex'}`}>
+                  <Card
+                    className={`glass-effect order-1 h-full flex-col overflow-hidden border-gray-700 bg-gray-900/50 ${
+                      focusMode ? "hidden" : "" // Hide in focus mode
+                    } ${activePanel === "problem" ? "flex" : "hidden lg:flex"}`}
+                  >
                     {/* IMPROVED: Enhanced header with title and difficulty badge */}
-                    <CardHeader className="pb-3 flex-shrink-0 border-b border-gray-700/50">
-                      <CardTitle className="text-white flex items-center justify-between">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Target className="h-5 w-5 text-accent flex-shrink-0" />
-                          <span className="text-base font-semibold truncate">{selectedScenario?.title || 'Problem'}</span>
+                    <CardHeader className="flex-shrink-0 border-b border-gray-700/50 pb-3">
+                      <CardTitle className="flex items-center justify-between text-white">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Target className="text-accent h-5 w-5 flex-shrink-0" />
+                          <span className="truncate text-base font-semibold">
+                            {selectedScenario?.title || "Problem"}
+                          </span>
                         </div>
                         {selectedScenario && (
-                          <Badge className={`text-xs flex-shrink-0 ml-2 ${
-                            selectedScenario.difficulty === 'easy' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                            selectedScenario.difficulty === 'medium' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
-                            'bg-red-500/20 text-red-400 border-red-500/30'
-                          }`}>
+                          <Badge
+                            className={`ml-2 flex-shrink-0 text-xs ${
+                              selectedScenario.difficulty === "easy"
+                                ? "border-green-500/30 bg-green-500/20 text-green-400"
+                                : selectedScenario.difficulty === "medium"
+                                  ? "border-yellow-500/30 bg-yellow-500/20 text-yellow-400"
+                                  : "border-red-500/30 bg-red-500/20 text-red-400"
+                            }`}
+                          >
                             {selectedScenario.difficulty}
                           </Badge>
                         )}
                       </CardTitle>
                     </CardHeader>
                     {/* IMPROVED: Better spacing and typography for readability */}
-                    <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-5 p-4">
+                    <CardContent className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
                       {selectedScenario && (
                         <>
                           {/* IMPROVED: Description with larger font and visual hierarchy */}
                           <div className="space-y-2">
-                            <h3 className="text-accent font-semibold text-sm uppercase tracking-wide flex items-center gap-2">
-                              <span className="w-1 h-4 bg-accent rounded-full"></span>
+                            <h3 className="text-accent flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
+                              <span className="bg-accent h-4 w-1 rounded-full"></span>
                               Description
                             </h3>
-                            <p className="text-gray-200 leading-relaxed text-[15px]">{selectedScenario.problemStatement}</p>
+                            <p className="text-[15px] leading-relaxed text-gray-200">
+                              {selectedScenario.problemStatement}
+                            </p>
                           </div>
 
                           {/* IMPROVED: Examples with better visual hierarchy */}
-                          {selectedScenario.type === 'dsa' && selectedScenario.examples && selectedScenario.examples.length > 0 && (
-                            <div className="space-y-2">
-                              <h3 className="text-accent font-semibold text-sm uppercase tracking-wide flex items-center gap-2">
-                                <span className="w-1 h-4 bg-accent rounded-full"></span>
-                                Examples
-                              </h3>
-                              <div className="space-y-3">
-                                {selectedScenario.examples.slice(0, 2).map((ex, i) => (
-                                  <div key={i} className="bg-gray-800/70 p-3 rounded-lg border border-gray-700/50">
-                                    <div className="font-mono text-sm space-y-1.5">
-                                      <div className="flex items-start gap-2">
-                                        <span className="text-gray-500 font-medium min-w-[55px]">Input:</span>
-                                        <code className="text-green-400 break-all">{ex.input}</code>
+                          {selectedScenario.type === "dsa" &&
+                            selectedScenario.examples &&
+                            selectedScenario.examples.length > 0 && (
+                              <div className="space-y-2">
+                                <h3 className="text-accent flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
+                                  <span className="bg-accent h-4 w-1 rounded-full"></span>
+                                  Examples
+                                </h3>
+                                <div className="space-y-3">
+                                  {selectedScenario.examples.slice(0, 2).map((ex, i) => (
+                                    <div
+                                      key={i}
+                                      className="rounded-lg border border-gray-700/50 bg-gray-800/70 p-3"
+                                    >
+                                      <div className="space-y-1.5 font-mono text-sm">
+                                        <div className="flex items-start gap-2">
+                                          <span className="min-w-[55px] font-medium text-gray-500">
+                                            Input:
+                                          </span>
+                                          <code className="break-all text-green-400">
+                                            {ex.input}
+                                          </code>
+                                        </div>
+                                        <div className="flex items-start gap-2">
+                                          <span className="min-w-[55px] font-medium text-gray-500">
+                                            Output:
+                                          </span>
+                                          <code className="break-all text-blue-400">
+                                            {ex.output}
+                                          </code>
+                                        </div>
                                       </div>
-                                      <div className="flex items-start gap-2">
-                                        <span className="text-gray-500 font-medium min-w-[55px]">Output:</span>
-                                        <code className="text-blue-400 break-all">{ex.output}</code>
-                                      </div>
+                                      {ex.explanation && (
+                                        <div className="mt-2 border-t border-gray-700/50 pt-2 text-sm text-gray-400 italic">
+                                          {ex.explanation}
+                                        </div>
+                                      )}
                                     </div>
-                                    {ex.explanation && (
-                                      <div className="text-gray-400 mt-2 pt-2 border-t border-gray-700/50 text-sm italic">
-                                        {ex.explanation}
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
+                                  ))}
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            )}
 
                           {/* IMPROVED: Constraints with better styling */}
-                          {selectedScenario.type === 'dsa' && selectedScenario.constraints && selectedScenario.constraints.length > 0 && (
-                            <div className="space-y-2">
-                              <h3 className="text-accent font-semibold text-sm uppercase tracking-wide flex items-center gap-2">
-                                <span className="w-1 h-4 bg-accent rounded-full"></span>
-                                Constraints
-                              </h3>
-                              <ul className="text-gray-300 space-y-1.5">
-                                {selectedScenario.constraints.slice(0, 4).map((c, i) => (
-                                  <li key={i} className="text-sm flex items-start gap-2">
-                                    <span className="text-accent mt-0.5">•</span>
-                                    <code className="font-mono text-gray-300">{c}</code>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
+                          {selectedScenario.type === "dsa" &&
+                            selectedScenario.constraints &&
+                            selectedScenario.constraints.length > 0 && (
+                              <div className="space-y-2">
+                                <h3 className="text-accent flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
+                                  <span className="bg-accent h-4 w-1 rounded-full"></span>
+                                  Constraints
+                                </h3>
+                                <ul className="space-y-1.5 text-gray-300">
+                                  {selectedScenario.constraints.slice(0, 4).map((c, i) => (
+                                    <li key={i} className="flex items-start gap-2 text-sm">
+                                      <span className="text-accent mt-0.5">•</span>
+                                      <code className="font-mono text-gray-300">{c}</code>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
 
                           {/* Hints Section */}
-                          {isInterviewStarted && (selectedScenario as any).hints && (selectedScenario as any).hints.length > 0 && (
-                            <div className="border-t border-gray-700 pt-3 mt-3">
-                              <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-white font-semibold flex items-center space-x-1 text-xs">
-                                  <Lightbulb className="h-3 w-3 text-yellow-400" />
-                                  <span>Hints ({revealedHintIndices.size}/{revealedHints} unlocked)</span>
-                                </h3>
-                                {revealedHints < (selectedScenario as any).hints.length && (
-                                  <span className="text-xs text-gray-400">
-                                    Next in {Math.ceil((180 - (elapsedTime % 180)) / 60)}m
-                                  </span>
+                          {isInterviewStarted &&
+                            (selectedScenario as any).hints &&
+                            (selectedScenario as any).hints.length > 0 && (
+                              <div className="mt-3 border-t border-gray-700 pt-3">
+                                <div className="mb-2 flex items-center justify-between">
+                                  <h3 className="flex items-center space-x-1 text-xs font-semibold text-white">
+                                    <Lightbulb className="h-3 w-3 text-yellow-400" />
+                                    <span>
+                                      Hints ({revealedHintIndices.size}/{revealedHints} unlocked)
+                                    </span>
+                                  </h3>
+                                  {revealedHints < (selectedScenario as any).hints.length && (
+                                    <span className="text-xs text-gray-400">
+                                      Next in {Math.ceil((180 - (elapsedTime % 180)) / 60)}m
+                                    </span>
+                                  )}
+                                </div>
+                                {revealedHints > 0 ? (
+                                  <div className="space-y-2">
+                                    {(selectedScenario as any).hints
+                                      .slice(0, revealedHints)
+                                      .map((hint: string, i: number) => {
+                                        const isHintRevealed = revealedHintIndices.has(i)
+                                        return (
+                                          <div
+                                            key={i}
+                                            className={`cursor-pointer rounded border border-yellow-500/20 bg-yellow-500/10 p-2 transition-all ${!isHintRevealed ? "hover:bg-yellow-500/15" : ""}`}
+                                            onClick={() => {
+                                              if (!isHintRevealed) {
+                                                setRevealedHintIndices(
+                                                  (prev) => new Set([...prev, i])
+                                                )
+                                              }
+                                            }}
+                                          >
+                                            {isHintRevealed ? (
+                                              <p className="text-xs leading-relaxed text-yellow-200">
+                                                <span className="font-semibold">Hint {i + 1}:</span>{" "}
+                                                {hint}
+                                              </p>
+                                            ) : (
+                                              <div className="relative">
+                                                <p className="pointer-events-none text-xs leading-relaxed text-yellow-200/30 blur-sm select-none">
+                                                  <span className="font-semibold">
+                                                    Hint {i + 1}:
+                                                  </span>{" "}
+                                                  {hint.substring(0, 50)}...
+                                                </p>
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                  <div className="flex items-center gap-1 rounded border border-yellow-500/30 bg-yellow-500/10 px-2 py-0.5 text-xs text-yellow-400">
+                                                    <HelpCircle className="h-3 w-3" />
+                                                    <span>Click to reveal Hint {i + 1}</span>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )
+                                      })}
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-gray-400 italic">
+                                    Hints will unlock every 3 minutes as you work on the problem
+                                  </p>
+                                )}
+
+                                {/* RAG-powered AI Hints */}
+                                {ragHints.length > 0 && (
+                                  <div className="mt-3 border-t border-gray-700/50 pt-2">
+                                    <div className="mb-2 flex items-center gap-1">
+                                      <Sparkles className="h-3 w-3 text-purple-400" />
+                                      <span className="text-xs text-purple-400">AI Insights</span>
+                                    </div>
+                                    <div className="space-y-1">
+                                      {ragHints.map((hint, i) => (
+                                        <div
+                                          key={`rag-${i}`}
+                                          className="rounded border border-purple-500/20 bg-purple-500/10 p-1.5 text-[10px] text-purple-200"
+                                        >
+                                          {hint.hint}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {isLoadingHints && (
+                                  <div className="mt-2 flex items-center gap-1 text-[10px] text-gray-500">
+                                    <div className="h-2 w-2 animate-spin rounded-full border border-gray-500 border-t-transparent" />
+                                    Loading AI hints...
+                                  </div>
                                 )}
                               </div>
-                              {revealedHints > 0 ? (
-                                <div className="space-y-2">
-                                  {(selectedScenario as any).hints.slice(0, revealedHints).map((hint: string, i: number) => {
-                                    const isHintRevealed = revealedHintIndices.has(i)
-                                    return (
-                                      <div
-                                        key={i}
-                                        className={`bg-yellow-500/10 border border-yellow-500/20 rounded p-2 transition-all cursor-pointer ${!isHintRevealed ? 'hover:bg-yellow-500/15' : ''}`}
-                                        onClick={() => {
-                                          if (!isHintRevealed) {
-                                            setRevealedHintIndices(prev => new Set([...prev, i]))
-                                          }
-                                        }}
-                                      >
-                                        {isHintRevealed ? (
-                                          <p className="text-yellow-200 text-xs leading-relaxed">
-                                            <span className="font-semibold">Hint {i + 1}:</span> {hint}
-                                          </p>
-                                        ) : (
-                                          <div className="relative">
-                                            <p className="text-yellow-200/30 text-xs leading-relaxed blur-sm select-none pointer-events-none">
-                                              <span className="font-semibold">Hint {i + 1}:</span> {hint.substring(0, 50)}...
-                                            </p>
-                                            <div className="absolute inset-0 flex items-center justify-center">
-                                              <div className="flex items-center gap-1 text-yellow-400 text-xs bg-yellow-500/10 px-2 py-0.5 rounded border border-yellow-500/30">
-                                                <HelpCircle className="h-3 w-3" />
-                                                <span>Click to reveal Hint {i + 1}</span>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        )}
-                                      </div>
-                                    )
-                                  })}
-                                </div>
-                              ) : (
-                                <p className="text-gray-400 text-xs italic">
-                                  Hints will unlock every 3 minutes as you work on the problem
-                                </p>
-                              )}
-
-                              {/* RAG-powered AI Hints */}
-                              {ragHints.length > 0 && (
-                                <div className="mt-3 pt-2 border-t border-gray-700/50">
-                                  <div className="flex items-center gap-1 mb-2">
-                                    <Sparkles className="h-3 w-3 text-purple-400" />
-                                    <span className="text-xs text-purple-400">AI Insights</span>
-                                  </div>
-                                  <div className="space-y-1">
-                                    {ragHints.map((hint, i) => (
-                                      <div
-                                        key={`rag-${i}`}
-                                        className="bg-purple-500/10 border border-purple-500/20 rounded p-1.5 text-[10px] text-purple-200"
-                                      >
-                                        {hint.hint}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              {isLoadingHints && (
-                                <div className="mt-2 flex items-center gap-1 text-[10px] text-gray-500">
-                                  <div className="h-2 w-2 border border-gray-500 border-t-transparent rounded-full animate-spin" />
-                                  Loading AI hints...
-                                </div>
-                              )}
-                            </div>
-                          )}
+                            )}
                         </>
                       )}
 
                       {/* Upload Codebase Section */}
-                      <div className="border-t border-gray-700 pt-3 mt-3">
-                        <h3 className="text-white font-semibold mb-2">Workspace Files</h3>
+                      <div className="mt-3 border-t border-gray-700 pt-3">
+                        <h3 className="mb-2 font-semibold text-white">Workspace Files</h3>
                         {/* Show warning for add-functionality when language has no files */}
-                        {selectedScenario && selectedScenario.type === 'add-functionality' && workspaceContext.length === 0 && (
-                          <div className="mb-2 bg-yellow-500/10 border border-yellow-500/30 rounded p-2">
-                            <p className="text-xs text-yellow-300">
-                              ⚠️ This scenario is optimized for <strong>JavaScript/TypeScript</strong>. Switch language for codebase files.
-                            </p>
-                          </div>
-                        )}
-                        {selectedScenario && (selectedScenario.type === 'bugfix' || selectedScenario.type === 'add-functionality') && workspaceContext.length > 0 ? (
+                        {selectedScenario &&
+                          selectedScenario.type === "add-functionality" &&
+                          workspaceContext.length === 0 && (
+                            <div className="mb-2 rounded border border-yellow-500/30 bg-yellow-500/10 p-2">
+                              <p className="text-xs text-yellow-300">
+                                ⚠️ This scenario is optimized for{" "}
+                                <strong>JavaScript/TypeScript</strong>. Switch language for codebase
+                                files.
+                              </p>
+                            </div>
+                          )}
+                        {selectedScenario &&
+                        (selectedScenario.type === "bugfix" ||
+                          selectedScenario.type === "add-functionality") &&
+                        workspaceContext.length > 0 ? (
                           <div className="mb-2">
-                            <p className="text-xs text-green-400 mb-2">
+                            <p className="mb-2 text-xs text-green-400">
                               ✓ {workspaceContext.length} codebase file(s) loaded automatically
                             </p>
-                            <div className="space-y-1 max-h-32 overflow-y-auto">
+                            <div className="max-h-32 space-y-1 overflow-y-auto">
                               {workspaceContext.map((file, idx) => (
                                 <button
                                   key={idx}
@@ -3311,9 +3657,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                     setSelectedFile(file)
                                     setIsCodeViewerOpen(true)
                                   }}
-                                  className="w-full text-left text-xs text-gray-300 bg-gray-800/50 px-2 py-1 rounded border border-gray-700 hover:bg-gray-700/50 hover:border-blue-500 transition-colors cursor-pointer"
+                                  className="w-full cursor-pointer rounded border border-gray-700 bg-gray-800/50 px-2 py-1 text-left text-xs text-gray-300 transition-colors hover:border-blue-500 hover:bg-gray-700/50"
                                 >
-                                  <div className="font-semibold text-blue-400 flex items-center gap-1">
+                                  <div className="flex items-center gap-1 font-semibold text-blue-400">
                                     <Code className="h-3 w-3" />
                                     {file.path}
                                   </div>
@@ -3334,7 +3680,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             <Button
                               onClick={() => fileInputRef.current?.click()}
                               variant="outline"
-                              className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent text-xs h-7"
+                              className="h-7 w-full border-gray-600 bg-transparent text-xs text-gray-300 hover:bg-gray-800"
                             >
                               <Code className="mr-1 h-3 w-3" />
                               Upload Files
@@ -3348,9 +3694,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                       setSelectedFile(file)
                                       setIsCodeViewerOpen(true)
                                     }}
-                                    className="w-full text-left text-xs text-gray-400 bg-gray-800/30 px-2 py-1 rounded hover:bg-gray-700/30 hover:text-blue-400 transition-colors cursor-pointer"
+                                    className="w-full cursor-pointer rounded bg-gray-800/30 px-2 py-1 text-left text-xs text-gray-400 transition-colors hover:bg-gray-700/30 hover:text-blue-400"
                                   >
-                                    <div className="truncate flex items-center gap-1">
+                                    <div className="flex items-center gap-1 truncate">
                                       <Code className="h-3 w-3 flex-shrink-0" />
                                       {file.path}
                                     </div>
@@ -3368,16 +3714,30 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       - Always visible in focus mode
                       - Only visible when activePanel === 'editor' (mobile)
                   */}
-                  <Card className={`bg-gray-900/50 border-gray-700 glass-effect flex-col h-full overflow-hidden order-2 ${activePanel === 'editor' ? 'flex' : 'hidden lg:flex'
-                    }`}>
-                    <CardHeader className="pb-2 flex-shrink-0 px-6">
-                      <CardTitle className="text-white flex items-center justify-between text-xs">
+                  <Card
+                    className={`glass-effect order-2 h-full flex-col overflow-hidden border-gray-700 bg-gray-900/50 ${
+                      activePanel === "editor" ? "flex" : "hidden lg:flex"
+                    }`}
+                  >
+                    <CardHeader className="flex-shrink-0 px-6 pb-2">
+                      <CardTitle className="flex items-center justify-between text-xs text-white">
                         <div className="flex items-center space-x-1">
-                          <Code className="h-3 w-3 text-accent" />
-                          {selectedScenario?.type === 'system-design' ? (
+                          <Code className="text-accent h-3 w-3" />
+                          {selectedScenario?.type === "system-design" ? (
                             <span>Design Notes</span>
                           ) : (
-                            <span>{selectedScenario?.title.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}.{selectedLanguage === "javascript" ? "js" : selectedLanguage === "typescript" ? "ts" : "py"}</span>
+                            <span>
+                              {selectedScenario?.title
+                                .toLowerCase()
+                                .replace(/\s+/g, "-")
+                                .slice(0, 20)}
+                              .
+                              {selectedLanguage === "javascript"
+                                ? "js"
+                                : selectedLanguage === "typescript"
+                                  ? "ts"
+                                  : "py"}
+                            </span>
                           )}
                         </div>
                         <div className="flex items-center space-x-3">
@@ -3385,7 +3745,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           <GradingCriteriaTooltip />
                           {isInterviewStarted && (
                             <div className="flex items-center space-x-1">
-                              <div className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse"></div>
+                              <div className="bg-accent h-1.5 w-1.5 animate-pulse rounded-full"></div>
                               <span className="text-accent text-xs">LIVE</span>
                             </div>
                           )}
@@ -3393,8 +3753,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       </CardTitle>
                     </CardHeader>
                     {/* Code Editor - Using CodeMirror 6 for lightweight editing */}
-                    <div className="flex flex-col flex-1 min-h-0 gap-2 px-3 pb-3">
-                      <div ref={editorContainerRef} className="flex-1 min-h-0 rounded border border-gray-700 overflow-hidden relative">
+                    <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3">
+                      <div
+                        ref={editorContainerRef}
+                        className="relative min-h-0 flex-1 overflow-hidden rounded border border-gray-700"
+                      >
                         <ErrorBoundary>
                           <CodeEditor
                             height="100%"
@@ -3402,10 +3765,21 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             value={code}
                             onChange={(newCode) => {
                               // Enforce code protection if enabled
-                              if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
-                                const validation = validateCodeProtection(newCode, protectedElements, selectedLanguage)
+                              if (
+                                protectedElements &&
+                                starterCode &&
+                                isInterviewStarted &&
+                                !showFeedback
+                              ) {
+                                const validation = validateCodeProtection(
+                                  newCode,
+                                  protectedElements,
+                                  selectedLanguage
+                                )
                                 if (!validation.valid) {
-                                  toast.error(`Cannot remove required code: ${validation.errors[0]}`)
+                                  toast.error(
+                                    `Cannot remove required code: ${validation.errors[0]}`
+                                  )
                                   return
                                 }
                               }
@@ -3416,23 +3790,24 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         </ErrorBoundary>
                         {/* Start Interview Overlay - shown when scenario selected but not started */}
                         {selectedScenario && !isInterviewStarted && !showScenarioBrowser && (
-                          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-10">
-                            <div className="text-center p-6 max-w-md">
-                              <div className="w-16 h-16 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <PlayCircle className="h-8 w-8 text-accent" />
+                          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                            <div className="max-w-md p-6 text-center">
+                              <div className="bg-accent/20 mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full">
+                                <PlayCircle className="text-accent h-8 w-8" />
                               </div>
-                              <h3 className="text-xl font-bold text-white mb-2">Ready to Start?</h3>
-                              <p className="text-gray-400 text-sm mb-4">
-                                Review the problem on the left, then start your interview when ready. The timer will begin once you start.
+                              <h3 className="mb-2 text-xl font-bold text-white">Ready to Start?</h3>
+                              <p className="mb-4 text-sm text-gray-400">
+                                Review the problem on the left, then start your interview when
+                                ready. The timer will begin once you start.
                               </p>
                               <Button
                                 onClick={() => startInterview()}
-                                className="bg-accent hover:bg-accent/80 text-accent-foreground font-semibold px-8 py-3 text-base"
+                                className="bg-accent hover:bg-accent/80 text-accent-foreground px-8 py-3 text-base font-semibold"
                               >
                                 <PlayCircle className="mr-2 h-5 w-5" />
                                 Start Interview
                               </Button>
-                              <p className="text-gray-500 text-xs mt-3">
+                              <p className="mt-3 text-xs text-gray-500">
                                 Estimated time: {selectedScenario.estimatedTime || 30} minutes
                               </p>
                             </div>
@@ -3441,12 +3816,12 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       </div>
 
                       {/* Console Panel - IDE-like output display (hidden for system design) */}
-                      {isInterviewStarted && selectedScenario?.type !== 'system-design' && (
+                      {isInterviewStarted && selectedScenario?.type !== "system-design" && (
                         <CodeConsole
-                          outputs={consoleLogs.map(log => ({
-                            type: log.type as 'log' | 'error' | 'warn' | 'info',
+                          outputs={consoleLogs.map((log) => ({
+                            type: log.type as "log" | "error" | "warn" | "info",
                             message: log.message,
-                            timestamp: log.timestamp
+                            timestamp: log.timestamp,
                           }))}
                           testResults={testResults}
                           testSummary={testSummary}
@@ -3461,10 +3836,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       )}
 
                       {/* Controls */}
-                      {selectedScenario?.type === 'system-design' ? (
+                      {selectedScenario?.type === "system-design" ? (
                         /* Submit Design button for system design */
-                        <div className="flex flex-col gap-2 flex-shrink-0">
-                          <div className="text-[10px] text-gray-400 text-right">
+                        <div className="flex flex-shrink-0 flex-col gap-2">
+                          <div className="text-right text-[10px] text-gray-400">
                             Document your design decisions above, then submit when ready
                           </div>
                           <div className="flex items-center justify-end gap-2">
@@ -3472,59 +3847,69 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                               onClick={submitSystemDesign}
                               disabled={showFeedback || showPostInterviewDiscussion}
                               loading={isRunningTests}
-                              className="bg-accent hover:bg-accent/80 text-accent-foreground font-semibold text-xs h-7"
+                              className="bg-accent hover:bg-accent/80 text-accent-foreground h-7 text-xs font-semibold"
                               aria-label={isRunningTests ? "Submitting design..." : "Submit Design"}
                             >
-                              {!isRunningTests && <CheckCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
+                              {!isRunningTests && (
+                                <CheckCircle className="mr-1 h-3 w-3" aria-hidden="true" />
+                              )}
                               {isRunningTests ? "Submitting..." : "Submit Design"}
                             </Button>
                           </div>
                         </div>
                       ) : (
                         /* Run Tests and Submit buttons for coding problems */
-                        <div className="flex items-center justify-end gap-2 flex-shrink-0">
+                        <div className="flex flex-shrink-0 items-center justify-end gap-2">
                           {!isLanguageSupported(selectedLanguage) && (
-                            <span className="text-[10px] text-yellow-400 mr-1">
+                            <span className="mr-1 text-[10px] text-yellow-400">
                               Use JS/Python to run tests
                             </span>
                           )}
                           <Button
                             onClick={() => {
                               if (!isLanguageSupported(selectedLanguage)) {
-                                toast.error(`${selectedLanguage.toUpperCase()} execution not supported yet`, {
-                                  description: "Switch to JavaScript or Python to run tests.",
-                                  action: {
-                                    label: "Use JavaScript",
-                                    onClick: () => setSelectedLanguage("javascript"),
-                                  },
-                                })
+                                toast.error(
+                                  `${selectedLanguage.toUpperCase()} execution not supported yet`,
+                                  {
+                                    description: "Switch to JavaScript or Python to run tests.",
+                                    action: {
+                                      label: "Use JavaScript",
+                                      onClick: () => setSelectedLanguage("javascript"),
+                                    },
+                                  }
+                                )
                                 return
                               }
                               runCode()
                             }}
                             disabled={showFeedback || isRunningTests}
-                            className={`${isLanguageSupported(selectedLanguage) ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 hover:bg-gray-500"} text-white text-xs h-7`}
+                            className={`${isLanguageSupported(selectedLanguage) ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 hover:bg-gray-500"} h-7 text-xs text-white`}
                             aria-label={isRunningTests ? "Running tests" : "Run tests"}
                           >
-                            {!isRunningTests && <PlayCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
+                            {!isRunningTests && (
+                              <PlayCircle className="mr-1 h-3 w-3" aria-hidden="true" />
+                            )}
                             {isRunningTests ? "Running..." : "Run Tests"}
                           </Button>
                           <Button
                             onClick={() => {
                               if (!isLanguageSupported(selectedLanguage)) {
-                                toast.error(`${selectedLanguage.toUpperCase()} execution not supported yet`, {
-                                  description: "Switch to JavaScript or Python to submit.",
-                                  action: {
-                                    label: "Use JavaScript",
-                                    onClick: () => setSelectedLanguage("javascript"),
-                                  },
-                                })
+                                toast.error(
+                                  `${selectedLanguage.toUpperCase()} execution not supported yet`,
+                                  {
+                                    description: "Switch to JavaScript or Python to submit.",
+                                    action: {
+                                      label: "Use JavaScript",
+                                      onClick: () => setSelectedLanguage("javascript"),
+                                    },
+                                  }
+                                )
                                 return
                               }
                               submitCode()
                             }}
                             disabled={showFeedback || isRunningTests}
-                            className="bg-accent hover:bg-accent/80 text-accent-foreground text-xs h-7 font-semibold"
+                            className="bg-accent hover:bg-accent/80 text-accent-foreground h-7 text-xs font-semibold"
                             aria-label="Submit code"
                           >
                             <Send className="mr-1 h-3 w-3" aria-hidden="true" />
@@ -3540,35 +3925,39 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           - Add Functionality: YES (realistic production environment)
                           - System Design: YES (discussion-based, AI collaboration acceptable)
                       */}
-                      {selectedScenario && selectedScenario.type !== 'dsa' && (
-                        <div className="border-t border-gray-700 pt-2 flex-shrink-0">
+                      {selectedScenario && selectedScenario.type !== "dsa" && (
+                        <div className="flex-shrink-0 border-t border-gray-700 pt-2">
                           {!isAIPartnerExpanded ? (
                             /* Collapsed state - just a thin bar */
                             <div
-                              className="flex items-center justify-between px-2 py-1.5 bg-gray-800/50 rounded cursor-pointer hover:bg-gray-800 transition-colors"
+                              className="flex cursor-pointer items-center justify-between rounded bg-gray-800/50 px-2 py-1.5 transition-colors hover:bg-gray-800"
                               onClick={() => setIsAIPartnerExpanded(true)}
                             >
                               <div className="flex items-center gap-2">
-                                <Bot className="h-3 w-3 text-accent" />
+                                <Bot className="text-accent h-3 w-3" />
                                 <span className="text-[10px] text-gray-400">AI Assistant</span>
                                 <span className="text-[10px] text-gray-600">· optional</span>
                               </div>
                               <div className="flex items-center gap-2">
                                 {chatMessages.length > 0 && (
-                                  <span className="text-[10px] text-gray-500">{chatMessages.length} msg</span>
+                                  <span className="text-[10px] text-gray-500">
+                                    {chatMessages.length} msg
+                                  </span>
                                 )}
                                 <ChevronUp className="h-3 w-3 text-gray-500" />
                               </div>
                             </div>
                           ) : (
                             /* Expanded state - compact chat */
-                            <div className="bg-gray-800/30 rounded p-2">
+                            <div className="rounded bg-gray-800/30 p-2">
                               {/* Header with collapse */}
-                              <div className="flex items-center justify-between mb-2">
+                              <div className="mb-2 flex items-center justify-between">
                                 <div className="flex items-center gap-1.5">
-                                  <Bot className="h-3 w-3 text-accent" />
+                                  <Bot className="text-accent h-3 w-3" />
                                   <span className="text-[10px] text-gray-300">AI Assistant</span>
-                                  <span className="text-[9px] text-gray-600 bg-gray-800 px-1 rounded">optional</span>
+                                  <span className="rounded bg-gray-800 px-1 text-[9px] text-gray-600">
+                                    optional
+                                  </span>
                                 </div>
                                 <Button
                                   variant="ghost"
@@ -3581,16 +3970,23 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                               </div>
 
                               {/* Messages - max height 120px */}
-                              <div className="max-h-[120px] overflow-y-auto space-y-1 mb-2">
+                              <div className="mb-2 max-h-[120px] space-y-1 overflow-y-auto">
                                 {chatMessages.length === 0 ? (
-                                  <p className="text-[10px] text-gray-500 text-center py-2">
+                                  <p className="py-2 text-center text-[10px] text-gray-500">
                                     Ask for hints, not solutions
                                   </p>
                                 ) : (
                                   chatMessages.slice(-4).map((msg, index) => (
-                                    <div key={`inline-chat-${msg.type}-${index}`} className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
-                                      <div className={`max-w-[85%] px-2 py-1 rounded text-[10px] ${msg.type === "user" ? "bg-blue-600/80 text-white" : "bg-gray-700 text-gray-200"}`}>
-                                        <p className="break-words whitespace-pre-wrap">{msg.message}</p>
+                                    <div
+                                      key={`inline-chat-${msg.type}-${index}`}
+                                      className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
+                                    >
+                                      <div
+                                        className={`max-w-[85%] rounded px-2 py-1 text-[10px] ${msg.type === "user" ? "bg-blue-600/80 text-white" : "bg-gray-700 text-gray-200"}`}
+                                      >
+                                        <p className="break-words whitespace-pre-wrap">
+                                          {msg.message}
+                                        </p>
                                       </div>
                                     </div>
                                   ))
@@ -3604,17 +4000,19 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                   value={chatInput}
                                   onChange={(e) => setChatInput(e.target.value)}
                                   placeholder="Quick question..."
-                                  className="flex-1 bg-gray-900 border-gray-700 text-white text-[10px] h-6 placeholder:text-gray-600"
-                                  onKeyPress={(e) => e.key === "Enter" && !isLoadingChat && handleSendMessage(false)}
+                                  className="h-6 flex-1 border-gray-700 bg-gray-900 text-[10px] text-white placeholder:text-gray-600"
+                                  onKeyPress={(e) =>
+                                    e.key === "Enter" && !isLoadingChat && handleSendMessage(false)
+                                  }
                                   disabled={isLoadingChat}
                                 />
                                 <Button
                                   onClick={() => handleSendMessage(false)}
                                   disabled={!chatInput.trim() || isLoadingChat}
-                                  className="h-6 w-6 p-0 bg-accent hover:bg-accent/80"
+                                  className="bg-accent hover:bg-accent/80 h-6 w-6 p-0"
                                 >
                                   {isLoadingChat ? (
-                                    <div className="h-2 w-2 border border-white/30 border-t-white rounded-full animate-spin" />
+                                    <div className="h-2 w-2 animate-spin rounded-full border border-white/30 border-t-white" />
                                   ) : (
                                     <Send className="h-2.5 w-2.5" />
                                   )}
@@ -3631,22 +4029,27 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       - Hidden in focus mode (desktop)
                       - Only visible when activePanel === 'chat' (mobile)
                   */}
-                  <Card className={`bg-gray-900/50 border-gray-700 glass-effect h-full flex-col overflow-hidden order-3 ${focusMode ? 'hidden' : '' // Hide in focus mode
-                    } ${activePanel === 'chat' ? 'flex' : 'hidden lg:flex'}`}>
-                    <CardHeader className="pb-2 flex-shrink-0">
-                      <CardTitle className="text-white flex items-center space-x-2 text-sm">
+                  <Card
+                    className={`glass-effect order-3 h-full flex-col overflow-hidden border-gray-700 bg-gray-900/50 ${
+                      focusMode ? "hidden" : "" // Hide in focus mode
+                    } ${activePanel === "chat" ? "flex" : "hidden lg:flex"}`}
+                  >
+                    <CardHeader className="flex-shrink-0 pb-2">
+                      <CardTitle className="flex items-center space-x-2 text-sm text-white">
                         <div className="relative">
-                          <Brain className="h-4 w-4 text-accent animate-neural-pulse" />
-                          <div className="absolute inset-0 bg-accent rounded-full blur-md opacity-30"></div>
+                          <Brain className="text-accent animate-neural-pulse h-4 w-4" />
+                          <div className="bg-accent absolute inset-0 rounded-full opacity-30 blur-md"></div>
                         </div>
-                        <span className="bg-gradient-to-r from-accent to-neural bg-clip-text text-transparent font-bold">CodeSparring AI</span>
+                        <span className="from-accent to-neural bg-gradient-to-r bg-clip-text font-bold text-transparent">
+                          CodeSparring AI
+                        </span>
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="flex flex-col flex-1 min-h-0 overflow-hidden p-3">
-                      <div className="flex-1 overflow-y-auto space-y-2 mb-2 min-h-0 pr-2">
+                    <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
+                      <div className="mb-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-2">
                         {interviewerMessages.length === 0 ? (
-                          <div className="text-center py-8 text-gray-400">
-                            <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                          <div className="py-8 text-center text-gray-400">
+                            <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
                             <p className="text-xs">Interview will begin when you start...</p>
                           </div>
                         ) : (
@@ -3657,20 +4060,25 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                 className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
                               >
                                 <div
-                                  className={`max-w-[90%] p-2 rounded-lg ${msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-100"
-                                    }`}
+                                  className={`max-w-[90%] rounded-lg p-2 ${
+                                    msg.type === "user"
+                                      ? "bg-blue-600 text-white"
+                                      : "bg-gray-800 text-gray-100"
+                                  }`}
                                 >
-                                  <div className="flex items-center space-x-1 mb-1">
+                                  <div className="mb-1 flex items-center space-x-1">
                                     {msg.type === "user" ? (
                                       <User className="h-3 w-3" />
                                     ) : (
-                                      <Brain className="h-3 w-3 text-accent animate-neural-pulse" />
+                                      <Brain className="text-accent animate-neural-pulse h-3 w-3" />
                                     )}
                                     <span className="text-xs opacity-75">
                                       {msg.type === "user" ? "You" : "CodeSparring AI"}
                                     </span>
                                   </div>
-                                  <p className="text-xs whitespace-pre-wrap leading-relaxed">{msg.message}</p>
+                                  <p className="text-xs leading-relaxed whitespace-pre-wrap">
+                                    {msg.message}
+                                  </p>
                                 </div>
                               </div>
                             ))}
@@ -3679,7 +4087,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         )}
                       </div>
                       {(isInterviewStarted || showPostInterviewDiscussion) && (
-                        <div className="flex flex-col gap-2 flex-shrink-0 border-t border-gray-700 pt-3">
+                        <div className="flex flex-shrink-0 flex-col gap-2 border-t border-gray-700 pt-3">
                           {/* Enhanced Voice Mode Toggle */}
                           <VoiceModeToggle
                             isRecording={isRecordingInterviewer}
@@ -3694,9 +4102,17 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                               <Input
                                 value={interviewerInput}
                                 onChange={(e) => setInterviewerInput(e.target.value)}
-                                placeholder={showPostInterviewDiscussion ? "Type or use voice..." : "Type a question..."}
-                                className="flex-1 bg-secondary border-border text-foreground placeholder-muted-foreground text-xs h-7"
-                                onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
+                                placeholder={
+                                  showPostInterviewDiscussion
+                                    ? "Type or use voice..."
+                                    : "Type a question..."
+                                }
+                                className="bg-secondary border-border text-foreground placeholder-muted-foreground h-7 flex-1 text-xs"
+                                onKeyPress={(e) =>
+                                  e.key === "Enter" &&
+                                  !isLoadingInterviewer &&
+                                  handleSendMessage(true)
+                                }
                                 disabled={isLoadingInterviewer || isGeneratingDiscussion}
                                 aria-label="Chat with interviewer"
                               />
@@ -3707,7 +4123,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                 disabled={!interviewerInput.trim()}
                                 aria-label="Send message"
                               >
-                                {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-3 w-3" aria-hidden="true" />}
+                                {!(isLoadingInterviewer || isGeneratingDiscussion) && (
+                                  <Send className="h-3 w-3" aria-hidden="true" />
+                                )}
                               </Button>
                             </div>
                           )}
@@ -3718,11 +4136,13 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 </div>
               ) : showPostInterviewDiscussion ? (
                 /* Post-Interview Discussion Phase */
-                <div className="max-w-7xl mx-auto py-8 px-4">
-                  <div className="text-center mb-6">
-                    <CheckCircle className="h-12 w-12 text-accent mx-auto mb-3" />
-                    <h2 className="text-2xl font-heading font-bold text-white mb-2">Solution Complete!</h2>
-                    <p className="text-gray-300 mb-4">
+                <div className="mx-auto max-w-7xl px-4 py-8">
+                  <div className="mb-6 text-center">
+                    <CheckCircle className="text-accent mx-auto mb-3 h-12 w-12" />
+                    <h2 className="font-heading mb-2 text-2xl font-bold text-white">
+                      Solution Complete!
+                    </h2>
+                    <p className="mb-4 text-gray-300">
                       {testSummary.passRate === 100
                         ? "All tests passed! Let's discuss your solution with the interviewer."
                         : `${testSummary.passed}/${testSummary.total} tests passed. Let's discuss your solution.`}
@@ -3734,20 +4154,26 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         variant="outline"
                         className="border-accent text-accent hover:bg-accent/10 mb-4"
                       >
-                        <Code className="h-4 w-4 mr-2" />
+                        <Code className="mr-2 h-4 w-4" />
                         Continue Editing
                       </Button>
                     )}
                     {testSummary.total > 0 && (
-                      <div className="flex items-center justify-center gap-4 mb-4">
+                      <div className="mb-4 flex items-center justify-center gap-4">
                         <Badge className="bg-[#00d9ff] text-black">
                           {testSummary.passed}/{testSummary.total} Tests Passed
                         </Badge>
                         {efficiencyMetrics && (
                           <>
-                            <Badge className={`${efficiencyMetrics.efficiencyScore >= 80 ? "bg-[#00d9ff]" :
-                              efficiencyMetrics.efficiencyScore >= 60 ? "bg-[#00d9ff]/70" : "bg-gray-600"
-                              } text-black`}>
+                            <Badge
+                              className={`${
+                                efficiencyMetrics.efficiencyScore >= 80
+                                  ? "bg-[#00d9ff]"
+                                  : efficiencyMetrics.efficiencyScore >= 60
+                                    ? "bg-[#00d9ff]/70"
+                                    : "bg-gray-600"
+                              } text-black`}
+                            >
                               Efficiency: {efficiencyMetrics.efficiencyScore}/100
                             </Badge>
                             <Badge variant="outline" className="border-gray-600 text-gray-300">
@@ -3763,14 +4189,14 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   </div>
 
                   {/* Collapsible Code Viewer */}
-                  <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-6">
+                  <Card className="glass-effect mb-6 border-gray-700 bg-gray-900/50">
                     <CardHeader
-                      className="cursor-pointer hover:bg-gray-800/50 transition-colors"
+                      className="cursor-pointer transition-colors hover:bg-gray-800/50"
                       onClick={() => setShowCodeInDiscussion(!showCodeInDiscussion)}
                     >
-                      <CardTitle className="text-white flex items-center justify-between">
+                      <CardTitle className="flex items-center justify-between text-white">
                         <div className="flex items-center space-x-2">
-                          <Code className="h-5 w-5 text-accent" />
+                          <Code className="text-accent h-5 w-5" />
                           <span>Your Solution</span>
                           <Badge variant="outline" className="border-gray-600 text-gray-400">
                             {selectedLanguage}
@@ -3785,7 +4211,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     </CardHeader>
                     {showCodeInDiscussion && (
                       <CardContent>
-                        <div className="border border-gray-700 rounded-lg overflow-hidden">
+                        <div className="overflow-hidden rounded-lg border border-gray-700">
                           <CodeEditor
                             height="400px"
                             language={selectedLanguage}
@@ -3799,13 +4225,16 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             {testResults.map((result, index) => (
                               <div
                                 key={index}
-                                className={`p-2 rounded border ${result.passed
-                                  ? "bg-green-900/20 border-green-700"
-                                  : "bg-red-900/20 border-red-700"
-                                  }`}
+                                className={`rounded border p-2 ${
+                                  result.passed
+                                    ? "border-green-700 bg-green-900/20"
+                                    : "border-red-700 bg-red-900/20"
+                                }`}
                               >
                                 <div className="flex items-center justify-between text-xs">
-                                  <span className={result.passed ? "text-green-400" : "text-red-400"}>
+                                  <span
+                                    className={result.passed ? "text-green-400" : "text-red-400"}
+                                  >
                                     {result.passed ? "✓" : "✗"} {result.description}
                                   </span>
                                 </div>
@@ -3818,50 +4247,61 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   </Card>
 
                   {/* Interviewer Discussion Panel */}
-                  <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-6">
+                  <Card className="glass-effect mb-6 border-gray-700 bg-gray-900/50">
                     <CardHeader>
-                      <CardTitle className="text-white flex items-center space-x-2">
+                      <CardTitle className="flex items-center space-x-2 text-white">
                         <div className="relative">
-                          <Brain className="h-5 w-5 text-accent animate-neural-pulse" />
-                          <div className="absolute inset-0 bg-accent rounded-full blur-md opacity-30"></div>
+                          <Brain className="text-accent animate-neural-pulse h-5 w-5" />
+                          <div className="bg-accent absolute inset-0 rounded-full opacity-30 blur-md"></div>
                         </div>
-                        <span className="bg-gradient-to-r from-accent to-neural bg-clip-text text-transparent font-bold">Post-Interview Discussion</span>
+                        <span className="from-accent to-neural bg-gradient-to-r bg-clip-text font-bold text-transparent">
+                          Post-Interview Discussion
+                        </span>
                         {isGeneratingDiscussion && (
-                          <span className="text-xs text-gray-400 ml-2">(Analyzing your solution...)</span>
+                          <span className="ml-2 text-xs text-gray-400">
+                            (Analyzing your solution...)
+                          </span>
                         )}
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-4 max-h-[500px] overflow-y-auto mb-4 pr-2">
+                      <div className="mb-4 max-h-[500px] space-y-4 overflow-y-auto pr-2">
                         {interviewerMessages.map((msg, index) => (
                           <div
                             key={index}
                             className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
                           >
                             <div
-                              className={`max-w-[85%] p-3 rounded-lg ${msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-100"
-                                }`}
+                              className={`max-w-[85%] rounded-lg p-3 ${
+                                msg.type === "user"
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-gray-800 text-gray-100"
+                              }`}
                             >
-                              <div className="flex items-center space-x-2 mb-1">
+                              <div className="mb-1 flex items-center space-x-2">
                                 {msg.type === "user" ? (
                                   <User className="h-4 w-4" />
                                 ) : (
-                                  <Brain className="h-4 w-4 text-accent animate-neural-pulse" />
+                                  <Brain className="text-accent animate-neural-pulse h-4 w-4" />
                                 )}
                                 <span className="text-sm font-medium">
                                   {msg.type === "user" ? "You" : "CodeSparring AI"}
                                 </span>
                               </div>
-                              <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.message}</p>
+                              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                                {msg.message}
+                              </p>
                             </div>
                           </div>
                         ))}
                         {isGeneratingDiscussion && (
                           <div className="flex justify-start">
-                            <div className="bg-gray-800 p-3 rounded-lg">
+                            <div className="rounded-lg bg-gray-800 p-3">
                               <div className="flex items-center space-x-2">
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#00d9ff]"></div>
-                                <span className="text-sm text-gray-300">Interviewer is analyzing your solution...</span>
+                                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+                                <span className="text-sm text-gray-300">
+                                  Interviewer is analyzing your solution...
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -3870,7 +4310,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       </div>
 
                       {/* Chat Input with Simplified Voice Mode */}
-                      <div className="flex flex-col gap-3 border-t border-border pt-4">
+                      <div className="border-border flex flex-col gap-3 border-t pt-4">
                         <VoiceModeToggle
                           isRecording={isRecordingInterviewer}
                           onToggleRecording={() => toggleVoiceRecording(true)}
@@ -3885,8 +4325,12 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                               value={interviewerInput}
                               onChange={(e) => setInterviewerInput(e.target.value)}
                               placeholder="Type or use voice above..."
-                              className="flex-1 bg-secondary border-border text-foreground placeholder-muted-foreground"
-                              onKeyPress={(e) => e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)}
+                              className="bg-secondary border-border text-foreground placeholder-muted-foreground flex-1"
+                              onKeyPress={(e) =>
+                                e.key === "Enter" &&
+                                !isLoadingInterviewer &&
+                                handleSendMessage(true)
+                              }
                               disabled={isLoadingInterviewer || isGeneratingDiscussion}
                               aria-label="Chat with interviewer"
                             />
@@ -3897,7 +4341,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                               disabled={!interviewerInput.trim()}
                               aria-label="Send message"
                             >
-                              {!(isLoadingInterviewer || isGeneratingDiscussion) && <Send className="h-4 w-4" aria-hidden="true" />}
+                              {!(isLoadingInterviewer || isGeneratingDiscussion) && (
+                                <Send className="h-4 w-4" aria-hidden="true" />
+                              )}
                             </Button>
                           </div>
                         )}
@@ -3925,14 +4371,17 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 </div>
               ) : isGeneratingFeedback ? (
                 /* Loading state while AI calculates comprehensive feedback */
-                <div className="flex flex-col items-center justify-center py-16 px-8">
+                <div className="flex flex-col items-center justify-center px-8 py-16">
                   <div className="relative mb-6">
-                    <div className="w-16 h-16 rounded-full border-4 border-accent/20 border-t-accent animate-spin" />
-                    <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-accent animate-pulse" />
+                    <div className="border-accent/20 border-t-accent h-16 w-16 animate-spin rounded-full border-4" />
+                    <Sparkles className="text-accent absolute top-1/2 left-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
                   </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">Analyzing Your Performance</h3>
-                  <p className="text-gray-400 text-center max-w-md mb-4">
-                    Our AI is evaluating your code, communication, and problem-solving approach to generate comprehensive feedback...
+                  <h3 className="mb-2 text-xl font-semibold text-white">
+                    Analyzing Your Performance
+                  </h3>
+                  <p className="mb-4 max-w-md text-center text-gray-400">
+                    Our AI is evaluating your code, communication, and problem-solving approach to
+                    generate comprehensive feedback...
                   </p>
                   <div className="flex items-center gap-2 text-sm text-gray-500">
                     <Clock className="h-4 w-4" />
@@ -3969,7 +4418,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         onClick={() => router.push("/roadmap")}
                         className="bg-primary hover:bg-primary/90 text-white"
                       >
-                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        <ArrowLeft className="mr-2 h-4 w-4" />
                         Back to Roadmap
                       </Button>
                     </div>
@@ -3985,8 +4434,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       {isGuestMode && showFeedback && performanceScore !== null && showSignupPrompt && (
         <SignupPrompt
           score={performanceScore}
-          sessionId={currentSessionId || ''}
-          scenarioTitle={selectedScenario?.title || ''}
+          sessionId={currentSessionId || ""}
+          scenarioTitle={selectedScenario?.title || ""}
           feedbackSummary={comprehensiveFeedback}
           onDismiss={() => {
             setShowSignupPrompt(false)
@@ -4011,15 +4460,18 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
       {/* Close Confirmation Dialog */}
       <AlertDialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
-        <AlertDialogContent className="bg-gray-900 border-gray-700">
+        <AlertDialogContent className="border-gray-700 bg-gray-900">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">You want to close this interview?</AlertDialogTitle>
+            <AlertDialogTitle className="text-white">
+              You want to close this interview?
+            </AlertDialogTitle>
             <AlertDialogDescription className="text-gray-300">
-              If you close now, your progress will be saved but you'll exit the interview session. You can always come back to continue later.
+              If you close now, your progress will be saved but you'll exit the interview session.
+              You can always come back to continue later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="bg-gray-800 text-white border-gray-600 hover:bg-gray-700">
+            <AlertDialogCancel className="border-gray-600 bg-gray-800 text-white hover:bg-gray-700">
               Stay
             </AlertDialogCancel>
             <AlertDialogAction
@@ -4027,7 +4479,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 setShowCloseDialog(false)
                 resetInterview()
               }}
-              className="bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white"
+              className="bg-[#00d9ff] text-white hover:bg-[#00d9ff]/80"
             >
               Close Interview
             </AlertDialogAction>
@@ -4043,9 +4495,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 // Loading fallback for Suspense boundary
 function InterviewPageLoading() {
   return (
-    <main className="flex-1 flex items-center justify-center min-h-screen bg-gradient-to-b from-gray-900 via-black to-gray-900">
+    <main className="flex min-h-screen flex-1 items-center justify-center bg-gradient-to-b from-gray-900 via-black to-gray-900">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff] mx-auto mb-4"></div>
+        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
         <p className="text-gray-400">Loading interview...</p>
       </div>
     </main>
@@ -4060,4 +4512,3 @@ export default function InterviewPage() {
     </Suspense>
   )
 }
-

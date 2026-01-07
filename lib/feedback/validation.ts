@@ -5,9 +5,9 @@
  * if candidates have blindly copied AI Partner suggestions without understanding.
  */
 
-import type { AICodeOverlapResult, ConversationValidation } from './types'
-import { generateAIResponse } from '@/lib/ai-providers'
-import { logger } from '@/lib/logger'
+import type { AICodeOverlapResult, ConversationValidation } from "./types"
+import { generateAIResponse } from "@/lib/ai-providers"
+import { logger } from "@/lib/logger"
 
 // ============================================================================
 // CODE EXTRACTION AND SIMILARITY
@@ -16,7 +16,9 @@ import { logger } from '@/lib/logger'
 /**
  * Extract code blocks from AI Partner conversation
  */
-export function extractCodeFromPartnerMessages(messages: Array<{ role: string; content: string }> | undefined): string[] {
+export function extractCodeFromPartnerMessages(
+  messages: Array<{ role: string; content: string }> | undefined
+): string[] {
   if (!messages || !Array.isArray(messages)) return []
 
   const codeBlocks: string[] = []
@@ -24,12 +26,13 @@ export function extractCodeFromPartnerMessages(messages: Array<{ role: string; c
 
   for (const msg of messages) {
     // Only look at AI Partner (model) responses
-    if (msg.role !== 'model' && msg.role !== 'assistant') continue
+    if (msg.role !== "model" && msg.role !== "assistant") continue
 
     let match
     while ((match = codeBlockRegex.exec(msg.content)) !== null) {
       const code = match[1].trim()
-      if (code.length > 20) { // Ignore tiny snippets
+      if (code.length > 20) {
+        // Ignore tiny snippets
         codeBlocks.push(code)
       }
     }
@@ -43,11 +46,11 @@ export function extractCodeFromPartnerMessages(messages: Array<{ role: string; c
  */
 export function normalizeCode(code: string): string {
   return code
-    .replace(/\/\/.*$/gm, '')           // Remove single-line comments
-    .replace(/\/\*[\s\S]*?\*\//g, '')   // Remove multi-line comments
-    .replace(/#.*$/gm, '')              // Remove Python comments
-    .replace(/\s+/g, ' ')               // Normalize whitespace
-    .replace(/["'`]/g, '"')             // Normalize quotes
+    .replace(/\/\/.*$/gm, "") // Remove single-line comments
+    .replace(/\/\*[\s\S]*?\*\//g, "") // Remove multi-line comments
+    .replace(/#.*$/gm, "") // Remove Python comments
+    .replace(/\s+/g, " ") // Normalize whitespace
+    .replace(/["'`]/g, '"') // Normalize quotes
     .toLowerCase()
     .trim()
 }
@@ -139,15 +142,15 @@ export function analyzeAICodeOverlap(
       maxOverlap = similarity
     }
     if (similarity >= 70) {
-      copiedSnippets.push(aiCode.substring(0, 100) + (aiCode.length > 100 ? '...' : ''))
+      copiedSnippets.push(aiCode.substring(0, 100) + (aiCode.length > 100 ? "..." : ""))
     }
   }
 
   // Check if any modifications were made (compare normalized lengths)
   const normalizedFinal = normalizeCode(finalCode)
-  const allAINormalized = aiCodeBlocks.map(normalizeCode).join(' ')
-  const modificationsMade = normalizedFinal.length !== allAINormalized.length ||
-    normalizedFinal !== allAINormalized
+  const allAINormalized = aiCodeBlocks.map(normalizeCode).join(" ")
+  const modificationsMade =
+    normalizedFinal.length !== allAINormalized.length || normalizedFinal !== allAINormalized
 
   return {
     hasHighOverlap: maxOverlap >= 70,
@@ -171,15 +174,34 @@ export async function validateConversationWithAI(
   code: string,
   actualComplexity: { time: string; space: string } | null
 ): Promise<ConversationValidation> {
-  // Prepare conversation for AI (truncate to save tokens)
-  const recentMessages = transcript.slice(-15) // Last 15 messages max
-  const conversationText = recentMessages.map(m =>
-    `[${m.role.toUpperCase()}]: ${m.content.slice(0, 300)}${m.content.length > 300 ? '...' : ''}`
-  ).join('\n')
+  // IMPORTANT: Include BOTH early messages (approach explanation) and late messages (complexity)
+  // Taking only the last 15 would miss the approach explanation at the start!
+  let messagesToAnalyze: Array<{ role: string; content: string }> = []
+
+  if (transcript.length <= 25) {
+    // Short conversation - use all messages
+    messagesToAnalyze = transcript
+  } else {
+    // Long conversation - take first 10 (approach) + last 15 (complexity/wrap-up)
+    const firstMessages = transcript.slice(0, 10)
+    const lastMessages = transcript.slice(-15)
+    messagesToAnalyze = [
+      ...firstMessages,
+      { role: "system", content: "[... middle of conversation ...]" },
+      ...lastMessages,
+    ]
+  }
+
+  const conversationText = messagesToAnalyze
+    .map(
+      (m) =>
+        `[${m.role.toUpperCase()}]: ${m.content.slice(0, 300)}${m.content.length > 300 ? "..." : ""}`
+    )
+    .join("\n")
 
   // Count interviewer questions
-  const interviewerQuestions = transcript.filter(m =>
-    m.role === 'interviewer' && m.content.includes('?')
+  const interviewerQuestions = transcript.filter(
+    (m) => m.role === "interviewer" && m.content.includes("?")
   ).length
 
   const validationPrompt = `Analyze this coding interview conversation and return ONLY valid JSON.
@@ -192,7 +214,7 @@ CANDIDATE'S CODE (for complexity verification):
 ${code.slice(0, 1000)}
 \`\`\`
 
-ACTUAL CODE COMPLEXITY: Time=${actualComplexity?.time || 'unknown'}, Space=${actualComplexity?.space || 'unknown'}
+ACTUAL CODE COMPLEXITY: Time=${actualComplexity?.time || "unknown"}, Space=${actualComplexity?.space || "unknown"}
 
 Analyze and return this exact JSON structure (no markdown, no explanation):
 {
@@ -236,10 +258,10 @@ Return ONLY the JSON object, nothing else.`
 
   try {
     const response = await generateAIResponse(
-      'You are a technical interview evaluator. Return only valid JSON, no markdown.',
+      "You are a technical interview evaluator. Return only valid JSON, no markdown.",
       validationPrompt,
       [],
-      { complexity: 'simple', temperature: 0.1 } // Low temp for consistent JSON
+      { complexity: "standard", temperature: 0.1 } // Use better model for accurate conversation analysis
     )
 
     // Parse AI response
@@ -250,7 +272,7 @@ Return ONLY the JSON object, nothing else.`
         isCoherent: Boolean(parsed.isCoherent),
         responsesRelevant: Boolean(parsed.responsesRelevant),
         approachExplained: Boolean(parsed.approachExplained),
-        approachQuality: parsed.approachQuality || 'none',
+        approachQuality: parsed.approachQuality || "none",
         complexityDiscussed: Boolean(parsed.complexityDiscussed),
         complexityAccurate: Boolean(parsed.complexityAccurate),
         statedComplexity: parsed.statedComplexity || null,
@@ -258,11 +280,11 @@ Return ONLY the JSON object, nothing else.`
         questionsAnswered: Number(parsed.questionsAnswered) || 0,
         edgeCasesConsidered: Boolean(parsed.edgeCasesConsidered),
         alternativesDiscussed: Boolean(parsed.alternativesDiscussed),
-        communicationScore: Math.min(100, Math.max(0, Number(parsed.communicationScore) || 50))
+        communicationScore: Math.min(100, Math.max(0, Number(parsed.communicationScore) || 50)),
       }
     }
   } catch (error) {
-    logger.error('AI validation parsing error', { error })
+    logger.error("AI validation parsing error", { error })
   }
 
   // Fallback if AI validation fails
@@ -278,7 +300,7 @@ export function getDefaultValidation(): ConversationValidation {
     isCoherent: true,
     responsesRelevant: true,
     approachExplained: false,
-    approachQuality: 'none',
+    approachQuality: "none",
     complexityDiscussed: false,
     complexityAccurate: false,
     statedComplexity: null,
@@ -286,6 +308,6 @@ export function getDefaultValidation(): ConversationValidation {
     questionsAnswered: 0,
     edgeCasesConsidered: false,
     alternativesDiscussed: false,
-    communicationScore: 25 // Low default - must earn through actual communication
+    communicationScore: 25, // Low default - must earn through actual communication
   }
 }

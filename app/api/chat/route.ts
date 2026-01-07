@@ -545,6 +545,22 @@ WHAT TO DO:
 - When tests pass: Give retrospective feedback (see AFTER TESTS PASS section)
 - When they verbalize their thinking: Respond like a real interviewer would
 
+WHEN TO LET THEM CODE (CRITICAL - DON'T OVER-QUESTION):
+Real interviewers don't ask endless clarifying questions. Once the candidate has:
+1. Explained their approach clearly (e.g., "I'll use two pointers...")
+2. Walked through an example showing they understand the mechanics
+3. Addressed any major gaps you probed
+
+Then SAY: "Sounds good, go ahead and code it up" or "That makes sense - let's see it in code"
+
+DO NOT keep asking implementation questions once they've demonstrated understanding.
+Signs they're ready to code:
+- They've traced through a concrete example correctly
+- They know the core data structure/algorithm they'll use
+- They can explain WHY their approach works
+
+If they ask "Can I start coding?" - the answer is almost always YES. Don't add more questions.
+
 SMART QUESTIONING (AVOID REPETITION):
 - If you've asked about the same concept twice and they're still confused, DON'T ask the same question a third time
 - Instead, give a CONCRETE NUDGE with a specific example:
@@ -604,9 +620,13 @@ When the candidate passes all tests, provide brief retrospective feedback:
 2. Mention ONE thing they did well: approach, communication, handling edge cases
 3. Mention ONE area for improvement if applicable: initial confusion that was resolved, could have considered X sooner
 4. Ask about time/space complexity
+5. After they answer complexity, prompt them to submit for full feedback
 
 Example good wrap-up:
 "Nice, all tests passing. You had good intuition using a hash map from the start. I noticed you initially had the key-value mapping reversed - that's a common gotcha with this pattern. What's the time complexity of your solution?"
+
+After they answer complexity correctly:
+"That's right - O(n) time and O(1) space. Good work on this one. When you're ready, click 'End Session' to see your detailed score breakdown and feedback."
 
 Example bad wrap-up (too brief):
 "Tests pass. What's the time complexity?"
@@ -874,6 +894,27 @@ IMPORTANT: After this wrap-up, if the candidate says goodbye or acknowledges, gi
           msg.message?.toLowerCase().includes("practice")
       )
 
+      // Check if AI already said goodbye in a recent message (interview is over)
+      const aiAlreadySaidGoodbye = recentMessages.some(
+        (msg: { message: string; type?: string }) =>
+          msg.type !== "user" &&
+          (msg.message?.toLowerCase().includes("good luck") ||
+            msg.message?.toLowerCase().includes("take care") ||
+            msg.message?.toLowerCase().includes("best of luck") ||
+            msg.message?.toLowerCase().includes("goodbye"))
+      )
+
+      if (aiAlreadySaidGoodbye && role === "interviewer") {
+        // Interview is OVER - don't respond to any more messages
+        // Return early with a flag indicating conversation ended
+        return NextResponse.json({
+          reply: null,
+          conversationEnded: true,
+          endMessage:
+            "The interview session has ended. Click 'End Session' to see your detailed feedback and score breakdown.",
+        })
+      }
+
       if (isFarewell && hasRecentWrapUp && role === "interviewer") {
         // Final response - end the conversation gracefully
         fullUserMessage = `[FINAL RESPONSE - CONVERSATION ENDING]
@@ -900,6 +941,9 @@ After this response, the conversation is OVER. Do not respond to any further mes
         }
       }
     }
+
+    // Track if this is a final farewell response
+    const isConversationEnding = fullUserMessage.includes("[FINAL RESPONSE - CONVERSATION ENDING]")
 
     // Determine task complexity for provider selection
     const complexity: TaskComplexity = isProactive ? "standard" : "simple"
@@ -936,6 +980,10 @@ After this response, the conversation is OVER. Do not respond to any further mes
       reply: aiResponse.text,
       provider: aiResponse.provider, // Include provider for debugging
       latencyMs: aiResponse.latencyMs,
+      conversationEnded: isConversationEnding,
+      ...(isConversationEnding && {
+        endMessage: "Click 'End Session' to see your detailed feedback and score breakdown.",
+      }),
     })
   } catch (error: any) {
     logger.error("Chat API error", {
