@@ -623,11 +623,25 @@ export async function shouldSendNotification(
     return { shouldSend: false, reason: 'type_disabled' }
   }
 
-  // Check quiet hours
+  // Check quiet hours (respecting user's timezone)
   if (prefs.quietHours.enabled) {
     const now = new Date()
-    // Simple check - in production would use timezone library
-    const currentHour = now.getHours()
+    // Get current hour in user's timezone
+    const userTimezone = prefs.timezone || 'America/New_York'
+    let currentHour: number
+
+    try {
+      // Use Intl.DateTimeFormat to get the hour in the user's timezone
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: userTimezone,
+        hour: 'numeric',
+        hour12: false,
+      })
+      currentHour = parseInt(formatter.format(now), 10)
+    } catch {
+      // Fallback to UTC if timezone is invalid
+      currentHour = now.getUTCHours()
+    }
 
     const { start, end } = prefs.quietHours
 

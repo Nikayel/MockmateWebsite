@@ -336,20 +336,32 @@ export async function POST(request: NextRequest) {
     const problemsSolvedTotal = problemsCountSnapshot.data().count;
 
     // Trigger smart notifications (milestones, weak patterns, etc.)
-    // This runs async and won't block the response
-    triggerSessionNotifications({
-      userId,
-      problemId: problem_id,
-      scenarioId: scenario_id,
-      pattern,
-      performanceScore: performance_score,
-      masteryScore,
-      timeSpentMinutes: time_spent_minutes,
-      hintsUsed: hints_used,
-      streakDays: learningState?.streak_days || 0,
-      problemsSolvedTotal,
-      isNewProblem: !existingMastery,
-    }).catch(err => logger.error('Session notification error', { error: err }));
+    // Run async but with proper error handling and logging
+    (async () => {
+      try {
+        await triggerSessionNotifications({
+          userId,
+          problemId: problem_id,
+          scenarioId: scenario_id,
+          pattern,
+          performanceScore: performance_score,
+          masteryScore,
+          timeSpentMinutes: time_spent_minutes,
+          hintsUsed: hints_used,
+          streakDays: learningState?.streak_days || 0,
+          problemsSolvedTotal,
+          isNewProblem: !existingMastery,
+        });
+        logger.info('Session notifications triggered successfully', { userId, problemId: problem_id });
+      } catch (err) {
+        // Log the full error with stack trace for debugging
+        logger.error('Session notification error', {
+          error: err instanceof Error ? { message: err.message, stack: err.stack } : err,
+          userId,
+          problemId: problem_id,
+        });
+      }
+    })();
 
     // Calculate XP earned (gamification)
     let xpEarned = 10; // Base XP
