@@ -18,7 +18,7 @@ import {
   getReviewSchedule,
   type NotificationType,
   type NotificationKnowledge,
-} from '@/lib/rag/knowledge-base/notification-knowledge'
+} from "@/lib/rag/knowledge-base/notification-knowledge"
 import {
   getNotificationPreferences,
   createNotification,
@@ -27,21 +27,21 @@ import {
   shouldSendNotification,
   recordNotificationSent,
   getRecentNotificationsByType,
-} from '@/lib/notification-helpers'
+} from "@/lib/notification-helpers"
 import type {
   Notification,
   NotificationTriggerContext,
   NotificationSendResult,
   NotificationChannel,
   InAppNotification,
-} from '@/lib/types/notifications'
+} from "@/lib/types/notifications"
 import {
   sendSpacedRepetitionEmail,
   sendMilestoneEmail,
   sendInactivityEmail,
   sendInterviewCountdownEmail,
   sendDailyRoadmapEmail,
-} from '@/lib/email/notifications'
+} from "@/lib/email/notifications"
 
 // ============================================================================
 // MESSAGE GENERATION
@@ -53,7 +53,12 @@ import {
 export function generateNotificationMessage(
   knowledge: NotificationKnowledge,
   variables: Record<string, string | number>,
-  preferredTone: 'motivational' | 'informative' | 'urgent' | 'celebratory' | 'supportive' = 'informative'
+  preferredTone:
+    | "motivational"
+    | "informative"
+    | "urgent"
+    | "celebratory"
+    | "supportive" = "informative"
 ): { title: string; body: string } {
   // Find template with preferred tone, or fall back to first available
   const template =
@@ -70,24 +75,24 @@ export function generateNotificationMessage(
   // Replace variables in template
   let body = template.template
   for (const [key, value] of Object.entries(variables)) {
-    body = body.replace(new RegExp(`{${key}}`, 'g'), String(value))
+    body = body.replace(new RegExp(`{${key}}`, "g"), String(value))
   }
 
   // Generate title based on type
   const titles: Record<NotificationType, string> = {
-    welcome: 'Welcome to CodeSparring!',
-    spaced_repetition_review: 'Time to Review',
-    pattern_decay_alert: 'Pattern Needs Attention',
-    daily_practice_reminder: 'Daily Practice',
-    streak_maintenance: 'Keep Your Streak!',
-    interview_countdown: 'Interview Countdown',
-    milestone_celebration: 'Achievement Unlocked!',
-    weak_pattern_focus: 'Focus Area',
-    roadmap_behind: 'Roadmap Update',
-    optimal_review_time: 'Perfect Timing',
-    new_challenge_unlock: 'New Challenge',
-    rest_reminder: 'Rest Reminder',
-    mock_interview_due: 'Mock Interview Due',
+    welcome: "Welcome to CodeSparring!",
+    spaced_repetition_review: "Time to Review",
+    pattern_decay_alert: "Pattern Needs Attention",
+    daily_practice_reminder: "Daily Practice",
+    streak_maintenance: "Keep Your Streak!",
+    interview_countdown: "Interview Countdown",
+    milestone_celebration: "Achievement Unlocked!",
+    weak_pattern_focus: "Focus Area",
+    roadmap_behind: "Roadmap Update",
+    optimal_review_time: "Perfect Timing",
+    new_challenge_unlock: "New Challenge",
+    rest_reminder: "Rest Reminder",
+    mock_interview_due: "Mock Interview Due",
   }
 
   return {
@@ -105,18 +110,24 @@ export function generateNotificationMessage(
  */
 export async function evaluateTriggers(
   context: NotificationTriggerContext
-): Promise<Array<{ type: NotificationType; variables: Record<string, any>; priority: 'critical' | 'high' | 'medium' | 'low' }>> {
+): Promise<
+  Array<{
+    type: NotificationType
+    variables: Record<string, any>
+    priority: "critical" | "high" | "medium" | "low"
+  }>
+> {
   const notifications: Array<{
     type: NotificationType
     variables: Record<string, any>
-    priority: 'critical' | 'high' | 'medium' | 'low'
+    priority: "critical" | "high" | "medium" | "low"
   }> = []
 
   // 1. Check spaced repetition reviews
   if (context.dueReviews && context.dueReviews.length > 0) {
     const topReview = context.dueReviews[0]
     notifications.push({
-      type: 'spaced_repetition_review',
+      type: "spaced_repetition_review",
       variables: {
         problemName: topReview.problemName,
         pattern: topReview.pattern,
@@ -125,22 +136,22 @@ export async function evaluateTriggers(
         ),
         retention: Math.round(topReview.estimatedRetention * 100),
       },
-      priority: 'high',
+      priority: "high",
     })
   }
 
   // 2. Check pattern decay
   if (context.patternProficiencies) {
     for (const [pattern, data] of Object.entries(context.patternProficiencies)) {
-      if (data.trend === 'declining' && data.level !== 'novice') {
+      if (data.trend === "declining" && data.level !== "novice") {
         notifications.push({
-          type: 'pattern_decay_alert',
+          type: "pattern_decay_alert",
           variables: {
             pattern,
             previousLevel: data.level,
             daysSince: data.daysSincePractice,
           },
-          priority: 'high',
+          priority: "high",
         })
         break // Only one decay alert at a time
       }
@@ -150,14 +161,14 @@ export async function evaluateTriggers(
   // 3. Check daily practice
   if (!context.todayPracticed && context.streakDays && context.streakDays > 0) {
     notifications.push({
-      type: 'daily_practice_reminder',
+      type: "daily_practice_reminder",
       variables: {
         streakDays: context.streakDays,
-        todayPattern: 'your next pattern',
+        todayPattern: "your next pattern",
         problemCount: 3,
         estimatedTime: 30,
       },
-      priority: 'medium',
+      priority: "medium",
     })
   }
 
@@ -168,12 +179,12 @@ export async function evaluateTriggers(
 
     if (hoursLeft <= 4) {
       notifications.push({
-        type: 'streak_maintenance',
+        type: "streak_maintenance",
         variables: {
           streakDays: context.streakDays,
           hoursRemaining: hoursLeft,
         },
-        priority: 'medium',
+        priority: "medium",
       })
     }
   }
@@ -187,14 +198,14 @@ export async function evaluateTriggers(
     const milestones = [30, 14, 7, 3, 1]
     if (milestones.includes(daysUntil)) {
       notifications.push({
-        type: 'interview_countdown',
+        type: "interview_countdown",
         variables: {
           daysRemaining: daysUntil,
-          companyName: context.targetCompany || 'your target company',
+          companyName: context.targetCompany || "your target company",
           progressPercent: Math.round((context.roadmapProgress || 0) * 100),
           recommendation: getInterviewRecommendation(daysUntil, context.roadmapProgress || 0),
         },
-        priority: 'critical',
+        priority: "critical",
       })
     }
   }
@@ -212,14 +223,14 @@ export async function evaluateTriggers(
 
     if (behindBy >= 0.15 && daysRemaining > 7) {
       notifications.push({
-        type: 'roadmap_behind',
+        type: "roadmap_behind",
         variables: {
           behindPercent: Math.round(behindBy * 100),
           daysRemaining,
           extraProblemsPerDay: Math.ceil((behindBy * 100) / daysRemaining),
-          priorityPatterns: 'your weak patterns',
+          priorityPatterns: "your weak patterns",
         },
-        priority: 'high',
+        priority: "high",
       })
     }
   }
@@ -229,16 +240,16 @@ export async function evaluateTriggers(
     for (const [pattern, data] of Object.entries(context.patternProficiencies)) {
       if (data.lastScore < 50 && data.daysSincePractice > 3) {
         notifications.push({
-          type: 'weak_pattern_focus',
+          type: "weak_pattern_focus",
           variables: {
             pattern,
             successRate: data.lastScore,
             companyFrequency: 25, // Would need company data
-            companyName: context.targetCompany || 'top companies',
+            companyName: context.targetCompany || "top companies",
             currentLevel: data.level,
-            targetLevel: 'Intermediate',
+            targetLevel: "Intermediate",
           },
-          priority: 'high',
+          priority: "high",
         })
         break
       }
@@ -248,21 +259,21 @@ export async function evaluateTriggers(
   // 8. Check rest reminder
   if (context.practiceHoursToday && context.practiceHoursToday >= 3) {
     notifications.push({
-      type: 'rest_reminder',
+      type: "rest_reminder",
       variables: {
         consecutiveDays: context.consecutivePracticeDays || 1,
       },
-      priority: 'medium',
+      priority: "medium",
     })
   }
 
   if (context.consecutivePracticeDays && context.consecutivePracticeDays >= 7) {
     notifications.push({
-      type: 'rest_reminder',
+      type: "rest_reminder",
       variables: {
         consecutiveDays: context.consecutivePracticeDays,
       },
-      priority: 'medium',
+      priority: "medium",
     })
   }
 
@@ -274,20 +285,20 @@ export async function evaluateTriggers(
  */
 function getInterviewRecommendation(daysUntil: number, progress: number): string {
   if (daysUntil <= 1) {
-    return 'Rest well and stay confident. Light review only if needed.'
+    return "Rest well and stay confident. Light review only if needed."
   }
   if (daysUntil <= 3) {
-    return 'Focus on confidence. Review your strongest patterns.'
+    return "Focus on confidence. Review your strongest patterns."
   }
   if (daysUntil <= 7) {
     return progress >= 0.8
-      ? 'Great progress! Focus on weak areas now.'
-      : 'Prioritize must-know problems in your weak patterns.'
+      ? "Great progress! Focus on weak areas now."
+      : "Prioritize must-know problems in your weak patterns."
   }
   if (daysUntil <= 14) {
-    return 'Good time to tackle harder problems and mock interviews.'
+    return "Good time to tackle harder problems and mock interviews."
   }
-  return 'Building strong foundations. Consistency is key!'
+  return "Building strong foundations. Consistency is key!"
 }
 
 // ============================================================================
@@ -301,13 +312,13 @@ export async function sendNotification(
   userId: string,
   type: NotificationType,
   variables: Record<string, any>,
-  priority: 'critical' | 'high' | 'medium' | 'low' = 'medium'
+  priority: "critical" | "high" | "medium" | "low" = "medium"
 ): Promise<NotificationSendResult> {
   try {
     // Get notification knowledge
     const knowledge = getNotificationByType(type)
     if (!knowledge) {
-      return { success: false, error: 'Unknown notification type', channels: {} }
+      return { success: false, error: "Unknown notification type", channels: {} }
     }
 
     // Check if we should send
@@ -327,7 +338,7 @@ export async function sendNotification(
 
     // Determine channels
     const typePref = prefs.typePreferences[type]
-    const channels: NotificationChannel[] = typePref?.channels || ['in_app']
+    const channels: NotificationChannel[] = typePref?.channels || ["in_app"]
 
     // Generate message
     const { title, body } = generateNotificationMessage(knowledge, variables)
@@ -342,7 +353,7 @@ export async function sendNotification(
       scheduledFor: new Date().toISOString(),
       priority,
       channels,
-      status: 'pending',
+      status: "pending",
     })
 
     const result: NotificationSendResult = {
@@ -356,7 +367,7 @@ export async function sendNotification(
       if (!prefs.channels[channel]) continue
 
       switch (channel) {
-        case 'in_app':
+        case "in_app":
           await createInAppNotification({
             userId,
             type,
@@ -368,15 +379,15 @@ export async function sendNotification(
           result.channels.in_app = { success: true }
           break
 
-        case 'push':
+        case "push":
           // FCM would be implemented here
           // For now, mark as pending integration
           if (prefs.fcmToken) {
-            result.channels.push = { success: false, error: 'FCM not yet integrated' }
+            result.channels.push = { success: false, error: "FCM not yet integrated" }
           }
           break
 
-        case 'email':
+        case "email":
           // Send email based on notification type
           try {
             const emailResult = await sendNotificationEmail(
@@ -390,7 +401,7 @@ export async function sendNotification(
           } catch (emailError: any) {
             result.channels.email = {
               success: false,
-              error: emailError.message || 'Email sending failed'
+              error: emailError.message || "Email sending failed",
             }
           }
           break
@@ -404,7 +415,7 @@ export async function sendNotification(
   } catch (error: any) {
     return {
       success: false,
-      error: error.message || 'Unknown error',
+      error: error.message || "Unknown error",
       channels: {},
     }
   }
@@ -422,31 +433,31 @@ async function sendNotificationEmail(
   variables: Record<string, any>
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   // Get user email from Firestore
-  const { adminDb } = await import('@/lib/firebase-admin')
-  const profileDoc = await adminDb.collection('profiles').doc(userId).get()
+  const { adminDb } = await import("@/lib/firebase-admin")
+  const profileDoc = await adminDb.collection("profiles").doc(userId).get()
 
   if (!profileDoc.exists) {
-    return { success: false, error: 'User profile not found' }
+    return { success: false, error: "User profile not found" }
   }
 
   const profile = profileDoc.data()
   const email = profile?.email
-  const userName = profile?.full_name || ''
+  const userName = profile?.full_name || ""
 
   if (!email) {
-    return { success: false, error: 'User has no email address' }
+    return { success: false, error: "User has no email address" }
   }
 
   try {
     let result: { success: boolean; messageId?: string; error?: string }
 
     switch (type) {
-      case 'spaced_repetition_review':
+      case "spaced_repetition_review":
         result = await sendSpacedRepetitionEmail(email, {
           userName,
           userEmail: email,
-          topic: variables.problemName || 'your problem',
-          pattern: variables.pattern || 'DSA',
+          topic: variables.problemName || "your problem",
+          pattern: variables.pattern || "DSA",
           daysSinceReview: variables.daysSince || 0,
           lastScore: variables.retention || 70,
           reviewCount: variables.reviewCount || 1,
@@ -454,20 +465,25 @@ async function sendNotificationEmail(
         })
         break
 
-      case 'milestone_celebration':
+      case "milestone_celebration":
         result = await sendMilestoneEmail(email, {
           userName,
           userEmail: email,
-          milestoneType: variables.milestoneType || 'problems',
-          value: variables.problemCount || variables.streakDays || variables.pattern || 0,
+          milestoneType:
+            (variables.milestoneType as
+              | "problems_solved"
+              | "streak"
+              | "pattern_mastered"
+              | "first_session") || "problems_solved",
+          milestoneValue: variables.problemCount || variables.streakDays || variables.pattern || 0,
         })
         break
 
-      case 'interview_countdown':
+      case "interview_countdown":
         result = await sendInterviewCountdownEmail(email, {
           userName,
           userEmail: email,
-          targetCompany: variables.companyName || 'your target company',
+          targetCompany: variables.companyName || "your target company",
           daysUntilInterview: variables.daysRemaining || 7,
           questionsCompleted: variables.questionsCompleted || 0,
           totalQuestions: variables.totalQuestions || 50,
@@ -475,11 +491,11 @@ async function sendNotificationEmail(
         })
         break
 
-      case 'daily_practice_reminder':
+      case "daily_practice_reminder":
         result = await sendDailyRoadmapEmail(email, {
           userName,
           userEmail: email,
-          targetCompany: variables.companyName || 'your target company',
+          targetCompany: variables.companyName || "your target company",
           daysUntilInterview: variables.daysRemaining || 14,
           todaysQuestions: [],
           questionsCompleted: variables.questionsCompleted || 0,
@@ -488,10 +504,10 @@ async function sendNotificationEmail(
         })
         break
 
-      case 'streak_maintenance':
-      case 'weak_pattern_focus':
-      case 'pattern_decay_alert':
-      case 'roadmap_behind':
+      case "streak_maintenance":
+      case "weak_pattern_focus":
+      case "pattern_decay_alert":
+      case "roadmap_behind":
         // These are primarily in-app notifications
         // Send a generic inactivity-style email as fallback
         result = await sendInactivityEmail(email, {
@@ -510,42 +526,39 @@ async function sendNotificationEmail(
 
     return result
   } catch (error: any) {
-    return { success: false, error: error.message || 'Email sending failed' }
+    return { success: false, error: error.message || "Email sending failed" }
   }
 }
 
 /**
  * Get deep link for notification
  */
-function getNotificationLink(
-  type: NotificationType,
-  variables: Record<string, any>
-): string {
+function getNotificationLink(type: NotificationType, variables: Record<string, any>): string {
   switch (type) {
-    case 'spaced_repetition_review':
-    case 'optimal_review_time':
-      return `/practice?problem=${variables.problemId || ''}`
+    case "spaced_repetition_review":
+    case "optimal_review_time":
+      return `/practice?problem=${variables.problemId || ""}`
 
-    case 'pattern_decay_alert':
-    case 'weak_pattern_focus':
-      return `/practice?pattern=${variables.pattern || ''}`
+    case "pattern_decay_alert":
+    case "weak_pattern_focus":
+      return `/practice?pattern=${variables.pattern || ""}`
 
-    case 'daily_practice_reminder':
-    case 'streak_maintenance':
-      return '/practice'
+    case "daily_practice_reminder":
+    case "streak_maintenance":
+      return "/practice"
 
-    case 'interview_countdown':
-    case 'roadmap_behind':
-      return '/roadmap'
+    case "interview_countdown":
+    case "roadmap_behind":
+      return "/roadmap"
 
-    case 'milestone_celebration':
-      return '/dashboard'
+    case "milestone_celebration":
+      return "/dashboard"
 
-    case 'rest_reminder':
-      return '/'
+    case "rest_reminder":
+      return "/"
 
     default:
-      return '/dashboard'
+      return "/dashboard"
   }
 }
 
@@ -557,7 +570,7 @@ export async function scheduleNotification(
   type: NotificationType,
   variables: Record<string, any>,
   scheduledFor: Date,
-  priority: 'critical' | 'high' | 'medium' | 'low' = 'medium'
+  priority: "critical" | "high" | "medium" | "low" = "medium"
 ): Promise<{ success: boolean; queueItemId?: string; error?: string }> {
   try {
     const queueItem = await addToNotificationQueue({
@@ -589,12 +602,7 @@ export async function processUserNotifications(
   const errors: string[] = []
 
   for (const trigger of triggers) {
-    const result = await sendNotification(
-      userId,
-      trigger.type,
-      trigger.variables,
-      trigger.priority
-    )
+    const result = await sendNotification(userId, trigger.type, trigger.variables, trigger.priority)
 
     if (result.success) {
       sent++
@@ -625,14 +633,14 @@ export function calculateNextReviewDate(
   usedHints?: boolean
 ): Date {
   // Determine scenario
-  let scenario: 'new_problem' | 'struggling' | 'moderate' | 'mastered' = 'moderate'
+  let scenario: "new_problem" | "struggling" | "moderate" | "mastered" = "moderate"
 
   if (attemptNumber === 1) {
-    scenario = 'new_problem'
+    scenario = "new_problem"
   } else if (!wasSuccessful || (usedHints && attemptNumber <= 3)) {
-    scenario = 'struggling'
+    scenario = "struggling"
   } else if (attemptNumber >= 5 && wasSuccessful) {
-    scenario = 'mastered'
+    scenario = "mastered"
   }
 
   const schedule = getReviewSchedule(scenario)
@@ -725,7 +733,7 @@ export function detectMilestones(
   const problemMilestones = [10, 25, 50, 100, 200, 500]
   for (const milestone of problemMilestones) {
     if (previousStats.problemsSolved < milestone && currentStats.problemsSolved >= milestone) {
-      milestones.push({ type: 'problems_solved', value: milestone })
+      milestones.push({ type: "problems_solved", value: milestone })
     }
   }
 
@@ -734,14 +742,14 @@ export function detectMilestones(
     (p) => !previousStats.patternsCompleted.includes(p)
   )
   for (const pattern of newPatterns) {
-    milestones.push({ type: 'pattern_mastered', value: pattern })
+    milestones.push({ type: "pattern_mastered", value: pattern })
   }
 
   // Streak milestones
   const streakMilestones = [3, 7, 14, 30, 60, 100]
   for (const milestone of streakMilestones) {
     if (previousStats.streakDays < milestone && currentStats.streakDays >= milestone) {
-      milestones.push({ type: 'streak', value: milestone })
+      milestones.push({ type: "streak", value: milestone })
     }
   }
 

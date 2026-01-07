@@ -9,7 +9,7 @@ import { analyzeAndTrackMisconceptions } from "@/lib/rag/misconception-detection
 import { logger } from "@/lib/logger"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import { calculateMasteryScore } from "@/lib/spaced-repetition/mastery-score"
-import type { Difficulty } from "@/lib/spaced-repetition/types"
+import type { Difficulty } from "@/lib/spaced-repetition"
 
 // Import feedback system modules
 import {

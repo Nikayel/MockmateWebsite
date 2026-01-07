@@ -11,11 +11,15 @@
  * - Temporal Profile: Skill decay, retention curves, growth predictions
  */
 
-import type { DSAPattern } from '@/lib/types/dsa-patterns'
-import type { CompanyId } from '@/lib/data/company-questions/types'
-import { adminDb } from '@/lib/firebase-admin'
-import { Timestamp } from 'firebase-admin/firestore'
-import { getUserPerformanceRAG, type UserPerformanceProfile, type SessionAnalysis } from './user-performance-rag'
+import type { DSAPattern } from "@/lib/types/dsa-patterns"
+import type { CompanyId } from "@/lib/data/company-questions/types"
+import { adminDb } from "@/lib/firebase-admin"
+import { Timestamp } from "firebase-admin/firestore"
+import {
+  getUserPerformanceRAG,
+  type UserPerformanceProfile,
+  type SessionAnalysis,
+} from "./user-performance-rag"
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -27,29 +31,29 @@ import { getUserPerformanceRAG, type UserPerformanceProfile, type SessionAnalysi
 export interface CognitiveProfile {
   // Learning style indicators
   learningStyle: {
-    primary: 'visual' | 'textual' | 'example-based' | 'exploratory'
-    secondary: 'visual' | 'textual' | 'example-based' | 'exploratory' | null
+    primary: "visual" | "textual" | "example-based" | "exploratory"
+    secondary: "visual" | "textual" | "example-based" | "exploratory" | null
     confidence: number // 0-100
   }
 
   // Problem-solving approach
   problemSolvingApproach: {
-    style: 'top-down' | 'bottom-up' | 'mixed'
-    planningTendency: 'planner' | 'improviser' | 'balanced' // Do they plan before coding?
-    debuggingStyle: 'systematic' | 'intuitive' | 'print-based'
+    style: "top-down" | "bottom-up" | "mixed"
+    planningTendency: "planner" | "improviser" | "balanced" // Do they plan before coding?
+    debuggingStyle: "systematic" | "intuitive" | "print-based"
   }
 
   // Pattern recognition ability
   patternRecognition: {
-    speed: 'slow' | 'moderate' | 'fast'
+    speed: "slow" | "moderate" | "fast"
     accuracy: number // 0-100
     transferAbility: number // Can apply patterns to new contexts (0-100)
   }
 
   // Working memory indicators
   workingMemory: {
-    complexityTolerance: 'low' | 'medium' | 'high' // Handles complex problems?
-    contextSwitchingCost: 'low' | 'medium' | 'high' // How much perf drops when switching
+    complexityTolerance: "low" | "medium" | "high" // Handles complex problems?
+    contextSwitchingCost: "low" | "medium" | "high" // How much perf drops when switching
   }
 }
 
@@ -59,9 +63,9 @@ export interface CognitiveProfile {
 export interface BehavioralProfile {
   // Motivation patterns
   motivation: {
-    type: 'streak-driven' | 'goal-driven' | 'mastery-driven' | 'social-driven'
+    type: "streak-driven" | "goal-driven" | "mastery-driven" | "social-driven"
     consistency: number // 0-100, how regular is practice
-    peakMotivationDay: 'weekday' | 'weekend' | 'any'
+    peakMotivationDay: "weekday" | "weekend" | "any"
   }
 
   // Engagement signals
@@ -74,14 +78,14 @@ export interface BehavioralProfile {
 
   // Challenge preference
   challengePreference: {
-    optimalDifficulty: 'easy' | 'medium' | 'hard' | 'adaptive'
-    riskTolerance: 'low' | 'medium' | 'high' // Tries hard problems?
+    optimalDifficulty: "easy" | "medium" | "hard" | "adaptive"
+    riskTolerance: "low" | "medium" | "high" // Tries hard problems?
     frustrationThreshold: number // Minutes before giving up (0 = never gives up)
   }
 
   // Fatigue/burnout signals
   fatigue: {
-    currentLevel: 'none' | 'mild' | 'moderate' | 'high'
+    currentLevel: "none" | "mild" | "moderate" | "high"
     burnoutRisk: number // 0-100
     recommendedBreak: boolean
     lastBreakDays: number
@@ -122,10 +126,10 @@ export interface PrerequisiteGap {
   pattern: DSAPattern
   missingPrerequisites: {
     concept: string
-    importance: 'critical' | 'important' | 'helpful'
+    importance: "critical" | "important" | "helpful"
     suggestedResource?: string
   }[]
-  impact: 'blocking' | 'slowing' | 'minor'
+  impact: "blocking" | "slowing" | "minor"
 }
 
 export interface DetectedMisconception {
@@ -136,21 +140,21 @@ export interface DetectedMisconception {
   description: string
   frequency: number // How often this error occurs
   lastSeen: Date
-  status: 'active' | 'resolving' | 'resolved'
+  status: "active" | "resolving" | "resolved"
   suggestedFix: string
 }
 
 export type MisconceptionType =
-  | 'off-by-one'
-  | 'wrong-data-structure'
-  | 'incorrect-complexity'
-  | 'missing-edge-case'
-  | 'wrong-algorithm'
-  | 'syntax-confusion'
-  | 'logic-error'
-  | 'boundary-confusion'
-  | 'initialization-error'
-  | 'termination-condition'
+  | "off-by-one"
+  | "wrong-data-structure"
+  | "incorrect-complexity"
+  | "missing-edge-case"
+  | "wrong-algorithm"
+  | "syntax-confusion"
+  | "logic-error"
+  | "boundary-confusion"
+  | "initialization-error"
+  | "termination-condition"
 
 /**
  * Temporal profile - skill changes over time
@@ -161,7 +165,7 @@ export interface TemporalProfile {
     pattern: DSAPattern
     daysSincePractice: number
     estimatedDecay: number // % of skill lost
-    urgency: 'none' | 'low' | 'medium' | 'high'
+    urgency: "none" | "low" | "medium" | "high"
   }[]
 
   // Retention analysis
@@ -174,7 +178,7 @@ export interface TemporalProfile {
   // Growth trajectory
   growth: {
     currentVelocity: number // Score improvement per week
-    projectedLevel: 'beginner' | 'intermediate' | 'advanced' | 'expert'
+    projectedLevel: "beginner" | "intermediate" | "advanced" | "expert"
     projectedTimeToGoal: number | null // Days to reach target
     accelerating: boolean
   }
@@ -184,7 +188,7 @@ export interface TemporalProfile {
     pattern: DSAPattern
     nextReviewDate: Date
     intervalDays: number
-    priority: 'critical' | 'high' | 'medium' | 'low'
+    priority: "critical" | "high" | "medium" | "low"
   }[]
 }
 
@@ -217,13 +221,13 @@ export interface EnhancedUserProfile {
 
 export interface UserInsight {
   id: string
-  type: 'strength' | 'weakness' | 'opportunity' | 'risk' | 'milestone'
+  type: "strength" | "weakness" | "opportunity" | "risk" | "milestone"
   icon: string // Emoji for UI
   title: string
   description: string
   actionable: boolean
   action?: string
-  priority: 'high' | 'medium' | 'low'
+  priority: "high" | "medium" | "low"
   createdAt: Date
 }
 
@@ -240,26 +244,26 @@ function analyzeCognitiveProfile(sessions: SessionAnalysis[]): CognitiveProfile 
   }
 
   // Analyze learning style based on hint usage and code patterns
-  const hintHeavySessions = sessions.filter(s => s.hintsUsed > 2).length
-  const quickSolves = sessions.filter(s => s.duration < 900 && s.score > 70).length // < 15 min
-  const exploratorySignals = sessions.filter(s => s.testsRun > 5).length
+  const hintHeavySessions = sessions.filter((s) => s.hintsUsed > 2).length
+  const quickSolves = sessions.filter((s) => s.duration < 900 && s.score > 70).length // < 15 min
+  const exploratorySignals = sessions.filter((s) => s.testsRun > 5).length
 
-  let primaryStyle: CognitiveProfile['learningStyle']['primary'] = 'textual'
+  let primaryStyle: CognitiveProfile["learningStyle"]["primary"] = "textual"
   if (hintHeavySessions / sessions.length > 0.5) {
-    primaryStyle = 'example-based'
+    primaryStyle = "example-based"
   } else if (exploratorySignals / sessions.length > 0.4) {
-    primaryStyle = 'exploratory'
+    primaryStyle = "exploratory"
   } else if (quickSolves / sessions.length > 0.3) {
-    primaryStyle = 'visual' // Quick pattern recognition suggests visual
+    primaryStyle = "visual" // Quick pattern recognition suggests visual
   }
 
   // Analyze problem-solving approach
-  const avgTestsBeforePass = sessions
-    .filter(s => s.score > 70)
-    .reduce((sum, s) => sum + s.testsRun, 0) / Math.max(sessions.filter(s => s.score > 70).length, 1)
+  const avgTestsBeforePass =
+    sessions.filter((s) => s.score > 70).reduce((sum, s) => sum + s.testsRun, 0) /
+    Math.max(sessions.filter((s) => s.score > 70).length, 1)
 
-  const planningTendency = avgTestsBeforePass < 3 ? 'planner' :
-    avgTestsBeforePass > 7 ? 'improviser' : 'balanced'
+  const planningTendency =
+    avgTestsBeforePass < 3 ? "planner" : avgTestsBeforePass > 7 ? "improviser" : "balanced"
 
   // Analyze pattern recognition
   const patternScores = new Map<DSAPattern, number[]>()
@@ -270,8 +274,9 @@ function analyzeCognitiveProfile(sessions: SessionAnalysis[]): CognitiveProfile 
   }
 
   let transferAbility = 50
-  const patternsWithMultipleSessions = Array.from(patternScores.entries())
-    .filter(([, scores]) => scores.length >= 2)
+  const patternsWithMultipleSessions = Array.from(patternScores.entries()).filter(
+    ([, scores]) => scores.length >= 2
+  )
 
   if (patternsWithMultipleSessions.length >= 2) {
     // Check if improvement in one pattern correlates with improvement in related patterns
@@ -285,35 +290,48 @@ function analyzeCognitiveProfile(sessions: SessionAnalysis[]): CognitiveProfile 
 
   // Complexity tolerance
   const hardProblemSuccess = sessions
-    .filter(s => s.difficulty === 'hard')
-    .filter(s => s.score > 60).length
-  const hardProblemAttempts = sessions.filter(s => s.difficulty === 'hard').length
+    .filter((s) => s.difficulty === "hard")
+    .filter((s) => s.score > 60).length
+  const hardProblemAttempts = sessions.filter((s) => s.difficulty === "hard").length
 
-  const complexityTolerance = hardProblemAttempts === 0 ? 'medium' :
-    hardProblemSuccess / hardProblemAttempts > 0.5 ? 'high' :
-    hardProblemSuccess / hardProblemAttempts > 0.2 ? 'medium' : 'low'
+  const complexityTolerance =
+    hardProblemAttempts === 0
+      ? "medium"
+      : hardProblemSuccess / hardProblemAttempts > 0.5
+        ? "high"
+        : hardProblemSuccess / hardProblemAttempts > 0.2
+          ? "medium"
+          : "low"
 
   return {
     learningStyle: {
       primary: primaryStyle,
-      secondary: primaryStyle === 'textual' ? 'example-based' : 'textual',
+      secondary: primaryStyle === "textual" ? "example-based" : "textual",
       confidence: Math.min(100, sessions.length * 5),
     },
     problemSolvingApproach: {
-      style: planningTendency === 'planner' ? 'top-down' :
-        planningTendency === 'improviser' ? 'bottom-up' : 'mixed',
+      style:
+        planningTendency === "planner"
+          ? "top-down"
+          : planningTendency === "improviser"
+            ? "bottom-up"
+            : "mixed",
       planningTendency,
-      debuggingStyle: avgTestsBeforePass > 5 ? 'print-based' : 'systematic',
+      debuggingStyle: avgTestsBeforePass > 5 ? "print-based" : "systematic",
     },
     patternRecognition: {
-      speed: quickSolves / sessions.length > 0.4 ? 'fast' :
-        quickSolves / sessions.length > 0.2 ? 'moderate' : 'slow',
+      speed:
+        quickSolves / sessions.length > 0.4
+          ? "fast"
+          : quickSolves / sessions.length > 0.2
+            ? "moderate"
+            : "slow",
       accuracy: sessions.reduce((sum, s) => sum + s.score, 0) / sessions.length,
       transferAbility,
     },
     workingMemory: {
       complexityTolerance,
-      contextSwitchingCost: 'medium', // Would need more data to determine
+      contextSwitchingCost: "medium", // Would need more data to determine
     },
   }
 }
@@ -340,27 +358,35 @@ function analyzeBehavioralProfile(sessions: SessionAnalysis[]): BehavioralProfil
   // Peak motivation day
   const weekendSessions = (sessionsByDay.get(0) || 0) + (sessionsByDay.get(6) || 0)
   const weekdaySessions = sessions.length - weekendSessions
-  const peakMotivationDay = weekendSessions > weekdaySessions * 0.4 ? 'weekend' :
-    weekdaySessions > weekendSessions * 2 ? 'weekday' : 'any'
+  const peakMotivationDay =
+    weekendSessions > weekdaySessions * 0.4
+      ? "weekend"
+      : weekdaySessions > weekendSessions * 2
+        ? "weekday"
+        : "any"
 
   // Consistency calculation
   const weeksActive = sessionsByWeek.size
-  const totalWeeks = Math.max(1, Math.ceil(
-    (Date.now() - Math.min(...sessions.map(s => s.timestamp.getTime()))) / (7 * 24 * 60 * 60 * 1000)
-  ))
+  const totalWeeks = Math.max(
+    1,
+    Math.ceil(
+      (Date.now() - Math.min(...sessions.map((s) => s.timestamp.getTime()))) /
+        (7 * 24 * 60 * 60 * 1000)
+    )
+  )
   const consistency = Math.min(100, (weeksActive / totalWeeks) * 100)
 
   // Average session metrics
   const avgSessionLength = sessions.reduce((sum, s) => sum + s.duration, 0) / sessions.length / 60
-  const completedSessions = sessions.filter(s => s.score > 0).length
+  const completedSessions = sessions.filter((s) => s.score > 0).length
   const completionRate = (completedSessions / sessions.length) * 100
-  const hintUsageRate = (sessions.filter(s => s.hintsUsed > 0).length / sessions.length) * 100
+  const hintUsageRate = (sessions.filter((s) => s.hintsUsed > 0).length / sessions.length) * 100
 
   // Challenge preference
   const difficultyAttempts = {
-    easy: sessions.filter(s => s.difficulty === 'easy').length,
-    medium: sessions.filter(s => s.difficulty === 'medium').length,
-    hard: sessions.filter(s => s.difficulty === 'hard').length,
+    easy: sessions.filter((s) => s.difficulty === "easy").length,
+    medium: sessions.filter((s) => s.difficulty === "medium").length,
+    hard: sessions.filter((s) => s.difficulty === "hard").length,
   }
   const totalAttempts = sessions.length
   const hardRatio = difficultyAttempts.hard / totalAttempts
@@ -369,22 +395,30 @@ function analyzeBehavioralProfile(sessions: SessionAnalysis[]): BehavioralProfil
   const recentSessions = sessions.slice(0, 10)
   const recentAvgScore = recentSessions.reduce((sum, s) => sum + s.score, 0) / recentSessions.length
   const olderSessions = sessions.slice(10, 20)
-  const olderAvgScore = olderSessions.length > 0 ?
-    olderSessions.reduce((sum, s) => sum + s.score, 0) / olderSessions.length : recentAvgScore
+  const olderAvgScore =
+    olderSessions.length > 0
+      ? olderSessions.reduce((sum, s) => sum + s.score, 0) / olderSessions.length
+      : recentAvgScore
 
   const performanceDrop = olderAvgScore - recentAvgScore
-  const fatigueLevel = performanceDrop > 20 ? 'high' :
-    performanceDrop > 10 ? 'moderate' :
-    performanceDrop > 5 ? 'mild' : 'none'
+  const fatigueLevel =
+    performanceDrop > 20
+      ? "high"
+      : performanceDrop > 10
+        ? "moderate"
+        : performanceDrop > 5
+          ? "mild"
+          : "none"
 
   // Days since last session
   const lastSessionDate = sessions[0]?.timestamp || new Date()
-  const daysSinceLastSession = Math.floor((Date.now() - lastSessionDate.getTime()) / (24 * 60 * 60 * 1000))
+  const daysSinceLastSession = Math.floor(
+    (Date.now() - lastSessionDate.getTime()) / (24 * 60 * 60 * 1000)
+  )
 
   return {
     motivation: {
-      type: consistency > 70 ? 'streak-driven' :
-        hardRatio > 0.3 ? 'mastery-driven' : 'goal-driven',
+      type: consistency > 70 ? "streak-driven" : hardRatio > 0.3 ? "mastery-driven" : "goal-driven",
       consistency,
       peakMotivationDay,
     },
@@ -395,15 +429,20 @@ function analyzeBehavioralProfile(sessions: SessionAnalysis[]): BehavioralProfil
       hintUsageRate,
     },
     challengePreference: {
-      optimalDifficulty: difficultyAttempts.hard > difficultyAttempts.easy ? 'hard' :
-        difficultyAttempts.medium > difficultyAttempts.easy ? 'medium' : 'adaptive',
-      riskTolerance: hardRatio > 0.3 ? 'high' : hardRatio > 0.1 ? 'medium' : 'low',
+      optimalDifficulty:
+        difficultyAttempts.hard > difficultyAttempts.easy
+          ? "hard"
+          : difficultyAttempts.medium > difficultyAttempts.easy
+            ? "medium"
+            : "adaptive",
+      riskTolerance: hardRatio > 0.3 ? "high" : hardRatio > 0.1 ? "medium" : "low",
       frustrationThreshold: avgSessionLength * 2, // Estimate based on avg session
     },
     fatigue: {
       currentLevel: fatigueLevel,
-      burnoutRisk: fatigueLevel === 'high' ? 80 : fatigueLevel === 'moderate' ? 50 : 20,
-      recommendedBreak: fatigueLevel === 'high' || daysSinceLastSession === 0 && sessions.length > 3,
+      burnoutRisk: fatigueLevel === "high" ? 80 : fatigueLevel === "moderate" ? 50 : 20,
+      recommendedBreak:
+        fatigueLevel === "high" || (daysSinceLastSession === 0 && sessions.length > 3),
       lastBreakDays: daysSinceLastSession,
     },
   }
@@ -421,23 +460,23 @@ function buildKnowledgeGraph(
 
   // Pattern to concepts mapping
   const patternConcepts: Record<string, string[]> = {
-    'arrays-hashing': ['hash-maps', 'two-pointers', 'frequency-counting', 'prefix-sum'],
-    'two-pointers': ['pointer-manipulation', 'sliding-window-basics', 'sorted-array-tricks'],
-    'sliding-window': ['window-expansion', 'window-contraction', 'window-state'],
-    'stack': ['lifo-principle', 'monotonic-stack', 'expression-parsing'],
-    'binary-search': ['search-space', 'mid-calculation', 'boundary-conditions'],
-    'linked-list': ['pointer-manipulation', 'fast-slow-pointers', 'reversal'],
-    'trees': ['tree-traversal', 'recursion', 'bfs-dfs'],
-    'heap': ['heap-property', 'priority-queue', 'k-elements'],
-    'backtracking': ['state-space-tree', 'pruning', 'constraint-satisfaction'],
-    'graphs': ['graph-representation', 'bfs', 'dfs', 'shortest-path'],
-    'dp-1d': ['overlapping-subproblems', 'optimal-substructure', 'memoization'],
-    'dp-2d': ['state-transitions', 'grid-dp', 'string-dp'],
-    'greedy': ['local-optimum', 'proof-of-correctness', 'sorting-strategy'],
-    'intervals': ['interval-sorting', 'merge-intervals', 'sweep-line'],
-    'bit-manipulation': ['bitwise-operators', 'bit-masking', 'xor-tricks'],
-    'trie': ['prefix-tree', 'string-matching', 'autocomplete'],
-    'union-find': ['disjoint-sets', 'path-compression', 'union-by-rank'],
+    "arrays-hashing": ["hash-maps", "two-pointers", "frequency-counting", "prefix-sum"],
+    "two-pointers": ["pointer-manipulation", "sliding-window-basics", "sorted-array-tricks"],
+    "sliding-window": ["window-expansion", "window-contraction", "window-state"],
+    stack: ["lifo-principle", "monotonic-stack", "expression-parsing"],
+    "binary-search": ["search-space", "mid-calculation", "boundary-conditions"],
+    "linked-list": ["pointer-manipulation", "fast-slow-pointers", "reversal"],
+    trees: ["tree-traversal", "recursion", "bfs-dfs"],
+    heap: ["heap-property", "priority-queue", "k-elements"],
+    backtracking: ["state-space-tree", "pruning", "constraint-satisfaction"],
+    graphs: ["graph-representation", "bfs", "dfs", "shortest-path"],
+    "dp-1d": ["overlapping-subproblems", "optimal-substructure", "memoization"],
+    "dp-2d": ["state-transitions", "grid-dp", "string-dp"],
+    greedy: ["local-optimum", "proof-of-correctness", "sorting-strategy"],
+    intervals: ["interval-sorting", "merge-intervals", "sweep-line"],
+    "bit-manipulation": ["bitwise-operators", "bit-masking", "xor-tricks"],
+    trie: ["prefix-tree", "string-matching", "autocomplete"],
+    "union-find": ["disjoint-sets", "path-compression", "union-by-rank"],
   }
 
   // Analyze concept mastery - only for patterns the user has actually practiced
@@ -453,10 +492,12 @@ function buildKnowledgeGraph(
 
   for (const [pattern, patternSessionList] of patternSessions) {
     const conceptList = patternConcepts[pattern] || [pattern]
-    const avgScore = patternSessionList.reduce((sum, s) => sum + s.score, 0) / patternSessionList.length
+    const avgScore =
+      patternSessionList.reduce((sum, s) => sum + s.score, 0) / patternSessionList.length
     const lastPracticed = patternSessionList[0]?.timestamp || null
-    const daysSincePractice = lastPracticed ?
-      (Date.now() - lastPracticed.getTime()) / (24 * 60 * 60 * 1000) : 999
+    const daysSincePractice = lastPracticed
+      ? (Date.now() - lastPracticed.getTime()) / (24 * 60 * 60 * 1000)
+      : 999
 
     for (const concept of conceptList) {
       // Calculate decay (skills decay ~10% per week without practice)
@@ -479,12 +520,12 @@ function buildKnowledgeGraph(
   // Detect prerequisite gaps - ONLY for patterns the user has actually attempted
   // Don't show gaps for patterns they haven't tried yet
   const patternPrerequisites: Record<string, DSAPattern[]> = {
-    'dp-1d': ['arrays-hashing', 'recursion' as DSAPattern],
-    'dp-2d': ['dp-1d'],
-    'graphs': ['trees', 'stack'],
-    'backtracking': ['trees', 'recursion' as DSAPattern],
-    'heap': ['arrays-hashing', 'trees'],
-    'trie': ['trees', 'strings' as DSAPattern],
+    "dp-1d": ["arrays-hashing", "recursion" as DSAPattern],
+    "dp-2d": ["dp-1d"],
+    graphs: ["trees", "stack"],
+    backtracking: ["trees", "recursion" as DSAPattern],
+    heap: ["arrays-hashing", "trees"],
+    trie: ["trees", "strings" as DSAPattern],
   }
 
   for (const [pattern, prereqs] of Object.entries(patternPrerequisites)) {
@@ -494,13 +535,13 @@ function buildKnowledgeGraph(
       continue
     }
 
-    const patternMastery = concepts.find(c => c.parentPattern === pattern)?.predictedMastery || 0
+    const patternMastery = concepts.find((c) => c.parentPattern === pattern)?.predictedMastery || 0
 
     // Only flag as a gap if they're struggling with the pattern (score < 60)
     if (patternMastery < 60) {
-      const missingPrereqs = prereqs.filter(prereq => {
+      const missingPrereqs = prereqs.filter((prereq) => {
         // Check if they've practiced the prerequisite
-        const prereqConcept = concepts.find(c => c.parentPattern === prereq)
+        const prereqConcept = concepts.find((c) => c.parentPattern === prereq)
         // If they haven't practiced prereq OR their prereq mastery is low
         const prereqMastery = prereqConcept?.predictedMastery || 0
         // Only flag if prereq wasn't practiced or has low score
@@ -510,11 +551,13 @@ function buildKnowledgeGraph(
       if (missingPrereqs.length > 0) {
         gaps.push({
           pattern: pattern as DSAPattern,
-          missingPrerequisites: missingPrereqs.map(prereq => ({
+          missingPrerequisites: missingPrereqs.map((prereq) => ({
             concept: prereq,
-            importance: practicedPatterns.has(prereq) ? 'important' as const : 'critical' as const,
+            importance: practicedPatterns.has(prereq)
+              ? ("important" as const)
+              : ("critical" as const),
           })),
-          impact: missingPrereqs.length > 1 ? 'blocking' : 'slowing',
+          impact: missingPrereqs.length > 1 ? "blocking" : "slowing",
         })
       }
     }
@@ -525,8 +568,8 @@ function buildKnowledgeGraph(
     gaps,
     misconceptions: existingMisconceptions,
     connections: {
-      strongConnections: concepts.filter(c => c.predictedMastery > 70).map(c => c.concept),
-      weakConnections: concepts.filter(c => c.predictedMastery < 40).map(c => c.concept),
+      strongConnections: concepts.filter((c) => c.predictedMastery > 70).map((c) => c.concept),
+      weakConnections: concepts.filter((c) => c.predictedMastery < 40).map((c) => c.concept),
     },
   }
 }
@@ -539,11 +582,14 @@ function buildTemporalProfile(
   knowledgeGraph: KnowledgeGraph
 ): TemporalProfile {
   // Skill decay analysis
-  const skillDecay: TemporalProfile['skillDecay'] = []
+  const skillDecay: TemporalProfile["skillDecay"] = []
   const patternLastPracticed = new Map<DSAPattern, Date>()
 
   for (const s of sessions) {
-    if (!patternLastPracticed.has(s.pattern) || s.timestamp > patternLastPracticed.get(s.pattern)!) {
+    if (
+      !patternLastPracticed.has(s.pattern) ||
+      s.timestamp > patternLastPracticed.get(s.pattern)!
+    ) {
       patternLastPracticed.set(s.pattern, s.timestamp)
     }
   }
@@ -556,46 +602,55 @@ function buildTemporalProfile(
       pattern,
       daysSincePractice: Math.floor(daysSince),
       estimatedDecay: decay,
-      urgency: decay > 30 ? 'high' : decay > 20 ? 'medium' : decay > 10 ? 'low' : 'none',
+      urgency: decay > 30 ? "high" : decay > 20 ? "medium" : decay > 10 ? "low" : "none",
     })
   }
 
   // Retention analysis
   const retentionScores = sessions
-    .filter(s => s.score > 60)
-    .map(s => {
+    .filter((s) => s.score > 60)
+    .map((s) => {
       // Check if there's a follow-up session on the same pattern
-      const followUp = sessions.find(fs =>
-        fs.pattern === s.pattern &&
-        fs.timestamp > s.timestamp &&
-        fs.timestamp.getTime() - s.timestamp.getTime() > 24 * 60 * 60 * 1000
+      const followUp = sessions.find(
+        (fs) =>
+          fs.pattern === s.pattern &&
+          fs.timestamp > s.timestamp &&
+          fs.timestamp.getTime() - s.timestamp.getTime() > 24 * 60 * 60 * 1000
       )
       return followUp ? followUp.score : null
     })
     .filter((s): s is number => s !== null)
 
-  const avgRetention = retentionScores.length > 0 ?
-    retentionScores.reduce((a, b) => a + b, 0) / retentionScores.length : 70
+  const avgRetention =
+    retentionScores.length > 0
+      ? retentionScores.reduce((a, b) => a + b, 0) / retentionScores.length
+      : 70
 
   // Growth trajectory
-  const recentScores = sessions.slice(0, 10).map(s => s.score)
-  const olderScores = sessions.slice(10, 20).map(s => s.score)
-  const recentAvg = recentScores.length > 0 ? recentScores.reduce((a, b) => a + b, 0) / recentScores.length : 0
-  const olderAvg = olderScores.length > 0 ? olderScores.reduce((a, b) => a + b, 0) / olderScores.length : recentAvg
+  const recentScores = sessions.slice(0, 10).map((s) => s.score)
+  const olderScores = sessions.slice(10, 20).map((s) => s.score)
+  const recentAvg =
+    recentScores.length > 0 ? recentScores.reduce((a, b) => a + b, 0) / recentScores.length : 0
+  const olderAvg =
+    olderScores.length > 0 ? olderScores.reduce((a, b) => a + b, 0) / olderScores.length : recentAvg
 
   const velocity = (recentAvg - olderAvg) / Math.max(1, sessions.length / 10) // Per week estimate
 
   // Review schedule based on spaced repetition
-  const reviewSchedule: TemporalProfile['reviewSchedule'] = skillDecay
-    .filter(sd => sd.urgency !== 'none')
-    .map(sd => {
-      const baseDays = sd.urgency === 'high' ? 1 : sd.urgency === 'medium' ? 3 : 7
+  const reviewSchedule: TemporalProfile["reviewSchedule"] = skillDecay
+    .filter((sd) => sd.urgency !== "none")
+    .map((sd) => {
+      const baseDays = sd.urgency === "high" ? 1 : sd.urgency === "medium" ? 3 : 7
       return {
         pattern: sd.pattern,
         nextReviewDate: new Date(Date.now() + baseDays * 24 * 60 * 60 * 1000),
         intervalDays: baseDays,
-        priority: sd.urgency === 'high' ? 'critical' as const :
-          sd.urgency === 'medium' ? 'high' as const : 'medium' as const,
+        priority:
+          sd.urgency === "high"
+            ? ("critical" as const)
+            : sd.urgency === "medium"
+              ? ("high" as const)
+              : ("medium" as const),
       }
     })
     .sort((a, b) => a.nextReviewDate.getTime() - b.nextReviewDate.getTime())
@@ -609,7 +664,7 @@ function buildTemporalProfile(
     },
     growth: {
       currentVelocity: velocity,
-      projectedLevel: recentAvg > 80 ? 'advanced' : recentAvg > 60 ? 'intermediate' : 'beginner',
+      projectedLevel: recentAvg > 80 ? "advanced" : recentAvg > 60 ? "intermediate" : "beginner",
       projectedTimeToGoal: velocity > 0 ? Math.ceil((80 - recentAvg) / velocity) * 7 : null,
       accelerating: velocity > 2,
     },
@@ -630,16 +685,16 @@ function generateInsights(
   const now = new Date()
 
   // Strength insights
-  if (cognitive.patternRecognition.speed === 'fast') {
+  if (cognitive.patternRecognition.speed === "fast") {
     insights.push({
-      id: 'insight-fast-pattern',
-      type: 'strength',
-      icon: '⚡',
-      title: 'Quick Pattern Recognition',
-      description: 'You identify patterns faster than average. Use this to tackle harder problems.',
+      id: "insight-fast-pattern",
+      type: "strength",
+      icon: "⚡",
+      title: "Quick Pattern Recognition",
+      description: "You identify patterns faster than average. Use this to tackle harder problems.",
       actionable: true,
-      action: 'Try more hard-level problems',
-      priority: 'medium',
+      action: "Try more hard-level problems",
+      priority: "medium",
       createdAt: now,
     })
   }
@@ -648,45 +703,45 @@ function generateInsights(
   if (knowledgeGraph.gaps.length > 0) {
     const criticalGap = knowledgeGraph.gaps[0]
     insights.push({
-      id: 'insight-prereq-gap',
-      type: 'weakness',
-      icon: '🔧',
+      id: "insight-prereq-gap",
+      type: "weakness",
+      icon: "🔧",
       title: `Prerequisite Gap: ${criticalGap.pattern}`,
-      description: `You're missing foundations in ${criticalGap.missingPrerequisites.map(p => p.concept).join(', ')}`,
+      description: `You're missing foundations in ${criticalGap.missingPrerequisites.map((p) => p.concept).join(", ")}`,
       actionable: true,
       action: `Practice ${criticalGap.missingPrerequisites[0].concept} first`,
-      priority: 'high',
+      priority: "high",
       createdAt: now,
     })
   }
 
   // Fatigue warning
-  if (behavioral.fatigue.currentLevel === 'high') {
+  if (behavioral.fatigue.currentLevel === "high") {
     insights.push({
-      id: 'insight-fatigue',
-      type: 'risk',
-      icon: '😴',
-      title: 'Fatigue Detected',
-      description: 'Your recent performance is dropping. Consider taking a break.',
+      id: "insight-fatigue",
+      type: "risk",
+      icon: "😴",
+      title: "Fatigue Detected",
+      description: "Your recent performance is dropping. Consider taking a break.",
       actionable: true,
-      action: 'Take a 1-2 day break',
-      priority: 'high',
+      action: "Take a 1-2 day break",
+      priority: "high",
       createdAt: now,
     })
   }
 
   // Decay warning
-  const urgentDecay = temporal.skillDecay.find(sd => sd.urgency === 'high')
+  const urgentDecay = temporal.skillDecay.find((sd) => sd.urgency === "high")
   if (urgentDecay) {
     insights.push({
-      id: 'insight-decay',
-      type: 'risk',
-      icon: '📉',
+      id: "insight-decay",
+      type: "risk",
+      icon: "📉",
       title: `Skill Decay: ${urgentDecay.pattern}`,
       description: `You haven't practiced ${urgentDecay.pattern} in ${urgentDecay.daysSincePractice} days. Skills are fading.`,
       actionable: true,
       action: `Review ${urgentDecay.pattern} today`,
-      priority: 'high',
+      priority: "high",
       createdAt: now,
     })
   }
@@ -694,13 +749,13 @@ function generateInsights(
   // Opportunity insights
   if (temporal.growth.accelerating) {
     insights.push({
-      id: 'insight-growth',
-      type: 'milestone',
-      icon: '🚀',
-      title: 'Accelerating Growth',
-      description: 'Your improvement rate is increasing. Keep up the momentum!',
+      id: "insight-growth",
+      type: "milestone",
+      icon: "🚀",
+      title: "Accelerating Growth",
+      description: "Your improvement rate is increasing. Keep up the momentum!",
       actionable: false,
-      priority: 'low',
+      priority: "low",
       createdAt: now,
     })
   }
@@ -708,29 +763,29 @@ function generateInsights(
   // Consistency milestone
   if (behavioral.motivation.consistency > 80) {
     insights.push({
-      id: 'insight-consistency',
-      type: 'milestone',
-      icon: '🔥',
-      title: 'Consistency Champion',
+      id: "insight-consistency",
+      type: "milestone",
+      icon: "🔥",
+      title: "Consistency Champion",
       description: `${Math.round(behavioral.motivation.consistency)}% weekly consistency. You're building strong habits.`,
       actionable: false,
-      priority: 'low',
+      priority: "low",
       createdAt: now,
     })
   }
 
   // Misconception alert
-  const activeMisconception = knowledgeGraph.misconceptions.find(m => m.status === 'active')
+  const activeMisconception = knowledgeGraph.misconceptions.find((m) => m.status === "active")
   if (activeMisconception) {
     insights.push({
-      id: 'insight-misconception',
-      type: 'weakness',
-      icon: '⚠️',
+      id: "insight-misconception",
+      type: "weakness",
+      icon: "⚠️",
       title: `Common Mistake: ${activeMisconception.misconceptionType}`,
       description: activeMisconception.description,
       actionable: true,
       action: activeMisconception.suggestedFix,
-      priority: 'high',
+      priority: "high",
       createdAt: now,
     })
   }
@@ -748,34 +803,38 @@ function calculateInterviewReadiness(
   knowledgeGraph: KnowledgeGraph,
   temporal: TemporalProfile,
   behavioral: BehavioralProfile
-): EnhancedUserProfile['interviewReadiness'] {
+): EnhancedUserProfile["interviewReadiness"] {
   // Overall readiness based on concept mastery
-  const avgMastery = knowledgeGraph.concepts.length > 0 ?
-    knowledgeGraph.concepts.reduce((sum, c) => sum + c.predictedMastery, 0) / knowledgeGraph.concepts.length : 0
+  const avgMastery =
+    knowledgeGraph.concepts.length > 0
+      ? knowledgeGraph.concepts.reduce((sum, c) => sum + c.predictedMastery, 0) /
+        knowledgeGraph.concepts.length
+      : 0
 
   // Penalty for gaps and misconceptions
   const gapPenalty = knowledgeGraph.gaps.length * 5
-  const misconceptionPenalty = knowledgeGraph.misconceptions.filter(m => m.status === 'active').length * 3
+  const misconceptionPenalty =
+    knowledgeGraph.misconceptions.filter((m) => m.status === "active").length * 3
 
   const overall = Math.max(0, Math.min(100, avgMastery - gapPenalty - misconceptionPenalty))
 
   // Strongest areas
-  const strongestAreas = [...new Set(
-    knowledgeGraph.concepts
-      .filter(c => c.predictedMastery > 70)
-      .map(c => c.parentPattern)
-  )].slice(0, 5)
+  const strongestAreas = [
+    ...new Set(
+      knowledgeGraph.concepts.filter((c) => c.predictedMastery > 70).map((c) => c.parentPattern)
+    ),
+  ].slice(0, 5)
 
   // Critical gaps
   const criticalGaps = knowledgeGraph.gaps
-    .filter(g => g.impact === 'blocking')
-    .flatMap(g => g.missingPrerequisites.map(p => p.concept))
+    .filter((g) => g.impact === "blocking")
+    .flatMap((g) => g.missingPrerequisites.map((p) => p.concept))
 
   // Estimated prep days based on velocity
   const targetReadiness = 80
   const velocity = temporal.growth.currentVelocity
-  const estimatedPrepDays = velocity > 0 ?
-    Math.ceil((targetReadiness - overall) / velocity) * 7 : 90
+  const estimatedPrepDays =
+    velocity > 0 ? Math.ceil((targetReadiness - overall) / velocity) * 7 : 90
 
   return {
     overall: Math.round(overall),
@@ -792,19 +851,32 @@ function calculateInterviewReadiness(
 
 function getDefaultCognitiveProfile(): CognitiveProfile {
   return {
-    learningStyle: { primary: 'textual', secondary: null, confidence: 0 },
-    problemSolvingApproach: { style: 'mixed', planningTendency: 'balanced', debuggingStyle: 'systematic' },
-    patternRecognition: { speed: 'moderate', accuracy: 50, transferAbility: 50 },
-    workingMemory: { complexityTolerance: 'medium', contextSwitchingCost: 'medium' },
+    learningStyle: { primary: "textual", secondary: null, confidence: 0 },
+    problemSolvingApproach: {
+      style: "mixed",
+      planningTendency: "balanced",
+      debuggingStyle: "systematic",
+    },
+    patternRecognition: { speed: "moderate", accuracy: 50, transferAbility: 50 },
+    workingMemory: { complexityTolerance: "medium", contextSwitchingCost: "medium" },
   }
 }
 
 function getDefaultBehavioralProfile(): BehavioralProfile {
   return {
-    motivation: { type: 'goal-driven', consistency: 0, peakMotivationDay: 'any' },
-    engagement: { averageSessionLength: 0, sessionsPerWeek: 0, completionRate: 0, hintUsageRate: 0 },
-    challengePreference: { optimalDifficulty: 'adaptive', riskTolerance: 'medium', frustrationThreshold: 45 },
-    fatigue: { currentLevel: 'none', burnoutRisk: 0, recommendedBreak: false, lastBreakDays: 0 },
+    motivation: { type: "goal-driven", consistency: 0, peakMotivationDay: "any" },
+    engagement: {
+      averageSessionLength: 0,
+      sessionsPerWeek: 0,
+      completionRate: 0,
+      hintUsageRate: 0,
+    },
+    challengePreference: {
+      optimalDifficulty: "adaptive",
+      riskTolerance: "medium",
+      frustrationThreshold: 45,
+    },
+    fatigue: { currentLevel: "none", burnoutRisk: 0, recommendedBreak: false, lastBreakDays: 0 },
   }
 }
 
@@ -828,7 +900,7 @@ export class EnhancedProfileService {
 
     // Try to load from Firestore
     try {
-      const profileDoc = await adminDb.collection('enhanced_user_profiles').doc(userId).get()
+      const profileDoc = await adminDb.collection("enhanced_user_profiles").doc(userId).get()
 
       if (profileDoc.exists) {
         const data = profileDoc.data()!
@@ -842,7 +914,7 @@ export class EnhancedProfileService {
         }
       }
     } catch (error) {
-      console.error('[EnhancedProfile] Error loading profile:', error)
+      console.error("[EnhancedProfile] Error loading profile:", error)
     }
 
     // Build fresh profile
@@ -860,26 +932,26 @@ export class EnhancedProfileService {
 
       // Get raw session data for deeper analysis from session_summaries subcollection
       const sessionsSnapshot = await adminDb
-        .collection('users')
+        .collection("users")
         .doc(userId)
-        .collection('session_summaries')
-        .orderBy('completedAt', 'desc')
+        .collection("session_summaries")
+        .orderBy("completedAt", "desc")
         .limit(100)
         .get()
 
       const sessions = sessionsSnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
         .filter((s: Record<string, unknown>) => s.performanceScore !== undefined)
         .map((s: Record<string, unknown>) => this.sessionToAnalysis(s))
 
       // Load existing misconceptions
       const misconceptionsSnapshot = await adminDb
-        .collection('user_misconceptions')
-        .where('userId', '==', userId)
-        .where('status', '==', 'active')
+        .collection("user_misconceptions")
+        .where("userId", "==", userId)
+        .where("status", "==", "active")
         .get()
 
-      const existingMisconceptions = misconceptionsSnapshot.docs.map(doc => ({
+      const existingMisconceptions = misconceptionsSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
         lastSeen: (doc.data().lastSeen as Timestamp).toDate(),
@@ -912,9 +984,8 @@ export class EnhancedProfileService {
       this.cache.set(userId, { profile: enhancedProfile, timestamp: Date.now() })
 
       return enhancedProfile
-
     } catch (error) {
-      console.error('[EnhancedProfile] Error building profile:', error)
+      console.error("[EnhancedProfile] Error building profile:", error)
       return this.createEmptyProfile(userId)
     }
   }
@@ -930,7 +1001,7 @@ export class EnhancedProfileService {
   /**
    * Get interview readiness score
    */
-  async getInterviewReadiness(userId: string): Promise<EnhancedUserProfile['interviewReadiness']> {
+  async getInterviewReadiness(userId: string): Promise<EnhancedUserProfile["interviewReadiness"]> {
     const profile = await this.getEnhancedProfile(userId)
     return profile.interviewReadiness
   }
@@ -943,13 +1014,18 @@ export class EnhancedProfileService {
     const scoreBreakdown = session.scoreBreakdown as Record<string, unknown> | undefined
     const interactionMetrics = session.interactionMetrics as Record<string, unknown> | undefined
 
+    const performanceScore =
+      (session.performanceScore as number) || (scoreBreakdown?.overallScore as number) || 0
+    const masteryScore = (session.masteryScore as number) || performanceScore // Fallback to performanceScore if masteryScore not available
+
     return {
-      sessionId: session.sessionId as string || session.id as string,
+      sessionId: (session.sessionId as string) || (session.id as string),
       userId: session.userId as string,
       scenarioId: session.scenarioId as string,
-      pattern: (session.pattern || 'arrays-hashing') as DSAPattern,
-      difficulty: (session.difficulty || 'medium') as 'easy' | 'medium' | 'hard',
-      score: (session.performanceScore as number) || (scoreBreakdown?.overallScore as number) || 0,
+      pattern: (session.pattern || "arrays-hashing") as DSAPattern,
+      difficulty: (session.difficulty || "medium") as "easy" | "medium" | "hard",
+      score: masteryScore, // MASTERY score for technical analysis
+      performanceScore: performanceScore, // PERFORMANCE score for interview readiness
       duration: ((session.durationMinutes as number) || 0) * 60, // Convert to seconds
       hintsUsed: (interactionMetrics?.hintsUsed as number) || 0,
       testsRun: (interactionMetrics?.codeExecutions as number) || 0,
@@ -970,29 +1046,29 @@ export class EnhancedProfileService {
       lastUpdated: Timestamp.fromDate(profile.lastUpdated),
       knowledgeGraph: {
         ...profile.knowledgeGraph,
-        concepts: profile.knowledgeGraph.concepts.map(c => ({
+        concepts: profile.knowledgeGraph.concepts.map((c) => ({
           ...c,
           lastPracticed: c.lastPracticed ? Timestamp.fromDate(c.lastPracticed) : null,
         })),
-        misconceptions: profile.knowledgeGraph.misconceptions.map(m => ({
+        misconceptions: profile.knowledgeGraph.misconceptions.map((m) => ({
           ...m,
           lastSeen: Timestamp.fromDate(m.lastSeen),
         })),
       },
       temporal: {
         ...profile.temporal,
-        reviewSchedule: profile.temporal.reviewSchedule.map(r => ({
+        reviewSchedule: profile.temporal.reviewSchedule.map((r) => ({
           ...r,
           nextReviewDate: Timestamp.fromDate(r.nextReviewDate),
         })),
       },
-      insights: profile.insights.map(i => ({
+      insights: profile.insights.map((i) => ({
         ...i,
         createdAt: Timestamp.fromDate(i.createdAt),
       })),
     }
 
-    await adminDb.collection('enhanced_user_profiles').doc(profile.userId).set(serialized)
+    await adminDb.collection("enhanced_user_profiles").doc(profile.userId).set(serialized)
   }
 
   /**
@@ -1007,27 +1083,29 @@ export class EnhancedProfileService {
       behavioral: data.behavioral as BehavioralProfile,
       knowledgeGraph: {
         ...(data.knowledgeGraph as KnowledgeGraph),
-        concepts: ((data.knowledgeGraph as KnowledgeGraph).concepts || []).map(c => ({
+        concepts: ((data.knowledgeGraph as KnowledgeGraph).concepts || []).map((c) => ({
           ...c,
-          lastPracticed: c.lastPracticed ? (c.lastPracticed as unknown as Timestamp).toDate() : null,
+          lastPracticed: c.lastPracticed
+            ? (c.lastPracticed as unknown as Timestamp).toDate()
+            : null,
         })),
-        misconceptions: ((data.knowledgeGraph as KnowledgeGraph).misconceptions || []).map(m => ({
+        misconceptions: ((data.knowledgeGraph as KnowledgeGraph).misconceptions || []).map((m) => ({
           ...m,
           lastSeen: (m.lastSeen as unknown as Timestamp).toDate(),
         })),
       },
       temporal: {
         ...(data.temporal as TemporalProfile),
-        reviewSchedule: ((data.temporal as TemporalProfile).reviewSchedule || []).map(r => ({
+        reviewSchedule: ((data.temporal as TemporalProfile).reviewSchedule || []).map((r) => ({
           ...r,
           nextReviewDate: (r.nextReviewDate as unknown as Timestamp).toDate(),
         })),
       },
-      insights: ((data.insights as UserInsight[]) || []).map(i => ({
+      insights: ((data.insights as UserInsight[]) || []).map((i) => ({
         ...i,
         createdAt: (i.createdAt as unknown as Timestamp).toDate(),
       })),
-      interviewReadiness: data.interviewReadiness as EnhancedUserProfile['interviewReadiness'],
+      interviewReadiness: data.interviewReadiness as EnhancedUserProfile["interviewReadiness"],
     }
   }
 
@@ -1051,20 +1129,27 @@ export class EnhancedProfileService {
       temporal: {
         skillDecay: [],
         retention: { shortTermRetention: 70, mediumTermRetention: 60, longTermRetention: 50 },
-        growth: { currentVelocity: 0, projectedLevel: 'beginner', projectedTimeToGoal: null, accelerating: false },
+        growth: {
+          currentVelocity: 0,
+          projectedLevel: "beginner",
+          projectedTimeToGoal: null,
+          accelerating: false,
+        },
         reviewSchedule: [],
       },
-      insights: [{
-        id: 'insight-welcome',
-        type: 'opportunity',
-        icon: '👋',
-        title: 'Welcome to Mockmate!',
-        description: 'Complete a few practice sessions to unlock personalized insights.',
-        actionable: true,
-        action: 'Start your first practice',
-        priority: 'high',
-        createdAt: now,
-      }],
+      insights: [
+        {
+          id: "insight-welcome",
+          type: "opportunity",
+          icon: "👋",
+          title: "Welcome to Mockmate!",
+          description: "Complete a few practice sessions to unlock personalized insights.",
+          actionable: true,
+          action: "Start your first practice",
+          priority: "high",
+          createdAt: now,
+        },
+      ],
       interviewReadiness: {
         overall: 0,
         byCompany: [],
@@ -1095,6 +1180,8 @@ export async function getUserInsights(userId: string): Promise<UserInsight[]> {
   return getEnhancedProfileService().getQuickInsights(userId)
 }
 
-export async function getInterviewReadiness(userId: string): Promise<EnhancedUserProfile['interviewReadiness']> {
+export async function getInterviewReadiness(
+  userId: string
+): Promise<EnhancedUserProfile["interviewReadiness"]> {
   return getEnhancedProfileService().getInterviewReadiness(userId)
 }

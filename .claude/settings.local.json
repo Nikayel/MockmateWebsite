@@ -22,7 +22,8 @@
       "Bash(rm:*)",
       "Bash(git pull:*)",
       "Bash(git stash:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }
