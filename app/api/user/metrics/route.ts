@@ -238,6 +238,67 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Always calculate technical score from recent sessions (more accurate than cached stats)
+    // This ensures we have proper breakdown-based technical scores
+    let technicalScoreOverride: number | null = null
+    const patternTechnicalScores: Record<string, number> = {}
+    const difficultyTechnicalScores: Record<string, number> = {}
+
+    if (recentSessions.length > 0) {
+      const sessionsWithBreakdown = recentSessions.filter((s) => s.scoreBreakdown)
+      if (sessionsWithBreakdown.length > 0) {
+        // Calculate overall technical score
+        const techScores = sessionsWithBreakdown.map((s) => {
+          const breakdown = s.scoreBreakdown!
+          // Technical = understanding + problemSolving + codeQuality (reweighted without communication)
+          return Math.round(
+            (breakdown.understandingScore || 0) * 0.375 +
+              (breakdown.problemSolvingScore || 0) * 0.3125 +
+              (breakdown.codeQualityScore || 0) * 0.3125
+          )
+        })
+        technicalScoreOverride = Math.round(
+          techScores.reduce((a, b) => a + b, 0) / techScores.length
+        )
+
+        // Calculate per-pattern technical scores
+        const patternGroups: Record<string, number[]> = {}
+        sessionsWithBreakdown.forEach((s) => {
+          const breakdown = s.scoreBreakdown!
+          const techScore = Math.round(
+            (breakdown.understandingScore || 0) * 0.375 +
+              (breakdown.problemSolvingScore || 0) * 0.3125 +
+              (breakdown.codeQualityScore || 0) * 0.3125
+          )
+          if (!patternGroups[s.pattern]) patternGroups[s.pattern] = []
+          patternGroups[s.pattern].push(techScore)
+        })
+        for (const [pattern, scores] of Object.entries(patternGroups)) {
+          patternTechnicalScores[pattern] = Math.round(
+            scores.reduce((a, b) => a + b, 0) / scores.length
+          )
+        }
+
+        // Calculate per-difficulty technical scores
+        const diffGroups: Record<string, number[]> = {}
+        sessionsWithBreakdown.forEach((s) => {
+          const breakdown = s.scoreBreakdown!
+          const techScore = Math.round(
+            (breakdown.understandingScore || 0) * 0.375 +
+              (breakdown.problemSolvingScore || 0) * 0.3125 +
+              (breakdown.codeQualityScore || 0) * 0.3125
+          )
+          if (!diffGroups[s.difficulty]) diffGroups[s.difficulty] = []
+          diffGroups[s.difficulty].push(techScore)
+        })
+        for (const [diff, scores] of Object.entries(diffGroups)) {
+          difficultyTechnicalScores[diff] = Math.round(
+            scores.reduce((a, b) => a + b, 0) / scores.length
+          )
+        }
+      }
+    }
+
     // Build response
     const response = {
       success: true,
@@ -248,27 +309,37 @@ export async function GET(request: NextRequest) {
           totalPracticeHours: Math.round((finalStats?.totalPracticeMinutes || 0) / 6) / 10, // 1 decimal place
           averageScore: finalStats?.averageScore || 0, // Overall score (includes communication 20%)
           averageTechnicalScore:
-            (finalStats as any)?.averageTechnicalScore || finalStats?.averageScore || 0, // Code-focused score (excludes communication)
+            technicalScoreOverride ?? // Use calculated technical score from breakdowns
+            (finalStats as any)?.averageTechnicalScore ??
+            finalStats?.averageScore ??
+            0, // Code-focused score (excludes communication)
           lastSessionAt: finalStats?.lastSessionAt || null,
         },
         patterns: Object.entries(finalStats?.patternStats || {})
-          .map(([pattern, data]) => ({
-            pattern,
-            displayName: formatPatternName(pattern),
-            sessions: data.sessions,
-            averageScore: data.averageScore, // Overall score
-            averageTechnicalScore: (data as any).averageTechnicalScore || data.averageScore, // Code-focused score
-            bestScore: data.bestScore,
-            proficiency: getProficiencyLevel(
-              (data as any).averageTechnicalScore || data.averageScore
-            ), // Base proficiency on technical score
-          }))
+          .map(([pattern, data]) => {
+            const techScore =
+              patternTechnicalScores[pattern] ?? // Use calculated from breakdowns
+              (data as any).averageTechnicalScore ??
+              data.averageScore
+            return {
+              pattern,
+              displayName: formatPatternName(pattern),
+              sessions: data.sessions,
+              averageScore: data.averageScore, // Overall score
+              averageTechnicalScore: techScore, // Code-focused score from breakdowns
+              bestScore: data.bestScore,
+              proficiency: getProficiencyLevel(techScore), // Base proficiency on technical score
+            }
+          })
           .sort((a, b) => b.sessions - a.sessions),
         difficulty: Object.entries(finalStats?.difficultyStats || {}).map(([difficulty, data]) => ({
           difficulty,
           sessions: data.sessions,
           averageScore: data.averageScore,
-          averageTechnicalScore: (data as any).averageTechnicalScore || data.averageScore,
+          averageTechnicalScore:
+            difficultyTechnicalScores[difficulty] ??
+            (data as any).averageTechnicalScore ??
+            data.averageScore,
         })),
         trends: {
           daily: trends.daily,
