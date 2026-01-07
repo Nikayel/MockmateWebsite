@@ -12,6 +12,7 @@ import { adminDb, FieldValue } from "./firebase-admin";
 import type { UserLearningState, TopicLearningState } from "./types";
 import type { DSAPattern } from "./types/dsa-patterns";
 import type { Difficulty } from "./spaced-repetition/sm2-algorithm";
+import { logger } from "./logger";
 
 /**
  * Calculate next review date using SM-2 spaced repetition algorithm
@@ -313,13 +314,18 @@ export async function completeSessionWithMastery(
     const nextReviewAt = new Date(existingMastery.next_review_at);
     const hoursSinceLastReview = (now.getTime() - lastReviewAt.getTime()) / (1000 * 60 * 60);
     const daysSinceLastReview = Math.floor(hoursSinceLastReview / 24);
+    const daysUntilDue = Math.floor((nextReviewAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     const daysOverdue = nextReviewAt < now
       ? Math.floor((now.getTime() - nextReviewAt.getTime()) / (1000 * 60 * 60 * 24))
       : 0;
     const isEarlyReview = nextReviewAt > now;
 
-    // MASSED PRACTICE DETECTION: Reviews < 12 hours apart don't count for SR
-    // Cramming doesn't improve long-term retention (Ebbinghaus, 1885)
+    // HYBRID REVIEW CATEGORIZATION SYSTEM
+    // Distinguishes between massed practice, early practice, and legitimate SR reviews
+    // Based on: Bjork (1994) desirable difficulties, Ebbinghaus (1885) spacing effect
+
+    // 1. MASSED PRACTICE: < 12 hours since last review
+    // Cramming doesn't improve long-term retention
     const isMassedPractice = hoursSinceLastReview < 12;
     if (isMassedPractice) {
       logger.info("Massed practice detected - updating score only, not interval", {
@@ -329,16 +335,13 @@ export async function completeSessionWithMastery(
         lastReviewAt: lastReviewAt.toISOString(),
       });
 
-      // Update score but don't change interval (massed practice doesn't help retention)
       masteryResult = await updateProblemMastery(userId, sessionData.scenarioId, {
         performance_score: sessionData.masteryScore ?? sessionData.performanceScore,
         time_spent_minutes: sessionData.timeSpentMinutes,
         hints_used: sessionData.hintsUsed,
-        // Keep existing interval/ease - don't increment review count
-        increment_review_count: false,
+        increment_review_count: false, // Not a valid SR review
       });
 
-      // Return current schedule unchanged
       return {
         nextReviewAt: existingMastery.next_review_at,
         intervalDays: existingMastery.interval_days,
@@ -347,9 +350,63 @@ export async function completeSessionWithMastery(
       };
     }
 
-    // Use masteryScore for SM-2 calculation (technical proficiency only)
-    // Fall back to performanceScore for backwards compatibility
+    // 2. EARLY PRACTICE: More than 3 days before due date
+    // User practicing from interview section, not scheduled SR review
+    const isEarlyPractice = daysUntilDue > 3;
     const scoreForSR = sessionData.masteryScore ?? sessionData.performanceScore;
+
+    if (isEarlyPractice) {
+      logger.info("Early practice session detected", {
+        userId,
+        problemId: sessionData.scenarioId,
+        daysUntilDue,
+        score: scoreForSR,
+        originalInterval: existingMastery.interval_days,
+      });
+
+      // Safety mechanism: Low score early indicates potential forgetting
+      if (scoreForSR < 60) {
+        logger.warn("Early practice with low score - resetting interval for safety", {
+          score: scoreForSR,
+          originalInterval: existingMastery.interval_days,
+          action: "Will calculate new shorter interval",
+        });
+        // Fall through to full SR algorithm (will shorten interval)
+      } else {
+        // High score on early practice = preserve SR schedule
+        // User just wants to practice, not disrupt spaced repetition
+        logger.info("Early practice with high score - preserving SR schedule", {
+          score: scoreForSR,
+          preservedInterval: existingMastery.interval_days,
+          nextReview: existingMastery.next_review_at,
+          reason: "High performance, not at forgetting threshold yet",
+        });
+
+        masteryResult = await updateProblemMastery(userId, sessionData.scenarioId, {
+          performance_score: scoreForSR,
+          time_spent_minutes: sessionData.timeSpentMinutes,
+          hints_used: sessionData.hintsUsed,
+          increment_review_count: false, // Practice session, not SR review
+        });
+
+        return {
+          nextReviewAt: existingMastery.next_review_at,
+          intervalDays: existingMastery.interval_days,
+          masteryLevel: existingMastery.mastery_level,
+          streakDays,
+        };
+      }
+    }
+
+    // 3. LEGITIMATE REVIEW: Within due window or overdue
+    // Run full spaced repetition algorithm
+    logger.info("Legitimate SR review - running full algorithm", {
+      userId,
+      problemId: sessionData.scenarioId,
+      daysUntilDue,
+      daysOverdue,
+      reviewType: daysOverdue > 0 ? "overdue" : isEarlyReview ? "slightly-early" : "on-time",
+    });
 
     const sm2Result = calculateNextInterval({
       previousInterval: existingMastery.interval_days,
