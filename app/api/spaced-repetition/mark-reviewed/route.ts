@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
     const isEarlyReview = nextReviewAtDate > now;
 
     // Reconstruct algorithm state
+    // Include scores_history for consecutive perfect score detection in SM-2
     const currentState = reconstructState(userAlgorithm, {
       interval_days: existingMastery.interval_days,
       next_review_at: existingMastery.next_review_at,
@@ -104,6 +105,7 @@ export async function POST(request: NextRequest) {
       confidence: existingMastery.confidence,
       ease_factor: existingMastery.ease_factor,
       last_reviewed_at: existingMastery.last_reviewed_at,
+      scores_history: existingMastery.scores_history,
     });
 
     // Estimate pre-review retention
@@ -137,12 +139,13 @@ export async function POST(request: NextRequest) {
     });
 
     // Update problem mastery
+    // NOTE: Use increment_review_count for atomic increment to prevent race conditions
     const updatedMastery = await updateProblemMastery(userId, problem_id, {
       performance_score: DEFAULT_MANUAL_REVIEW_SCORE,
       time_spent_minutes: 0,
       hints_used: 0,
       ...storageData,
-      review_count: existingMastery.review_count + 1,
+      increment_review_count: true, // Atomic increment prevents race conditions
     });
 
     // Record research event
