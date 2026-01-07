@@ -23,7 +23,13 @@
       "Bash(git pull:*)",
       "Bash(git stash:*)",
       "Bash(git restore:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(pnpm run build:*)",
+      "Bash(/opt/homebrew/bin/pnpm run build)",
+      "Bash(echo:*)",
+      "Bash(export PATH=\"/opt/homebrew/bin:/usr/local/bin:$HOME/.nvm/versions/node/*/bin:$PATH\")",
+      "Bash(source ~/.zshrc)",
+      "Bash(source ~/.bashrc)"
     ]
   }
 }
