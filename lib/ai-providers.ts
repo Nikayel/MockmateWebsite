@@ -69,20 +69,20 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     name: "gemini-lite",
     enabled: true,
     apiKey: process.env.GEMINI_API_KEY, // Same API key as gemini
-    model: "gemini-2.0-flash-lite", // Cheapest: ~50% less than regular Flash
+    model: "gemini-2.5-flash", // Use 2.5 Flash - free tier up to 1M tokens!
     maxTokens: 1024,
     temperature: 0.7,
-    costPer1kTokens: 0.000075, // Roughly half the cost of regular Flash
+    costPer1kTokens: 0, // Free tier - no cost until 1M tokens
   },
   deepseek: {
     name: "deepseek",
     enabled: !!process.env.DEEPSEEK_API_KEY,
     apiKey: process.env.DEEPSEEK_API_KEY,
     baseUrl: "https://api.deepseek.com/v1",
-    model: "deepseek-chat", // $0.14/1M input, $0.28/1M output - excellent fallback
+    model: "deepseek-reasoner", // R1 model - $0.55/1M input, $2.19/1M output - best for critique/reasoning
     maxTokens: 1024,
     temperature: 0.7,
-    costPer1kTokens: 0.00021, // Averaged
+    costPer1kTokens: 0.00137, // Averaged - only used for Constitutional AI critique (~$0.003/critique)
   },
   claude: {
     name: "claude",
