@@ -163,7 +163,9 @@ export function useInterviewSession({
 
       // Create session in Firestore
       // Include pattern for stats aggregation (used by dashboard Performance Insights)
-      const scenarioPattern = ('pattern' in selectedScenario ? selectedScenario.pattern : selectedScenario.type) || 'unknown'
+      const scenarioPattern =
+        ("pattern" in selectedScenario ? selectedScenario.pattern : selectedScenario.type) ||
+        "unknown"
       const sessionId = await createInterviewSession(
         userId,
         selectedScenario.title,
@@ -189,46 +191,58 @@ export function useInterviewSession({
     }
   }, [firebaseUser, userId, selectedScenario])
 
-  const endInterview = useCallback(async (performanceScore?: number, feedback?: string) => {
-    if (!currentSessionId) return
+  const endInterview = useCallback(
+    async (performanceScore?: number, feedback?: string) => {
+      if (!currentSessionId) return
 
-    try {
-      await updateInterviewSession(currentSessionId, performanceScore, feedback)
+      try {
+        await updateInterviewSession(
+          currentSessionId,
+          performanceScore,
+          feedback,
+          // Only mark as complete if we have actual feedback
+          feedback ? { feedbackStatus: "complete" } : undefined
+        )
 
-      // Clear timer
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
+        // Clear timer
+        if (timerRef.current) {
+          clearInterval(timerRef.current)
+        }
+
+        // Clear auto-save
+        if (autoSaveRef.current) {
+          clearInterval(autoSaveRef.current)
+        }
+      } catch {
+        // Non-critical error
       }
+    },
+    [currentSessionId]
+  )
 
-      // Clear auto-save
-      if (autoSaveRef.current) {
-        clearInterval(autoSaveRef.current)
+  const saveState = useCallback(
+    async (state: Partial<SessionState>) => {
+      if (!currentSessionId) return
+
+      // Merge with last state
+      const mergedState = { ...lastSaveStateRef.current, ...state }
+      lastSaveStateRef.current = mergedState
+
+      try {
+        await saveSessionState(currentSessionId, {
+          code: mergedState.code || "",
+          selectedLanguage: mergedState.selectedLanguage || "javascript",
+          elapsedTime: mergedState.elapsedTime || elapsedTime,
+          chatMessages: mergedState.chatMessages,
+          interviewerMessages: mergedState.interviewerMessages,
+          testResults: mergedState.testResults,
+        })
+      } catch {
+        // Non-critical - localStorage backup exists
       }
-    } catch {
-      // Non-critical error
-    }
-  }, [currentSessionId])
-
-  const saveState = useCallback(async (state: Partial<SessionState>) => {
-    if (!currentSessionId) return
-
-    // Merge with last state
-    const mergedState = { ...lastSaveStateRef.current, ...state }
-    lastSaveStateRef.current = mergedState
-
-    try {
-      await saveSessionState(currentSessionId, {
-        code: mergedState.code || "",
-        selectedLanguage: mergedState.selectedLanguage || "javascript",
-        elapsedTime: mergedState.elapsedTime || elapsedTime,
-        chatMessages: mergedState.chatMessages,
-        interviewerMessages: mergedState.interviewerMessages,
-        testResults: mergedState.testResults,
-      })
-    } catch {
-      // Non-critical - localStorage backup exists
-    }
-  }, [currentSessionId, elapsedTime])
+    },
+    [currentSessionId, elapsedTime]
+  )
 
   return {
     selectedScenario,

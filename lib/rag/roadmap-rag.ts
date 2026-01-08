@@ -12,7 +12,7 @@
  * - Contextual daily themes
  */
 
-import type { DSAPattern } from '@/lib/types/dsa-patterns'
+import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import type {
   CompanyId,
   UserRoadmapAssessment,
@@ -20,21 +20,22 @@ import type {
   DailyPlan,
   Milestone,
   PrioritizedQuestion,
-} from '@/lib/data/company-questions/types'
-import { getCompanyById } from '@/lib/data/company-questions'
+} from "@/lib/data/company-questions/types"
+import { getCompanyById } from "@/lib/data/company-questions"
 import {
   generatePersonalizedRoadmap,
   prioritizeQuestions,
   buildDailySchedule,
   createMilestones,
-} from '@/lib/roadmap/prioritization-algorithm'
-import { buildRoadmapContext, type RoadmapContextOptions } from './context-builder'
-import { getAdvancedRetriever } from './retrieval/advanced-retrieval'
-import { getPatternKnowledge } from './knowledge-base/dsa-knowledge'
-import { getCompanyInterviewKnowledge } from './knowledge-base/company-knowledge'
-import type { DSAScenario } from '@/lib/scenarios'
-import { adminDb } from '@/lib/firebase-admin'
-import { Timestamp } from 'firebase-admin/firestore'
+} from "@/lib/roadmap/prioritization-algorithm"
+import { generateEnhancedRoadmap } from "@/lib/roadmap/enhanced-roadmap-generator"
+import { buildRoadmapContext, type RoadmapContextOptions } from "./context-builder"
+import { getAdvancedRetriever } from "./retrieval/advanced-retrieval"
+import { getPatternKnowledge } from "./knowledge-base/dsa-knowledge"
+import { getCompanyInterviewKnowledge } from "./knowledge-base/company-knowledge"
+import type { DSAScenario } from "@/lib/scenarios"
+import { adminDb } from "@/lib/firebase-admin"
+import { Timestamp } from "firebase-admin/firestore"
 
 /**
  * RAG-enhanced roadmap options
@@ -66,11 +67,11 @@ export interface RAGEnhancedRoadmap extends PersonalizedRoadmap {
  */
 export interface PatternInsight {
   pattern: DSAPattern
-  importance: number         // 1-10
-  companyFrequency: number   // 0-100
+  importance: number // 1-10
+  companyFrequency: number // 0-100
   suggestedApproach: string
   tips: string[]
-  estimatedPracticeTime: number  // hours
+  estimatedPracticeTime: number // hours
   prerequisitesMet: boolean
 }
 
@@ -78,10 +79,10 @@ export interface PatternInsight {
  * Adaptive adjustment based on user history
  */
 export interface AdaptiveAdjustment {
-  type: 'difficulty' | 'pattern-focus' | 'time-allocation' | 'review-schedule'
+  type: "difficulty" | "pattern-focus" | "time-allocation" | "review-schedule"
   description: string
   reason: string
-  impact: 'high' | 'medium' | 'low'
+  impact: "high" | "medium" | "low"
 }
 
 /**
@@ -142,13 +143,20 @@ export class RAGRoadmapGenerator {
     const patternInsights = await this.generatePatternInsights(assessment)
 
     // Step 4: Get company-specific tips
-    const companyTips = await this.getCompanyTips(assessment.targetCompany, assessment.experienceLevel)
+    const companyTips = await this.getCompanyTips(
+      assessment.targetCompany,
+      assessment.experienceLevel
+    )
 
     // Step 5: Generate personalized advice based on user history
     const personalizedAdvice = await this.generatePersonalizedAdvice(userId, assessment)
 
     // Step 6: Calculate adaptive adjustments
-    const adaptiveAdjustments = await this.calculateAdaptiveAdjustments(userId, assessment, baseRoadmap)
+    const adaptiveAdjustments = await this.calculateAdaptiveAdjustments(
+      userId,
+      assessment,
+      baseRoadmap
+    )
 
     // Step 7: Generate study strategies
     const studyStrategies = this.generateStudyStrategies(assessment, patternInsights)
@@ -202,42 +210,43 @@ export class RAGRoadmapGenerator {
     for (const patternFreq of companyData.topPatterns) {
       const patternKnowledge = getPatternKnowledge(patternFreq.pattern)
       const familiarity = assessment.patternFamiliarity.find(
-        p => p.pattern === patternFreq.pattern
+        (p) => p.pattern === patternFreq.pattern
       )
 
       // Check prerequisites
-      const prerequisitesMet = patternKnowledge?.prerequisites.every(prereq => {
-        const prereqFam = assessment.patternFamiliarity.find(p => p.pattern === prereq)
-        return prereqFam && (prereqFam.level === 'practiced' || prereqFam.level === 'confident')
-      }) ?? true
+      const prerequisitesMet =
+        patternKnowledge?.prerequisites.every((prereq) => {
+          const prereqFam = assessment.patternFamiliarity.find((p) => p.pattern === prereq)
+          return prereqFam && (prereqFam.level === "practiced" || prereqFam.level === "confident")
+        }) ?? true
 
       // Calculate importance based on frequency and familiarity gap
       const familiarityScore = {
-        'unknown': 0,
-        'seen': 0.3,
-        'practiced': 0.6,
-        'confident': 0.9,
-      }[familiarity?.level || 'unknown']
+        unknown: 0,
+        seen: 0.3,
+        practiced: 0.6,
+        confident: 0.9,
+      }[familiarity?.level || "unknown"]
 
       const gap = 1 - familiarityScore
       const importance = Math.round((patternFreq.frequency / 10) * gap)
 
       // Get company-specific tips for this pattern
-      const companyPatternTips = companyKnowledge?.topPatterns
-        .find(p => p.pattern === patternFreq.pattern)?.tips || []
+      const companyPatternTips =
+        companyKnowledge?.topPatterns.find((p) => p.pattern === patternFreq.pattern)?.tips || []
 
       // Estimate practice time based on difficulty and familiarity
       const baseTime = {
-        'unknown': 10,
-        'seen': 6,
-        'practiced': 3,
-        'confident': 1,
-      }[familiarity?.level || 'unknown']
+        unknown: 10,
+        seen: 6,
+        practiced: 3,
+        confident: 1,
+      }[familiarity?.level || "unknown"]
 
       const difficultyMultiplier = {
-        'easy': 0.8,
-        'medium': 1,
-        'hard': 1.5,
+        easy: 0.8,
+        medium: 1,
+        hard: 1.5,
       }[patternFreq.typicalDifficulty]
 
       const estimatedPracticeTime = Math.round(baseTime * difficultyMultiplier)
@@ -249,10 +258,7 @@ export class RAGRoadmapGenerator {
         suggestedApproach: patternKnowledge
           ? `Focus on ${patternKnowledge.keyInsights[0]}`
           : `Practice ${patternFreq.pattern} problems regularly`,
-        tips: [
-          ...companyPatternTips,
-          ...(patternKnowledge?.interviewTips || []).slice(0, 2),
-        ],
+        tips: [...companyPatternTips, ...(patternKnowledge?.interviewTips || []).slice(0, 2)],
         estimatedPracticeTime,
         prerequisitesMet,
       })
@@ -265,10 +271,7 @@ export class RAGRoadmapGenerator {
   /**
    * Get company-specific tips from knowledge base
    */
-  private async getCompanyTips(
-    companyId: CompanyId,
-    experienceLevel: string
-  ): Promise<string[]> {
+  private async getCompanyTips(companyId: CompanyId, experienceLevel: string): Promise<string[]> {
     const companyKnowledge = getCompanyInterviewKnowledge(companyId)
     if (!companyKnowledge) return []
 
@@ -278,12 +281,17 @@ export class RAGRoadmapGenerator {
     tips.push(...companyKnowledge.cultureTips.slice(0, 2))
 
     // Add do's relevant to experience level
-    if (experienceLevel === 'intern' || experienceLevel === 'beginner') {
-      tips.push(...companyKnowledge.dosDonts.dos.filter(d =>
-        d.toLowerCase().includes('ask') ||
-        d.toLowerCase().includes('explain') ||
-        d.toLowerCase().includes('communicate')
-      ).slice(0, 2))
+    if (experienceLevel === "intern" || experienceLevel === "beginner") {
+      tips.push(
+        ...companyKnowledge.dosDonts.dos
+          .filter(
+            (d) =>
+              d.toLowerCase().includes("ask") ||
+              d.toLowerCase().includes("explain") ||
+              d.toLowerCase().includes("communicate")
+          )
+          .slice(0, 2)
+      )
     } else {
       tips.push(...companyKnowledge.dosDonts.dos.slice(0, 2))
     }
@@ -295,7 +303,7 @@ export class RAGRoadmapGenerator {
     const { results } = await this.retriever.retrieve({
       query: `${companyId} interview tips ${experienceLevel}`,
       limit: 3,
-      types: ['knowledge'],
+      types: ["knowledge"],
       companies: [companyId],
     })
 
@@ -321,59 +329,61 @@ export class RAGRoadmapGenerator {
     try {
       // Get user's past sessions from session_summaries subcollection
       const sessionsSnapshot = await adminDb
-        .collection('users')
+        .collection("users")
         .doc(userId)
-        .collection('session_summaries')
-        .orderBy('completedAt', 'desc')
+        .collection("session_summaries")
+        .orderBy("completedAt", "desc")
         .limit(20)
         .get()
 
       if (sessionsSnapshot.empty) {
         // New user advice
-        advice.push('Welcome! Start with easier problems to build confidence.')
-        advice.push('Focus on understanding patterns rather than memorizing solutions.')
-        advice.push('Practice explaining your thought process out loud.')
+        advice.push("Welcome! Start with easier problems to build confidence.")
+        advice.push("Focus on understanding patterns rather than memorizing solutions.")
+        advice.push("Practice explaining your thought process out loud.")
         return advice
       }
 
       // Analyze past performance (session_summaries are all completed)
-      const sessions = sessionsSnapshot.docs.map(doc => doc.data())
-      const avgScore = sessions.length > 0
-        ? sessions.reduce((sum, s) => sum + (s.performanceScore || 0), 0) / sessions.length
-        : 0
+      const sessions = sessionsSnapshot.docs.map((doc) => doc.data())
+      const avgScore =
+        sessions.length > 0
+          ? sessions.reduce((sum, s) => sum + (s.performanceScore || 0), 0) / sessions.length
+          : 0
 
       // Score-based advice
       if (avgScore < 50) {
-        advice.push('Focus on fundamentals. Review the pattern before attempting problems.')
-        advice.push('Take time to understand the problem fully before coding.')
+        advice.push("Focus on fundamentals. Review the pattern before attempting problems.")
+        advice.push("Take time to understand the problem fully before coding.")
       } else if (avgScore < 70) {
-        advice.push('Good progress! Work on optimizing your solutions.')
-        advice.push('Practice time management - aim to solve faster.')
+        advice.push("Good progress! Work on optimizing your solutions.")
+        advice.push("Practice time management - aim to solve faster.")
       } else {
-        advice.push('Excellent performance! Challenge yourself with harder problems.')
-        advice.push('Focus on edge cases and optimization.')
+        advice.push("Excellent performance! Challenge yourself with harder problems.")
+        advice.push("Focus on edge cases and optimization.")
       }
 
       // Pattern-specific advice
       const weakPatterns = assessment.patternFamiliarity
-        .filter(p => p.level === 'unknown' || p.level === 'seen')
-        .map(p => p.pattern)
+        .filter((p) => p.level === "unknown" || p.level === "seen")
+        .map((p) => p.pattern)
 
       if (weakPatterns.length > 3) {
-        advice.push(`Focus on ${weakPatterns.slice(0, 2).join(' and ')} first - these are foundational.`)
+        advice.push(
+          `Focus on ${weakPatterns.slice(0, 2).join(" and ")} first - these are foundational.`
+        )
       }
 
       // Time-based advice
       if (assessment.daysRemaining < 7) {
-        advice.push('With limited time, focus on must-know problems for your target company.')
-        advice.push('Prioritize patterns with highest frequency at your target company.')
+        advice.push("With limited time, focus on must-know problems for your target company.")
+        advice.push("Prioritize patterns with highest frequency at your target company.")
       } else if (assessment.daysRemaining > 30) {
-        advice.push('You have good time - build strong foundations before moving to harder topics.')
+        advice.push("You have good time - build strong foundations before moving to harder topics.")
       }
-
     } catch (error) {
-      console.error('[RAGRoadmap] Error generating personalized advice:', error)
-      advice.push('Practice consistently and track your progress.')
+      console.error("[RAGRoadmap] Error generating personalized advice:", error)
+      advice.push("Practice consistently and track your progress.")
     }
 
     return advice.slice(0, 5)
@@ -392,52 +402,53 @@ export class RAGRoadmapGenerator {
     try {
       // Check user's past performance from session_summaries subcollection
       const sessionsSnapshot = await adminDb
-        .collection('users')
+        .collection("users")
         .doc(userId)
-        .collection('session_summaries')
-        .orderBy('completedAt', 'desc')
+        .collection("session_summaries")
+        .orderBy("completedAt", "desc")
         .limit(10)
         .get()
 
       if (!sessionsSnapshot.empty) {
-        const sessions = sessionsSnapshot.docs.map(doc => doc.data())
+        const sessions = sessionsSnapshot.docs.map((doc) => doc.data())
         const recentScores = sessions
-          .filter(s => s.performanceScore !== undefined)
-          .map(s => s.performanceScore as number)
+          .filter((s) => s.performanceScore !== undefined)
+          .map((s) => s.performanceScore as number)
 
         // Difficulty adjustment
-        const avgRecentScore = recentScores.length > 0
-          ? recentScores.reduce((a, b) => a + b, 0) / recentScores.length
-          : 50
+        const avgRecentScore =
+          recentScores.length > 0
+            ? recentScores.reduce((a, b) => a + b, 0) / recentScores.length
+            : 50
 
-        if (avgRecentScore < 40 && assessment.experienceLevel !== 'intern') {
+        if (avgRecentScore < 40 && assessment.experienceLevel !== "intern") {
           adjustments.push({
-            type: 'difficulty',
-            description: 'Reduce initial difficulty',
-            reason: 'Recent scores suggest starting with easier problems will build confidence',
-            impact: 'high',
+            type: "difficulty",
+            description: "Reduce initial difficulty",
+            reason: "Recent scores suggest starting with easier problems will build confidence",
+            impact: "high",
           })
         } else if (avgRecentScore > 80) {
           adjustments.push({
-            type: 'difficulty',
-            description: 'Increase difficulty earlier',
-            reason: 'Strong recent performance indicates readiness for harder challenges',
-            impact: 'medium',
+            type: "difficulty",
+            description: "Increase difficulty earlier",
+            reason: "Strong recent performance indicates readiness for harder challenges",
+            impact: "medium",
           })
         }
 
         // Time allocation adjustment
-        const avgDuration = sessions
-          .filter(s => s.duration)
-          .reduce((sum, s) => sum + s.duration, 0) / sessions.length
+        const avgDuration =
+          sessions.filter((s) => s.duration).reduce((sum, s) => sum + s.duration, 0) /
+          sessions.length
 
         if (avgDuration > 60 * 60) {
           // More than 1 hour average
           adjustments.push({
-            type: 'time-allocation',
-            description: 'Allocate more time per problem',
-            reason: 'You tend to spend more time on problems - plan accordingly',
-            impact: 'medium',
+            type: "time-allocation",
+            description: "Allocate more time per problem",
+            reason: "You tend to spend more time on problems - plan accordingly",
+            impact: "medium",
           })
         }
       }
@@ -445,34 +456,33 @@ export class RAGRoadmapGenerator {
       // Review schedule adjustment
       if (assessment.daysRemaining > 14) {
         adjustments.push({
-          type: 'review-schedule',
-          description: 'Include spaced repetition',
-          reason: 'With enough time, reviewing past patterns improves retention',
-          impact: 'medium',
+          type: "review-schedule",
+          description: "Include spaced repetition",
+          reason: "With enough time, reviewing past patterns improves retention",
+          impact: "medium",
         })
       }
 
       // Pattern focus adjustment
       const companyData = getCompanyById(assessment.targetCompany)
       if (companyData) {
-        const topPatterns = companyData.topPatterns.slice(0, 3).map(p => p.pattern)
-        const weakTopPatterns = topPatterns.filter(pattern => {
-          const fam = assessment.patternFamiliarity.find(p => p.pattern === pattern)
-          return !fam || fam.level === 'unknown' || fam.level === 'seen'
+        const topPatterns = companyData.topPatterns.slice(0, 3).map((p) => p.pattern)
+        const weakTopPatterns = topPatterns.filter((pattern) => {
+          const fam = assessment.patternFamiliarity.find((p) => p.pattern === pattern)
+          return !fam || fam.level === "unknown" || fam.level === "seen"
         })
 
         if (weakTopPatterns.length > 0) {
           adjustments.push({
-            type: 'pattern-focus',
-            description: `Prioritize ${weakTopPatterns.join(', ')}`,
+            type: "pattern-focus",
+            description: `Prioritize ${weakTopPatterns.join(", ")}`,
             reason: `These are top patterns at ${companyData.name} but you need more practice`,
-            impact: 'high',
+            impact: "high",
           })
         }
       }
-
     } catch (error) {
-      console.error('[RAGRoadmap] Error calculating adjustments:', error)
+      console.error("[RAGRoadmap] Error calculating adjustments:", error)
     }
 
     return adjustments
@@ -488,13 +498,13 @@ export class RAGRoadmapGenerator {
     const strategies: StudyStrategy[] = []
 
     // Pattern grouping strategy
-    const relatedPatterns = patternInsights.filter(p => !p.prerequisitesMet)
+    const relatedPatterns = patternInsights.filter((p) => !p.prerequisitesMet)
     if (relatedPatterns.length > 0) {
       strategies.push({
-        name: 'Prerequisites First',
-        description: 'Learn prerequisite patterns before advancing to complex ones',
-        applicablePatterns: relatedPatterns.map(p => p.pattern),
-        estimatedBenefit: 'Builds strong foundation, prevents confusion',
+        name: "Prerequisites First",
+        description: "Learn prerequisite patterns before advancing to complex ones",
+        applicablePatterns: relatedPatterns.map((p) => p.pattern),
+        estimatedBenefit: "Builds strong foundation, prevents confusion",
         priority: 1,
       })
     }
@@ -502,38 +512,38 @@ export class RAGRoadmapGenerator {
     // Spaced repetition strategy
     if (assessment.daysRemaining > 7) {
       strategies.push({
-        name: 'Spaced Repetition',
-        description: 'Review solved problems at increasing intervals',
-        applicablePatterns: patternInsights.slice(0, 5).map(p => p.pattern),
-        estimatedBenefit: 'Improves long-term retention',
+        name: "Spaced Repetition",
+        description: "Review solved problems at increasing intervals",
+        applicablePatterns: patternInsights.slice(0, 5).map((p) => p.pattern),
+        estimatedBenefit: "Improves long-term retention",
         priority: 2,
       })
     }
 
     // Interleaving strategy
     strategies.push({
-      name: 'Interleaved Practice',
-      description: 'Mix different pattern types in each session',
-      applicablePatterns: patternInsights.slice(0, 6).map(p => p.pattern),
-      estimatedBenefit: 'Improves pattern recognition and problem-solving flexibility',
+      name: "Interleaved Practice",
+      description: "Mix different pattern types in each session",
+      applicablePatterns: patternInsights.slice(0, 6).map((p) => p.pattern),
+      estimatedBenefit: "Improves pattern recognition and problem-solving flexibility",
       priority: 3,
     })
 
     // Time-boxed practice
     strategies.push({
-      name: 'Time-Boxed Practice',
-      description: 'Set strict time limits matching interview conditions',
-      applicablePatterns: patternInsights.map(p => p.pattern),
-      estimatedBenefit: 'Builds speed and time management skills',
+      name: "Time-Boxed Practice",
+      description: "Set strict time limits matching interview conditions",
+      applicablePatterns: patternInsights.map((p) => p.pattern),
+      estimatedBenefit: "Builds speed and time management skills",
       priority: 4,
     })
 
     // Active recall
     strategies.push({
-      name: 'Active Recall',
-      description: 'Try to recall pattern approaches before looking at hints',
-      applicablePatterns: patternInsights.filter(p => p.importance > 5).map(p => p.pattern),
-      estimatedBenefit: 'Strengthens pattern memory and recognition',
+      name: "Active Recall",
+      description: "Try to recall pattern approaches before looking at hints",
+      applicablePatterns: patternInsights.filter((p) => p.importance > 5).map((p) => p.pattern),
+      estimatedBenefit: "Strengthens pattern memory and recognition",
       priority: 5,
     })
 
@@ -554,22 +564,22 @@ export class RAGRoadmapGenerator {
       // Add pattern-specific tips to notes
       if (plan.focusPatterns.length > 0) {
         const patternTips = plan.focusPatterns
-          .map(pattern => patternInsights.find(p => p.pattern === pattern))
+          .map((pattern) => patternInsights.find((p) => p.pattern === pattern))
           .filter((p): p is PatternInsight => p !== undefined)
-          .flatMap(p => p.tips.slice(0, 1))
+          .flatMap((p) => p.tips.slice(0, 1))
 
         if (patternTips.length > 0) {
           enhancedPlan.notes = enhancedPlan.notes
-            ? `${enhancedPlan.notes}\n\nTips: ${patternTips.join('. ')}`
-            : `Tips: ${patternTips.join('. ')}`
+            ? `${enhancedPlan.notes}\n\nTips: ${patternTips.join(". ")}`
+            : `Tips: ${patternTips.join(". ")}`
         }
       }
 
       // Add warm-up suggestion for first few days
-      if (index < 3 && assessment.experienceLevel === 'intern') {
+      if (index < 3 && assessment.experienceLevel === "intern") {
         enhancedPlan.notes = enhancedPlan.notes
           ? `${enhancedPlan.notes}\n\nStart with the easier problems to warm up.`
-          : 'Start with the easier problems to warm up.'
+          : "Start with the easier problems to warm up."
       }
 
       return enhancedPlan
@@ -584,13 +594,13 @@ export class RAGRoadmapGenerator {
     patternInsights: PatternInsight[],
     assessment: UserRoadmapAssessment
   ): Milestone[] {
-    return milestones.map(milestone => {
+    return milestones.map((milestone) => {
       const enhanced = { ...milestone }
 
       // Add context to milestone descriptions
-      if (milestone.id.startsWith('pattern-')) {
-        const pattern = milestone.id.replace('pattern-', '') as DSAPattern
-        const insight = patternInsights.find(p => p.pattern === pattern)
+      if (milestone.id.startsWith("pattern-")) {
+        const pattern = milestone.id.replace("pattern-", "") as DSAPattern
+        const insight = patternInsights.find((p) => p.pattern === pattern)
 
         if (insight) {
           enhanced.description = `${milestone.description} (${insight.companyFrequency}% frequency at ${assessment.targetCompany})`

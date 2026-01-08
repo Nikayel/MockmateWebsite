@@ -1633,6 +1633,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         try {
           // performanceScore is now 0-100, save directly
           const scoreToSave = calculatedPerformanceScore
+          // Mark as 'complete' since we have the final feedback
           await updateInterviewSession(currentSessionId, scoreToSave, comprehensiveFeedback, {
             code,
             language: selectedLanguage,
@@ -1640,6 +1641,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             timeComplexity: efficiencyData?.estimatedTimeComplexity,
             spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
             efficiencyScore: efficiencyData?.efficiencyScore,
+            feedbackStatus: "complete", // Feedback generation is done
             scoreBreakdown: scoreBreakdownData || undefined,
           })
 
@@ -2104,6 +2106,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           timeComplexity: efficiencyMetrics?.estimatedTimeComplexity,
           spaceComplexity: efficiencyMetrics?.estimatedSpaceComplexity,
           efficiencyScore: efficiencyMetrics?.efficiencyScore,
+          feedbackStatus: "complete", // Feedback generation is done
         })
 
         // Store system design notes if not already stored
@@ -2765,6 +2768,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               code: code || "// Design notes",
               language: "notes",
               testResults: [],
+              feedbackStatus: "complete", // Feedback generation is done
               scoreBreakdown: systemDesignScoreBreakdown || undefined,
             }
           )

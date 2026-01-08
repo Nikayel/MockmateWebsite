@@ -8,7 +8,16 @@ import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs } from "firebase/firestore"
-import { Clock, Calendar, ChevronRight, Terminal, ArrowRight, Play, FileText, CheckCircle } from "lucide-react"
+import {
+  Clock,
+  Calendar,
+  ChevronRight,
+  Terminal,
+  ArrowRight,
+  Play,
+  FileText,
+  CheckCircle,
+} from "lucide-react"
 import { InterviewSession } from "@/lib/types"
 import Link from "next/link"
 import { getScenarioById } from "@/lib/scenarios"
@@ -46,10 +55,13 @@ export default function SessionsPage() {
           const sessionsSnap = await getDocs(sessionsQuery)
 
           if (!sessionsSnap.empty) {
-            const sessionsData = sessionsSnap.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data()
-            } as InterviewSession))
+            const sessionsData = sessionsSnap.docs.map(
+              (doc) =>
+                ({
+                  id: doc.id,
+                  ...doc.data(),
+                }) as InterviewSession
+            )
 
             sessionsData.sort((a, b) => {
               const dateA = new Date(a.started_at).getTime()
@@ -74,11 +86,11 @@ export default function SessionsPage() {
 
   if (loading || authLoading || !initialized) {
     return (
-      <main className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <main className="flex min-h-screen items-center justify-center bg-zinc-950">
         <div className="flex items-center gap-3">
-          <div className="w-2 h-2 bg-zinc-600 rounded-full animate-pulse" />
-          <div className="w-2 h-2 bg-zinc-500 rounded-full animate-pulse delay-75" />
-          <div className="w-2 h-2 bg-zinc-400 rounded-full animate-pulse delay-150" />
+          <div className="h-2 w-2 animate-pulse rounded-full bg-zinc-600" />
+          <div className="h-2 w-2 animate-pulse rounded-full bg-zinc-500 delay-75" />
+          <div className="h-2 w-2 animate-pulse rounded-full bg-zinc-400 delay-150" />
         </div>
       </main>
     )
@@ -86,17 +98,21 @@ export default function SessionsPage() {
 
   const getDifficultyStyle = (difficulty: string) => {
     switch (difficulty) {
-      case 'easy': return 'text-emerald-400'
-      case 'medium': return 'text-amber-400'
-      case 'hard': return 'text-red-400'
-      default: return 'text-zinc-400'
+      case "easy":
+        return "text-emerald-400"
+      case "medium":
+        return "text-amber-400"
+      case "hard":
+        return "text-red-400"
+      default:
+        return "text-zinc-400"
     }
   }
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-emerald-400 bg-emerald-500/10'
-    if (score >= 60) return 'text-amber-400 bg-amber-500/10'
-    return 'text-red-400 bg-red-500/10'
+    if (score >= 80) return "text-emerald-400 bg-emerald-500/10"
+    if (score >= 60) return "text-amber-400 bg-amber-500/10"
+    return "text-red-400 bg-red-500/10"
   }
 
   return (
@@ -104,15 +120,15 @@ export default function SessionsPage() {
       <Header />
 
       <div className="pt-24 pb-16">
-        <div className="container mx-auto px-4 max-w-5xl">
+        <div className="container mx-auto max-w-5xl px-4">
           {/* Header */}
           <div className="mb-8 flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-white mb-1">Sessions</h1>
-              <p className="text-zinc-500 text-sm">Your practice history</p>
+              <h1 className="mb-1 text-2xl font-semibold text-white">Sessions</h1>
+              <p className="text-sm text-zinc-500">Your practice history</p>
             </div>
             <Link href="/interview">
-              <Button className="bg-white hover:bg-zinc-200 text-zinc-900 font-medium">
+              <Button className="bg-white font-medium text-zinc-900 hover:bg-zinc-200">
                 <Terminal className="mr-2 h-4 w-4" />
                 New Session
               </Button>
@@ -121,72 +137,107 @@ export default function SessionsPage() {
 
           {/* Sessions List */}
           {sessions.length === 0 ? (
-            <div className="text-center py-20">
-              <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-5">
-                <Clock className="w-7 h-7 text-zinc-600" />
+            <div className="py-20 text-center">
+              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900">
+                <Clock className="h-7 w-7 text-zinc-600" />
               </div>
-              <h3 className="text-lg font-medium text-white mb-2">No sessions yet</h3>
-              <p className="text-zinc-500 text-sm mb-6">Start practicing to see your history here</p>
+              <h3 className="mb-2 text-lg font-medium text-white">No sessions yet</h3>
+              <p className="mb-6 text-sm text-zinc-500">
+                Start practicing to see your history here
+              </p>
               <Link href="/interview">
-                <Button className="bg-white hover:bg-zinc-200 text-zinc-900 font-medium">
+                <Button className="bg-white font-medium text-zinc-900 hover:bg-zinc-200">
                   <Terminal className="mr-2 h-4 w-4" />
                   Start First Session
                 </Button>
               </Link>
             </div>
           ) : (
-            <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl overflow-hidden">
+            <div className="overflow-hidden rounded-2xl border border-zinc-800/50 bg-zinc-900/50">
               <div className="divide-y divide-zinc-800/50">
                 {sessions.map((session) => {
                   const isInProgress = !session.completed_at
-                  const scenarioExists = session.scenario_id ? !!getScenarioById(session.scenario_id) : false
+                  const scenarioExists = session.scenario_id
+                    ? !!getScenarioById(session.scenario_id)
+                    : false
                   const canReopen = isInProgress && session.scenario_id && scenarioExists
-                  const hasFeedback = session.feedback && session.completed_at
-                  const score = session.performance_score ? Math.round(session.performance_score) : null
+                  // Check if feedback is still being generated
+                  const isFeedbackPending =
+                    session.feedback_status === "pending" ||
+                    (session.completed_at &&
+                      !session.feedback &&
+                      session.feedback_status !== "failed")
+                  const hasFeedback =
+                    session.feedback &&
+                    session.completed_at &&
+                    session.feedback_status === "complete"
+                  // Only show score if feedback generation is complete
+                  const score =
+                    session.feedback_status === "complete" && session.performance_score
+                      ? Math.round(session.performance_score)
+                      : null
 
                   return (
                     <div
                       key={session.id}
-                      className="flex items-center gap-4 p-4 hover:bg-zinc-800/30 transition-colors group"
+                      className="group flex items-center gap-4 p-4 transition-colors hover:bg-zinc-800/30"
                     >
                       {/* Score/Status indicator */}
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-mono text-sm shrink-0 ${
-                        score ? getScoreColor(score) :
-                        isInProgress ? 'bg-amber-500/10 text-amber-400' : 'bg-zinc-800 text-zinc-400'
-                      }`}>
-                        {score ? score : isInProgress ? '...' : '—'}
+                      <div
+                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl font-mono text-sm ${
+                          score
+                            ? getScoreColor(score)
+                            : isFeedbackPending
+                              ? "animate-pulse bg-blue-500/10 text-blue-400"
+                              : isInProgress
+                                ? "bg-amber-500/10 text-amber-400"
+                                : "bg-zinc-800 text-zinc-400"
+                        }`}
+                      >
+                        {score ? score : isFeedbackPending ? "..." : isInProgress ? "..." : "—"}
                       </div>
 
                       {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-white font-medium truncate">{session.topic}</span>
-                          <span className={`text-[10px] uppercase tracking-wider ${getDifficultyStyle(session.difficulty)}`}>
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex items-center gap-2">
+                          <span className="truncate font-medium text-white">{session.topic}</span>
+                          <span
+                            className={`text-[10px] tracking-wider uppercase ${getDifficultyStyle(session.difficulty)}`}
+                          >
                             {session.difficulty}
                           </span>
                           {isInProgress && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">
+                            <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-400">
                               In Progress
                             </span>
                           )}
-                          {hasFeedback && (
-                            <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                          {isFeedbackPending && !isInProgress && (
+                            <span className="rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-400">
+                              Generating Feedback...
+                            </span>
                           )}
+                          {hasFeedback && <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />}
                         </div>
                         <div className="flex items-center gap-3 text-xs text-zinc-500">
                           <span className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
-                            {new Date(session.started_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            {new Date(session.started_at).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })}
                           </span>
                           {session.completed_at && (
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {Math.round((new Date(session.completed_at).getTime() - new Date(session.started_at).getTime()) / 60000)} min
+                              {Math.round(
+                                (new Date(session.completed_at).getTime() -
+                                  new Date(session.started_at).getTime()) /
+                                  60000
+                              )}{" "}
+                              min
                             </span>
                           )}
-                          {session.type === 'dsa' && (
-                            <span className="text-emerald-500">Free</span>
-                          )}
+                          {session.type === "dsa" && <span className="text-emerald-500">Free</span>}
                         </div>
                       </div>
 
@@ -194,9 +245,13 @@ export default function SessionsPage() {
                       <div className="shrink-0">
                         {canReopen ? (
                           <Button
-                            onClick={() => router.push(`/interview?session=${session.id}&scenario=${session.scenario_id}`)}
+                            onClick={() =>
+                              router.push(
+                                `/interview?session=${session.id}&scenario=${session.scenario_id}`
+                              )
+                            }
                             size="sm"
-                            className="bg-white hover:bg-zinc-200 text-zinc-900 h-8 text-xs"
+                            className="h-8 bg-white text-xs text-zinc-900 hover:bg-zinc-200"
                           >
                             <Play className="mr-1.5 h-3 w-3" />
                             Continue
@@ -206,7 +261,7 @@ export default function SessionsPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-zinc-400 hover:text-white h-8 text-xs"
+                              className="h-8 text-xs text-zinc-400 hover:text-white"
                             >
                               <FileText className="mr-1.5 h-3 w-3" />
                               Details
@@ -214,7 +269,7 @@ export default function SessionsPage() {
                             </Button>
                           </Link>
                         ) : (
-                          <ChevronRight className="w-4 h-4 text-zinc-600" />
+                          <ChevronRight className="h-4 w-4 text-zinc-600" />
                         )}
                       </div>
                     </div>
