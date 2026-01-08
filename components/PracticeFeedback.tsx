@@ -68,9 +68,9 @@ export default function PracticeFeedback({
     sections.scores.communication = Math.round(baseScore * (hasCommunicationIssues ? 0.5 : 0.7))
 
     sections.scores.overall = Math.round(
-      sections.scores.understanding * 0.3 +
+      sections.scores.understanding * 0.25 +
         sections.scores.problemSolving * 0.25 +
-        sections.scores.codeQuality * 0.25 +
+        sections.scores.codeQuality * 0.3 +
         sections.scores.communication * 0.2
     )
   }
@@ -84,7 +84,8 @@ export default function PracticeFeedback({
     communication: normalizeScore(sections.scores.communication || 0),
   }
 
-  // Calculate weighted average from category scores (this is the correct interview score)
+  // Calculate weighted average from category scores using canonical weights
+  // SCORE_WEIGHTS.performance: U=25%, PS=25%, CQ=30%, Comm=20%
   const hasValidCategoryScores =
     scores.understanding > 0 ||
     scores.problemSolving > 0 ||
@@ -93,21 +94,23 @@ export default function PracticeFeedback({
 
   const weightedAverage = hasValidCategoryScores
     ? Math.round(
-        scores.understanding * 0.3 +
+        scores.understanding * 0.25 +
           scores.problemSolving * 0.25 +
-          scores.codeQuality * 0.25 +
+          scores.codeQuality * 0.3 +
           scores.communication * 0.2
       )
     : 0
 
-  // Use weighted average from category scores first, then fall back to parsed overall, then performanceScore
+  // Use performanceScore from the backend as the authoritative overall score
+  // The backend calculates this using validated algorithms, score floors, and Constitutional AI critique
+  // We should NOT recalculate from category scores as that would give different results
   const overallScore =
-    weightedAverage > 0
-      ? weightedAverage
-      : sections.scores.overall > 0
-        ? normalizeScore(sections.scores.overall)
-        : performanceScore > 0
-          ? normalizeScore(performanceScore)
+    performanceScore > 0
+      ? normalizeScore(performanceScore)
+      : weightedAverage > 0
+        ? weightedAverage
+        : sections.scores.overall > 0
+          ? normalizeScore(sections.scores.overall)
           : 0
 
   const getLetterGrade = (score: number) => {

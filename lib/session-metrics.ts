@@ -1039,9 +1039,13 @@ export async function getPerformanceTrends(
 
     snapshot.docs.forEach((doc) => {
       const data = doc.data()
+      // Skip sessions without a valid performance score
+      const score = data.performanceScore ?? data.performance_score
+      if (score === undefined || score === null || score === 0) return
+
       const date = data.completedAt.split("T")[0]
       const existing = dailyMap.get(date) || { total: 0, count: 0 }
-      existing.total += data.performanceScore
+      existing.total += score
       existing.count++
       dailyMap.set(date, existing)
     })
