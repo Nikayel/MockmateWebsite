@@ -581,6 +581,14 @@ CRITICAL INSTRUCTIONS:
     const prompt = buildPrompt()
 
     // Build RAG-enhanced context for better feedback (non-blocking)
+    // Maps scenario type to ScenarioType for context builder
+    const ragScenarioType =
+      scenarioType === "bugfix"
+        ? "bugfix"
+        : scenarioType === "system-design"
+          ? "system-design"
+          : "dsa"
+
     let ragFeedbackContext = ""
     try {
       ragFeedbackContext = await buildRAGFeedbackContext({
@@ -588,6 +596,7 @@ CRITICAL INSTRUCTIONS:
         userCode: code || "",
         testResults: { passed: testsPassed, total: testsTotal },
         scenarioPattern: efficiencyMetrics?.problemPattern, // Pattern from efficiency analysis
+        scenarioType: ragScenarioType, // Use knowledge base specific to scenario type
         difficulty: efficiencyMetrics?.difficulty as "easy" | "medium" | "hard",
         userId,
       })
