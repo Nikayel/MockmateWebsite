@@ -57,6 +57,19 @@ interface KnowledgeBaseStatus {
   needsSync: boolean
 }
 
+interface ScenarioStatus {
+  hasProblems: boolean
+  hasCompanies: boolean
+  hasPatternKnowledge: boolean
+  hasSystemDesign: boolean
+  hasBugFix: boolean
+  problemCount: number
+  companyCount: number
+  patternCount: number
+  systemDesignCount: number
+  bugFixCount: number
+}
+
 interface RAGHealthData {
   health: {
     status: "healthy" | "degraded" | "unhealthy"
@@ -94,6 +107,7 @@ interface RAGHealthData {
     cacheHitRate: number
   }
   knowledgeBaseStatus?: KnowledgeBaseStatus
+  scenarioStatus?: ScenarioStatus
 }
 
 interface EvalResult {
@@ -126,6 +140,7 @@ export default function RAGHealthPage() {
   const [runningEval, setRunningEval] = useState(false)
   const [seeding, setSeeding] = useState(false)
   const [seedingCategories, setSeedingCategories] = useState<string[]>([])
+  const [vectorizingScenarios, setVectorizingScenarios] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(false)
 
   const loadHealth = useCallback(async () => {
@@ -218,6 +233,34 @@ export default function RAGHealthPage() {
       .map((c) => c.category)
     if (outOfSync.length > 0) {
       await seedKnowledgeBase(outOfSync, true)
+    }
+  }
+
+  const vectorizeScenarios = async () => {
+    if (!firebaseUser) return
+
+    setVectorizingScenarios(true)
+    try {
+      const token = await firebaseUser.getIdToken()
+      const response = await fetch("/api/admin/rag-health", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "vectorize-scenarios",
+        }),
+      })
+
+      if (response.ok) {
+        // Reload health after vectorizing
+        await loadHealth()
+      }
+    } catch (error) {
+      logger.error("Error vectorizing scenarios", { error })
+    } finally {
+      setVectorizingScenarios(false)
     }
   }
 
@@ -566,6 +609,73 @@ export default function RAGHealthPage() {
             </CardContent>
           </Card>
 
+          {/* Interview Scenarios Status */}
+          <Card className="border-gray-800 bg-gray-900/50">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-white">
+                    <FileCode className="h-5 w-5 text-[#00d9ff]" />
+                    Interview Scenarios
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Actual interview questions (DSA, System Design, Bug Fix)
+                  </CardDescription>
+                </div>
+                <Button
+                  onClick={vectorizeScenarios}
+                  disabled={vectorizingScenarios}
+                  className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+                  size="sm"
+                >
+                  {vectorizingScenarios ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Database className="mr-2 h-4 w-4" />
+                  )}
+                  Vectorize All
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="rounded-lg border border-gray-700 bg-gray-800/30 p-4">
+                  <div className="flex items-center gap-2 text-[#00d9ff]">
+                    <FileCode className="h-4 w-4" />
+                    <span className="text-sm font-medium text-white">DSA Problems</span>
+                  </div>
+                  <p className="mt-2 text-2xl font-bold text-white">
+                    {healthData.scenarioStatus?.problemCount || 0}
+                  </p>
+                  <p className="text-xs text-gray-500">vectors in Pinecone</p>
+                </div>
+                <div className="rounded-lg border border-gray-700 bg-gray-800/30 p-4">
+                  <div className="flex items-center gap-2 text-[#00d9ff]">
+                    <Server className="h-4 w-4" />
+                    <span className="text-sm font-medium text-white">System Design</span>
+                  </div>
+                  <p className="mt-2 text-2xl font-bold text-white">
+                    {healthData.scenarioStatus?.systemDesignCount || 0}
+                  </p>
+                  <p className="text-xs text-gray-500">vectors in Pinecone</p>
+                </div>
+                <div className="rounded-lg border border-gray-700 bg-gray-800/30 p-4">
+                  <div className="flex items-center gap-2 text-[#00d9ff]">
+                    <Bug className="h-4 w-4" />
+                    <span className="text-sm font-medium text-white">Bug Fix</span>
+                  </div>
+                  <p className="mt-2 text-2xl font-bold text-white">
+                    {healthData.scenarioStatus?.bugFixCount || 0}
+                  </p>
+                  <p className="text-xs text-gray-500">vectors in Pinecone</p>
+                </div>
+              </div>
+              <p className="mt-4 text-center text-xs text-gray-500">
+                These are the actual interview questions, separate from Knowledge Base concepts
+              </p>
+            </CardContent>
+          </Card>
+
           {/* Retrieval Metrics */}
           <Card className="border-gray-800 bg-gray-900/50">
             <CardHeader>
@@ -712,7 +822,9 @@ export default function RAGHealthPage() {
               <span className="text-[#00d9ff]">npx tsx scripts/eval-rag.ts</span>
             </div>
             <div className="rounded bg-gray-800 p-3">
-              <span className="text-gray-400"># Vectorize all problems</span>
+              <span className="text-gray-400">
+                # Vectorize all problems (or use &quot;Vectorize All&quot; button above)
+              </span>
               <br />
               <span className="text-[#00d9ff]">npx tsx scripts/vectorize-problems.ts</span>
             </div>
