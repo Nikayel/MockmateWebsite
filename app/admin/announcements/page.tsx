@@ -93,7 +93,7 @@ const defaultAnnouncement: {
   type: "banner",
   priority: "info",
   targetAudience: "all",
-  startDate: new Date().toISOString().split("T")[0],
+  startDate: new Date().toISOString().slice(0, 16), // Format: YYYY-MM-DDTHH:MM
   endDate: "",
   dismissible: true,
   active: true,
@@ -160,8 +160,8 @@ export default function AnnouncementsPage() {
       type: announcement.type,
       priority: announcement.priority,
       targetAudience: announcement.targetAudience,
-      startDate: announcement.startDate?.split("T")[0] || "",
-      endDate: announcement.endDate?.split("T")[0] || "",
+      startDate: announcement.startDate?.slice(0, 16) || "",
+      endDate: announcement.endDate?.slice(0, 16) || "",
       dismissible: announcement.dismissible,
       active: announcement.active,
       cta: announcement.cta || { text: "", url: "" },
@@ -602,9 +602,9 @@ export default function AnnouncementsPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Start Date</Label>
+                <Label>Start Date & Time</Label>
                 <Input
-                  type="date"
+                  type="datetime-local"
                   value={formData.startDate}
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                   className="border-gray-700 bg-gray-800 text-white"
@@ -612,9 +612,9 @@ export default function AnnouncementsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>End Date (Optional)</Label>
+                <Label>End Date & Time (Optional)</Label>
                 <Input
-                  type="date"
+                  type="datetime-local"
                   value={formData.endDate}
                   onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                   className="border-gray-700 bg-gray-800 text-white"
