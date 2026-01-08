@@ -4,6 +4,7 @@ import { Work_Sans, Open_Sans } from "next/font/google"
 import { Toaster } from "sonner"
 import { AuthProvider } from "@/lib/auth-context"
 import { ErrorBoundaryProvider } from "@/components/providers/error-boundary-provider"
+import { AnnouncementProvider } from "@/components/announcements"
 import { CookieConsent } from "@/components/CookieConsent"
 import { ConsentAnalytics } from "@/components/ConsentAnalytics"
 import { PerformancePolyfill } from "@/components/performance-polyfill"
@@ -196,12 +197,14 @@ html {
         <PerformancePolyfill />
         <ErrorBoundaryProvider>
           <AuthProvider>
-            <div id="main-content">
-              {children}
-            </div>
-            <Toaster position="top-right" richColors />
-            <CookieConsent />
-            <ConsentAnalytics />
+            <AnnouncementProvider>
+              <div id="main-content">
+                {children}
+              </div>
+              <Toaster position="top-right" richColors />
+              <CookieConsent />
+              <ConsentAnalytics />
+            </AnnouncementProvider>
           </AuthProvider>
         </ErrorBoundaryProvider>
       </body>
