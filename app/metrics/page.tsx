@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 interface MetricsData {
   overview: {
@@ -371,11 +372,6 @@ export default function MetricsPage() {
                     <button
                       onClick={() => setShowOverallScore(!showOverallScore)}
                       className="flex items-center gap-1.5 text-xs text-zinc-500 transition-colors hover:text-zinc-300"
-                      title={
-                        showOverallScore
-                          ? "Interview Score: Includes communication (20%). Click for Technical Score."
-                          : "Technical Score: Code quality + problem solving + understanding. Click for Interview Score."
-                      }
                     >
                       {showOverallScore ? (
                         <ToggleRight className="h-4 w-4 text-[#00d9ff]" />
@@ -383,8 +379,22 @@ export default function MetricsPage() {
                         <ToggleLeft className="h-4 w-4" />
                       )}
                       <span>{showOverallScore ? "Interview" : "Technical"}</span>
-                      <HelpCircle className="h-3 w-3" />
                     </button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="h-3 w-3 cursor-help text-zinc-500" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs bg-zinc-800 text-zinc-200">
+                        <p className="mb-1 font-medium">
+                          {showOverallScore ? "Interview Score" : "Technical Score"}
+                        </p>
+                        <p className="text-xs">
+                          {showOverallScore
+                            ? "Your overall interview performance weighted as: Code Quality (30%) + Problem Solving (25%) + Understanding (25%) + Communication (20%)"
+                            : "Code-focused score excluding communication: Understanding (37.5%) + Problem Solving (31.25%) + Code Quality (31.25%)"}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
 

@@ -1,11 +1,25 @@
 "use client"
 
-import { useRef, useEffect } from "react"
+import { useRef, useEffect, useState } from "react"
 import { Brain, User, MessageSquare, Send, Mic, MicOff } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useInterviewStore, type ChatMessage } from "@/lib/stores"
+
+// Sable thinking messages - creative status indicators like Claude Code
+const SABLE_THINKING_MESSAGES = [
+  "Sable is thinking",
+  "Sable is analyzing your approach",
+  "Sable is formulating a response",
+  "Sable is considering the problem",
+  "Sable is preparing feedback",
+  "Sable is evaluating your solution",
+  "Sable is crafting a hint",
+  "Sable is reviewing your code",
+  "Sable is pondering",
+  "Sable is connecting the dots",
+]
 
 interface InterviewerChatProps {
   onSendMessage: (message: string) => Promise<void>
@@ -30,6 +44,23 @@ export function InterviewerChat({
     isLoadingInterviewer,
     isGeneratingDiscussion,
   } = useInterviewStore()
+
+  // Rotating thinking message
+  const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0)
+
+  // Rotate thinking messages every 2 seconds when AI is loading
+  useEffect(() => {
+    if (isLoadingInterviewer || isGeneratingDiscussion) {
+      // Start with a random message
+      setThinkingMessageIndex(Math.floor(Math.random() * SABLE_THINKING_MESSAGES.length))
+
+      const interval = setInterval(() => {
+        setThinkingMessageIndex((prev) => (prev + 1) % SABLE_THINKING_MESSAGES.length)
+      }, 2500)
+
+      return () => clearInterval(interval)
+    }
+  }, [isLoadingInterviewer, isGeneratingDiscussion])
 
   // Auto-scroll chat
   useEffect(() => {
@@ -109,7 +140,9 @@ export function InterviewerChat({
                   <div className="max-w-[90%] rounded-lg border border-gray-700/50 bg-gray-800/50 p-2 text-gray-400">
                     <div className="flex items-center space-x-2">
                       <Brain className="h-3 w-3 animate-pulse text-[#00d9ff]" />
-                      <span className="text-xs">CodeSparring AI is thinking</span>
+                      <span className="text-xs">
+                        {SABLE_THINKING_MESSAGES[thinkingMessageIndex]}
+                      </span>
                       <span className="flex space-x-0.5">
                         <span
                           className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
@@ -206,6 +239,23 @@ export function AIChatPartner({
   const chatEndRef = useRef<HTMLDivElement>(null)
   const { chatMessages, isLoadingChat } = useInterviewStore()
 
+  // Rotating thinking message
+  const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0)
+
+  // Rotate thinking messages every 2.5 seconds when AI is loading
+  useEffect(() => {
+    if (isLoadingChat) {
+      // Start with a random message
+      setThinkingMessageIndex(Math.floor(Math.random() * SABLE_THINKING_MESSAGES.length))
+
+      const interval = setInterval(() => {
+        setThinkingMessageIndex((prev) => (prev + 1) % SABLE_THINKING_MESSAGES.length)
+      }, 2500)
+
+      return () => clearInterval(interval)
+    }
+  }, [isLoadingChat])
+
   // Auto-scroll chat
   useEffect(() => {
     if (chatEndRef.current) {
@@ -263,7 +313,7 @@ export function AIChatPartner({
             <div className="max-w-[85%] rounded border border-gray-600/50 bg-gray-700/50 p-1.5 text-gray-400">
               <div className="flex items-center space-x-1.5">
                 <Brain className="h-2.5 w-2.5 animate-pulse text-[#00d9ff]" />
-                <span className="text-xs">AI Partner is thinking</span>
+                <span className="text-xs">{SABLE_THINKING_MESSAGES[thinkingMessageIndex]}</span>
                 <span className="flex space-x-0.5">
                   <span
                     className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"

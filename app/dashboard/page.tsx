@@ -68,6 +68,7 @@ export default function DashboardPage() {
     periodEnd?: string
   } | null>(null)
   const [sessions, setSessions] = useState<InterviewSession[]>([])
+  const [completedSessions, setCompletedSessions] = useState<InterviewSession[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
@@ -129,7 +130,14 @@ export default function DashboardPage() {
             return dateB - dateA
           })
 
+          // For Recent Activity: show up to 5 most recent (any status)
           setSessions(sessionsData.slice(0, 5))
+
+          // For Recent Avg: only use completed sessions with scores
+          const completed = sessionsData.filter(
+            (s) => s.performance_score !== undefined && s.performance_score !== null
+          )
+          setCompletedSessions(completed.slice(0, 5))
         }
 
         if (
@@ -379,28 +387,24 @@ export default function DashboardPage() {
                   </TooltipContent>
                 </Tooltip>
               </div>
-              {sessions.filter((s) => s.performance_score).length > 0 ? (
+              {completedSessions.length > 0 ? (
                 <>
                   <span
                     className={`text-2xl font-light sm:text-3xl ${getScoreColor(
                       Math.round(
-                        sessions
-                          .filter((s) => s.performance_score)
-                          .reduce((acc, s) => acc + (s.performance_score || 0), 0) /
-                          sessions.filter((s) => s.performance_score).length
+                        completedSessions.reduce((acc, s) => acc + (s.performance_score || 0), 0) /
+                          completedSessions.length
                       )
                     )}`}
                   >
                     {Math.round(
-                      sessions
-                        .filter((s) => s.performance_score)
-                        .reduce((acc, s) => acc + (s.performance_score || 0), 0) /
-                        sessions.filter((s) => s.performance_score).length
+                      completedSessions.reduce((acc, s) => acc + (s.performance_score || 0), 0) /
+                        completedSessions.length
                     )}
                     %
                   </span>
                   <p className="mt-1.5 text-[10px] text-zinc-600">
-                    Last {sessions.filter((s) => s.performance_score).length} sessions
+                    Last {completedSessions.length} completed sessions
                   </p>
                 </>
               ) : (
