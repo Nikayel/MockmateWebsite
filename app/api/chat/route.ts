@@ -656,6 +656,9 @@ After they answer complexity correctly:
 Example bad wrap-up (too brief):
 "Tests pass. What's the time complexity?"
 
+CONVERSATION CONTINUITY:
+Keep interviewing until the candidate explicitly says goodbye (e.g., "bye", "goodbye") or clicks End Session. Short replies like "ok", "thanks", "cool", "got it" are normal acknowledgments - continue with your next question.
+
 WHAT NOT TO DO:
 - Don't give long speeches or multiple questions at once
 - Don't say "Great question!" or "That's a good point!" repeatedly
@@ -902,36 +905,19 @@ Keep it under 50 words. Be encouraging but honest.
 
 IMPORTANT: After this wrap-up, if the candidate says goodbye or acknowledges, give a FINAL brief response (under 20 words) and DO NOT continue the conversation. The interview is over.`
     } else {
-      // Check for farewell/end-of-conversation messages
-      const farewellPatterns =
-        /\b(bye|goodbye|thanks|thank you|ok|okay|cool|got it|see you|later|cheers|take care|cya|thx|ty)\b/i
-      const messageLower = (message || "").toLowerCase().trim()
-      const isShortMessage = messageLower.length < 30
-      const isFarewell = isShortMessage && farewellPatterns.test(messageLower)
-
-      // Check if we're in post-interview wrap-up mode by looking at recent context
-      const recentMessages = context?.slice(-4) || []
-      const hasRecentWrapUp = recentMessages.some(
-        (msg: { message: string }) =>
-          msg.message?.toLowerCase().includes("wrap") ||
-          msg.message?.toLowerCase().includes("complexity") ||
-          msg.message?.toLowerCase().includes("session") ||
-          msg.message?.toLowerCase().includes("practice")
-      )
-
       // Check if AI already said goodbye in a recent message (interview is over)
+      const recentMessages = context?.slice(-4) || []
       const aiAlreadySaidGoodbye = recentMessages.some(
         (msg: { message: string; type?: string }) =>
           msg.type !== "user" &&
-          (msg.message?.toLowerCase().includes("good luck") ||
-            msg.message?.toLowerCase().includes("take care") ||
+          (msg.message?.toLowerCase().includes("good luck with your") ||
             msg.message?.toLowerCase().includes("best of luck") ||
-            msg.message?.toLowerCase().includes("goodbye"))
+            (msg.message?.toLowerCase().includes("take care") &&
+              msg.message?.toLowerCase().includes("interview")))
       )
 
       if (aiAlreadySaidGoodbye && role === "interviewer") {
         // Interview is OVER - don't respond to any more messages
-        // Return early with a flag indicating conversation ended
         return NextResponse.json({
           reply: null,
           conversationEnded: true,
@@ -940,35 +926,13 @@ IMPORTANT: After this wrap-up, if the candidate says goodbye or acknowledges, gi
         })
       }
 
-      if (isFarewell && hasRecentWrapUp && role === "interviewer") {
-        // Final response - end the conversation gracefully
-        fullUserMessage = `[FINAL RESPONSE - CONVERSATION ENDING]
-The candidate has said goodbye: "${message}"
-
-This is the END of the interview. Provide ONE final brief response (under 15 words):
-- Thank them for their time
-- Wish them well
-- DO NOT ask any more questions
-- DO NOT continue discussing the problem
-- DO NOT say "feel free to..." or invite further discussion
-
-Example responses:
-- "Thanks for your time today. Good luck with your prep!"
-- "Great session. Take care!"
-- "Thanks, good luck with your interviews!"
-
-After this response, the conversation is OVER. Do not respond to any further messages.`
-      } else {
-        // Regular message
-        fullUserMessage = message
-        if (workspaceContextStr || currentCodeContext) {
-          fullUserMessage += workspaceContextStr + currentCodeContext
-        }
+      // Regular message - let the AI naturally handle conversation flow
+      // The AI will determine if this is a farewell based on full context
+      fullUserMessage = message
+      if (workspaceContextStr || currentCodeContext) {
+        fullUserMessage += workspaceContextStr + currentCodeContext
       }
     }
-
-    // Track if this is a final farewell response
-    const isConversationEnding = fullUserMessage.includes("[FINAL RESPONSE - CONVERSATION ENDING]")
 
     // Determine task complexity for provider selection
     const complexity: TaskComplexity = isProactive ? "standard" : "simple"
@@ -1005,10 +969,6 @@ After this response, the conversation is OVER. Do not respond to any further mes
       reply: aiResponse.text,
       provider: aiResponse.provider, // Include provider for debugging
       latencyMs: aiResponse.latencyMs,
-      conversationEnded: isConversationEnding,
-      ...(isConversationEnding && {
-        endMessage: "Click 'End Session' to see your detailed feedback and score breakdown.",
-      }),
     })
   } catch (error: any) {
     logger.error("Chat API error", {

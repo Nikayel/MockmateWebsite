@@ -82,19 +82,29 @@ export interface ScorePersistenceInput {
 
 /**
  * Score weights for different calculation methods
+ *
+ * Philosophy:
+ * - Performance Score = Full interview simulation (communication matters)
+ * - Technical Score = Code-focused (tests, efficiency, hints used)
+ * - Mastery Score = Spaced repetition (correctness, time, independence)
+ *
+ * For Technical Score, we weight heavily on what we can OBJECTIVELY measure:
+ * - Code Quality (60%): test pass rate, efficiency, readability
+ * - Problem Solving (25%): debugging, optimization attempts, structured approach
+ * - Understanding (15%): explained approach, complexity analysis (bonus, not penalty)
  */
 export const SCORE_WEIGHTS = {
-  // Performance score (full interview)
+  // Performance score (full interview simulation)
   performance: {
     understanding: 0.25,
     problemSolving: 0.25,
     codeQuality: 0.3,
     communication: 0.2,
   },
-  // Technical score (code-only, reweighted to 100%)
+  // Technical score (code-focused, heavily weighted on objective metrics)
   technical: {
-    understanding: 0.3125, // 25/80
-    problemSolving: 0.3125, // 25/80
-    codeQuality: 0.375, // 30/80
+    codeQuality: 0.6, // 60% - Tests passed, efficiency, readability
+    problemSolving: 0.25, // 25% - Debugging, optimization, structured approach
+    understanding: 0.15, // 15% - Explained approach, complexity (bonus)
   },
 } as const

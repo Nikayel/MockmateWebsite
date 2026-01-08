@@ -87,6 +87,7 @@ import {
   validateCodeProtection,
   enforceCodeProtection,
 } from "@/lib/code-protection"
+import { trackUserMessage, trackAIMessage } from "@/lib/scoring/track-chat"
 import { toast } from "sonner"
 
 // Dynamic imports for heavy components to reduce initial bundle size
@@ -2385,6 +2386,21 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       setInput("")
       setLoading(true)
 
+      // Track user message for scoring (fire-and-forget)
+      if (currentSessionId && firebaseUser) {
+        firebaseUser
+          .getIdToken()
+          .then((token) => {
+            trackUserMessage(
+              currentSessionId,
+              input,
+              isInterviewer ? "interviewer" : "partner",
+              token
+            )
+          })
+          .catch(() => {}) // Silently ignore tracking errors
+      }
+
       // Check if user wants to end the session
       const conclusionSignals = [
         "no thanks",
@@ -2475,6 +2491,21 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
         if (data.reply) {
           setMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+
+          // Track AI response for scoring (fire-and-forget)
+          if (currentSessionId && firebaseUser) {
+            firebaseUser
+              .getIdToken()
+              .then((token) => {
+                trackAIMessage(
+                  currentSessionId,
+                  data.reply,
+                  isInterviewer ? "interviewer" : "partner",
+                  token
+                )
+              })
+              .catch(() => {}) // Silently ignore tracking errors
+          }
 
           // Check if this is the final farewell response
           if (data.conversationEnded === true) {

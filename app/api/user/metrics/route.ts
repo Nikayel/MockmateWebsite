@@ -16,7 +16,8 @@ import { getMasteryStatistics, getUserScoreStats, SCORE_WEIGHTS } from "@/lib/sc
 
 /**
  * Calculate technical score from breakdown using canonical weights.
- * Uses SCORE_WEIGHTS.technical: U=31.25%, PS=31.25%, CQ=37.5%
+ * Uses SCORE_WEIGHTS.technical: CQ=60%, PS=25%, U=15%
+ * Heavily weighted on code quality (objective) over understanding (subjective)
  */
 function calculateTechScore(
   understanding: number,
@@ -28,7 +29,7 @@ function calculateTechScore(
     problemSolving: psWeight,
     codeQuality: cqWeight,
   } = SCORE_WEIGHTS.technical
-  return Math.round(understanding * uWeight + problemSolving * psWeight + codeQuality * cqWeight)
+  return Math.round(codeQuality * cqWeight + problemSolving * psWeight + understanding * uWeight)
 }
 
 /**

@@ -19,6 +19,7 @@ import {
   fromInteractionMetrics,
   type MasteryScoreResult,
 } from "./spaced-repetition/mastery-score"
+import { analyzeMessage } from "./scoring/keyword-detection"
 
 // =============================================================================
 // TYPES
@@ -240,36 +241,54 @@ export async function trackChatMessage(params: {
     if (params.type === "ai") {
       state.aiSuggestionsReceived++
     }
+
+    // Also analyze partner chat for signals (users may explain approach to AI partner)
+    if (params.type === "user") {
+      const analysis = analyzeMessage(params.message)
+      if (analysis.detection.approachExplained) {
+        state.approachExplained = true
+      }
+      if (analysis.detection.complexityDiscussed) {
+        state.complexityDiscussed = true
+      }
+      for (const edgeCase of analysis.detection.edgeCasesMentioned) {
+        if (!state.edgeCasesIdentified.includes(edgeCase)) {
+          state.edgeCasesIdentified.push(edgeCase)
+        }
+      }
+    }
   } else {
     state.interviewerMessages.push(metric)
     state.totalInterviewerMessages++
 
-    // Analyze for approach explanation and complexity discussion
+    // Analyze user messages for scoring signals using improved keyword detection
     if (params.type === "user") {
-      const lowerMessage = params.message.toLowerCase()
-      if (
-        lowerMessage.includes("approach") ||
-        lowerMessage.includes("plan") ||
-        lowerMessage.includes("strategy")
-      ) {
+      const analysis = analyzeMessage(params.message)
+
+      // Update state based on detected signals
+      if (analysis.detection.approachExplained) {
         state.approachExplained = true
       }
-      if (
-        lowerMessage.includes("o(") ||
-        lowerMessage.includes("time complexity") ||
-        lowerMessage.includes("space complexity")
-      ) {
+      if (analysis.detection.complexityDiscussed) {
         state.complexityDiscussed = true
       }
-      if (
-        lowerMessage.includes("edge case") ||
-        lowerMessage.includes("corner case") ||
-        lowerMessage.includes("what if")
-      ) {
-        const edgeCase = params.message.slice(0, 100)
+      if (analysis.detection.optimizationMentioned) {
+        state.optimizationAttempts++
+      }
+      if (analysis.detection.debuggingMentioned) {
+        state.debuggingAttempts++
+      }
+
+      // Track edge cases
+      for (const edgeCase of analysis.detection.edgeCasesMentioned) {
         if (!state.edgeCasesIdentified.includes(edgeCase)) {
           state.edgeCasesIdentified.push(edgeCase)
         }
+      }
+
+      // Track clarifying questions
+      if (analysis.detection.clarifyingQuestion) {
+        // This will be counted in InteractionMetrics
       }
     }
   }
@@ -644,6 +663,9 @@ async function persistSessionMetrics(state: SessionMetricsState): Promise<void> 
  */
 async function storeSessionSummary(summary: SessionSummary): Promise<void> {
   try {
+    // Calculate technical score for syncing
+    const technicalScore = calculateTechnicalScore(summary.scoreBreakdown)
+
     // Store in user's session history
     await adminDb
       .collection("users")
@@ -654,6 +676,15 @@ async function storeSessionSummary(summary: SessionSummary): Promise<void> {
         ...summary,
         createdAt: FieldValue.serverTimestamp(),
       })
+
+    // Sync performance_score to interview_sessions for dashboard consistency
+    // This ensures "Recent Avg" shows the same score as "This Week"
+    await syncScoreToInterviewSession(
+      summary.sessionId,
+      summary.performanceScore,
+      technicalScore,
+      summary.scoreBreakdown
+    )
 
     // Update all user learning data in parallel
     await Promise.all([
@@ -667,23 +698,57 @@ async function storeSessionSummary(summary: SessionSummary): Promise<void> {
 }
 
 /**
+ * Sync score to interview_sessions collection
+ * Ensures dashboard "Recent Avg" matches "This Week" percentage
+ */
+async function syncScoreToInterviewSession(
+  sessionId: string,
+  performanceScore: number,
+  technicalScore: number,
+  scoreBreakdown: ScoreBreakdown
+): Promise<void> {
+  try {
+    await adminDb
+      .collection("interview_sessions")
+      .doc(sessionId)
+      .set(
+        {
+          performance_score: performanceScore,
+          technical_score: technicalScore,
+          score_breakdown: {
+            understandingScore: scoreBreakdown.understandingScore,
+            problemSolvingScore: scoreBreakdown.problemSolvingScore,
+            codeQualityScore: scoreBreakdown.codeQualityScore,
+            communicationScore: scoreBreakdown.communicationScore,
+            overallScore: scoreBreakdown.overallScore,
+          },
+          scores_synced_at: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      )
+  } catch (error) {
+    // Non-blocking - don't fail if sync fails
+    console.error("[Session Metrics] Failed to sync score to interview_sessions:", error)
+  }
+}
+
+/**
  * Calculate technical score from score breakdown
  * Uses canonical weights from SCORE_WEIGHTS.technical:
- * - Understanding: 31.25% (25/80)
- * - Problem Solving: 31.25% (25/80)
- * - Code Quality: 37.5% (30/80)
- * This reweights the 80% non-communication portion to 100%
+ * - Code Quality: 60% (tests, efficiency, readability)
+ * - Problem Solving: 25% (debugging, optimization)
+ * - Understanding: 15% (explained approach, complexity)
  */
 function calculateTechnicalScore(breakdown: ScoreBreakdown): number {
-  const understanding = breakdown.understandingScore || 0
-  const problemSolving = breakdown.problemSolvingScore || 0
   const codeQuality = breakdown.codeQualityScore || 0
+  const problemSolving = breakdown.problemSolvingScore || 0
+  const understanding = breakdown.understandingScore || 0
   const {
-    understanding: uWeight,
-    problemSolving: psWeight,
     codeQuality: cqWeight,
+    problemSolving: psWeight,
+    understanding: uWeight,
   } = SCORE_WEIGHTS.technical
-  return Math.round(understanding * uWeight + problemSolving * psWeight + codeQuality * cqWeight)
+  return Math.round(codeQuality * cqWeight + problemSolving * psWeight + understanding * uWeight)
 }
 
 /**
