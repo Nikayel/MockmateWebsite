@@ -13,6 +13,8 @@ export { PatternCoverage } from "./PatternCoverage"
 export { WeeklyCalendar } from "./WeeklyCalendar"
 export { CompanyInterviewGuide } from "./CompanyInterviewGuide"
 export { PersonalizedCompanyGuide } from "./PersonalizedCompanyGuide"
+export { DayUnlockModal } from "./DayUnlockModal"
+export { RoadmapCompleteCard } from "./RoadmapCompleteCard"
 
 // Status components
 export {

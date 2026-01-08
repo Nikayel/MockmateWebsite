@@ -48,6 +48,8 @@ import {
   PersonalizedCompanyGuide,
   RoadmapStatusBanner,
   ArchivedRoadmapsList,
+  DayUnlockModal,
+  RoadmapCompleteCard,
 } from "@/components/roadmap"
 import { useRoadmapStore, useActiveRoadmap } from "@/lib/stores/roadmap-store"
 import { getCompanyById } from "@/lib/data/company-questions"
@@ -88,6 +90,8 @@ export default function RoadmapPage() {
   const [showTips, setShowTips] = useState(false)
   const [showEndRoadmapDialog, setShowEndRoadmapDialog] = useState(false)
   const [isArchiving, setIsArchiving] = useState(false)
+  const [showDayUnlockModal, setShowDayUnlockModal] = useState(false)
+  const [lastCompletedDayIndex, setLastCompletedDayIndex] = useState<number | null>(null)
 
   // Get today's plan
   const today = new Date()
@@ -206,6 +210,52 @@ export default function RoadmapPage() {
 
   const handleMarkComplete = (scenarioId: string) => {
     markQuestionCompleted(scenarioId)
+  }
+
+  // Check if current day was just completed and show unlock modal
+  useEffect(() => {
+    if (!roadmap) return
+
+    const currentPlan = roadmap.dailyPlans[selectedDayIndex]
+    if (!currentPlan || currentPlan.questions.length === 0) return
+
+    const allCompleted = currentPlan.questions.every(
+      (q) => q.status === "completed" || q.status === "skipped"
+    )
+    const hasNextDay = selectedDayIndex < roadmap.dailyPlans.length - 1
+
+    // Show unlock modal if day is complete and there's a next day
+    if (allCompleted && hasNextDay && lastCompletedDayIndex !== selectedDayIndex) {
+      setLastCompletedDayIndex(selectedDayIndex)
+      setShowDayUnlockModal(true)
+    }
+  }, [roadmap?.dailyPlans, selectedDayIndex, lastCompletedDayIndex])
+
+  // Handle unlocking next day
+  const handleUnlockNextDay = () => {
+    if (!roadmap) return
+    const nextDayIndex = selectedDayIndex + 1
+    if (nextDayIndex < roadmap.dailyPlans.length) {
+      selectDay(nextDayIndex)
+      setShowDayUnlockModal(false)
+    }
+  }
+
+  // Handle taking a break (just close modal)
+  const handleTakeBreak = () => {
+    setShowDayUnlockModal(false)
+  }
+
+  // Handle starting a mock interview
+  const handleStartMockInterview = () => {
+    router.push("/interview?mode=mock")
+  }
+
+  // Handle adding more questions (would need to implement roadmap extension)
+  const handleAddMoreQuestions = () => {
+    // For now, just show a message or navigate to settings
+    // In future, this could open a modal to add more questions to the roadmap
+    router.push("/roadmap/new?extend=true")
   }
 
   // Handle reactivating an archived/abandoned roadmap
@@ -718,14 +768,32 @@ export default function RoadmapPage() {
                 transition={{ duration: 0.15 }}
               >
                 {activeTab === "today" && selectedPlan && (
-                  <TodaysFocus
-                    plan={selectedPlan}
-                    onStartQuestion={handleStartQuestion}
-                    onSkipQuestion={handleSkipQuestion}
-                    onMarkComplete={handleMarkComplete}
-                    ragEnhancements={roadmap.ragEnhancements}
-                    companyName={roadmap.companyName}
-                  />
+                  <>
+                    {/* Show RoadmapCompleteCard when ALL roadmap questions are done */}
+                    {isCompleted && companyData ? (
+                      <RoadmapCompleteCard
+                        companyName={roadmap.companyName}
+                        companyId={roadmap.targetCompany}
+                        questionsCompleted={roadmap.questionsCompleted}
+                        totalHoursSpent={roadmap.actualHoursSpent}
+                        daysUntilInterview={daysRemaining}
+                        patternsCovered={
+                          roadmap.patternCoverage.filter((p) => p.completed > 0).length
+                        }
+                        onStartMockInterview={handleStartMockInterview}
+                        onAddMoreQuestions={handleAddMoreQuestions}
+                      />
+                    ) : (
+                      <TodaysFocus
+                        plan={selectedPlan}
+                        onStartQuestion={handleStartQuestion}
+                        onSkipQuestion={handleSkipQuestion}
+                        onMarkComplete={handleMarkComplete}
+                        ragEnhancements={roadmap.ragEnhancements}
+                        companyName={roadmap.companyName}
+                      />
+                    )}
+                  </>
                 )}
 
                 {activeTab === "schedule" && (
@@ -819,6 +887,31 @@ export default function RoadmapPage() {
               </div>
             )}
           </div>
+        )}
+
+        {/* Day Unlock Modal - Shows when user completes a day */}
+        {roadmap && (
+          <DayUnlockModal
+            isOpen={showDayUnlockModal}
+            onClose={() => setShowDayUnlockModal(false)}
+            onUnlockNextDay={handleUnlockNextDay}
+            onTakeBreak={handleTakeBreak}
+            completedDay={selectedDayIndex + 1}
+            totalDaysRemaining={roadmap.dailyPlans.length - selectedDayIndex - 1}
+            questionsCompletedToday={
+              roadmap.dailyPlans[selectedDayIndex]?.questions.filter(
+                (q) => q.status === "completed"
+              ).length || 0
+            }
+            minutesSpentToday={
+              roadmap.dailyPlans[selectedDayIndex]?.questions.reduce(
+                (sum, q) => sum + (q.status === "completed" ? q.estimatedMinutes : 0),
+                0
+              ) || 0
+            }
+            nextDayTheme={roadmap.dailyPlans[selectedDayIndex + 1]?.theme}
+            nextDayQuestionCount={roadmap.dailyPlans[selectedDayIndex + 1]?.questions.length}
+          />
         )}
 
         {/* Confirmation Dialog for Ending Roadmap */}
