@@ -1,13 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { motion } from "framer-motion"
 import {
   Trophy,
   PartyPopper,
   BookOpen,
   MessageSquare,
-  Users,
   Target,
   Clock,
   ChevronDown,
@@ -22,6 +21,12 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { CompanyId } from "@/lib/data/company-questions/types"
+
+/**
+ * Max tips shown per section (cognitive load optimization)
+ * Based on Miller's Law: 7±2 items, but we keep it lower for scannability
+ */
+const MAX_TIPS_SHOWN = 3
 
 interface RoadmapCompleteCardProps {
   companyName: string
@@ -38,6 +43,12 @@ interface RoadmapCompleteCardProps {
 /**
  * Card shown when user completes all roadmap questions.
  * Recommends next steps: behavioral prep, mock interviews, review, etc.
+ *
+ * Cognitive Load Optimizations Applied:
+ * 1. Progressive disclosure: Only one section expanded at a time
+ * 2. Miller's Law: Max 3 tips shown initially per section
+ * 3. Visual hierarchy: Priority badge draws attention to high-priority items
+ * 4. Gestalt grouping: Related tips grouped under expandable sections
  */
 export function RoadmapCompleteCard({
   companyName,
@@ -50,7 +61,8 @@ export function RoadmapCompleteCard({
   onAddMoreQuestions,
   onStartBehavioralPrep,
 }: RoadmapCompleteCardProps) {
-  const [expandedSection, setExpandedSection] = useState<string | null>("recommended")
+  // Default to no expanded section - user chooses what to focus on (progressive disclosure)
+  const [expandedSection, setExpandedSection] = useState<string | null>(null)
 
   // Determine recommendations based on time remaining
   const getRecommendations = () => {
@@ -245,6 +257,11 @@ export function RoadmapCompleteCard({
 
 /**
  * Individual recommendation card with expandable tips
+ *
+ * Cognitive Load Optimization:
+ * - Shows only MAX_TIPS_SHOWN tips initially
+ * - "Show more" reveals remaining tips
+ * - Prevents information overload
  */
 function RecommendationCard({
   recommendation,
@@ -265,7 +282,14 @@ function RecommendationCard({
   expanded: boolean
   onToggle: () => void
 }) {
+  const [showAllTips, setShowAllTips] = useState(false)
   const Icon = recommendation.icon
+
+  // Apply cognitive load limit - only show MAX_TIPS_SHOWN initially
+  const visibleTips = showAllTips
+    ? recommendation.tips
+    : recommendation.tips.slice(0, MAX_TIPS_SHOWN)
+  const hasMoreTips = recommendation.tips.length > MAX_TIPS_SHOWN
 
   return (
     <div className="border-border rounded-lg border">
@@ -304,13 +328,26 @@ function RecommendationCard({
         >
           <div className="p-3">
             <ul className="space-y-1.5">
-              {recommendation.tips.map((tip, i) => (
+              {visibleTips.map((tip, i) => (
                 <li key={i} className="text-muted-foreground flex items-start gap-2 text-xs">
                   <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-green-500" />
                   {tip}
                 </li>
               ))}
             </ul>
+
+            {/* Show more button - only if there are hidden tips */}
+            {hasMoreTips && !showAllTips && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowAllTips(true)
+                }}
+                className="text-primary hover:text-primary/80 mt-2 text-xs font-medium"
+              >
+                +{recommendation.tips.length - MAX_TIPS_SHOWN} more tips
+              </button>
+            )}
 
             {recommendation.action && recommendation.actionLabel && (
               <button

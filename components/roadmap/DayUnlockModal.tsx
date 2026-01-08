@@ -1,6 +1,7 @@
 "use client"
 
-import { motion, AnimatePresence } from "framer-motion"
+import { useMemo } from "react"
+import { motion } from "framer-motion"
 import {
   Trophy,
   Rocket,
@@ -26,9 +27,22 @@ interface DayUnlockModalProps {
   nextDayQuestionCount?: number
 }
 
+const ENCOURAGING_MESSAGES = [
+  "You're crushing it!",
+  "Incredible focus!",
+  "Interview-ready pace!",
+  "On fire today!",
+  "Momentum building!",
+] as const
+
 /**
  * Modal shown when user completes all questions for the current day.
  * Celebrates their progress and offers to unlock the next day immediately.
+ *
+ * Cognitive Load Optimization:
+ * - Max 4 visual elements (trophy, stats, next preview, actions)
+ * - Clear primary vs secondary action
+ * - Memoized random message to prevent re-render flicker
  */
 export function DayUnlockModal({
   isOpen,
@@ -42,14 +56,11 @@ export function DayUnlockModal({
   nextDayTheme,
   nextDayQuestionCount,
 }: DayUnlockModalProps) {
-  const encouragingMessages = [
-    "You're crushing it!",
-    "Incredible focus!",
-    "Interview-ready pace!",
-    "On fire today!",
-    "Momentum building!",
-  ]
-  const randomMessage = encouragingMessages[Math.floor(Math.random() * encouragingMessages.length)]
+  // Memoize random message so it doesn't change on re-renders
+  // Only changes when the completedDay changes (new day completed)
+  const encouragingMessage = useMemo(() => {
+    return ENCOURAGING_MESSAGES[Math.floor(Math.random() * ENCOURAGING_MESSAGES.length)]
+  }, [completedDay])
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -85,7 +96,7 @@ export function DayUnlockModal({
               className="text-center"
             >
               <h2 className="text-foreground text-xl font-bold">Day {completedDay} Complete!</h2>
-              <p className="text-primary mt-1 font-medium">{randomMessage}</p>
+              <p className="text-primary mt-1 font-medium">{encouragingMessage}</p>
             </motion.div>
 
             {/* Stats */}
