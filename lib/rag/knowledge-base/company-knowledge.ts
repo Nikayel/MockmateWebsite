@@ -1165,6 +1165,243 @@ export const COMPANY_INTERVIEW_KNOWLEDGE: CompanyInterviewKnowledge[] = [
       ],
     },
   },
+  {
+    companyId: "instacart",
+    companyName: "Instacart",
+    interviewStyle: {
+      description:
+        "Instacart interviews focus on logistics, grocery retail, and real-time inventory systems. Strong emphasis on optimization and customer experience.",
+      pace: "Moderate with focus on practical problems",
+      expectations: [
+        "Strong algorithmic skills",
+        "Understanding of logistics challenges",
+        "Customer-centric thinking",
+        "Scalability awareness",
+        "Real-time systems knowledge",
+      ],
+    },
+    topPatterns: [
+      {
+        pattern: "graphs",
+        frequency: 85,
+        tips: ["Shopping route optimization", "Store mapping", "Delivery routing"],
+      },
+      {
+        pattern: "greedy",
+        frequency: 80,
+        tips: ["Item substitution", "Batch optimization", "Shopper assignment"],
+      },
+      {
+        pattern: "arrays-hashing",
+        frequency: 80,
+        tips: ["Inventory lookups", "Product matching", "Search optimization"],
+      },
+      {
+        pattern: "heap-priority-queue",
+        frequency: 70,
+        tips: ["Order prioritization", "Delivery scheduling", "Time slot management"],
+      },
+      {
+        pattern: "sliding-window",
+        frequency: 60,
+        tips: ["Demand forecasting", "Availability windows", "Time-based queries"],
+      },
+    ],
+    interviewProcess: [
+      "Recruiter screen",
+      "Technical phone interview",
+      "On-site: 4 rounds",
+      "System design + coding",
+      "Values discussion",
+    ],
+    cultureTips: [
+      "Customer obsession",
+      "Shopper experience matters",
+      "Retail domain knowledge valued",
+      "Speed and reliability focus",
+    ],
+    commonQuestionTypes: [
+      "Route optimization",
+      "Inventory management",
+      "Real-time availability",
+      "Substitution algorithms",
+      "Batch processing",
+    ],
+    dosDonts: {
+      dos: [
+        "Think about all stakeholders (customer, shopper, retailer)",
+        "Consider inventory constraints",
+        "Optimize for real-world scenarios",
+        "Design for scale",
+        "Focus on reliability",
+      ],
+      donts: [
+        "Ignore shopper experience",
+        "Forget about inventory accuracy",
+        "Overlook substitution logic",
+        "Design without considering real-time updates",
+        "Neglect customer preferences",
+      ],
+    },
+  },
+  {
+    companyId: "square",
+    companyName: "Square (Block)",
+    interviewStyle: {
+      description:
+        "Square interviews focus on payments, fintech, and merchant solutions. Strong emphasis on reliability, security, and economic empowerment.",
+      pace: "Methodical with focus on correctness",
+      expectations: [
+        "Strong fundamentals",
+        "Understanding of payments",
+        "Security awareness",
+        "Reliability mindset",
+        "Clean, maintainable code",
+      ],
+    },
+    topPatterns: [
+      {
+        pattern: "arrays-hashing",
+        frequency: 90,
+        tips: ["Transaction processing", "Merchant lookups", "Payment validation"],
+      },
+      {
+        pattern: "trees",
+        frequency: 80,
+        tips: ["Hierarchical data", "Account structures", "Menu organization"],
+      },
+      {
+        pattern: "dp-1d",
+        frequency: 70,
+        tips: ["Financial calculations", "Fee optimization", "Settlement logic"],
+      },
+      {
+        pattern: "graphs",
+        frequency: 65,
+        tips: ["Transaction flows", "Fraud detection", "Money movement"],
+      },
+      {
+        pattern: "string",
+        frequency: 60,
+        tips: ["Receipt parsing", "Data validation", "API handling"],
+      },
+    ],
+    interviewProcess: [
+      "Recruiter call",
+      "Technical phone screen",
+      "On-site: 4 rounds",
+      "Coding + system design",
+      "Values interview",
+    ],
+    cultureTips: [
+      "Economic empowerment mission",
+      "Merchant success focus",
+      "Design for reliability",
+      "Security is non-negotiable",
+    ],
+    commonQuestionTypes: [
+      "Payment processing",
+      "Transaction handling",
+      "Inventory management",
+      "Financial calculations",
+      "API design",
+    ],
+    dosDonts: {
+      dos: [
+        "Think about failure scenarios",
+        "Prioritize correctness over speed",
+        "Consider security implications",
+        "Design for auditability",
+        "Think about merchant experience",
+      ],
+      donts: [
+        "Ignore edge cases in money handling",
+        "Forget about idempotency",
+        "Overlook compliance requirements",
+        "Design without considering failures",
+        "Be imprecise with financial data",
+      ],
+    },
+  },
+  {
+    companyId: "figma",
+    companyName: "Figma",
+    interviewStyle: {
+      description:
+        "Figma interviews focus on real-time collaboration, design tools, and creative applications. Strong emphasis on user experience and technical excellence.",
+      pace: "Thoughtful with emphasis on design thinking",
+      expectations: [
+        "Strong algorithmic skills",
+        "Understanding of real-time systems",
+        "Design sensibility",
+        "Collaboration focus",
+        "User experience awareness",
+      ],
+    },
+    topPatterns: [
+      {
+        pattern: "trees",
+        frequency: 90,
+        tips: ["Document structure", "Layer hierarchy", "Component trees"],
+      },
+      {
+        pattern: "graphs",
+        frequency: 85,
+        tips: ["Constraint systems", "Object relationships", "Dependency graphs"],
+      },
+      {
+        pattern: "arrays-hashing",
+        frequency: 80,
+        tips: ["Object lookups", "State management", "Caching"],
+      },
+      {
+        pattern: "bfs",
+        frequency: 70,
+        tips: ["Layer traversal", "Selection expansion", "Nearest neighbor"],
+      },
+      {
+        pattern: "string",
+        frequency: 60,
+        tips: ["Text rendering", "Font handling", "Search functionality"],
+      },
+    ],
+    interviewProcess: [
+      "Recruiter screen",
+      "Technical phone interview",
+      "On-site: 4-5 rounds",
+      "Coding + practical design",
+      "Culture fit discussion",
+    ],
+    cultureTips: [
+      "Design excellence matters",
+      "Collaborative by default",
+      "User experience first",
+      "Technical craft valued",
+    ],
+    commonQuestionTypes: [
+      "Real-time collaboration (CRDTs)",
+      "Canvas rendering",
+      "Undo/redo systems",
+      "Constraint solving",
+      "Tree manipulation",
+    ],
+    dosDonts: {
+      dos: [
+        "Think about user experience",
+        "Consider real-time implications",
+        "Design for collaboration",
+        "Focus on performance",
+        "Show design sensibility",
+      ],
+      donts: [
+        "Ignore edge cases in collaboration",
+        "Forget about conflict resolution",
+        "Overlook performance for large documents",
+        "Design without considering UX",
+        "Be dismissive of design discussions",
+      ],
+    },
+  },
 ]
 
 /**
