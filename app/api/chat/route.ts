@@ -262,6 +262,8 @@ export async function POST(request: NextRequest) {
       timeSinceLastMessage,
       // NEW: Is this a wrap-up request?
       isWrapUp,
+      // NEW: Edge cases for interviewer to ask about
+      edgeCases,
     } = await request.json()
 
     // For proactive messages (interviewer jumping in), message might be empty
@@ -366,6 +368,28 @@ ${patternMeta.interviewerFollowUps
   .join("\n")}
 `
       : ""
+
+    // Build edge case context for interviewer to ask about specific scenarios
+    const edgeCaseContext =
+      edgeCases && Array.isArray(edgeCases) && edgeCases.length > 0
+        ? `
+EDGE CASES TO ASK ABOUT (if candidate hasn't discussed them):
+These are specific edge cases for this problem. If the candidate hasn't mentioned them,
+ask about ONE of these when appropriate (after they explain their approach or before running tests):
+${edgeCases
+  .slice(0, 4)
+  .map(
+    (ec: { description: string; input: unknown }) =>
+      `- "${ec.description}": What happens with input ${JSON.stringify(ec.input)}?`
+  )
+  .join("\n")}
+
+HOW TO USE EDGE CASES:
+- If their code might fail on an edge case, ask: "What happens if the input is ${JSON.stringify(edgeCases[0]?.input)}?"
+- Don't reveal the answer - let them think through it
+- If they've already discussed edge cases well, skip this and move to complexity
+`
+        : ""
 
     // Build system design specific context with phase-based guidance
     const isSystemDesign = scenarioType === "system-design"
@@ -496,6 +520,7 @@ DO NOT:
 ${companyContext}
 ${userContextString}${problemContext}
 ${isSystemDesign ? systemDesignContext : isBugFix ? bugFixContext : patternContext}
+${edgeCaseContext}
 
 INTERVIEW STYLE - ACT LIKE A REAL INTERVIEWER:
 You are having a natural conversation with the candidate. They may:

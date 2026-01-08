@@ -59,8 +59,33 @@ export type VectorizationProgressCallback = (
 
 /**
  * Convert DSA scenario to rich text for embedding
+ * Includes ALL test cases with edge case tagging for better RAG retrieval
  */
 function scenarioToEmbeddingText(scenario: DSAScenario): string {
+  // Build test case section with edge case tagging
+  const testCaseLines =
+    scenario.testCases?.map((tc, i) => {
+      const isEdgeCase = tc.description?.toLowerCase().includes("edge")
+      const label = isEdgeCase ? "[EDGE CASE]" : ""
+      return `${i + 1}. ${tc.description} ${label}\n   Input: ${JSON.stringify(tc.input)}\n   Expected: ${JSON.stringify(tc.expected)}`
+    }) || []
+
+  // Separate edge cases for emphasis
+  const edgeCases =
+    scenario.testCases?.filter((tc) => tc.description?.toLowerCase().includes("edge")) || []
+
+  const edgeCaseSection =
+    edgeCases.length > 0
+      ? [
+          ``,
+          `## Edge Cases (${edgeCases.length} total)`,
+          ...edgeCases.map(
+            (tc, i) =>
+              `- ${tc.description}: Input ${JSON.stringify(tc.input)} → Expected ${JSON.stringify(tc.expected)}`
+          ),
+        ]
+      : []
+
   const parts = [
     `# ${scenario.title}`,
     ``,
@@ -81,6 +106,10 @@ function scenarioToEmbeddingText(scenario: DSAScenario): string {
       (ex, i) =>
         `Example ${i + 1}:\nInput: ${ex.input}\nOutput: ${ex.output}${ex.explanation ? `\nExplanation: ${ex.explanation}` : ""}`
     ),
+    ``,
+    `## Test Cases (${scenario.testCases?.length || 0} total)`,
+    ...testCaseLines,
+    ...edgeCaseSection,
     ``,
     `## Hints`,
     scenario.hints.join("\n"),
@@ -160,12 +189,20 @@ function systemDesignToEmbeddingText(scenario: SystemDesignScenario): string {
 /**
  * Convert Bug Fix scenario to rich text for embedding
  * Includes bug description, expected behavior, and debugging context
+ * Updated to include ALL test cases with edge case tagging
  */
 function bugFixToEmbeddingText(scenario: BugFixScenario): string {
   // Get a representative language for the buggy code snippet
   const languages = Object.keys(scenario.buggyCode)
   const primaryLang = languages.includes("python") ? "python" : languages[0]
   const buggyCodeSnippet = scenario.buggyCode[primaryLang] || ""
+
+  // Build test case section with edge case tagging (all test cases, no truncation)
+  const testCaseLines = scenario.testCases.map((tc, i) => {
+    const isEdgeCase = tc.description?.toLowerCase().includes("edge")
+    const label = isEdgeCase ? " [EDGE CASE]" : ""
+    return `${i + 1}. ${tc.description}${label}: Input: ${JSON.stringify(tc.input)} → Expected: ${JSON.stringify(tc.expected)}`
+  })
 
   const parts = [
     `# ${scenario.title}`,
@@ -188,19 +225,14 @@ function bugFixToEmbeddingText(scenario: BugFixScenario): string {
     ``,
     `## Buggy Code (${primaryLang})`,
     "```" + primaryLang,
-    buggyCodeSnippet.substring(0, 1000), // Limit code length for embedding
+    buggyCodeSnippet.substring(0, 1500), // Increased limit for better context
     "```",
     ``,
     `## Debugging Hints`,
     ...scenario.hints.map((hint) => `- ${hint}`),
     ``,
-    `## Test Cases`,
-    ...scenario.testCases
-      .slice(0, 3)
-      .map(
-        (tc, i) =>
-          `${i + 1}. ${tc.description}: Input: ${JSON.stringify(tc.input).substring(0, 100)} → Expected: ${JSON.stringify(tc.expected).substring(0, 100)}`
-      ),
+    `## Test Cases (${scenario.testCases.length} total)`,
+    ...testCaseLines,
   ]
 
   return parts.join("\n")

@@ -1215,6 +1215,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           scenarioType: selectedScenario?.type,
           isProactive: true,
           elapsedTime: elapsedTime,
+          edgeCases: getEdgeCasesForInterviewer(),
         }),
       })
 
@@ -1331,6 +1332,7 @@ Interviews are conversations, not just coding exercises.`
           scenarioType: selectedScenario?.type,
           isProactive: true,
           elapsedTime: elapsedTime,
+          edgeCases: getEdgeCasesForInterviewer(),
         }),
       })
 
@@ -1382,6 +1384,19 @@ Interviews are conversations, not just coding exercises.`
     } catch (error) {
       console.error("[Session Metrics] Failed to track completion:", error)
     }
+  }
+
+  // Extract edge cases from scenario for interviewer to ask about
+  const getEdgeCasesForInterviewer = (): { description: string; input: unknown }[] => {
+    if (!selectedScenario) return []
+    const testCases = (selectedScenario as any).testCases || []
+    // Filter for edge cases (those with "edge" in description)
+    return testCases
+      .filter((tc: { description?: string }) => tc.description?.toLowerCase().includes("edge"))
+      .map((tc: { description: string; input: unknown }) => ({
+        description: tc.description,
+        input: tc.input,
+      }))
   }
 
   // Analyze code for context-aware proactive feedback
@@ -1619,6 +1634,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           scenarioTitle: selectedScenario?.title,
           scenarioType: selectedScenario?.type,
           isProactive: false,
+          edgeCases: getEdgeCasesForInterviewer(),
         }),
       })
 
@@ -2434,6 +2450,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             isProactive: false,
             isPostInterview: showPostInterviewDiscussion,
             isEndingSession: isEndingSession,
+            edgeCases: isInterviewer ? getEdgeCasesForInterviewer() : undefined,
           }),
         })
 
@@ -2864,6 +2881,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           isProactive: false,
           isPostInterview: true,
           isEndingSession: false,
+          edgeCases: getEdgeCasesForInterviewer(),
         }),
       })
 

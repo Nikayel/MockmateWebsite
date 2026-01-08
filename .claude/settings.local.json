@@ -39,7 +39,12 @@
       "Bash(export PATH=\"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$HOME/.nvm/versions/node/v22.12.0/bin:$PATH\")",
       "Bash($HOME/.nvm/versions/node/v22.12.0/bin/node $HOME/.nvm/versions/node/v22.12.0/bin/pnpm run build)",
       "Bash(export PATH:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin/node /Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin/pnpm run build:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:$PATH\" pnpm run build:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:$PATH\" git add:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:$PATH\" git add:*)",
+      "Bash(export PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:$PATH\")"
     ]
   }
 }
