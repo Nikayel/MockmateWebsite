@@ -58,13 +58,20 @@ export async function GET(request: NextRequest) {
     const now = Timestamp.now()
     const nowDate = now.toDate()
 
-    // Fetch active announcements
+    // Priority order for sorting (higher = more important)
+    const priorityOrder: Record<string, number> = {
+      critical: 4,
+      warning: 3,
+      success: 2,
+      info: 1,
+    }
+
+    // Fetch active announcements - order by createdAt only to avoid composite index issues
     const snapshot = await adminDb
       .collection("announcements")
       .where("active", "==", true)
-      .orderBy("priority", "desc")
       .orderBy("createdAt", "desc")
-      .limit(10)
+      .limit(50) // Fetch more, filter later
       .get()
 
     // Get user's dismissed announcements
@@ -144,10 +151,22 @@ export async function GET(request: NextRequest) {
       viewedIds.push(announcementId)
     }
 
+    // Sort announcements by priority (critical first) then by newest
+    announcements.sort((a, b) => {
+      const priorityDiff = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0)
+      if (priorityDiff !== 0) return priorityDiff
+      // Both have same priority, already sorted by createdAt from Firestore
+      return 0
+    })
+
+    // Limit to 10 announcements after filtering and sorting
+    const limitedAnnouncements = announcements.slice(0, 10)
+    const limitedViewedIds = viewedIds.slice(0, 10)
+
     // Increment view counts (fire and forget)
-    if (viewedIds.length > 0) {
+    if (limitedViewedIds.length > 0) {
       Promise.all(
-        viewedIds.map((id) =>
+        limitedViewedIds.map((id) =>
           adminDb
             .collection("announcements")
             .doc(id)
@@ -163,7 +182,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      announcements,
+      announcements: limitedAnnouncements,
     })
   } catch (error) {
     console.error("[User Announcements API] GET Error:", error)

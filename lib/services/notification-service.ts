@@ -20,20 +20,15 @@ import {
   type NotificationKnowledge,
 } from "@/lib/rag/knowledge-base/notification-knowledge"
 import {
-  getNotificationPreferences,
-  createNotification,
-  createInAppNotification,
-  addToNotificationQueue,
-  shouldSendNotification,
-  recordNotificationSent,
-  getRecentNotificationsByType,
-} from "@/lib/notification-helpers"
+  getNotificationPreferencesServer,
+  createInAppNotificationServer,
+  shouldSendNotificationServer,
+  recordNotificationSentServer,
+} from "@/lib/notification-helpers-server"
 import type {
-  Notification,
   NotificationTriggerContext,
   NotificationSendResult,
   NotificationChannel,
-  InAppNotification,
 } from "@/lib/types/notifications"
 import {
   sendSpacedRepetitionEmail,
@@ -108,9 +103,7 @@ export function generateNotificationMessage(
 /**
  * Evaluate all triggers for a user and return notifications to send
  */
-export async function evaluateTriggers(
-  context: NotificationTriggerContext
-): Promise<
+export async function evaluateTriggers(context: NotificationTriggerContext): Promise<
   Array<{
     type: NotificationType
     variables: Record<string, any>
@@ -321,8 +314,8 @@ export async function sendNotification(
       return { success: false, error: "Unknown notification type", channels: {} }
     }
 
-    // Check if we should send
-    const { shouldSend, reason } = await shouldSendNotification(
+    // Check if we should send (using server-side helper)
+    const { shouldSend, reason } = await shouldSendNotificationServer(
       userId,
       type,
       knowledge.frequency.cooldownAfterDismiss,
@@ -333,8 +326,8 @@ export async function sendNotification(
       return { success: false, error: `Blocked: ${reason}`, channels: {} }
     }
 
-    // Get user preferences
-    const prefs = await getNotificationPreferences(userId)
+    // Get user preferences (using server-side helper)
+    const prefs = await getNotificationPreferencesServer(userId)
 
     // Determine channels
     const typePref = prefs.typePreferences[type]
@@ -343,22 +336,9 @@ export async function sendNotification(
     // Generate message
     const { title, body } = generateNotificationMessage(knowledge, variables)
 
-    // Create notification record
-    const notification = await createNotification({
-      userId,
-      type,
-      title,
-      body,
-      data: variables,
-      scheduledFor: new Date().toISOString(),
-      priority,
-      channels,
-      status: "pending",
-    })
-
     const result: NotificationSendResult = {
       success: true,
-      notificationId: notification.id,
+      notificationId: `notif_${Date.now()}`,
       channels: {},
     }
 
@@ -368,7 +348,8 @@ export async function sendNotification(
 
       switch (channel) {
         case "in_app":
-          await createInAppNotification({
+          // Use server-side helper to create in-app notification
+          const inAppNotif = await createInAppNotificationServer({
             userId,
             type,
             title,
@@ -376,6 +357,7 @@ export async function sendNotification(
             link: getNotificationLink(type, variables),
             read: false,
           })
+          result.notificationId = inAppNotif.id
           result.channels.in_app = { success: true }
           break
 
@@ -408,8 +390,8 @@ export async function sendNotification(
       }
     }
 
-    // Record analytics
-    await recordNotificationSent(userId, type)
+    // Record analytics (using server-side helper)
+    await recordNotificationSentServer(userId, type)
 
     return result
   } catch (error: any) {
@@ -559,32 +541,6 @@ function getNotificationLink(type: NotificationType, variables: Record<string, a
 
     default:
       return "/dashboard"
-  }
-}
-
-/**
- * Schedule notification for later
- */
-export async function scheduleNotification(
-  userId: string,
-  type: NotificationType,
-  variables: Record<string, any>,
-  scheduledFor: Date,
-  priority: "critical" | "high" | "medium" | "low" = "medium"
-): Promise<{ success: boolean; queueItemId?: string; error?: string }> {
-  try {
-    const queueItem = await addToNotificationQueue({
-      userId,
-      type,
-      triggerData: variables,
-      scheduledFor: scheduledFor.toISOString(),
-      priority,
-      maxAttempts: 3,
-    })
-
-    return { success: true, queueItemId: queueItem.id }
-  } catch (error: any) {
-    return { success: false, error: error.message }
   }
 }
 

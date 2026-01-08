@@ -82,6 +82,7 @@ const defaultAnnouncement: {
   type: "banner" | "modal" | "toast" | "page"
   priority: "info" | "warning" | "critical" | "success"
   targetAudience: "all" | "free" | "pro" | "enterprise" | "specific"
+  targetUserIds: string
   startDate: string
   endDate: string
   dismissible: boolean
@@ -93,6 +94,7 @@ const defaultAnnouncement: {
   type: "banner",
   priority: "info",
   targetAudience: "all",
+  targetUserIds: "",
   startDate: new Date().toISOString().slice(0, 16), // Format: YYYY-MM-DDTHH:MM
   endDate: "",
   dismissible: true,
@@ -160,6 +162,7 @@ export default function AnnouncementsPage() {
       type: announcement.type,
       priority: announcement.priority,
       targetAudience: announcement.targetAudience,
+      targetUserIds: (announcement as any).targetUserIds?.join(", ") || "",
       startDate: announcement.startDate?.slice(0, 16) || "",
       endDate: announcement.endDate?.slice(0, 16) || "",
       dismissible: announcement.dismissible,
@@ -176,7 +179,21 @@ export default function AnnouncementsPage() {
     try {
       const token = await firebaseUser.getIdToken()
       const method = editingAnnouncement ? "PUT" : "POST"
-      const body = editingAnnouncement ? { id: editingAnnouncement.id, ...formData } : formData
+
+      // Prepare body with targetUserIds as array
+      const body: any = editingAnnouncement
+        ? { id: editingAnnouncement.id, ...formData }
+        : { ...formData }
+
+      // Convert targetUserIds string to array if targeting specific users
+      if (formData.targetAudience === "specific" && formData.targetUserIds) {
+        body.targetUserIds = formData.targetUserIds
+          .split(",")
+          .map((id: string) => id.trim())
+          .filter((id: string) => id.length > 0)
+      } else {
+        delete body.targetUserIds
+      }
 
       // Clean up empty CTA
       if (!body.cta?.text && !body.cta?.url) {
@@ -580,6 +597,9 @@ export default function AnnouncementsPage() {
                     <SelectItem value="enterprise" className="text-white">
                       Enterprise Only
                     </SelectItem>
+                    <SelectItem value="specific" className="text-white">
+                      Specific Users
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -599,6 +619,21 @@ export default function AnnouncementsPage() {
                 </div>
               </div>
             </div>
+
+            {formData.targetAudience === "specific" && (
+              <div className="space-y-2">
+                <Label>Target User IDs</Label>
+                <Textarea
+                  value={formData.targetUserIds}
+                  onChange={(e) => setFormData({ ...formData, targetUserIds: e.target.value })}
+                  placeholder="Enter user IDs separated by commas (e.g., user123, user456)"
+                  className="min-h-[80px] border-gray-700 bg-gray-800 text-white"
+                />
+                <p className="text-xs text-gray-500">
+                  Comma-separated list of Firebase user IDs to target
+                </p>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
