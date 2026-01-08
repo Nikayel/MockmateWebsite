@@ -488,6 +488,14 @@ function generatePatternReasoning(
 /**
  * Generate question selection rationale
  */
+// Realistic max questions per day by experience level
+const MAX_QUESTIONS_PER_DAY: Record<string, number> = {
+  intern: 3,
+  beginner: 4,
+  intermediate: 5,
+  advanced: 6,
+}
+
 function generateQuestionRationale(
   assessment: UserRoadmapAssessment,
   company: CompanyQuestionData,
@@ -495,8 +503,13 @@ function generateQuestionRationale(
   selectedQuestionCount?: number
 ): PersonalizedCompanyGuide["questionSelectionRationale"] {
   const expConfig = EXPERIENCE_CONFIG[assessment.experienceLevel]
-  const totalQuestions =
-    selectedQuestionCount || Math.round(assessment.daysRemaining * assessment.hoursPerDay * 1.5)
+
+  // Calculate realistic question count based on experience level
+  const maxPerDay = MAX_QUESTIONS_PER_DAY[assessment.experienceLevel] || 4
+  const availableDays = Math.max(1, assessment.daysRemaining - 3) // Leave 3 days for review
+  const realisticMax = availableDays * maxPerDay
+
+  const totalQuestions = selectedQuestionCount || realisticMax
 
   // Calculate distribution
   const byDifficulty = {
