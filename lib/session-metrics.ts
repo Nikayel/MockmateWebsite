@@ -9,12 +9,16 @@
  * - User insights and recommendations
  */
 
-import { adminDb } from './firebase-admin'
-import { FieldValue, Timestamp } from 'firebase-admin/firestore'
-import { trackUsageEvent } from './usage-tracking'
-import type { InteractionMetrics, ScoreBreakdown } from './scoring'
-import { calculateUserScore, getPerformanceFeedback } from './scoring'
-import { calculateMasteryScore, fromInteractionMetrics, type MasteryScoreResult } from './spaced-repetition/mastery-score'
+import { adminDb } from "./firebase-admin"
+import { FieldValue, Timestamp } from "firebase-admin/firestore"
+import { trackUsageEvent } from "./usage-tracking"
+import type { InteractionMetrics, ScoreBreakdown } from "./scoring"
+import { calculateUserScore, getPerformanceFeedback } from "./scoring"
+import {
+  calculateMasteryScore,
+  fromInteractionMetrics,
+  type MasteryScoreResult,
+} from "./spaced-repetition/mastery-score"
 
 // =============================================================================
 // TYPES
@@ -26,8 +30,8 @@ export interface SessionMetricsState {
   scenarioId: string
   scenarioTitle: string
   pattern: string
-  difficulty: 'easy' | 'medium' | 'hard'
-  scenarioType: 'dsa' | 'bugfix' | 'system-design'
+  difficulty: "easy" | "medium" | "hard"
+  scenarioType: "dsa" | "bugfix" | "system-design"
 
   // Timestamps
   startedAt: string
@@ -82,7 +86,7 @@ export interface SessionMetricsState {
 
 export interface ChatMetric {
   timestamp: string
-  type: 'user' | 'ai'
+  type: "user" | "ai"
   messageLength: number
   containsCode: boolean
   containsQuestion: boolean
@@ -102,11 +106,11 @@ export interface SessionSummary {
   userId: string
   scenarioId: string
   pattern: string
-  difficulty: 'easy' | 'medium' | 'hard'
+  difficulty: "easy" | "medium" | "hard"
   durationMinutes: number
-  performanceScore: number          // Interview score (includes communication)
-  masteryScore: number              // Code-focused score for SR algorithm
-  masteryScoreDetails: MasteryScoreResult  // Breakdown for analytics
+  performanceScore: number // Interview score (includes communication)
+  masteryScore: number // Code-focused score for SR algorithm
+  masteryScoreDetails: MasteryScoreResult // Breakdown for analytics
   scoreBreakdown: ScoreBreakdown
   feedback: ReturnType<typeof getPerformanceFeedback>
   interactionMetrics: InteractionMetrics
@@ -129,8 +133,8 @@ export async function initSessionMetrics(params: {
   scenarioId: string
   scenarioTitle: string
   pattern: string
-  difficulty: 'easy' | 'medium' | 'hard'
-  scenarioType: 'dsa' | 'bugfix' | 'system-design'
+  difficulty: "easy" | "medium" | "hard"
+  scenarioType: "dsa" | "bugfix" | "system-design"
   hintsTotal: number
 }): Promise<SessionMetricsState> {
   const now = new Date().toISOString()
@@ -173,7 +177,7 @@ export async function initSessionMetrics(params: {
   // Track session start event
   await trackUsageEvent({
     userId: params.userId,
-    eventType: 'session_start',
+    eventType: "session_start",
     sessionId: params.sessionId,
     scenarioId: params.scenarioId,
     metadata: {
@@ -201,17 +205,18 @@ export function getSessionMetrics(sessionId: string): SessionMetricsState | null
  */
 export async function trackChatMessage(params: {
   sessionId: string
-  type: 'user' | 'ai'
+  type: "user" | "ai"
   message: string
-  chatType: 'partner' | 'interviewer'
+  chatType: "partner" | "interviewer"
 }): Promise<void> {
   const state = activeSessions.get(params.sessionId)
   if (!state) return
 
   const now = new Date().toISOString()
-  const lastMessage = params.chatType === 'partner'
-    ? state.chatMessages[state.chatMessages.length - 1]
-    : state.interviewerMessages[state.interviewerMessages.length - 1]
+  const lastMessage =
+    params.chatType === "partner"
+      ? state.chatMessages[state.chatMessages.length - 1]
+      : state.interviewerMessages[state.interviewerMessages.length - 1]
 
   const metric: ChatMetric = {
     timestamp: now,
@@ -224,15 +229,15 @@ export async function trackChatMessage(params: {
       : undefined,
   }
 
-  if (params.chatType === 'partner') {
+  if (params.chatType === "partner") {
     state.chatMessages.push(metric)
     state.totalChatMessages++
 
     // Track AI interactions
-    if (params.type === 'user' && metric.containsQuestion) {
+    if (params.type === "user" && metric.containsQuestion) {
       state.aiQuestionsAsked++
     }
-    if (params.type === 'ai') {
+    if (params.type === "ai") {
       state.aiSuggestionsReceived++
     }
   } else {
@@ -240,15 +245,27 @@ export async function trackChatMessage(params: {
     state.totalInterviewerMessages++
 
     // Analyze for approach explanation and complexity discussion
-    if (params.type === 'user') {
+    if (params.type === "user") {
       const lowerMessage = params.message.toLowerCase()
-      if (lowerMessage.includes('approach') || lowerMessage.includes('plan') || lowerMessage.includes('strategy')) {
+      if (
+        lowerMessage.includes("approach") ||
+        lowerMessage.includes("plan") ||
+        lowerMessage.includes("strategy")
+      ) {
         state.approachExplained = true
       }
-      if (lowerMessage.includes('o(') || lowerMessage.includes('time complexity') || lowerMessage.includes('space complexity')) {
+      if (
+        lowerMessage.includes("o(") ||
+        lowerMessage.includes("time complexity") ||
+        lowerMessage.includes("space complexity")
+      ) {
         state.complexityDiscussed = true
       }
-      if (lowerMessage.includes('edge case') || lowerMessage.includes('corner case') || lowerMessage.includes('what if')) {
+      if (
+        lowerMessage.includes("edge case") ||
+        lowerMessage.includes("corner case") ||
+        lowerMessage.includes("what if")
+      ) {
         const edgeCase = params.message.slice(0, 100)
         if (!state.edgeCasesIdentified.includes(edgeCase)) {
           state.edgeCasesIdentified.push(edgeCase)
@@ -262,7 +279,7 @@ export async function trackChatMessage(params: {
   // Track chat message usage (fire and forget)
   trackUsageEvent({
     userId: state.userId,
-    eventType: 'chat_message',
+    eventType: "chat_message",
     sessionId: params.sessionId,
     metadata: {
       chatType: params.chatType,
@@ -300,7 +317,7 @@ export async function trackHintReveal(params: {
   // Track hint usage event
   await trackUsageEvent({
     userId: state.userId,
-    eventType: 'hint_request',
+    eventType: "hint_request",
     sessionId: params.sessionId,
     metadata: {
       hintIndex: params.hintIndex,
@@ -409,9 +426,11 @@ export async function completeSessionMetrics(params: {
   // Fallback: If session not in memory (server restart, edge function cold start, etc.)
   // try to reconstruct minimal state from interview_sessions collection
   if (!state) {
-    console.warn(`[Session Metrics] Session ${params.sessionId} not in memory, attempting fallback...`)
+    console.warn(
+      `[Session Metrics] Session ${params.sessionId} not in memory, attempting fallback...`
+    )
     try {
-      const sessionDoc = await adminDb.collection('interview_sessions').doc(params.sessionId).get()
+      const sessionDoc = await adminDb.collection("interview_sessions").doc(params.sessionId).get()
       if (sessionDoc.exists) {
         const data = sessionDoc.data()!
         // Reconstruct minimal state for scoring
@@ -419,10 +438,10 @@ export async function completeSessionMetrics(params: {
           sessionId: params.sessionId,
           userId: data.user_id,
           scenarioId: data.scenario_id || params.sessionId,
-          scenarioTitle: data.topic || 'Unknown',
-          pattern: data.pattern || data.type || 'unknown',
-          difficulty: data.difficulty || 'medium',
-          scenarioType: data.type || 'dsa',
+          scenarioTitle: data.topic || "Unknown",
+          pattern: data.pattern || data.type || "unknown",
+          difficulty: data.difficulty || "medium",
+          scenarioType: data.type || "dsa",
           startedAt: data.started_at || data.created_at || new Date().toISOString(),
           lastActivityAt: new Date().toISOString(),
           chatMessages: [],
@@ -446,13 +465,20 @@ export async function completeSessionMetrics(params: {
           filesViewed: [],
           workspaceContextUsed: false,
         }
-        console.log(`[Session Metrics] Reconstructed session from interview_sessions: ${params.sessionId}`)
+        console.log(
+          `[Session Metrics] Reconstructed session from interview_sessions: ${params.sessionId}`
+        )
       } else {
-        console.error(`[Session Metrics] No active session found and no fallback available: ${params.sessionId}`)
+        console.error(
+          `[Session Metrics] No active session found and no fallback available: ${params.sessionId}`
+        )
         return null
       }
     } catch (fallbackError) {
-      console.error(`[Session Metrics] Fallback failed for session ${params.sessionId}:`, fallbackError)
+      console.error(
+        `[Session Metrics] Fallback failed for session ${params.sessionId}:`,
+        fallbackError
+      )
       return null
     }
   }
@@ -504,8 +530,10 @@ export async function completeSessionMetrics(params: {
     aiUsedStrategically: state.aiQuestionsAsked > 0 && state.aiSuggestionsCopiedBlindly === 0,
 
     // Communication
-    interviewerQuestionsAnswered: state.interviewerMessages.filter(m => m.type === 'user').length,
-    clarifyingQuestionsAsked: state.interviewerMessages.filter(m => m.type === 'user' && m.containsQuestion).length,
+    interviewerQuestionsAnswered: state.interviewerMessages.filter((m) => m.type === "user").length,
+    clarifyingQuestionsAsked: state.interviewerMessages.filter(
+      (m) => m.type === "user" && m.containsQuestion
+    ).length,
     thoughtProcessShared: state.thoughtProcessShared || 50,
 
     // Problem Context
@@ -520,7 +548,7 @@ export async function completeSessionMetrics(params: {
 
     // Workspace
     workspaceFilesViewed: state.filesViewed.length,
-    workspaceFilesTotal: state.scenarioType !== 'dsa' ? 5 : 0, // Approximate
+    workspaceFilesTotal: state.scenarioType !== "dsa" ? 5 : 0, // Approximate
     workspaceContextUsed: state.workspaceContextUsed,
   }
 
@@ -536,10 +564,10 @@ export async function completeSessionMetrics(params: {
   state.performanceScore = scoreBreakdown.overallScore
 
   // Log the score separation for analytics
-  console.log('[Session Metrics] Score breakdown:', {
+  console.log("[Session Metrics] Score breakdown:", {
     sessionId: state.sessionId,
-    performanceScore: scoreBreakdown.overallScore,  // Interview score (with communication)
-    masteryScore: masteryScoreDetails.masteryScore,  // Code-focused score (for SR)
+    performanceScore: scoreBreakdown.overallScore, // Interview score (with communication)
+    masteryScore: masteryScoreDetails.masteryScore, // Code-focused score (for SR)
     difference: scoreBreakdown.overallScore - masteryScoreDetails.masteryScore,
     components: masteryScoreDetails.components,
   })
@@ -564,7 +592,7 @@ export async function completeSessionMetrics(params: {
   // Track session end event
   await trackUsageEvent({
     userId: state.userId,
-    eventType: 'session_end',
+    eventType: "session_end",
     sessionId: params.sessionId,
     metadata: {
       durationMinutes,
@@ -597,14 +625,17 @@ export async function completeSessionMetrics(params: {
 async function persistSessionMetrics(state: SessionMetricsState): Promise<void> {
   try {
     await adminDb
-      .collection('session_metrics')
+      .collection("session_metrics")
       .doc(state.sessionId)
-      .set({
-        ...state,
-        updatedAt: FieldValue.serverTimestamp(),
-      }, { merge: true })
+      .set(
+        {
+          ...state,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      )
   } catch (error) {
-    console.error('[Session Metrics] Failed to persist:', error)
+    console.error("[Session Metrics] Failed to persist:", error)
   }
 }
 
@@ -615,9 +646,9 @@ async function storeSessionSummary(summary: SessionSummary): Promise<void> {
   try {
     // Store in user's session history
     await adminDb
-      .collection('users')
+      .collection("users")
       .doc(summary.userId)
-      .collection('session_summaries')
+      .collection("session_summaries")
       .doc(summary.sessionId)
       .set({
         ...summary,
@@ -631,15 +662,30 @@ async function storeSessionSummary(summary: SessionSummary): Promise<void> {
       updateUserProblemMastery(summary),
     ])
   } catch (error) {
-    console.error('[Session Metrics] Failed to store summary:', error)
+    console.error("[Session Metrics] Failed to store summary:", error)
   }
+}
+
+/**
+ * Calculate technical score from score breakdown
+ * Technical = (understanding × 0.375) + (problemSolving × 0.3125) + (codeQuality × 0.3125)
+ * This reweights the 80% non-communication portion to 100%
+ */
+function calculateTechnicalScore(breakdown: ScoreBreakdown): number {
+  const understanding = breakdown.understandingScore || 0
+  const problemSolving = breakdown.problemSolvingScore || 0
+  const codeQuality = breakdown.codeQualityScore || 0
+  return Math.round(understanding * 0.375 + problemSolving * 0.3125 + codeQuality * 0.3125)
 }
 
 /**
  * Update user's aggregate statistics
  */
 async function updateUserAggregateStats(summary: SessionSummary): Promise<void> {
-  const userStatsRef = adminDb.collection('user_stats').doc(summary.userId)
+  const userStatsRef = adminDb.collection("user_stats").doc(summary.userId)
+
+  // Calculate technical score from breakdown
+  const technicalScore = calculateTechnicalScore(summary.scoreBreakdown)
 
   await adminDb.runTransaction(async (transaction) => {
     const doc = await transaction.get(userStatsRef)
@@ -651,20 +697,27 @@ async function updateUserAggregateStats(summary: SessionSummary): Promise<void> 
         totalSessions: 1,
         totalPracticeMinutes: summary.durationMinutes,
         totalScore: summary.performanceScore,
+        totalTechnicalScore: technicalScore,
         averageScore: summary.performanceScore,
+        averageTechnicalScore: technicalScore,
         patternStats: {
           [summary.pattern]: {
             sessions: 1,
             totalScore: summary.performanceScore,
+            totalTechnicalScore: technicalScore,
             averageScore: summary.performanceScore,
+            averageTechnicalScore: technicalScore,
             bestScore: summary.performanceScore,
+            bestTechnicalScore: technicalScore,
           },
         },
         difficultyStats: {
           [summary.difficulty]: {
             sessions: 1,
             totalScore: summary.performanceScore,
+            totalTechnicalScore: technicalScore,
             averageScore: summary.performanceScore,
+            averageTechnicalScore: technicalScore,
           },
         },
         lastSessionAt: summary.completedAt,
@@ -675,29 +728,53 @@ async function updateUserAggregateStats(summary: SessionSummary): Promise<void> 
       const data = doc.data()!
       const totalSessions = (data.totalSessions || 0) + 1
       const totalScore = (data.totalScore || 0) + summary.performanceScore
+      const totalTechnicalScore = (data.totalTechnicalScore || 0) + technicalScore
 
       // Update pattern stats
       const patternStats = data.patternStats || {}
-      const patternData = patternStats[summary.pattern] || { sessions: 0, totalScore: 0, averageScore: 0, bestScore: 0 }
+      const patternData = patternStats[summary.pattern] || {
+        sessions: 0,
+        totalScore: 0,
+        totalTechnicalScore: 0,
+        averageScore: 0,
+        averageTechnicalScore: 0,
+        bestScore: 0,
+        bestTechnicalScore: 0,
+      }
       patternData.sessions++
       patternData.totalScore += summary.performanceScore
+      patternData.totalTechnicalScore = (patternData.totalTechnicalScore || 0) + technicalScore
       patternData.averageScore = Math.round(patternData.totalScore / patternData.sessions)
+      patternData.averageTechnicalScore = Math.round(
+        patternData.totalTechnicalScore / patternData.sessions
+      )
       patternData.bestScore = Math.max(patternData.bestScore, summary.performanceScore)
+      patternData.bestTechnicalScore = Math.max(patternData.bestTechnicalScore || 0, technicalScore)
       patternStats[summary.pattern] = patternData
 
       // Update difficulty stats
       const difficultyStats = data.difficultyStats || {}
-      const diffData = difficultyStats[summary.difficulty] || { sessions: 0, totalScore: 0, averageScore: 0 }
+      const diffData = difficultyStats[summary.difficulty] || {
+        sessions: 0,
+        totalScore: 0,
+        totalTechnicalScore: 0,
+        averageScore: 0,
+        averageTechnicalScore: 0,
+      }
       diffData.sessions++
       diffData.totalScore += summary.performanceScore
+      diffData.totalTechnicalScore = (diffData.totalTechnicalScore || 0) + technicalScore
       diffData.averageScore = Math.round(diffData.totalScore / diffData.sessions)
+      diffData.averageTechnicalScore = Math.round(diffData.totalTechnicalScore / diffData.sessions)
       difficultyStats[summary.difficulty] = diffData
 
       transaction.update(userStatsRef, {
         totalSessions,
         totalPracticeMinutes: FieldValue.increment(summary.durationMinutes),
         totalScore,
+        totalTechnicalScore,
         averageScore: Math.round(totalScore / totalSessions),
+        averageTechnicalScore: Math.round(totalTechnicalScore / totalSessions),
         patternStats,
         difficultyStats,
         lastSessionAt: summary.completedAt,
@@ -713,12 +790,12 @@ async function updateUserAggregateStats(summary: SessionSummary): Promise<void> 
  */
 async function updateUserLearningState(summary: SessionSummary): Promise<void> {
   try {
-    const learningStateRef = adminDb.collection('user_learning_state').doc(summary.userId)
+    const learningStateRef = adminDb.collection("user_learning_state").doc(summary.userId)
 
     await adminDb.runTransaction(async (transaction) => {
       const doc = await transaction.get(learningStateRef)
       const now = new Date(summary.completedAt)
-      const today = now.toISOString().split('T')[0]
+      const today = now.toISOString().split("T")[0]
 
       if (!doc.exists) {
         // Create new learning state document
@@ -742,7 +819,7 @@ async function updateUserLearningState(summary: SessionSummary): Promise<void> {
         })
       } else {
         const data = doc.data()!
-        const lastSessionDate = data.last_session_date || ''
+        const lastSessionDate = data.last_session_date || ""
         let streakDays = data.streak_days || 0
 
         // Calculate streak
@@ -781,7 +858,7 @@ async function updateUserLearningState(summary: SessionSummary): Promise<void> {
       }
     })
   } catch (error) {
-    console.error('[Session Metrics] Failed to update learning state:', error)
+    console.error("[Session Metrics] Failed to update learning state:", error)
   }
 }
 
@@ -792,9 +869,9 @@ async function updateUserLearningState(summary: SessionSummary): Promise<void> {
 async function updateUserProblemMastery(summary: SessionSummary): Promise<void> {
   try {
     const masteryRef = adminDb
-      .collection('user_problem_mastery')
+      .collection("user_problem_mastery")
       .doc(summary.userId)
-      .collection('problems')
+      .collection("problems")
       .doc(summary.scenarioId)
 
     await adminDb.runTransaction(async (transaction) => {
@@ -802,12 +879,12 @@ async function updateUserProblemMastery(summary: SessionSummary): Promise<void> 
 
       // Calculate mastery level based on score
       const getMasteryLevel = (score: number, practiceCount: number): string => {
-        if (practiceCount < 2) return 'novice'
-        if (score >= 90) return 'expert'
-        if (score >= 75) return 'proficient'
-        if (score >= 60) return 'practicing'
-        if (score >= 40) return 'learning'
-        return 'novice'
+        if (practiceCount < 2) return "novice"
+        if (score >= 90) return "expert"
+        if (score >= 75) return "proficient"
+        if (score >= 60) return "practicing"
+        if (score >= 40) return "learning"
+        return "novice"
       }
 
       if (!doc.exists) {
@@ -847,7 +924,7 @@ async function updateUserProblemMastery(summary: SessionSummary): Promise<void> 
       }
     })
   } catch (error) {
-    console.error('[Session Metrics] Failed to update problem mastery:', error)
+    console.error("[Session Metrics] Failed to update problem mastery:", error)
   }
 }
 
@@ -862,12 +939,29 @@ export async function getUserStats(userId: string): Promise<{
   totalSessions: number
   totalPracticeMinutes: number
   averageScore: number
-  patternStats: Record<string, { sessions: number; averageScore: number; bestScore: number }>
-  difficultyStats: Record<string, { sessions: number; averageScore: number }>
+  averageTechnicalScore?: number
+  patternStats: Record<
+    string,
+    {
+      sessions: number
+      averageScore: number
+      averageTechnicalScore?: number
+      bestScore: number
+      bestTechnicalScore?: number
+    }
+  >
+  difficultyStats: Record<
+    string,
+    {
+      sessions: number
+      averageScore: number
+      averageTechnicalScore?: number
+    }
+  >
   lastSessionAt?: string
 } | null> {
   try {
-    const doc = await adminDb.collection('user_stats').doc(userId).get()
+    const doc = await adminDb.collection("user_stats").doc(userId).get()
     if (!doc.exists) return null
 
     const data = doc.data()!
@@ -875,12 +969,13 @@ export async function getUserStats(userId: string): Promise<{
       totalSessions: data.totalSessions || 0,
       totalPracticeMinutes: data.totalPracticeMinutes || 0,
       averageScore: data.averageScore || 0,
+      averageTechnicalScore: data.averageTechnicalScore,
       patternStats: data.patternStats || {},
       difficultyStats: data.difficultyStats || {},
       lastSessionAt: data.lastSessionAt,
     }
   } catch (error) {
-    console.error('[Session Metrics] Failed to get user stats:', error)
+    console.error("[Session Metrics] Failed to get user stats:", error)
     return null
   }
 }
@@ -888,19 +983,22 @@ export async function getUserStats(userId: string): Promise<{
 /**
  * Get user's recent session summaries
  */
-export async function getRecentSessions(userId: string, limit: number = 10): Promise<SessionSummary[]> {
+export async function getRecentSessions(
+  userId: string,
+  limit: number = 10
+): Promise<SessionSummary[]> {
   try {
     const snapshot = await adminDb
-      .collection('users')
+      .collection("users")
       .doc(userId)
-      .collection('session_summaries')
-      .orderBy('completedAt', 'desc')
+      .collection("session_summaries")
+      .orderBy("completedAt", "desc")
       .limit(limit)
       .get()
 
-    return snapshot.docs.map(doc => doc.data() as SessionSummary)
+    return snapshot.docs.map((doc) => doc.data() as SessionSummary)
   } catch (error) {
-    console.error('[Session Metrics] Failed to get recent sessions:', error)
+    console.error("[Session Metrics] Failed to get recent sessions:", error)
     return []
   }
 }
@@ -908,29 +1006,32 @@ export async function getRecentSessions(userId: string, limit: number = 10): Pro
 /**
  * Get user's performance trends
  */
-export async function getPerformanceTrends(userId: string, days: number = 30): Promise<{
+export async function getPerformanceTrends(
+  userId: string,
+  days: number = 30
+): Promise<{
   daily: Array<{ date: string; score: number; sessions: number }>
   weeklyAverage: number
-  trend: 'improving' | 'stable' | 'declining'
+  trend: "improving" | "stable" | "declining"
 }> {
   try {
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
 
     const snapshot = await adminDb
-      .collection('users')
+      .collection("users")
       .doc(userId)
-      .collection('session_summaries')
-      .where('completedAt', '>=', startDate.toISOString())
-      .orderBy('completedAt', 'asc')
+      .collection("session_summaries")
+      .where("completedAt", ">=", startDate.toISOString())
+      .orderBy("completedAt", "asc")
       .get()
 
     // Group by date
     const dailyMap = new Map<string, { total: number; count: number }>()
 
-    snapshot.docs.forEach(doc => {
+    snapshot.docs.forEach((doc) => {
       const data = doc.data()
-      const date = data.completedAt.split('T')[0]
+      const date = data.completedAt.split("T")[0]
       const existing = dailyMap.get(date) || { total: 0, count: 0 }
       existing.total += data.performanceScore
       existing.count++
@@ -945,12 +1046,13 @@ export async function getPerformanceTrends(userId: string, days: number = 30): P
 
     // Calculate weekly average (last 7 days)
     const lastWeek = daily.slice(-7)
-    const weeklyAverage = lastWeek.length > 0
-      ? Math.round(lastWeek.reduce((sum, d) => sum + d.score, 0) / lastWeek.length)
-      : 0
+    const weeklyAverage =
+      lastWeek.length > 0
+        ? Math.round(lastWeek.reduce((sum, d) => sum + d.score, 0) / lastWeek.length)
+        : 0
 
     // Calculate trend
-    let trend: 'improving' | 'stable' | 'declining' = 'stable'
+    let trend: "improving" | "stable" | "declining" = "stable"
     if (daily.length >= 4) {
       const firstHalf = daily.slice(0, Math.floor(daily.length / 2))
       const secondHalf = daily.slice(Math.floor(daily.length / 2))
@@ -958,13 +1060,13 @@ export async function getPerformanceTrends(userId: string, days: number = 30): P
       const firstAvg = firstHalf.reduce((s, d) => s + d.score, 0) / firstHalf.length
       const secondAvg = secondHalf.reduce((s, d) => s + d.score, 0) / secondHalf.length
 
-      if (secondAvg - firstAvg > 5) trend = 'improving'
-      else if (firstAvg - secondAvg > 5) trend = 'declining'
+      if (secondAvg - firstAvg > 5) trend = "improving"
+      else if (firstAvg - secondAvg > 5) trend = "declining"
     }
 
     return { daily, weeklyAverage, trend }
   } catch (error) {
-    console.error('[Session Metrics] Failed to get trends:', error)
-    return { daily: [], weeklyAverage: 0, trend: 'stable' }
+    console.error("[Session Metrics] Failed to get trends:", error)
+    return { daily: [], weeklyAverage: 0, trend: "stable" }
   }
 }
