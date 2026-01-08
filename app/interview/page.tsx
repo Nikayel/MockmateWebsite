@@ -4108,6 +4108,31 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                 </div>
                               </div>
                             ))}
+                            {/* Thinking indicator - shows when AI is processing */}
+                            {(isLoadingInterviewer || isGeneratingDiscussion) && (
+                              <div className="flex justify-start">
+                                <div className="max-w-[90%] rounded-lg border border-gray-700/50 bg-gray-800/50 p-2 text-gray-400">
+                                  <div className="flex items-center space-x-2">
+                                    <Brain className="h-3 w-3 animate-pulse text-[#00d9ff]" />
+                                    <span className="text-xs">CodeSparring AI is thinking</span>
+                                    <span className="flex space-x-0.5">
+                                      <span
+                                        className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                                        style={{ animationDelay: "0ms" }}
+                                      />
+                                      <span
+                                        className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                                        style={{ animationDelay: "150ms" }}
+                                      />
+                                      <span
+                                        className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                                        style={{ animationDelay: "300ms" }}
+                                      />
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                             <div ref={interviewerEndRef} />
                           </>
                         )}
@@ -4320,13 +4345,30 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             </div>
                           </div>
                         ))}
-                        {isGeneratingDiscussion && (
+                        {/* Thinking indicator for post-interview discussion */}
+                        {(isLoadingInterviewer || isGeneratingDiscussion) && (
                           <div className="flex justify-start">
-                            <div className="rounded-lg bg-gray-800 p-3">
+                            <div className="max-w-[85%] rounded-lg border border-gray-700/50 bg-gray-800/50 p-3 text-gray-400">
                               <div className="flex items-center space-x-2">
-                                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
-                                <span className="text-sm text-gray-300">
-                                  Interviewer is analyzing your solution...
+                                <Brain className="h-4 w-4 animate-pulse text-[#00d9ff]" />
+                                <span className="text-sm">
+                                  {isGeneratingDiscussion
+                                    ? "Analyzing your solution..."
+                                    : "CodeSparring AI is thinking"}
+                                </span>
+                                <span className="flex space-x-0.5">
+                                  <span
+                                    className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#00d9ff]"
+                                    style={{ animationDelay: "0ms" }}
+                                  />
+                                  <span
+                                    className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#00d9ff]"
+                                    style={{ animationDelay: "150ms" }}
+                                  />
+                                  <span
+                                    className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#00d9ff]"
+                                    style={{ animationDelay: "300ms" }}
+                                  />
                                 </span>
                               </div>
                             </div>

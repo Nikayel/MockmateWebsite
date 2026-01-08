@@ -50,13 +50,17 @@ export default function PracticeFeedback({
   const feedbackLower = feedback.toLowerCase()
 
   // Calculate scores with fallback logic
-  const hasParsedScores = sections.scores.understanding > 0 || sections.scores.problemSolving > 0 ||
-    sections.scores.codeQuality > 0 || sections.scores.communication > 0
+  const hasParsedScores =
+    sections.scores.understanding > 0 ||
+    sections.scores.problemSolving > 0 ||
+    sections.scores.codeQuality > 0 ||
+    sections.scores.communication > 0
 
   if (!hasParsedScores && performanceScore > 0) {
     const baseScore = performanceScore <= 10 ? performanceScore * 10 : performanceScore
     const testPassRateVal = testsTotal > 0 ? testsPassed / testsTotal : 1
-    const hasCommunicationIssues = feedbackLower.includes('explain') || feedbackLower.includes('thought process')
+    const hasCommunicationIssues =
+      feedbackLower.includes("explain") || feedbackLower.includes("thought process")
 
     sections.scores.understanding = Math.round(baseScore * testPassRateVal * 0.9)
     sections.scores.problemSolving = Math.round(baseScore * (testPassRateVal > 0.8 ? 1 : 0.8))
@@ -64,14 +68,14 @@ export default function PracticeFeedback({
     sections.scores.communication = Math.round(baseScore * (hasCommunicationIssues ? 0.5 : 0.7))
 
     sections.scores.overall = Math.round(
-      sections.scores.understanding * 0.30 +
-      sections.scores.problemSolving * 0.25 +
-      sections.scores.codeQuality * 0.25 +
-      sections.scores.communication * 0.20
+      sections.scores.understanding * 0.3 +
+        sections.scores.problemSolving * 0.25 +
+        sections.scores.codeQuality * 0.25 +
+        sections.scores.communication * 0.2
     )
   }
 
-  const normalizeScore = (score: number) => score <= 10 ? score * 10 : score
+  const normalizeScore = (score: number) => (score <= 10 ? score * 10 : score)
 
   const scores = {
     understanding: normalizeScore(sections.scores.understanding || 0),
@@ -80,8 +84,31 @@ export default function PracticeFeedback({
     communication: normalizeScore(sections.scores.communication || 0),
   }
 
-  const overallScore = performanceScore > 0 ? normalizeScore(performanceScore) :
-    (sections.scores.overall > 0 ? normalizeScore(sections.scores.overall) : 0)
+  // Calculate weighted average from category scores (this is the correct interview score)
+  const hasValidCategoryScores =
+    scores.understanding > 0 ||
+    scores.problemSolving > 0 ||
+    scores.codeQuality > 0 ||
+    scores.communication > 0
+
+  const weightedAverage = hasValidCategoryScores
+    ? Math.round(
+        scores.understanding * 0.3 +
+          scores.problemSolving * 0.25 +
+          scores.codeQuality * 0.25 +
+          scores.communication * 0.2
+      )
+    : 0
+
+  // Use weighted average from category scores first, then fall back to parsed overall, then performanceScore
+  const overallScore =
+    weightedAverage > 0
+      ? weightedAverage
+      : sections.scores.overall > 0
+        ? normalizeScore(sections.scores.overall)
+        : performanceScore > 0
+          ? normalizeScore(performanceScore)
+          : 0
 
   const getLetterGrade = (score: number) => {
     if (score >= 95) return { grade: "A+", color: "text-emerald-400" }
@@ -115,7 +142,7 @@ export default function PracticeFeedback({
         efficiencyScore={efficiencyScore}
       />
 
-      <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border border-zinc-800/50 bg-zinc-900/50">
         <FeedbackActions
           onRetry={onRetry}
           onNewProblem={onNewProblem}
