@@ -4,7 +4,7 @@
  * Takes user assessment data and generates a prioritized, time-aware study plan
  */
 
-import { DSAPattern, PATTERN_ROADMAP, getPatternNode } from '@/lib/types/dsa-patterns'
+import { DSAPattern, PATTERN_ROADMAP, getPatternNode } from "@/lib/types/dsa-patterns"
 import {
   CompanyQuestionData,
   UserRoadmapAssessment,
@@ -13,9 +13,9 @@ import {
   PersonalizedRoadmap,
   Milestone,
   CompanyId,
-} from '@/lib/data/company-questions/types'
-import { getCompanyById } from '@/lib/data/company-questions'
-import { DSAScenario } from '@/lib/scenarios'
+} from "@/lib/data/company-questions/types"
+import { getCompanyById } from "@/lib/data/company-questions"
+import { DSAScenario } from "@/lib/scenarios"
 
 /**
  * Configuration constants for the algorithm
@@ -23,11 +23,11 @@ import { DSAScenario } from '@/lib/scenarios'
 const CONFIG = {
   // Weight factors for priority scoring (should sum to 1.0)
   weights: {
-    companyFrequency: 0.35,    // How often company asks this pattern
-    mustKnow: 0.25,            // Is this a must-know question?
-    knowledgeGap: 0.20,        // Does user need to learn this?
-    timeEfficiency: 0.15,      // ROI based on time available
-    prerequisites: 0.05,       // Are prerequisites met?
+    companyFrequency: 0.35, // How often company asks this pattern
+    mustKnow: 0.25, // Is this a must-know question?
+    knowledgeGap: 0.2, // Does user need to learn this?
+    timeEfficiency: 0.15, // ROI based on time available
+    prerequisites: 0.05, // Are prerequisites met?
   },
 
   // Time estimates by difficulty (minutes) - adjusted by experience level
@@ -39,15 +39,15 @@ const CONFIG = {
 
   // Time multipliers for different experience levels (interns need more time)
   timeMultipliers: {
-    intern: 1.5,      // Interns typically need 50% more time
-    beginner: 1.3,    // Beginners need 30% more time
+    intern: 1.5, // Interns typically need 50% more time
+    beginner: 1.3, // Beginners need 30% more time
     intermediate: 1.0,
-    advanced: 0.8,    // Advanced users are faster
+    advanced: 0.8, // Advanced users are faster
   },
 
   // Minimum questions per pattern for adequate coverage
   minQuestionsPerPattern: {
-    intern: 6,        // Interns should practice more fundamentals
+    intern: 6, // Interns should practice more fundamentals
     beginner: 5,
     intermediate: 3,
     advanced: 2,
@@ -65,14 +65,14 @@ const CONFIG = {
 
   // Intern-specific patterns to prioritize (commonly asked in internship interviews)
   internPriorityPatterns: [
-    'arrays-hashing',
-    'two-pointers',
-    'sliding-window',
-    'binary-search',
-    'stack',
-    'trees',
-    'dp-1d',
-    'string',
+    "arrays-hashing",
+    "two-pointers",
+    "sliding-window",
+    "binary-search",
+    "stack",
+    "trees",
+    "dp-1d",
+    "string",
   ] as const,
 }
 
@@ -87,13 +87,13 @@ export function calculatePriorityScore(
 ): { score: number; reasons: string[] } {
   let score = 0
   const reasons: string[] = []
-  const isIntern = assessment.experienceLevel === 'intern'
-  const isBeginnerOrIntern = isIntern || assessment.experienceLevel === 'beginner'
+  const isIntern = assessment.experienceLevel === "intern"
+  const isBeginnerOrIntern = isIntern || assessment.experienceLevel === "beginner"
 
   // 1. Company frequency score (35%)
-  const patternData = companyData.topPatterns.find(p => p.pattern === scenario.pattern)
+  const patternData = companyData.topPatterns.find((p) => p.pattern === scenario.pattern)
   if (patternData) {
-    const freqScore = (patternData.frequency / 100) * patternData.priority / 10
+    const freqScore = ((patternData.frequency / 100) * patternData.priority) / 10
     score += freqScore * CONFIG.weights.companyFrequency * 100
     if (patternData.frequency >= 80) {
       reasons.push(`Top pattern at ${companyData.name} (${patternData.frequency}% frequency)`)
@@ -104,19 +104,19 @@ export function calculatePriorityScore(
   if (isIntern && CONFIG.internPriorityPatterns.includes(scenario.pattern as any)) {
     score += 15 // Bonus for fundamental patterns commonly asked in intern interviews
     if (!patternData || patternData.frequency < 80) {
-      reasons.push('Core pattern for internship interviews')
+      reasons.push("Core pattern for internship interviews")
     }
   }
 
   // 2. Must-know question bonus (25%)
-  const isMustKnow = companyData.mustKnowQuestions.some(q => q.scenarioId === scenario.id)
+  const isMustKnow = companyData.mustKnowQuestions.some((q) => q.scenarioId === scenario.id)
   if (isMustKnow) {
     score += CONFIG.weights.mustKnow * 100
     reasons.push(`Must-know question for ${companyData.name}`)
   }
 
   // 3. Knowledge gap score (20%)
-  const familiarity = assessment.patternFamiliarity.find(p => p.pattern === scenario.pattern)
+  const familiarity = assessment.patternFamiliarity.find((p) => p.pattern === scenario.pattern)
   if (familiarity) {
     const gapMultiplier = {
       unknown: 1.0,
@@ -125,8 +125,8 @@ export function calculatePriorityScore(
       confident: 0.1,
     }[familiarity.level]
     score += gapMultiplier * CONFIG.weights.knowledgeGap * 100
-    if (familiarity.level === 'unknown') {
-      reasons.push('New pattern to learn')
+    if (familiarity.level === "unknown") {
+      reasons.push("New pattern to learn")
     }
   }
 
@@ -135,38 +135,38 @@ export function calculatePriorityScore(
 
   // For interns: prioritize easy and medium, avoid hard problems
   if (isIntern) {
-    if (scenario.difficulty === 'easy') {
+    if (scenario.difficulty === "easy") {
       score += CONFIG.weights.timeEfficiency * 80
-      reasons.push('Great for building fundamentals')
-    } else if (scenario.difficulty === 'medium') {
+      reasons.push("Great for building fundamentals")
+    } else if (scenario.difficulty === "medium") {
       score += CONFIG.weights.timeEfficiency * 60
-    } else if (scenario.difficulty === 'hard') {
+    } else if (scenario.difficulty === "hard") {
       score -= CONFIG.weights.timeEfficiency * 80 // Strongly penalize hard for interns
-      reasons.push('Consider after mastering basics')
+      reasons.push("Consider after mastering basics")
     }
   } else if (daysRemaining < 7) {
     // Very limited time - prioritize medium difficulty
-    if (scenario.difficulty === 'medium') {
+    if (scenario.difficulty === "medium") {
       score += CONFIG.weights.timeEfficiency * 100
-      reasons.push('Best ROI for limited time')
-    } else if (scenario.difficulty === 'hard') {
+      reasons.push("Best ROI for limited time")
+    } else if (scenario.difficulty === "hard") {
       score -= CONFIG.weights.timeEfficiency * 50
     }
   } else if (daysRemaining < 14) {
     // Limited time - slight preference for medium
-    if (scenario.difficulty === 'medium') {
+    if (scenario.difficulty === "medium") {
       score += CONFIG.weights.timeEfficiency * 50
     }
   } else if (daysRemaining >= 30) {
     // Plenty of time - include hard problems (but not for beginners)
-    if (scenario.difficulty === 'hard' && !isBeginnerOrIntern) {
+    if (scenario.difficulty === "hard" && !isBeginnerOrIntern) {
       score += CONFIG.weights.timeEfficiency * 30
-      reasons.push('Time available for challenging problems')
+      reasons.push("Time available for challenging problems")
     }
   }
 
   // 5. Prerequisite check (5%)
-  const scenarioPatternNode = PATTERN_ROADMAP.find(node =>
+  const scenarioPatternNode = PATTERN_ROADMAP.find((node) =>
     node.patterns.includes(scenario.pattern as DSAPattern)
   )
 
@@ -174,8 +174,8 @@ export function calculatePriorityScore(
     const prereqsMet = scenarioPatternNode.prerequisites.every((prereqId: string) => {
       const prereqNode = getPatternNode(prereqId)
       return prereqNode?.patterns.every((p: DSAPattern) => {
-        const fam = assessment.patternFamiliarity.find(f => f.pattern === p)
-        return fam && (fam.level === 'practiced' || fam.level === 'confident')
+        const fam = assessment.patternFamiliarity.find((f) => f.pattern === p)
+        return fam && (fam.level === "practiced" || fam.level === "confident")
       })
     })
 
@@ -185,9 +185,9 @@ export function calculatePriorityScore(
       score -= CONFIG.weights.prerequisites * 50
       // More helpful message for interns
       if (isIntern) {
-        reasons.push('Learn prerequisite patterns first for better understanding')
+        reasons.push("Learn prerequisite patterns first for better understanding")
       } else {
-        reasons.push('Consider learning prerequisites first')
+        reasons.push("Consider learning prerequisites first")
       }
     }
   }
@@ -206,12 +206,12 @@ export function getRelevantScenarios(
   companyData: CompanyQuestionData
 ): DSAScenario[] {
   // Get patterns that the company cares about
-  const companyPatterns = new Set(companyData.topPatterns.map(p => p.pattern))
+  const companyPatterns = new Set(companyData.topPatterns.map((p) => p.pattern))
 
   // Filter scenarios that match company's patterns or are must-know
-  return scenarios.filter(scenario => {
+  return scenarios.filter((scenario) => {
     // Must-know questions always included
-    if (companyData.mustKnowQuestions.some(q => q.scenarioId === scenario.id)) {
+    if (companyData.mustKnowQuestions.some((q) => q.scenarioId === scenario.id)) {
       return true
     }
 
@@ -239,9 +239,9 @@ export function prioritizeQuestions(
 ): PrioritizedQuestion[] {
   const relevantScenarios = getRelevantScenarios(scenarios, companyData)
 
-  const prioritized: PrioritizedQuestion[] = relevantScenarios.map(scenario => {
+  const prioritized: PrioritizedQuestion[] = relevantScenarios.map((scenario) => {
     const { score, reasons } = calculatePriorityScore(scenario, assessment, companyData)
-    const isMustKnow = companyData.mustKnowQuestions.some(q => q.scenarioId === scenario.id)
+    const isMustKnow = companyData.mustKnowQuestions.some((q) => q.scenarioId === scenario.id)
 
     return {
       scenarioId: scenario.id,
@@ -261,19 +261,67 @@ export function prioritizeQuestions(
 }
 
 /**
+ * Get realistic daily question limit based on experience level
+ * Quality over quantity - these are achievable targets that lead to mastery
+ */
+function getDailyQuestionLimit(experienceLevel: string): number {
+  const limits: Record<string, number> = {
+    intern: 3, // Interns need more time per problem - focus on depth
+    beginner: 4, // Building fundamentals
+    intermediate: 5, // Balanced pace
+    advanced: 6, // Experienced can handle more
+  }
+  return limits[experienceLevel] || 4
+}
+
+/**
  * Build daily schedule from prioritized questions
+ *
+ * KEY IMPROVEMENTS:
+ * 1. Enforces realistic daily question limits (not just time)
+ * 2. Ensures 7-day roadmap is genuinely different from 14-day
+ * 3. Prioritizes must-know questions for shorter timeframes
  */
 export function buildDailySchedule(
   prioritizedQuestions: PrioritizedQuestion[],
   assessment: UserRoadmapAssessment
 ): DailyPlan[] {
   const dailyPlans: DailyPlan[] = []
-  const availableDays = assessment.daysRemaining - CONFIG.reviewBufferDays
+  const availableDays = Math.max(1, assessment.daysRemaining - CONFIG.reviewBufferDays)
   const dailyMinutes = assessment.hoursPerDay * 60
+  const maxQuestionsPerDay = getDailyQuestionLimit(assessment.experienceLevel)
+
+  // For very short timeframes, focus only on must-know and high-priority
+  const isCrunchMode = assessment.daysRemaining <= 7
+  const isFocusedMode = assessment.daysRemaining <= 14
+
+  // Calculate max achievable questions for this timeframe
+  const maxAchievableQuestions = availableDays * maxQuestionsPerDay
+
+  // Filter and limit questions based on priority (top N)
+  let questionsToSchedule = [...prioritizedQuestions]
+
+  // For crunch mode: be very selective, focus on required questions
+  if (isCrunchMode) {
+    // Prioritize required/must-know questions
+    questionsToSchedule.sort((a, b) => {
+      if (a.isRequired && !b.isRequired) return -1
+      if (!a.isRequired && b.isRequired) return 1
+      return b.priorityScore - a.priorityScore
+    })
+    // Limit to what's achievable
+    questionsToSchedule = questionsToSchedule.slice(0, maxAchievableQuestions)
+  } else if (isFocusedMode) {
+    // For focused mode: prioritize high-value questions
+    questionsToSchedule = questionsToSchedule.slice(
+      0,
+      Math.min(questionsToSchedule.length, maxAchievableQuestions * 1.1)
+    )
+  }
 
   // Group questions by pattern for thematic days
   const questionsByPattern = new Map<DSAPattern, PrioritizedQuestion[]>()
-  for (const q of prioritizedQuestions) {
+  for (const q of questionsToSchedule) {
     const existing = questionsByPattern.get(q.pattern) || []
     existing.push(q)
     questionsByPattern.set(q.pattern, existing)
@@ -281,7 +329,7 @@ export function buildDailySchedule(
 
   // Get patterns ordered by importance
   const companyData = getCompanyById(assessment.targetCompany)
-  const patternOrder = companyData?.topPatterns.map(p => p.pattern) || []
+  const patternOrder = companyData?.topPatterns.map((p) => p.pattern) || []
 
   // Add any patterns not in company's top list
   for (const pattern of questionsByPattern.keys()) {
@@ -290,8 +338,15 @@ export function buildDailySchedule(
     }
   }
 
+  // For crunch mode, limit to top 3-4 patterns only
+  const effectivePatterns = isCrunchMode
+    ? patternOrder.slice(0, 4)
+    : isFocusedMode
+      ? patternOrder.slice(0, 6)
+      : patternOrder
+
   let currentDay = 0
-  let remainingQuestions = [...prioritizedQuestions]
+  let remainingQuestions = [...questionsToSchedule]
   const today = new Date()
 
   // Distribute questions across days
@@ -300,30 +355,34 @@ export function buildDailySchedule(
     dayDate.setDate(dayDate.getDate() + currentDay)
 
     // Determine focus pattern for today
-    const focusPatternIndex = currentDay % patternOrder.length
-    const focusPattern = patternOrder[focusPatternIndex]
+    const focusPatternIndex = currentDay % effectivePatterns.length
+    const focusPattern = effectivePatterns[focusPatternIndex]
 
     // Get questions for today, prioritizing focus pattern
     const todaysQuestions: PrioritizedQuestion[] = []
     let todaysMinutes = 0
 
     // First, add questions from focus pattern
-    const patternQuestions = remainingQuestions.filter(q => q.pattern === focusPattern)
+    const patternQuestions = remainingQuestions.filter((q) => q.pattern === focusPattern)
     for (const q of patternQuestions) {
+      // Check BOTH time limit AND question count limit
+      if (todaysQuestions.length >= maxQuestionsPerDay) break
       if (todaysMinutes + q.estimatedMinutes <= dailyMinutes) {
         todaysQuestions.push(q)
         todaysMinutes += q.estimatedMinutes
-        remainingQuestions = remainingQuestions.filter(rq => rq.scenarioId !== q.scenarioId)
+        remainingQuestions = remainingQuestions.filter((rq) => rq.scenarioId !== q.scenarioId)
       }
     }
 
-    // Then fill with other high-priority questions
-    const otherQuestions = remainingQuestions.filter(q => q.pattern !== focusPattern)
+    // Then fill with other high-priority questions (respecting limits)
+    const otherQuestions = remainingQuestions.filter((q) => q.pattern !== focusPattern)
     for (const q of otherQuestions) {
+      // Check BOTH time limit AND question count limit
+      if (todaysQuestions.length >= maxQuestionsPerDay) break
       if (todaysMinutes + q.estimatedMinutes <= dailyMinutes) {
         todaysQuestions.push(q)
         todaysMinutes += q.estimatedMinutes
-        remainingQuestions = remainingQuestions.filter(rq => rq.scenarioId !== q.scenarioId)
+        remainingQuestions = remainingQuestions.filter((rq) => rq.scenarioId !== q.scenarioId)
       }
     }
 
@@ -334,31 +393,33 @@ export function buildDailySchedule(
     }
 
     // Get unique patterns for today
-    const todaysPatterns = [...new Set(todaysQuestions.map(q => q.pattern))]
+    const todaysPatterns = [...new Set(todaysQuestions.map((q) => q.pattern))]
 
     dailyPlans.push({
       date: dayDate,
       dayNumber: currentDay + 1,
       targetMinutes: todaysMinutes,
-      theme: todaysPatterns.length === 1
-        ? `${formatPatternName(todaysPatterns[0])} Day`
-        : `Mixed Practice`,
+      theme:
+        todaysPatterns.length === 1
+          ? `${formatPatternName(todaysPatterns[0])} Day`
+          : `Mixed Practice`,
       focusPatterns: todaysPatterns,
-      questions: todaysQuestions.map(q => ({
+      questions: todaysQuestions.map((q) => ({
         scenarioId: q.scenarioId,
         title: q.title,
         pattern: q.pattern,
         difficulty: q.difficulty,
         estimatedMinutes: q.estimatedMinutes,
-        status: 'pending' as const,
+        status: "pending" as const,
       })),
     })
 
     currentDay++
   }
 
-  // Add review days
-  for (let i = 0; i < CONFIG.reviewBufferDays && currentDay < assessment.daysRemaining; i++) {
+  // Add review days (fewer for shorter timeframes)
+  const reviewDays = isCrunchMode ? 1 : isFocusedMode ? 2 : CONFIG.reviewBufferDays
+  for (let i = 0; i < reviewDays && currentDay < assessment.daysRemaining; i++) {
     const dayDate = new Date(today)
     dayDate.setDate(dayDate.getDate() + currentDay)
 
@@ -366,14 +427,20 @@ export function buildDailySchedule(
       date: dayDate,
       dayNumber: currentDay + 1,
       targetMinutes: dailyMinutes,
-      theme: i === 0 ? 'Review Day - Weak Areas' : i === 1 ? 'Review Day - Must-Know Questions' : 'Final Review',
+      theme:
+        i === 0
+          ? "Review Day - Weak Areas"
+          : i === 1
+            ? "Review Day - Must-Know Questions"
+            : "Final Review",
       focusPatterns: [],
       questions: [],
-      notes: i === 0
-        ? 'Re-attempt questions you struggled with'
-        : i === 1
-        ? 'Review all must-know questions for this company'
-        : 'Light review - get rest before your interview!',
+      notes:
+        i === 0
+          ? "Re-attempt questions you struggled with"
+          : i === 1
+            ? "Review all must-know questions for this company"
+            : "Light review - get rest before your interview!",
     })
 
     currentDay++
@@ -399,10 +466,12 @@ export function createMilestones(
   // Create pattern mastery milestones
   for (let i = 0; i < topPatterns.length; i++) {
     const pattern = topPatterns[i]
-    const patternQuestions = dailyPlans.flatMap(d =>
-      d.questions.filter(q => {
+    const patternQuestions = dailyPlans.flatMap((d) =>
+      d.questions.filter((q) => {
         // Find the question's pattern
-        const dayQ = dailyPlans.flatMap(dp => dp.questions).find(dq => dq.scenarioId === q.scenarioId)
+        const dayQ = dailyPlans
+          .flatMap((dp) => dp.questions)
+          .find((dq) => dq.scenarioId === q.scenarioId)
         return dayQ !== undefined
       })
     )
@@ -434,15 +503,15 @@ export function createMilestones(
   }
 
   // Add must-know questions milestone
-  const mustKnowIds = companyData.mustKnowQuestions.map(q => q.scenarioId)
+  const mustKnowIds = companyData.mustKnowQuestions.map((q) => q.scenarioId)
   const midPoint = Math.floor(assessment.daysRemaining * 0.6)
   const mustKnowDate = new Date(today)
   mustKnowDate.setDate(mustKnowDate.getDate() + midPoint)
 
   milestones.push({
-    id: 'must-know-complete',
+    id: "must-know-complete",
     name: `${companyData.name} Must-Know Complete`,
-    description: 'Complete all must-know questions for this company',
+    description: "Complete all must-know questions for this company",
     targetDate: mustKnowDate,
     requiredScenarios: mustKnowIds,
     bonusScenarios: [],
@@ -454,8 +523,8 @@ export function createMilestones(
   finalDate.setDate(finalDate.getDate() + assessment.daysRemaining - 1)
 
   milestones.push({
-    id: 'interview-ready',
-    name: 'Interview Ready!',
+    id: "interview-ready",
+    name: "Interview Ready!",
     description: `You're prepared for your ${companyData.name} interview`,
     targetDate: finalDate,
     requiredScenarios: [],
@@ -467,7 +536,21 @@ export function createMilestones(
 }
 
 /**
+ * Realistic daily question limits by experience level
+ * Quality > Quantity - these are achievable targets
+ */
+const DAILY_QUESTION_LIMITS = {
+  intern: 3, // Interns need more time per problem
+  beginner: 4,
+  intermediate: 5,
+  advanced: 6,
+}
+
+/**
  * Generate a complete personalized roadmap
+ *
+ * IMPORTANT: Question count is based on what actually fits in available days,
+ * NOT the total number of relevant questions. This ensures realistic roadmaps.
  */
 export function generatePersonalizedRoadmap(
   scenarios: DSAScenario[],
@@ -483,22 +566,36 @@ export function generatePersonalizedRoadmap(
   // Step 1: Prioritize questions
   const prioritizedQuestions = prioritizeQuestions(scenarios, assessment, companyData)
 
-  // Step 2: Build daily schedule
+  // Step 2: Build daily schedule (this limits questions to what fits)
   const dailyPlans = buildDailySchedule(prioritizedQuestions, assessment)
 
   // Step 3: Create milestones
   const milestones = createMilestones(dailyPlans, assessment, companyData)
 
-  // Calculate pattern coverage
+  // CRITICAL FIX: Count ONLY questions that are actually scheduled
+  // This ensures we don't show unrealistic counts like "57 problems in 7 days"
+  const scheduledQuestionIds = new Set<string>()
+  for (const plan of dailyPlans) {
+    for (const q of plan.questions) {
+      scheduledQuestionIds.add(q.scenarioId)
+    }
+  }
+
+  // Get only the scheduled questions for accurate stats
+  const scheduledQuestions = prioritizedQuestions.filter((q) =>
+    scheduledQuestionIds.has(q.scenarioId)
+  )
+
+  // Calculate pattern coverage from SCHEDULED questions only
   const patternCoverage = new Map<DSAPattern, { total: number; completed: number }>()
-  for (const q of prioritizedQuestions) {
+  for (const q of scheduledQuestions) {
     const existing = patternCoverage.get(q.pattern) || { total: 0, completed: 0 }
     existing.total++
     patternCoverage.set(q.pattern, existing)
   }
 
-  // Calculate total hours
-  const totalMinutes = prioritizedQuestions.reduce((sum, q) => sum + q.estimatedMinutes, 0)
+  // Calculate total hours from SCHEDULED questions only
+  const totalMinutes = scheduledQuestions.reduce((sum, q) => sum + q.estimatedMinutes, 0)
 
   const roadmap: PersonalizedRoadmap = {
     id: `roadmap-${userId}-${Date.now()}`,
@@ -509,8 +606,8 @@ export function generatePersonalizedRoadmap(
     createdAt: new Date(),
     updatedAt: new Date(),
     assessment,
-    totalQuestions: prioritizedQuestions.length,
-    totalEstimatedHours: Math.round(totalMinutes / 60 * 10) / 10,
+    totalQuestions: scheduledQuestionIds.size, // FIXED: Only count scheduled questions
+    totalEstimatedHours: Math.round((totalMinutes / 60) * 10) / 10,
     questionsCompleted: 0,
     questionsSkipped: 0,
     actualHoursSpent: 0,
@@ -522,7 +619,7 @@ export function generatePersonalizedRoadmap(
     })),
     dailyPlans,
     milestones,
-    status: 'active',
+    status: "active",
     isOnTrack: true,
     daysAhead: 0,
   }
@@ -543,21 +640,24 @@ export function recalculateRoadmap(
   // Calculate days remaining from now
   const now = new Date()
   const interviewDate = new Date(roadmap.interviewDate)
-  const daysRemaining = Math.max(0, Math.ceil((interviewDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+  const daysRemaining = Math.max(
+    0,
+    Math.ceil((interviewDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  )
 
   // Get incomplete questions
   const completedIds = new Set(
     roadmap.dailyPlans
-      .flatMap(d => d.questions)
-      .filter(q => q.status === 'completed')
-      .map(q => q.scenarioId)
+      .flatMap((d) => d.questions)
+      .filter((q) => q.status === "completed")
+      .map((q) => q.scenarioId)
   )
 
   const skippedIds = new Set(
     roadmap.dailyPlans
-      .flatMap(d => d.questions)
-      .filter(q => q.status === 'skipped')
-      .map(q => q.scenarioId)
+      .flatMap((d) => d.questions)
+      .filter((q) => q.status === "skipped")
+      .map((q) => q.scenarioId)
   )
 
   // Update assessment with remaining time
@@ -568,7 +668,7 @@ export function recalculateRoadmap(
 
   // Re-prioritize remaining questions
   const remainingScenarios = scenarios.filter(
-    s => !completedIds.has(s.id) && !skippedIds.has(s.id)
+    (s) => !completedIds.has(s.id) && !skippedIds.has(s.id)
   )
 
   const prioritized = prioritizeQuestions(remainingScenarios, updatedAssessment, companyData)
@@ -579,7 +679,9 @@ export function recalculateRoadmap(
   // Calculate progress status
   const expectedProgress = (roadmap.dailyPlans.length - daysRemaining) / roadmap.dailyPlans.length
   const actualProgress = roadmap.questionsCompleted / roadmap.totalQuestions
-  const daysAhead = Math.round((actualProgress - expectedProgress) * roadmap.assessment.daysRemaining)
+  const daysAhead = Math.round(
+    (actualProgress - expectedProgress) * roadmap.assessment.daysRemaining
+  )
 
   return {
     ...roadmap,
@@ -595,9 +697,9 @@ export function recalculateRoadmap(
  */
 function formatPatternName(pattern: DSAPattern): string {
   return pattern
-    .split('-')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
 }
 
 /**
@@ -606,75 +708,92 @@ function formatPatternName(pattern: DSAPattern): string {
  */
 export function getStudyRecommendations(roadmap: PersonalizedRoadmap): string[] {
   const recommendations: string[] = []
-  const isIntern = roadmap.assessment.experienceLevel === 'intern'
-  const isBeginnerOrIntern = isIntern || roadmap.assessment.experienceLevel === 'beginner'
+  const isIntern = roadmap.assessment.experienceLevel === "intern"
+  const isBeginnerOrIntern = isIntern || roadmap.assessment.experienceLevel === "beginner"
   const daysLeft = roadmap.assessment.daysRemaining
 
   // Progress-based recommendations
   if (!roadmap.isOnTrack) {
     if (roadmap.daysAhead < -3) {
       if (isIntern) {
-        recommendations.push('Focus on easy and medium problems to build confidence quickly.')
-        recommendations.push('Prioritize core patterns: arrays, two pointers, and basic trees.')
+        recommendations.push("Focus on easy and medium problems to build confidence quickly.")
+        recommendations.push("Prioritize core patterns: arrays, two pointers, and basic trees.")
       } else {
-        recommendations.push('You\'re significantly behind schedule. Consider increasing daily study time.')
-        recommendations.push('Focus on must-know questions if time is very limited.')
+        recommendations.push(
+          "You're significantly behind schedule. Consider increasing daily study time."
+        )
+        recommendations.push("Focus on must-know questions if time is very limited.")
       }
     } else {
-      recommendations.push('You\'re slightly behind. Try to complete one extra question today.')
+      recommendations.push("You're slightly behind. Try to complete one extra question today.")
     }
   }
 
   // Check pattern coverage
   const weakPatterns = roadmap.patternCoverage
-    .filter(p => p.percentage < 30 && p.total >= 3)
-    .map(p => p.pattern)
+    .filter((p) => p.percentage < 30 && p.total >= 3)
+    .map((p) => p.pattern)
 
   if (weakPatterns.length > 0) {
     if (isIntern) {
       // Filter to show only intern-friendly patterns first
-      const internFriendlyWeak = weakPatterns.filter(p =>
+      const internFriendlyWeak = weakPatterns.filter((p) =>
         CONFIG.internPriorityPatterns.includes(p as any)
       )
       if (internFriendlyWeak.length > 0) {
-        recommendations.push(`Start with fundamentals: ${internFriendlyWeak.slice(0, 2).map(p => formatPatternName(p)).join(', ')}`)
+        recommendations.push(
+          `Start with fundamentals: ${internFriendlyWeak
+            .slice(0, 2)
+            .map((p) => formatPatternName(p))
+            .join(", ")}`
+        )
       } else {
-        recommendations.push(`Focus on improving: ${weakPatterns.slice(0, 2).map(p => formatPatternName(p)).join(', ')}`)
+        recommendations.push(
+          `Focus on improving: ${weakPatterns
+            .slice(0, 2)
+            .map((p) => formatPatternName(p))
+            .join(", ")}`
+        )
       }
     } else {
-      recommendations.push(`Focus on improving: ${weakPatterns.slice(0, 2).map(p => formatPatternName(p)).join(', ')}`)
+      recommendations.push(
+        `Focus on improving: ${weakPatterns
+          .slice(0, 2)
+          .map((p) => formatPatternName(p))
+          .join(", ")}`
+      )
     }
   }
 
   // Time-based recommendations with intern/experience-level considerations
   if (daysLeft <= 3) {
     if (isIntern) {
-      recommendations.push('Review completed problems and get plenty of rest!')
-      recommendations.push('Practice explaining your thought process out loud.')
+      recommendations.push("Review completed problems and get plenty of rest!")
+      recommendations.push("Practice explaining your thought process out loud.")
     } else {
-      recommendations.push('Final days! Focus on review and rest.')
-      recommendations.push('Re-attempt any questions you struggled with.')
+      recommendations.push("Final days! Focus on review and rest.")
+      recommendations.push("Re-attempt any questions you struggled with.")
     }
   } else if (daysLeft <= 7) {
     if (isIntern) {
-      recommendations.push('Focus on problems you can solve confidently.')
-      recommendations.push('Practice clear communication - interviewers value this for interns!')
+      recommendations.push("Focus on problems you can solve confidently.")
+      recommendations.push("Practice clear communication - interviewers value this for interns!")
     } else {
-      recommendations.push('One week left - prioritize must-know questions.')
-      recommendations.push('Skip very hard problems if not comfortable.')
+      recommendations.push("One week left - prioritize must-know questions.")
+      recommendations.push("Skip very hard problems if not comfortable.")
     }
   } else if (isIntern && daysLeft > 14) {
     // Early stage advice for interns
-    const masteredPatterns = roadmap.patternCoverage.filter(p => p.percentage >= 80).length
+    const masteredPatterns = roadmap.patternCoverage.filter((p) => p.percentage >= 80).length
     if (masteredPatterns < 3) {
-      recommendations.push('Master 2-3 core patterns deeply before moving on.')
-      recommendations.push('Internship interviews test fundamentals - quality over quantity!')
+      recommendations.push("Master 2-3 core patterns deeply before moving on.")
+      recommendations.push("Internship interviews test fundamentals - quality over quantity!")
     }
   }
 
   // Experience-specific tips
   if (isBeginnerOrIntern && recommendations.length < 2) {
-    recommendations.push('Don\'t rush! Understanding the approach matters more than speed.')
+    recommendations.push("Don't rush! Understanding the approach matters more than speed.")
   }
 
   return recommendations
