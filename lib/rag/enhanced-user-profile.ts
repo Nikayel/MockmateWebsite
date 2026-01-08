@@ -818,12 +818,19 @@ function calculateInterviewReadiness(
 
   const overall = Math.max(0, Math.min(100, avgMastery - gapPenalty - misconceptionPenalty))
 
-  // Strongest areas
-  const strongestAreas = [
-    ...new Set(
-      knowledgeGraph.concepts.filter((c) => c.predictedMastery > 70).map((c) => c.parentPattern)
-    ),
-  ].slice(0, 5)
+  // Strongest areas - sort by mastery and take top 5 patterns
+  // First, get unique patterns with their highest concept mastery
+  const patternMasteryMap = new Map<DSAPattern, number>()
+  for (const concept of knowledgeGraph.concepts) {
+    const current = patternMasteryMap.get(concept.parentPattern) || 0
+    patternMasteryMap.set(concept.parentPattern, Math.max(current, concept.predictedMastery))
+  }
+
+  // Sort by mastery (descending) and take top 5
+  const strongestAreas = [...patternMasteryMap.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([pattern]) => pattern)
 
   // Critical gaps
   const criticalGaps = knowledgeGraph.gaps
