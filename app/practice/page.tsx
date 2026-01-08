@@ -8,7 +8,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { type DueItem } from "@/components/practice"
 import { Button } from "@/components/ui/button"
-import { Loader2, Lock, ArrowRight } from "lucide-react"
+import { Loader2, Lock, ArrowRight, HelpCircle } from "lucide-react"
 import Link from "next/link"
 
 // Dynamic imports for heavy components - reduces initial bundle size
@@ -361,7 +361,12 @@ export default function PracticePage() {
               </div>
               <div className="py-4 text-center">
                 <div className="text-2xl font-bold text-white">{stats.overall.average_score}%</div>
-                <div className="text-sm text-gray-500">Avg Score</div>
+                <div className="flex items-center justify-center gap-1 text-sm text-gray-500">
+                  Review Avg
+                  <span title="Review Average: Your average score across spaced repetition reviews. This tracks how well you perform when revisiting problems over time.">
+                    <HelpCircle className="h-3 w-3 cursor-help text-gray-600" />
+                  </span>
+                </div>
               </div>
               <div className="py-4 text-center">
                 <div className="text-2xl font-bold text-white">
