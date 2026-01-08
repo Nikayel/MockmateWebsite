@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { adminAuth, adminDb } from "@/lib/firebase-admin"
 import { getUserStats, getRecentSessions, getPerformanceTrends } from "@/lib/session-metrics"
 import { getUserUsageSummary } from "@/lib/usage-tracking"
+import { getMasteryStatistics, getUserScoreStats } from "@/lib/scoring"
 
 /**
  * Fallback: Get stats directly from interview_sessions if user_stats is empty
@@ -222,12 +223,21 @@ export async function GET(request: NextRequest) {
     const days = parseInt(searchParams.get("days") || "30", 10)
 
     // Fetch all metrics in parallel
-    const [stats, recentSessions, trends, usageSummary] = await Promise.all([
-      getUserStats(userId),
-      getRecentSessions(userId, 10),
-      getPerformanceTrends(userId, days),
-      getUserUsageSummary(userId),
-    ])
+    const [stats, recentSessions, trends, usageSummary, masteryStats, scoreStats] =
+      await Promise.all([
+        getUserStats(userId),
+        getRecentSessions(userId, 10),
+        getPerformanceTrends(userId, days),
+        getUserUsageSummary(userId),
+        getMasteryStatistics(userId).catch(() => ({
+          total: 0,
+          new: 0,
+          learning: 0,
+          reviewing: 0,
+          mastered: 0,
+        })),
+        getUserScoreStats(userId).catch(() => null),
+      ])
 
     // Fallback: if user_stats is empty, try to get stats from interview_sessions directly
     let finalStats = stats
@@ -396,6 +406,27 @@ export async function GET(request: NextRequest) {
               totalRequests: usageSummary.totalRequests,
               budgetUsedPercent: usageSummary.budgetUsedPercent,
               budgetRemaining: usageSummary.budgetRemaining,
+            }
+          : null,
+        // Mastery statistics for spaced repetition progress
+        mastery: {
+          total: masteryStats.total,
+          mastered: masteryStats.mastered,
+          reviewing: masteryStats.reviewing,
+          learning: masteryStats.learning,
+          new: masteryStats.new,
+          // Mastery percentage (mastered / total practiced)
+          masteryRate:
+            masteryStats.total > 0
+              ? Math.round((masteryStats.mastered / masteryStats.total) * 100)
+              : 0,
+        },
+        // Averages from scoring system (if available)
+        averages: scoreStats
+          ? {
+              overall: scoreStats.averageOverallScore,
+              technical: scoreStats.averageTechnicalScore,
+              mastery: scoreStats.averageMasteryScore,
             }
           : null,
       },

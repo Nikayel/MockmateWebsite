@@ -9,9 +9,9 @@
  * - Recording research events for analysis
  */
 
-import { adminDb } from '../firebase-admin'
-import type { SpacedRepetitionAlgorithm, SpacedRepetitionMasteryLevel } from '../types'
-import type { Difficulty, MasteryLevel as SM2MasteryLevel } from './sm2-algorithm'
+import { adminDb } from "../firebase-admin"
+import type { SpacedRepetitionAlgorithm, SpacedRepetitionMasteryLevel } from "../types"
+import type { Difficulty, MasteryLevel as SM2MasteryLevel } from "./sm2-algorithm"
 import {
   calculateNextInterval as sm2Calculate,
   mapScoreToQuality,
@@ -20,7 +20,7 @@ import {
   estimateRetention as sm2EstimateRetention,
   type SM2Input,
   type SM2Output,
-} from './sm2-algorithm'
+} from "./sm2-algorithm"
 import {
   scheduleFSRS,
   createFSRSCard,
@@ -32,7 +32,7 @@ import {
   DEFAULT_FSRS_CONFIG,
   type FSRSCard,
   type FSRSRating,
-} from './fsrs-algorithm'
+} from "./fsrs-algorithm"
 
 // ============================================
 // Types
@@ -57,7 +57,7 @@ export interface AlgorithmState {
 }
 
 export interface ReviewInput {
-  performance_score: number      // 0-100 (interview score - includes communication)
+  performance_score: number // 0-100 (interview score - includes communication)
   time_spent_minutes: number
   hints_used: number
   problem_difficulty: Difficulty
@@ -69,7 +69,7 @@ export interface ReviewInput {
   // This score focuses on correctness/time/hints, EXCLUDING communication
   // If provided, this is what the SR algorithm uses to determine intervals
   // If not provided, falls back to performance_score for backwards compatibility
-  mastery_score?: number         // 0-100 (code mastery - excludes communication)
+  mastery_score?: number // 0-100 (code mastery - excludes communication)
 }
 
 export interface ReviewOutput {
@@ -78,12 +78,12 @@ export interface ReviewOutput {
   next_review_at: string
   mastery_level: SpacedRepetitionMasteryLevel
   confidence: number
-  quality_rating: number         // SM-2: 0-5, FSRS: 1-4
+  quality_rating: number // SM-2: 0-5, FSRS: 1-4
   retention_estimate: number
 
   // Algorithm-specific output
-  ease_factor?: number           // SM-2
-  fsrs_state?: FSRSCard          // FSRS
+  ease_factor?: number // SM-2
+  fsrs_state?: FSRSCard // FSRS
 }
 
 // ============================================
@@ -95,7 +95,7 @@ export interface ReviewOutput {
  * Uses 50/50 random assignment for A/B testing
  */
 export async function getUserAlgorithm(userId: string): Promise<SpacedRepetitionAlgorithm> {
-  const profileRef = adminDb.collection('profiles').doc(userId)
+  const profileRef = adminDb.collection("profiles").doc(userId)
   const profileDoc = await profileRef.get()
 
   if (!profileDoc.exists) {
@@ -125,7 +125,7 @@ export async function getUserAlgorithm(userId: string): Promise<SpacedRepetition
  * Randomly assign SM-2 or FSRS with 50/50 probability
  */
 function assignRandomAlgorithm(): SpacedRepetitionAlgorithm {
-  return Math.random() < 0.5 ? 'sm2' : 'fsrs'
+  return Math.random() < 0.5 ? "sm2" : "fsrs"
 }
 
 /**
@@ -136,7 +136,7 @@ export async function setUserAlgorithm(
   userId: string,
   algorithm: SpacedRepetitionAlgorithm
 ): Promise<void> {
-  const profileRef = adminDb.collection('profiles').doc(userId)
+  const profileRef = adminDb.collection("profiles").doc(userId)
   await profileRef.update({
     spaced_repetition_algorithm: algorithm,
     algorithm_user_overridden: true,
@@ -159,7 +159,7 @@ export async function calculateNextReview(
 ): Promise<ReviewOutput> {
   const algorithm = await getUserAlgorithm(userId)
 
-  if (algorithm === 'fsrs') {
+  if (algorithm === "fsrs") {
     return calculateFSRSReview(currentState, reviewInput)
   } else {
     return calculateSM2Review(currentState, reviewInput)
@@ -172,10 +172,7 @@ export async function calculateNextReview(
  * Uses mastery_score (code-focused) if available, otherwise falls back to
  * performance_score (interview score including communication).
  */
-function calculateSM2Review(
-  currentState: AlgorithmState,
-  input: ReviewInput
-): ReviewOutput {
+function calculateSM2Review(currentState: AlgorithmState, input: ReviewInput): ReviewOutput {
   // Use mastery_score for SR calculations if available (code-focused, no communication)
   // Fall back to performance_score for backwards compatibility
   const scoreForSR = input.mastery_score ?? input.performance_score
@@ -199,7 +196,7 @@ function calculateSM2Review(
   nextReviewDate.setDate(nextReviewDate.getDate() + result.nextInterval)
 
   return {
-    algorithm: 'sm2',
+    algorithm: "sm2",
     next_interval_days: result.nextInterval,
     next_review_at: nextReviewDate.toISOString(),
     mastery_level: result.masteryLevel as SpacedRepetitionMasteryLevel,
@@ -216,12 +213,9 @@ function calculateSM2Review(
  * Uses mastery_score (code-focused) if available, otherwise falls back to
  * performance_score (interview score including communication).
  */
-function calculateFSRSReview(
-  currentState: AlgorithmState,
-  input: ReviewInput
-): ReviewOutput {
+function calculateFSRSReview(currentState: AlgorithmState, input: ReviewInput): ReviewOutput {
   // Get or create FSRS card state
-  let card: FSRSCard = currentState.fsrs_state || createFSRSCard()
+  const card: FSRSCard = currentState.fsrs_state || createFSRSCard()
 
   // Use mastery_score for SR calculations if available (code-focused, no communication)
   // Fall back to performance_score for backwards compatibility
@@ -229,17 +223,11 @@ function calculateFSRSReview(
 
   // Map performance score to FSRS rating
   // Handle time_spent_minutes = 0 (untracked) by using neutral ratio of 1.0
-  const expectedMinutes = input.problem_difficulty === 'easy' ? 10 :
-                          input.problem_difficulty === 'medium' ? 20 : 30
-  const timeRatio = input.time_spent_minutes > 0
-    ? input.time_spent_minutes / expectedMinutes
-    : 1.0 // Neutral ratio when time is not tracked
+  const expectedMinutes =
+    input.problem_difficulty === "easy" ? 10 : input.problem_difficulty === "medium" ? 20 : 30
+  const timeRatio = input.time_spent_minutes > 0 ? input.time_spent_minutes / expectedMinutes : 1.0 // Neutral ratio when time is not tracked
 
-  const rating = mapPerformanceToFSRSRating(
-    scoreForSR,
-    input.hints_used,
-    timeRatio
-  )
+  const rating = mapPerformanceToFSRSRating(scoreForSR, input.hints_used, timeRatio)
 
   // Schedule next review
   const newCard = scheduleFSRS(card, rating, DEFAULT_FSRS_CONFIG)
@@ -247,10 +235,10 @@ function calculateFSRSReview(
   // Convert FSRS state to mastery level
   const fsrsMastery = fsrsMasteryLevel(newCard)
   const masteryLevel: SpacedRepetitionMasteryLevel =
-    fsrsMastery === 'familiar' ? 'reviewing' : fsrsMastery
+    fsrsMastery === "familiar" ? "reviewing" : fsrsMastery
 
   return {
-    algorithm: 'fsrs',
+    algorithm: "fsrs",
     next_interval_days: newCard.scheduledDays,
     next_review_at: newCard.nextReview.toISOString(),
     mastery_level: masteryLevel,
@@ -274,24 +262,24 @@ export function createInitialState(
 ): AlgorithmState {
   const now = new Date().toISOString()
 
-  if (algorithm === 'fsrs') {
+  if (algorithm === "fsrs") {
     const card = createFSRSCard()
     return {
-      algorithm: 'fsrs',
+      algorithm: "fsrs",
       interval_days: 0,
       next_review_at: now,
       review_count: 0,
-      mastery_level: 'new',
+      mastery_level: "new",
       confidence: 0,
       fsrs_state: card,
     }
   } else {
     return {
-      algorithm: 'sm2',
+      algorithm: "sm2",
       interval_days: 0,
       next_review_at: now,
       review_count: 0,
-      mastery_level: 'new',
+      mastery_level: "new",
       confidence: 0,
       ease_factor: 2.5,
     }
@@ -327,7 +315,7 @@ export function reconstructState(
     confidence: data.confidence,
   }
 
-  if (algorithm === 'sm2') {
+  if (algorithm === "sm2") {
     return {
       ...baseState,
       ease_factor: data.ease_factor || 2.5,
@@ -353,8 +341,12 @@ export function reconstructState(
       fsrsCard = {
         difficulty: data.fsrs_difficulty || 5,
         stability: data.fsrs_stability || data.interval_days || 1,
-        state: data.review_count === 0 ? 'new' :
-               data.mastery_level === 'learning' ? 'learning' : 'review',
+        state:
+          data.review_count === 0
+            ? "new"
+            : data.mastery_level === "learning"
+              ? "learning"
+              : "review",
         lastReview,
         nextReview,
         reps: data.review_count,
@@ -385,7 +377,7 @@ export function prepareStateForStorage(state: AlgorithmState): Record<string, un
     confidence: state.confidence,
   }
 
-  if (state.algorithm === 'sm2') {
+  if (state.algorithm === "sm2") {
     return {
       ...base,
       ease_factor: state.ease_factor || 2.5,
@@ -421,7 +413,7 @@ export function estimateRetention(
   state: AlgorithmState,
   daysSinceReview: number
 ): number {
-  if (algorithm === 'fsrs' && state.fsrs_state) {
+  if (algorithm === "fsrs" && state.fsrs_state) {
     // FSRS uses power-law forgetting curve: R = (1 + t/(9*S))^(-1)
     const retention = calculateRetrievability(state.fsrs_state.stability, daysSinceReview) * 100
     return Math.round(Math.max(0, Math.min(100, retention)))
@@ -456,17 +448,17 @@ export function getMemoryStrength(
   algorithm: SpacedRepetitionAlgorithm,
   state: AlgorithmState,
   daysSinceReview: number
-): { score: number; label: string; urgency: 'safe' | 'ok' | 'warning' | 'urgent' } {
+): { score: number; label: string; urgency: "safe" | "ok" | "warning" | "urgent" } {
   const retention = estimateRetention(algorithm, state, daysSinceReview)
 
   if (retention >= 90) {
-    return { score: retention, label: 'Strong', urgency: 'safe' }
+    return { score: retention, label: "Strong", urgency: "safe" }
   } else if (retention >= 70) {
-    return { score: retention, label: 'Good', urgency: 'ok' }
+    return { score: retention, label: "Good", urgency: "ok" }
   } else if (retention >= 50) {
-    return { score: retention, label: 'Weakening', urgency: 'warning' }
+    return { score: retention, label: "Weakening", urgency: "warning" }
   } else {
-    return { score: retention, label: 'Fading', urgency: 'urgent' }
+    return { score: retention, label: "Fading", urgency: "urgent" }
   }
 }
 
@@ -481,7 +473,7 @@ export async function getAlgorithmDistribution(): Promise<{
   sm2: { total: number; active_7d: number; overridden: number }
   fsrs: { total: number; active_7d: number; overridden: number }
 }> {
-  const profiles = await adminDb.collection('profiles').get()
+  const profiles = await adminDb.collection("profiles").get()
 
   const stats = {
     sm2: { total: 0, active_7d: 0, overridden: 0 },
@@ -493,7 +485,7 @@ export async function getAlgorithmDistribution(): Promise<{
 
   profiles.docs.forEach((doc) => {
     const data = doc.data()
-    const algorithm = (data.spaced_repetition_algorithm as SpacedRepetitionAlgorithm) || 'sm2'
+    const algorithm = (data.spaced_repetition_algorithm as SpacedRepetitionAlgorithm) || "sm2"
     const lastActive = data.updated_at ? new Date(data.updated_at) : null
 
     stats[algorithm].total++
@@ -519,7 +511,7 @@ export async function migrateExistingUsers(): Promise<{
   sm2_assigned: number
   fsrs_assigned: number
 }> {
-  const profiles = await adminDb.collection('profiles').get()
+  const profiles = await adminDb.collection("profiles").get()
   const batch = adminDb.batch()
 
   let migrated = 0
@@ -538,14 +530,16 @@ export async function migrateExistingUsers(): Promise<{
       })
 
       migrated++
-      if (algorithm === 'sm2') sm2Assigned++
+      if (algorithm === "sm2") sm2Assigned++
       else fsrsAssigned++
     }
   })
 
   if (migrated > 0) {
     await batch.commit()
-    console.log(`[AlgorithmRouter] Migrated ${migrated} users (SM-2: ${sm2Assigned}, FSRS: ${fsrsAssigned})`)
+    console.log(
+      `[AlgorithmRouter] Migrated ${migrated} users (SM-2: ${sm2Assigned}, FSRS: ${fsrsAssigned})`
+    )
   }
 
   return {
@@ -553,4 +547,92 @@ export async function migrateExistingUsers(): Promise<{
     sm2_assigned: sm2Assigned,
     fsrs_assigned: fsrsAssigned,
   }
+}
+
+// ============================================
+// Unified Mastery Level
+// ============================================
+
+/**
+ * Get a unified mastery level that works for both FSRS and SM2
+ *
+ * This function provides consistent mastery level determination
+ * regardless of which algorithm a user is assigned to.
+ *
+ * Mastery Levels:
+ * - new: Never reviewed (reps = 0)
+ * - learning: Short intervals (< 7 days), still building skill
+ * - reviewing: Medium intervals (7-20 days), needs occasional practice
+ * - mastered: Long intervals (21+ days), in long-term memory
+ *
+ * Algorithm-specific differences:
+ * - FSRS: Requires interval >= 21 AND reps >= 3 for mastered
+ * - SM2: Requires interval >= 21 days for mastered
+ *
+ * @param algorithm - User's assigned algorithm ('sm2' or 'fsrs')
+ * @param interval - Current review interval in days
+ * @param reps - Number of successful reviews
+ * @returns Unified mastery level
+ */
+export function getUnifiedMasteryLevel(
+  algorithm: SpacedRepetitionAlgorithm,
+  interval: number,
+  reps: number
+): SpacedRepetitionMasteryLevel {
+  // Never reviewed = new
+  if (reps === 0) return "new"
+
+  if (algorithm === "fsrs") {
+    // FSRS: More strict - requires both interval AND rep count
+    // This ensures the user has demonstrated consistent retention
+    if (interval >= 21 && reps >= 3) return "mastered"
+    if (interval >= 7) return "reviewing"
+    return "learning"
+  } else {
+    // SM2: Based primarily on interval
+    if (interval >= 21) return "mastered"
+    if (interval >= 7) return "reviewing"
+    return "learning"
+  }
+}
+
+/**
+ * Check if a problem is considered "mastered"
+ * Quick helper for filtering/display purposes
+ *
+ * @param algorithm - User's assigned algorithm
+ * @param interval - Current review interval in days
+ * @param reps - Number of successful reviews
+ * @returns true if problem is mastered
+ */
+export function isProblemMastered(
+  algorithm: SpacedRepetitionAlgorithm,
+  interval: number,
+  reps: number
+): boolean {
+  return getUnifiedMasteryLevel(algorithm, interval, reps) === "mastered"
+}
+
+/**
+ * Get mastery progress as a percentage (0-100)
+ * Useful for progress bars and visualizations
+ *
+ * Progress milestones:
+ * - 0%: New (never practiced)
+ * - 25%: First successful review
+ * - 50%: Reached 7-day interval (reviewing)
+ * - 75%: Reached 14-day interval
+ * - 100%: Mastered (21+ day interval)
+ *
+ * @param interval - Current review interval in days
+ * @param reps - Number of successful reviews
+ * @returns Progress percentage (0-100)
+ */
+export function getMasteryProgress(interval: number, reps: number): number {
+  if (reps === 0) return 0
+  if (interval >= 21) return 100
+  if (interval >= 14) return 75
+  if (interval >= 7) return 50
+  if (reps >= 1) return 25
+  return 0
 }

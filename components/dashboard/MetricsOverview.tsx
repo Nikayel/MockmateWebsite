@@ -18,10 +18,13 @@ import {
   ArrowRight,
   Flame,
   Sparkles,
-  HelpCircle,
   ToggleLeft,
   ToggleRight,
+  CheckCircle,
+  RefreshCw,
+  BookOpen,
 } from "lucide-react"
+import { ScoreInfoTooltip } from "@/components/ui/score-info-tooltip"
 
 interface QuickMetrics {
   totalSessions: number
@@ -47,6 +50,15 @@ interface QuickMetrics {
     problemSolving: number // 25%
     understanding: number // 25%
     communication: number // 20%
+  }
+  // Mastery statistics for spaced repetition
+  mastery?: {
+    total: number
+    mastered: number
+    reviewing: number
+    learning: number
+    new: number
+    masteryRate: number
   }
 }
 
@@ -108,6 +120,7 @@ export function MetricsOverview() {
                     }
                   : undefined,
               scoreBreakdown: data.data.scoreBreakdown || undefined,
+              mastery: data.data.mastery || undefined,
             })
           }
         }
@@ -222,23 +235,7 @@ export function MetricsOverview() {
             <span className="flex items-center gap-1 text-xs text-gray-400">
               <Target className="h-3 w-3" />
               {showOverallScore ? "Interview Score" : "Technical Score"}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => setShowOverallScore(!showOverallScore)}
-                    className="ml-1 text-gray-500 transition-colors hover:text-[#00d9ff]"
-                  >
-                    <HelpCircle className="h-3 w-3" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs bg-zinc-800 text-zinc-200">
-                  <p>
-                    {showOverallScore
-                      ? "Interview Score: Includes communication (20%). Click to see Technical Score."
-                      : "Technical Score: Code quality + problem solving + understanding. Click to see Interview Score (includes communication)."}
-                  </p>
-                </TooltipContent>
-              </Tooltip>
+              <ScoreInfoTooltip type={showOverallScore ? "overall" : "technical"} />
             </span>
             <div className="flex items-center gap-2">
               <span className="font-mono text-sm text-white">
@@ -274,6 +271,59 @@ export function MetricsOverview() {
           </div>
         </div>
 
+        {/* Mastery Progress */}
+        {metrics.mastery && metrics.mastery.total > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1 text-xs font-medium text-gray-400">
+                Mastery Progress
+                <ScoreInfoTooltip type="mastery" />
+              </span>
+              <span className="font-mono text-xs text-white">
+                {metrics.mastery.masteryRate}% mastered
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded bg-emerald-500/10 p-2">
+                <div className="flex items-center justify-center gap-1">
+                  <CheckCircle className="h-3 w-3 text-emerald-400" />
+                  <span className="text-sm font-bold text-emerald-400">
+                    {metrics.mastery.mastered}
+                  </span>
+                </div>
+                <div className="flex items-center justify-center text-[10px] text-gray-400">
+                  Mastered
+                  <ScoreInfoTooltip type="mastered" iconClassName="h-2.5 w-2.5" />
+                </div>
+              </div>
+              <div className="rounded bg-amber-500/10 p-2">
+                <div className="flex items-center justify-center gap-1">
+                  <RefreshCw className="h-3 w-3 text-amber-400" />
+                  <span className="text-sm font-bold text-amber-400">
+                    {metrics.mastery.reviewing}
+                  </span>
+                </div>
+                <div className="flex items-center justify-center text-[10px] text-gray-400">
+                  Reviewing
+                  <ScoreInfoTooltip type="reviewing" iconClassName="h-2.5 w-2.5" />
+                </div>
+              </div>
+              <div className="rounded bg-blue-500/10 p-2">
+                <div className="flex items-center justify-center gap-1">
+                  <BookOpen className="h-3 w-3 text-blue-400" />
+                  <span className="text-sm font-bold text-blue-400">
+                    {metrics.mastery.learning}
+                  </span>
+                </div>
+                <div className="flex items-center justify-center text-[10px] text-gray-400">
+                  Learning
+                  <ScoreInfoTooltip type="learning" iconClassName="h-2.5 w-2.5" />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Score Breakdown - 4 weighted categories */}
         {metrics.scoreBreakdown && (
           <div className="space-y-2">
@@ -281,7 +331,10 @@ export function MetricsOverview() {
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded bg-gray-800/50 p-2">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="text-xs text-gray-400">Code Quality</span>
+                  <span className="flex items-center text-xs text-gray-400">
+                    Code Quality
+                    <ScoreInfoTooltip type="codeQuality" iconClassName="h-2.5 w-2.5" />
+                  </span>
                   <span className="font-mono text-xs text-white">
                     {metrics.scoreBreakdown.codeQuality}%
                   </span>
@@ -290,7 +343,10 @@ export function MetricsOverview() {
               </div>
               <div className="rounded bg-gray-800/50 p-2">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="text-xs text-gray-400">Problem Solving</span>
+                  <span className="flex items-center text-xs text-gray-400">
+                    Problem Solving
+                    <ScoreInfoTooltip type="problemSolving" iconClassName="h-2.5 w-2.5" />
+                  </span>
                   <span className="font-mono text-xs text-white">
                     {metrics.scoreBreakdown.problemSolving}%
                   </span>
@@ -299,7 +355,10 @@ export function MetricsOverview() {
               </div>
               <div className="rounded bg-gray-800/50 p-2">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="text-xs text-gray-400">Understanding</span>
+                  <span className="flex items-center text-xs text-gray-400">
+                    Understanding
+                    <ScoreInfoTooltip type="understanding" iconClassName="h-2.5 w-2.5" />
+                  </span>
                   <span className="font-mono text-xs text-white">
                     {metrics.scoreBreakdown.understanding}%
                   </span>
@@ -308,7 +367,10 @@ export function MetricsOverview() {
               </div>
               <div className="rounded bg-gray-800/50 p-2">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="text-xs text-gray-400">Communication</span>
+                  <span className="flex items-center text-xs text-gray-400">
+                    Communication
+                    <ScoreInfoTooltip type="communication" iconClassName="h-2.5 w-2.5" />
+                  </span>
                   <span className="font-mono text-xs text-white">
                     {metrics.scoreBreakdown.communication}%
                   </span>
