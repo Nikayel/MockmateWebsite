@@ -192,8 +192,10 @@ export async function getMasteryStatistics(userId: string): Promise<{
   reviewing: number
   mastered: number
 }> {
+  // Read from problem_mastery collection (where spaced repetition stores mastery_level)
+  // NOT user_problem_mastery (which is for score persistence only)
   const snapshot = await adminDb
-    .collection("user_problem_mastery")
+    .collection("problem_mastery")
     .doc(userId)
     .collection("problems")
     .get()

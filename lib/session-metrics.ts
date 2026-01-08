@@ -116,6 +116,7 @@ export interface SessionSummary {
   feedback: ReturnType<typeof getPerformanceFeedback>
   interactionMetrics: InteractionMetrics
   completedAt: string
+  isReconstructedSession?: boolean // True if session was reconstructed from fallback (incomplete metrics data)
 }
 
 // =============================================================================
@@ -441,6 +442,7 @@ export async function completeSessionMetrics(params: {
   thoughtProcessShared?: number
 }): Promise<SessionSummary | null> {
   let state = activeSessions.get(params.sessionId)
+  let isReconstructedSession = false
 
   // Fallback: If session not in memory (server restart, edge function cold start, etc.)
   // try to reconstruct minimal state from interview_sessions collection
@@ -448,6 +450,7 @@ export async function completeSessionMetrics(params: {
     console.warn(
       `[Session Metrics] Session ${params.sessionId} not in memory, attempting fallback...`
     )
+    isReconstructedSession = true // Mark as reconstructed - we have incomplete metrics data
     try {
       const sessionDoc = await adminDb.collection("interview_sessions").doc(params.sessionId).get()
       if (sessionDoc.exists) {
@@ -606,6 +609,7 @@ export async function completeSessionMetrics(params: {
     feedback,
     interactionMetrics,
     completedAt: now,
+    isReconstructedSession, // Track if this was reconstructed from fallback (incomplete metrics)
   }
 
   // Track session end event
@@ -679,11 +683,13 @@ async function storeSessionSummary(summary: SessionSummary): Promise<void> {
 
     // Sync performance_score to interview_sessions for dashboard consistency
     // This ensures "Recent Avg" shows the same score as "This Week"
+    // IMPORTANT: Pass isReconstructedSession to prevent overwriting authoritative scores
     await syncScoreToInterviewSession(
       summary.sessionId,
       summary.performanceScore,
       technicalScore,
-      summary.scoreBreakdown
+      summary.scoreBreakdown,
+      summary.isReconstructedSession ?? false
     )
 
     // Update all user learning data in parallel
@@ -700,14 +706,37 @@ async function storeSessionSummary(summary: SessionSummary): Promise<void> {
 /**
  * Sync score to interview_sessions collection
  * Ensures dashboard "Recent Avg" matches "This Week" percentage
+ *
+ * IMPORTANT: Only syncs if no authoritative score exists from generate-feedback API.
+ * This prevents race conditions where metrics tracking (with incomplete data) overwrites
+ * the proper AI-calculated score from the feedback generation.
  */
 async function syncScoreToInterviewSession(
   sessionId: string,
   performanceScore: number,
   technicalScore: number,
-  scoreBreakdown: ScoreBreakdown
+  scoreBreakdown: ScoreBreakdown,
+  isReconstructedSession: boolean = false
 ): Promise<void> {
   try {
+    // If this is a reconstructed session (fallback data), check if authoritative score already exists
+    if (isReconstructedSession) {
+      const sessionDoc = await adminDb.collection("interview_sessions").doc(sessionId).get()
+      const existingData = sessionDoc.data()
+
+      // If feedback_status is 'complete' and we have a performance_score, the generate-feedback API
+      // already set the authoritative score - don't overwrite it with our incomplete data
+      if (
+        existingData?.feedback_status === "complete" &&
+        typeof existingData?.performance_score === "number"
+      ) {
+        console.log(
+          `[Session Metrics] Skipping score sync for ${sessionId} - authoritative score exists from generate-feedback (${existingData.performance_score})`
+        )
+        return
+      }
+    }
+
     await adminDb
       .collection("interview_sessions")
       .doc(sessionId)

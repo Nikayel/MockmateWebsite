@@ -5,24 +5,24 @@
  * Works in conjunction with the notification knowledge base for RAG-powered messages.
  */
 
-import type { NotificationType } from '@/lib/rag/knowledge-base/notification-knowledge'
+import type { NotificationType } from "@/lib/rag/knowledge-base/notification-knowledge"
 
 /**
  * Notification delivery channels
  */
-export type NotificationChannel = 'push' | 'email' | 'in_app'
+export type NotificationChannel = "push" | "email" | "in_app"
 
 /**
  * Notification status for tracking
  */
 export type NotificationStatus =
-  | 'pending'      // Scheduled but not yet sent
-  | 'sent'         // Successfully delivered
-  | 'delivered'    // Confirmed received (push only)
-  | 'opened'       // User opened/viewed
-  | 'dismissed'    // User dismissed
-  | 'failed'       // Delivery failed
-  | 'cancelled'    // Cancelled before sending
+  | "pending" // Scheduled but not yet sent
+  | "sent" // Successfully delivered
+  | "delivered" // Confirmed received (push only)
+  | "opened" // User opened/viewed
+  | "dismissed" // User dismissed
+  | "failed" // Delivery failed
+  | "cancelled" // Cancelled before sending
 
 /**
  * User notification preferences
@@ -46,7 +46,7 @@ export interface NotificationPreferences {
   quietHours: {
     enabled: boolean
     start: number // Hour (0-23)
-    end: number   // Hour (0-23)
+    end: number // Hour (0-23)
   }
 
   // Per-type settings
@@ -54,7 +54,7 @@ export interface NotificationPreferences {
     [K in NotificationType]?: {
       enabled: boolean
       channels: NotificationChannel[]
-      frequency?: 'all' | 'daily_digest' | 'weekly_digest'
+      frequency?: "all" | "daily_digest" | "weekly_digest"
     }
   }
 
@@ -84,9 +84,12 @@ export interface NotificationPreferences {
  * - rest_reminder (patronizing)
  * - roadmap_behind (covered by interview_countdown)
  */
-export const DEFAULT_NOTIFICATION_PREFERENCES: Omit<NotificationPreferences, 'userId' | 'createdAt' | 'updatedAt'> = {
+export const DEFAULT_NOTIFICATION_PREFERENCES: Omit<
+  NotificationPreferences,
+  "userId" | "createdAt" | "updatedAt"
+> = {
   enabled: true,
-  timezone: 'America/New_York',
+  timezone: "America/New_York",
   channels: {
     push: true,
     email: true,
@@ -95,25 +98,25 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: Omit<NotificationPreferences, 'us
   quietHours: {
     enabled: true,
     start: 22, // 10 PM
-    end: 8,    // 8 AM
+    end: 8, // 8 AM
   },
   typePreferences: {
     // Always enabled
-    welcome: { enabled: true, channels: ['email', 'in_app'] },
+    welcome: { enabled: true, channels: ["email", "in_app"] },
 
     // High-value types (Smart Notifications)
-    spaced_repetition_review: { enabled: true, channels: ['email', 'in_app'] },
-    streak_maintenance: { enabled: true, channels: ['in_app'] },
-    interview_countdown: { enabled: true, channels: ['email', 'in_app'] },
-    weak_pattern_focus: { enabled: true, channels: ['in_app'] },
-    milestone_celebration: { enabled: true, channels: ['in_app'] },
-    daily_practice_reminder: { enabled: true, channels: ['in_app'] },
+    spaced_repetition_review: { enabled: true, channels: ["email", "in_app"] },
+    streak_maintenance: { enabled: true, channels: ["in_app"] },
+    interview_countdown: { enabled: true, channels: ["email", "in_app"] },
+    weak_pattern_focus: { enabled: true, channels: ["in_app"] },
+    milestone_celebration: { enabled: true, channels: ["in_app"] },
+    daily_practice_reminder: { enabled: true, channels: ["in_app"] },
 
     // Disabled by default (low value or redundant)
-    pattern_decay_alert: { enabled: false, channels: ['in_app'] },
-    roadmap_behind: { enabled: false, channels: ['in_app'] },
-    optimal_review_time: { enabled: false, channels: ['in_app'] },
-    rest_reminder: { enabled: false, channels: ['in_app'] },
+    pattern_decay_alert: { enabled: false, channels: ["in_app"] },
+    roadmap_behind: { enabled: false, channels: ["in_app"] },
+    optimal_review_time: { enabled: false, channels: ["in_app"] },
+    rest_reminder: { enabled: false, channels: ["in_app"] },
   },
 }
 
@@ -133,7 +136,7 @@ export interface Notification {
 
   // Scheduling
   scheduledFor: string // ISO date
-  priority: 'critical' | 'high' | 'medium' | 'low'
+  priority: "critical" | "high" | "medium" | "low"
 
   // Delivery
   channels: NotificationChannel[]
@@ -163,18 +166,24 @@ export interface Notification {
 export interface NotificationTriggerContext {
   userId: string
 
+  // User preferences
+  timezone?: string // IANA timezone (e.g., "America/New_York")
+
   // User state
   lastPracticeDate?: string
   streakDays?: number
   todayPracticed?: boolean
 
   // Performance data
-  patternProficiencies?: Record<string, {
-    level: string
-    trend: 'improving' | 'stable' | 'declining'
-    lastScore: number
-    daysSincePractice: number
-  }>
+  patternProficiencies?: Record<
+    string,
+    {
+      level: string
+      trend: "improving" | "stable" | "declining"
+      lastScore: number
+      daysSincePractice: number
+    }
+  >
 
   // Roadmap data
   interviewDate?: string
@@ -206,12 +215,12 @@ export interface NotificationQueueItem {
   type: NotificationType
   triggerData: Record<string, any>
   scheduledFor: string
-  priority: 'critical' | 'high' | 'medium' | 'low'
+  priority: "critical" | "high" | "medium" | "low"
   attempts: number
   maxAttempts: number
   lastAttemptAt?: string
   lastError?: string
-  status: 'pending' | 'processing' | 'completed' | 'failed'
+  status: "pending" | "processing" | "completed" | "failed"
   createdAt: string
   updatedAt: string
 }
@@ -269,7 +278,7 @@ export interface BatchNotificationRequest {
   type: NotificationType
   variables: Record<string, string>
   scheduledFor?: string // If not provided, send immediately
-  priority?: 'critical' | 'high' | 'medium' | 'low'
+  priority?: "critical" | "high" | "medium" | "low"
 }
 
 /**
