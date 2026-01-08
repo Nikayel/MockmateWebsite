@@ -12,7 +12,24 @@ import { NextRequest, NextResponse } from "next/server"
 import { adminAuth, adminDb } from "@/lib/firebase-admin"
 import { getUserStats, getRecentSessions, getPerformanceTrends } from "@/lib/session-metrics"
 import { getUserUsageSummary } from "@/lib/usage-tracking"
-import { getMasteryStatistics, getUserScoreStats } from "@/lib/scoring"
+import { getMasteryStatistics, getUserScoreStats, SCORE_WEIGHTS } from "@/lib/scoring"
+
+/**
+ * Calculate technical score from breakdown using canonical weights.
+ * Uses SCORE_WEIGHTS.technical: U=31.25%, PS=31.25%, CQ=37.5%
+ */
+function calculateTechScore(
+  understanding: number,
+  problemSolving: number,
+  codeQuality: number
+): number {
+  const {
+    understanding: uWeight,
+    problemSolving: psWeight,
+    codeQuality: cqWeight,
+  } = SCORE_WEIGHTS.technical
+  return Math.round(understanding * uWeight + problemSolving * psWeight + codeQuality * cqWeight)
+}
 
 /**
  * Fallback: Get stats directly from interview_sessions if user_stats is empty
@@ -92,11 +109,7 @@ async function getStatsFromInterviewSessions(userId: string): Promise<{
           const understanding = breakdown.understanding || breakdown.understandingScore || 0
           const problemSolving = breakdown.problemSolving || breakdown.problemSolvingScore || 0
           const codeQuality = breakdown.codeQuality || breakdown.codeQualityScore || 0
-          // Reweight without communication: understanding 37.5%, problemSolving 31.25%, codeQuality 31.25%
-          const techScore = Math.round(
-            understanding * 0.375 + problemSolving * 0.3125 + codeQuality * 0.3125
-          )
-          totalTechnicalScore += techScore
+          totalTechnicalScore += calculateTechScore(understanding, problemSolving, codeQuality)
         } else if (session.mastery_score !== undefined) {
           totalTechnicalScore += session.mastery_score
         } else {
@@ -131,13 +144,17 @@ async function getStatsFromInterviewSessions(userId: string): Promise<{
         )
 
         // Technical score for pattern
-        const breakdown = session.score_breakdown || session.scoreBreakdown
-        if (breakdown) {
-          const understanding = breakdown.understanding || breakdown.understandingScore || 0
-          const problemSolving = breakdown.problemSolving || breakdown.problemSolvingScore || 0
-          const codeQuality = breakdown.codeQuality || breakdown.codeQualityScore || 0
-          patternStats[pattern].totalTechnicalScore += Math.round(
-            understanding * 0.375 + problemSolving * 0.3125 + codeQuality * 0.3125
+        const patternBreakdown = session.score_breakdown || session.scoreBreakdown
+        if (patternBreakdown) {
+          const understanding =
+            patternBreakdown.understanding || patternBreakdown.understandingScore || 0
+          const problemSolving =
+            patternBreakdown.problemSolving || patternBreakdown.problemSolvingScore || 0
+          const codeQuality = patternBreakdown.codeQuality || patternBreakdown.codeQualityScore || 0
+          patternStats[pattern].totalTechnicalScore += calculateTechScore(
+            understanding,
+            problemSolving,
+            codeQuality
           )
         } else if (session.mastery_score !== undefined) {
           patternStats[pattern].totalTechnicalScore += session.mastery_score
@@ -162,13 +179,16 @@ async function getStatsFromInterviewSessions(userId: string): Promise<{
         difficultyStats[difficulty].totalScore += session.performance_score
 
         // Technical score for difficulty
-        const breakdown = session.score_breakdown || session.scoreBreakdown
-        if (breakdown) {
-          const understanding = breakdown.understanding || breakdown.understandingScore || 0
-          const problemSolving = breakdown.problemSolving || breakdown.problemSolvingScore || 0
-          const codeQuality = breakdown.codeQuality || breakdown.codeQualityScore || 0
-          difficultyStats[difficulty].totalTechnicalScore += Math.round(
-            understanding * 0.375 + problemSolving * 0.3125 + codeQuality * 0.3125
+        const diffBreakdown = session.score_breakdown || session.scoreBreakdown
+        if (diffBreakdown) {
+          const understanding = diffBreakdown.understanding || diffBreakdown.understandingScore || 0
+          const problemSolving =
+            diffBreakdown.problemSolving || diffBreakdown.problemSolvingScore || 0
+          const codeQuality = diffBreakdown.codeQuality || diffBreakdown.codeQualityScore || 0
+          difficultyStats[difficulty].totalTechnicalScore += calculateTechScore(
+            understanding,
+            problemSolving,
+            codeQuality
           )
         } else if (session.mastery_score !== undefined) {
           difficultyStats[difficulty].totalTechnicalScore += session.mastery_score
@@ -257,16 +277,22 @@ export async function GET(request: NextRequest) {
     if (recentSessions.length > 0) {
       const sessionsWithBreakdown = recentSessions.filter((s) => s.scoreBreakdown)
       if (sessionsWithBreakdown.length > 0) {
-        // Calculate overall technical score
-        const techScores = sessionsWithBreakdown.map((s) => {
-          const breakdown = s.scoreBreakdown!
-          // Technical = understanding + problemSolving + codeQuality (reweighted without communication)
-          return Math.round(
-            (breakdown.understandingScore || 0) * 0.375 +
-              (breakdown.problemSolvingScore || 0) * 0.3125 +
-              (breakdown.codeQualityScore || 0) * 0.3125
+        // Helper to extract technical score from breakdown
+        const getTechScoreFromBreakdown = (breakdown: {
+          understandingScore?: number
+          problemSolvingScore?: number
+          codeQualityScore?: number
+        }) =>
+          calculateTechScore(
+            breakdown.understandingScore || 0,
+            breakdown.problemSolvingScore || 0,
+            breakdown.codeQualityScore || 0
           )
-        })
+
+        // Calculate overall technical score
+        const techScores = sessionsWithBreakdown.map((s) =>
+          getTechScoreFromBreakdown(s.scoreBreakdown!)
+        )
         technicalScoreOverride = Math.round(
           techScores.reduce((a, b) => a + b, 0) / techScores.length
         )
@@ -274,12 +300,7 @@ export async function GET(request: NextRequest) {
         // Calculate per-pattern technical scores
         const patternGroups: Record<string, number[]> = {}
         sessionsWithBreakdown.forEach((s) => {
-          const breakdown = s.scoreBreakdown!
-          const techScore = Math.round(
-            (breakdown.understandingScore || 0) * 0.375 +
-              (breakdown.problemSolvingScore || 0) * 0.3125 +
-              (breakdown.codeQualityScore || 0) * 0.3125
-          )
+          const techScore = getTechScoreFromBreakdown(s.scoreBreakdown!)
           if (!patternGroups[s.pattern]) patternGroups[s.pattern] = []
           patternGroups[s.pattern].push(techScore)
         })
@@ -292,12 +313,7 @@ export async function GET(request: NextRequest) {
         // Calculate per-difficulty technical scores
         const diffGroups: Record<string, number[]> = {}
         sessionsWithBreakdown.forEach((s) => {
-          const breakdown = s.scoreBreakdown!
-          const techScore = Math.round(
-            (breakdown.understandingScore || 0) * 0.375 +
-              (breakdown.problemSolvingScore || 0) * 0.3125 +
-              (breakdown.codeQualityScore || 0) * 0.3125
-          )
+          const techScore = getTechScoreFromBreakdown(s.scoreBreakdown!)
           if (!diffGroups[s.difficulty]) diffGroups[s.difficulty] = []
           diffGroups[s.difficulty].push(techScore)
         })

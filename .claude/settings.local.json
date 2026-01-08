@@ -29,7 +29,17 @@
       "Bash(echo:*)",
       "Bash(export PATH=\"/opt/homebrew/bin:/usr/local/bin:$HOME/.nvm/versions/node/*/bin:$PATH\")",
       "Bash(source ~/.zshrc)",
-      "Bash(source ~/.bashrc)"
+      "Bash(source ~/.bashrc)",
+      "Bash(export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\")",
+      "Bash(~/.nvm/versions/node/v22.12.0/bin/pnpm run build)",
+      "Bash(PATH=\"$HOME/.nvm/versions/node/v22.12.0/bin:$PATH\" pnpm run build:*)",
+      "Bash(PATH=\"$HOME/.nvm/versions/node/v22.12.0/bin:$PATH\" git add:*)",
+      "Bash(PATH=\"$HOME/.nvm/versions/node/v22.12.0/bin:$PATH\" git commit -m \"$\\(cat <<''EOF''\nfeat: update Veeva Systems interview data with research-backed info\n\n- Add specific tech stack: Java/Spring Boot primary, Python/JS for certain roles\n- Update interview process with Team Day format \\(4-5 hours\\)\n- Add common LeetCode questions: valid parentheses, binary tree comparison\n- Include AWS services focus \\(Lambda, ECS, Fargate, RDS\\)\n- Update pattern frequencies based on Glassdoor/LeetCode research\n- Add core values: Do the Right Thing, Customer Success, Employee Success, Speed\n- Include specific products to research: Veeva CRM, Vault, OpenData\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(export PATH=\"$HOME/.nvm/versions/node/v22.12.0/bin:$PATH\")",
+      "Bash(export PATH=\"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$HOME/.nvm/versions/node/v22.12.0/bin:$PATH\")",
+      "Bash($HOME/.nvm/versions/node/v22.12.0/bin/node $HOME/.nvm/versions/node/v22.12.0/bin/pnpm run build)",
+      "Bash(export PATH:*)",
+      "Bash(node:*)"
     ]
   }
 }

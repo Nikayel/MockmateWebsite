@@ -430,117 +430,12 @@ export function createDefaultMetrics(
 }
 
 // =============================================================================
-// LEGACY COMPATIBILITY (for backward compatibility with existing code)
+// MODULAR SCORING RE-EXPORTS
 // =============================================================================
-
-/**
- * @deprecated Use createDefaultMetrics instead
- * This function maintains backward compatibility with the old scoring interface
- */
-export function vectorizeMetrics(metrics: InteractionMetrics): number[] {
-  return [
-    metrics.testCasesPassed / Math.max(1, metrics.testCasesTotal),
-    metrics.codeEfficiencyScore / 100,
-    metrics.codeQualityScore / 100,
-    metrics.codeExplanationQuality / 100,
-    metrics.timeSpent / 3600,
-    metrics.hintsRevealed / Math.max(1, metrics.hintsTotal),
-    metrics.workspaceFilesViewed / Math.max(1, metrics.workspaceFilesTotal),
-    metrics.workspaceContextUsed ? 1 : 0,
-    metrics.aiQuestionsAsked,
-    metrics.aiSuggestionsUnderstood /
-      Math.max(1, metrics.aiSuggestionsUnderstood + metrics.aiSuggestionsMisunderstood),
-    metrics.problemDifficulty === "easy" ? 0 : metrics.problemDifficulty === "medium" ? 0.5 : 1,
-    metrics.problemType === "dsa" ? 0 : metrics.problemType === "bugfix" ? 0.5 : 1,
-  ]
-}
-
-// Legacy interface for backward compatibility
-export interface LegacyInteractionMetrics {
-  partnerMessagesSent?: number
-  partnerMessagesReceived?: number
-  partnerHintsRequested?: number
-  partnerCodeSuggestionsAccepted?: number
-  aiCollaborationQuality?: number
-  aiQuestionsQuality?: number
-  aiSuggestionsUnderstood?: number
-  aiSuggestionsMisunderstood?: number
-  aiOverDependency?: number
-  strategicAiUsage?: number
-  interviewerQuestionsAnswered?: number
-  interviewerClarificationsRequested?: number
-  interviewerFeedbackAcknowledged?: number
-  proactiveInteractions?: number
-  testCasesPassed: number
-  testCasesTotal: number
-  codeEfficiencyScore: number
-  codeQualityScore: number
-  problemDifficulty: "easy" | "medium" | "hard"
-  problemType: "dsa" | "bugfix" | "system-design"
-  skillsDemonstrated?: string[]
-  timeSpent: number
-  hintsRevealed: number
-  hintsTotal: number
-  workspaceFilesViewed?: number
-  workspaceFilesTotal?: number
-  workspaceContextUsed?: boolean
-}
-
-/**
- * Convert legacy metrics to new format
- */
-export function convertLegacyMetrics(legacy: LegacyInteractionMetrics): InteractionMetrics {
-  return {
-    codeExplanationQuality: legacy.aiCollaborationQuality || 50,
-    approachExplanationGiven: (legacy.interviewerQuestionsAnswered || 0) > 0,
-    complexityAnalysisProvided: false,
-    edgeCasesIdentified: 0,
-
-    debuggingAttempts: 0,
-    testDrivenApproach: legacy.testCasesPassed > 0,
-    systematicDebugging: false,
-
-    testCasesPassed: legacy.testCasesPassed,
-    testCasesTotal: legacy.testCasesTotal,
-    codeEfficiencyScore: legacy.codeEfficiencyScore,
-    codeQualityScore: legacy.codeQualityScore,
-    codeReadability: 50,
-
-    brokeDownProblem: false,
-    consideredAlternatives: false,
-    optimizationAttempted: false,
-
-    aiQuestionsAsked: legacy.partnerMessagesSent || 0,
-    aiSuggestionsUnderstood: legacy.aiSuggestionsUnderstood || 0,
-    aiSuggestionsMisunderstood: legacy.aiSuggestionsMisunderstood || 0,
-    aiUsedStrategically: (legacy.strategicAiUsage || 0) > 50,
-
-    interviewerQuestionsAnswered: legacy.interviewerQuestionsAnswered || 0,
-    clarifyingQuestionsAsked: legacy.interviewerClarificationsRequested || 0,
-    thoughtProcessShared: (legacy.proactiveInteractions || 0) * 10,
-
-    problemDifficulty: legacy.problemDifficulty,
-    problemType: legacy.problemType,
-    skillsDemonstrated: legacy.skillsDemonstrated || [],
-
-    timeSpent: legacy.timeSpent,
-    hintsRevealed: legacy.hintsRevealed,
-    hintsTotal: legacy.hintsTotal,
-
-    workspaceFilesViewed: legacy.workspaceFilesViewed || 0,
-    workspaceFilesTotal: legacy.workspaceFilesTotal || 0,
-    workspaceContextUsed: legacy.workspaceContextUsed || false,
-  }
-}
-
-// =============================================================================
-// NEW SCORING MODULE RE-EXPORTS
-// =============================================================================
-// These exports provide access to the new modular scoring system.
-// The new system separates concerns into distinct modules:
-// - mastery-score: Test pass rate for spaced repetition
+// These exports provide access to the modular scoring system.
 // - technical-score: Code-only scoring (excludes communication)
 // - score-persistence: Atomic Firestore operations
+// Note: Mastery scoring for spaced repetition is in lib/spaced-repetition/mastery-score.ts
 
 export {
   // Types
@@ -551,12 +446,6 @@ export {
   type MasteryStatistics,
   type ScorePersistenceInput,
   SCORE_WEIGHTS,
-
-  // Mastery Score (for spaced repetition)
-  calculateMasteryScore,
-  calculateMasteryScoreFromTests,
-  hasPassed,
-  getMasteryQuality,
 
   // Technical Score (code-only, excludes communication)
   calculateTechnicalScore,

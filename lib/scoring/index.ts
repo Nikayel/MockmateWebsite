@@ -2,16 +2,18 @@
  * Scoring Module
  *
  * Centralized exports for the scoring system.
- * Three distinct scores serve different purposes:
+ * Two score types are handled here:
  *
  * - performanceScore: Full interview evaluation (includes communication)
  *   Used for: Overall feedback, interview assessment
+ *   Calculated in: lib/scoring.ts
  *
  * - technicalScore: Code-focused evaluation (excludes communication)
  *   Used for: Dashboard "Technical Avg", skill assessment
+ *   Calculated in: lib/scoring/technical-score.ts
  *
- * - masteryScore: Test pass rate only
- *   Used for: Spaced repetition scheduling, determining review intervals
+ * Note: masteryScore for spaced repetition is calculated in
+ * lib/spaced-repetition/mastery-score.ts (uses test pass rate + time + hints)
  */
 
 // Types
@@ -26,14 +28,6 @@ export type {
 } from "./types"
 
 export { SCORE_WEIGHTS } from "./types"
-
-// Mastery Score (for spaced repetition)
-export {
-  calculateMasteryScore,
-  calculateMasteryScoreFromTests,
-  hasPassed,
-  getMasteryQuality,
-} from "./mastery-score"
 
 // Technical Score (code-only, excludes communication)
 export {

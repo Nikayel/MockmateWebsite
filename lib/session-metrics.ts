@@ -13,7 +13,7 @@ import { adminDb } from "./firebase-admin"
 import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { trackUsageEvent } from "./usage-tracking"
 import type { InteractionMetrics, ScoreBreakdown } from "./scoring"
-import { calculateUserScore, getPerformanceFeedback } from "./scoring"
+import { calculateUserScore, getPerformanceFeedback, SCORE_WEIGHTS } from "./scoring"
 import {
   calculateMasteryScore,
   fromInteractionMetrics,
@@ -668,14 +668,22 @@ async function storeSessionSummary(summary: SessionSummary): Promise<void> {
 
 /**
  * Calculate technical score from score breakdown
- * Technical = (understanding × 0.375) + (problemSolving × 0.3125) + (codeQuality × 0.3125)
+ * Uses canonical weights from SCORE_WEIGHTS.technical:
+ * - Understanding: 31.25% (25/80)
+ * - Problem Solving: 31.25% (25/80)
+ * - Code Quality: 37.5% (30/80)
  * This reweights the 80% non-communication portion to 100%
  */
 function calculateTechnicalScore(breakdown: ScoreBreakdown): number {
   const understanding = breakdown.understandingScore || 0
   const problemSolving = breakdown.problemSolvingScore || 0
   const codeQuality = breakdown.codeQualityScore || 0
-  return Math.round(understanding * 0.375 + problemSolving * 0.3125 + codeQuality * 0.3125)
+  const {
+    understanding: uWeight,
+    problemSolving: psWeight,
+    codeQuality: cqWeight,
+  } = SCORE_WEIGHTS.technical
+  return Math.round(understanding * uWeight + problemSolving * psWeight + codeQuality * cqWeight)
 }
 
 /**
