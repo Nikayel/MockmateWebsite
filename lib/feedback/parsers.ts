@@ -75,20 +75,29 @@ function parseBulletList(text: string, preferNumbered: boolean = false): string[
 
   // Try different bullet patterns in order of preference
   const bulletPatterns = [
-    /\n[-•*]\s*/, // Standard bullets: -, •, *
+    /\n[-•*]\s*/, // Standard bullets with newline: -, •, *
+    /\s[-•*]\s+(?=[A-Z])/, // Inline bullets followed by capital letter (e.g., "* Implemented")
     /\n\d+\.\s*/, // Numbered: 1., 2., etc.
   ]
 
   // Try pattern based on preference
-  const pattern = preferNumbered ? bulletPatterns[1] : bulletPatterns[0]
+  const pattern = preferNumbered ? bulletPatterns[2] : bulletPatterns[0]
   let items = trimmed
     .split(pattern)
     .map((s) => s.trim())
     .filter((s) => s && s.length > 0)
 
-  // If no items found with primary pattern, try the other
+  // If no items found with newline pattern, try inline bullet pattern
+  if (items.length <= 1 && !preferNumbered) {
+    items = trimmed
+      .split(bulletPatterns[1])
+      .map((s) => s.trim())
+      .filter((s) => s && s.length > 0)
+  }
+
+  // If still no items, try the alternate pattern
   if (items.length <= 1) {
-    const altPattern = preferNumbered ? bulletPatterns[0] : bulletPatterns[1]
+    const altPattern = preferNumbered ? bulletPatterns[0] : bulletPatterns[2]
     items = trimmed
       .split(altPattern)
       .map((s) => s.trim())
@@ -103,7 +112,15 @@ function parseBulletList(text: string, preferNumbered: boolean = false): string[
       .filter((s) => s && s.length > 5) // Filter out very short lines
   }
 
-  // Final fallback: if text is just paragraphs, split by sentences
+  // Final fallback: split on " * " or " - " patterns (inline bullets)
+  if (items.length <= 1) {
+    items = trimmed
+      .split(/\s+[-*•]\s+/)
+      .map((s) => s.trim())
+      .filter((s) => s && s.length > 10)
+  }
+
+  // Last fallback: if text is just paragraphs, split by sentences
   if (items.length === 0) {
     const sentences = trimmed
       .split(/(?<=[.!?])\s+/)

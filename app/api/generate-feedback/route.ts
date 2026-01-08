@@ -102,6 +102,11 @@ If overall score is below 25:
 
 ## OUTPUT FORMAT FOR SYSTEM DESIGN
 
+CRITICAL FORMATTING RULES:
+- Each bullet point MUST start on a NEW LINE
+- Use ONLY hyphen (-) bullets, NOT asterisks (*)
+- There MUST be a newline after each section header before the bullets
+
 **TL;DR** – One sentence: If score < 25, state clearly they did not participate. Otherwise: what they did well + biggest gap.
 
 **Score Snapshot** (use the PRE-CALCULATED SCORES provided)
@@ -111,16 +116,16 @@ If overall score is below 25:
 - Communication: X/100 – Did they explain decisions clearly?
 - Overall: X/100
 
-**What Worked** (max 3 bullets)
+**What Worked**
 - If score >= 30: specific design strength with evidence from discussion
 - If score < 30: "The candidate opened the design template" (be honest - don't fabricate positives)
 
-**Fix Next** (max 3 bullets, prioritized)
+**Fix Next**
 - If score < 25: Start with "ENGAGE WITH THE INTERVIEWER - system design is a CONVERSATION, not a silent exercise"
 - specific improvement for system design interviews
 
-**Action Plan** (3 numbered steps)
-1. If score < 25: "IMMEDIATE: Understand that system design interviews require active discussion. Practice explaining your thoughts out loud."
+**Action Plan**
+1. If score < 25: "IMMEDIATE: Understand that system design interviews require active discussion."
 2. Short-term: concepts to study
 3. Long-term: projects to build
 
@@ -140,6 +145,11 @@ ${baseRules}
 
 ## OUTPUT FORMAT FOR BUG FIX
 
+CRITICAL FORMATTING RULES:
+- Each bullet point MUST start on a NEW LINE
+- Use ONLY hyphen (-) bullets, NOT asterisks (*)
+- There MUST be a newline after each section header before the bullets
+
 **TL;DR** – One sentence: bug identification success + biggest gap.
 
 **Score Snapshot** (use the PRE-CALCULATED SCORES provided)
@@ -149,13 +159,13 @@ ${baseRules}
 - Communication: X/100 – Did they explain their debugging process?
 - Overall: X/100
 
-**What Worked** (max 3 bullets)
+**What Worked**
 - specific debugging strength with evidence
 
-**Fix Next** (max 3 bullets, prioritized)
+**Fix Next**
 - specific improvement for debugging skills
 
-**Action Plan** (3 numbered steps)
+**Action Plan**
 1. Immediate debugging technique to practice
 2. Short-term: debugging patterns to learn
 3. Long-term: codebase understanding to build
@@ -199,6 +209,11 @@ If communication score < 60 or "Approach explained: NO" in the analysis:
 
 ## OUTPUT FORMAT
 
+CRITICAL FORMATTING RULES:
+- Each bullet point MUST start on a NEW LINE
+- Use ONLY hyphen (-) bullets, NOT asterisks (*)
+- There MUST be a newline after each section header before the bullets
+
 **TL;DR** – One sentence: If incomplete, state clearly "Solution incomplete - only base case, no algorithm." Otherwise: what they did well + biggest gap.
 
 **Score Snapshot** (use the PRE-CALCULATED SCORES provided)
@@ -208,18 +223,20 @@ If communication score < 60 or "Approach explained: NO" in the analysis:
 - Communication: X/100 – brief justification
 - Overall: X/100
 
-**What Worked** (max 3 bullets)
-- If incomplete/failing: ONLY mention trivial things like "Identified base case" - nothing more
-- If working: specific strength with evidence
+**What Worked**
+- First strength (specific, with evidence)
+- Second strength if applicable
+- Third strength if applicable
 
-**Fix Next** (max 3 bullets, prioritized)
-- If incomplete: "IMPLEMENT THE COMPLETE ALGORITHM - base case alone is not a solution"
-- specific improvement with concrete action
+**Fix Next**
+- Most important improvement needed
+- Second improvement if applicable
+- Third improvement if applicable
 
-**Action Plan** (3 numbered steps)
-1. If incomplete: "IMMEDIATE: Write the complete solution, not just edge case handling"
-2. Short-term practice
-3. Long-term skill development
+**Action Plan**
+1. IMMEDIATE: First concrete action
+2. Short-term: Second action
+3. Long-term: Third action
 
 DSA FOCUS:
 - Reference actual data (tests passed, complexity, time).
