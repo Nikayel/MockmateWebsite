@@ -7,7 +7,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAdminAccess } from "@/lib/admin/middleware"
 import { checkRAGHealth, getRAGMetrics } from "@/lib/rag/monitoring"
-import { isKnowledgeBaseSeeded } from "@/lib/rag/knowledge-base/seeder"
+import {
+  isKnowledgeBaseSeeded,
+  getKnowledgeBaseStatus,
+  seedKnowledgeBase,
+  type KnowledgeCategory,
+} from "@/lib/rag/knowledge-base/seeder"
 import { getHybridProvider } from "@/lib/rag/embeddings/hybrid-provider"
 import { getVectorDBProvider, isPineconeEnabled } from "@/lib/rag/vectordb"
 import { advancedRetrieve } from "@/lib/rag"
@@ -34,11 +39,12 @@ export async function GET(request: NextRequest) {
 
     switch (action) {
       case "health": {
-        // Get system health
-        const [health, metrics, kbSeeded] = await Promise.all([
+        // Get system health with detailed knowledge base status
+        const [health, metrics, kbSeeded, kbStatus] = await Promise.all([
           checkRAGHealth(),
           getRAGMetrics(24),
           isKnowledgeBaseSeeded(),
+          getKnowledgeBaseStatus(),
         ])
 
         const provider = getHybridProvider()
@@ -57,6 +63,7 @@ export async function GET(request: NextRequest) {
               dimensions: provider.getDimensions(),
             },
             providerMetrics,
+            knowledgeBaseStatus: kbStatus,
           },
         })
       }
@@ -148,11 +155,22 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case "seed-knowledge-base": {
-        const { seedKnowledgeBase } = await import("@/lib/rag/knowledge-base/seeder")
-        const progress = await seedKnowledgeBase({ force: body.force || false })
+        const categories = body.categories as KnowledgeCategory[] | undefined
+        const progress = await seedKnowledgeBase({
+          force: body.force || false,
+          categories,
+        })
         return NextResponse.json({
           success: true,
           data: { progress },
+        })
+      }
+
+      case "get-status": {
+        const status = await getKnowledgeBaseStatus()
+        return NextResponse.json({
+          success: true,
+          data: { status },
         })
       }
 
