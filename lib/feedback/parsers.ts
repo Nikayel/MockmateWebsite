@@ -255,21 +255,36 @@ export function parseFeedback(feedback: string): FeedbackSection {
     }
   }
 
-  const whatWorkedMatch = feedback.match(/\*\*What Worked\*\*[:\s]*([\s\S]+?)(?=\n\*\*|$)/)
-  if (whatWorkedMatch) {
-    sections.whatWorked = parseBulletList(whatWorkedMatch[1])
+  // Try multiple patterns for "What Worked" section (handles different markdown formats)
+  const whatWorkedPatterns = [
+    /\*\*What Worked\*\*[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /##\s*What Worked[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /###\s*What Worked[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /What Worked[:\s]*\n([\s\S]+?)(?=\n\*\*|\n##|\n###|Fix Next|To Improve|Action Plan|$)/i,
+  ]
+  for (const pattern of whatWorkedPatterns) {
+    const match = feedback.match(pattern)
+    if (match && match[1].trim()) {
+      sections.whatWorked = parseBulletList(match[1])
+      if (sections.whatWorked.length > 0) break
+    }
   }
 
-  const fixNextMatch = feedback.match(/\*\*Fix Next\*\*[:\s]*([\s\S]+?)(?=\n\*\*|$)/)
-  if (fixNextMatch) {
-    sections.fixNext = parseBulletList(fixNextMatch[1])
-  }
-
-  // Also try "To Improve" as an alternative header
-  if (sections.fixNext.length === 0) {
-    const toImproveMatch = feedback.match(/\*\*To Improve\*\*[:\s]*([\s\S]+?)(?=\n\*\*|$)/)
-    if (toImproveMatch) {
-      sections.fixNext = parseBulletList(toImproveMatch[1])
+  // Try multiple patterns for "Fix Next" / "To Improve" section
+  const fixNextPatterns = [
+    /\*\*Fix Next\*\*[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /\*\*To Improve\*\*[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /##\s*Fix Next[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /##\s*To Improve[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /###\s*Fix Next[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /###\s*To Improve[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /(?:Fix Next|To Improve)[:\s]*\n([\s\S]+?)(?=\n\*\*|\n##|\n###|Action Plan|What Worked|$)/i,
+  ]
+  for (const pattern of fixNextPatterns) {
+    const match = feedback.match(pattern)
+    if (match && match[1].trim()) {
+      sections.fixNext = parseBulletList(match[1])
+      if (sections.fixNext.length > 0) break
     }
   }
 
