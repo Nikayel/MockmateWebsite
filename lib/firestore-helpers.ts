@@ -470,7 +470,18 @@ export async function createInterviewSession(
 }
 
 /**
+ * Feedback generation status
+ * - 'pending': Session submitted, AI feedback is being generated
+ * - 'complete': Feedback generation finished, scores are final
+ * - 'failed': Feedback generation failed (user can retry)
+ */
+export type FeedbackStatus = "pending" | "complete" | "failed"
+
+/**
  * Update interview session on completion
+ *
+ * IMPORTANT: Sessions should be marked as 'pending' initially, then 'complete'
+ * after AI feedback generation finishes. This prevents showing incomplete scores.
  */
 export async function updateInterviewSession(
   sessionId: string,
@@ -483,6 +494,7 @@ export async function updateInterviewSession(
     timeComplexity?: string
     spaceComplexity?: string
     efficiencyScore?: number
+    feedbackStatus?: FeedbackStatus // Track feedback generation state
     scoreBreakdown?: {
       understanding?: number
       understandingScore?: number
@@ -500,6 +512,7 @@ export async function updateInterviewSession(
     completed_at: new Date().toISOString(),
     performance_score: performanceScore,
     feedback: feedback,
+    feedback_status: additionalData?.feedbackStatus || "pending", // Default to pending
     updated_at: new Date().toISOString(),
   }
 

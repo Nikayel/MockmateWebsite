@@ -341,8 +341,10 @@ export async function completeSessionWithMastery(
         lastReviewAt: lastReviewAt.toISOString(),
       })
 
+      // IMPORTANT: Always use performanceScore for user-facing displays (last_score)
+      // masteryScore is only used internally for spaced repetition interval calculations
       masteryResult = await updateProblemMastery(userId, sessionData.scenarioId, {
-        performance_score: sessionData.masteryScore ?? sessionData.performanceScore,
+        performance_score: sessionData.performanceScore, // Always use full interview score for display
         time_spent_minutes: sessionData.timeSpentMinutes,
         hints_used: sessionData.hintsUsed,
         increment_review_count: false, // Not a valid SR review
@@ -485,7 +487,8 @@ export async function completeSessionWithMastery(
     }
   } else {
     // Initialize new problem mastery
-    // Use masteryScore for SR calculation (technical proficiency only)
+    // IMPORTANT: Use performanceScore for display (last_score), not masteryScore
+    // masteryScore is used internally for SR quality rating calculations
     const scoreForSR = sessionData.masteryScore ?? sessionData.performanceScore
 
     masteryResult = await initializeProblemMasteryFromSession(userId, {
@@ -493,14 +496,14 @@ export async function completeSessionWithMastery(
       title: sessionData.title,
       pattern: sessionData.pattern,
       difficulty: sessionData.difficulty,
-      performance_score: scoreForSR, // Use mastery score for initial SR setup
+      performance_score: sessionData.performanceScore, // Always use full interview score for display
       time_spent_minutes: sessionData.timeSpentMinutes,
       hints_used: sessionData.hintsUsed,
     })
 
     // Record research event for first review
     try {
-      const qualityRating = mapScoreToQuality(scoreForSR) // Use mastery score for quality rating
+      const qualityRating = mapScoreToQuality(scoreForSR) // Use mastery score for SR quality rating
 
       await recordReviewEvent({
         userId,

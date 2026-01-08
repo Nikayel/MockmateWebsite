@@ -44,9 +44,9 @@ export interface Profile {
   emails_sent_today?: number
   welcome_email_sent?: boolean
   // Spaced Repetition Algorithm A/B Testing
-  spaced_repetition_algorithm?: 'sm2' | 'fsrs'  // Assigned algorithm for A/B testing
-  algorithm_assigned_at?: string                  // ISO date when algorithm was assigned
-  algorithm_user_overridden?: boolean             // True if user manually changed algorithm
+  spaced_repetition_algorithm?: "sm2" | "fsrs" // Assigned algorithm for A/B testing
+  algorithm_assigned_at?: string // ISO date when algorithm was assigned
+  algorithm_user_overridden?: boolean // True if user manually changed algorithm
 }
 
 export interface NotificationPreferences {
@@ -86,6 +86,7 @@ export interface InterviewSession {
   scenario_id?: string // scenario ID for reopening sessions
   performance_score?: number
   feedback?: string
+  feedback_status?: "pending" | "complete" | "failed" // Track feedback generation state
   // Additional completion data
   final_code?: string
   language?: string
@@ -163,7 +164,13 @@ export interface TopicLearningState {
 export interface EmailNotificationRecord {
   id: string
   user_id: string
-  email_type: "welcome" | "inactivity_24h" | "inactivity_48h" | "inactivity_72h" | "spaced_repetition" | "milestone"
+  email_type:
+    | "welcome"
+    | "inactivity_24h"
+    | "inactivity_48h"
+    | "inactivity_72h"
+    | "spaced_repetition"
+    | "milestone"
   status: "pending" | "sent" | "failed" | "opened" | "clicked"
   scheduled_at: string
   sent_at?: string
@@ -239,7 +246,13 @@ export interface DueReviewItem {
  * Smart recommendation from RAG system
  */
 export interface SmartPracticeRecommendation {
-  type: "review" | "practice_weakness" | "similar_to_failed" | "company_relevant" | "next_in_roadmap" | "strengthen_pattern"
+  type:
+    | "review"
+    | "practice_weakness"
+    | "similar_to_failed"
+    | "company_relevant"
+    | "next_in_roadmap"
+    | "strengthen_pattern"
   scenario_id: string
   title: string
   pattern: string
@@ -302,7 +315,7 @@ export interface UserMasteryStatistics {
  * SM-2 vs FSRS spaced repetition algorithms
  */
 
-export type SpacedRepetitionAlgorithm = 'sm2' | 'fsrs'
+export type SpacedRepetitionAlgorithm = "sm2" | "fsrs"
 
 /**
  * Daily snapshot of user's algorithm performance metrics
@@ -320,34 +333,34 @@ export interface AlgorithmDailyMetrics {
   average_review_time_minutes: number
 
   // Performance Metrics
-  scores: number[]                    // All scores from this day
+  scores: number[] // All scores from this day
   average_score: number
   median_score: number
   lowest_score: number
   highest_score: number
 
   // Quality Distribution (SM-2 quality ratings 0-5 or FSRS ratings 1-4)
-  quality_distribution: Record<number, number>  // quality -> count
+  quality_distribution: Record<number, number> // quality -> count
 
   // Retention & Memory
-  retention_rate: number              // % of items recalled correctly (score >= 56)
-  lapse_count: number                 // Times user forgot (score < 40)
-  first_try_success_rate: number      // % correct on first attempt
+  retention_rate: number // % of items recalled correctly (score >= 56)
+  lapse_count: number // Times user forgot (score < 40)
+  first_try_success_rate: number // % correct on first attempt
 
   // Progress Metrics
   problems_due_at_start: number
   problems_completed: number
   new_problems_learned: number
-  problems_mastered_today: number     // Moved to 'mastered' level
-  problems_regressed_today: number    // Dropped mastery level
+  problems_mastered_today: number // Moved to 'mastered' level
+  problems_regressed_today: number // Dropped mastery level
 
   // Streak & Engagement
   streak_days: number
-  session_count: number               // How many practice sessions
+  session_count: number // How many practice sessions
   longest_session_minutes: number
 
   // Interval Analysis (key for comparing algorithms)
-  intervals_scheduled: number[]       // Intervals assigned today
+  intervals_scheduled: number[] // Intervals assigned today
   average_interval_days: number
   max_interval_days: number
 
@@ -387,7 +400,7 @@ export interface AlgorithmResearchSummary {
   // Mastery Progress
   problems_mastered: number
   problems_learning: number
-  problems_struggling: number         // Low ease factor, many lapses
+  problems_struggling: number // Low ease factor, many lapses
   average_time_to_mastery_days: number
 
   // Engagement
@@ -398,7 +411,7 @@ export interface AlgorithmResearchSummary {
 
   // Performance Trajectory (for trend analysis)
   weekly_averages: {
-    week_start: string  // ISO date
+    week_start: string // ISO date
     average_score: number
     retention_rate: number
     reviews_completed: number
@@ -406,14 +419,14 @@ export interface AlgorithmResearchSummary {
   }[]
 
   // Interval Efficiency
-  average_interval_accuracy: number   // How well predicted intervals matched actual retention
+  average_interval_accuracy: number // How well predicted intervals matched actual retention
   interval_distribution: {
-    '1-3_days': number
-    '4-7_days': number
-    '8-14_days': number
-    '15-30_days': number
-    '31-60_days': number
-    '60+_days': number
+    "1-3_days": number
+    "4-7_days": number
+    "8-14_days": number
+    "15-30_days": number
+    "31-60_days": number
+    "60+_days": number
   }
 
   // Algorithm-Specific Data
@@ -449,10 +462,10 @@ export interface AlgorithmComparisonAggregate {
 
   // Statistical Analysis
   comparison: {
-    retention_rate_difference: number      // FSRS - SM2 (positive = FSRS better)
+    retention_rate_difference: number // FSRS - SM2 (positive = FSRS better)
     average_score_difference: number
     time_to_mastery_difference_days: number
-    engagement_difference: number          // Average daily reviews difference
+    engagement_difference: number // Average daily reviews difference
     interval_efficiency_difference: number
 
     // Significance Testing
@@ -461,10 +474,10 @@ export interface AlgorithmComparisonAggregate {
     sufficient_sample_size: boolean
 
     // Winner determination
-    overall_winner: SpacedRepetitionAlgorithm | null  // null if no clear winner
-    confidence_level: number | null  // 0-100%, null if insufficient data
-    fsrs_wins_count: number  // Count of metrics where FSRS is better
-    sm2_wins_count: number   // Count of metrics where SM-2 is better
+    overall_winner: SpacedRepetitionAlgorithm | null // null if no clear winner
+    confidence_level: number | null // 0-100%, null if insufficient data
+    fsrs_wins_count: number // Count of metrics where FSRS is better
+    sm2_wins_count: number // Count of metrics where SM-2 is better
   }
 }
 
@@ -476,9 +489,9 @@ export interface AlgorithmCohortStats {
 
   // User Counts
   total_users: number
-  active_users_7d: number              // Active in last 7 days
+  active_users_7d: number // Active in last 7 days
   active_users_30d: number
-  users_with_overrides: number         // Excluded from research
+  users_with_overrides: number // Excluded from research
 
   // Aggregate Performance
   average_retention_rate: number
@@ -495,16 +508,16 @@ export interface AlgorithmCohortStats {
   average_streak_days: number
   average_daily_reviews: number
   average_session_length_minutes: number
-  churn_rate_7d: number                // % users inactive for 7+ days
+  churn_rate_7d: number // % users inactive for 7+ days
   churn_rate_30d: number
 
   // Performance Distribution
   score_distribution: {
-    '0-20': number
-    '21-40': number
-    '41-60': number
-    '61-80': number
-    '81-100': number
+    "0-20": number
+    "21-40": number
+    "41-60": number
+    "61-80": number
+    "81-100": number
   }
 
   // Lapse Analysis
@@ -513,7 +526,7 @@ export interface AlgorithmCohortStats {
 
   // Interval Analysis
   average_interval_days: number
-  interval_accuracy: number            // How well intervals predict actual retention
+  interval_accuracy: number // How well intervals predict actual retention
 
   // Trends (weekly for last 12 weeks)
   weekly_trends: {
@@ -542,9 +555,9 @@ export interface AlgorithmResearchEvent {
   difficulty: SpacedRepetitionDifficulty
 
   // Performance
-  score: number                        // Interview score (includes communication)
-  mastery_score: number                // Code-focused score (for SR algorithm)
-  quality_rating: number               // SM-2: 0-5, FSRS: 1-4
+  score: number // Interview score (includes communication)
+  mastery_score: number // Code-focused score (for SR algorithm)
+  quality_rating: number // SM-2: 0-5, FSRS: 1-4
   time_spent_minutes: number
   hints_used: number
 
@@ -553,26 +566,26 @@ export interface AlgorithmResearchEvent {
     interval_days: number
     days_since_last_review: number
     days_overdue: number
-    ease_factor?: number               // SM-2
-    stability?: number                 // FSRS
+    ease_factor?: number // SM-2
+    stability?: number // FSRS
     predicted_retention: number
   }
 
   // Post-review State
   post_review: {
     new_interval_days: number
-    new_ease_factor?: number           // SM-2
-    new_stability?: number             // FSRS
+    new_ease_factor?: number // SM-2
+    new_stability?: number // FSRS
     mastery_level: SpacedRepetitionMasteryLevel
     mastery_level_changed: boolean
   }
 
   // Retention Analysis
-  actual_retention: boolean            // Did user remember? (score >= 56)
-  retention_as_predicted: boolean      // Did prediction match reality?
+  actual_retention: boolean // Did user remember? (score >= 56)
+  retention_as_predicted: boolean // Did prediction match reality?
 
   // Context
-  session_number: number               // Which review in this session
+  session_number: number // Which review in this session
   is_early_review: boolean
   is_first_review: boolean
 }
