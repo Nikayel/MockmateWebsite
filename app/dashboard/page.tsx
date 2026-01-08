@@ -8,6 +8,7 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { useAuth } from "@/lib/auth-context"
 import { getUserProfile, checkUsageLimit } from "@/lib/firestore-helpers"
 import { Profile, InterviewSession } from "@/lib/types"
@@ -366,9 +367,17 @@ export default function DashboardPage() {
               <div className="mb-2 flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-zinc-500" />
                 <span className="text-xs text-zinc-500">Recent Avg</span>
-                <span title="Interview Score: Your overall performance including code quality (30%), problem solving (25%), understanding (25%), and communication (20%)">
-                  <HelpCircle className="h-3 w-3 cursor-help text-zinc-600" />
-                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-3 w-3 cursor-help text-zinc-600" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs bg-zinc-800 text-zinc-200">
+                    <p>
+                      Interview Score: Your overall performance including code quality (30%),
+                      problem solving (25%), understanding (25%), and communication (20%)
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
               {sessions.filter((s) => s.performance_score).length > 0 ? (
                 <>

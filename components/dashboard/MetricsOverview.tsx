@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { useAuth } from "@/lib/auth-context"
 import Link from "next/link"
 import {
@@ -221,33 +222,45 @@ export function MetricsOverview() {
             <span className="flex items-center gap-1 text-xs text-gray-400">
               <Target className="h-3 w-3" />
               {showOverallScore ? "Interview Score" : "Technical Score"}
-              <button
-                onClick={() => setShowOverallScore(!showOverallScore)}
-                className="ml-1 text-gray-500 transition-colors hover:text-[#00d9ff]"
-                title={
-                  showOverallScore
-                    ? "Interview Score: Includes communication (20%). Click to see Technical Score."
-                    : "Technical Score: Code quality + problem solving + understanding. Click to see Interview Score (includes communication)."
-                }
-              >
-                <HelpCircle className="h-3 w-3" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setShowOverallScore(!showOverallScore)}
+                    className="ml-1 text-gray-500 transition-colors hover:text-[#00d9ff]"
+                  >
+                    <HelpCircle className="h-3 w-3" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs bg-zinc-800 text-zinc-200">
+                  <p>
+                    {showOverallScore
+                      ? "Interview Score: Includes communication (20%). Click to see Technical Score."
+                      : "Technical Score: Code quality + problem solving + understanding. Click to see Interview Score (includes communication)."}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
             </span>
             <div className="flex items-center gap-2">
               <span className="font-mono text-sm text-white">
                 {showOverallScore ? metrics.averageScore : metrics.averageTechnicalScore}%
               </span>
-              <button
-                onClick={() => setShowOverallScore(!showOverallScore)}
-                className="text-gray-500 transition-colors hover:text-[#00d9ff]"
-                title="Toggle score type"
-              >
-                {showOverallScore ? (
-                  <ToggleRight className="h-4 w-4 text-[#00d9ff]" />
-                ) : (
-                  <ToggleLeft className="h-4 w-4" />
-                )}
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setShowOverallScore(!showOverallScore)}
+                    className="text-gray-500 transition-colors hover:text-[#00d9ff]"
+                  >
+                    {showOverallScore ? (
+                      <ToggleRight className="h-4 w-4 text-[#00d9ff]" />
+                    ) : (
+                      <ToggleLeft className="h-4 w-4" />
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="bg-zinc-800 text-zinc-200">
+                  <p>Toggle score type</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
           <Progress

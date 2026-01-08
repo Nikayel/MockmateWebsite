@@ -8,6 +8,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { type DueItem } from "@/components/practice"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Loader2, Lock, ArrowRight, HelpCircle } from "lucide-react"
 import Link from "next/link"
 
@@ -363,9 +364,17 @@ export default function PracticePage() {
                 <div className="text-2xl font-bold text-white">{stats.overall.average_score}%</div>
                 <div className="flex items-center justify-center gap-1 text-sm text-gray-500">
                   Review Avg
-                  <span title="Review Average: Your average score across spaced repetition reviews. This tracks how well you perform when revisiting problems over time.">
-                    <HelpCircle className="h-3 w-3 cursor-help text-gray-600" />
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-3 w-3 cursor-help text-gray-600" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs bg-zinc-800 text-zinc-200">
+                      <p>
+                        Review Average: Your average score across spaced repetition reviews. This
+                        tracks how well you perform when revisiting problems over time.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
               <div className="py-4 text-center">
