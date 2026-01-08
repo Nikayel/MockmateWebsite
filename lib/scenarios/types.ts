@@ -3,32 +3,47 @@
  * Separated for tree-shaking and module optimization
  */
 
-import { DSAPattern } from '../types/dsa-patterns'
+import { DSAPattern } from "../types/dsa-patterns"
 
-export type ScenarioType = 'dsa' | 'bugfix' | 'optimization' | 'security' | 'system-design' | 'add-functionality'
-export type DifficultyLevel = 'easy' | 'medium' | 'hard'
+export type ScenarioType =
+  | "dsa"
+  | "bugfix"
+  | "optimization"
+  | "security"
+  | "system-design"
+  | "add-functionality"
+export type DifficultyLevel = "easy" | "medium" | "hard"
 export type Company =
-  | 'Google'
-  | 'Meta'
-  | 'Amazon'
-  | 'Netflix'
-  | 'Apple'
-  | 'Microsoft'
-  | 'Startup'
-  | 'Generic'
-  | 'Airbnb'
-  | 'Shopify'
-  | 'Walmart'
-  | 'Stripe'
-  | 'Slack'
-  | 'Notion'
-  | 'Figma'
-  | 'Discord'
-  | 'LinkedIn'
-  | 'Bloomberg'
-  | 'Cloudflare'
-  | 'Algolia'
-  | 'Elasticsearch'
+  | "Google"
+  | "Meta"
+  | "Amazon"
+  | "Netflix"
+  | "Apple"
+  | "Microsoft"
+  | "Startup"
+  | "Generic"
+  | "Airbnb"
+  | "Shopify"
+  | "Walmart"
+  | "Stripe"
+  | "Slack"
+  | "Notion"
+  | "Figma"
+  | "Discord"
+  | "LinkedIn"
+  | "Bloomberg"
+  | "Cloudflare"
+  | "Algolia"
+  | "Elasticsearch"
+  | "Twitter"
+  | "Uber"
+  | "Lyft"
+  | "DoorDash"
+  | "Instacart"
+  | "eBay"
+  | "Alibaba"
+  | "Dropbox"
+  | "Box"
 
 export interface BaseScenario {
   id: string
@@ -42,7 +57,7 @@ export interface BaseScenario {
 }
 
 export interface DSAScenario extends BaseScenario {
-  type: 'dsa'
+  type: "dsa"
   pattern: DSAPattern
   problemStatement: string
   examples: {
@@ -67,7 +82,7 @@ export interface DSAScenario extends BaseScenario {
 }
 
 export interface BugFixScenario extends BaseScenario {
-  type: 'bugfix'
+  type: "bugfix"
   problemStatement: string
   buggyCode: {
     [language: string]: string
@@ -90,7 +105,7 @@ export interface BugFixScenario extends BaseScenario {
 }
 
 export interface SystemDesignScenario extends BaseScenario {
-  type: 'system-design'
+  type: "system-design"
   problemStatement: string
   functionalRequirements: string[]
   nonFunctionalRequirements: string[]
