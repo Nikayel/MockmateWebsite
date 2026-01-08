@@ -12,14 +12,22 @@
  * - Supports incremental updates
  */
 
-import { getHybridProvider } from '@/lib/rag/embeddings/hybrid-provider'
-import { vectorDB } from '@/lib/rag/vectordb'
-import type { VectorDocument } from '@/lib/rag/types'
-import type { DSAScenario, SystemDesignScenario, BugFixScenario, Scenario } from '@/lib/scenarios/types'
-import { getScenariosByType, getScenariosByPattern } from '@/lib/scenarios/index'
-import { ALL_COMPANIES, type CompanyQuestionData } from '@/lib/data/company-questions'
-import { getPatternKnowledge, patternKnowledgeToDocument } from '@/lib/rag/knowledge-base/dsa-knowledge'
-import type { DSAPattern } from '@/lib/types/dsa-patterns'
+import { getHybridProvider } from "@/lib/rag/embeddings/hybrid-provider"
+import { vectorDB } from "@/lib/rag/vectordb"
+import type { VectorDocument } from "@/lib/rag/types"
+import type {
+  DSAScenario,
+  SystemDesignScenario,
+  BugFixScenario,
+  Scenario,
+} from "@/lib/scenarios/types"
+import { getScenariosByType, getScenariosByPattern } from "@/lib/scenarios/index"
+import { ALL_COMPANIES, type CompanyQuestionData } from "@/lib/data/company-questions"
+import {
+  getPatternKnowledge,
+  patternKnowledgeToDocument,
+} from "@/lib/rag/knowledge-base/dsa-knowledge"
+import type { DSAPattern } from "@/lib/types/dsa-patterns"
 
 /**
  * Vectorization result
@@ -59,29 +67,30 @@ function scenarioToEmbeddingText(scenario: DSAScenario): string {
     `## Problem Type`,
     `Pattern: ${scenario.pattern}`,
     `Difficulty: ${scenario.difficulty}`,
-    `Companies: ${scenario.companies.join(', ')}`,
-    `Tags: ${scenario.tags.join(', ')}`,
+    `Companies: ${scenario.companies.join(", ")}`,
+    `Tags: ${scenario.tags.join(", ")}`,
     ``,
     `## Problem Statement`,
     scenario.problemStatement,
     ``,
     `## Constraints`,
-    scenario.constraints.join('\n'),
+    scenario.constraints.join("\n"),
     ``,
     `## Examples`,
-    ...scenario.examples.map((ex, i) =>
-      `Example ${i + 1}:\nInput: ${ex.input}\nOutput: ${ex.output}${ex.explanation ? `\nExplanation: ${ex.explanation}` : ''}`
+    ...scenario.examples.map(
+      (ex, i) =>
+        `Example ${i + 1}:\nInput: ${ex.input}\nOutput: ${ex.output}${ex.explanation ? `\nExplanation: ${ex.explanation}` : ""}`
     ),
     ``,
     `## Hints`,
-    scenario.hints.join('\n'),
+    scenario.hints.join("\n"),
     ``,
     `## Complexity`,
     `Time: ${scenario.optimalComplexity.time}`,
     `Space: ${scenario.optimalComplexity.space}`,
   ]
 
-  return parts.join('\n')
+  return parts.join("\n")
 }
 
 /**
@@ -95,31 +104,31 @@ function systemDesignToEmbeddingText(scenario: SystemDesignScenario): string {
     `## Overview`,
     `Type: System Design Interview`,
     `Difficulty: ${scenario.difficulty}`,
-    `Companies: ${scenario.companies.join(', ')}`,
+    `Companies: ${scenario.companies.join(", ")}`,
     `Estimated Time: ${scenario.estimatedTime} minutes`,
-    `Tags: ${scenario.tags.join(', ')}`,
+    `Tags: ${scenario.tags.join(", ")}`,
     ``,
     `## Problem Statement`,
     scenario.problemStatement,
     ``,
     `## Functional Requirements`,
-    ...scenario.functionalRequirements.map(req => `- ${req}`),
+    ...scenario.functionalRequirements.map((req) => `- ${req}`),
     ``,
     `## Non-Functional Requirements`,
-    ...scenario.nonFunctionalRequirements.map(req => `- ${req}`),
+    ...scenario.nonFunctionalRequirements.map((req) => `- ${req}`),
     ``,
     `## Constraints`,
-    ...scenario.constraints.map(c => `- ${c}`),
+    ...scenario.constraints.map((c) => `- ${c}`),
     ``,
     `## Key Components`,
-    ...scenario.keyComponents.map(comp => `- ${comp}`),
+    ...scenario.keyComponents.map((comp) => `- ${comp}`),
     ``,
     `## Hints for Candidates`,
-    ...scenario.hints.map(hint => `- ${hint}`),
+    ...scenario.hints.map((hint) => `- ${hint}`),
     ``,
     `## Evaluation Criteria`,
-    ...scenario.evaluationCriteria.map(ec =>
-      `- ${ec.category} (${ec.weight}%): ${ec.description}`
+    ...scenario.evaluationCriteria.map(
+      (ec) => `- ${ec.category} (${ec.weight}%): ${ec.description}`
     ),
     ``,
     `## Example Solution`,
@@ -127,25 +136,25 @@ function systemDesignToEmbeddingText(scenario: SystemDesignScenario): string {
     scenario.exampleSolution.overview,
     ``,
     `### Architecture`,
-    ...scenario.exampleSolution.architecture.map(a => `- ${a}`),
+    ...scenario.exampleSolution.architecture.map((a) => `- ${a}`),
     ``,
     `### Data Model`,
-    ...scenario.exampleSolution.dataModel.map(dm => `- ${dm}`),
+    ...scenario.exampleSolution.dataModel.map((dm) => `- ${dm}`),
     ``,
     `### API Design`,
-    ...scenario.exampleSolution.apiDesign.map(api => `- ${api}`),
+    ...scenario.exampleSolution.apiDesign.map((api) => `- ${api}`),
     ``,
     `### Scalability Considerations`,
-    ...scenario.exampleSolution.scalability.map(s => `- ${s}`),
+    ...scenario.exampleSolution.scalability.map((s) => `- ${s}`),
     ``,
     `### Trade-offs`,
-    ...scenario.exampleSolution.tradeoffs.map(t => `- ${t}`),
+    ...scenario.exampleSolution.tradeoffs.map((t) => `- ${t}`),
     ``,
     `## Discussion Points`,
-    ...scenario.discussionPoints.map(dp => `- ${dp}`),
+    ...scenario.discussionPoints.map((dp) => `- ${dp}`),
   ]
 
-  return parts.join('\n')
+  return parts.join("\n")
 }
 
 /**
@@ -155,8 +164,8 @@ function systemDesignToEmbeddingText(scenario: SystemDesignScenario): string {
 function bugFixToEmbeddingText(scenario: BugFixScenario): string {
   // Get a representative language for the buggy code snippet
   const languages = Object.keys(scenario.buggyCode)
-  const primaryLang = languages.includes('python') ? 'python' : languages[0]
-  const buggyCodeSnippet = scenario.buggyCode[primaryLang] || ''
+  const primaryLang = languages.includes("python") ? "python" : languages[0]
+  const buggyCodeSnippet = scenario.buggyCode[primaryLang] || ""
 
   const parts = [
     `# ${scenario.title}`,
@@ -164,9 +173,9 @@ function bugFixToEmbeddingText(scenario: BugFixScenario): string {
     `## Overview`,
     `Type: Bug Fix / Debugging`,
     `Difficulty: ${scenario.difficulty}`,
-    `Companies: ${scenario.companies.join(', ')}`,
+    `Companies: ${scenario.companies.join(", ")}`,
     `Estimated Time: ${scenario.estimatedTime} minutes`,
-    `Tags: ${scenario.tags.join(', ')}`,
+    `Tags: ${scenario.tags.join(", ")}`,
     ``,
     `## Problem Statement`,
     scenario.problemStatement,
@@ -178,20 +187,23 @@ function bugFixToEmbeddingText(scenario: BugFixScenario): string {
     scenario.expectedBehavior,
     ``,
     `## Buggy Code (${primaryLang})`,
-    '```' + primaryLang,
+    "```" + primaryLang,
     buggyCodeSnippet.substring(0, 1000), // Limit code length for embedding
-    '```',
+    "```",
     ``,
     `## Debugging Hints`,
-    ...scenario.hints.map(hint => `- ${hint}`),
+    ...scenario.hints.map((hint) => `- ${hint}`),
     ``,
     `## Test Cases`,
-    ...scenario.testCases.slice(0, 3).map((tc, i) =>
-      `${i + 1}. ${tc.description}: Input: ${JSON.stringify(tc.input).substring(0, 100)} → Expected: ${JSON.stringify(tc.expected).substring(0, 100)}`
-    ),
+    ...scenario.testCases
+      .slice(0, 3)
+      .map(
+        (tc, i) =>
+          `${i + 1}. ${tc.description}: Input: ${JSON.stringify(tc.input).substring(0, 100)} → Expected: ${JSON.stringify(tc.expected).substring(0, 100)}`
+      ),
   ]
 
-  return parts.join('\n')
+  return parts.join("\n")
 }
 
 /**
@@ -210,43 +222,46 @@ function companyToEmbeddingText(company: CompanyQuestionData): string {
     `Hard: ${company.difficultyDistribution.hard}%`,
     ``,
     `## Top Patterns Asked`,
-    ...company.topPatterns.map((p) =>
-      `- ${p.pattern}: ${p.frequency}% frequency, priority ${p.priority}/10, typically ${p.typicalDifficulty}`
+    ...company.topPatterns.map(
+      (p) =>
+        `- ${p.pattern}: ${p.frequency}% frequency, priority ${p.priority}/10, typically ${p.typicalDifficulty}`
     ),
     ``,
     `## Must-Know Questions`,
-    ...company.mustKnowQuestions.map((q) =>
-      `- ${q.title} (${q.frequency})${q.variants ? ` - Variants: ${q.variants.join(', ')}` : ''}`
+    ...company.mustKnowQuestions.map(
+      (q) =>
+        `- ${q.title} (${q.frequency})${q.variants ? ` - Variants: ${q.variants.join(", ")}` : ""}`
     ),
     ``,
     `## Interview Process`,
     `Total Rounds: ${company.interviewProcess.totalRounds}`,
     `Timeline: ${company.interviewProcess.timeline}`,
-    ...company.interviewProcess.rounds.map((r, i) =>
-      `Round ${i + 1}: ${r.type} (${r.duration} min) - ${r.description}\nFocus: ${r.focusAreas.join(', ')}`
+    ...company.interviewProcess.rounds.map(
+      (r, i) =>
+        `Round ${i + 1}: ${r.type} (${r.duration} min) - ${r.description}\nFocus: ${r.focusAreas.join(", ")}`
     ),
     ``,
     `## Interview Style`,
     `Pace: ${company.interviewStyle.pace}`,
     `Communication Emphasis: ${company.interviewStyle.communicationEmphasis}/10`,
     `Code Quality Emphasis: ${company.interviewStyle.codeQualityEmphasis}/10`,
-    `Optimal Solution Required: ${company.interviewStyle.optimalSolutionRequired ? 'Yes' : 'No'}`,
-    `Allows Pseudocode: ${company.interviewStyle.allowsPseudocode ? 'Yes' : 'No'}`,
-    `Provides Hints: ${company.interviewStyle.providesHints ? 'Yes' : 'No'}`,
-    `Unique Traits: ${company.interviewStyle.uniqueTraits.join(', ')}`,
+    `Optimal Solution Required: ${company.interviewStyle.optimalSolutionRequired ? "Yes" : "No"}`,
+    `Allows Pseudocode: ${company.interviewStyle.allowsPseudocode ? "Yes" : "No"}`,
+    `Provides Hints: ${company.interviewStyle.providesHints ? "Yes" : "No"}`,
+    `Unique Traits: ${company.interviewStyle.uniqueTraits.join(", ")}`,
     ``,
     `## Tips`,
     ...company.interviewProcess.tips.map((t) => `- ${t}`),
   ]
 
-  return parts.join('\n')
+  return parts.join("\n")
 }
 
 /**
  * Convert a must-know question to embedding text
  */
 function mustKnowQuestionToEmbeddingText(
-  question: CompanyQuestionData['mustKnowQuestions'][0],
+  question: CompanyQuestionData["mustKnowQuestions"][0],
   company: CompanyQuestionData
 ): string {
   return `
@@ -255,10 +270,10 @@ function mustKnowQuestionToEmbeddingText(
 ## Context
 Company: ${company.name}
 Frequency: ${question.frequency}
-${question.lastReported ? `Last Reported: ${question.lastReported}` : ''}
+${question.lastReported ? `Last Reported: ${question.lastReported}` : ""}
 
 ## Variants
-${question.variants ? question.variants.join('\n') : 'No known variants'}
+${question.variants ? question.variants.join("\n") : "No known variants"}
 
 ## Preparation Tips
 This is a ${question.frequency} question at ${company.name}. Focus on:
@@ -280,9 +295,9 @@ async function vectorizeDSAProblems(
 
   try {
     // Load all DSA scenarios
-    onProgress?.('Loading DSA scenarios', 0, 1, 'Loading...')
-    const scenarios = (await getScenariosByType('dsa')) as DSAScenario[]
-    onProgress?.('Loading DSA scenarios', 1, 1, `Loaded ${scenarios.length} scenarios`)
+    onProgress?.("Loading DSA scenarios", 0, 1, "Loading...")
+    const scenarios = (await getScenariosByType("dsa")) as DSAScenario[]
+    onProgress?.("Loading DSA scenarios", 1, 1, `Loaded ${scenarios.length} scenarios`)
 
     // Process in batches of 10
     const batchSize = 10
@@ -290,7 +305,7 @@ async function vectorizeDSAProblems(
 
     for (let i = 0; i < batches; i++) {
       const batch = scenarios.slice(i * batchSize, (i + 1) * batchSize)
-      onProgress?.('Vectorizing DSA problems', i + 1, batches, batch.map(s => s.title).join(', '))
+      onProgress?.("Vectorizing DSA problems", i + 1, batches, batch.map((s) => s.title).join(", "))
 
       const documents: VectorDocument[] = []
 
@@ -304,7 +319,7 @@ async function vectorizeDSAProblems(
             vector: embedding,
             text: text,
             metadata: {
-              type: 'problem',
+              type: "problem",
               problemId: scenario.id,
               title: scenario.title,
               pattern: scenario.pattern,
@@ -351,7 +366,7 @@ async function vectorizeCompanyQuestions(
 
   for (let i = 0; i < ALL_COMPANIES.length; i++) {
     const company = ALL_COMPANIES[i]
-    onProgress?.('Vectorizing company data', i + 1, ALL_COMPANIES.length, company.name)
+    onProgress?.("Vectorizing company data", i + 1, ALL_COMPANIES.length, company.name)
 
     try {
       // Vectorize company overview
@@ -364,7 +379,7 @@ async function vectorizeCompanyQuestions(
           vector: companyEmbedding,
           text: companyText,
           metadata: {
-            type: 'company',
+            type: "company",
             companyId: company.id,
             companyName: company.name,
             topPatterns: company.topPatterns.map((p) => p.pattern),
@@ -388,7 +403,7 @@ async function vectorizeCompanyQuestions(
               vector: questionEmbedding,
               text: questionText,
               metadata: {
-                type: 'company-question',
+                type: "company-question",
                 companyId: company.id,
                 companyName: company.name,
                 scenarioId: question.scenarioId,
@@ -401,7 +416,9 @@ async function vectorizeCompanyQuestions(
           ])
           vectorized++
         } catch (error) {
-          errors.push(`Failed to vectorize question ${question.title} for ${company.name}: ${error}`)
+          errors.push(
+            `Failed to vectorize question ${question.title} for ${company.name}: ${error}`
+          )
         }
       }
     } catch (error) {
@@ -426,13 +443,13 @@ async function vectorizeSystemDesignScenarios(
   let vectorized = 0
 
   try {
-    onProgress?.('Loading System Design scenarios', 0, 1, 'Loading...')
-    const scenarios = (await getScenariosByType('system-design')) as SystemDesignScenario[]
-    onProgress?.('Loading System Design scenarios', 1, 1, `Loaded ${scenarios.length} scenarios`)
+    onProgress?.("Loading System Design scenarios", 0, 1, "Loading...")
+    const scenarios = (await getScenariosByType("system-design")) as SystemDesignScenario[]
+    onProgress?.("Loading System Design scenarios", 1, 1, `Loaded ${scenarios.length} scenarios`)
 
     for (let i = 0; i < scenarios.length; i++) {
       const scenario = scenarios[i]
-      onProgress?.('Vectorizing System Design', i + 1, scenarios.length, scenario.title)
+      onProgress?.("Vectorizing System Design", i + 1, scenarios.length, scenario.title)
 
       try {
         const text = systemDesignToEmbeddingText(scenario)
@@ -444,7 +461,7 @@ async function vectorizeSystemDesignScenarios(
             vector: embedding,
             text: text,
             metadata: {
-              type: 'system-design',
+              type: "system-design",
               problemId: scenario.id,
               title: scenario.title,
               difficulty: scenario.difficulty,
@@ -483,9 +500,9 @@ async function vectorizeBugFixScenarios(
   let vectorized = 0
 
   try {
-    onProgress?.('Loading Bug Fix scenarios', 0, 1, 'Loading...')
-    const scenarios = (await getScenariosByType('bugfix')) as BugFixScenario[]
-    onProgress?.('Loading Bug Fix scenarios', 1, 1, `Loaded ${scenarios.length} scenarios`)
+    onProgress?.("Loading Bug Fix scenarios", 0, 1, "Loading...")
+    const scenarios = (await getScenariosByType("bugfix")) as BugFixScenario[]
+    onProgress?.("Loading Bug Fix scenarios", 1, 1, `Loaded ${scenarios.length} scenarios`)
 
     // Process in batches of 5
     const batchSize = 5
@@ -493,7 +510,7 @@ async function vectorizeBugFixScenarios(
 
     for (let i = 0; i < batches; i++) {
       const batch = scenarios.slice(i * batchSize, (i + 1) * batchSize)
-      onProgress?.('Vectorizing Bug Fix', i + 1, batches, batch.map(s => s.title).join(', '))
+      onProgress?.("Vectorizing Bug Fix", i + 1, batches, batch.map((s) => s.title).join(", "))
 
       const documents: VectorDocument[] = []
 
@@ -507,7 +524,7 @@ async function vectorizeBugFixScenarios(
             vector: embedding,
             text: text,
             metadata: {
-              type: 'bugfix',
+              type: "bugfix",
               problemId: scenario.id,
               title: scenario.title,
               difficulty: scenario.difficulty,
@@ -551,28 +568,28 @@ async function vectorizePatternKnowledge(
   let vectorized = 0
 
   const patterns: DSAPattern[] = [
-    'arrays-hashing',
-    'two-pointers',
-    'sliding-window',
-    'stack',
-    'binary-search',
-    'linked-list',
-    'trees',
-    'trie',
-    'heap',
-    'graphs',
-    'backtracking',
-    'greedy',
-    'intervals',
-    'dp-1d',
-    'dp-2d',
-    'bit-manipulation',
-    'math-geometry',
+    "arrays-hashing",
+    "two-pointers",
+    "sliding-window",
+    "stack",
+    "binary-search",
+    "linked-list",
+    "trees",
+    "trie",
+    "heap",
+    "graphs",
+    "backtracking",
+    "greedy",
+    "intervals",
+    "dp-1d",
+    "dp-2d",
+    "bit-manipulation",
+    "math-geometry",
   ]
 
   for (let i = 0; i < patterns.length; i++) {
     const pattern = patterns[i]
-    onProgress?.('Vectorizing pattern knowledge', i + 1, patterns.length, pattern)
+    onProgress?.("Vectorizing pattern knowledge", i + 1, patterns.length, pattern)
 
     const knowledge = getPatternKnowledge(pattern)
     if (!knowledge) continue
@@ -587,7 +604,7 @@ async function vectorizePatternKnowledge(
           vector: embedding,
           text: text,
           metadata: {
-            type: 'pattern-knowledge',
+            type: "pattern-knowledge",
             pattern: pattern,
             displayName: knowledge.displayName,
             relatedPatterns: knowledge.relatedPatterns,
@@ -621,16 +638,16 @@ export async function vectorizeAllProblems(
 
   // Count totals
   let totalProblems = 0
-  let totalCompanies = ALL_COMPANIES.length
-  let totalPatternKnowledge = 17 // Number of patterns
+  const totalCompanies = ALL_COMPANIES.length
+  const totalPatternKnowledge = 17 // Number of patterns
   let totalSystemDesign = 0
   let totalBugFix = 0
 
   try {
     const [dsaScenarios, systemDesignScenarios, bugFixScenarios] = await Promise.all([
-      getScenariosByType('dsa'),
-      getScenariosByType('system-design'),
-      getScenariosByType('bugfix'),
+      getScenariosByType("dsa"),
+      getScenariosByType("system-design"),
+      getScenariosByType("bugfix"),
     ])
     totalProblems = dsaScenarios.length
     totalSystemDesign = systemDesignScenarios.length
@@ -642,31 +659,31 @@ export async function vectorizeAllProblems(
   const totalSteps = 5
 
   // 1. Vectorize DSA problems
-  onProgress?.('Starting', 0, totalSteps, 'DSA Problems')
+  onProgress?.("Starting", 0, totalSteps, "DSA Problems")
   const dsaResult = await vectorizeDSAProblems(embeddingProvider, onProgress)
   allErrors.push(...dsaResult.errors)
 
   // 2. Vectorize System Design scenarios
-  onProgress?.('Starting', 1, totalSteps, 'System Design Scenarios')
+  onProgress?.("Starting", 1, totalSteps, "System Design Scenarios")
   const systemDesignResult = await vectorizeSystemDesignScenarios(embeddingProvider, onProgress)
   allErrors.push(...systemDesignResult.errors)
 
   // 3. Vectorize Bug Fix scenarios
-  onProgress?.('Starting', 2, totalSteps, 'Bug Fix Scenarios')
+  onProgress?.("Starting", 2, totalSteps, "Bug Fix Scenarios")
   const bugFixResult = await vectorizeBugFixScenarios(embeddingProvider, onProgress)
   allErrors.push(...bugFixResult.errors)
 
   // 4. Vectorize company data
-  onProgress?.('Starting', 3, totalSteps, 'Company Questions')
+  onProgress?.("Starting", 3, totalSteps, "Company Questions")
   const companyResult = await vectorizeCompanyQuestions(embeddingProvider, onProgress)
   allErrors.push(...companyResult.errors)
 
   // 5. Vectorize pattern knowledge
-  onProgress?.('Starting', 4, totalSteps, 'Pattern Knowledge')
+  onProgress?.("Starting", 4, totalSteps, "Pattern Knowledge")
   const patternResult = await vectorizePatternKnowledge(embeddingProvider, onProgress)
   allErrors.push(...patternResult.errors)
 
-  onProgress?.('Complete', totalSteps, totalSteps, 'Done!')
+  onProgress?.("Complete", totalSteps, totalSteps, "Done!")
 
   return {
     totalProblems,
@@ -698,7 +715,7 @@ export async function vectorizeSingleProblem(scenario: DSAScenario): Promise<voi
       vector: embedding,
       text: text,
       metadata: {
-        type: 'problem',
+        type: "problem",
         problemId: scenario.id,
         title: scenario.title,
         pattern: scenario.pattern,
@@ -730,22 +747,51 @@ export async function getVectorizationStatus(): Promise<{
   bugFixCount: number
 }> {
   try {
-    // Try to query for a known problem
+    // Use getStats if available (Pinecone) for accurate counts
+    if (vectorDB.getStats) {
+      const stats = await vectorDB.getStats()
+      const namespaces = stats.namespaces
+
+      // Namespace naming: mockmate_{type}
+      const problemCount = namespaces["mockmate_problem"] || 0
+      const companyCount =
+        (namespaces["mockmate_company"] || 0) + (namespaces["mockmate_company-question"] || 0)
+      const patternCount = namespaces["mockmate_pattern-knowledge"] || 0
+      const systemDesignCount = namespaces["mockmate_system-design"] || 0
+      const bugFixCount = namespaces["mockmate_bugfix"] || 0
+
+      return {
+        hasProblems: problemCount > 0,
+        hasCompanies: companyCount > 0,
+        hasPatternKnowledge: patternCount > 0,
+        hasSystemDesign: systemDesignCount > 0,
+        hasBugFix: bugFixCount > 0,
+        problemCount,
+        companyCount,
+        patternCount,
+        systemDesignCount,
+        bugFixCount,
+      }
+    }
+
+    // Fallback: use semantic search (less accurate, for Firestore)
     const embeddingProvider = getHybridProvider()
-    const testEmbedding = await embeddingProvider.generateEmbedding('Two Sum array hash map system design URL shortener bug fix')
+    const testEmbedding = await embeddingProvider.generateEmbedding(
+      "Two Sum array hash map system design URL shortener bug fix"
+    )
 
     const results = await vectorDB.query(testEmbedding, {
       topK: 200,
       includeMetadata: true,
     })
 
-    const problemCount = results.filter((r) => r.metadata?.type === 'problem').length
-    const companyCount = results.filter((r) =>
-      r.metadata?.type === 'company' || r.metadata?.type === 'company-question'
+    const problemCount = results.filter((r) => r.metadata?.type === "problem").length
+    const companyCount = results.filter(
+      (r) => r.metadata?.type === "company" || r.metadata?.type === "company-question"
     ).length
-    const patternCount = results.filter((r) => r.metadata?.type === 'pattern-knowledge').length
-    const systemDesignCount = results.filter((r) => r.metadata?.type === 'system-design').length
-    const bugFixCount = results.filter((r) => r.metadata?.type === 'bugfix').length
+    const patternCount = results.filter((r) => r.metadata?.type === "pattern-knowledge").length
+    const systemDesignCount = results.filter((r) => r.metadata?.type === "system-design").length
+    const bugFixCount = results.filter((r) => r.metadata?.type === "bugfix").length
 
     return {
       hasProblems: problemCount > 0,
