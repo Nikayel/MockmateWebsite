@@ -3,7 +3,19 @@
  */
 
 import { db } from "./firebase"
-import { doc, setDoc, getDoc, collection, query, where, getDocs, runTransaction, increment, limit, orderBy } from "firebase/firestore"
+import {
+  doc,
+  setDoc,
+  getDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  runTransaction,
+  increment,
+  limit,
+  orderBy,
+} from "firebase/firestore"
 import { Profile, ProfileQuota } from "./types"
 import { PRICING_CONFIG } from "./config"
 
@@ -40,9 +52,7 @@ export async function createOrUpdateProfile(
   // Only set subscription_tier to "free" for NEW profiles
   // For existing profiles, preserve their current subscription tier
   const isNewProfile = !existingProfile
-  const subscriptionTier = isNewProfile
-    ? "free"
-    : (existingProfile?.subscription_tier || "free")
+  const subscriptionTier = isNewProfile ? "free" : existingProfile?.subscription_tier || "free"
 
   // Build profile data, filtering out undefined values for Firestore
   // Firestore doesn't allow undefined values, so we only include defined fields
@@ -77,7 +87,8 @@ export async function createOrUpdateProfile(
       profileDataForFirestore.subscription_start_date = existingProfile.subscription_start_date
     }
     if (existingProfile.subscription_current_period_end !== undefined) {
-      profileDataForFirestore.subscription_current_period_end = existingProfile.subscription_current_period_end
+      profileDataForFirestore.subscription_current_period_end =
+        existingProfile.subscription_current_period_end
     }
     if (existingProfile.subscription_platform !== undefined) {
       profileDataForFirestore.subscription_platform = existingProfile.subscription_platform
@@ -149,7 +160,10 @@ export async function createOrUpdateProfile(
  * Get user profile from Firestore
  * If user has Stripe subscription info but tier is free, sync from Stripe
  */
-export async function getUserProfile(userId: string, syncStripe: boolean = true): Promise<Profile | null> {
+export async function getUserProfile(
+  userId: string,
+  syncStripe: boolean = true
+): Promise<Profile | null> {
   const profileRef = doc(db, "profiles", userId)
   const profileSnap = await getDoc(profileRef)
 
@@ -184,7 +198,10 @@ export async function getUserProfile(userId: string, syncStripe: boolean = true)
  * Calculate billing period based on anniversary date
  * Returns the current period start/end based on the signup date anniversary
  */
-function calculateAnniversaryPeriod(signupDate: Date, referenceDate: Date = new Date()): { periodStart: Date; periodEnd: Date } {
+function calculateAnniversaryPeriod(
+  signupDate: Date,
+  referenceDate: Date = new Date()
+): { periodStart: Date; periodEnd: Date } {
   const signupDay = signupDate.getDate()
   const now = referenceDate
 
@@ -228,7 +245,10 @@ export async function initializeUserQuota(
 
   // For Pro users with Stripe billing info, use Stripe's period
   if (subscriptionTier === "pro" && stripeCurrentPeriodEnd) {
-    const stripeEnd = typeof stripeCurrentPeriodEnd === 'string' ? new Date(stripeCurrentPeriodEnd) : stripeCurrentPeriodEnd
+    const stripeEnd =
+      typeof stripeCurrentPeriodEnd === "string"
+        ? new Date(stripeCurrentPeriodEnd)
+        : stripeCurrentPeriodEnd
     periodEnd = new Date(stripeEnd)
     periodEnd.setHours(23, 59, 59, 999)
     // Period start is one month before period end
@@ -238,7 +258,7 @@ export async function initializeUserQuota(
     periodStart.setHours(0, 0, 0, 0)
   } else if (signupDate) {
     // Use anniversary billing based on signup date
-    const signup = typeof signupDate === 'string' ? new Date(signupDate) : signupDate
+    const signup = typeof signupDate === "string" ? new Date(signupDate) : signupDate
     const period = calculateAnniversaryPeriod(signup, now)
     periodStart = period.periodStart
     periodEnd = period.periodEnd
@@ -261,17 +281,18 @@ export async function initializeUserQuota(
   // Filter by date range in memory to avoid composite index requirement
   if (!quotaSnap.empty) {
     const currentPeriodQuota = quotaSnap.docs
-      .map(doc => doc.data() as ProfileQuota)
-      .find(quota => {
+      .map((doc) => doc.data() as ProfileQuota)
+      .find((quota) => {
         const quotaStart = new Date(quota.period_start)
         return quotaStart >= periodStart && quotaStart <= periodEnd
       })
 
     if (currentPeriodQuota) {
       // Update quota limit if subscription tier changed
-      const sessionsLimit = subscriptionTier === "pro"
-        ? PRICING_CONFIG.pro.sessionsPerMonth
-        : PRICING_CONFIG.free.sessionsPerMonth
+      const sessionsLimit =
+        subscriptionTier === "pro"
+          ? PRICING_CONFIG.pro.sessionsPerMonth
+          : PRICING_CONFIG.free.sessionsPerMonth
 
       // Check if we need to update anything
       let needsUpdate = false
@@ -294,7 +315,7 @@ export async function initializeUserQuota(
       }
 
       if (needsUpdate) {
-        const quotaRef = quotaSnap.docs.find(doc => {
+        const quotaRef = quotaSnap.docs.find((doc) => {
           const quota = doc.data() as ProfileQuota
           const quotaStart = new Date(quota.period_start)
           return quotaStart >= periodStart && quotaStart <= periodEnd
@@ -311,9 +332,10 @@ export async function initializeUserQuota(
 
   // Create new quota for this period
   // This automatically resets usage when a new month starts
-  const sessionsLimit = subscriptionTier === "pro"
-    ? PRICING_CONFIG.pro.sessionsPerMonth
-    : PRICING_CONFIG.free.sessionsPerMonth
+  const sessionsLimit =
+    subscriptionTier === "pro"
+      ? PRICING_CONFIG.pro.sessionsPerMonth
+      : PRICING_CONFIG.free.sessionsPerMonth
 
   const quotaData: ProfileQuota = {
     id: "", // Will be auto-generated by Firestore
@@ -339,11 +361,11 @@ export async function initializeUserQuota(
  * Also returns period end for UI display
  */
 export async function checkUsageLimit(userId: string): Promise<{
-  allowed: boolean;
-  used: number;
-  limit: number;
-  freeOpensRemaining: number;
-  periodEnd: string;
+  allowed: boolean
+  used: number
+  limit: number
+  freeOpensRemaining: number
+  periodEnd: string
 }> {
   const profile = await getUserProfile(userId)
   const quota = await initializeUserQuota(
@@ -372,10 +394,10 @@ export async function checkUsageLimit(userId: string): Promise<{
  * - Pro users have higher limits but same free opens system
  */
 export async function checkSessionCost(userId: string): Promise<{
-  costsUsage: boolean;
-  freeOpensRemaining: number;
-  allowed: boolean;
-  reason: string;
+  costsUsage: boolean
+  freeOpensRemaining: number
+  allowed: boolean
+  reason: string
 }> {
   const profile = await getUserProfile(userId)
   const quota = await initializeUserQuota(
@@ -427,7 +449,7 @@ export async function createInterviewSession(
   scenarioType: string,
   difficulty: "easy" | "medium" | "hard",
   scenarioId?: string,
-  pattern?: string  // DSA pattern for stats aggregation (e.g., "arrays-hashing", "two-pointers")
+  pattern?: string // DSA pattern for stats aggregation (e.g., "arrays-hashing", "two-pointers")
 ): Promise<string> {
   const sessionRef = doc(collection(db, "interview_sessions"))
   const sessionData = {
@@ -461,6 +483,16 @@ export async function updateInterviewSession(
     timeComplexity?: string
     spaceComplexity?: string
     efficiencyScore?: number
+    scoreBreakdown?: {
+      understanding?: number
+      understandingScore?: number
+      problemSolving?: number
+      problemSolvingScore?: number
+      codeQuality?: number
+      codeQualityScore?: number
+      communication?: number
+      communicationScore?: number
+    }
   }
 ): Promise<void> {
   const sessionRef = doc(db, "interview_sessions", sessionId)
@@ -483,6 +515,27 @@ export async function updateInterviewSession(
     if (additionalData.timeComplexity) updateData.time_complexity = additionalData.timeComplexity
     if (additionalData.spaceComplexity) updateData.space_complexity = additionalData.spaceComplexity
     if (additionalData.efficiencyScore) updateData.efficiency_score = additionalData.efficiencyScore
+    // Save score breakdown for technical score calculations (required for pattern ranking)
+    if (additionalData.scoreBreakdown) {
+      updateData.score_breakdown = {
+        understandingScore:
+          additionalData.scoreBreakdown.understanding ||
+          additionalData.scoreBreakdown.understandingScore ||
+          0,
+        problemSolvingScore:
+          additionalData.scoreBreakdown.problemSolving ||
+          additionalData.scoreBreakdown.problemSolvingScore ||
+          0,
+        codeQualityScore:
+          additionalData.scoreBreakdown.codeQuality ||
+          additionalData.scoreBreakdown.codeQualityScore ||
+          0,
+        communicationScore:
+          additionalData.scoreBreakdown.communication ||
+          additionalData.scoreBreakdown.communicationScore ||
+          0,
+      }
+    }
   }
 
   await setDoc(sessionRef, updateData, { merge: true })
@@ -495,28 +548,32 @@ export async function updateInterviewSession(
 export async function saveSessionState(
   sessionId: string,
   state: {
-    code: string;
-    selectedLanguage: string;
-    elapsedTime: number;
-    chatMessages?: Array<{ type: string; message: string }>;
-    interviewerMessages?: Array<{ type: string; message: string }>;
-    testResults?: Array<any>;
+    code: string
+    selectedLanguage: string
+    elapsedTime: number
+    chatMessages?: Array<{ type: string; message: string }>
+    interviewerMessages?: Array<{ type: string; message: string }>
+    testResults?: Array<any>
   }
 ): Promise<void> {
   try {
     const sessionRef = doc(db, "interview_sessions", sessionId)
-    await setDoc(sessionRef, {
-      session_state: {
-        code: state.code,
-        language: state.selectedLanguage,
-        elapsed_time: state.elapsedTime,
-        chat_messages: state.chatMessages?.slice(-20), // Keep last 20 messages
-        interviewer_messages: state.interviewerMessages?.slice(-20),
-        test_results: state.testResults?.slice(-10),
-        saved_at: new Date().toISOString(),
+    await setDoc(
+      sessionRef,
+      {
+        session_state: {
+          code: state.code,
+          language: state.selectedLanguage,
+          elapsed_time: state.elapsedTime,
+          chat_messages: state.chatMessages?.slice(-20), // Keep last 20 messages
+          interviewer_messages: state.interviewerMessages?.slice(-20),
+          test_results: state.testResults?.slice(-10),
+          saved_at: new Date().toISOString(),
+        },
+        updated_at: new Date().toISOString(),
       },
-      updated_at: new Date().toISOString(),
-    }, { merge: true })
+      { merge: true }
+    )
   } catch {
     // Non-blocking - localStorage backup exists
   }
@@ -526,13 +583,13 @@ export async function saveSessionState(
  * Get session state for recovery
  */
 export async function getSessionState(sessionId: string): Promise<{
-  code?: string;
-  language?: string;
-  elapsedTime?: number;
-  chatMessages?: Array<{ type: string; message: string }>;
-  interviewerMessages?: Array<{ type: string; message: string }>;
-  testResults?: Array<any>;
-  savedAt?: string;
+  code?: string
+  language?: string
+  elapsedTime?: number
+  chatMessages?: Array<{ type: string; message: string }>
+  interviewerMessages?: Array<{ type: string; message: string }>
+  testResults?: Array<any>
+  savedAt?: string
 } | null> {
   try {
     const sessionRef = doc(db, "interview_sessions", sessionId)
@@ -565,9 +622,9 @@ export async function getSessionState(sessionId: string): Promise<{
  * - If no free opens, increment sessions_used and grant 10 free opens
  */
 export async function recordSessionStart(userId: string): Promise<{
-  success: boolean;
-  usedPaidSession: boolean;
-  freeOpensRemaining: number;
+  success: boolean
+  usedPaidSession: boolean
+  freeOpensRemaining: number
 }> {
   const profile = await getUserProfile(userId)
   const quota = await initializeUserQuota(
@@ -786,13 +843,17 @@ export async function migrateGuestSession(
     if (!session) return false
 
     const sessionRef = doc(db, "interview_sessions", sessionId)
-    await setDoc(sessionRef, {
-      user_id: newUserId, // Transfer ownership
-      is_guest: false, // No longer a guest session
-      migrated_from_guest: guestId, // Keep track of original guest ID
-      migrated_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }, { merge: true })
+    await setDoc(
+      sessionRef,
+      {
+        user_id: newUserId, // Transfer ownership
+        is_guest: false, // No longer a guest session
+        migrated_from_guest: guestId, // Keep track of original guest ID
+        migrated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      { merge: true }
+    )
 
     return true
   } catch {
@@ -804,7 +865,9 @@ export async function migrateGuestSession(
  * Find all guest sessions for a guest ID
  * Used during migration to find all sessions to transfer
  */
-export async function findGuestSessions(guestId: string): Promise<Array<{ id: string; data: any }>> {
+export async function findGuestSessions(
+  guestId: string
+): Promise<Array<{ id: string; data: any }>> {
   try {
     const sessionsQuery = query(
       collection(db, "interview_sessions"),
@@ -873,20 +936,23 @@ export async function saveGuestSessionState(
     if (!session) return
 
     const sessionRef = doc(db, "interview_sessions", sessionId)
-    await setDoc(sessionRef, {
-      session_state: {
-        code: state.code,
-        language: state.selectedLanguage,
-        elapsed_time: state.elapsedTime,
-        chat_messages: state.chatMessages?.slice(-20),
-        interviewer_messages: state.interviewerMessages?.slice(-20),
-        test_results: state.testResults?.slice(-10),
-        saved_at: new Date().toISOString(),
+    await setDoc(
+      sessionRef,
+      {
+        session_state: {
+          code: state.code,
+          language: state.selectedLanguage,
+          elapsed_time: state.elapsedTime,
+          chat_messages: state.chatMessages?.slice(-20),
+          interviewer_messages: state.interviewerMessages?.slice(-20),
+          test_results: state.testResults?.slice(-10),
+          saved_at: new Date().toISOString(),
+        },
+        updated_at: new Date().toISOString(),
       },
-      updated_at: new Date().toISOString(),
-    }, { merge: true })
+      { merge: true }
+    )
   } catch {
     // Non-blocking - localStorage backup exists
   }
 }
-

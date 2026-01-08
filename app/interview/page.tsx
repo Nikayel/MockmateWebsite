@@ -1494,6 +1494,13 @@ Ask ONE focused question based on these observations.`)
       let comprehensiveFeedback = `Completed ${selectedScenario?.title} with ${summary.passed}/${summary.total} tests passing`
       // Convert pass rate (0-100) to 0-100 score scale
       let calculatedPerformanceScore = summary.passRate
+      // Store score breakdown for technical score calculations
+      let scoreBreakdownData: {
+        understanding?: number
+        problemSolving?: number
+        codeQuality?: number
+        communication?: number
+      } | null = null
 
       // Calculate efficiency metrics for feedback
       const efficiencyData = analyzeCodeEfficiency(code)
@@ -1546,6 +1553,10 @@ Ask ONE focused question based on these observations.`)
             const feedbackData = await feedbackResponse.json()
             comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
             calculatedPerformanceScore = feedbackData.performanceScore || calculatedPerformanceScore
+            // Store score breakdown for metrics (pattern ranking)
+            if (feedbackData.scores) {
+              scoreBreakdownData = feedbackData.scores
+            }
             // Store Constitutional AI critique if present
             if (feedbackData.constitutionalAICritique) {
               setConstitutionalAICritique(feedbackData.constitutionalAICritique)
@@ -1629,6 +1640,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             timeComplexity: efficiencyData?.estimatedTimeComplexity,
             spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
             efficiencyScore: efficiencyData?.efficiencyScore,
+            scoreBreakdown: scoreBreakdownData || undefined,
           })
 
           // Track session completion for user stats (async, non-blocking)
@@ -2723,10 +2735,20 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         }),
       })
 
+      let systemDesignScoreBreakdown: {
+        understanding?: number
+        problemSolving?: number
+        codeQuality?: number
+        communication?: number
+      } | null = null
       if (feedbackResponse.ok) {
         const feedbackData = await feedbackResponse.json()
         comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
         calculatedPerformanceScore = feedbackData.scores?.overall || 0
+        // Store score breakdown for technical score calculations
+        if (feedbackData.scores) {
+          systemDesignScoreBreakdown = feedbackData.scores
+        }
       }
 
       setComprehensiveFeedback(comprehensiveFeedback)
@@ -2743,6 +2765,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               code: code || "// Design notes",
               language: "notes",
               testResults: [],
+              scoreBreakdown: systemDesignScoreBreakdown || undefined,
             }
           )
 
