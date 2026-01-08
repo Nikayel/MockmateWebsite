@@ -20,6 +20,14 @@ import {
   TrendingUp,
   Play,
   Loader2,
+  AlertTriangle,
+  Sparkles,
+  Bug,
+  Server,
+  Bell,
+  Users,
+  FileCode,
+  RotateCcw,
 } from "lucide-react"
 import { logger } from "@/lib/logger"
 
@@ -29,6 +37,24 @@ interface ComponentHealth {
   message: string
   responseTimeMs?: number
   details?: Record<string, unknown>
+}
+
+interface CategoryMetadata {
+  category: string
+  documentCount: number
+  version: string
+  lastSeededAt: string | null
+  sourceCount: number
+  needsSync: boolean
+}
+
+interface KnowledgeBaseStatus {
+  seeded: boolean
+  totalDocuments: number
+  lastSeededAt: string | null
+  version: string
+  categories: CategoryMetadata[]
+  needsSync: boolean
 }
 
 interface RAGHealthData {
@@ -67,6 +93,7 @@ interface RAGHealthData {
     avgLatencyMs: number
     cacheHitRate: number
   }
+  knowledgeBaseStatus?: KnowledgeBaseStatus
 }
 
 interface EvalResult {
@@ -98,6 +125,8 @@ export default function RAGHealthPage() {
   const [loading, setLoading] = useState(true)
   const [runningEval, setRunningEval] = useState(false)
   const [seeding, setSeeding] = useState(false)
+  const [seedingCategories, setSeedingCategories] = useState<string[]>([])
+  const [autoRefresh, setAutoRefresh] = useState(false)
 
   const loadHealth = useCallback(async () => {
     if (!firebaseUser) return
@@ -144,10 +173,13 @@ export default function RAGHealthPage() {
     }
   }
 
-  const seedKnowledgeBase = async () => {
+  const seedKnowledgeBase = async (categories?: string[], force?: boolean) => {
     if (!firebaseUser) return
 
     setSeeding(true)
+    if (categories) {
+      setSeedingCategories(categories)
+    }
     try {
       const token = await firebaseUser.getIdToken()
       const response = await fetch("/api/admin/rag-health", {
@@ -156,7 +188,11 @@ export default function RAGHealthPage() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ action: "seed-knowledge-base", force: false }),
+        body: JSON.stringify({
+          action: "seed-knowledge-base",
+          force: force || false,
+          categories: categories,
+        }),
       })
 
       if (response.ok) {
@@ -167,12 +203,36 @@ export default function RAGHealthPage() {
       logger.error("Error seeding knowledge base", { error })
     } finally {
       setSeeding(false)
+      setSeedingCategories([])
+    }
+  }
+
+  const seedCategory = async (category: string) => {
+    await seedKnowledgeBase([category], true)
+  }
+
+  const seedAllOutOfSync = async () => {
+    if (!healthData?.knowledgeBaseStatus) return
+    const outOfSync = healthData.knowledgeBaseStatus.categories
+      .filter((c) => c.needsSync)
+      .map((c) => c.category)
+    if (outOfSync.length > 0) {
+      await seedKnowledgeBase(outOfSync, true)
     }
   }
 
   useEffect(() => {
     loadHealth()
   }, [loadHealth])
+
+  // Auto-refresh every 30 seconds when enabled
+  useEffect(() => {
+    if (!autoRefresh) return
+    const interval = setInterval(() => {
+      loadHealth()
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [autoRefresh, loadHealth])
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -217,6 +277,15 @@ export default function RAGHealthPage() {
           <p className="mt-1 text-gray-400">Monitor retrieval quality and system health</p>
         </div>
         <div className="flex items-center gap-3">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-400">
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-700 bg-gray-800"
+            />
+            Auto-refresh
+          </label>
           <Button
             onClick={runQuickEval}
             disabled={runningEval}
@@ -230,12 +299,12 @@ export default function RAGHealthPage() {
             Run Quick Eval
           </Button>
           <Button
-            onClick={loadHealth}
+            onClick={() => loadHealth()}
             variant="outline"
             size="sm"
             className="border-gray-700 text-gray-400 hover:text-white"
           >
-            <RefreshCw className="mr-2 h-4 w-4" />
+            <RefreshCw className={`mr-2 h-4 w-4 ${autoRefresh ? "animate-spin" : ""}`} />
             Refresh
           </Button>
         </div>
@@ -332,57 +401,168 @@ export default function RAGHealthPage() {
             </CardContent>
           </Card>
 
-          {/* Knowledge Base Status */}
+          {/* Knowledge Base Status - Enhanced */}
           <Card className="border-gray-800 bg-gray-900/50">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-white">
-                <BookOpen className="h-5 w-5 text-[#00d9ff]" />
-                Knowledge Base
-              </CardTitle>
-              <CardDescription className="text-gray-400">
-                Static knowledge for DSA patterns, company info, and interview tips
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
               <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      className={
-                        healthData.config.knowledgeBaseSeeded
-                          ? "border-green-600/30 bg-green-600/20 text-green-400"
-                          : "border-yellow-600/30 bg-yellow-600/20 text-yellow-400"
-                      }
-                    >
-                      {healthData.config.knowledgeBaseSeeded ? "Seeded" : "Not Seeded"}
-                    </Badge>
-                    <span className="text-gray-400">
-                      {healthData.metrics.knowledgeBase.totalDocuments} documents
-                    </span>
-                  </div>
-                  {healthData.metrics.knowledgeBase.lastSeeded && (
-                    <p className="text-sm text-gray-500">
-                      Last seeded:{" "}
-                      {new Date(healthData.metrics.knowledgeBase.lastSeeded).toLocaleDateString()}
-                    </p>
-                  )}
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-white">
+                    <BookOpen className="h-5 w-5 text-[#00d9ff]" />
+                    Knowledge Base
+                    {healthData.knowledgeBaseStatus?.needsSync && (
+                      <Badge className="ml-2 border-yellow-600/30 bg-yellow-600/20 text-yellow-400">
+                        <AlertTriangle className="mr-1 h-3 w-3" />
+                        Sync Required
+                      </Badge>
+                    )}
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
+                    {healthData.knowledgeBaseStatus?.totalDocuments || 0} documents across{" "}
+                    {healthData.knowledgeBaseStatus?.categories.length || 0} categories
+                  </CardDescription>
                 </div>
-                {!healthData.config.knowledgeBaseSeeded && (
+                <div className="flex items-center gap-2">
+                  {healthData.knowledgeBaseStatus?.needsSync && (
+                    <Button
+                      onClick={seedAllOutOfSync}
+                      disabled={seeding}
+                      className="bg-yellow-600 text-white hover:bg-yellow-700"
+                      size="sm"
+                    >
+                      {seeding ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <RotateCcw className="mr-2 h-4 w-4" />
+                      )}
+                      Sync All
+                    </Button>
+                  )}
                   <Button
-                    onClick={seedKnowledgeBase}
+                    onClick={() => seedKnowledgeBase(undefined, true)}
                     disabled={seeding}
                     variant="outline"
+                    size="sm"
                     className="border-[#00d9ff]/30 text-[#00d9ff] hover:bg-[#00d9ff]/10"
                   >
-                    {seeding ? (
+                    {seeding && seedingCategories.length === 0 ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
                       <Database className="mr-2 h-4 w-4" />
                     )}
-                    Seed Knowledge Base
+                    Reseed All
                   </Button>
-                )}
+                </div>
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {healthData.knowledgeBaseStatus?.categories.map((category) => {
+                  const getCategoryIcon = (cat: string) => {
+                    switch (cat) {
+                      case "dsa-patterns":
+                        return <FileCode className="h-4 w-4" />
+                      case "company-knowledge":
+                        return <Users className="h-4 w-4" />
+                      case "interview-tips":
+                        return <Sparkles className="h-4 w-4" />
+                      case "notification-knowledge":
+                        return <Bell className="h-4 w-4" />
+                      case "debugging-knowledge":
+                        return <Bug className="h-4 w-4" />
+                      case "system-design-knowledge":
+                        return <Server className="h-4 w-4" />
+                      default:
+                        return <Database className="h-4 w-4" />
+                    }
+                  }
+
+                  const formatCategoryName = (cat: string) => {
+                    return cat
+                      .split("-")
+                      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                      .join(" ")
+                  }
+
+                  const isSeeding = seedingCategories.includes(category.category)
+
+                  return (
+                    <div
+                      key={category.category}
+                      className={`rounded-lg border p-4 ${
+                        category.needsSync
+                          ? "border-yellow-600/30 bg-yellow-900/10"
+                          : "border-gray-700 bg-gray-800/30"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={category.needsSync ? "text-yellow-400" : "text-[#00d9ff]"}
+                          >
+                            {getCategoryIcon(category.category)}
+                          </div>
+                          <span className="text-sm font-medium text-white">
+                            {formatCategoryName(category.category)}
+                          </span>
+                        </div>
+                        {category.needsSync && (
+                          <Button
+                            onClick={() => seedCategory(category.category)}
+                            disabled={seeding}
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-yellow-400 hover:bg-yellow-900/30 hover:text-yellow-300"
+                          >
+                            {isSeeding ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <RotateCcw className="h-3 w-3" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-500">Vectorized</span>
+                          <span className="text-gray-300">{category.documentCount}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-500">Source</span>
+                          <span
+                            className={category.needsSync ? "text-yellow-400" : "text-gray-300"}
+                          >
+                            {category.sourceCount}
+                            {category.needsSync &&
+                              category.sourceCount > category.documentCount && (
+                                <span className="ml-1 text-yellow-400">
+                                  (+{category.sourceCount - category.documentCount} new)
+                                </span>
+                              )}
+                          </span>
+                        </div>
+                        {category.lastSeededAt && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-500">Last sync</span>
+                            <span className="text-gray-400">
+                              {new Date(category.lastSeededAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        )}
+                        {!category.lastSeededAt && (
+                          <div className="text-xs text-yellow-400">Never vectorized</div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              {healthData.knowledgeBaseStatus?.lastSeededAt && (
+                <p className="mt-4 text-center text-xs text-gray-500">
+                  Last full sync:{" "}
+                  {new Date(healthData.knowledgeBaseStatus.lastSeededAt).toLocaleString()} •
+                  Version: {healthData.knowledgeBaseStatus.version}
+                </p>
+              )}
             </CardContent>
           </Card>
 
