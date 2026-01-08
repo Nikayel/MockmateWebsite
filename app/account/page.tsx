@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/auth-context"
 import { signOut } from "@/lib/auth"
 import { getUserProfile } from "@/lib/firestore-helpers"
 import { db } from "@/lib/firebase"
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore"
 import {
   User,
   Crown,
@@ -339,19 +339,15 @@ export default function AccountPage() {
     setIsSavingPrefs(true)
 
     try {
-      const idToken = await firebaseUser.getIdToken()
-      const response = await fetch("/api/user/notification-preferences", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ preferences: newPrefs }),
+      // Write directly to Firestore - no admin API needed
+      const profileRef = doc(db, "profiles", firebaseUser.uid)
+      await updateDoc(profileRef, {
+        notification_preferences: newPrefs,
+        updated_at: new Date().toISOString(),
       })
-
-      if (!response.ok) throw new Error()
       toast.success("Preferences updated")
-    } catch {
+    } catch (err) {
+      console.error("Failed to update preferences:", err)
       setNotificationPrefs(notificationPrefs)
       toast.error("Update failed")
     } finally {
