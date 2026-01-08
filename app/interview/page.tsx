@@ -72,6 +72,7 @@ import {
 } from "@/lib/guest-session"
 import { SignupPrompt } from "@/components/SignupPrompt"
 import { useRoadmapStore } from "@/lib/stores/roadmap-store"
+import { useInterviewStore } from "@/lib/stores"
 import {
   scenarios,
   filterScenarios,
@@ -197,6 +198,9 @@ function InterviewPageContent() {
   const searchParams = useSearchParams()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const { markQuestionCompleted, addActualTime, activeRoadmap } = useRoadmapStore()
+  // Use store for loading states so InterviewerChat component can see them
+  const { isLoadingChat, isLoadingInterviewer, setIsLoadingChat, setIsLoadingInterviewer } =
+    useInterviewStore()
   const [isLoading, setIsLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
   const [showScenarioBrowser, setShowScenarioBrowser] = useState(true)
@@ -228,8 +232,7 @@ function InterviewPageContent() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState("")
   const [interviewerInput, setInterviewerInput] = useState("")
-  const [isLoadingChat, setIsLoadingChat] = useState(false)
-  const [isLoadingInterviewer, setIsLoadingInterviewer] = useState(false)
+  // Note: isLoadingChat and isLoadingInterviewer are from useInterviewStore above
 
   // Track pending auto-send to avoid duplicate sends
   const pendingAutoSendRef = useRef<{ interviewer: boolean; partner: boolean }>({
