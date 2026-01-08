@@ -13,6 +13,7 @@ import {
   seedKnowledgeBase,
   type KnowledgeCategory,
 } from "@/lib/rag/knowledge-base/seeder"
+import { vectorizeAllProblems, getVectorizationStatus } from "@/lib/rag/problem-vectorization"
 import { getHybridProvider } from "@/lib/rag/embeddings/hybrid-provider"
 import { getVectorDBProvider, isPineconeEnabled } from "@/lib/rag/vectordb"
 import { advancedRetrieve } from "@/lib/rag"
@@ -40,11 +41,12 @@ export async function GET(request: NextRequest) {
     switch (action) {
       case "health": {
         // Get system health with detailed knowledge base status
-        const [health, metrics, kbSeeded, kbStatus] = await Promise.all([
+        const [health, metrics, kbSeeded, kbStatus, scenarioStatus] = await Promise.all([
           checkRAGHealth(),
           getRAGMetrics(24),
           isKnowledgeBaseSeeded(),
           getKnowledgeBaseStatus(),
+          getVectorizationStatus(),
         ])
 
         const provider = getHybridProvider()
@@ -64,6 +66,7 @@ export async function GET(request: NextRequest) {
             },
             providerMetrics,
             knowledgeBaseStatus: kbStatus,
+            scenarioStatus,
           },
         })
       }
@@ -171,6 +174,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           data: { status },
+        })
+      }
+
+      case "vectorize-scenarios": {
+        // Vectorize all scenarios (DSA, System Design, BugFix)
+        const result = await vectorizeAllProblems()
+        return NextResponse.json({
+          success: true,
+          data: { result },
         })
       }
 
