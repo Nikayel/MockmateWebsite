@@ -20,10 +20,9 @@ import {
   Calendar,
   Terminal,
   Clock,
-  ArrowRight,
   ChevronRight,
   Zap,
-  Target,
+  RefreshCw,
   TrendingUp,
   HelpCircle,
 } from "lucide-react"
@@ -69,6 +68,11 @@ export default function DashboardPage() {
   } | null>(null)
   const [sessions, setSessions] = useState<InterviewSession[]>([])
   const [completedSessions, setCompletedSessions] = useState<InterviewSession[]>([])
+  const [reviewStats, setReviewStats] = useState<{
+    overdueCount: number
+    totalDue: number
+    daysUntilNext: number | null
+  }>({ overdueCount: 0, totalDue: 0, daysUntilNext: null })
   const [dataLoading, setDataLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
@@ -92,7 +96,7 @@ export default function DashboardPage() {
       }
 
       try {
-        const [userProfile, usageData, sessionsSnap] = await Promise.all([
+        const [userProfile, usageData, sessionsSnap, dueData] = await Promise.all([
           getUserProfile(firebaseUser.uid),
           checkUsageLimit(firebaseUser.uid),
           (async () => {
@@ -106,10 +110,46 @@ export default function DashboardPage() {
               return null
             }
           })(),
+          (async () => {
+            try {
+              const token = await firebaseUser.getIdToken()
+              const response = await fetch("/api/spaced-repetition/due?limit=10", {
+                headers: { Authorization: `Bearer ${token}` },
+              })
+              if (response.ok) {
+                return await response.json()
+              }
+              return null
+            } catch {
+              return null
+            }
+          })(),
         ])
 
         setProfile(userProfile)
         setUsage(usageData)
+
+        if (dueData) {
+          // Find the soonest upcoming review if nothing is due
+          let daysUntilNext: number | null = null
+          if (
+            dueData.stats?.overdue_count === 0 &&
+            dueData.stats?.total_due === 0 &&
+            dueData.upcoming?.length > 0
+          ) {
+            // Find the minimum days_until_review from upcoming
+            daysUntilNext = Math.min(
+              ...dueData.upcoming.map(
+                (item: { days_until_review: number }) => item.days_until_review
+              )
+            )
+          }
+          setReviewStats({
+            overdueCount: dueData.stats?.overdue_count || 0,
+            totalDue: dueData.stats?.total_due || 0,
+            daysUntilNext,
+          })
+        }
 
         if (userProfile && !userProfile.onboarding_completed) {
           setShowOnboarding(true)
@@ -358,17 +398,47 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Total Sessions */}
-            <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/50 p-4">
+            {/* Due for Review */}
+            <Link
+              href="/practice"
+              className="rounded-xl border border-zinc-800/50 bg-zinc-900/50 p-4 transition-colors hover:border-zinc-700 hover:bg-zinc-800/50"
+            >
               <div className="mb-2 flex items-center gap-2">
-                <Target className="h-4 w-4 text-zinc-500" />
-                <span className="text-xs text-zinc-500">Total Sessions</span>
+                <RefreshCw className="h-4 w-4 text-zinc-500" />
+                <span className="text-xs text-zinc-500">
+                  {reviewStats.overdueCount > 0 ? "Overdue" : "Next Review"}
+                </span>
               </div>
-              <span className="text-2xl font-light text-white sm:text-3xl">
-                {sessions.length > 0 ? sessions.length : "0"}
-              </span>
-              <p className="mt-1.5 text-[10px] text-zinc-600">All time</p>
-            </div>
+              {reviewStats.overdueCount > 0 ? (
+                <>
+                  <span className="text-2xl font-light text-red-400 sm:text-3xl">
+                    {reviewStats.overdueCount}
+                  </span>
+                  <p className="mt-1.5 text-[10px] text-zinc-600">
+                    {reviewStats.overdueCount === 1 ? "Problem overdue" : "Problems overdue"}
+                  </p>
+                </>
+              ) : reviewStats.totalDue > 0 ? (
+                <>
+                  <span className="text-2xl font-light text-amber-400 sm:text-3xl">
+                    {reviewStats.totalDue}
+                  </span>
+                  <p className="mt-1.5 text-[10px] text-zinc-600">Due today</p>
+                </>
+              ) : reviewStats.daysUntilNext !== null ? (
+                <>
+                  <span className="text-2xl font-light text-white sm:text-3xl">
+                    {reviewStats.daysUntilNext}d
+                  </span>
+                  <p className="mt-1.5 text-[10px] text-zinc-600">Until next review</p>
+                </>
+              ) : (
+                <>
+                  <span className="text-2xl font-light text-emerald-400 sm:text-3xl">—</span>
+                  <p className="mt-1.5 text-[10px] text-zinc-600">No reviews scheduled</p>
+                </>
+              )}
+            </Link>
 
             {/* Recent Avg Score */}
             <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/50 p-4">

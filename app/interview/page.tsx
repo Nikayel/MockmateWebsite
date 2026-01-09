@@ -580,6 +580,7 @@ function InterviewPageContent() {
       const sessionId = searchParams?.get("session")
       const scenarioId = searchParams?.get("scenario")
       const fromRoadmap = searchParams?.get("roadmap") === "true"
+      const fromPractice = searchParams?.get("practice") === "true"
 
       // Case 1: Reopening an existing session
       if (sessionId && scenarioId) {
@@ -754,8 +755,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           toast.error("Scenario not found")
         }
       }
-      // Case 2: Starting fresh from roadmap (scenario only, no session)
-      else if (scenarioId && !sessionId && fromRoadmap) {
+      // Case 2: Starting fresh from roadmap or practice (scenario only, no session)
+      else if (scenarioId && !sessionId && (fromRoadmap || fromPractice)) {
         const scenario = getScenarioById(scenarioId)
         if (scenario) {
           // Check if there's already a submitted session for this scenario
