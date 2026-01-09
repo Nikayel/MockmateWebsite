@@ -1,7 +1,7 @@
 "use client"
 
 import { memo, useState } from "react"
-import { Cpu, Bug, Wrench, Zap, Shield, Check, X, ChevronDown, Building2 } from "lucide-react"
+import { Cpu, Bug, Wrench, Zap, Shield, Check, X, ChevronDown, Building2, Layers } from "lucide-react"
 import { scenarios, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
 import { ScenarioSearchBar } from "./ScenarioSearchBar"
 
@@ -86,6 +86,17 @@ const EXERCISE_TYPES = [
     borderColor: 'border-red-500',
     lightBg: 'bg-red-500/10',
     lightText: 'text-red-400'
+  },
+  {
+    id: 'system-design',
+    label: 'System Design',
+    description: 'Architecture & scalability',
+    icon: Layers,
+    color: 'bg-indigo-500',
+    textColor: 'text-white',
+    borderColor: 'border-indigo-500',
+    lightBg: 'bg-indigo-500/10',
+    lightText: 'text-indigo-400'
   },
 ] as const
 

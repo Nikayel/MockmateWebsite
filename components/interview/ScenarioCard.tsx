@@ -2,7 +2,7 @@
 
 import { memo } from "react"
 import Link from "next/link"
-import { Play, Check, Clock, Cpu, Bug, Wrench, Zap, Shield } from "lucide-react"
+import { Play, Check, Clock, Cpu, Bug, Wrench, Zap, Shield, Layers } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Scenario, ScenarioType, DifficultyLevel } from "@/lib/scenarios"
 import type { UsageLimit } from "@/lib/stores"
@@ -52,6 +52,13 @@ const EXERCISE_TYPES = [
     icon: Shield,
     lightBg: 'bg-red-500/10',
     lightText: 'text-red-400'
+  },
+  {
+    id: 'system-design',
+    label: 'System Design',
+    icon: Layers,
+    lightBg: 'bg-indigo-500/10',
+    lightText: 'text-indigo-400'
   },
 ] as const
 

@@ -1,0 +1,8 @@
+<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <!-- Figma logo - colorful circles -->
+  <circle cx="16" cy="12" r="6" fill="#F24E1E"/>
+  <circle cx="32" cy="12" r="6" fill="#FF7262"/>
+  <circle cx="16" cy="24" r="6" fill="#A259FF"/>
+  <circle cx="32" cy="24" r="6" fill="#1ABCFE"/>
+  <circle cx="16" cy="36" r="6" fill="#0ACF83"/>
+</svg>

@@ -1,0 +1,5 @@
+<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <!-- DoorDash - Red rounded square with D -->
+  <rect x="8" y="8" width="32" height="32" rx="8" fill="#FF3008"/>
+  <path fill="#fff" d="M18 16h8c4.4 0 8 3.6 8 8s-3.6 8-8 8h-8v-16zm4 12h4c2.2 0 4-1.8 4-4s-1.8-4-4-4h-4v8z"/>
+</svg>
