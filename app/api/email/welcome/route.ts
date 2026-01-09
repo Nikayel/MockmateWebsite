@@ -6,18 +6,18 @@
  * Requires authentication to prevent spam abuse.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { adminDb, adminAuth } from "@/lib/firebase-admin";
-import { sendWelcomeEmail } from "@/lib/email";
+import { NextRequest, NextResponse } from "next/server"
+import { adminDb, adminAuth } from "@/lib/firebase-admin"
+import { sendWelcomeEmail } from "@/lib/email"
 
-const db = adminDb;
+const db = adminDb
 
 /**
  * Create an in-app welcome notification for the user
  */
 async function createWelcomeNotification(userId: string, displayName?: string): Promise<void> {
   try {
-    const notificationRef = db.collection("in_app_notifications").doc();
+    const notificationRef = db.collection("in_app_notifications").doc()
     await notificationRef.set({
       id: notificationRef.id,
       userId,
@@ -29,10 +29,10 @@ async function createWelcomeNotification(userId: string, displayName?: string): 
       link: "/practice",
       read: false,
       createdAt: new Date().toISOString(),
-    });
-    console.log("[Welcome API] Created in-app welcome notification for user:", userId);
+    })
+    console.log("[Welcome API] Created in-app welcome notification for user:", userId)
   } catch (error) {
-    console.error("[Welcome API] Failed to create in-app notification:", error);
+    console.error("[Welcome API] Failed to create in-app notification:", error)
     // Non-blocking - email is more important
   }
 }
@@ -42,14 +42,14 @@ async function createWelcomeNotification(userId: string, displayName?: string): 
  */
 async function initializeNotificationPreferences(userId: string): Promise<void> {
   try {
-    const prefsRef = db.collection("notification_preferences").doc(userId);
-    const prefsSnap = await prefsRef.get();
+    const prefsRef = db.collection("notification_preferences").doc(userId)
+    const prefsSnap = await prefsRef.get()
 
     if (!prefsSnap.exists) {
       await prefsRef.set({
         userId,
         enabled: true,
-        timezone: "UTC", // Default timezone, user can update later
+        timezone: "America/Los_Angeles", // Default to Pacific Time, user can update in settings
         channels: {
           email: true,
           in_app: true,
@@ -71,48 +71,39 @@ async function initializeNotificationPreferences(userId: string): Promise<void> 
         },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      });
-      console.log("[Welcome API] Initialized notification preferences for user:", userId);
+      })
+      console.log("[Welcome API] Initialized notification preferences for user:", userId)
     }
   } catch (error) {
-    console.error("[Welcome API] Failed to initialize notification preferences:", error);
+    console.error("[Welcome API] Failed to initialize notification preferences:", error)
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("[Welcome Email API] Request received");
+    console.log("[Welcome Email API] Request received")
     // Verify Firebase ID token for authentication
-    const authHeader = request.headers.get("authorization");
+    const authHeader = request.headers.get("authorization")
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      console.error("[Welcome Email API] Missing authorization header");
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
+      console.error("[Welcome Email API] Missing authorization header")
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
-    const token = authHeader.substring(7);
-    let authenticatedUserId: string;
+    const token = authHeader.substring(7)
+    let authenticatedUserId: string
 
     try {
-      const decodedToken = await adminAuth.verifyIdToken(token);
-      authenticatedUserId = decodedToken.uid;
+      const decodedToken = await adminAuth.verifyIdToken(token)
+      authenticatedUserId = decodedToken.uid
     } catch {
-      return NextResponse.json(
-        { error: "Invalid authentication token" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Invalid authentication token" }, { status: 401 })
     }
 
-    const body = await request.json();
-    const { userId, email, displayName } = body;
+    const body = await request.json()
+    const { userId, email, displayName } = body
 
     if (!userId || !email) {
-      return NextResponse.json(
-        { error: "userId and email are required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "userId and email are required" }, { status: 400 })
     }
 
     // Security: Only allow users to send welcome emails to themselves
@@ -120,35 +111,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Cannot send welcome email for another user" },
         { status: 403 }
-      );
+      )
     }
 
     // Check if welcome email already sent
-    const profileRef = db.collection("profiles").doc(userId);
-    const profileSnap = await profileRef.get();
+    const profileRef = db.collection("profiles").doc(userId)
+    const profileSnap = await profileRef.get()
 
     if (profileSnap.exists) {
-      const profile = profileSnap.data();
+      const profile = profileSnap.data()
       if (profile?.welcome_email_sent) {
-        console.log("[Welcome Email API] Welcome email already sent for user:", userId);
+        console.log("[Welcome Email API] Welcome email already sent for user:", userId)
         return NextResponse.json({
           success: true,
           message: "Welcome email already sent",
           skipped: true,
-        });
+        })
       }
     }
 
     // Send welcome email
-    console.log("[Welcome Email API] Sending welcome email to:", email);
-    const result = await sendWelcomeEmail(userId, email, displayName);
-    console.log("[Welcome Email API] Email send result:", result.success, result.error || "success");
+    console.log("[Welcome Email API] Sending welcome email to:", email)
+    const result = await sendWelcomeEmail(userId, email, displayName)
+    console.log("[Welcome Email API] Email send result:", result.success, result.error || "success")
 
     // Always create in-app notification and initialize preferences, even if email fails
     await Promise.all([
       createWelcomeNotification(userId, displayName),
       initializeNotificationPreferences(userId),
-    ]);
+    ])
 
     if (result.success) {
       // Mark welcome email as sent
@@ -168,7 +159,7 @@ export async function POST(request: NextRequest) {
           },
         },
         { merge: true }
-      );
+      )
 
       // Log the email notification
       await db.collection("email_notifications").add({
@@ -179,11 +170,11 @@ export async function POST(request: NextRequest) {
         sent_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
         source: "api",
-      });
+      })
 
       // Record analytics for notification
       try {
-        const analyticsRef = db.collection("notification_analytics").doc(userId);
+        const analyticsRef = db.collection("notification_analytics").doc(userId)
         await analyticsRef.set(
           {
             userId,
@@ -197,9 +188,9 @@ export async function POST(request: NextRequest) {
             updatedAt: new Date().toISOString(),
           },
           { merge: true }
-        );
+        )
       } catch (analyticsError) {
-        console.warn("[Welcome API] Failed to update analytics:", analyticsError);
+        console.warn("[Welcome API] Failed to update analytics:", analyticsError)
       }
     } else {
       // Even if email failed, mark that we tried and created in-app notification
@@ -218,7 +209,7 @@ export async function POST(request: NextRequest) {
           },
         },
         { merge: true }
-      );
+      )
 
       // Log the failed email notification for debugging
       await db.collection("email_notifications").add({
@@ -229,8 +220,8 @@ export async function POST(request: NextRequest) {
         scheduled_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
         source: "api",
-      });
-      console.error("[Welcome API] Email failed, logged to email_notifications:", result.error);
+      })
+      console.error("[Welcome API] Email failed, logged to email_notifications:", result.error)
     }
 
     return NextResponse.json({
@@ -238,16 +229,16 @@ export async function POST(request: NextRequest) {
       messageId: result.messageId,
       error: result.error,
       inAppNotificationCreated: true,
-    });
+    })
   } catch (error: any) {
-    console.error("[Welcome Email API] Unexpected error:", error);
-    console.error("[Welcome Email API] Error stack:", error?.stack);
+    console.error("[Welcome Email API] Unexpected error:", error)
+    console.error("[Welcome Email API] Error stack:", error?.stack)
     return NextResponse.json(
-      { 
+      {
         success: false,
-        error: error.message || "Failed to send welcome email" 
+        error: error.message || "Failed to send welcome email",
       },
       { status: 500 }
-    );
+    )
   }
 }

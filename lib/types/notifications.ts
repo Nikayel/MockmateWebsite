@@ -89,7 +89,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: Omit<
   "userId" | "createdAt" | "updatedAt"
 > = {
   enabled: true,
-  timezone: "America/New_York",
+  timezone: "America/Los_Angeles",
   channels: {
     push: true,
     email: true,

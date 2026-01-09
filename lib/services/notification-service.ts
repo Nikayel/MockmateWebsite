@@ -168,7 +168,7 @@ export async function evaluateTriggers(context: NotificationTriggerContext): Pro
   // 4. Check streak at risk (evening only - checked by timing later)
   if (!context.todayPracticed && context.streakDays && context.streakDays >= 3) {
     const now = new Date()
-    const userTimezone = context.timezone || "America/New_York"
+    const userTimezone = context.timezone || "America/Los_Angeles"
 
     // Get current hour in user's timezone
     let currentHour: number

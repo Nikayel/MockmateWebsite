@@ -8,7 +8,7 @@
  * - Notification analytics
  */
 
-import { db } from './firebase'
+import { db } from "./firebase"
 import {
   doc,
   setDoc,
@@ -24,7 +24,7 @@ import {
   writeBatch,
   increment,
   Timestamp,
-} from 'firebase/firestore'
+} from "firebase/firestore"
 import type {
   NotificationPreferences,
   Notification,
@@ -33,9 +33,9 @@ import type {
   NotificationQueueItem,
   NotificationStatus,
   NotificationChannel,
-} from './types/notifications'
-import type { NotificationType } from './rag/knowledge-base/notification-knowledge'
-import { DEFAULT_NOTIFICATION_PREFERENCES } from './types/notifications'
+} from "./types/notifications"
+import type { NotificationType } from "./rag/knowledge-base/notification-knowledge"
+import { DEFAULT_NOTIFICATION_PREFERENCES } from "./types/notifications"
 
 // ============================================================================
 // NOTIFICATION PREFERENCES
@@ -44,10 +44,8 @@ import { DEFAULT_NOTIFICATION_PREFERENCES } from './types/notifications'
 /**
  * Get user notification preferences, creating defaults if none exist
  */
-export async function getNotificationPreferences(
-  userId: string
-): Promise<NotificationPreferences> {
-  const prefRef = doc(db, 'notification_preferences', userId)
+export async function getNotificationPreferences(userId: string): Promise<NotificationPreferences> {
+  const prefRef = doc(db, "notification_preferences", userId)
   const prefSnap = await getDoc(prefRef)
 
   if (prefSnap.exists()) {
@@ -71,9 +69,9 @@ export async function getNotificationPreferences(
  */
 export async function updateNotificationPreferences(
   userId: string,
-  updates: Partial<Omit<NotificationPreferences, 'userId' | 'createdAt'>>
+  updates: Partial<Omit<NotificationPreferences, "userId" | "createdAt">>
 ): Promise<NotificationPreferences> {
-  const prefRef = doc(db, 'notification_preferences', userId)
+  const prefRef = doc(db, "notification_preferences", userId)
 
   // Get existing preferences first
   const existing = await getNotificationPreferences(userId)
@@ -91,11 +89,8 @@ export async function updateNotificationPreferences(
 /**
  * Update FCM token for push notifications
  */
-export async function updateFCMToken(
-  userId: string,
-  fcmToken: string
-): Promise<void> {
-  const prefRef = doc(db, 'notification_preferences', userId)
+export async function updateFCMToken(userId: string, fcmToken: string): Promise<void> {
+  const prefRef = doc(db, "notification_preferences", userId)
 
   await setDoc(
     prefRef,
@@ -137,9 +132,9 @@ export async function toggleNotificationType(
  * Create a new notification
  */
 export async function createNotification(
-  notification: Omit<Notification, 'id' | 'createdAt' | 'updatedAt'>
+  notification: Omit<Notification, "id" | "createdAt" | "updatedAt">
 ): Promise<Notification> {
-  const notifRef = doc(collection(db, 'notifications'))
+  const notifRef = doc(collection(db, "notifications"))
 
   const newNotification: Notification = {
     ...notification,
@@ -158,9 +153,9 @@ export async function createNotification(
 export async function updateNotificationStatus(
   notificationId: string,
   status: NotificationStatus,
-  channelStatus?: Notification['channelStatus']
+  channelStatus?: Notification["channelStatus"]
 ): Promise<void> {
-  const notifRef = doc(db, 'notifications', notificationId)
+  const notifRef = doc(db, "notifications", notificationId)
 
   const updates: Partial<Notification> = {
     status,
@@ -181,10 +176,10 @@ export async function markNotificationOpened(
   notificationId: string,
   actionTaken?: string
 ): Promise<void> {
-  const notifRef = doc(db, 'notifications', notificationId)
+  const notifRef = doc(db, "notifications", notificationId)
 
   await updateDoc(notifRef, {
-    status: 'opened',
+    status: "opened",
     openedAt: new Date().toISOString(),
     actionTaken: actionTaken || null,
     updatedAt: new Date().toISOString(),
@@ -194,13 +189,11 @@ export async function markNotificationOpened(
 /**
  * Mark notification as dismissed
  */
-export async function markNotificationDismissed(
-  notificationId: string
-): Promise<void> {
-  const notifRef = doc(db, 'notifications', notificationId)
+export async function markNotificationDismissed(notificationId: string): Promise<void> {
+  const notifRef = doc(db, "notifications", notificationId)
 
   await updateDoc(notifRef, {
-    status: 'dismissed',
+    status: "dismissed",
     dismissedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   })
@@ -214,9 +207,9 @@ export async function getUserNotifications(
   limitCount: number = 50
 ): Promise<Notification[]> {
   const q = query(
-    collection(db, 'notifications'),
-    where('userId', '==', userId),
-    orderBy('createdAt', 'desc'),
+    collection(db, "notifications"),
+    where("userId", "==", userId),
+    orderBy("createdAt", "desc"),
     limit(limitCount)
   )
 
@@ -236,11 +229,11 @@ export async function getRecentNotificationsByType(
   cutoff.setHours(cutoff.getHours() - hoursBack)
 
   const q = query(
-    collection(db, 'notifications'),
-    where('userId', '==', userId),
-    where('type', '==', type),
-    where('createdAt', '>=', cutoff.toISOString()),
-    orderBy('createdAt', 'desc')
+    collection(db, "notifications"),
+    where("userId", "==", userId),
+    where("type", "==", type),
+    where("createdAt", ">=", cutoff.toISOString()),
+    orderBy("createdAt", "desc")
   )
 
   const snap = await getDocs(q)
@@ -258,9 +251,7 @@ export async function isNotificationInCooldown(
   const recent = await getRecentNotificationsByType(userId, type, cooldownHours)
 
   // Check if any were dismissed recently
-  const dismissed = recent.filter(
-    (n) => n.status === 'dismissed' && n.dismissedAt
-  )
+  const dismissed = recent.filter((n) => n.status === "dismissed" && n.dismissedAt)
 
   if (dismissed.length > 0) {
     return true
@@ -278,9 +269,9 @@ export async function isNotificationInCooldown(
  * Create an in-app notification
  */
 export async function createInAppNotification(
-  notification: Omit<InAppNotification, 'id' | 'createdAt'>
+  notification: Omit<InAppNotification, "id" | "createdAt">
 ): Promise<InAppNotification> {
-  const notifRef = doc(collection(db, 'in_app_notifications'))
+  const notifRef = doc(collection(db, "in_app_notifications"))
 
   const newNotification: InAppNotification = {
     ...notification,
@@ -300,10 +291,10 @@ export async function getUnreadInAppNotifications(
   limitCount: number = 20
 ): Promise<InAppNotification[]> {
   const q = query(
-    collection(db, 'in_app_notifications'),
-    where('userId', '==', userId),
-    where('read', '==', false),
-    orderBy('createdAt', 'desc'),
+    collection(db, "in_app_notifications"),
+    where("userId", "==", userId),
+    where("read", "==", false),
+    orderBy("createdAt", "desc"),
     limit(limitCount)
   )
 
@@ -319,9 +310,9 @@ export async function getInAppNotifications(
   limitCount: number = 50
 ): Promise<InAppNotification[]> {
   const q = query(
-    collection(db, 'in_app_notifications'),
-    where('userId', '==', userId),
-    orderBy('createdAt', 'desc'),
+    collection(db, "in_app_notifications"),
+    where("userId", "==", userId),
+    orderBy("createdAt", "desc"),
     limit(limitCount)
   )
 
@@ -336,7 +327,7 @@ export async function markInAppNotificationRead(
   notificationId: string,
   userId?: string
 ): Promise<boolean> {
-  const notifRef = doc(db, 'in_app_notifications', notificationId)
+  const notifRef = doc(db, "in_app_notifications", notificationId)
   const notifSnap = await getDoc(notifRef)
 
   if (!notifSnap.exists()) {
@@ -347,7 +338,9 @@ export async function markInAppNotificationRead(
   if (userId) {
     const notifData = notifSnap.data()
     if (notifData.userId !== userId) {
-      console.warn(`[Notification] User ${userId} attempted to mark notification ${notificationId} owned by ${notifData.userId}`)
+      console.warn(
+        `[Notification] User ${userId} attempted to mark notification ${notificationId} owned by ${notifData.userId}`
+      )
       return false
     }
   }
@@ -359,9 +352,7 @@ export async function markInAppNotificationRead(
 /**
  * Mark all in-app notifications as read
  */
-export async function markAllInAppNotificationsRead(
-  userId: string
-): Promise<void> {
+export async function markAllInAppNotificationsRead(userId: string): Promise<void> {
   const unread = await getUnreadInAppNotifications(userId, 100)
 
   if (unread.length === 0) return
@@ -369,7 +360,7 @@ export async function markAllInAppNotificationsRead(
   const batch = writeBatch(db)
 
   unread.forEach((notif) => {
-    const ref = doc(db, 'in_app_notifications', notif.id)
+    const ref = doc(db, "in_app_notifications", notif.id)
     batch.update(ref, { read: true })
   })
 
@@ -387,9 +378,9 @@ export async function cleanupOldInAppNotifications(
   cutoff.setDate(cutoff.getDate() - daysOld)
 
   const q = query(
-    collection(db, 'in_app_notifications'),
-    where('userId', '==', userId),
-    where('createdAt', '<', cutoff.toISOString()),
+    collection(db, "in_app_notifications"),
+    where("userId", "==", userId),
+    where("createdAt", "<", cutoff.toISOString()),
     limit(100)
   )
 
@@ -411,10 +402,8 @@ export async function cleanupOldInAppNotifications(
 /**
  * Get or create notification analytics for a user
  */
-export async function getNotificationAnalytics(
-  userId: string
-): Promise<NotificationAnalytics> {
-  const analyticsRef = doc(db, 'notification_analytics', userId)
+export async function getNotificationAnalytics(userId: string): Promise<NotificationAnalytics> {
+  const analyticsRef = doc(db, "notification_analytics", userId)
   const snap = await getDoc(analyticsRef)
 
   if (snap.exists()) {
@@ -442,7 +431,7 @@ export async function recordNotificationSent(
   userId: string,
   type: NotificationType
 ): Promise<void> {
-  const analyticsRef = doc(db, 'notification_analytics', userId)
+  const analyticsRef = doc(db, "notification_analytics", userId)
 
   await setDoc(
     analyticsRef,
@@ -463,14 +452,12 @@ export async function recordNotificationOpened(
   userId: string,
   type: NotificationType
 ): Promise<void> {
-  const analyticsRef = doc(db, 'notification_analytics', userId)
+  const analyticsRef = doc(db, "notification_analytics", userId)
   const analytics = await getNotificationAnalytics(userId)
 
   const newTotalOpened = analytics.totalOpened + 1
   const openRate =
-    analytics.totalSent > 0
-      ? Math.round((newTotalOpened / analytics.totalSent) * 100)
-      : 0
+    analytics.totalSent > 0 ? Math.round((newTotalOpened / analytics.totalSent) * 100) : 0
 
   await setDoc(
     analyticsRef,
@@ -491,7 +478,7 @@ export async function recordNotificationDismissed(
   userId: string,
   type: NotificationType
 ): Promise<void> {
-  const analyticsRef = doc(db, 'notification_analytics', userId)
+  const analyticsRef = doc(db, "notification_analytics", userId)
 
   await setDoc(
     analyticsRef,
@@ -512,15 +499,15 @@ export async function recordNotificationDismissed(
  * Add item to notification queue
  */
 export async function addToNotificationQueue(
-  item: Omit<NotificationQueueItem, 'id' | 'createdAt' | 'updatedAt' | 'attempts' | 'status'>
+  item: Omit<NotificationQueueItem, "id" | "createdAt" | "updatedAt" | "attempts" | "status">
 ): Promise<NotificationQueueItem> {
-  const queueRef = doc(collection(db, 'notification_queue'))
+  const queueRef = doc(collection(db, "notification_queue"))
 
   const queueItem: NotificationQueueItem = {
     ...item,
     id: queueRef.id,
     attempts: 0,
-    status: 'pending',
+    status: "pending",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
@@ -538,11 +525,11 @@ export async function getPendingQueueItems(
   const now = new Date().toISOString()
 
   const q = query(
-    collection(db, 'notification_queue'),
-    where('status', '==', 'pending'),
-    where('scheduledFor', '<=', now),
-    orderBy('scheduledFor', 'asc'),
-    orderBy('priority', 'asc'),
+    collection(db, "notification_queue"),
+    where("status", "==", "pending"),
+    where("scheduledFor", "<=", now),
+    orderBy("scheduledFor", "asc"),
+    orderBy("priority", "asc"),
     limit(limitCount)
   )
 
@@ -555,10 +542,10 @@ export async function getPendingQueueItems(
  */
 export async function updateQueueItemStatus(
   itemId: string,
-  status: NotificationQueueItem['status'],
+  status: NotificationQueueItem["status"],
   error?: string
 ): Promise<void> {
-  const queueRef = doc(db, 'notification_queue', itemId)
+  const queueRef = doc(db, "notification_queue", itemId)
 
   await updateDoc(queueRef, {
     status,
@@ -572,16 +559,14 @@ export async function updateQueueItemStatus(
 /**
  * Delete completed queue items (cleanup)
  */
-export async function cleanupCompletedQueueItems(
-  hoursOld: number = 24
-): Promise<number> {
+export async function cleanupCompletedQueueItems(hoursOld: number = 24): Promise<number> {
   const cutoff = new Date()
   cutoff.setHours(cutoff.getHours() - hoursOld)
 
   const q = query(
-    collection(db, 'notification_queue'),
-    where('status', 'in', ['completed', 'failed']),
-    where('updatedAt', '<', cutoff.toISOString()),
+    collection(db, "notification_queue"),
+    where("status", "in", ["completed", "failed"]),
+    where("updatedAt", "<", cutoff.toISOString()),
     limit(500)
   )
 
@@ -614,27 +599,27 @@ export async function shouldSendNotification(
 
   // Check global enabled
   if (!prefs.enabled) {
-    return { shouldSend: false, reason: 'notifications_disabled' }
+    return { shouldSend: false, reason: "notifications_disabled" }
   }
 
   // Check type enabled
   const typePref = prefs.typePreferences[type]
   if (typePref && !typePref.enabled) {
-    return { shouldSend: false, reason: 'type_disabled' }
+    return { shouldSend: false, reason: "type_disabled" }
   }
 
   // Check quiet hours (respecting user's timezone)
   if (prefs.quietHours.enabled) {
     const now = new Date()
     // Get current hour in user's timezone
-    const userTimezone = prefs.timezone || 'America/New_York'
+    const userTimezone = prefs.timezone || "America/Los_Angeles"
     let currentHour: number
 
     try {
       // Use Intl.DateTimeFormat to get the hour in the user's timezone
-      const formatter = new Intl.DateTimeFormat('en-US', {
+      const formatter = new Intl.DateTimeFormat("en-US", {
         timeZone: userTimezone,
-        hour: 'numeric',
+        hour: "numeric",
         hour12: false,
       })
       currentHour = parseInt(formatter.format(now), 10)
@@ -648,24 +633,24 @@ export async function shouldSendNotification(
     // Handle overnight quiet hours (e.g., 22:00 - 08:00)
     if (start > end) {
       if (currentHour >= start || currentHour < end) {
-        return { shouldSend: false, reason: 'quiet_hours' }
+        return { shouldSend: false, reason: "quiet_hours" }
       }
     } else {
       if (currentHour >= start && currentHour < end) {
-        return { shouldSend: false, reason: 'quiet_hours' }
+        return { shouldSend: false, reason: "quiet_hours" }
       }
     }
   }
 
   // Check cooldown
   if (await isNotificationInCooldown(userId, type, cooldownHours)) {
-    return { shouldSend: false, reason: 'cooldown' }
+    return { shouldSend: false, reason: "cooldown" }
   }
 
   // Check daily limit
   const todayNotifications = await getRecentNotificationsByType(userId, type, 24)
   if (todayNotifications.length >= maxPerDay) {
-    return { shouldSend: false, reason: 'daily_limit' }
+    return { shouldSend: false, reason: "daily_limit" }
   }
 
   return { shouldSend: true }

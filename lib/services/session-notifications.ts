@@ -160,14 +160,14 @@ export async function checkStreakAtRisk(userId: string): Promise<boolean> {
     if (!learningState) return false
 
     const streakDays = learningState.streak_days || 0
-    const lastPracticeDate = learningState.last_practice_date
+    const lastPracticeDate = learningState.last_session_at
 
     // No streak to protect
     if (streakDays < 3) return false
 
     // Get user's timezone from preferences
     const prefs = await getNotificationPreferencesServer(userId)
-    const userTimezone = prefs.timezone || "America/New_York"
+    const userTimezone = prefs.timezone || "America/Los_Angeles"
 
     // Get current hour in user's timezone
     const now = new Date()
@@ -231,7 +231,7 @@ export async function sendDailyReminderIfNeeded(userId: string): Promise<boolean
 
     // Check if they've practiced today
     const today = new Date().toISOString().split("T")[0]
-    const lastPracticeDate = learningState.last_practice_date
+    const lastPracticeDate = learningState.last_session_at
 
     if (lastPracticeDate?.split("T")[0] === today) return false
 

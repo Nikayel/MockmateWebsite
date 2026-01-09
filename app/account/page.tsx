@@ -10,7 +10,16 @@ import { useAuth } from "@/lib/auth-context"
 import { signOut } from "@/lib/auth"
 import { getUserProfile } from "@/lib/firestore-helpers"
 import { db } from "@/lib/firebase"
-import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore"
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  updateDoc,
+  getDoc,
+  setDoc,
+} from "firebase/firestore"
 import {
   User,
   Crown,
@@ -32,6 +41,7 @@ import {
   Check,
   Mail,
   Settings,
+  Globe,
 } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { Profile, ProfileQuota, NotificationPreferences, PaymentHistory } from "@/lib/types"
@@ -71,6 +81,7 @@ export default function AccountPage() {
   })
   const [isSavingPrefs, setIsSavingPrefs] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [userTimezone, setUserTimezone] = useState("America/Los_Angeles")
 
   const toggleSection = (section: string) => {
     const newExpanded = new Set(expandedSections)
@@ -100,7 +111,7 @@ export default function AccountPage() {
       }
 
       try {
-        const [userProfile, usageSnap, paymentsSnap] = await Promise.all([
+        const [userProfile, usageSnap, paymentsSnap, notifPrefsSnap] = await Promise.all([
           getUserProfile(firebaseUser.uid).catch((err) => {
             console.error("Error fetching profile:", err)
             setError("Failed to load profile data")
@@ -125,6 +136,14 @@ export default function AccountPage() {
                 where("user_id", "==", firebaseUser.uid)
               )
               return await getDocs(paymentsQuery)
+            } catch {
+              return null
+            }
+          })(),
+          (async () => {
+            try {
+              const notifPrefsRef = doc(db, "notification_preferences", firebaseUser.uid)
+              return await getDoc(notifPrefsRef)
             } catch {
               return null
             }
@@ -168,16 +187,24 @@ export default function AccountPage() {
 
         if (paymentsSnap && !paymentsSnap.empty) {
           const paymentsData = paymentsSnap.docs.map(
-            (doc) =>
+            (docSnap) =>
               ({
-                id: doc.id,
-                ...doc.data(),
+                id: docSnap.id,
+                ...docSnap.data(),
               }) as PaymentHistory
           )
           paymentsData.sort(
             (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
           )
           setPaymentHistory(paymentsData)
+        }
+
+        // Load timezone from notification_preferences collection
+        if (notifPrefsSnap && notifPrefsSnap.exists()) {
+          const notifData = notifPrefsSnap.data()
+          if (notifData?.timezone) {
+            setUserTimezone(notifData.timezone)
+          }
         }
       } catch (error) {
         console.error("Error loading user data:", error)
@@ -350,6 +377,43 @@ export default function AccountPage() {
       console.error("Failed to update preferences:", err)
       setNotificationPrefs(notificationPrefs)
       toast.error("Update failed")
+    } finally {
+      setIsSavingPrefs(false)
+    }
+  }
+
+  const handleUpdateTimezone = async (newTimezone: string) => {
+    if (!firebaseUser) return
+
+    const previousTimezone = userTimezone
+    setUserTimezone(newTimezone)
+    setIsSavingPrefs(true)
+
+    try {
+      const notifPrefsRef = doc(db, "notification_preferences", firebaseUser.uid)
+      const notifPrefsSnap = await getDoc(notifPrefsRef)
+
+      if (notifPrefsSnap.exists()) {
+        await updateDoc(notifPrefsRef, {
+          timezone: newTimezone,
+          updatedAt: new Date().toISOString(),
+        })
+      } else {
+        // Create the document if it doesn't exist
+        await setDoc(notifPrefsRef, {
+          userId: firebaseUser.uid,
+          enabled: true,
+          timezone: newTimezone,
+          channels: { push: true, email: true, in_app: true },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+      }
+      toast.success("Timezone updated")
+    } catch (err) {
+      console.error("Failed to update timezone:", err)
+      setUserTimezone(previousTimezone)
+      toast.error("Failed to update timezone")
     } finally {
       setIsSavingPrefs(false)
     }
@@ -695,9 +759,9 @@ export default function AccountPage() {
                     </div>
                   </div>
 
-                  {/* Quiet Hours */}
+                  {/* Quiet Hours & Timezone */}
                   {notificationPrefs.email_notifications_enabled && (
-                    <div className="border-t border-zinc-800/50 pt-3">
+                    <div className="space-y-3 border-t border-zinc-800/50 pt-3">
                       <div className="flex items-center justify-between py-2">
                         <div>
                           <span className="text-sm text-zinc-300">Quiet Hours</span>
@@ -706,6 +770,40 @@ export default function AccountPage() {
                           </p>
                         </div>
                         <Check className="h-4 w-4 text-emerald-500" />
+                      </div>
+
+                      {/* Timezone Selector */}
+                      <div className="flex items-center justify-between py-2">
+                        <div className="flex items-center gap-3">
+                          <Globe className="h-4 w-4 text-zinc-500" />
+                          <div>
+                            <span className="text-sm text-zinc-300">Timezone</span>
+                            <p className="text-xs text-zinc-600">For streak and reminder timing</p>
+                          </div>
+                        </div>
+                        <select
+                          value={userTimezone}
+                          onChange={(e) => handleUpdateTimezone(e.target.value)}
+                          disabled={isSavingPrefs}
+                          className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-white focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 focus:outline-none"
+                        >
+                          <option value="America/Los_Angeles">Pacific Time (LA)</option>
+                          <option value="America/Denver">Mountain Time (Denver)</option>
+                          <option value="America/Chicago">Central Time (Chicago)</option>
+                          <option value="America/New_York">Eastern Time (NYC)</option>
+                          <option value="America/Phoenix">Arizona (Phoenix)</option>
+                          <option value="Pacific/Honolulu">Hawaii (Honolulu)</option>
+                          <option value="America/Anchorage">Alaska (Anchorage)</option>
+                          <option value="Europe/London">UK (London)</option>
+                          <option value="Europe/Paris">Europe (Paris)</option>
+                          <option value="Europe/Berlin">Europe (Berlin)</option>
+                          <option value="Asia/Tokyo">Japan (Tokyo)</option>
+                          <option value="Asia/Shanghai">China (Shanghai)</option>
+                          <option value="Asia/Kolkata">India (Mumbai)</option>
+                          <option value="Asia/Singapore">Singapore</option>
+                          <option value="Australia/Sydney">Australia (Sydney)</option>
+                          <option value="UTC">UTC</option>
+                        </select>
                       </div>
                     </div>
                   )}

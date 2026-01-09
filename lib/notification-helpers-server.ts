@@ -5,14 +5,14 @@
  * IMPORTANT: Use this file in API routes instead of notification-helpers.ts
  */
 
-import { adminDb } from './firebase-admin'
+import { adminDb } from "./firebase-admin"
 import type {
   NotificationPreferences,
   InAppNotification,
   NotificationAnalytics,
-} from './types/notifications'
-import { DEFAULT_NOTIFICATION_PREFERENCES } from './types/notifications'
-import type { NotificationType } from './rag/knowledge-base/notification-knowledge'
+} from "./types/notifications"
+import { DEFAULT_NOTIFICATION_PREFERENCES } from "./types/notifications"
+import type { NotificationType } from "./rag/knowledge-base/notification-knowledge"
 
 const db = adminDb
 
@@ -26,7 +26,7 @@ const db = adminDb
 export async function getNotificationPreferencesServer(
   userId: string
 ): Promise<NotificationPreferences> {
-  const prefRef = db.collection('notification_preferences').doc(userId)
+  const prefRef = db.collection("notification_preferences").doc(userId)
   const prefSnap = await prefRef.get()
 
   if (prefSnap.exists) {
@@ -50,9 +50,9 @@ export async function getNotificationPreferencesServer(
  */
 export async function updateNotificationPreferencesServer(
   userId: string,
-  updates: Partial<Omit<NotificationPreferences, 'userId' | 'createdAt'>>
+  updates: Partial<Omit<NotificationPreferences, "userId" | "createdAt">>
 ): Promise<NotificationPreferences> {
-  const prefRef = db.collection('notification_preferences').doc(userId)
+  const prefRef = db.collection("notification_preferences").doc(userId)
 
   // Get existing preferences first
   const existing = await getNotificationPreferencesServer(userId)
@@ -79,9 +79,9 @@ export async function getInAppNotificationsServer(
   limitCount: number = 50
 ): Promise<InAppNotification[]> {
   const snapshot = await db
-    .collection('in_app_notifications')
-    .where('userId', '==', userId)
-    .orderBy('createdAt', 'desc')
+    .collection("in_app_notifications")
+    .where("userId", "==", userId)
+    .orderBy("createdAt", "desc")
     .limit(limitCount)
     .get()
 
@@ -96,10 +96,10 @@ export async function getUnreadInAppNotificationsServer(
   limitCount: number = 20
 ): Promise<InAppNotification[]> {
   const snapshot = await db
-    .collection('in_app_notifications')
-    .where('userId', '==', userId)
-    .where('read', '==', false)
-    .orderBy('createdAt', 'desc')
+    .collection("in_app_notifications")
+    .where("userId", "==", userId)
+    .where("read", "==", false)
+    .orderBy("createdAt", "desc")
     .limit(limitCount)
     .get()
 
@@ -113,7 +113,7 @@ export async function markInAppNotificationReadServer(
   notificationId: string,
   userId?: string
 ): Promise<boolean> {
-  const notifRef = db.collection('in_app_notifications').doc(notificationId)
+  const notifRef = db.collection("in_app_notifications").doc(notificationId)
   const notifSnap = await notifRef.get()
 
   if (!notifSnap.exists) {
@@ -124,7 +124,9 @@ export async function markInAppNotificationReadServer(
   if (userId) {
     const notifData = notifSnap.data()
     if (notifData?.userId !== userId) {
-      console.warn(`[Notification] User ${userId} attempted to mark notification ${notificationId} owned by ${notifData?.userId}`)
+      console.warn(
+        `[Notification] User ${userId} attempted to mark notification ${notificationId} owned by ${notifData?.userId}`
+      )
       return false
     }
   }
@@ -136,9 +138,7 @@ export async function markInAppNotificationReadServer(
 /**
  * Mark all in-app notifications as read
  */
-export async function markAllInAppNotificationsReadServer(
-  userId: string
-): Promise<void> {
+export async function markAllInAppNotificationsReadServer(userId: string): Promise<void> {
   const unread = await getUnreadInAppNotificationsServer(userId, 100)
 
   if (unread.length === 0) return
@@ -146,7 +146,7 @@ export async function markAllInAppNotificationsReadServer(
   const batch = db.batch()
 
   unread.forEach((notif) => {
-    const ref = db.collection('in_app_notifications').doc(notif.id)
+    const ref = db.collection("in_app_notifications").doc(notif.id)
     batch.update(ref, { read: true })
   })
 
@@ -157,9 +157,9 @@ export async function markAllInAppNotificationsReadServer(
  * Create an in-app notification
  */
 export async function createInAppNotificationServer(
-  notification: Omit<InAppNotification, 'id' | 'createdAt'>
+  notification: Omit<InAppNotification, "id" | "createdAt">
 ): Promise<InAppNotification> {
-  const notifRef = db.collection('in_app_notifications').doc()
+  const notifRef = db.collection("in_app_notifications").doc()
 
   const newNotification: InAppNotification = {
     ...notification,
@@ -181,7 +181,7 @@ export async function createInAppNotificationServer(
 export async function getNotificationAnalyticsServer(
   userId: string
 ): Promise<NotificationAnalytics> {
-  const analyticsRef = db.collection('notification_analytics').doc(userId)
+  const analyticsRef = db.collection("notification_analytics").doc(userId)
   const snap = await analyticsRef.get()
 
   if (snap.exists) {
@@ -209,7 +209,7 @@ export async function recordNotificationSentServer(
   userId: string,
   type: NotificationType
 ): Promise<void> {
-  const analyticsRef = db.collection('notification_analytics').doc(userId)
+  const analyticsRef = db.collection("notification_analytics").doc(userId)
 
   await analyticsRef.set(
     {
@@ -235,27 +235,27 @@ export async function shouldSendNotificationServer(
 
   // Check global enabled
   if (!prefs.enabled) {
-    return { shouldSend: false, reason: 'notifications_disabled' }
+    return { shouldSend: false, reason: "notifications_disabled" }
   }
 
   // Check type enabled
   const typePref = prefs.typePreferences[type]
   if (typePref && !typePref.enabled) {
-    return { shouldSend: false, reason: 'type_disabled' }
+    return { shouldSend: false, reason: "type_disabled" }
   }
 
   // Check quiet hours (respecting user's timezone)
   if (prefs.quietHours?.enabled) {
     const now = new Date()
     // Get current hour in user's timezone
-    const userTimezone = prefs.timezone || 'UTC'
+    const userTimezone = prefs.timezone || "America/Los_Angeles"
     let currentHour: number
 
     try {
       // Use Intl.DateTimeFormat to get the hour in the user's timezone
-      const formatter = new Intl.DateTimeFormat('en-US', {
+      const formatter = new Intl.DateTimeFormat("en-US", {
         timeZone: userTimezone,
-        hour: 'numeric',
+        hour: "numeric",
         hour12: false,
       })
       currentHour = parseInt(formatter.format(now), 10)
@@ -269,11 +269,11 @@ export async function shouldSendNotificationServer(
     // Handle overnight quiet hours (e.g., 22:00 - 08:00)
     if (start > end) {
       if (currentHour >= start || currentHour < end) {
-        return { shouldSend: false, reason: 'quiet_hours' }
+        return { shouldSend: false, reason: "quiet_hours" }
       }
     } else {
       if (currentHour >= start && currentHour < end) {
-        return { shouldSend: false, reason: 'quiet_hours' }
+        return { shouldSend: false, reason: "quiet_hours" }
       }
     }
   }
@@ -285,18 +285,18 @@ export async function shouldSendNotificationServer(
     const lastSentTime = new Date(lastSent).getTime()
     const cooldownMs = cooldownHours * 60 * 60 * 1000
     if (Date.now() - lastSentTime < cooldownMs) {
-      return { shouldSend: false, reason: 'cooldown' }
+      return { shouldSend: false, reason: "cooldown" }
     }
   }
 
   // Check daily limit
-  const today = new Date().toISOString().split('T')[0]
+  const today = new Date().toISOString().split("T")[0]
   const sentToday = analytics.byType?.[type]?.lastSentAt?.startsWith(today)
-    ? (analytics.byType?.[type]?.sent || 0)
+    ? analytics.byType?.[type]?.sent || 0
     : 0
 
   if (sentToday >= maxPerDay) {
-    return { shouldSend: false, reason: 'daily_limit' }
+    return { shouldSend: false, reason: "daily_limit" }
   }
 
   return { shouldSend: true }
