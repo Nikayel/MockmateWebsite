@@ -603,6 +603,10 @@ export async function getSessionState(sessionId: string): Promise<{
   interviewerMessages?: Array<{ type: string; message: string }>
   testResults?: Array<any>
   savedAt?: string
+  completedAt?: string
+  feedbackStatus?: FeedbackStatus
+  performanceScore?: number
+  feedback?: string
 } | null> {
   try {
     const sessionRef = doc(db, "interview_sessions", sessionId)
@@ -611,17 +615,39 @@ export async function getSessionState(sessionId: string): Promise<{
     if (!sessionSnap.exists()) return null
 
     const data = sessionSnap.data()
-    if (!data.session_state) return null
 
-    return {
-      code: data.session_state.code,
-      language: data.session_state.language,
-      elapsedTime: data.session_state.elapsed_time,
-      chatMessages: data.session_state.chat_messages,
-      interviewerMessages: data.session_state.interviewer_messages,
-      testResults: data.session_state.test_results,
-      savedAt: data.session_state.saved_at,
+    // Return completion info even if no session_state (session was submitted)
+    const result: {
+      code?: string
+      language?: string
+      elapsedTime?: number
+      chatMessages?: Array<{ type: string; message: string }>
+      interviewerMessages?: Array<{ type: string; message: string }>
+      testResults?: Array<any>
+      savedAt?: string
+      completedAt?: string
+      feedbackStatus?: FeedbackStatus
+      performanceScore?: number
+      feedback?: string
+    } = {
+      completedAt: data.completed_at,
+      feedbackStatus: data.feedback_status,
+      performanceScore: data.performance_score,
+      feedback: data.feedback,
     }
+
+    // Add session state if available
+    if (data.session_state) {
+      result.code = data.session_state.code
+      result.language = data.session_state.language
+      result.elapsedTime = data.session_state.elapsed_time
+      result.chatMessages = data.session_state.chat_messages
+      result.interviewerMessages = data.session_state.interviewer_messages
+      result.testResults = data.session_state.test_results
+      result.savedAt = data.session_state.saved_at
+    }
+
+    return result
   } catch {
     return null
   }

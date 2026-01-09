@@ -1,14 +1,14 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
-import { Coffee } from 'lucide-react'
-import { DailyPlan, PersonalizedRoadmap } from '@/lib/data/company-questions/types'
-import { FocusHeader } from './FocusHeader'
-import { FocusQuestionsList } from './FocusQuestionsList'
-import { FocusCompletionBanner } from './FocusCompletionBanner'
-import { RAGExplanationModal } from './RAGExplanationModal'
+import { useState } from "react"
+import { Coffee } from "lucide-react"
+import { DailyPlan, PersonalizedRoadmap } from "@/lib/data/company-questions/types"
+import { FocusHeader } from "./FocusHeader"
+import { FocusQuestionsList } from "./FocusQuestionsList"
+import { FocusCompletionBanner } from "./FocusCompletionBanner"
+import { RAGExplanationModal } from "./RAGExplanationModal"
 
-type RAGEnhancements = NonNullable<PersonalizedRoadmap['ragEnhancements']>
+type RAGEnhancements = NonNullable<PersonalizedRoadmap["ragEnhancements"]>
 
 interface TodaysFocusProps {
   plan: DailyPlan
@@ -29,9 +29,11 @@ export function TodaysFocus({
 }: TodaysFocusProps) {
   const [showRAGExplanation, setShowRAGExplanation] = useState(false)
 
-  const completedQuestions = plan.questions.filter((q) => q.status === 'completed')
-  const pendingQuestions = plan.questions.filter((q) => q.status === 'pending' || q.status === 'in_progress')
-  const skippedQuestions = plan.questions.filter((q) => q.status === 'skipped')
+  const completedQuestions = plan.questions.filter((q) => q.status === "completed")
+  const pendingQuestions = plan.questions.filter(
+    (q) => q.status === "pending" || q.status === "in_progress" || q.status === "evaluating"
+  )
+  const skippedQuestions = plan.questions.filter((q) => q.status === "skipped")
 
   const completedCount = completedQuestions.length
   const totalCount = plan.questions.length
@@ -52,18 +54,18 @@ export function TodaysFocus({
   // Format date for display
   const dateLabel = isToday
     ? "Today's Focus"
-    : planDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+    : planDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
 
   // Handle rest/review days (no questions)
   if (totalCount === 0) {
     return (
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="p-6 text-center bg-blue-500/5">
-          <Coffee className="h-12 w-12 mx-auto text-blue-400 mb-3" />
+      <div className="bg-card border-border overflow-hidden rounded-xl border">
+        <div className="bg-blue-500/5 p-6 text-center">
+          <Coffee className="mx-auto mb-3 h-12 w-12 text-blue-400" />
           <h2 className="text-lg font-bold">{dateLabel}</h2>
           <p className="text-muted-foreground mt-1">{plan.theme}</p>
           {plan.notes && (
-            <p className="text-sm text-muted-foreground mt-4 max-w-md mx-auto">{plan.notes}</p>
+            <p className="text-muted-foreground mx-auto mt-4 max-w-md text-sm">{plan.notes}</p>
           )}
         </div>
       </div>
@@ -71,7 +73,7 @@ export function TodaysFocus({
   }
 
   return (
-    <div className="bg-card border border-border rounded-xl overflow-hidden">
+    <div className="bg-card border-border overflow-hidden rounded-xl border">
       <FocusHeader
         plan={plan}
         completedCount={completedCount}
@@ -97,8 +99,8 @@ export function TodaysFocus({
       {allComplete && <FocusCompletionBanner completedMinutes={completedMinutes} />}
 
       {plan.notes && (
-        <div className="p-4 bg-muted/30 border-t border-border">
-          <p className="text-sm text-muted-foreground italic">{plan.notes}</p>
+        <div className="bg-muted/30 border-border border-t p-4">
+          <p className="text-muted-foreground text-sm italic">{plan.notes}</p>
         </div>
       )}
 

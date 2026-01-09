@@ -2,30 +2,33 @@
  * Zustand Store for Company-Specific DSA Roadmap
  */
 
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { create } from "zustand"
+import { persist } from "zustand/middleware"
 import {
   PersonalizedRoadmap,
   UserRoadmapAssessment,
   CompanyId,
   DailyPlan,
-} from '@/lib/data/company-questions/types'
-import { DSAPattern } from '@/lib/types/dsa-patterns'
-import { getCurrentUserToken } from '@/lib/firebase-lazy'
+} from "@/lib/data/company-questions/types"
+import { DSAPattern } from "@/lib/types/dsa-patterns"
+import { getCurrentUserToken } from "@/lib/firebase-lazy"
 
 interface RoadmapState {
   // Current roadmap
   activeRoadmap: PersonalizedRoadmap | null
 
   // Wizard state
-  wizardStep: 'company' | 'date' | 'assessment' | 'generating' | 'complete'
+  wizardStep: "company" | "date" | "assessment" | "generating" | "complete"
   selectedCompany: CompanyId | null
   selectedDate: Date | null
   assessmentAnswers: {
-    experienceLevel: 'beginner' | 'intermediate' | 'advanced' | null
+    experienceLevel: "beginner" | "intermediate" | "advanced" | null
     problemsSolved: number
     hoursPerDay: number
-    patternFamiliarity: { pattern: DSAPattern; level: 'unknown' | 'seen' | 'practiced' | 'confident' }[]
+    patternFamiliarity: {
+      pattern: DSAPattern
+      level: "unknown" | "seen" | "practiced" | "confident"
+    }[]
   }
 
   // UI state
@@ -35,13 +38,16 @@ interface RoadmapState {
   selectedDayIndex: number
 
   // Actions - Wizard
-  setWizardStep: (step: RoadmapState['wizardStep']) => void
+  setWizardStep: (step: RoadmapState["wizardStep"]) => void
   selectCompany: (company: CompanyId) => void
   selectDate: (date: Date) => void
-  setExperienceLevel: (level: 'beginner' | 'intermediate' | 'advanced') => void
+  setExperienceLevel: (level: "beginner" | "intermediate" | "advanced") => void
   setProblemsSolved: (count: number) => void
   setHoursPerDay: (hours: number) => void
-  setPatternFamiliarity: (pattern: DSAPattern, level: 'unknown' | 'seen' | 'practiced' | 'confident') => void
+  setPatternFamiliarity: (
+    pattern: DSAPattern,
+    level: "unknown" | "seen" | "practiced" | "confident"
+  ) => void
   resetWizard: () => void
 
   // Actions - Roadmap
@@ -49,6 +55,7 @@ interface RoadmapState {
   markQuestionCompleted: (scenarioId: string, score?: number, timeSpentMinutes?: number) => void
   markQuestionSkipped: (scenarioId: string) => void
   markQuestionPending: (scenarioId: string) => void
+  markQuestionEvaluating: (scenarioId: string) => void
   selectDay: (index: number) => void
   addActualTime: (minutes: number) => void
 
@@ -66,10 +73,13 @@ interface RoadmapState {
 }
 
 const initialAssessmentAnswers = {
-  experienceLevel: null as 'beginner' | 'intermediate' | 'advanced' | null,
+  experienceLevel: null as "beginner" | "intermediate" | "advanced" | null,
   problemsSolved: 0,
   hoursPerDay: 2,
-  patternFamiliarity: [] as { pattern: DSAPattern; level: 'unknown' | 'seen' | 'practiced' | 'confident' }[],
+  patternFamiliarity: [] as {
+    pattern: DSAPattern
+    level: "unknown" | "seen" | "practiced" | "confident"
+  }[],
 }
 
 export const useRoadmapStore = create<RoadmapState>()(
@@ -79,7 +89,7 @@ export const useRoadmapStore = create<RoadmapState>()(
       // NOTE: activeRoadmap is NOT persisted to avoid cross-user data leaks
       // It's always loaded fresh from Firebase when the page mounts
       activeRoadmap: null,
-      wizardStep: 'company',
+      wizardStep: "company",
       selectedCompany: null,
       selectedDate: null,
       assessmentAnswers: { ...initialAssessmentAnswers },
@@ -91,63 +101,71 @@ export const useRoadmapStore = create<RoadmapState>()(
       // Wizard actions
       setWizardStep: (step) => set({ wizardStep: step }),
 
-      selectCompany: (company) => set({
-        selectedCompany: company,
-        wizardStep: 'date',
-      }),
+      selectCompany: (company) =>
+        set({
+          selectedCompany: company,
+          wizardStep: "date",
+        }),
 
-      selectDate: (date) => set({
-        selectedDate: date,
-        wizardStep: 'assessment',
-      }),
+      selectDate: (date) =>
+        set({
+          selectedDate: date,
+          wizardStep: "assessment",
+        }),
 
-      setExperienceLevel: (level) => set((state) => ({
-        assessmentAnswers: {
-          ...state.assessmentAnswers,
-          experienceLevel: level,
-        },
-      })),
-
-      setProblemsSolved: (count) => set((state) => ({
-        assessmentAnswers: {
-          ...state.assessmentAnswers,
-          problemsSolved: count,
-        },
-      })),
-
-      setHoursPerDay: (hours) => set((state) => ({
-        assessmentAnswers: {
-          ...state.assessmentAnswers,
-          hoursPerDay: hours,
-        },
-      })),
-
-      setPatternFamiliarity: (pattern, level) => set((state) => {
-        const existing = state.assessmentAnswers.patternFamiliarity.filter(
-          (p) => p.pattern !== pattern
-        )
-        return {
+      setExperienceLevel: (level) =>
+        set((state) => ({
           assessmentAnswers: {
             ...state.assessmentAnswers,
-            patternFamiliarity: [...existing, { pattern, level }],
+            experienceLevel: level,
           },
-        }
-      }),
+        })),
 
-      resetWizard: () => set({
-        wizardStep: 'company',
-        selectedCompany: null,
-        selectedDate: null,
-        assessmentAnswers: { ...initialAssessmentAnswers },
-        error: null,
-      }),
+      setProblemsSolved: (count) =>
+        set((state) => ({
+          assessmentAnswers: {
+            ...state.assessmentAnswers,
+            problemsSolved: count,
+          },
+        })),
+
+      setHoursPerDay: (hours) =>
+        set((state) => ({
+          assessmentAnswers: {
+            ...state.assessmentAnswers,
+            hoursPerDay: hours,
+          },
+        })),
+
+      setPatternFamiliarity: (pattern, level) =>
+        set((state) => {
+          const existing = state.assessmentAnswers.patternFamiliarity.filter(
+            (p) => p.pattern !== pattern
+          )
+          return {
+            assessmentAnswers: {
+              ...state.assessmentAnswers,
+              patternFamiliarity: [...existing, { pattern, level }],
+            },
+          }
+        }),
+
+      resetWizard: () =>
+        set({
+          wizardStep: "company",
+          selectedCompany: null,
+          selectedDate: null,
+          assessmentAnswers: { ...initialAssessmentAnswers },
+          error: null,
+        }),
 
       // Roadmap actions
-      setActiveRoadmap: (roadmap) => set({
-        activeRoadmap: roadmap,
-        wizardStep: roadmap ? 'complete' : 'company',
-        selectedDayIndex: 0,
-      }),
+      setActiveRoadmap: (roadmap) =>
+        set({
+          activeRoadmap: roadmap,
+          wizardStep: roadmap ? "complete" : "company",
+          selectedDayIndex: 0,
+        }),
 
       markQuestionCompleted: (scenarioId, score, timeSpentMinutes) => {
         const state = get()
@@ -157,18 +175,18 @@ export const useRoadmapStore = create<RoadmapState>()(
           ...plan,
           questions: plan.questions.map((q) =>
             q.scenarioId === scenarioId
-              ? { ...q, status: 'completed' as const, completedAt: new Date(), score }
+              ? { ...q, status: "completed" as const, completedAt: new Date(), score }
               : q
           ),
         }))
 
         const allQuestions = updatedPlans.flatMap((p) => p.questions)
-        const completedCount = allQuestions.filter((q) => q.status === 'completed').length
+        const completedCount = allQuestions.filter((q) => q.status === "completed").length
 
         // Update pattern coverage - count per pattern
         const patternCoverage = state.activeRoadmap.patternCoverage.map((pc) => {
           const patternQuestions = allQuestions.filter((q) => q.pattern === pc.pattern)
-          const patternCompleted = patternQuestions.filter((q) => q.status === 'completed').length
+          const patternCompleted = patternQuestions.filter((q) => q.status === "completed").length
           const total = patternQuestions.length || pc.total
           return {
             ...pc,
@@ -198,29 +216,29 @@ export const useRoadmapStore = create<RoadmapState>()(
 
         // Sync to Firebase in the background
         if (state.activeRoadmap.id) {
-          (async () => {
+          ;(async () => {
             try {
               const token = await getCurrentUserToken()
               if (!token) {
-                console.error('Failed to sync progress: No auth token')
+                console.error("Failed to sync progress: No auth token")
                 return
               }
-              await fetch('/api/roadmap/progress', {
-                method: 'PATCH',
+              await fetch("/api/roadmap/progress", {
+                method: "PATCH",
                 headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify({
                   roadmapId: state.activeRoadmap!.id,
                   scenarioId,
-                  status: 'completed',
+                  status: "completed",
                   score,
                   timeSpentMinutes,
                 }),
               })
             } catch (error) {
-              console.error('Failed to sync progress to Firebase:', error)
+              console.error("Failed to sync progress to Firebase:", error)
             }
           })()
         }
@@ -233,15 +251,13 @@ export const useRoadmapStore = create<RoadmapState>()(
         const updatedPlans = state.activeRoadmap.dailyPlans.map((plan) => ({
           ...plan,
           questions: plan.questions.map((q) =>
-            q.scenarioId === scenarioId
-              ? { ...q, status: 'skipped' as const }
-              : q
+            q.scenarioId === scenarioId ? { ...q, status: "skipped" as const } : q
           ),
         }))
 
         const skippedCount = updatedPlans
           .flatMap((p) => p.questions)
-          .filter((q) => q.status === 'skipped').length
+          .filter((q) => q.status === "skipped").length
 
         const updatedRoadmap = {
           ...state.activeRoadmap,
@@ -255,52 +271,101 @@ export const useRoadmapStore = create<RoadmapState>()(
 
         // Sync to Firebase in the background
         if (state.activeRoadmap.id) {
-          (async () => {
+          ;(async () => {
             try {
               const token = await getCurrentUserToken()
               if (!token) {
-                console.error('Failed to sync progress: No auth token')
+                console.error("Failed to sync progress: No auth token")
                 return
               }
-              await fetch('/api/roadmap/progress', {
-                method: 'PATCH',
+              await fetch("/api/roadmap/progress", {
+                method: "PATCH",
                 headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify({
                   roadmapId: state.activeRoadmap!.id,
                   scenarioId,
-                  status: 'skipped',
+                  status: "skipped",
                 }),
               })
             } catch (error) {
-              console.error('Failed to sync progress to Firebase:', error)
+              console.error("Failed to sync progress to Firebase:", error)
             }
           })()
         }
       },
 
-      markQuestionPending: (scenarioId) => set((state) => {
-        if (!state.activeRoadmap) return state
+      markQuestionPending: (scenarioId) =>
+        set((state) => {
+          if (!state.activeRoadmap) return state
+
+          const updatedPlans = state.activeRoadmap.dailyPlans.map((plan) => ({
+            ...plan,
+            questions: plan.questions.map((q) =>
+              q.scenarioId === scenarioId
+                ? { ...q, status: "pending" as const, completedAt: undefined, score: undefined }
+                : q
+            ),
+          }))
+
+          return {
+            activeRoadmap: {
+              ...state.activeRoadmap,
+              dailyPlans: updatedPlans,
+              updatedAt: new Date(),
+            },
+          }
+        }),
+
+      markQuestionEvaluating: (scenarioId) => {
+        const state = get()
+        if (!state.activeRoadmap) return
 
         const updatedPlans = state.activeRoadmap.dailyPlans.map((plan) => ({
           ...plan,
           questions: plan.questions.map((q) =>
-            q.scenarioId === scenarioId
-              ? { ...q, status: 'pending' as const, completedAt: undefined, score: undefined }
-              : q
+            q.scenarioId === scenarioId ? { ...q, status: "evaluating" as const } : q
           ),
         }))
 
-        return {
-          activeRoadmap: {
-            ...state.activeRoadmap,
-            dailyPlans: updatedPlans,
-            updatedAt: new Date(),
-          },
+        const updatedRoadmap = {
+          ...state.activeRoadmap,
+          dailyPlans: updatedPlans,
+          updatedAt: new Date(),
         }
-      }),
+
+        // Update local state immediately (optimistic update)
+        set({ activeRoadmap: updatedRoadmap })
+
+        // Sync to Firebase in the background
+        if (state.activeRoadmap.id) {
+          ;(async () => {
+            try {
+              const token = await getCurrentUserToken()
+              if (!token) {
+                console.error("Failed to sync progress: No auth token")
+                return
+              }
+              await fetch("/api/roadmap/progress", {
+                method: "PATCH",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  roadmapId: state.activeRoadmap!.id,
+                  scenarioId,
+                  status: "evaluating",
+                }),
+              })
+            } catch (error) {
+              console.error("Failed to sync progress to Firebase:", error)
+            }
+          })()
+        }
+      },
 
       selectDay: (index) => set({ selectedDayIndex: index }),
 
@@ -336,11 +401,13 @@ export const useRoadmapStore = create<RoadmapState>()(
         const today = new Date()
         today.setHours(0, 0, 0, 0)
 
-        return roadmap.dailyPlans.find((plan) => {
-          const planDate = new Date(plan.date)
-          planDate.setHours(0, 0, 0, 0)
-          return planDate.getTime() === today.getTime()
-        }) || null
+        return (
+          roadmap.dailyPlans.find((plan) => {
+            const planDate = new Date(plan.date)
+            planDate.setHours(0, 0, 0, 0)
+            return planDate.getTime() === today.getTime()
+          }) || null
+        )
       },
 
       getProgress: () => {
@@ -369,7 +436,7 @@ export const useRoadmapStore = create<RoadmapState>()(
       },
     }),
     {
-      name: 'roadmap-storage',
+      name: "roadmap-storage",
       // IMPORTANT: Do NOT persist activeRoadmap - it must be loaded fresh from Firebase
       // to prevent cross-user data leaks when multiple users use the same browser
       partialize: (state) => ({

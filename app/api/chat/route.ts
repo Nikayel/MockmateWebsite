@@ -946,7 +946,7 @@ IMPORTANT: After this wrap-up, if the candidate says goodbye or acknowledges, gi
           reply: null,
           conversationEnded: true,
           endMessage:
-            "The interview session has ended. Click 'End Session' to see your detailed feedback and score breakdown.",
+            "The interview session has ended. Click 'Submit or View detailed feedback' to see your detailed feedback and score breakdown.",
         })
       }
 

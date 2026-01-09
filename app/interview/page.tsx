@@ -198,7 +198,8 @@ function InterviewPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
-  const { markQuestionCompleted, addActualTime, activeRoadmap } = useRoadmapStore()
+  const { markQuestionCompleted, markQuestionEvaluating, addActualTime, activeRoadmap } =
+    useRoadmapStore()
   // Use store for loading states so InterviewerChat component can see them
   const { isLoadingChat, isLoadingInterviewer, setIsLoadingChat, setIsLoadingInterviewer } =
     useInterviewStore()
@@ -1152,6 +1153,16 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           const sessionIdFromUrl = searchParams?.get("session")
           if (sessionIdFromUrl) {
             const firestoreState = await getSessionState(sessionIdFromUrl)
+
+            // If session was already submitted, redirect to results page
+            if (firestoreState?.completedAt) {
+              toast.info("Session already submitted", {
+                description: "Redirecting to your results...",
+              })
+              router.push(`/sessions/${sessionIdFromUrl}`)
+              return
+            }
+
             if (firestoreState?.savedAt) {
               remoteData = firestoreState
               remoteTimestamp = new Date(firestoreState.savedAt).getTime()
@@ -1184,6 +1195,16 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               )
               if (response.ok) {
                 const data = await response.json()
+
+                // If session was already submitted, redirect to results page
+                if (data.session?.completed_at) {
+                  toast.info("Session already submitted", {
+                    description: "Redirecting to your results...",
+                  })
+                  router.push(`/sessions/${sessionIdFromUrl}`)
+                  return
+                }
+
                 if (data.session?.session_state) {
                   remoteData = {
                     code: data.session.session_state.code,
@@ -2767,7 +2788,29 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
     setIsRunningTests(true) // Reuse this state for loading indicator
 
+    // Clear auto-save data immediately on submission to prevent session restoration
+    if (firebaseUser && selectedScenario) {
+      const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
+      try {
+        localStorage.removeItem(storageKey)
+      } catch (e) {
+        // Silent failure - localStorage might be unavailable
+      }
+    } else if (isGuestMode && selectedScenario) {
+      const storageKey = `interview_autosave_guest_${selectedScenario.id}`
+      try {
+        localStorage.removeItem(storageKey)
+      } catch (e) {
+        // Silent failure
+      }
+    }
+
     try {
+      // Mark question as evaluating in roadmap (if from roadmap)
+      if (isFromRoadmap && selectedScenario && activeRoadmap) {
+        markQuestionEvaluating(selectedScenario.id)
+      }
+
       // Generate feedback for system design based on conversation and design notes
       await triggerSystemDesignFeedback()
 
@@ -3311,6 +3354,28 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           playSound("milestone")
         } else {
           playSound("fail")
+        }
+
+        // Clear auto-save data immediately on submission to prevent session restoration
+        if (firebaseUser && selectedScenario) {
+          const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
+          try {
+            localStorage.removeItem(storageKey)
+          } catch (e) {
+            // Silent failure - localStorage might be unavailable
+          }
+        } else if (isGuestMode && selectedScenario) {
+          const storageKey = `interview_autosave_guest_${selectedScenario.id}`
+          try {
+            localStorage.removeItem(storageKey)
+          } catch (e) {
+            // Silent failure
+          }
+        }
+
+        // Mark question as evaluating in roadmap (if from roadmap)
+        if (isFromRoadmap && selectedScenario && activeRoadmap) {
+          markQuestionEvaluating(selectedScenario.id)
         }
 
         // Proceed to post-interview discussion
@@ -4656,7 +4721,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     Analyzing Your Performance
                   </h3>
                   <p className="mb-4 max-w-md text-center text-gray-400">
-                    Our AI is evaluating your code, communication, and problem-solving approach to
+                    We are evaluating your code, communication, and problem-solving approach to
                     generate comprehensive feedback...
                   </p>
                   <div className="flex items-center gap-2 text-sm text-gray-500">

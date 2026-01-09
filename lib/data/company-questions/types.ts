@@ -156,7 +156,7 @@ export interface DailyPlan {
     pattern: DSAPattern
     difficulty: "easy" | "medium" | "hard"
     estimatedMinutes: number
-    status: "pending" | "in_progress" | "completed" | "skipped"
+    status: "pending" | "in_progress" | "completed" | "skipped" | "evaluating"
     completedAt?: Date
     score?: number
   }[]

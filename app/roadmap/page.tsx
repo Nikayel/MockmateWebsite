@@ -499,9 +499,9 @@ export default function RoadmapPage() {
     ? generatePersonalizedGuide(roadmap.assessment, roadmap.totalQuestions)
     : null
 
-  // Get first pending question for primary CTA
+  // Get first pending question for primary CTA (evaluating questions are shown but not as "next")
   const nextQuestion = todayPlan?.questions.find(
-    (q) => q.status === "pending" || q.status === "in_progress"
+    (q) => q.status === "pending" || q.status === "in_progress" || q.status === "evaluating"
   )
   const todayCompleted = todayPlan?.questions.filter((q) => q.status === "completed").length || 0
   const todayTotal = todayPlan?.questions.length || 0
