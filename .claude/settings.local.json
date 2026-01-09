@@ -48,7 +48,16 @@
       "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:$PATH\" npx tsc:*)",
       "Bash(/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin/npx tsc:*)",
       "Bash(export PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:$PATH\")",
-      "Bash(/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin/node /Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin/npx tsc:*)"
+      "Bash(/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin/node /Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin/npx tsc:*)",
+      "Bash(/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin/node:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:$PATH\" git commit:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:$PATH\" git push:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:$PATH\" /Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin/node ./node_modules/next/dist/bin/next build:*)",
+      "Bash(/usr/local/bin/pnpm run build:*)",
+      "Bash(source /Users/nikayeljamal/.nvm/nvm.sh)",
+      "Bash(nvm use:*)",
+      "Bash(pnpm install:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:$PATH\" git commit -m \"$\\(cat <<''EOF''\nfix: security hardening and performance improvements\n\nSecurity fixes:\n- Add authentication to agents/recommendations and agents/hints routes\n- Add Firestore transaction to roadmap/progress to prevent race conditions\n- Add input validation \\(max length\\) to execute, chat, generate-feedback routes\n- Add rate limiting to create-checkout, customer-portal, promo-code routes\n- Add promoCodeRateLimit \\(5/hour\\) to prevent brute-force attacks\n\nCode quality:\n- Replace console.log/error with structured logger in API routes\n- Standardize error response formats\n\nPerformance:\n- Add @next/bundle-analyzer for build analysis\n- Add build:analyze script to package.json\nEOF\n\\)\")"
     ]
   }
 }

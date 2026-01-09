@@ -78,12 +78,12 @@ export async function GET(request: NextRequest) {
       const data = doc.data()
       return {
         id: doc.id,
-        title: data.title,
-        message: data.message,
-        type: data.type,
-        priority: data.priority,
-        targetAudience: data.targetAudience,
-        targetUserIds: data.targetUserIds,
+        title: data.title || "",
+        message: data.message || "",
+        type: data.type || "banner",
+        priority: data.priority || "info",
+        targetAudience: data.targetAudience || "all",
+        targetUserIds: data.targetUserIds || [],
         startDate: data.startDate?.toDate?.()?.toISOString() || data.startDate,
         endDate: data.endDate?.toDate?.()?.toISOString() || data.endDate,
         dismissible: data.dismissible ?? true,

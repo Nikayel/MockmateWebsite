@@ -33,7 +33,8 @@ export function Header() {
 
   return (
     <header
-      className={`fixed top-0 z-50 w-full transition-all duration-500 ${
+      style={{ top: "var(--announcement-banner-height, 0px)" }}
+      className={`fixed right-0 left-0 z-50 w-full transition-all duration-500 ${
         isScrolled ? "glass-minimal border-accent/10 border-b" : "bg-transparent"
       }`}
     >

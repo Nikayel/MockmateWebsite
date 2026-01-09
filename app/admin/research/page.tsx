@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context"
 import { AdminLayout, DataTable, renderBadge } from "@/components/admin/shared"
 import { useResearchData } from "@/lib/hooks/useResearchData"
 import { useEnhancedResearch } from "@/lib/hooks/useEnhancedResearch"
+import { useResearchUsers } from "@/lib/hooks/useResearchUsers"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,7 @@ import {
   SampleSizeAnalysisPanel,
   QualityScorePanel,
   RecommendationsPanel,
+  UserAlgorithmBreakdown,
 } from "@/components/admin/research"
 import {
   FlaskConical,
@@ -45,6 +47,7 @@ import {
   FileJson,
   FileSpreadsheet,
   ChevronDown,
+  Users,
 } from "lucide-react"
 
 // Helper component for trend indicators
@@ -79,6 +82,11 @@ function TrendIndicator({ label, direction, slope }: TrendIndicatorProps) {
 export default function ResearchDashboard() {
   const { firebaseUser } = useAuth()
   const [activeTab, setActiveTab] = useState("overview")
+  const [exportStatus, setExportStatus] = useState<{
+    loading: boolean
+    message: string | null
+    type: "success" | "error" | null
+  }>({ loading: false, message: null, type: null })
 
   // Basic research data
   const {
@@ -97,8 +105,41 @@ export default function ResearchDashboard() {
   const {
     data: enhancedData,
     loading: enhancedLoading,
-    exportData,
+    exportData: rawExportData,
   } = useEnhancedResearch(firebaseUser)
+
+  // Wrap export to show status
+  const exportData = async (
+    format: "csv" | "json",
+    type: "events" | "summary" | "comparison",
+    range?: string
+  ) => {
+    setExportStatus({ loading: true, message: null, type: null })
+    try {
+      await rawExportData(format, type, range)
+      setExportStatus({
+        loading: false,
+        message: `Exported ${type} as ${format.toUpperCase()}`,
+        type: "success",
+      })
+      // Clear success message after 3 seconds
+      setTimeout(() => setExportStatus({ loading: false, message: null, type: null }), 3000)
+    } catch {
+      setExportStatus({
+        loading: false,
+        message: "Export failed. Please try again.",
+        type: "error",
+      })
+    }
+  }
+
+  // Users with algorithm breakdown
+  const {
+    data: usersData,
+    loading: usersLoading,
+    setParams: setUsersParams,
+    params: usersParams,
+  } = useResearchUsers(firebaseUser)
 
   const { distribution, comparison, insights, recentEvents } = data || {}
   const sm2Stats = comparison?.sm2
@@ -118,11 +159,37 @@ export default function ResearchDashboard() {
       refreshing={refreshing}
       actions={
         <>
+          {/* Export Status */}
+          {exportStatus.message && (
+            <div
+              className={`flex items-center gap-2 rounded px-3 py-1.5 text-sm ${
+                exportStatus.type === "success"
+                  ? "bg-green-500/10 text-green-400"
+                  : "bg-red-500/10 text-red-400"
+              }`}
+            >
+              {exportStatus.type === "success" ? (
+                <CheckCircle className="h-4 w-4" />
+              ) : (
+                <XCircle className="h-4 w-4" />
+              )}
+              {exportStatus.message}
+            </div>
+          )}
+
           {/* Export Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800">
-                <Download className="mr-2 h-4 w-4" />
+              <Button
+                variant="outline"
+                className="border-gray-700 text-gray-300 hover:bg-gray-800"
+                disabled={exportStatus.loading}
+              >
+                {exportStatus.loading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
                 Export
                 <ChevronDown className="ml-2 h-4 w-4" />
               </Button>
@@ -188,6 +255,55 @@ export default function ResearchDashboard() {
         </>
       }
     >
+      {/* Data Health Summary */}
+      <Card className="border-gray-800 bg-gray-900/50">
+        <CardContent className="py-3">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Algorithm Assignment Status */}
+              <div className="flex items-center gap-2">
+                {totalUsers > 0 ? (
+                  <CheckCircle className="h-4 w-4 text-green-400" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                )}
+                <span className="text-sm text-gray-300">{totalUsers} users assigned</span>
+              </div>
+
+              {/* Event Tracking Status */}
+              <div className="flex items-center gap-2">
+                {(recentEvents?.length || 0) > 0 ? (
+                  <CheckCircle className="h-4 w-4 text-green-400" />
+                ) : (
+                  <Clock className="h-4 w-4 text-yellow-400" />
+                )}
+                <span className="text-sm text-gray-300">
+                  {recentEvents?.length || 0} events tracked
+                </span>
+              </div>
+
+              {/* Statistical Power Status */}
+              <div className="flex items-center gap-2">
+                {comp?.sufficient_sample_size ? (
+                  <CheckCircle className="h-4 w-4 text-green-400" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                )}
+                <span className="text-sm text-gray-300">
+                  {comp?.sufficient_sample_size ? "Sufficient sample" : "Need more data"}
+                </span>
+              </div>
+            </div>
+
+            {/* Last Updated */}
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <Database className="h-3 w-3" />
+              Updated: {data?.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : "Never"}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Distribution Overview */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <AlgorithmCard
@@ -245,7 +361,7 @@ export default function ResearchDashboard() {
       {/* Winner Banner */}
       {comp && (
         <WinnerBanner
-          winner={comp.overall_winner}
+          winner={comp.overall_winner as "sm2" | "fsrs" | null}
           confidence={comp.confidence_level}
           fsrsWins={comp.fsrs_wins_count}
           sm2Wins={comp.sm2_wins_count}
@@ -290,7 +406,7 @@ export default function ResearchDashboard() {
 
       {/* Primary Metrics Comparison */}
       {sm2Stats && fsrsStats && comp && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <MetricComparisonCard
             title="Retention Rate"
             sm2Value={sm2Stats.average_retention_rate}
@@ -342,53 +458,133 @@ export default function ResearchDashboard() {
 
       {/* Tabbed Advanced Analysis Section */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-gray-800/50">
-          <TabsTrigger value="overview" className="data-[state=active]:bg-gray-700">
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="statistics" className="data-[state=active]:bg-gray-700">
-            Statistics
-          </TabsTrigger>
-          <TabsTrigger value="predictions" className="data-[state=active]:bg-gray-700">
-            Predictions
-          </TabsTrigger>
-          <TabsTrigger value="events" className="data-[state=active]:bg-gray-700">
-            Events
-          </TabsTrigger>
-        </TabsList>
+        <div className="-mx-1 overflow-x-auto px-1 pb-2">
+          <TabsList className="inline-flex w-full min-w-max bg-gray-800/50 md:grid md:grid-cols-5">
+            <TabsTrigger
+              value="overview"
+              className="flex-1 whitespace-nowrap data-[state=active]:bg-gray-700"
+            >
+              Overview
+            </TabsTrigger>
+            <TabsTrigger
+              value="users"
+              className="flex-1 whitespace-nowrap data-[state=active]:bg-gray-700"
+            >
+              <Users className="mr-1 h-4 w-4" />
+              Users
+            </TabsTrigger>
+            <TabsTrigger
+              value="statistics"
+              className="flex-1 whitespace-nowrap data-[state=active]:bg-gray-700"
+            >
+              Statistics
+            </TabsTrigger>
+            <TabsTrigger
+              value="predictions"
+              className="flex-1 whitespace-nowrap data-[state=active]:bg-gray-700"
+            >
+              Predictions
+            </TabsTrigger>
+            <TabsTrigger
+              value="events"
+              className="flex-1 whitespace-nowrap data-[state=active]:bg-gray-700"
+            >
+              Events
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Overview Tab - Research Quality & Recommendations */}
         <TabsContent value="overview" className="space-y-4">
-          {enhancedData && (
+          {enhancedLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-[#00d9ff]" />
+              <span className="ml-2 text-gray-400">Loading enhanced analysis...</span>
+            </div>
+          ) : enhancedData ? (
             <>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <QualityScorePanel qualityScore={enhancedData.qualityScore} />
                 <SampleSizeAnalysisPanel analysis={enhancedData.sampleAnalysis} />
               </div>
               <RecommendationsPanel recommendations={enhancedData.recommendations} />
             </>
+          ) : (
+            <Card className="border-gray-800 bg-gray-900/50">
+              <CardContent className="py-12">
+                <div className="text-center">
+                  <FlaskConical className="mx-auto mb-4 h-12 w-12 text-gray-600" />
+                  <h3 className="mb-2 text-lg font-medium text-white">
+                    Research Analysis Unavailable
+                  </h3>
+                  <p className="mx-auto max-w-md text-sm text-gray-400">
+                    Enhanced research analysis could not be loaded. This may happen if there is no
+                    research data yet or if there was a connection issue.
+                  </p>
+                  <Button
+                    onClick={() => loadData(true)}
+                    variant="outline"
+                    className="mt-4 border-gray-700 text-gray-300 hover:bg-gray-800"
+                  >
+                    <Repeat className="mr-2 h-4 w-4" />
+                    Retry
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           )}
-          {enhancedLoading && (
+        </TabsContent>
+
+        {/* Users Tab - Algorithm Breakdown by User */}
+        <TabsContent value="users" className="space-y-4">
+          {usersData ? (
+            <UserAlgorithmBreakdown
+              users={usersData.users}
+              pagination={usersData.pagination}
+              aggregateStats={usersData.aggregateStats}
+              patternStats={usersData.patternStats}
+              loading={usersLoading}
+              onParamsChange={setUsersParams}
+              currentParams={usersParams}
+            />
+          ) : usersLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-[#00d9ff]" />
-              <span className="ml-2 text-gray-400">Loading enhanced analysis...</span>
+              <span className="ml-2 text-gray-400">Loading user data...</span>
             </div>
+          ) : (
+            <div className="py-8 text-center text-gray-400">No user data available</div>
           )}
         </TabsContent>
 
         {/* Statistics Tab - Significance Tests */}
         <TabsContent value="statistics" className="space-y-4">
-          {enhancedData?.significanceTests && (
+          {enhancedLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-[#00d9ff]" />
+              <span className="ml-2 text-gray-400">Computing statistical analysis...</span>
+            </div>
+          ) : enhancedData?.significanceTests ? (
             <>
-              <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
-                <BarChart3 className="h-5 w-5 text-[#00d9ff]" />
-                Statistical Significance Tests
-              </h3>
-              <p className="mb-4 text-sm text-gray-400">
-                T-tests comparing SM-2 and FSRS performance. p &lt; 0.05 indicates statistical
-                significance.
-              </p>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
+                    <BarChart3 className="h-5 w-5 text-[#00d9ff]" />
+                    Statistical Significance Tests
+                  </h3>
+                  <p className="text-sm text-gray-400">
+                    T-tests comparing SM-2 and FSRS performance. p &lt; 0.05 indicates statistical
+                    significance.
+                  </p>
+                </div>
+                {enhancedData.metadata && (
+                  <Badge variant="outline" className="border-gray-700 text-gray-400">
+                    {enhancedData.metadata.totalEventsAnalyzed.toLocaleString()} events analyzed
+                  </Badge>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <SignificanceTestCard
                   title="Retention Rate"
                   test={enhancedData.significanceTests.retention}
@@ -406,9 +602,40 @@ export default function ResearchDashboard() {
                 />
               </div>
 
+              {/* Additional Tests - Placeholders */}
+              <Card className="border-gray-800 bg-gray-900/50">
+                <CardContent className="py-4">
+                  <h4 className="mb-3 text-sm font-medium text-gray-300">
+                    Additional Metrics (Coming Soon)
+                  </h4>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                    <div className="flex items-center gap-2 rounded bg-gray-800/50 p-2">
+                      <Clock className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm text-gray-400">Time to Mastery comparison</span>
+                      <Badge
+                        variant="outline"
+                        className="ml-auto border-gray-700 text-xs text-gray-500"
+                      >
+                        Pending
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 rounded bg-gray-800/50 p-2">
+                      <Activity className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm text-gray-400">Daily Reviews comparison</span>
+                      <Badge
+                        variant="outline"
+                        className="ml-auto border-gray-700 text-xs text-gray-500"
+                      >
+                        Pending
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Confidence Intervals */}
               {enhancedData.confidenceIntervals && (
-                <Card className="mt-4 border-gray-800 bg-gray-900/50">
+                <Card className="border-gray-800 bg-gray-900/50">
                   <CardHeader>
                     <CardTitle className="text-base">95% Confidence Intervals</CardTitle>
                   </CardHeader>
@@ -420,21 +647,17 @@ export default function ResearchDashboard() {
                           <div className="flex justify-between">
                             <span className="text-gray-400">Retention</span>
                             <span className="text-gray-300">
-                              {(enhancedData.confidenceIntervals.sm2Retention.lower * 100).toFixed(
-                                1
-                              )}
-                              % -{" "}
-                              {(enhancedData.confidenceIntervals.sm2Retention.upper * 100).toFixed(
-                                1
-                              )}
-                              %
+                              {enhancedData.confidenceIntervals.sm2Retention
+                                ? `${(enhancedData.confidenceIntervals.sm2Retention.lower * 100).toFixed(1)}% - ${(enhancedData.confidenceIntervals.sm2Retention.upper * 100).toFixed(1)}%`
+                                : "Insufficient data"}
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-400">Score</span>
                             <span className="text-gray-300">
-                              {enhancedData.confidenceIntervals.sm2Score.lower.toFixed(1)} -{" "}
-                              {enhancedData.confidenceIntervals.sm2Score.upper.toFixed(1)}
+                              {enhancedData.confidenceIntervals.sm2Score
+                                ? `${enhancedData.confidenceIntervals.sm2Score.lower.toFixed(1)} - ${enhancedData.confidenceIntervals.sm2Score.upper.toFixed(1)}`
+                                : "Insufficient data"}
                             </span>
                           </div>
                         </div>
@@ -445,21 +668,17 @@ export default function ResearchDashboard() {
                           <div className="flex justify-between">
                             <span className="text-gray-400">Retention</span>
                             <span className="text-gray-300">
-                              {(enhancedData.confidenceIntervals.fsrsRetention.lower * 100).toFixed(
-                                1
-                              )}
-                              % -{" "}
-                              {(enhancedData.confidenceIntervals.fsrsRetention.upper * 100).toFixed(
-                                1
-                              )}
-                              %
+                              {enhancedData.confidenceIntervals.fsrsRetention
+                                ? `${(enhancedData.confidenceIntervals.fsrsRetention.lower * 100).toFixed(1)}% - ${(enhancedData.confidenceIntervals.fsrsRetention.upper * 100).toFixed(1)}%`
+                                : "Insufficient data"}
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-400">Score</span>
                             <span className="text-gray-300">
-                              {enhancedData.confidenceIntervals.fsrsScore.lower.toFixed(1)} -{" "}
-                              {enhancedData.confidenceIntervals.fsrsScore.upper.toFixed(1)}
+                              {enhancedData.confidenceIntervals.fsrsScore
+                                ? `${enhancedData.confidenceIntervals.fsrsScore.lower.toFixed(1)} - ${enhancedData.confidenceIntervals.fsrsScore.upper.toFixed(1)}`
+                                : "Insufficient data"}
                             </span>
                           </div>
                         </div>
@@ -469,17 +688,32 @@ export default function ResearchDashboard() {
                 </Card>
               )}
             </>
-          )}
-          {enhancedLoading && (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-[#00d9ff]" />
-            </div>
+          ) : (
+            <Card className="border-gray-800 bg-gray-900/50">
+              <CardContent className="py-12">
+                <div className="text-center">
+                  <BarChart3 className="mx-auto mb-4 h-12 w-12 text-gray-600" />
+                  <h3 className="mb-2 text-lg font-medium text-white">
+                    Statistical Analysis Unavailable
+                  </h3>
+                  <p className="mx-auto max-w-md text-sm text-gray-400">
+                    Not enough data to compute statistical tests. Need at least 30 events per
+                    algorithm for meaningful t-tests.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 
         {/* Predictions Tab - Accuracy Metrics */}
         <TabsContent value="predictions" className="space-y-4">
-          {enhancedData?.predictionAccuracy && (
+          {enhancedLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-[#00d9ff]" />
+              <span className="ml-2 text-gray-400">Computing prediction metrics...</span>
+            </div>
+          ) : enhancedData?.predictionAccuracy ? (
             <>
               <PredictionAccuracyPanel
                 sm2Metrics={enhancedData.predictionAccuracy.sm2}
@@ -488,7 +722,7 @@ export default function ResearchDashboard() {
               />
 
               {/* Trend Analysis */}
-              {enhancedData.trends && (
+              {enhancedData.trends ? (
                 <Card className="border-gray-800 bg-gray-900/50">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
@@ -497,43 +731,94 @@ export default function ResearchDashboard() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       <TrendIndicator
                         label="SM-2 Retention"
-                        direction={enhancedData.trends.sm2Retention.direction}
-                        slope={enhancedData.trends.sm2Retention.slope}
+                        direction={enhancedData.trends.sm2Retention?.direction || "stable"}
+                        slope={enhancedData.trends.sm2Retention?.slope || 0}
                       />
                       <TrendIndicator
                         label="FSRS Retention"
-                        direction={enhancedData.trends.fsrsRetention.direction}
-                        slope={enhancedData.trends.fsrsRetention.slope}
+                        direction={enhancedData.trends.fsrsRetention?.direction || "stable"}
+                        slope={enhancedData.trends.fsrsRetention?.slope || 0}
                       />
                       <TrendIndicator
                         label="SM-2 Score"
-                        direction={enhancedData.trends.sm2Score.direction}
-                        slope={enhancedData.trends.sm2Score.slope}
+                        direction={enhancedData.trends.sm2Score?.direction || "stable"}
+                        slope={enhancedData.trends.sm2Score?.slope || 0}
                       />
                       <TrendIndicator
                         label="FSRS Score"
-                        direction={enhancedData.trends.fsrsScore.direction}
-                        slope={enhancedData.trends.fsrsScore.slope}
+                        direction={enhancedData.trends.fsrsScore?.direction || "stable"}
+                        slope={enhancedData.trends.fsrsScore?.slope || 0}
                       />
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="border-gray-800 bg-gray-900/50">
+                  <CardContent className="py-8">
+                    <div className="text-center">
+                      <TrendingUp className="mx-auto mb-2 h-8 w-8 text-gray-600" />
+                      <p className="text-sm text-gray-400">
+                        Trend data requires at least 7 days of events
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
               )}
             </>
-          )}
-          {enhancedLoading && (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-[#00d9ff]" />
-            </div>
+          ) : (
+            <Card className="border-gray-800 bg-gray-900/50">
+              <CardContent className="py-12">
+                <div className="text-center">
+                  <Target className="mx-auto mb-4 h-12 w-12 text-gray-600" />
+                  <h3 className="mb-2 text-lg font-medium text-white">
+                    Prediction Metrics Unavailable
+                  </h3>
+                  <p className="mx-auto max-w-md text-sm text-gray-400">
+                    Not enough data to compute prediction accuracy. Metrics will appear once users
+                    complete more reviews with both algorithms.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 
         {/* Events Tab - Recent Activity */}
         <TabsContent value="events" className="space-y-4">
-          {recentEvents && (
+          {/* Event Tracking Health Check */}
+          <Card className="border-gray-800 bg-gray-900/50">
+            <CardContent className="py-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    {recentEvents && recentEvents.length > 0 ? (
+                      <>
+                        <CheckCircle className="h-5 w-5 text-green-400" />
+                        <span className="text-sm text-green-400">Events tracking active</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="h-5 w-5 text-yellow-400" />
+                        <span className="text-sm text-yellow-400">No events recorded yet</span>
+                      </>
+                    )}
+                  </div>
+                  <Badge variant="outline" className="border-gray-700 text-gray-400">
+                    {recentEvents?.length || 0} recent events
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <Clock className="h-3 w-3" />
+                  Last checked: {new Date().toLocaleTimeString()}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {recentEvents && recentEvents.length > 0 ? (
             <DataTable
               title="Recent Review Events"
               description="Latest spaced repetition reviews across both algorithms"
@@ -543,43 +828,73 @@ export default function ResearchDashboard() {
                   key: "algorithm",
                   label: "Algorithm",
                   render: (value) =>
-                    renderBadge(value.toUpperCase(), value === "fsrs" ? "default" : "default"),
+                    renderBadge(
+                      value?.toUpperCase() || "N/A",
+                      value === "fsrs" ? "default" : "default"
+                    ),
                 },
-                { key: "pattern", label: "Pattern" },
+                {
+                  key: "pattern",
+                  label: "Pattern",
+                  render: (value) => (
+                    <span className="capitalize">{(value || "unknown").replace(/_/g, " ")}</span>
+                  ),
+                },
                 {
                   key: "difficulty",
                   label: "Difficulty",
                   render: (value) =>
                     renderBadge(
-                      value,
+                      value || "medium",
                       value === "easy" ? "success" : value === "medium" ? "warning" : "error"
                     ),
                 },
-                { key: "score", label: "Score", align: "right" },
+                {
+                  key: "score",
+                  label: "Score",
+                  align: "right",
+                  render: (value) => (
+                    <span
+                      className={
+                        value >= 70
+                          ? "text-green-400"
+                          : value >= 50
+                            ? "text-yellow-400"
+                            : "text-red-400"
+                      }
+                    >
+                      {value ?? "-"}
+                    </span>
+                  ),
+                },
                 {
                   key: "interval_days",
                   label: "Next Interval",
                   align: "right",
-                  render: (v) => `${v}d`,
+                  render: (v) => (v ? `${v}d` : "-"),
                 },
                 {
                   key: "actual_retention",
-                  label: "Retention",
+                  label: "Retained",
                   align: "center",
                   render: (value) =>
-                    value ? (
+                    value === true ? (
                       <CheckCircle className="mx-auto h-4 w-4 text-green-400" />
-                    ) : (
+                    ) : value === false ? (
                       <XCircle className="mx-auto h-4 w-4 text-red-400" />
+                    ) : (
+                      <Minus className="mx-auto h-4 w-4 text-gray-500" />
                     ),
                 },
                 {
                   key: "retention_as_predicted",
-                  label: "Predicted",
+                  label: "Predicted OK",
                   align: "center",
                   render: (value) =>
-                    value ? (
+                    value === true ? (
                       <CheckCircle className="mx-auto h-4 w-4 text-[#00d9ff]" />
+                    ) : value === false ? (
+                      <XCircle className="mx-auto h-4 w-4 text-orange-400" />
                     ) : (
                       <Minus className="mx-auto h-4 w-4 text-gray-500" />
                     ),
@@ -587,12 +902,53 @@ export default function ResearchDashboard() {
                 {
                   key: "timestamp",
                   label: "Time",
-                  render: (value) => new Date(value).toLocaleString(),
+                  render: (value) =>
+                    value ? (
+                      <span className="text-xs text-gray-400">
+                        {new Date(value).toLocaleDateString()}{" "}
+                        {new Date(value).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    ) : (
+                      "-"
+                    ),
                 },
               ]}
-              keyExtractor={(event) => event.id}
+              keyExtractor={(event) => event.id || `${event.timestamp}-${Math.random()}`}
               emptyMessage="No review events recorded yet. Data will appear as users practice."
             />
+          ) : (
+            <Card className="border-gray-800 bg-gray-900/50">
+              <CardContent className="py-12">
+                <div className="text-center">
+                  <Database className="mx-auto mb-4 h-12 w-12 text-gray-600" />
+                  <h3 className="mb-2 text-lg font-medium text-white">No Events Recorded</h3>
+                  <p className="mx-auto max-w-md text-sm text-gray-400">
+                    Review events will appear here once users start practicing with spaced
+                    repetition. Events are recorded each time a user completes a review session.
+                  </p>
+                  <div className="mt-6 rounded-lg border border-gray-700 bg-gray-800/50 p-4">
+                    <h4 className="mb-2 text-sm font-medium text-gray-300">Tracking Checklist</h4>
+                    <ul className="space-y-1 text-left text-xs text-gray-400">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-3 w-3 text-green-400" />
+                        Event tracking code deployed
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Clock className="h-3 w-3 text-yellow-400" />
+                        Waiting for user activity
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <AlertTriangle className="h-3 w-3 text-gray-500" />
+                        Check if algorithm assignment is working
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
       </Tabs>
@@ -662,7 +1018,21 @@ function AlgorithmCard({
   )
 }
 
-function WinnerBanner({ winner, confidence, fsrsWins, sm2Wins, sufficientSample }: any) {
+interface WinnerBannerProps {
+  winner: "sm2" | "fsrs" | null
+  confidence: number | null
+  fsrsWins: number
+  sm2Wins: number
+  sufficientSample: boolean
+}
+
+function WinnerBanner({
+  winner,
+  confidence,
+  fsrsWins,
+  sm2Wins,
+  sufficientSample,
+}: WinnerBannerProps) {
   return (
     <Card
       className={`border-2 ${
@@ -717,7 +1087,14 @@ function WinnerBanner({ winner, confidence, fsrsWins, sm2Wins, sufficientSample 
   )
 }
 
-function InsightSection({ title, icon: Icon, items, color }: any) {
+interface InsightSectionProps {
+  title: string
+  icon: React.ComponentType<{ className?: string }>
+  items: string[]
+  color: "green" | "cyan"
+}
+
+function InsightSection({ title, icon: Icon, items, color }: InsightSectionProps) {
   const dotColor = color === "green" ? "text-green-400" : "text-[#00d9ff]"
   const iconColor = color === "green" ? "text-green-400" : "text-[#00d9ff]"
 

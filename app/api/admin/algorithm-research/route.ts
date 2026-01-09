@@ -10,17 +10,17 @@
  * Requires admin authentication
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
-import { verifyAdminAccess } from '@/lib/admin/middleware'
+import { NextRequest, NextResponse } from "next/server"
+import { adminDb } from "@/lib/firebase-admin"
+import { verifyAdminAccess } from "@/lib/admin/middleware"
 import {
   getAlgorithmDistribution,
   migrateExistingUsers,
   getAggregateComparison,
   generateAggregateComparison,
   getRecentEvents,
-} from '@/lib/spaced-repetition'
-import type { AlgorithmComparisonAggregate } from '@/lib/types'
+} from "@/lib/spaced-repetition"
+import type { AlgorithmComparisonAggregate } from "@/lib/types"
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Firebase Admin SDK not initialized.',
+          error: "Firebase Admin SDK not initialized.",
         },
         { status: 500 }
       )
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     // Parse query params
     const { searchParams } = new URL(request.url)
-    const forceRefresh = searchParams.get('refresh') === 'true'
+    const forceRefresh = searchParams.get("refresh") === "true"
 
     // Get algorithm distribution
     const distribution = await getAlgorithmDistribution()
@@ -77,12 +77,12 @@ export async function GET(request: NextRequest) {
         distribution,
         comparison,
         recentEvents: recentEvents.map((event) => ({
-          id: event.id || '',
-          algorithm: event.algorithm || 'sm2',
+          id: event.id || "",
+          algorithm: event.algorithm || "sm2",
           score: event.score ?? 0,
           quality_rating: event.quality_rating ?? 0,
-          pattern: event.pattern || 'Unknown',
-          difficulty: event.difficulty || 'medium',
+          pattern: event.pattern || "Unknown",
+          difficulty: event.difficulty || "medium",
           pre_retention: event.pre_review?.predicted_retention ?? 0,
           actual_retention: event.actual_retention ?? false,
           retention_as_predicted: event.retention_as_predicted ?? false,
@@ -94,11 +94,11 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Admin algorithm research API error:', error)
+    console.error("Admin algorithm research API error:", error)
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
     )
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
   try {
     if (!adminDb) {
       return NextResponse.json(
-        { success: false, error: 'Firebase Admin SDK not initialized.' },
+        { success: false, error: "Firebase Admin SDK not initialized." },
         { status: 500 }
       )
     }
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
     const { action } = body
 
     switch (action) {
-      case 'migrate': {
+      case "migrate": {
         const result = await migrateExistingUsers()
         return NextResponse.json({
           success: true,
@@ -142,18 +142,18 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      case 'regenerate': {
+      case "regenerate": {
         const comparison = await generateAggregateComparison()
         return NextResponse.json({
           success: true,
-          message: 'Aggregate comparison regenerated',
+          message: "Aggregate comparison regenerated",
           data: comparison,
         })
       }
 
-      case 'migrate-notification-preferences': {
+      case "migrate-notification-preferences": {
         // Backfill notification preferences for existing users
-        const profiles = await adminDb.collection('profiles').get()
+        const profiles = await adminDb.collection("profiles").get()
         let migrated = 0
         const batch = adminDb.batch()
 
@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      case 'backfill-research': {
+      case "backfill-research": {
         // Backfill research data from existing problem mastery and session summaries
         // This populates algorithm_research_metrics for users who practiced before tracking was added
         const result = await backfillResearchData()
@@ -202,11 +202,11 @@ export async function POST(request: NextRequest) {
         )
     }
   } catch (error) {
-    console.error('Admin algorithm research POST error:', error)
+    console.error("Admin algorithm research POST error:", error)
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
     )
@@ -233,43 +233,43 @@ async function backfillResearchData(): Promise<{
 
   try {
     // Get all user profiles
-    const profilesSnap = await adminDb.collection('profiles').get()
-    const userIds = profilesSnap.docs.map(doc => doc.id)
+    const profilesSnap = await adminDb.collection("profiles").get()
+    const userIds = profilesSnap.docs.map((doc) => doc.id)
 
     for (const userId of userIds) {
       try {
         result.usersProcessed++
 
         // Get user's algorithm assignment
-        const profileData = profilesSnap.docs.find(d => d.id === userId)?.data()
-        const algorithm = (profileData?.spaced_repetition_algorithm || 'sm2') as 'sm2' | 'fsrs'
+        const profileData = profilesSnap.docs.find((d) => d.id === userId)?.data()
+        const algorithm = (profileData?.spaced_repetition_algorithm || "sm2") as "sm2" | "fsrs"
 
         // Check if research summary already exists
         const existingSummary = await adminDb
-          .collection('algorithm_research_metrics')
+          .collection("algorithm_research_metrics")
           .doc(userId)
-          .collection('summary')
-          .doc('current')
+          .collection("summary")
+          .doc("current")
           .get()
 
         // Get problem mastery data
         const masterySnap = await adminDb
-          .collection('user_problem_mastery')
+          .collection("user_problem_mastery")
           .doc(userId)
-          .collection('problems')
+          .collection("problems")
           .get()
 
         // Get session summaries
         const sessionsSnap = await adminDb
-          .collection('users')
+          .collection("users")
           .doc(userId)
-          .collection('session_summaries')
-          .orderBy('completedAt', 'desc')
+          .collection("session_summaries")
+          .orderBy("completedAt", "desc")
           .limit(100)
           .get()
 
-        const sessions = sessionsSnap.docs.map(d => d.data())
-        const masteryDocs = masterySnap.docs.map(d => d.data())
+        const sessions = sessionsSnap.docs.map((d) => d.data())
+        const masteryDocs = masterySnap.docs.map((d) => d.data())
 
         // Skip if no data to backfill
         if (sessions.length === 0 && masteryDocs.length === 0) {
@@ -281,22 +281,69 @@ async function backfillResearchData(): Promise<{
           const totalReviews = masteryDocs.reduce((sum, m) => sum + (m.review_count || 1), 0)
           const totalScore = sessions.reduce((sum, s) => sum + (s.performanceScore || 0), 0)
           const avgScore = sessions.length > 0 ? Math.round(totalScore / sessions.length) : 0
-          const retainedCount = sessions.filter(s => (s.performanceScore || 0) >= 56).length
-          const retentionRate = sessions.length > 0 ? Math.round((retainedCount / sessions.length) * 100) : 0
-          const problemsMastered = masteryDocs.filter(m =>
-            m.mastery_level === 'mastered' || m.mastery_level === 'reviewing'
+          const retainedCount = sessions.filter((s) => (s.performanceScore || 0) >= 56).length
+          const retentionRate =
+            sessions.length > 0 ? Math.round((retainedCount / sessions.length) * 100) : 0
+          const problemsMastered = masteryDocs.filter(
+            (m) => m.mastery_level === "mastered" || m.mastery_level === "reviewing"
           ).length
 
           const totalMinutes = sessions.reduce((sum, s) => sum + (s.durationMinutes || 0), 0)
 
           // Get first and last review dates
-          const sortedSessions = [...sessions].sort((a, b) =>
-            new Date(a.completedAt || 0).getTime() - new Date(b.completedAt || 0).getTime()
+          const sortedSessions = [...sessions].sort(
+            (a, b) =>
+              new Date(a.completedAt || 0).getTime() - new Date(b.completedAt || 0).getTime()
           )
           const firstReview = sortedSessions[0]?.completedAt || new Date().toISOString()
-          const lastReview = sortedSessions[sortedSessions.length - 1]?.completedAt || new Date().toISOString()
+          const lastReview =
+            sortedSessions[sortedSessions.length - 1]?.completedAt || new Date().toISOString()
+
+          // Calculate average time to mastery from actual mastery data
+          // Time from first review to mastery level
+          const masteredProblems = masteryDocs.filter(
+            (m) => m.mastery_level === "mastered" || m.mastery_level === "reviewing"
+          )
+          let avgTimeToMastery: number | null = null
+          if (masteredProblems.length > 0) {
+            const timeToMasteryDays = masteredProblems
+              .filter((m) => m.first_reviewed_at && m.mastered_at)
+              .map((m) => {
+                const first = new Date(m.first_reviewed_at).getTime()
+                const mastered = new Date(m.mastered_at).getTime()
+                return Math.max(1, Math.round((mastered - first) / (1000 * 60 * 60 * 24)))
+              })
+
+            if (timeToMasteryDays.length > 0) {
+              avgTimeToMastery = Math.round(
+                timeToMasteryDays.reduce((sum, d) => sum + d, 0) / timeToMasteryDays.length
+              )
+            }
+          }
+          // Fallback: estimate based on total days active vs problems mastered
+          if (avgTimeToMastery === null) {
+            const daysActive =
+              new Set(sessions.map((s) => s.completedAt?.split("T")[0]).filter(Boolean)).size || 1
+            avgTimeToMastery =
+              problemsMastered > 0 ? Math.round(daysActive / problemsMastered) : null
+          }
+
+          // Calculate interval accuracy from mastery data
+          // Compare predicted vs actual retention (score >= 56 means retained)
+          const accuratePredictions = sessions.filter((s) => {
+            const predicted = (s.predicted_retention || 50) >= 50 // Predicted to retain if >= 50%
+            const actual = (s.performanceScore || 0) >= 56 // Actually retained if score >= 56
+            return predicted === actual
+          }).length
+          const intervalAccuracy =
+            sessions.length > 0 ? Math.round((accuratePredictions / sessions.length) * 100) : null
 
           const now = new Date().toISOString()
+          const daysActiveSet = new Set(
+            sessions.map((s) => s.completedAt?.split("T")[0]).filter(Boolean)
+          )
+          const daysActiveCount = daysActiveSet.size || 1
+
           const researchSummary = {
             user_id: userId,
             algorithm,
@@ -305,31 +352,28 @@ async function backfillResearchData(): Promise<{
             total_reviews: totalReviews,
             total_problems_seen: masteryDocs.length || sessions.length,
             total_time_spent_minutes: totalMinutes,
-            total_days_active: new Set(sessions.map(s =>
-              s.completedAt?.split('T')[0]
-            ).filter(Boolean)).size || 1,
+            total_days_active: daysActiveCount,
             lifetime_average_score: avgScore,
             lifetime_retention_rate: retentionRate,
             lifetime_lapse_rate: 100 - retentionRate,
             problems_mastered: problemsMastered,
             problems_learning: masteryDocs.length - problemsMastered,
             problems_struggling: 0,
-            average_time_to_mastery_days: 7, // Default estimate
+            average_time_to_mastery_days: avgTimeToMastery,
             longest_streak: profileData?.longest_streak_days || 1,
             current_streak: profileData?.streak_days || 0,
-            average_daily_reviews: totalReviews / Math.max(1, new Set(sessions.map(s =>
-              s.completedAt?.split('T')[0]
-            ).filter(Boolean)).size),
-            average_session_length_minutes: sessions.length > 0 ? Math.round(totalMinutes / sessions.length) : 0,
+            average_daily_reviews: totalReviews / Math.max(1, daysActiveCount),
+            average_session_length_minutes:
+              sessions.length > 0 ? Math.round(totalMinutes / sessions.length) : 0,
             weekly_averages: [],
-            average_interval_accuracy: 50, // Default estimate
+            average_interval_accuracy: intervalAccuracy,
             interval_distribution: {
-              '1-3_days': 0,
-              '4-7_days': 0,
-              '8-14_days': 0,
-              '15-30_days': 0,
-              '31-60_days': 0,
-              '60+_days': 0,
+              "1-3_days": 0,
+              "4-7_days": 0,
+              "8-14_days": 0,
+              "15-30_days": 0,
+              "31-60_days": 0,
+              "60+_days": 0,
             },
             first_review_at: firstReview,
             last_review_at: lastReview,
@@ -340,26 +384,26 @@ async function backfillResearchData(): Promise<{
           // Populate interval distribution from mastery data
           for (const mastery of masteryDocs) {
             const interval = mastery.interval_days || 1
-            if (interval <= 3) researchSummary.interval_distribution['1-3_days']++
-            else if (interval <= 7) researchSummary.interval_distribution['4-7_days']++
-            else if (interval <= 14) researchSummary.interval_distribution['8-14_days']++
-            else if (interval <= 30) researchSummary.interval_distribution['15-30_days']++
-            else if (interval <= 60) researchSummary.interval_distribution['31-60_days']++
-            else researchSummary.interval_distribution['60+_days']++
+            if (interval <= 3) researchSummary.interval_distribution["1-3_days"]++
+            else if (interval <= 7) researchSummary.interval_distribution["4-7_days"]++
+            else if (interval <= 14) researchSummary.interval_distribution["8-14_days"]++
+            else if (interval <= 30) researchSummary.interval_distribution["15-30_days"]++
+            else if (interval <= 60) researchSummary.interval_distribution["31-60_days"]++
+            else researchSummary.interval_distribution["60+_days"]++
           }
 
           await adminDb
-            .collection('algorithm_research_metrics')
+            .collection("algorithm_research_metrics")
             .doc(userId)
-            .collection('summary')
-            .doc('current')
+            .collection("summary")
+            .doc("current")
             .set(researchSummary)
 
           result.researchSummariesCreated++
         }
 
         // Check and update user_stats if missing or empty
-        const userStatsDoc = await adminDb.collection('user_stats').doc(userId).get()
+        const userStatsDoc = await adminDb.collection("user_stats").doc(userId).get()
         const existingStats = userStatsDoc.data()
 
         if (!userStatsDoc.exists || (existingStats?.totalSessions || 0) === 0) {
@@ -374,9 +418,14 @@ async function backfillResearchData(): Promise<{
               totalMinutes += session.durationMinutes || 0
               totalScore += session.performanceScore || 0
 
-              const pattern = session.pattern || 'unknown'
+              const pattern = session.pattern || "unknown"
               if (!patternStats[pattern]) {
-                patternStats[pattern] = { sessions: 0, totalScore: 0, averageScore: 0, bestScore: 0 }
+                patternStats[pattern] = {
+                  sessions: 0,
+                  totalScore: 0,
+                  averageScore: 0,
+                  bestScore: 0,
+                }
               }
               patternStats[pattern].sessions++
               patternStats[pattern].totalScore += session.performanceScore || 0
@@ -385,7 +434,7 @@ async function backfillResearchData(): Promise<{
                 session.performanceScore || 0
               )
 
-              const difficulty = session.difficulty || 'medium'
+              const difficulty = session.difficulty || "medium"
               if (!difficultyStats[difficulty]) {
                 difficultyStats[difficulty] = { sessions: 0, totalScore: 0, averageScore: 0 }
               }
@@ -414,20 +463,21 @@ async function backfillResearchData(): Promise<{
               updatedAt: new Date(),
             }
 
-            await adminDb.collection('user_stats').doc(userId).set(userStats, { merge: true })
+            await adminDb.collection("user_stats").doc(userId).set(userStats, { merge: true })
             result.userStatsUpdated++
           }
         }
       } catch (userError) {
-        result.errors.push(`User ${userId}: ${userError instanceof Error ? userError.message : 'Unknown error'}`)
+        result.errors.push(
+          `User ${userId}: ${userError instanceof Error ? userError.message : "Unknown error"}`
+        )
       }
     }
 
     // Regenerate aggregate comparison with new data
     await generateAggregateComparison()
-
   } catch (error) {
-    result.errors.push(`Global error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    result.errors.push(`Global error: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 
   return result
@@ -448,7 +498,7 @@ function isStale(timestamp: string, minutes: number): boolean {
 function calculateInsights(comparison: AlgorithmComparisonAggregate | null) {
   if (!comparison) {
     return {
-      summary: 'Not enough data for insights yet.',
+      summary: "Not enough data for insights yet.",
       recommendations: [],
       keyFindings: [],
     }
@@ -465,15 +515,15 @@ function calculateInsights(comparison: AlgorithmComparisonAggregate | null) {
     keyFindings.push(
       `Sample size insufficient: SM-2 has ${sm2.total_users} users, FSRS has ${fsrs.total_users} users. Need 30+ each for valid comparison.`
     )
-    recommendations.push('Continue collecting data before drawing conclusions.')
+    recommendations.push("Continue collecting data before drawing conclusions.")
   }
 
   // Retention rate comparison
   if (Math.abs(comp.retention_rate_difference) >= 5) {
-    const winner = comp.retention_rate_difference > 0 ? 'FSRS' : 'SM-2'
+    const winner = comp.retention_rate_difference > 0 ? "FSRS" : "SM-2"
     const diff = Math.abs(comp.retention_rate_difference)
-    const winnerRate = winner === 'FSRS' ? fsrs.average_retention_rate : sm2.average_retention_rate
-    const loserRate = winner === 'FSRS' ? sm2.average_retention_rate : fsrs.average_retention_rate
+    const winnerRate = winner === "FSRS" ? fsrs.average_retention_rate : sm2.average_retention_rate
+    const loserRate = winner === "FSRS" ? sm2.average_retention_rate : fsrs.average_retention_rate
     keyFindings.push(
       `${winner} shows ${diff}% higher retention rate (${winnerRate}% vs ${loserRate}%)`
     )
@@ -481,11 +531,9 @@ function calculateInsights(comparison: AlgorithmComparisonAggregate | null) {
 
   // Score comparison
   if (Math.abs(comp.average_score_difference) >= 3) {
-    const winner = comp.average_score_difference > 0 ? 'FSRS' : 'SM-2'
+    const winner = comp.average_score_difference > 0 ? "FSRS" : "SM-2"
     const diff = Math.abs(comp.average_score_difference)
-    keyFindings.push(
-      `${winner} users score ${diff} points higher on average`
-    )
+    keyFindings.push(`${winner} users score ${diff} points higher on average`)
   }
 
   // Time to mastery
@@ -501,7 +549,7 @@ function calculateInsights(comparison: AlgorithmComparisonAggregate | null) {
 
   // Engagement
   if (Math.abs(comp.engagement_difference) >= 0.5) {
-    const winner = comp.engagement_difference > 0 ? 'FSRS' : 'SM-2'
+    const winner = comp.engagement_difference > 0 ? "FSRS" : "SM-2"
     keyFindings.push(
       `${winner} users complete ${Math.abs(comp.engagement_difference).toFixed(1)} more reviews per day`
     )
@@ -512,7 +560,7 @@ function calculateInsights(comparison: AlgorithmComparisonAggregate | null) {
     keyFindings.push(
       `SM-2 has ${sm2.churn_rate_30d - fsrs.churn_rate_30d}% higher 30-day churn rate`
     )
-    recommendations.push('Consider switching new users to FSRS to reduce churn.')
+    recommendations.push("Consider switching new users to FSRS to reduce churn.")
   } else if (fsrs.churn_rate_30d > sm2.churn_rate_30d + 10) {
     keyFindings.push(
       `FSRS has ${fsrs.churn_rate_30d - sm2.churn_rate_30d}% higher 30-day churn rate`
@@ -520,24 +568,16 @@ function calculateInsights(comparison: AlgorithmComparisonAggregate | null) {
   }
 
   // Overall winner
-  let summary = 'Results are inconclusive. Need more data.'
+  let summary = "Results are inconclusive. Need more data."
   if (comp.overall_winner && comp.confidence_level) {
     summary = `${comp.overall_winner.toUpperCase()} appears to be the better algorithm with ${comp.confidence_level}% confidence.`
 
-    if (comp.overall_winner === 'fsrs') {
-      recommendations.push(
-        'Consider migrating all new users to FSRS algorithm.'
-      )
-      recommendations.push(
-        'Prepare migration plan for existing SM-2 users.'
-      )
+    if (comp.overall_winner === "fsrs") {
+      recommendations.push("Consider migrating all new users to FSRS algorithm.")
+      recommendations.push("Prepare migration plan for existing SM-2 users.")
     } else {
-      recommendations.push(
-        'Keep SM-2 as the default algorithm.'
-      )
-      recommendations.push(
-        'Investigate why FSRS is underperforming - may need parameter tuning.'
-      )
+      recommendations.push("Keep SM-2 as the default algorithm.")
+      recommendations.push("Investigate why FSRS is underperforming - may need parameter tuning.")
     }
   }
 

@@ -1,10 +1,11 @@
 "use client"
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react"
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { toast } from "sonner"
 import { AnnouncementBanner } from "./AnnouncementBanner"
 import { AnnouncementModal } from "./AnnouncementModal"
+import { cn } from "@/lib/utils"
 
 interface Announcement {
   id: string
@@ -51,6 +52,8 @@ export function AnnouncementProvider({ children }: AnnouncementProviderProps) {
   const [shownToastIds, setShownToastIds] = useState<Set<string>>(new Set())
   const [shownModalIds, setShownModalIds] = useState<Set<string>>(new Set())
   const [currentModal, setCurrentModal] = useState<Announcement | null>(null)
+  const [bannerHeight, setBannerHeight] = useState(0)
+  const bannerContainerRef = useRef<HTMLDivElement>(null)
 
   // Load dismissed IDs from localStorage on mount
   useEffect(() => {
@@ -92,7 +95,7 @@ export function AnnouncementProvider({ children }: AnnouncementProviderProps) {
         }
       }
     } catch (error) {
-      console.error("Error fetching announcements:", error)
+      console.error("[Announcements] Error fetching:", error)
     }
   }, [firebaseUser, dismissedIds])
 
@@ -166,6 +169,25 @@ export function AnnouncementProvider({ children }: AnnouncementProviderProps) {
       setCurrentModal(modalAnnouncement)
     }
   }, [announcements, currentModal, shownModalIds])
+
+  // Update banner height CSS variable
+  useEffect(() => {
+    const bannerAnnouncements = announcements.filter((a) => a.type === "banner")
+
+    if (bannerAnnouncements.length > 0) {
+      // Each banner is approximately 52px (py-3 = 12px top + 12px bottom + ~28px content)
+      const height = bannerAnnouncements.length * 52
+      setBannerHeight(height)
+      document.documentElement.style.setProperty("--announcement-banner-height", `${height}px`)
+    } else {
+      setBannerHeight(0)
+      document.documentElement.style.setProperty("--announcement-banner-height", "0px")
+    }
+
+    return () => {
+      document.documentElement.style.setProperty("--announcement-banner-height", "0px")
+    }
+  }, [announcements])
 
   // Dismiss announcement
   const dismissAnnouncement = useCallback(
@@ -241,13 +263,46 @@ export function AnnouncementProvider({ children }: AnnouncementProviderProps) {
     getModalAnnouncements,
   }
 
+  const bannerAnnouncements = getBannerAnnouncements()
+
   return (
     <AnnouncementContext.Provider value={value}>
       {/* Render banner announcements at the top */}
-      <AnnouncementBanners
-        announcements={getBannerAnnouncements()}
-        onDismiss={dismissAnnouncement}
-      />
+      {bannerAnnouncements.length > 0 && (
+        <div
+          ref={bannerContainerRef}
+          className={cn(
+            "fixed top-0 right-0 left-0 z-[100]",
+            "flex flex-col",
+            "transition-all duration-300 ease-out"
+          )}
+          role="region"
+          aria-label="Announcements"
+        >
+          {bannerAnnouncements.map((announcement, index) => (
+            <div
+              key={announcement.id}
+              style={{
+                animationDelay: `${index * 100}ms`,
+              }}
+            >
+              <AnnouncementBanner
+                announcement={announcement}
+                onDismiss={() => dismissAnnouncement(announcement.id)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Spacer to push content down when banners are visible */}
+      {bannerHeight > 0 && (
+        <div
+          style={{ height: bannerHeight }}
+          className="transition-all duration-300 ease-out"
+          aria-hidden="true"
+        />
+      )}
 
       {children}
 
@@ -260,28 +315,5 @@ export function AnnouncementProvider({ children }: AnnouncementProviderProps) {
         />
       )}
     </AnnouncementContext.Provider>
-  )
-}
-
-// Component to render all banner announcements
-function AnnouncementBanners({
-  announcements,
-  onDismiss,
-}: {
-  announcements: Announcement[]
-  onDismiss: (id: string) => void
-}) {
-  if (announcements.length === 0) return null
-
-  return (
-    <div className="fixed top-0 left-0 right-0 z-[100] flex flex-col">
-      {announcements.map((announcement) => (
-        <AnnouncementBanner
-          key={announcement.id}
-          announcement={announcement}
-          onDismiss={() => onDismiss(announcement.id)}
-        />
-      ))}
-    </div>
   )
 }

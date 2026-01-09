@@ -111,39 +111,91 @@ export interface ResearchRecommendation {
 // ============================================
 
 /**
+ * Default values for when data is unavailable
+ */
+const DEFAULT_SIGNIFICANCE_TESTS: EnhancedResearchAnalysis["significanceTests"] = {
+  retention: null,
+  score: null,
+  timeToMastery: null,
+  dailyReviews: null,
+  intervalAccuracy: null,
+}
+
+const DEFAULT_PREDICTION_ACCURACY: EnhancedResearchAnalysis["predictionAccuracy"] = {
+  sm2: { logLoss: 0, rmse: 0, mae: 0, accuracy: 0, calibration: [], brierScore: 0, aucRoc: 0.5 },
+  fsrs: { logLoss: 0, rmse: 0, mae: 0, accuracy: 0, calibration: [], brierScore: 0, aucRoc: 0.5 },
+  comparison: { logLossDifference: 0, winner: "equal", improvement: 0 },
+}
+
+const DEFAULT_TRENDS: EnhancedResearchAnalysis["trends"] = {
+  sm2Retention: { direction: "stable", slope: 0, r2: 0, forecast7d: 0, forecast30d: 0 },
+  fsrsRetention: { direction: "stable", slope: 0, r2: 0, forecast7d: 0, forecast30d: 0 },
+  sm2Score: { direction: "stable", slope: 0, r2: 0, forecast7d: 0, forecast30d: 0 },
+  fsrsScore: { direction: "stable", slope: 0, r2: 0, forecast7d: 0, forecast30d: 0 },
+  overallEngagement: { direction: "stable", slope: 0, r2: 0, forecast7d: 0, forecast30d: 0 },
+}
+
+const DEFAULT_CONFIDENCE_INTERVALS: EnhancedResearchAnalysis["confidenceIntervals"] = {
+  sm2Retention: { lower: 0, upper: 1, point: 0.5, confidenceLevel: 0.95 },
+  fsrsRetention: { lower: 0, upper: 1, point: 0.5, confidenceLevel: 0.95 },
+  sm2Score: { lower: 0, upper: 100, point: 50, confidenceLevel: 0.95 },
+  fsrsScore: { lower: 0, upper: 100, point: 50, confidenceLevel: 0.95 },
+}
+
+/**
  * Perform comprehensive research analysis
+ * Returns safe defaults when data is unavailable
  */
 export async function analyzeResearchData(): Promise<EnhancedResearchAnalysis> {
   const now = new Date()
   const thirtyDaysAgo = new Date(now)
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-  // Fetch comparison data
-  const comparisonDoc = await adminDb
-    .collection("algorithm_research_aggregate")
-    .doc("comparison")
-    .get()
-  const comparison = comparisonDoc.exists
-    ? (comparisonDoc.data() as AlgorithmComparisonAggregate)
-    : null
+  // Check if adminDb is initialized
+  if (!adminDb) {
+    console.warn("Research analyzer: adminDb not initialized, returning defaults")
+    return createDefaultAnalysis(now, thirtyDaysAgo)
+  }
+
+  let comparison: AlgorithmComparisonAggregate | null = null
+  let events: AlgorithmResearchEvent[] = []
+  let sm2Events: AlgorithmResearchEvent[] = []
+  let fsrsEvents: AlgorithmResearchEvent[] = []
+
+  // Fetch comparison data with error handling
+  try {
+    const comparisonDoc = await adminDb
+      .collection("algorithm_research_aggregate")
+      .doc("comparison")
+      .get()
+    comparison = comparisonDoc.exists
+      ? (comparisonDoc.data() as AlgorithmComparisonAggregate)
+      : null
+  } catch (error) {
+    console.error("Research analyzer: Failed to fetch comparison data:", error)
+    // Continue with null comparison
+  }
 
   // Fetch recent events for detailed analysis
-  const eventsSnapshot = await adminDb
-    .collection("algorithm_research_events")
-    .orderBy("timestamp", "desc")
-    .limit(5000) // Analyze last 5000 events
-    .get()
+  try {
+    const eventsSnapshot = await adminDb
+      .collection("algorithm_research_events")
+      .orderBy("timestamp", "desc")
+      .limit(5000) // Analyze last 5000 events
+      .get()
 
-  const events = eventsSnapshot.docs.map((doc) => doc.data() as AlgorithmResearchEvent)
+    events = eventsSnapshot.docs.map((doc) => doc.data() as AlgorithmResearchEvent)
+    sm2Events = events.filter((e) => e.algorithm === "sm2")
+    fsrsEvents = events.filter((e) => e.algorithm === "fsrs")
+  } catch (error) {
+    console.error("Research analyzer: Failed to fetch events:", error)
+    // Continue with empty events
+  }
 
-  // Separate by algorithm
-  const sm2Events = events.filter((e) => e.algorithm === "sm2")
-  const fsrsEvents = events.filter((e) => e.algorithm === "fsrs")
-
-  // Calculate significance tests
+  // Calculate significance tests (safe with empty arrays)
   const significanceTests = calculateSignificanceTests(sm2Events, fsrsEvents)
 
-  // Calculate prediction accuracy
+  // Calculate prediction accuracy (safe with empty arrays)
   const predictionAccuracy = calculatePredictionAccuracyComparison(sm2Events, fsrsEvents)
 
   // Sample size analysis
@@ -153,10 +205,16 @@ export async function analyzeResearchData(): Promise<EnhancedResearchAnalysis> {
     estimateDailyNewUsers(events)
   )
 
-  // Trend analysis
-  const trends = await calculateTrends(thirtyDaysAgo)
+  // Trend analysis with error handling
+  let trends: EnhancedResearchAnalysis["trends"]
+  try {
+    trends = await calculateTrends(thirtyDaysAgo)
+  } catch (error) {
+    console.error("Research analyzer: Failed to calculate trends:", error)
+    trends = DEFAULT_TRENDS
+  }
 
-  // Confidence intervals
+  // Confidence intervals (safe with empty arrays)
   const confidenceIntervals = calculateConfidenceIntervals(sm2Events, fsrsEvents)
 
   // Calculate quality score
@@ -193,6 +251,58 @@ export async function analyzeResearchData(): Promise<EnhancedResearchAnalysis> {
       },
       totalEventsAnalyzed: events.length,
       totalUsersAnalyzed: new Set(events.map((e) => e.user_id)).size,
+    },
+  }
+}
+
+/**
+ * Create a default analysis response when data is unavailable
+ */
+function createDefaultAnalysis(now: Date, thirtyDaysAgo: Date): EnhancedResearchAnalysis {
+  const defaultSampleAnalysis: SampleSizeAnalysis = {
+    currentSampleSm2: 0,
+    currentSampleFsrs: 0,
+    totalSample: 0,
+    isSufficient: false,
+    minimumRequired: 30,
+    recommendedForPower80: 100,
+    recommendedForPower95: 200,
+    estimatedDaysToSufficient: null,
+    powerWithCurrentSample: 0,
+  }
+
+  return {
+    comparison: null,
+    significanceTests: DEFAULT_SIGNIFICANCE_TESTS,
+    predictionAccuracy: DEFAULT_PREDICTION_ACCURACY,
+    sampleAnalysis: defaultSampleAnalysis,
+    trends: DEFAULT_TRENDS,
+    confidenceIntervals: DEFAULT_CONFIDENCE_INTERVALS,
+    qualityScore: {
+      overall: 0,
+      sampleSize: 0,
+      statisticalPower: 0,
+      dataQuality: 0,
+      consistency: 0,
+      interpretation: "No data available - research tracking needs to be set up",
+    },
+    recommendations: [
+      {
+        priority: "high",
+        category: "data_quality",
+        title: "Start Collecting Data",
+        description: "No research events have been recorded yet. Begin tracking user interactions.",
+        action: "Ensure research tracking is enabled and users are being assigned algorithms.",
+      },
+    ],
+    metadata: {
+      analysisTimestamp: now.toISOString(),
+      dataRange: {
+        start: thirtyDaysAgo.toISOString(),
+        end: now.toISOString(),
+      },
+      totalEventsAnalyzed: 0,
+      totalUsersAnalyzed: 0,
     },
   }
 }
@@ -307,14 +417,30 @@ function estimateDailyNewUsers(events: AlgorithmResearchEvent[]): number {
 }
 
 async function calculateTrends(startDate: Date): Promise<EnhancedResearchAnalysis["trends"]> {
-  // Fetch daily metrics for trend analysis
-  const dailyMetricsSnapshot = await adminDb
-    .collectionGroup("daily")
-    .where("date", ">=", startDate.toISOString().split("T")[0])
-    .orderBy("date", "asc")
-    .get()
+  // Return defaults if adminDb not initialized
+  if (!adminDb) {
+    return DEFAULT_TRENDS
+  }
 
-  const dailyMetrics = dailyMetricsSnapshot.docs.map((doc) => doc.data() as AlgorithmDailyMetrics)
+  // Fetch daily metrics for trend analysis
+  let dailyMetrics: AlgorithmDailyMetrics[] = []
+  try {
+    const dailyMetricsSnapshot = await adminDb
+      .collectionGroup("daily")
+      .where("date", ">=", startDate.toISOString().split("T")[0])
+      .orderBy("date", "asc")
+      .get()
+
+    dailyMetrics = dailyMetricsSnapshot.docs.map((doc) => doc.data() as AlgorithmDailyMetrics)
+  } catch (error) {
+    console.error("Research analyzer: Failed to fetch daily metrics:", error)
+    return DEFAULT_TRENDS
+  }
+
+  // Return defaults if no daily metrics
+  if (dailyMetrics.length === 0) {
+    return DEFAULT_TRENDS
+  }
 
   // Aggregate by date and algorithm
   const byDateAlgorithm = new Map<

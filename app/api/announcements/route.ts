@@ -29,6 +29,7 @@ export interface UserAnnouncement {
 export async function GET(request: NextRequest) {
   try {
     if (!adminDb) {
+      console.log("[User Announcements API] Database not available")
       return NextResponse.json({ success: true, announcements: [] })
     }
 
@@ -66,13 +67,16 @@ export async function GET(request: NextRequest) {
       info: 1,
     }
 
-    // Fetch active announcements - order by createdAt only to avoid composite index issues
-    const snapshot = await adminDb
-      .collection("announcements")
-      .where("active", "==", true)
-      .orderBy("createdAt", "desc")
-      .limit(50) // Fetch more, filter later
-      .get()
+    // Fetch all announcements and filter in code to avoid composite index requirement
+    let snapshot
+    try {
+      snapshot = await adminDb.collection("announcements").get()
+
+      console.log("[User Announcements API] Total announcements in DB:", snapshot.docs.length)
+    } catch (queryError) {
+      console.error("[User Announcements API] Query error:", queryError)
+      return NextResponse.json({ success: true, announcements: [] })
+    }
 
     // Get user's dismissed announcements
     let dismissedIds: string[] = []
@@ -104,20 +108,56 @@ export async function GET(request: NextRequest) {
       const data = doc.data()
       const announcementId = doc.id
 
-      // Skip dismissed announcements (if dismissible)
-      if (data.dismissible && dismissedIds.includes(announcementId)) {
+      // Skip inactive announcements
+      if (!data.active) {
+        console.log("[User Announcements API] Skipping", announcementId, "- not active")
         continue
       }
 
-      // Check date range
-      const startDate = data.startDate?.toDate?.() || new Date(0)
-      const endDate = data.endDate?.toDate?.() || null
+      // Skip dismissed announcements (if dismissible)
+      if (data.dismissible && dismissedIds.includes(announcementId)) {
+        console.log("[User Announcements API] Skipping", announcementId, "- dismissed by user")
+        continue
+      }
+
+      // Check date range - handle both Firestore Timestamps and ISO strings
+      let startDate: Date
+      if (data.startDate?.toDate) {
+        startDate = data.startDate.toDate()
+      } else if (data.startDate) {
+        startDate = new Date(data.startDate)
+      } else {
+        startDate = new Date(0) // Default to epoch if no start date
+      }
+
+      let endDate: Date | null = null
+      if (data.endDate?.toDate) {
+        endDate = data.endDate.toDate()
+      } else if (data.endDate) {
+        endDate = new Date(data.endDate)
+      }
 
       if (nowDate < startDate) {
+        console.log(
+          "[User Announcements API] Skipping",
+          announcementId,
+          "- not started yet. Start:",
+          startDate,
+          "Now:",
+          nowDate
+        )
         continue // Not started yet
       }
 
       if (endDate && nowDate > endDate) {
+        console.log(
+          "[User Announcements API] Skipping",
+          announcementId,
+          "- expired. End:",
+          endDate,
+          "Now:",
+          nowDate
+        )
         continue // Expired
       }
 
@@ -128,16 +168,30 @@ export async function GET(request: NextRequest) {
           // Check if user is in the specific list
           const targetUserIds = data.targetUserIds || []
           if (!userId || !targetUserIds.includes(userId)) {
+            console.log(
+              "[User Announcements API] Skipping",
+              announcementId,
+              "- user not in specific list"
+            )
             continue
           }
         } else {
           // Check subscription tier
           if (targetAudience !== userTier) {
+            console.log(
+              "[User Announcements API] Skipping",
+              announcementId,
+              "- tier mismatch. Required:",
+              targetAudience,
+              "User:",
+              userTier
+            )
             continue
           }
         }
       }
 
+      console.log("[User Announcements API] Including announcement:", announcementId, data.title)
       announcements.push({
         id: announcementId,
         title: data.title,

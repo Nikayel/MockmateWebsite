@@ -1,6 +1,5 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
 import { RotateCcw, Play, Download, XCircle } from "lucide-react"
 
 interface FeedbackActionsProps {
@@ -95,10 +94,15 @@ export function FeedbackActions({
   scores,
 }: FeedbackActionsProps) {
   const handleExport = async () => {
-    if (onExport) {
-      onExport()
-    } else {
-      await generatePDF(problemTitle || "Interview Session", grade, overallScore, scores, [])
+    try {
+      if (onExport) {
+        onExport()
+      } else {
+        await generatePDF(problemTitle || "Interview Session", grade, overallScore, scores, [])
+      }
+    } catch (error) {
+      console.error("Failed to export PDF:", error)
+      alert("Failed to export PDF. Please try again.")
     }
   }
 

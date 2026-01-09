@@ -9,3 +9,5 @@ export {
   QualityScorePanel,
   RecommendationsPanel,
 } from "./StatisticalPanel"
+
+export { UserAlgorithmBreakdown } from "./UserAlgorithmBreakdown"

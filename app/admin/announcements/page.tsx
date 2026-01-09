@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useAuth } from "@/lib/auth-context"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,13 +23,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Megaphone,
   RefreshCw,
   Plus,
-  Edit,
+  Edit2,
   Trash2,
   Eye,
   X,
@@ -39,8 +38,14 @@ import {
   CheckCircle,
   Bell,
   Users,
+  Calendar,
+  ExternalLink,
+  MoreHorizontal,
+  Power,
+  PowerOff,
 } from "lucide-react"
 import { logger } from "@/lib/logger"
+import { cn } from "@/lib/utils"
 
 interface Announcement {
   id: string
@@ -63,17 +68,49 @@ interface Announcement {
 }
 
 const priorityConfig = {
-  info: { icon: Info, color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
-  warning: { icon: AlertTriangle, color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" },
-  critical: { icon: AlertCircle, color: "bg-red-500/20 text-red-400 border-red-500/30" },
-  success: { icon: CheckCircle, color: "bg-green-500/20 text-green-400 border-green-500/30" },
+  info: {
+    icon: Info,
+    label: "Info",
+    color: "bg-accent/10 text-accent border-accent/20",
+    iconColor: "text-accent",
+    badgeClass: "bg-accent/10 text-accent border-accent/20",
+  },
+  warning: {
+    icon: AlertTriangle,
+    label: "Warning",
+    color: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    iconColor: "text-amber-400",
+    badgeClass: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  },
+  critical: {
+    icon: AlertCircle,
+    label: "Critical",
+    color: "bg-destructive/10 text-destructive border-destructive/20",
+    iconColor: "text-destructive",
+    badgeClass: "bg-destructive/10 text-destructive border-destructive/20",
+  },
+  success: {
+    icon: CheckCircle,
+    label: "Success",
+    color: "bg-neural/10 text-neural border-neural/20",
+    iconColor: "text-neural",
+    badgeClass: "bg-neural/10 text-neural border-neural/20",
+  },
 }
 
 const typeConfig = {
-  banner: "Top banner across all pages",
-  modal: "Popup dialog on first visit",
-  toast: "Temporary notification",
-  page: "Dedicated announcement page",
+  banner: { label: "Banner", description: "Top banner across all pages" },
+  modal: { label: "Modal", description: "Popup dialog on first visit" },
+  toast: { label: "Toast", description: "Temporary notification" },
+  page: { label: "Page", description: "Dedicated announcement page" },
+}
+
+const audienceConfig = {
+  all: { label: "All Users", icon: Users },
+  free: { label: "Free", icon: Users },
+  pro: { label: "Pro", icon: Users },
+  enterprise: { label: "Enterprise", icon: Users },
+  specific: { label: "Specific", icon: Users },
 }
 
 const defaultAnnouncement: {
@@ -95,7 +132,7 @@ const defaultAnnouncement: {
   priority: "info",
   targetAudience: "all",
   targetUserIds: "",
-  startDate: new Date().toISOString().slice(0, 16), // Format: YYYY-MM-DDTHH:MM
+  startDate: new Date().toISOString().slice(0, 16),
   endDate: "",
   dismissible: true,
   active: true,
@@ -114,6 +151,7 @@ export default function AnnouncementsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingAnnouncement, setEditingAnnouncement] = useState<Partial<Announcement> | null>(null)
   const [formData, setFormData] = useState(defaultAnnouncement)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   const loadAnnouncements = useCallback(
     async (showRefreshing = false) => {
@@ -157,16 +195,16 @@ export default function AnnouncementsPage() {
   const handleOpenEdit = (announcement: Announcement) => {
     setEditingAnnouncement(announcement)
     setFormData({
-      title: announcement.title,
-      message: announcement.message,
-      type: announcement.type,
-      priority: announcement.priority,
-      targetAudience: announcement.targetAudience,
+      title: announcement.title || "",
+      message: announcement.message || "",
+      type: announcement.type || "banner",
+      priority: announcement.priority || "info",
+      targetAudience: announcement.targetAudience || "all",
       targetUserIds: (announcement as any).targetUserIds?.join(", ") || "",
       startDate: announcement.startDate?.slice(0, 16) || "",
       endDate: announcement.endDate?.slice(0, 16) || "",
-      dismissible: announcement.dismissible,
-      active: announcement.active,
+      dismissible: announcement.dismissible ?? true,
+      active: announcement.active ?? true,
       cta: announcement.cta || { text: "", url: "" },
     })
     setDialogOpen(true)
@@ -180,12 +218,10 @@ export default function AnnouncementsPage() {
       const token = await firebaseUser.getIdToken()
       const method = editingAnnouncement ? "PUT" : "POST"
 
-      // Prepare body with targetUserIds as array
       const body: any = editingAnnouncement
         ? { id: editingAnnouncement.id, ...formData }
         : { ...formData }
 
-      // Convert targetUserIds string to array if targeting specific users
       if (formData.targetAudience === "specific" && formData.targetUserIds) {
         body.targetUserIds = formData.targetUserIds
           .split(",")
@@ -195,7 +231,6 @@ export default function AnnouncementsPage() {
         delete body.targetUserIds
       }
 
-      // Clean up empty CTA
       if (!body.cta?.text && !body.cta?.url) {
         body.cta = undefined as any
       }
@@ -221,7 +256,7 @@ export default function AnnouncementsPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!firebaseUser || !confirm("Are you sure you want to delete this announcement?")) return
+    if (!firebaseUser) return
 
     try {
       const token = await firebaseUser.getIdToken()
@@ -231,6 +266,7 @@ export default function AnnouncementsPage() {
       })
 
       if (response.ok) {
+        setDeleteConfirmId(null)
         loadAnnouncements(true)
       }
     } catch (error) {
@@ -261,10 +297,30 @@ export default function AnnouncementsPage() {
     }
   }
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
+  }
+
+  const formatNumber = (num: number) => {
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`
+    return num.toString()
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="border-muted h-12 w-12 rounded-full border-2" />
+            <div className="border-accent absolute inset-0 h-12 w-12 animate-spin rounded-full border-t-2" />
+          </div>
+          <p className="text-muted-foreground text-sm">Loading announcements...</p>
+        </div>
       </div>
     )
   }
@@ -272,27 +328,32 @@ export default function AnnouncementsPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-3xl font-bold text-white">Announcements</h1>
-          <p className="mt-1 text-gray-400">Manage system announcements and user notifications</p>
+          <h1 className="font-heading text-foreground text-2xl font-bold tracking-tight sm:text-3xl">
+            Announcements
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Manage system announcements and user notifications
+          </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Button
             onClick={() => loadAnnouncements(true)}
             disabled={refreshing}
             variant="outline"
             size="sm"
-            className="border-gray-700 text-gray-400 hover:text-white"
+            className="h-9"
           >
-            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            <RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />
             Refresh
           </Button>
 
           <Button
             onClick={handleOpenCreate}
-            className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+            size="sm"
+            className="bg-accent text-accent-foreground hover:bg-accent/90 h-9"
           >
             <Plus className="mr-2 h-4 w-4" />
             New Announcement
@@ -300,61 +361,63 @@ export default function AnnouncementsPage() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
-        <Card className="border-gray-800 bg-gray-900/50">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-[#00d9ff]/20 p-3">
-                <Megaphone className="h-6 w-6 text-[#00d9ff]" />
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Card className="border-border bg-card">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-4">
+              <div className="bg-accent/10 flex h-11 w-11 items-center justify-center rounded-xl">
+                <Megaphone className="text-accent h-5 w-5" />
               </div>
               <div>
-                <p className="text-3xl font-bold text-white">{stats.total}</p>
-                <p className="text-sm text-gray-400">Total Announcements</p>
+                <p className="text-foreground text-2xl font-bold tracking-tight">{stats.total}</p>
+                <p className="text-muted-foreground text-xs">Total</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-gray-800 bg-gray-900/50">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-green-500/20 p-3">
-                <Bell className="h-6 w-6 text-green-400" />
+        <Card className="border-border bg-card">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-4">
+              <div className="bg-neural/10 flex h-11 w-11 items-center justify-center rounded-xl">
+                <Bell className="text-neural h-5 w-5" />
               </div>
               <div>
-                <p className="text-3xl font-bold text-white">{stats.active}</p>
-                <p className="text-sm text-gray-400">Active</p>
+                <p className="text-foreground text-2xl font-bold tracking-tight">{stats.active}</p>
+                <p className="text-muted-foreground text-xs">Active</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-gray-800 bg-gray-900/50">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-yellow-500/20 p-3">
-                <Eye className="h-6 w-6 text-yellow-400" />
+        <Card className="border-border bg-card">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-4">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/10">
+                <Eye className="h-5 w-5 text-amber-400" />
               </div>
               <div>
-                <p className="text-3xl font-bold text-white">{stats.totalViews.toLocaleString()}</p>
-                <p className="text-sm text-gray-400">Total Views</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-gray-800 bg-gray-900/50">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-purple-500/20 p-3">
-                <X className="h-6 w-6 text-purple-400" />
-              </div>
-              <div>
-                <p className="text-3xl font-bold text-white">
-                  {stats.totalDismissals.toLocaleString()}
+                <p className="text-foreground text-2xl font-bold tracking-tight">
+                  {formatNumber(stats.totalViews)}
                 </p>
-                <p className="text-sm text-gray-400">Dismissals</p>
+                <p className="text-muted-foreground text-xs">Views</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border bg-card">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-4">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-500/10">
+                <X className="h-5 w-5 text-purple-400" />
+              </div>
+              <div>
+                <p className="text-foreground text-2xl font-bold tracking-tight">
+                  {formatNumber(stats.totalDismissals)}
+                </p>
+                <p className="text-muted-foreground text-xs">Dismissals</p>
               </div>
             </div>
           </CardContent>
@@ -362,122 +425,182 @@ export default function AnnouncementsPage() {
       </div>
 
       {/* Announcements List */}
-      <Card className="border-gray-800 bg-gray-900/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
-            <Megaphone className="h-5 w-5 text-[#00d9ff]" />
-            All Announcements
-          </CardTitle>
+      <Card className="border-border bg-card">
+        <CardHeader className="border-border border-b pb-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-accent/10 flex h-9 w-9 items-center justify-center rounded-lg">
+              <Megaphone className="text-accent h-4 w-4" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-semibold">All Announcements</CardTitle>
+              <CardDescription className="text-xs">
+                {announcements.length} announcement{announcements.length !== 1 ? "s" : ""}
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {announcements.length === 0 ? (
-            <div className="py-12 text-center">
-              <Megaphone className="mx-auto mb-4 h-12 w-12 text-gray-600" />
-              <p className="text-gray-400">No announcements yet</p>
-              <Button
-                onClick={handleOpenCreate}
-                variant="outline"
-                className="mt-4 border-gray-700 text-gray-400 hover:text-white"
-              >
-                Create your first announcement
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="bg-muted/50 flex h-14 w-14 items-center justify-center rounded-2xl">
+                <Megaphone className="text-muted-foreground h-7 w-7" />
+              </div>
+              <p className="text-foreground mt-4 text-sm font-medium">No announcements yet</p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Create your first announcement to communicate with users
+              </p>
+              <Button onClick={handleOpenCreate} variant="outline" size="sm" className="mt-4">
+                <Plus className="mr-2 h-4 w-4" />
+                Create Announcement
               </Button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="divide-border divide-y">
               {announcements.map((announcement) => {
                 const PriorityIcon = priorityConfig[announcement.priority].icon
                 const isExpired =
                   announcement.endDate && new Date(announcement.endDate) < new Date()
+                const isInactive = !announcement.active || isExpired
 
                 return (
                   <div
                     key={announcement.id}
-                    className={`rounded-lg border bg-gray-800/50 p-4 ${
-                      announcement.active && !isExpired
-                        ? "border-gray-700"
-                        : "border-gray-800 opacity-60"
-                    }`}
+                    className={cn(
+                      "group hover:bg-muted/30 flex items-start gap-4 p-4 transition-colors",
+                      isInactive && "opacity-60"
+                    )}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex flex-1 items-start gap-4">
-                        <div
-                          className={`rounded-lg p-2 ${priorityConfig[announcement.priority].color.split(" ")[0]}`}
-                        >
-                          <PriorityIcon
-                            className={`h-5 w-5 ${priorityConfig[announcement.priority].color.split(" ")[1]}`}
-                          />
-                        </div>
+                    {/* Priority Icon */}
+                    <div
+                      className={cn(
+                        "mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg",
+                        priorityConfig[announcement.priority].color
+                      )}
+                    >
+                      <PriorityIcon className="h-4 w-4" />
+                    </div>
 
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-medium text-white">{announcement.title}</h3>
-                            <Badge className={priorityConfig[announcement.priority].color}>
-                              {announcement.priority}
-                            </Badge>
-                            <Badge className="border-gray-600/30 bg-gray-600/20 text-gray-400">
-                              {announcement.type}
-                            </Badge>
-                            <Badge className="border-purple-600/30 bg-purple-600/20 text-purple-400">
-                              <Users className="mr-1 h-3 w-3" />
-                              {announcement.targetAudience}
-                            </Badge>
-                            {!announcement.active && (
-                              <Badge className="border-gray-600/30 bg-gray-600/20 text-gray-500">
-                                Inactive
-                              </Badge>
-                            )}
-                            {isExpired && (
-                              <Badge className="border-red-600/30 bg-red-600/20 text-red-400">
-                                Expired
-                              </Badge>
-                            )}
-                          </div>
+                    {/* Content */}
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-foreground font-medium">{announcement.title}</h3>
 
-                          <p className="mt-2 line-clamp-2 text-sm text-gray-400">
-                            {announcement.message}
-                          </p>
-
-                          <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
-                            <span>
-                              Created: {new Date(announcement.createdAt).toLocaleDateString()}
-                            </span>
-                            {announcement.endDate && (
-                              <span>
-                                Ends: {new Date(announcement.endDate).toLocaleDateString()}
-                              </span>
+                        {/* Status badges */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px] tracking-wide uppercase",
+                              priorityConfig[announcement.priority].badgeClass
                             )}
-                            <span className="flex items-center gap-1">
-                              <Eye className="h-3 w-3" /> {announcement.views}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <X className="h-3 w-3" /> {announcement.dismissals}
-                            </span>
-                          </div>
+                          >
+                            {announcement.priority}
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className="border-border text-muted-foreground text-[10px] tracking-wide uppercase"
+                          >
+                            {announcement.type}
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className="border-purple-500/20 bg-purple-500/10 text-[10px] tracking-wide text-purple-400 uppercase"
+                          >
+                            <Users className="mr-1 h-2.5 w-2.5" />
+                            {announcement.targetAudience}
+                          </Badge>
+
+                          {!announcement.active && (
+                            <Badge
+                              variant="outline"
+                              className="border-border text-muted-foreground bg-muted/50 text-[10px] tracking-wide uppercase"
+                            >
+                              <PowerOff className="mr-1 h-2.5 w-2.5" />
+                              Inactive
+                            </Badge>
+                          )}
+                          {isExpired && (
+                            <Badge
+                              variant="outline"
+                              className="border-destructive/20 text-destructive bg-destructive/10 text-[10px] tracking-wide uppercase"
+                            >
+                              Expired
+                            </Badge>
+                          )}
                         </div>
                       </div>
 
-                      <div className="ml-4 flex items-center gap-2">
-                        <Switch
-                          checked={announcement.active}
-                          onCheckedChange={() => handleToggleActive(announcement)}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenEdit(announcement)}
-                          className="text-gray-400 hover:text-white"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(announcement.id)}
-                          className="text-gray-400 hover:text-red-400"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <p className="text-muted-foreground line-clamp-2 text-sm">
+                        {announcement.message}
+                      </p>
+
+                      {/* Meta info */}
+                      <div className="text-muted-foreground flex flex-wrap items-center gap-4 text-xs">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {formatDate(announcement.createdAt)}
+                        </span>
+                        {announcement.endDate && (
+                          <span className="flex items-center gap-1">
+                            <span className="text-muted-foreground/60">Ends:</span>
+                            {formatDate(announcement.endDate)}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1">
+                          <Eye className="h-3 w-3" />
+                          {formatNumber(announcement.views)}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <X className="h-3 w-3" />
+                          {formatNumber(announcement.dismissals)}
+                        </span>
+                        {announcement.cta && (
+                          <span className="text-accent flex items-center gap-1">
+                            <ExternalLink className="h-3 w-3" />
+                            {announcement.cta.text}
+                          </span>
+                        )}
                       </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "h-8 w-8",
+                          announcement.active
+                            ? "text-neural hover:text-neural hover:bg-neural/10"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                        onClick={() => handleToggleActive(announcement)}
+                        title={announcement.active ? "Deactivate" : "Activate"}
+                      >
+                        {announcement.active ? (
+                          <Power className="h-4 w-4" />
+                        ) : (
+                          <PowerOff className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-foreground h-8 w-8"
+                        onClick={() => handleOpenEdit(announcement)}
+                        title="Edit"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-destructive h-8 w-8"
+                        onClick={() => setDeleteConfirmId(announcement.id)}
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 )
@@ -489,55 +612,60 @@ export default function AnnouncementsPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl border-gray-800 bg-gray-900 text-white">
+        <DialogContent className="border-border bg-card max-w-2xl">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-lg font-semibold">
               {editingAnnouncement ? "Edit Announcement" : "Create Announcement"}
             </DialogTitle>
-            <DialogDescription className="text-gray-400">
+            <DialogDescription className="text-muted-foreground text-sm">
               {editingAnnouncement
                 ? "Update the announcement details below"
                 : "Create a new announcement to communicate with your users"}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-5 py-4">
+            {/* Title */}
             <div className="space-y-2">
-              <Label>Title</Label>
+              <Label className="text-sm font-medium">Title</Label>
               <Input
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 placeholder="Announcement title"
-                className="border-gray-700 bg-gray-800 text-white"
+                className="h-10"
               />
             </div>
 
+            {/* Message */}
             <div className="space-y-2">
-              <Label>Message</Label>
+              <Label className="text-sm font-medium">Message</Label>
               <Textarea
                 value={formData.message}
                 onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                 placeholder="Announcement message..."
-                className="min-h-[100px] border-gray-700 bg-gray-800 text-white"
+                className="min-h-[100px] resize-none"
               />
             </div>
 
+            {/* Type and Priority */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Type</Label>
+                <Label className="text-sm font-medium">Type</Label>
                 <Select
                   value={formData.type}
                   onValueChange={(value: any) => setFormData({ ...formData, type: value })}
                 >
-                  <SelectTrigger className="border-gray-700 bg-gray-800 text-white">
+                  <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="border-gray-700 bg-gray-800">
-                    {Object.entries(typeConfig).map(([value, description]) => (
-                      <SelectItem key={value} value={value} className="text-white">
-                        <div>
-                          <span className="capitalize">{value}</span>
-                          <span className="ml-2 text-xs text-gray-500">- {description}</span>
+                  <SelectContent>
+                    {Object.entries(typeConfig).map(([value, config]) => (
+                      <SelectItem key={value} value={value}>
+                        <div className="flex flex-col">
+                          <span className="font-medium capitalize">{config.label}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {config.description}
+                          </span>
                         </div>
                       </SelectItem>
                     ))}
@@ -546,119 +674,112 @@ export default function AnnouncementsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Priority</Label>
+                <Label className="text-sm font-medium">Priority</Label>
                 <Select
                   value={formData.priority}
                   onValueChange={(value: any) => setFormData({ ...formData, priority: value })}
                 >
-                  <SelectTrigger className="border-gray-700 bg-gray-800 text-white">
+                  <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="border-gray-700 bg-gray-800">
-                    <SelectItem value="info" className="text-white">
-                      Info
-                    </SelectItem>
-                    <SelectItem value="success" className="text-white">
-                      Success
-                    </SelectItem>
-                    <SelectItem value="warning" className="text-white">
-                      Warning
-                    </SelectItem>
-                    <SelectItem value="critical" className="text-white">
-                      Critical
-                    </SelectItem>
+                  <SelectContent>
+                    {Object.entries(priorityConfig).map(([value, config]) => (
+                      <SelectItem key={value} value={value}>
+                        <div className="flex items-center gap-2">
+                          <config.icon className={cn("h-4 w-4", config.iconColor)} />
+                          <span className="capitalize">{config.label}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
+            {/* Target Audience and Dismissible */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Target Audience</Label>
+                <Label className="text-sm font-medium">Target Audience</Label>
                 <Select
                   value={formData.targetAudience}
                   onValueChange={(value: any) =>
                     setFormData({ ...formData, targetAudience: value })
                   }
                 >
-                  <SelectTrigger className="border-gray-700 bg-gray-800 text-white">
+                  <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="border-gray-700 bg-gray-800">
-                    <SelectItem value="all" className="text-white">
-                      All Users
-                    </SelectItem>
-                    <SelectItem value="free" className="text-white">
-                      Free Users Only
-                    </SelectItem>
-                    <SelectItem value="pro" className="text-white">
-                      Pro Users Only
-                    </SelectItem>
-                    <SelectItem value="enterprise" className="text-white">
-                      Enterprise Only
-                    </SelectItem>
-                    <SelectItem value="specific" className="text-white">
-                      Specific Users
-                    </SelectItem>
+                  <SelectContent>
+                    {Object.entries(audienceConfig).map(([value, config]) => (
+                      <SelectItem key={value} value={value}>
+                        <div className="flex items-center gap-2">
+                          <config.icon className="text-muted-foreground h-4 w-4" />
+                          <span>{config.label}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label>Dismissible</Label>
-                <div className="flex h-10 items-center gap-2">
+                <Label className="text-sm font-medium">Dismissible</Label>
+                <div className="border-input bg-background flex h-10 items-center gap-3 rounded-md border px-3">
                   <Switch
                     checked={formData.dismissible}
                     onCheckedChange={(checked) =>
                       setFormData({ ...formData, dismissible: checked })
                     }
                   />
-                  <span className="text-sm text-gray-400">
+                  <span className="text-muted-foreground text-sm">
                     {formData.dismissible ? "Users can dismiss" : "Cannot be dismissed"}
                   </span>
                 </div>
               </div>
             </div>
 
+            {/* Target User IDs (conditional) */}
             {formData.targetAudience === "specific" && (
               <div className="space-y-2">
-                <Label>Target User IDs</Label>
+                <Label className="text-sm font-medium">Target User IDs</Label>
                 <Textarea
                   value={formData.targetUserIds}
                   onChange={(e) => setFormData({ ...formData, targetUserIds: e.target.value })}
                   placeholder="Enter user IDs separated by commas (e.g., user123, user456)"
-                  className="min-h-[80px] border-gray-700 bg-gray-800 text-white"
+                  className="min-h-[80px] resize-none"
                 />
-                <p className="text-xs text-gray-500">
+                <p className="text-muted-foreground text-xs">
                   Comma-separated list of Firebase user IDs to target
                 </p>
               </div>
             )}
 
+            {/* Date Range */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Start Date & Time</Label>
+                <Label className="text-sm font-medium">Start Date & Time</Label>
                 <Input
                   type="datetime-local"
                   value={formData.startDate}
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  className="border-gray-700 bg-gray-800 text-white"
+                  className="h-10"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>End Date & Time (Optional)</Label>
+                <Label className="text-sm font-medium">End Date & Time (Optional)</Label>
                 <Input
                   type="datetime-local"
                   value={formData.endDate}
                   onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  className="border-gray-700 bg-gray-800 text-white"
+                  className="h-10"
                 />
               </div>
             </div>
 
+            {/* CTA */}
             <div className="space-y-2">
-              <Label>Call to Action (Optional)</Label>
+              <Label className="text-sm font-medium">Call to Action (Optional)</Label>
               <div className="grid grid-cols-2 gap-4">
                 <Input
                   value={formData.cta?.text || ""}
@@ -669,7 +790,7 @@ export default function AnnouncementsPage() {
                     })
                   }
                   placeholder="Button text"
-                  className="border-gray-700 bg-gray-800 text-white"
+                  className="h-10"
                 />
                 <Input
                   value={formData.cta?.url || ""}
@@ -680,34 +801,68 @@ export default function AnnouncementsPage() {
                     })
                   }
                   placeholder="Button URL"
-                  className="border-gray-700 bg-gray-800 text-white"
+                  className="h-10"
                 />
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Active Toggle */}
+            <div className="border-border bg-muted/30 flex items-center gap-3 rounded-lg border p-4">
               <Switch
                 checked={formData.active}
                 onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
               />
-              <Label>Active immediately</Label>
+              <div>
+                <Label className="text-sm font-medium">Active immediately</Label>
+                <p className="text-muted-foreground text-xs">
+                  When enabled, the announcement will be visible to users right away
+                </p>
+              </div>
             </div>
           </div>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDialogOpen(false)}
-              className="border-gray-700 text-gray-400 hover:text-white"
-            >
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
             <Button
               onClick={handleSave}
               disabled={saving || !formData.title || !formData.message}
-              className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
+              className="bg-accent text-accent-foreground hover:bg-accent/90"
             >
-              {saving ? "Saving..." : editingAnnouncement ? "Update" : "Create"}
+              {saving ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : editingAnnouncement ? (
+                "Update"
+              ) : (
+                "Create"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+        <DialogContent className="border-border bg-card max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">Delete Announcement</DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Are you sure you want to delete this announcement? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}
+            >
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>
