@@ -428,11 +428,15 @@ export function buildEnhancedDailySchedule(
     .sort((a, b) => b.avgPriority - a.avgPriority)
 
   let remainingQuestions = [...prioritizedQuestions]
+  // Use noon local time to avoid timezone issues when dates are stored as UTC
+  // and later converted back - noon ensures the date stays the same day in most timezones
   const today = new Date()
+  today.setHours(12, 0, 0, 0)
 
   for (let day = 0; day < availableDays && remainingQuestions.length > 0; day++) {
     const dayDate = new Date(today)
     dayDate.setDate(dayDate.getDate() + day)
+    dayDate.setHours(12, 0, 0, 0) // Ensure noon time for each day
 
     // Determine focus cluster for today (rotate)
     const focusClusterIndex = day % clusterOrder.length
@@ -533,6 +537,7 @@ export function buildEnhancedDailySchedule(
   for (let i = 0; i < config.reviewBufferDays; i++) {
     const dayDate = new Date(today)
     dayDate.setDate(dayDate.getDate() + availableDays + i)
+    dayDate.setHours(12, 0, 0, 0) // Ensure noon time for timezone safety
 
     const reviewThemes = [
       "Review Day - Weak Areas",

@@ -45,11 +45,13 @@ export function TodaysFocus({
   const completedMinutes = completedQuestions.reduce((sum, q) => sum + q.estimatedMinutes, 0)
 
   // Determine if this is today, past, or future
+  // Compare using local date components to avoid timezone issues with UTC dates
   const planDate = new Date(plan.date)
-  planDate.setHours(0, 0, 0, 0)
   const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const isToday = planDate.getTime() === today.getTime()
+  const isToday =
+    planDate.getFullYear() === today.getFullYear() &&
+    planDate.getMonth() === today.getMonth() &&
+    planDate.getDate() === today.getDate()
 
   // Format date for display
   const dateLabel = isToday

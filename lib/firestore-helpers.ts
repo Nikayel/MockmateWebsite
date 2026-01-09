@@ -654,6 +654,45 @@ export async function getSessionState(sessionId: string): Promise<{
 }
 
 /**
+ * Find the latest submitted session for a scenario
+ * Returns the session ID if found and it was completed/submitted
+ */
+export async function findLatestSubmittedSession(
+  userId: string,
+  scenarioId: string
+): Promise<{ sessionId: string; completedAt: string } | null> {
+  try {
+    const sessionsRef = collection(db, "interview_sessions")
+    const q = query(
+      sessionsRef,
+      where("user_id", "==", userId),
+      where("scenario_id", "==", scenarioId),
+      orderBy("created_at", "desc"),
+      limit(1)
+    )
+
+    const snapshot = await getDocs(q)
+    if (snapshot.empty) return null
+
+    const doc = snapshot.docs[0]
+    const data = doc.data()
+
+    // Only return if the session was completed (has completed_at)
+    if (data.completed_at) {
+      return {
+        sessionId: doc.id,
+        completedAt: data.completed_at,
+      }
+    }
+
+    return null
+  } catch (error) {
+    console.error("Error finding latest submitted session:", error)
+    return null
+  }
+}
+
+/**
  * Record session start and manage usage
  *
  * New model:

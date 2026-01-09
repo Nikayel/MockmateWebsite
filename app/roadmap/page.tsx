@@ -92,17 +92,28 @@ export default function RoadmapPage() {
   const [isArchiving, setIsArchiving] = useState(false)
   const [showDayUnlockModal, setShowDayUnlockModal] = useState(false)
   const [acknowledgedDays, setAcknowledgedDays] = useState<Set<number>>(new Set())
+  // Track if acknowledged days have been loaded from localStorage
+  const [acknowledgedDaysLoaded, setAcknowledgedDaysLoaded] = useState(false)
+  // Track if we should check for day completion (after completing/skipping a question)
+  const [shouldCheckDayCompletion, setShouldCheckDayCompletion] = useState(false)
 
   // Get today's plan
+  // Use local date comparison - both today and plan dates should be compared in user's local timezone
+  // This ensures "Day 1" shows on the day it was meant to be in the user's timezone
   const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const todayYear = today.getFullYear()
+  const todayMonth = today.getMonth()
+  const todayDay = today.getDate()
 
   const todayIndex =
     roadmap?.dailyPlans.findIndex((plan) => {
       const planDate = new Date(plan.date)
-      planDate.setHours(0, 0, 0, 0)
-      return planDate.getTime() === today.getTime()
-    }) ?? 0
+      return (
+        planDate.getFullYear() === todayYear &&
+        planDate.getMonth() === todayMonth &&
+        planDate.getDate() === todayDay
+      )
+    }) ?? -1 // Use -1 to indicate no match, then handle below
 
   // Load roadmaps from Firebase on mount
   // IMPORTANT: Clear stale roadmap first to prevent cross-user data leaks
@@ -206,15 +217,24 @@ export default function RoadmapPage() {
 
   const handleSkipQuestion = (scenarioId: string) => {
     markQuestionSkipped(scenarioId)
+    // Trigger day completion check after skipping
+    // Use setTimeout to allow state to update first
+    setTimeout(() => setShouldCheckDayCompletion(true), 100)
   }
 
   const handleMarkComplete = (scenarioId: string) => {
     markQuestionCompleted(scenarioId)
+    // Trigger day completion check after marking complete
+    // Use setTimeout to allow state to update first
+    setTimeout(() => setShouldCheckDayCompletion(true), 100)
   }
 
   // Load acknowledged days from localStorage when roadmap changes
   useEffect(() => {
-    if (!roadmap?.id) return
+    if (!roadmap?.id) {
+      setAcknowledgedDaysLoaded(false)
+      return
+    }
     const storageKey = `roadmap-acknowledged-days-${roadmap.id}`
     const stored = localStorage.getItem(storageKey)
     if (stored) {
@@ -227,25 +247,72 @@ export default function RoadmapPage() {
     } else {
       setAcknowledgedDays(new Set())
     }
+    setAcknowledgedDaysLoaded(true)
   }, [roadmap?.id])
 
-  // Check if current day was just completed and show unlock modal
+  // Check if user just completed a question (coming back from interview page)
+  // This runs once on mount to check sessionStorage
   useEffect(() => {
-    if (!roadmap) return
+    if (!roadmap?.id || !acknowledgedDaysLoaded) return
 
-    const currentPlan = roadmap.dailyPlans[selectedDayIndex]
-    if (!currentPlan || currentPlan.questions.length === 0) return
+    const completionData = sessionStorage.getItem("roadmap-question-just-completed")
+    if (!completionData) return
 
-    const allCompleted = currentPlan.questions.every(
-      (q) => q.status === "completed" || q.status === "skipped"
-    )
-    const hasNextDay = selectedDayIndex < roadmap.dailyPlans.length - 1
+    try {
+      const { roadmapId, timestamp } = JSON.parse(completionData)
 
-    // Show unlock modal if day is complete, there's a next day, and user hasn't acknowledged this day
-    if (allCompleted && hasNextDay && !acknowledgedDays.has(selectedDayIndex)) {
+      // Only process if it's for the current roadmap and recent (within 5 minutes)
+      const isRecent = Date.now() - timestamp < 5 * 60 * 1000
+      const isCurrentRoadmap = roadmapId === roadmap.id
+
+      if (isRecent && isCurrentRoadmap) {
+        // Clear the flag so it doesn't trigger again on subsequent navigations
+        sessionStorage.removeItem("roadmap-question-just-completed")
+        // Signal that we should check for day completion
+        setShouldCheckDayCompletion(true)
+      } else {
+        // Stale or different roadmap - clean up
+        sessionStorage.removeItem("roadmap-question-just-completed")
+      }
+    } catch {
+      sessionStorage.removeItem("roadmap-question-just-completed")
+    }
+  }, [roadmap?.id, acknowledgedDaysLoaded])
+
+  // Check if current day was just completed and show unlock modal
+  // Only show if: user just came back from completing a question AND the day is now complete
+  useEffect(() => {
+    if (!roadmap || !acknowledgedDaysLoaded || !shouldCheckDayCompletion) return
+
+    // Reset the flag so we don't check again
+    setShouldCheckDayCompletion(false)
+
+    // Find which day the user was working on (the one with the most recently completed question)
+    // We need to find the correct day, not rely on selectedDayIndex which might be stale
+    let completedDayIndex = -1
+    for (let i = 0; i < roadmap.dailyPlans.length; i++) {
+      const plan = roadmap.dailyPlans[i]
+      const allCompleted =
+        plan.questions.length > 0 &&
+        plan.questions.every((q) => q.status === "completed" || q.status === "skipped")
+      // Check if this day is complete and not already acknowledged
+      if (allCompleted && !acknowledgedDays.has(i)) {
+        completedDayIndex = i
+        break // Take the first unacknowledged completed day
+      }
+    }
+
+    if (completedDayIndex === -1) return
+
+    const hasNextDay = completedDayIndex < roadmap.dailyPlans.length - 1
+
+    // Show unlock modal if there's a completed day that hasn't been acknowledged
+    if (hasNextDay) {
+      // Select the completed day so the modal shows correct info
+      selectDay(completedDayIndex)
       setShowDayUnlockModal(true)
     }
-  }, [roadmap?.dailyPlans, selectedDayIndex, acknowledgedDays])
+  }, [roadmap, acknowledgedDaysLoaded, shouldCheckDayCompletion, acknowledgedDays, selectDay])
 
   // Mark day as acknowledged and persist to localStorage
   const acknowledgeDayCompletion = (dayIndex: number) => {

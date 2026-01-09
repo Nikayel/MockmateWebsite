@@ -61,6 +61,7 @@ import {
   checkSessionCost,
   saveSessionState,
   getSessionState,
+  findLatestSubmittedSession,
 } from "@/lib/firestore-helpers"
 import {
   getOrCreateGuestId,
@@ -757,6 +758,18 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       else if (scenarioId && !sessionId && fromRoadmap) {
         const scenario = getScenarioById(scenarioId)
         if (scenario) {
+          // Check if there's already a submitted session for this scenario
+          if (user?.id) {
+            const existingSession = await findLatestSubmittedSession(user.id, scenarioId)
+            if (existingSession) {
+              toast.info("Session already submitted", {
+                description: "Redirecting to your results...",
+              })
+              router.push(`/sessions/${existingSession.sessionId}`)
+              return
+            }
+          }
+
           // Just select the scenario - don't auto-start, let user click Start Interview
           setSelectedScenario(scenario)
           setShowScenarioBrowser(false) // Hide browser to show the problem view
@@ -1776,6 +1789,15 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             if (minutesSpent > 0) {
               addActualTime(minutesSpent)
             }
+            // Signal to roadmap page that a question was just completed (for day completion modal)
+            sessionStorage.setItem(
+              "roadmap-question-just-completed",
+              JSON.stringify({
+                scenarioId: selectedScenario.id,
+                roadmapId: activeRoadmap.id,
+                timestamp: Date.now(),
+              })
+            )
             toast.success("Progress saved to your roadmap!")
           }
 
@@ -2967,13 +2989,24 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           }).catch((err) => console.error("Session metrics tracking failed:", err))
 
           // Mark question complete in roadmap if user came from roadmap
-          const isFromRoadmap = searchParams.get("from") === "roadmap"
-          if (isFromRoadmap && selectedScenario && activeRoadmap) {
+          // Note: Check both param patterns for compatibility
+          const isFromRoadmapHere =
+            searchParams.get("from") === "roadmap" || searchParams.get("roadmap") === "true"
+          if (isFromRoadmapHere && selectedScenario && activeRoadmap) {
             markQuestionCompleted(selectedScenario.id, calculatedPerformanceScore)
             const minutesSpent = Math.round(elapsedTime / 60)
             if (minutesSpent > 0) {
               addActualTime(minutesSpent)
             }
+            // Signal to roadmap page that a question was just completed (for day completion modal)
+            sessionStorage.setItem(
+              "roadmap-question-just-completed",
+              JSON.stringify({
+                scenarioId: selectedScenario.id,
+                roadmapId: activeRoadmap.id,
+                timestamp: Date.now(),
+              })
+            )
             toast.success("Progress saved to your roadmap!")
           }
 
@@ -4693,20 +4726,13 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   </Card>
 
                   {/* Action Buttons */}
-                  <div className="flex justify-center gap-4">
+                  <div className="flex justify-center">
                     <Button
                       onClick={proceedToFinalFeedback}
                       className="bg-accent hover:bg-accent/80 text-accent-foreground px-6"
                     >
                       View Detailed Feedback
                       <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                    <Button
-                      onClick={resetInterview}
-                      variant="outline"
-                      className="border-border text-muted-foreground hover:bg-secondary"
-                    >
-                      Try Another Problem
                     </Button>
                   </div>
                 </div>

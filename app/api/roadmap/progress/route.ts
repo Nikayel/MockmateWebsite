@@ -27,7 +27,7 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    if (!["pending", "in_progress", "completed", "skipped"].includes(status)) {
+    if (!["pending", "in_progress", "completed", "skipped", "evaluating"].includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 })
     }
 

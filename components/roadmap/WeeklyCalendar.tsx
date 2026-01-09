@@ -1,10 +1,10 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Check, Circle, CalendarDays } from 'lucide-react'
-import { DailyPlan } from '@/lib/data/company-questions/types'
-import { cn } from '@/lib/utils'
+import { useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { ChevronLeft, ChevronRight, Check, Circle, CalendarDays } from "lucide-react"
+import { DailyPlan } from "@/lib/data/company-questions/types"
+import { cn } from "@/lib/utils"
 
 interface WeeklyCalendarProps {
   dailyPlans: DailyPlan[]
@@ -12,20 +12,21 @@ interface WeeklyCalendarProps {
   onSelectDay: (index: number) => void
 }
 
-export function WeeklyCalendar({
-  dailyPlans,
-  selectedDayIndex,
-  onSelectDay,
-}: WeeklyCalendarProps) {
+export function WeeklyCalendar({ dailyPlans, selectedDayIndex, onSelectDay }: WeeklyCalendarProps) {
   const [hoveredDay, setHoveredDay] = useState<number | null>(null)
   const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const todayYear = today.getFullYear()
+  const todayMonth = today.getMonth()
+  const todayDay = today.getDate()
 
-  // Find today's index
+  // Find today's index using date component comparison to avoid timezone issues
   const todayIndex = dailyPlans.findIndex((plan) => {
     const planDate = new Date(plan.date)
-    planDate.setHours(0, 0, 0, 0)
-    return planDate.getTime() === today.getTime()
+    return (
+      planDate.getFullYear() === todayYear &&
+      planDate.getMonth() === todayMonth &&
+      planDate.getDate() === todayDay
+    )
   })
 
   // Get current week view (show 7 days centered around today or selected day)
@@ -56,17 +57,17 @@ export function WeeklyCalendar({
   }
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold flex items-center gap-2">
-          <CalendarDays className="h-5 w-5 text-primary" />
+    <div className="bg-card border-border rounded-xl border p-4">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="flex items-center gap-2 font-semibold">
+          <CalendarDays className="text-primary h-5 w-5" />
           Weekly Schedule
         </h3>
         <div className="flex items-center gap-2">
           {showJumpToToday && (
             <button
               onClick={jumpToToday}
-              className="px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 rounded-lg transition-colors"
+              className="text-primary hover:bg-primary/10 rounded-lg px-2 py-1 text-xs font-medium transition-colors"
             >
               Jump to Today
             </button>
@@ -77,10 +78,10 @@ export function WeeklyCalendar({
               disabled={!canScrollLeft}
               aria-label="Previous week"
               className={cn(
-                'p-1.5 rounded-lg transition-colors',
+                "rounded-lg p-1.5 transition-colors",
                 canScrollLeft
-                  ? 'hover:bg-muted text-foreground'
-                  : 'text-muted-foreground/50 cursor-not-allowed'
+                  ? "hover:bg-muted text-foreground"
+                  : "text-muted-foreground/50 cursor-not-allowed"
               )}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -90,10 +91,10 @@ export function WeeklyCalendar({
               disabled={!canScrollRight}
               aria-label="Next week"
               className={cn(
-                'p-1.5 rounded-lg transition-colors',
+                "rounded-lg p-1.5 transition-colors",
                 canScrollRight
-                  ? 'hover:bg-muted text-foreground'
-                  : 'text-muted-foreground/50 cursor-not-allowed'
+                  ? "hover:bg-muted text-foreground"
+                  : "text-muted-foreground/50 cursor-not-allowed"
               )}
             >
               <ChevronRight className="h-4 w-4" />
@@ -109,7 +110,7 @@ export function WeeklyCalendar({
             initial={{ opacity: 0, y: -5 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -5 }}
-            className="mb-3 p-2 bg-muted rounded-lg text-sm text-center"
+            className="bg-muted mb-3 rounded-lg p-2 text-center text-sm"
           >
             <span className="font-medium">{dailyPlans[hoveredDay].theme}</span>
             {dailyPlans[hoveredDay].questions.length > 0 && (
@@ -125,15 +126,24 @@ export function WeeklyCalendar({
         {visibleDays.map((plan, index) => {
           const actualIndex = weekStart + index
           const planDate = new Date(plan.date)
-          planDate.setHours(0, 0, 0, 0)
 
-          const isToday = planDate.getTime() === today.getTime()
-          const isPast = planDate < today
+          // Compare using date components to avoid timezone issues
+          const isToday =
+            planDate.getFullYear() === todayYear &&
+            planDate.getMonth() === todayMonth &&
+            planDate.getDate() === todayDay
+
+          // For past comparison, use date-only midnight values
+          const planDateMidnight = new Date(
+            planDate.getFullYear(),
+            planDate.getMonth(),
+            planDate.getDate()
+          )
+          const todayMidnight = new Date(todayYear, todayMonth, todayDay)
+          const isPast = planDateMidnight < todayMidnight
           const isSelected = actualIndex === selectedDayIndex
 
-          const completedCount = plan.questions.filter(
-            (q) => q.status === 'completed'
-          ).length
+          const completedCount = plan.questions.filter((q) => q.status === "completed").length
           const totalCount = plan.questions.length
           const allComplete = totalCount > 0 && completedCount === totalCount
 
@@ -156,17 +166,17 @@ export function WeeklyCalendar({
       </div>
 
       {/* Legend */}
-      <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground justify-center">
+      <div className="text-muted-foreground mt-4 flex flex-wrap justify-center gap-4 text-xs">
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded-full bg-green-500" />
+          <div className="h-3 w-3 rounded-full bg-green-500" />
           <span>Complete</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded-full bg-primary" />
+          <div className="bg-primary h-3 w-3 rounded-full" />
           <span>Today</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded-full bg-muted" />
+          <div className="bg-muted h-3 w-3 rounded-full" />
           <span>Upcoming</span>
         </div>
       </div>
@@ -198,7 +208,7 @@ function DayCell({
   onLeave: () => void
 }) {
   const date = new Date(plan.date)
-  const dayName = date.toLocaleDateString('en-US', { weekday: 'short' })
+  const dayName = date.toLocaleDateString("en-US", { weekday: "short" })
   const dayNum = date.getDate()
 
   return (
@@ -210,30 +220,25 @@ function DayCell({
       onMouseLeave={onLeave}
       aria-label={`${dayName} ${dayNum}: ${plan.theme}. ${completedCount} of ${totalCount} completed.`}
       className={cn(
-        'relative p-2 rounded-lg text-center transition-all cursor-pointer',
-        isSelected && 'ring-2 ring-primary ring-offset-2 bg-primary/5',
-        allComplete && !isSelected && 'bg-green-100',
-        isToday && !allComplete && !isSelected && 'bg-primary/10',
-        isPast && !allComplete && !isSelected && 'bg-yellow-50',
-        !isToday && !isPast && !allComplete && !isSelected && 'bg-muted/50 hover:bg-muted'
+        "relative cursor-pointer rounded-lg p-2 text-center transition-all",
+        isSelected && "ring-primary bg-primary/5 ring-2 ring-offset-2",
+        allComplete && !isSelected && "bg-green-100",
+        isToday && !allComplete && !isSelected && "bg-primary/10",
+        isPast && !allComplete && !isSelected && "bg-yellow-50",
+        !isToday && !isPast && !allComplete && !isSelected && "bg-muted/50 hover:bg-muted"
       )}
     >
       {/* Day name */}
-      <p
-        className={cn(
-          'text-xs font-medium',
-          isToday ? 'text-primary' : 'text-muted-foreground'
-        )}
-      >
+      <p className={cn("text-xs font-medium", isToday ? "text-primary" : "text-muted-foreground")}>
         {dayName}
       </p>
 
       {/* Day number */}
       <p
         className={cn(
-          'text-lg font-bold',
-          allComplete && 'text-green-600',
-          isToday && !allComplete && 'text-primary'
+          "text-lg font-bold",
+          allComplete && "text-green-600",
+          isToday && !allComplete && "text-primary"
         )}
       >
         {dayNum}
@@ -242,7 +247,7 @@ function DayCell({
       {/* Progress indicator */}
       <div className="mt-1 flex justify-center">
         {totalCount === 0 ? (
-          <span className="text-xs text-muted-foreground">Rest</span>
+          <span className="text-muted-foreground text-xs">Rest</span>
         ) : allComplete ? (
           <Check className="h-4 w-4 text-green-500" />
         ) : (
@@ -251,8 +256,8 @@ function DayCell({
               <Circle
                 key={i}
                 className={cn(
-                  'h-1.5 w-1.5',
-                  i < completedCount ? 'fill-primary text-primary' : 'text-muted-foreground'
+                  "h-1.5 w-1.5",
+                  i < completedCount ? "fill-primary text-primary" : "text-muted-foreground"
                 )}
               />
             ))}
@@ -261,9 +266,7 @@ function DayCell({
       </div>
 
       {/* Today indicator */}
-      {isToday && (
-        <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full" />
-      )}
+      {isToday && <div className="bg-primary absolute -top-1 -right-1 h-3 w-3 rounded-full" />}
     </motion.button>
   )
 }
