@@ -7,6 +7,7 @@ import { FocusHeader } from "./FocusHeader"
 import { FocusQuestionsList } from "./FocusQuestionsList"
 import { FocusCompletionBanner } from "./FocusCompletionBanner"
 import { RAGExplanationModal } from "./RAGExplanationModal"
+import { isStoredDateToday, getUTCDateComponents } from "@/lib/utils"
 
 type RAGEnhancements = NonNullable<PersonalizedRoadmap["ragEnhancements"]>
 
@@ -44,19 +45,22 @@ export function TodaysFocus({
   const totalMinutes = plan.questions.reduce((sum, q) => sum + q.estimatedMinutes, 0)
   const completedMinutes = completedQuestions.reduce((sum, q) => sum + q.estimatedMinutes, 0)
 
-  // Determine if this is today, past, or future
-  // Compare using local date components to avoid timezone issues with UTC dates
+  // Determine if this is today
+  // Use timezone-safe comparison: plan dates are stored as UTC midnight,
+  // so we compare the UTC date with local today to handle timezone differences correctly.
   const planDate = new Date(plan.date)
-  const today = new Date()
-  const isToday =
-    planDate.getFullYear() === today.getFullYear() &&
-    planDate.getMonth() === today.getMonth() &&
-    planDate.getDate() === today.getDate()
+  const isToday = isStoredDateToday(planDate)
 
-  // Format date for display
+  // Format date for display using UTC components to show the "intended" date
+  const planDateComponents = getUTCDateComponents(planDate)
+  const displayDate = new Date(
+    planDateComponents.year,
+    planDateComponents.month,
+    planDateComponents.day
+  )
   const dateLabel = isToday
     ? "Today's Focus"
-    : planDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
+    : displayDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
 
   // Handle rest/review days (no questions)
   if (totalCount === 0) {

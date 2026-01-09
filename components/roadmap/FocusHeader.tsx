@@ -2,7 +2,13 @@
 
 import { motion } from "framer-motion"
 import { Calendar, Clock, Flame, HelpCircle, SkipForward, Target, Trophy } from "lucide-react"
-import { cn } from "@/lib/utils"
+import {
+  cn,
+  isStoredDateToday,
+  isStoredDatePast,
+  isStoredDateFuture,
+  getUTCDateComponents,
+} from "@/lib/utils"
 import { DailyPlan, PersonalizedRoadmap } from "@/lib/data/company-questions/types"
 
 type RAGEnhancements = NonNullable<PersonalizedRoadmap["ragEnhancements"]>
@@ -35,24 +41,23 @@ export function FocusHeader({
   ragEnhancements,
 }: FocusHeaderProps) {
   // Determine if this is today, past, or future
-  // Compare using local date components to avoid timezone issues with UTC dates
+  // Use timezone-safe comparison: plan dates are stored as UTC midnight,
+  // so we compare the UTC date with local today to handle timezone differences correctly.
   const planDate = new Date(plan.date)
-  const today = new Date()
-  const isToday =
-    planDate.getFullYear() === today.getFullYear() &&
-    planDate.getMonth() === today.getMonth() &&
-    planDate.getDate() === today.getDate()
+  const isToday = isStoredDateToday(planDate)
+  const isPast = isStoredDatePast(planDate)
+  const isFuture = isStoredDateFuture(planDate)
 
-  // For past/future comparison, use date-only (midnight local time)
-  const planDateMidnight = new Date(planDate.getFullYear(), planDate.getMonth(), planDate.getDate())
-  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const isPast = planDateMidnight < todayMidnight
-  const isFuture = planDateMidnight > todayMidnight
-
-  // Format date for display
+  // Format date for display using UTC components to show the "intended" date
+  const planDateComponents = getUTCDateComponents(planDate)
+  const displayDate = new Date(
+    planDateComponents.year,
+    planDateComponents.month,
+    planDateComponents.day
+  )
   const dateLabel = isToday
     ? "Today's Focus"
-    : planDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
+    : displayDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
 
   return (
     <div

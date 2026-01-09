@@ -55,7 +55,7 @@ import { useRoadmapStore, useActiveRoadmap } from "@/lib/stores/roadmap-store"
 import { getCompanyById } from "@/lib/data/company-questions"
 import { getStudyRecommendations } from "@/lib/roadmap/prioritization-algorithm"
 import { generatePersonalizedGuide } from "@/lib/roadmap/personalized-guide-generator"
-import { cn } from "@/lib/utils"
+import { cn, getUTCDateComponents, getLocalDateComponents, isStoredDateToday } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 
 /**
@@ -98,20 +98,21 @@ export default function RoadmapPage() {
   const [shouldCheckDayCompletion, setShouldCheckDayCompletion] = useState(false)
 
   // Get today's plan
-  // Use local date comparison - both today and plan dates should be compared in user's local timezone
-  // This ensures "Day 1" shows on the day it was meant to be in the user's timezone
+  // Use timezone-safe date comparison: plan dates are stored as UTC midnight,
+  // so we use UTC methods to extract the "intended" date and compare with local today.
+  // This ensures "Day 2" on Jan 9 UTC matches Jan 9 local time, regardless of timezone.
   const today = new Date()
-  const todayYear = today.getFullYear()
-  const todayMonth = today.getMonth()
-  const todayDay = today.getDate()
+  const localToday = getLocalDateComponents(today)
 
   const todayIndex =
     roadmap?.dailyPlans.findIndex((plan) => {
       const planDate = new Date(plan.date)
+      // Use UTC methods to get the intended date from the stored UTC midnight timestamp
+      const planDateComponents = getUTCDateComponents(planDate)
       return (
-        planDate.getFullYear() === todayYear &&
-        planDate.getMonth() === todayMonth &&
-        planDate.getDate() === todayDay
+        planDateComponents.year === localToday.year &&
+        planDateComponents.month === localToday.month &&
+        planDateComponents.day === localToday.day
       )
     }) ?? -1 // Use -1 to indicate no match, then handle below
 
