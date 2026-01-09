@@ -4,7 +4,13 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ChevronLeft, ChevronRight, Check, Circle, CalendarDays } from "lucide-react"
 import { DailyPlan } from "@/lib/data/company-questions/types"
-import { cn } from "@/lib/utils"
+import {
+  cn,
+  getLocalDateComponents,
+  getUTCDateComponents,
+  isStoredDateToday,
+  isStoredDatePast,
+} from "@/lib/utils"
 
 interface WeeklyCalendarProps {
   dailyPlans: DailyPlan[]
@@ -15,17 +21,18 @@ interface WeeklyCalendarProps {
 export function WeeklyCalendar({ dailyPlans, selectedDayIndex, onSelectDay }: WeeklyCalendarProps) {
   const [hoveredDay, setHoveredDay] = useState<number | null>(null)
   const today = new Date()
-  const todayYear = today.getFullYear()
-  const todayMonth = today.getMonth()
-  const todayDay = today.getDate()
+  const localToday = getLocalDateComponents(today)
 
-  // Find today's index using date component comparison to avoid timezone issues
+  // Find today's index using timezone-safe comparison:
+  // Plan dates are stored as UTC midnight, so we use UTC methods to get the "intended" date
+  // and compare with local today.
   const todayIndex = dailyPlans.findIndex((plan) => {
     const planDate = new Date(plan.date)
+    const planComponents = getUTCDateComponents(planDate)
     return (
-      planDate.getFullYear() === todayYear &&
-      planDate.getMonth() === todayMonth &&
-      planDate.getDate() === todayDay
+      planComponents.year === localToday.year &&
+      planComponents.month === localToday.month &&
+      planComponents.day === localToday.day
     )
   })
 
@@ -127,20 +134,9 @@ export function WeeklyCalendar({ dailyPlans, selectedDayIndex, onSelectDay }: We
           const actualIndex = weekStart + index
           const planDate = new Date(plan.date)
 
-          // Compare using date components to avoid timezone issues
-          const isToday =
-            planDate.getFullYear() === todayYear &&
-            planDate.getMonth() === todayMonth &&
-            planDate.getDate() === todayDay
-
-          // For past comparison, use date-only midnight values
-          const planDateMidnight = new Date(
-            planDate.getFullYear(),
-            planDate.getMonth(),
-            planDate.getDate()
-          )
-          const todayMidnight = new Date(todayYear, todayMonth, todayDay)
-          const isPast = planDateMidnight < todayMidnight
+          // Use timezone-safe comparison for isToday and isPast
+          const isToday = isStoredDateToday(planDate)
+          const isPast = isStoredDatePast(planDate)
           const isSelected = actualIndex === selectedDayIndex
 
           const completedCount = plan.questions.filter((q) => q.status === "completed").length
@@ -207,9 +203,12 @@ function DayCell({
   onHover: () => void
   onLeave: () => void
 }) {
-  const date = new Date(plan.date)
-  const dayName = date.toLocaleDateString("en-US", { weekday: "short" })
-  const dayNum = date.getDate()
+  // Use UTC components to display the "intended" date from the stored UTC midnight timestamp
+  const planDate = new Date(plan.date)
+  const planComponents = getUTCDateComponents(planDate)
+  const displayDate = new Date(planComponents.year, planComponents.month, planComponents.day)
+  const dayName = displayDate.toLocaleDateString("en-US", { weekday: "short" })
+  const dayNum = planComponents.day
 
   return (
     <motion.button
