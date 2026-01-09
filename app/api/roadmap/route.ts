@@ -1,12 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
-import { verifyAuth } from '@/lib/auth-helpers'
-import { generatePersonalizedRoadmap } from '@/lib/roadmap/prioritization-algorithm'
-import { generateRAGEnhancedRoadmap, type RAGEnhancedRoadmap } from '@/lib/rag/roadmap-rag'
-import { scenarios, type DSAScenario } from '@/lib/scenarios'
-import { UserRoadmapAssessment, PersonalizedRoadmap } from '@/lib/data/company-questions/types'
+import { NextRequest, NextResponse } from "next/server"
+import { adminDb } from "@/lib/firebase-admin"
+import { verifyAuth } from "@/lib/auth-helpers"
+import { generatePersonalizedRoadmap } from "@/lib/roadmap/prioritization-algorithm"
+import { generateRAGEnhancedRoadmap, type RAGEnhancedRoadmap } from "@/lib/rag/roadmap-rag"
+import { scenarios, type DSAScenario } from "@/lib/scenarios"
+import { UserRoadmapAssessment, PersonalizedRoadmap } from "@/lib/data/company-questions/types"
+import { logger } from "@/lib/logger"
 
-const COLLECTION = 'user_roadmaps'
+const COLLECTION = "user_roadmaps"
 
 /**
  * GET /api/roadmap - Get user's active roadmap or all roadmaps
@@ -18,16 +19,16 @@ export async function GET(request: NextRequest) {
   try {
     const authResult = await verifyAuth(request)
     if (!authResult.authenticated || !authResult.userId) {
-      console.log('[Roadmap API] Unauthorized request')
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      logger.warn("[Roadmap API] Unauthorized request")
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const userId = authResult.userId
-    console.log('[Roadmap API] GET request for user:', userId)
+    logger.info("[Roadmap API] GET request for user:", { userId })
 
     const { searchParams } = new URL(request.url)
-    const getAll = searchParams.get('all') === 'true'
-    const statusFilter = searchParams.get('status')
+    const getAll = searchParams.get("all") === "true"
+    const statusFilter = searchParams.get("status")
 
     // Check for expired active roadmaps and archive them
     const now = new Date()
@@ -36,20 +37,20 @@ export async function GET(request: NextRequest) {
     // We'll sort client-side instead
     const activeSnapshot = await adminDb
       .collection(COLLECTION)
-      .where('userId', '==', userId)
-      .where('status', '==', 'active')
+      .where("userId", "==", userId)
+      .where("status", "==", "active")
       .get()
 
-    console.log('[Roadmap API] Found', activeSnapshot.docs.length, 'active roadmaps')
+    logger.info("[Roadmap API] Found active roadmaps", { count: activeSnapshot.docs.length })
 
     const batch = adminDb.batch()
     let hasExpired = false
 
-    activeSnapshot.docs.forEach(doc => {
+    activeSnapshot.docs.forEach((doc) => {
       const data = doc.data()
       const interviewDate = data.interviewDate?.toDate?.() || new Date(data.interviewDate)
       if (interviewDate < now) {
-        batch.update(doc.ref, { status: 'archived', updatedAt: new Date() })
+        batch.update(doc.ref, { status: "archived", updatedAt: new Date() })
         hasExpired = true
       }
     })
@@ -63,50 +64,54 @@ export async function GET(request: NextRequest) {
     let snapshot
     if (getAll) {
       // Get all roadmaps
-      snapshot = await adminDb
-        .collection(COLLECTION)
-        .where('userId', '==', userId)
-        .get()
+      snapshot = await adminDb.collection(COLLECTION).where("userId", "==", userId).get()
     } else if (statusFilter) {
       // Get roadmaps by status
       snapshot = await adminDb
         .collection(COLLECTION)
-        .where('userId', '==', userId)
-        .where('status', '==', statusFilter)
+        .where("userId", "==", userId)
+        .where("status", "==", statusFilter)
         .get()
     } else {
       // Get active roadmap only (default behavior)
       snapshot = await adminDb
         .collection(COLLECTION)
-        .where('userId', '==', userId)
-        .where('status', '==', 'active')
+        .where("userId", "==", userId)
+        .where("status", "==", "active")
         .get()
     }
 
     if (snapshot.empty) {
-      console.log('[Roadmap API] No roadmaps found matching query')
+      logger.info("[Roadmap API] No roadmaps found matching query")
 
       // Check if there are any roadmaps without proper status field (legacy data fix)
       const allDocsSnapshot = await adminDb
         .collection(COLLECTION)
-        .where('userId', '==', userId)
+        .where("userId", "==", userId)
         .get()
 
-      console.log('[Roadmap API] Total documents for user:', allDocsSnapshot.docs.length)
+      logger.info("[Roadmap API] Total documents for user:", { count: allDocsSnapshot.docs.length })
 
       // Find roadmaps that need status field fix
-      const docsNeedingFix = allDocsSnapshot.docs.filter(doc => {
+      const docsNeedingFix = allDocsSnapshot.docs.filter((doc) => {
         const data = doc.data()
         const hasNoStatus = !data.status
         const interviewDate = data.interviewDate?.toDate?.() || new Date(data.interviewDate)
         const isNotExpired = interviewDate >= new Date()
-        console.log('[Roadmap API] Doc:', doc.id, 'status:', data.status, 'company:', data.targetCompany || data.companyName, 'needsFix:', hasNoStatus && isNotExpired)
+        logger.debug("[Roadmap API] Doc status check", {
+          docId: doc.id,
+          status: data.status,
+          company: data.targetCompany || data.companyName,
+          needsFix: hasNoStatus && isNotExpired,
+        })
         return hasNoStatus && isNotExpired
       })
 
       // Fix legacy roadmaps missing status field
       if (docsNeedingFix.length > 0 && !getAll) {
-        console.log('[Roadmap API] Fixing', docsNeedingFix.length, 'legacy roadmaps missing status field')
+        logger.info("[Roadmap API] Fixing legacy roadmaps missing status field", {
+          count: docsNeedingFix.length,
+        })
         const batch = adminDb.batch()
 
         // Set the most recent one as active, others as abandoned
@@ -118,7 +123,7 @@ export async function GET(request: NextRequest) {
 
         sortedDocs.forEach((doc, index) => {
           batch.update(doc.ref, {
-            status: index === 0 ? 'active' : 'abandoned',
+            status: index === 0 ? "active" : "abandoned",
             updatedAt: new Date(),
           })
         })
@@ -133,28 +138,30 @@ export async function GET(request: NextRequest) {
         const convertedRoadmap = {
           id: fixedDoc.id,
           ...data,
-          status: 'active',
+          status: "active",
           createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
           updatedAt: new Date().toISOString(),
           interviewDate: data.interviewDate?.toDate?.()?.toISOString() || data.interviewDate,
-          dailyPlans: data.dailyPlans?.map((plan: any) => ({
-            ...plan,
-            date: plan.date?.toDate?.()?.toISOString() || plan.date,
-          })) || [],
-          milestones: data.milestones?.map((m: any) => ({
-            ...m,
-            targetDate: m.targetDate?.toDate?.()?.toISOString() || m.targetDate,
-          })) || [],
+          dailyPlans:
+            data.dailyPlans?.map((plan: any) => ({
+              ...plan,
+              date: plan.date?.toDate?.()?.toISOString() || plan.date,
+            })) || [],
+          milestones:
+            data.milestones?.map((m: any) => ({
+              ...m,
+              targetDate: m.targetDate?.toDate?.()?.toISOString() || m.targetDate,
+            })) || [],
         }
 
-        console.log('[Roadmap API] Returning fixed roadmap:', convertedRoadmap.id)
+        logger.info("[Roadmap API] Returning fixed roadmap", { roadmapId: convertedRoadmap.id })
         return NextResponse.json({ roadmap: convertedRoadmap })
       }
 
       return NextResponse.json(getAll ? { roadmaps: [] } : { roadmap: null })
     }
 
-    console.log('[Roadmap API] Found', snapshot.docs.length, 'roadmaps matching query')
+    logger.info("[Roadmap API] Found roadmaps matching query", { count: snapshot.docs.length })
 
     const convertRoadmap = (doc: any) => {
       const data = doc.data()
@@ -166,26 +173,26 @@ export async function GET(request: NextRequest) {
         updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt,
         interviewDate: data.interviewDate?.toDate?.()?.toISOString() || data.interviewDate,
         // Convert nested dates in dailyPlans and milestones
-        dailyPlans: data.dailyPlans?.map((plan: any) => ({
-          ...plan,
-          date: plan.date?.toDate?.()?.toISOString() || plan.date,
-        })) || [],
-        milestones: data.milestones?.map((m: any) => ({
-          ...m,
-          targetDate: m.targetDate?.toDate?.()?.toISOString() || m.targetDate,
-        })) || [],
+        dailyPlans:
+          data.dailyPlans?.map((plan: any) => ({
+            ...plan,
+            date: plan.date?.toDate?.()?.toISOString() || plan.date,
+          })) || [],
+        milestones:
+          data.milestones?.map((m: any) => ({
+            ...m,
+            targetDate: m.targetDate?.toDate?.()?.toISOString() || m.targetDate,
+          })) || [],
       }
     }
 
     if (getAll || statusFilter) {
       // Sort by createdAt descending (client-side to avoid index requirement)
-      const roadmaps = snapshot.docs
-        .map(convertRoadmap)
-        .sort((a: any, b: any) => {
-          const aDate = new Date(a.createdAt || 0).getTime()
-          const bDate = new Date(b.createdAt || 0).getTime()
-          return bDate - aDate
-        })
+      const roadmaps = snapshot.docs.map(convertRoadmap).sort((a: any, b: any) => {
+        const aDate = new Date(a.createdAt || 0).getTime()
+        const bDate = new Date(b.createdAt || 0).getTime()
+        return bDate - aDate
+      })
       return NextResponse.json({ roadmaps })
     } else {
       // Get the most recent active roadmap (sort client-side)
@@ -198,9 +205,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ roadmap })
     }
   } catch (error) {
-    console.error('Error fetching roadmap:', error)
+    logger.error("Error fetching roadmap:", { error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch roadmap' },
+      { error: error instanceof Error ? error.message : "Failed to fetch roadmap" },
       { status: 500 }
     )
   }
@@ -217,23 +224,24 @@ export async function POST(request: NextRequest) {
   try {
     const authResult = await verifyAuth(request)
     if (!authResult.authenticated || !authResult.userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const userId = authResult.userId
 
     // Check subscription tier - roadmap is a Pro-only feature
-    const profileDoc = await adminDb.collection('profiles').doc(userId).get()
+    const profileDoc = await adminDb.collection("profiles").doc(userId).get()
     const profile = profileDoc.data()
-    const subscriptionTier = profile?.subscription_tier || 'free'
+    const subscriptionTier = profile?.subscription_tier || "free"
 
-    if (subscriptionTier === 'free') {
+    if (subscriptionTier === "free") {
       return NextResponse.json(
         {
-          error: 'Pro feature required',
-          message: 'Personalized study roadmaps are available with Pro. Upgrade to unlock custom prep plans tailored to your target company and interview date.',
-          code: 'PRO_REQUIRED',
-          upgradeUrl: '/upgrade'
+          error: "Pro feature required",
+          message:
+            "Personalized study roadmaps are available with Pro. Upgrade to unlock custom prep plans tailored to your target company and interview date.",
+          code: "PRO_REQUIRED",
+          upgradeUrl: "/upgrade",
         },
         { status: 403 }
       )
@@ -241,7 +249,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { searchParams } = new URL(request.url)
-    const enableRAG = searchParams.get('rag') !== 'false' // RAG enabled by default
+    const enableRAG = searchParams.get("rag") !== "false" // RAG enabled by default
 
     const {
       targetCompany,
@@ -254,7 +262,7 @@ export async function POST(request: NextRequest) {
 
     if (!targetCompany || !interviewDate) {
       return NextResponse.json(
-        { error: 'Target company and interview date are required' },
+        { error: "Target company and interview date are required" },
         { status: 400 }
       )
     }
@@ -262,29 +270,32 @@ export async function POST(request: NextRequest) {
     // Calculate days remaining
     const now = new Date()
     const interview = new Date(interviewDate)
-    const daysRemaining = Math.max(1, Math.ceil((interview.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+    const daysRemaining = Math.max(
+      1,
+      Math.ceil((interview.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    )
 
     // Build assessment
     const assessment: UserRoadmapAssessment = {
       targetCompany,
       interviewDate: interview,
       daysRemaining,
-      experienceLevel: experienceLevel || 'intermediate',
+      experienceLevel: experienceLevel || "intermediate",
       problemsSolvedEstimate: problemsSolved || 0,
       patternFamiliarity: patternFamiliarity || [],
       hoursPerDay: hoursPerDay || 2,
-      preferredDifficulty: 'mixed',
+      preferredDifficulty: "mixed",
       targetScore: 80,
     }
 
     // Get DSA scenarios
-    const dsaScenarios = scenarios.filter(s => s.type === 'dsa') as DSAScenario[]
+    const dsaScenarios = scenarios.filter((s) => s.type === "dsa") as DSAScenario[]
 
     // Generate roadmap - use RAG-enhanced version if enabled
     let roadmap: PersonalizedRoadmap | RAGEnhancedRoadmap | null
 
     if (enableRAG) {
-      console.log('[Roadmap] Generating RAG-enhanced roadmap for user:', userId)
+      logger.info("[Roadmap] Generating RAG-enhanced roadmap for user", { userId })
       roadmap = await generateRAGEnhancedRoadmap({
         userId,
         assessment,
@@ -293,35 +304,32 @@ export async function POST(request: NextRequest) {
         enableAIInsights: true,
       })
     } else {
-      console.log('[Roadmap] Generating standard roadmap for user:', userId)
+      logger.info("[Roadmap] Generating standard roadmap for user", { userId })
       roadmap = generatePersonalizedRoadmap(dsaScenarios, assessment, userId)
     }
 
     if (!roadmap) {
-      return NextResponse.json(
-        { error: 'Failed to generate roadmap' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: "Failed to generate roadmap" }, { status: 500 })
     }
 
     // Mark any existing active roadmaps as abandoned
     const existingSnapshot = await adminDb
       .collection(COLLECTION)
-      .where('userId', '==', userId)
-      .where('status', '==', 'active')
+      .where("userId", "==", userId)
+      .where("status", "==", "active")
       .get()
 
     const batch = adminDb.batch()
-    existingSnapshot.docs.forEach(doc => {
-      batch.update(doc.ref, { status: 'abandoned', updatedAt: new Date() })
+    existingSnapshot.docs.forEach((doc) => {
+      batch.update(doc.ref, { status: "abandoned", updatedAt: new Date() })
     })
 
     // Prepare roadmap for Firestore (convert dates)
-    const ragEnhancements = 'ragEnhancements' in roadmap ? roadmap.ragEnhancements : null
+    const ragEnhancements = "ragEnhancements" in roadmap ? roadmap.ragEnhancements : null
     const roadmapDoc = {
       ...roadmap,
       // Explicitly set status to 'active' (ensure it's always present)
-      status: 'active',
+      status: "active",
       userId,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -330,11 +338,11 @@ export async function POST(request: NextRequest) {
         ...assessment,
         interviewDate: interview,
       },
-      dailyPlans: roadmap.dailyPlans.map(plan => ({
+      dailyPlans: roadmap.dailyPlans.map((plan) => ({
         ...plan,
         date: new Date(plan.date),
       })),
-      milestones: roadmap.milestones.map(m => ({
+      milestones: roadmap.milestones.map((m) => ({
         ...m,
         targetDate: new Date(m.targetDate),
       })),
@@ -353,12 +361,12 @@ export async function POST(request: NextRequest) {
         ...roadmap,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      }
+      },
     })
   } catch (error) {
-    console.error('Error creating roadmap:', error)
+    logger.error("Error creating roadmap:", { error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create roadmap' },
+      { error: error instanceof Error ? error.message : "Failed to create roadmap" },
       { status: 500 }
     )
   }
@@ -371,7 +379,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const authResult = await verifyAuth(request)
     if (!authResult.authenticated || !authResult.userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const userId = authResult.userId
@@ -379,17 +387,11 @@ export async function PATCH(request: NextRequest) {
     const { roadmapId, status } = body
 
     if (!roadmapId || !status) {
-      return NextResponse.json(
-        { error: 'Roadmap ID and status are required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Roadmap ID and status are required" }, { status: 400 })
     }
 
-    if (!['active', 'archived', 'completed', 'abandoned'].includes(status)) {
-      return NextResponse.json(
-        { error: 'Invalid status' },
-        { status: 400 }
-      )
+    if (!["active", "archived", "completed", "abandoned"].includes(status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 })
     }
 
     // Get the roadmap
@@ -397,20 +399,14 @@ export async function PATCH(request: NextRequest) {
     const doc = await docRef.get()
 
     if (!doc.exists) {
-      return NextResponse.json(
-        { error: 'Roadmap not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: "Roadmap not found" }, { status: 404 })
     }
 
     const roadmapData = doc.data()
 
     // Verify ownership
     if (roadmapData?.userId !== userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      )
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 
     // Update status
@@ -421,9 +417,9 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error updating roadmap:', error)
+    logger.error("Error updating roadmap:", { error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to update roadmap' },
+      { error: error instanceof Error ? error.message : "Failed to update roadmap" },
       { status: 500 }
     )
   }

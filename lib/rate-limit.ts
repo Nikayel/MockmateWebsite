@@ -99,13 +99,13 @@ class InMemoryRateLimitStore implements RateLimitStore {
       // Create new window
       entry = {
         count: 1,
-        resetTime: now + config.interval
+        resetTime: now + config.interval,
       }
       this.store.set(key, entry)
       return {
         allowed: true,
         remaining: config.maxRequests - 1,
-        resetTime: entry.resetTime
+        resetTime: entry.resetTime,
       }
     }
 
@@ -115,7 +115,7 @@ class InMemoryRateLimitStore implements RateLimitStore {
         allowed: false,
         remaining: 0,
         resetTime: entry.resetTime,
-        retryAfter: Math.ceil((entry.resetTime - now) / 1000)
+        retryAfter: Math.ceil((entry.resetTime - now) / 1000),
       }
     }
 
@@ -126,7 +126,7 @@ class InMemoryRateLimitStore implements RateLimitStore {
     return {
       allowed: true,
       remaining: config.maxRequests - entry.count,
-      resetTime: entry.resetTime
+      resetTime: entry.resetTime,
     }
   }
 
@@ -151,16 +151,16 @@ class UpstashRateLimitStore implements RateLimitStore {
   private token: string
 
   constructor() {
-    this.baseUrl = process.env.UPSTASH_REDIS_REST_URL || ''
-    this.token = process.env.UPSTASH_REDIS_REST_TOKEN || ''
+    this.baseUrl = process.env.UPSTASH_REDIS_REST_URL || ""
+    this.token = process.env.UPSTASH_REDIS_REST_TOKEN || ""
   }
 
   private async redis(command: string[]): Promise<any> {
     const response = await fetch(`${this.baseUrl}`, {
-      method: 'POST',
+      method: "POST",
       headers: {
         Authorization: `Bearer ${this.token}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(command),
     })
@@ -175,20 +175,20 @@ class UpstashRateLimitStore implements RateLimitStore {
 
   async get(key: string): Promise<RateLimitEntry | null> {
     try {
-      const result = await this.redis(['GET', key])
+      const result = await this.redis(["GET", key])
       if (!result) return null
       return JSON.parse(result) as RateLimitEntry
     } catch (error) {
-      logger.error('Upstash get error', { key, error })
+      logger.error("Upstash get error", { key, error })
       return null
     }
   }
 
   async set(key: string, entry: RateLimitEntry, ttlMs: number): Promise<void> {
     try {
-      await this.redis(['SET', key, JSON.stringify(entry), 'PX', ttlMs.toString()])
+      await this.redis(["SET", key, JSON.stringify(entry), "PX", ttlMs.toString()])
     } catch (error) {
-      logger.error('Upstash set error', { key, error })
+      logger.error("Upstash set error", { key, error })
     }
   }
 
@@ -230,13 +230,13 @@ class UpstashRateLimitStore implements RateLimitStore {
       if (!entry || entry.resetTime < now) {
         const newEntry = {
           count: 1,
-          resetTime: now + config.interval
+          resetTime: now + config.interval,
         }
         await this.set(key, newEntry, config.interval + 1000)
         return {
           allowed: true,
           remaining: config.maxRequests - 1,
-          resetTime: newEntry.resetTime
+          resetTime: newEntry.resetTime,
         }
       }
 
@@ -245,7 +245,7 @@ class UpstashRateLimitStore implements RateLimitStore {
           allowed: false,
           remaining: 0,
           resetTime: entry.resetTime,
-          retryAfter: Math.ceil((entry.resetTime - now) / 1000)
+          retryAfter: Math.ceil((entry.resetTime - now) / 1000),
         }
       }
 
@@ -256,15 +256,15 @@ class UpstashRateLimitStore implements RateLimitStore {
       return {
         allowed: true,
         remaining: config.maxRequests - entry.count,
-        resetTime: entry.resetTime
+        resetTime: entry.resetTime,
       }
     } catch (error) {
-      logger.error('Upstash increment error, falling back to allow', { key, error })
+      logger.error("Upstash increment error, falling back to allow", { key, error })
       // Fail open on errors - don't block users if Redis is down
       return {
         allowed: true,
         remaining: config.maxRequests,
-        resetTime: now + config.interval
+        resetTime: now + config.interval,
       }
     }
   }
@@ -278,8 +278,8 @@ class UpstashRateLimitStore implements RateLimitStore {
 class FirestoreRateLimitStore implements RateLimitStore {
   async get(key: string): Promise<RateLimitEntry | null> {
     try {
-      const { adminDb } = await import('./firebase-admin')
-      const doc = await adminDb.collection('rate_limits').doc(key).get()
+      const { adminDb } = await import("./firebase-admin")
+      const doc = await adminDb.collection("rate_limits").doc(key).get()
       if (!doc.exists) return null
 
       const data = doc.data()
@@ -287,31 +287,31 @@ class FirestoreRateLimitStore implements RateLimitStore {
 
       const entry: RateLimitEntry = {
         count: data.count || 0,
-        resetTime: data.resetTime || 0
+        resetTime: data.resetTime || 0,
       }
 
       if (entry.resetTime < Date.now()) {
-        await adminDb.collection('rate_limits').doc(key).delete()
+        await adminDb.collection("rate_limits").doc(key).delete()
         return null
       }
 
       return entry
     } catch (error) {
-      logger.error('Firestore rate limit get error', { key, error })
+      logger.error("Firestore rate limit get error", { key, error })
       return null
     }
   }
 
   async set(key: string, entry: RateLimitEntry, _ttlMs: number): Promise<void> {
     try {
-      const { adminDb } = await import('./firebase-admin')
-      await adminDb.collection('rate_limits').doc(key).set({
+      const { adminDb } = await import("./firebase-admin")
+      await adminDb.collection("rate_limits").doc(key).set({
         count: entry.count,
         resetTime: entry.resetTime,
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
       })
     } catch (error) {
-      logger.error('Firestore rate limit set error', { key, error })
+      logger.error("Firestore rate limit set error", { key, error })
     }
   }
 
@@ -319,8 +319,8 @@ class FirestoreRateLimitStore implements RateLimitStore {
     const now = Date.now()
 
     try {
-      const { adminDb, FieldValue } = await import('./firebase-admin')
-      const docRef = adminDb.collection('rate_limits').doc(key)
+      const { adminDb, FieldValue } = await import("./firebase-admin")
+      const docRef = adminDb.collection("rate_limits").doc(key)
 
       // Use transaction for atomic increment
       const result = await adminDb.runTransaction(async (transaction) => {
@@ -339,7 +339,7 @@ class FirestoreRateLimitStore implements RateLimitStore {
         transaction.set(docRef, {
           count,
           resetTime,
-          updatedAt: now
+          updatedAt: now,
         })
 
         return { count, resetTime }
@@ -351,15 +351,15 @@ class FirestoreRateLimitStore implements RateLimitStore {
         allowed,
         remaining: Math.max(0, config.maxRequests - result.count),
         resetTime: result.resetTime,
-        retryAfter: allowed ? undefined : Math.ceil((result.resetTime - now) / 1000)
+        retryAfter: allowed ? undefined : Math.ceil((result.resetTime - now) / 1000),
       }
     } catch (error) {
-      logger.error('Firestore rate limit increment error, falling back to allow', { key, error })
+      logger.error("Firestore rate limit increment error, falling back to allow", { key, error })
       // Fail open
       return {
         allowed: true,
         remaining: config.maxRequests,
-        resetTime: now + config.interval
+        resetTime: now + config.interval,
       }
     }
   }
@@ -376,19 +376,20 @@ class FirestoreRateLimitStore implements RateLimitStore {
 function getRateLimitStore(): RateLimitStore {
   // Check for Upstash Redis (recommended for Vercel - fastest option)
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-    logger.info('Using Upstash Redis for rate limiting')
+    logger.info("Using Upstash Redis for rate limiting")
     return new UpstashRateLimitStore()
   }
 
   // In production, default to Firestore if Firebase is configured
   // This ensures distributed rate limiting works across serverless instances
-  const isProduction = process.env.NODE_ENV === 'production'
-  const hasFirebaseConfig = process.env.FIREBASE_ADMIN_PRIVATE_KEY || process.env.GOOGLE_APPLICATION_CREDENTIALS
+  const isProduction = process.env.NODE_ENV === "production"
+  const hasFirebaseConfig =
+    process.env.FIREBASE_ADMIN_PRIVATE_KEY || process.env.GOOGLE_APPLICATION_CREDENTIALS
 
   if (hasFirebaseConfig) {
     // Use Firestore in production by default, or if explicitly enabled
-    if (isProduction || process.env.USE_FIRESTORE_RATE_LIMIT === 'true') {
-      logger.info('Using Firestore for distributed rate limiting')
+    if (isProduction || process.env.USE_FIRESTORE_RATE_LIMIT === "true") {
+      logger.info("Using Firestore for distributed rate limiting")
       return new FirestoreRateLimitStore()
     }
   }
@@ -399,18 +400,18 @@ function getRateLimitStore(): RateLimitStore {
     // Each serverless instance has its own in-memory store, allowing attackers
     // to bypass limits by distributing requests across instances
     const errorMessage =
-      'SECURITY ERROR: No distributed rate limiting configured in production. ' +
-      'Configure UPSTASH_REDIS_REST_URL/TOKEN or ensure Firebase Admin is properly configured. ' +
-      'Set ALLOW_INSECURE_RATE_LIMIT=true to override (NOT RECOMMENDED).'
+      "SECURITY ERROR: No distributed rate limiting configured in production. " +
+      "Configure UPSTASH_REDIS_REST_URL/TOKEN or ensure Firebase Admin is properly configured. " +
+      "Set ALLOW_INSECURE_RATE_LIMIT=true to override (NOT RECOMMENDED)."
 
-    if (process.env.ALLOW_INSECURE_RATE_LIMIT !== 'true') {
+    if (process.env.ALLOW_INSECURE_RATE_LIMIT !== "true") {
       logger.error(errorMessage)
       throw new Error(errorMessage)
     }
 
     logger.warn(
-      'Using in-memory rate limiting in production - this may allow rate limit bypass. ' +
-      'Configure UPSTASH_REDIS_REST_URL/TOKEN or ensure Firebase Admin is properly configured.'
+      "Using in-memory rate limiting in production - this may allow rate limit bypass. " +
+        "Configure UPSTASH_REDIS_REST_URL/TOKEN or ensure Firebase Admin is properly configured."
     )
   }
   return new InMemoryRateLimitStore()
@@ -456,7 +457,7 @@ function getClientIdentifier(request: NextRequest): string {
  * Returns null if allowed, or NextResponse with 429 if rate limited
  */
 export function rateLimit(config: RateLimitConfig) {
-  const prefix = config.prefix || 'rl'
+  const prefix = config.prefix || "rl"
 
   return async (request: NextRequest): Promise<NextResponse | null> => {
     const identifier = getClientIdentifier(request)
@@ -467,7 +468,7 @@ export function rateLimit(config: RateLimitConfig) {
       const result = await store.increment(key, config)
 
       if (!result.allowed) {
-        logger.warn('Rate limit exceeded', {
+        logger.warn("Rate limit exceeded", {
           key,
           identifier,
           retryAfter: result.retryAfter,
@@ -476,7 +477,7 @@ export function rateLimit(config: RateLimitConfig) {
         return NextResponse.json(
           {
             error: "Too many requests. Please try again later.",
-            retryAfter: result.retryAfter
+            retryAfter: result.retryAfter,
           },
           {
             status: 429,
@@ -484,15 +485,15 @@ export function rateLimit(config: RateLimitConfig) {
               "Retry-After": (result.retryAfter || 60).toString(),
               "X-RateLimit-Limit": config.maxRequests.toString(),
               "X-RateLimit-Remaining": "0",
-              "X-RateLimit-Reset": result.resetTime.toString()
-            }
+              "X-RateLimit-Reset": result.resetTime.toString(),
+            },
           }
         )
       }
 
       return null // Allow request
     } catch (error) {
-      logger.error('Rate limiting error, allowing request', { key, error })
+      logger.error("Rate limiting error, allowing request", { key, error })
       // Fail open - don't block users if rate limiting fails
       return null
     }
@@ -508,7 +509,7 @@ export const executeRateLimit = rateLimit({
   interval: 60 * 1000, // 1 minute
   uniqueTokenPerInterval: 500,
   maxRequests: 10,
-  prefix: 'rl:execute'
+  prefix: "rl:execute",
 })
 
 // Moderate rate limit for chat API (20 requests per minute)
@@ -516,7 +517,7 @@ export const chatRateLimit = rateLimit({
   interval: 60 * 1000, // 1 minute
   uniqueTokenPerInterval: 500,
   maxRequests: 20,
-  prefix: 'rl:chat'
+  prefix: "rl:chat",
 })
 
 // Lenient rate limit for other API endpoints (30 requests per minute)
@@ -524,7 +525,7 @@ export const apiRateLimit = rateLimit({
   interval: 60 * 1000, // 1 minute
   uniqueTokenPerInterval: 500,
   maxRequests: 30,
-  prefix: 'rl:api'
+  prefix: "rl:api",
 })
 
 // Very strict for feedback generation (5 requests per minute)
@@ -532,7 +533,7 @@ export const feedbackRateLimit = rateLimit({
   interval: 60 * 1000, // 1 minute
   uniqueTokenPerInterval: 500,
   maxRequests: 5,
-  prefix: 'rl:feedback'
+  prefix: "rl:feedback",
 })
 
 // Extremely strict for sensitive operations like account deletion
@@ -541,7 +542,7 @@ export const sensitiveOperationRateLimit = rateLimit({
   interval: 60 * 60 * 1000, // 1 hour
   uniqueTokenPerInterval: 100,
   maxRequests: 2,
-  prefix: 'rl:sensitive'
+  prefix: "rl:sensitive",
 })
 
 // Guest session rate limit - strict to prevent abuse
@@ -550,7 +551,7 @@ export const guestSessionRateLimit = rateLimit({
   interval: 60 * 60 * 1000, // 1 hour
   uniqueTokenPerInterval: 500,
   maxRequests: 3,
-  prefix: 'rl:guest'
+  prefix: "rl:guest",
 })
 
 // Guest API rate limit - for chat/execute during guest sessions
@@ -559,7 +560,16 @@ export const guestApiRateLimit = rateLimit({
   interval: 60 * 1000, // 1 minute
   uniqueTokenPerInterval: 500,
   maxRequests: 15, // Slightly lower than authenticated users
-  prefix: 'rl:guest-api'
+  prefix: "rl:guest-api",
+})
+
+// Promo code rate limit - strict to prevent brute-force attacks
+// 5 attempts per hour per IP to prevent code guessing
+export const promoCodeRateLimit = rateLimit({
+  interval: 60 * 60 * 1000, // 1 hour
+  uniqueTokenPerInterval: 500,
+  maxRequests: 5,
+  prefix: "rl:promo",
 })
 
 // Export types and utilities for testing

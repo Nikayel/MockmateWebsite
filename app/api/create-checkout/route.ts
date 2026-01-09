@@ -10,6 +10,7 @@ import { adminDb } from "@/lib/firebase-admin"
 import { PRICING_CONFIG } from "@/lib/config"
 import { getUserIdFromRequest } from "@/lib/auth-server"
 import { logger } from "@/lib/logger"
+import { sensitiveOperationRateLimit } from "@/lib/rate-limit"
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY environment variable is required")
@@ -26,15 +27,23 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
  */
 function getValidatedPriceId(platform: string, planType: string): string | null {
   // Build expected price ID key
-  const priceKey = platform === "vscode"
-    ? (planType === "yearly" ? "STRIPE_PRICE_ID_VSCODE_YEARLY" : "STRIPE_PRICE_ID_VSCODE")
-    : (planType === "yearly" ? "STRIPE_PRICE_ID_WEBSITE_YEARLY" : "STRIPE_PRICE_ID_WEBSITE")
+  const priceKey =
+    platform === "vscode"
+      ? planType === "yearly"
+        ? "STRIPE_PRICE_ID_VSCODE_YEARLY"
+        : "STRIPE_PRICE_ID_VSCODE"
+      : planType === "yearly"
+        ? "STRIPE_PRICE_ID_WEBSITE_YEARLY"
+        : "STRIPE_PRICE_ID_WEBSITE"
 
   const priceId = process.env[priceKey]
 
   // Validate price ID format (Stripe price IDs start with 'price_')
-  if (!priceId || !priceId.startsWith('price_')) {
-    logger.error("Invalid or missing price ID", { priceKey, priceId: priceId ? "[REDACTED]" : "missing" })
+  if (!priceId || !priceId.startsWith("price_")) {
+    logger.error("Invalid or missing price ID", {
+      priceKey,
+      priceId: priceId ? "[REDACTED]" : "missing",
+    })
     return null
   }
 
@@ -42,6 +51,12 @@ function getValidatedPriceId(platform: string, planType: string): string | null 
 }
 
 export async function POST(request: NextRequest) {
+  // Apply rate limiting to prevent abuse
+  const rateLimitResponse = await sensitiveOperationRateLimit(request)
+  if (rateLimitResponse) {
+    return rateLimitResponse
+  }
+
   try {
     // Verify authentication - userId must come from verified token
     const authenticatedUserId = await getUserIdFromRequest(request)
@@ -54,8 +69,11 @@ export async function POST(request: NextRequest) {
     // Use the authenticated userId, not from request body
     const userId = authenticatedUserId
 
-    if (!planType || (planType !== 'monthly' && planType !== 'yearly')) {
-      return NextResponse.json({ error: "Plan type must be 'monthly' or 'yearly'" }, { status: 400 })
+    if (!planType || (planType !== "monthly" && planType !== "yearly")) {
+      return NextResponse.json(
+        { error: "Plan type must be 'monthly' or 'yearly'" },
+        { status: 400 }
+      )
     }
 
     // Validate that user has an email before creating checkout
@@ -69,13 +87,18 @@ export async function POST(request: NextRequest) {
 
       const profile = profileSnap.data()
       if (!profile || !profile.email || profile.email.trim() === "") {
-        return NextResponse.json({
-          error: "Email address is required for subscription. Please update your profile with a valid email address."
-        }, { status: 400 })
+        return NextResponse.json(
+          {
+            error:
+              "Email address is required for subscription. Please update your profile with a valid email address.",
+          },
+          { status: 400 }
+        )
       }
 
       // SECURITY FIX: Check for existing active subscription to prevent duplicate charges
-      const isActiveSubscription = profile.subscription_tier === "pro" &&
+      const isActiveSubscription =
+        profile.subscription_tier === "pro" &&
         (profile.subscription_status === "active" || profile.subscription_status === "trialing")
 
       // Also check if subscription hasn't expired (for yearly plans)
@@ -89,13 +112,17 @@ export async function POST(request: NextRequest) {
           userId,
           currentTier: profile.subscription_tier,
           currentStatus: profile.subscription_status,
-          expiresAt: profile.subscription_current_period_end
+          expiresAt: profile.subscription_current_period_end,
         })
-        return NextResponse.json({
-          error: "You already have an active Pro subscription.",
-          message: "To modify your subscription, please use the Customer Portal in your account settings.",
-          code: "DUPLICATE_SUBSCRIPTION"
-        }, { status: 400 })
+        return NextResponse.json(
+          {
+            error: "You already have an active Pro subscription.",
+            message:
+              "To modify your subscription, please use the Customer Portal in your account settings.",
+            code: "DUPLICATE_SUBSCRIPTION",
+          },
+          { status: 400 }
+        )
       }
     } catch (profileError) {
       logger.error("Error fetching user profile", { error: profileError })
@@ -107,9 +134,12 @@ export async function POST(request: NextRequest) {
 
     if (!priceId) {
       // Don't expose configuration details in error message
-      return NextResponse.json({
-        error: "Unable to process subscription. Please try again or contact support."
-      }, { status: 500 })
+      return NextResponse.json(
+        {
+          error: "Unable to process subscription. Please try again or contact support.",
+        },
+        { status: 500 }
+      )
     }
 
     const profile = profileSnap.data()
@@ -124,14 +154,20 @@ export async function POST(request: NextRequest) {
       try {
         await stripe.customers.retrieve(profile.stripe_customer_id)
         stripeCustomerId = profile.stripe_customer_id
-        logger.info("Using existing customer for checkout", { userId, customerId: stripeCustomerId })
+        logger.info("Using existing customer for checkout", {
+          userId,
+          customerId: stripeCustomerId,
+        })
       } catch {
         // Customer doesn't exist in Stripe - clear the invalid ID from Firebase
-        logger.warn("Existing customer ID invalid, clearing from profile", { userId, invalidId: profile.stripe_customer_id })
+        logger.warn("Existing customer ID invalid, clearing from profile", {
+          userId,
+          invalidId: profile.stripe_customer_id,
+        })
         try {
           await adminDb.collection("profiles").doc(userId).update({
             stripe_customer_id: null,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
         } catch (clearError) {
           logger.error("Failed to clear invalid customer ID", { error: clearError })
@@ -147,15 +183,18 @@ export async function POST(request: NextRequest) {
           limit: 10,
         })
 
-        const matchingCustomer = existingCustomers.data.find(c => c.metadata?.userId === userId)
+        const matchingCustomer = existingCustomers.data.find((c) => c.metadata?.userId === userId)
         if (matchingCustomer) {
           stripeCustomerId = matchingCustomer.id
           // Update profile with the found customer ID
           await adminDb.collection("profiles").doc(userId).update({
             stripe_customer_id: stripeCustomerId,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
-          logger.info("Found existing customer with matching userId", { userId, customerId: stripeCustomerId })
+          logger.info("Found existing customer with matching userId", {
+            userId,
+            customerId: stripeCustomerId,
+          })
         }
       } catch (searchError) {
         logger.warn("Error searching for existing customer", { error: searchError })
@@ -170,13 +209,13 @@ export async function POST(request: NextRequest) {
           metadata: {
             userId: userId,
             source: "checkout_creation",
-          }
+          },
         })
         stripeCustomerId = newCustomer.id
         // Update profile with new customer ID
         await adminDb.collection("profiles").doc(userId).update({
           stripe_customer_id: stripeCustomerId,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         logger.info("Created new customer for checkout", { userId, customerId: stripeCustomerId })
       } catch (createError) {
@@ -187,7 +226,7 @@ export async function POST(request: NextRequest) {
 
     // Create checkout session
     // Yearly plans use one-time payment, monthly uses subscription
-    const isSubscription = planType === 'monthly'
+    const isSubscription = planType === "monthly"
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: isSubscription ? "subscription" : "payment",
@@ -218,7 +257,7 @@ export async function POST(request: NextRequest) {
     // payment_method_collection only works with subscriptions, not one-time payments
     // This allows $0 subscriptions (100% discount) to proceed without payment method
     if (isSubscription) {
-      sessionParams.payment_method_collection = 'if_required'
+      sessionParams.payment_method_collection = "if_required"
     }
 
     // Attach pre-created customer if we have one
@@ -227,7 +266,7 @@ export async function POST(request: NextRequest) {
       // customer_update only works when customer is set
       // This saves the billing address to the customer for future tax calculation
       sessionParams.customer_update = {
-        address: 'auto',
+        address: "auto",
       }
     } else if (userEmail) {
       // Fallback: Let Stripe create customer but pre-fill email
@@ -249,4 +288,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
-import { verifyAuth } from '@/lib/auth-helpers'
+import { NextRequest, NextResponse } from "next/server"
+import { adminDb } from "@/lib/firebase-admin"
+import { verifyAuth } from "@/lib/auth-helpers"
+import { logger } from "@/lib/logger"
 
-const COLLECTION = 'user_roadmaps'
+const COLLECTION = "user_roadmaps"
 
 /**
  * PATCH /api/roadmap/progress - Update question progress
@@ -11,7 +12,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const authResult = await verifyAuth(request)
     if (!authResult.authenticated || !authResult.userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const userId = authResult.userId
@@ -21,112 +22,121 @@ export async function PATCH(request: NextRequest) {
 
     if (!roadmapId || !scenarioId || !status) {
       return NextResponse.json(
-        { error: 'Roadmap ID, scenario ID, and status are required' },
+        { error: "Roadmap ID, scenario ID, and status are required" },
         { status: 400 }
       )
     }
 
-    if (!['pending', 'in_progress', 'completed', 'skipped'].includes(status)) {
-      return NextResponse.json(
-        { error: 'Invalid status' },
-        { status: 400 }
-      )
+    if (!["pending", "in_progress", "completed", "skipped"].includes(status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 })
     }
 
-    // Get the roadmap
     const docRef = adminDb.collection(COLLECTION).doc(roadmapId)
-    const doc = await docRef.get()
 
-    if (!doc.exists) {
-      return NextResponse.json(
-        { error: 'Roadmap not found' },
-        { status: 404 }
-      )
-    }
+    // Use a transaction to prevent race conditions when multiple updates happen concurrently
+    const result = await adminDb.runTransaction(async (transaction) => {
+      const doc = await transaction.get(docRef)
 
-    const roadmapData = doc.data()
+      if (!doc.exists) {
+        throw new Error("ROADMAP_NOT_FOUND")
+      }
 
-    // Verify ownership
-    if (roadmapData?.userId !== userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      )
-    }
+      const roadmapData = doc.data()
 
-    // Update the question status in dailyPlans
-    const dailyPlans = roadmapData.dailyPlans || []
-    let questionFound = false
-    let completedCount = roadmapData.questionsCompleted || 0
-    let skippedCount = roadmapData.questionsSkipped || 0
-    let actualHoursSpent = roadmapData.actualHoursSpent || 0
+      // Verify ownership
+      if (roadmapData?.userId !== userId) {
+        throw new Error("UNAUTHORIZED")
+      }
 
-    const updatedPlans = dailyPlans.map((plan: any) => ({
-      ...plan,
-      questions: plan.questions.map((q: any) => {
-        if (q.scenarioId === scenarioId) {
-          questionFound = true
+      // Update the question status in dailyPlans
+      const dailyPlans = roadmapData.dailyPlans || []
+      let questionFound = false
+      let completedCount = roadmapData.questionsCompleted || 0
+      let skippedCount = roadmapData.questionsSkipped || 0
+      let actualHoursSpent = roadmapData.actualHoursSpent || 0
 
-          // Handle status changes
-          const wasCompleted = q.status === 'completed'
-          const wasSkipped = q.status === 'skipped'
-          const nowCompleted = status === 'completed'
-          const nowSkipped = status === 'skipped'
+      const updatedPlans = dailyPlans.map((plan: any) => ({
+        ...plan,
+        questions: plan.questions.map((q: any) => {
+          if (q.scenarioId === scenarioId) {
+            questionFound = true
 
-          // Update counts
-          if (!wasCompleted && nowCompleted) completedCount++
-          if (wasCompleted && !nowCompleted) completedCount--
-          if (!wasSkipped && nowSkipped) skippedCount++
-          if (wasSkipped && !nowSkipped) skippedCount--
+            // Handle status changes
+            const wasCompleted = q.status === "completed"
+            const wasSkipped = q.status === "skipped"
+            const nowCompleted = status === "completed"
+            const nowSkipped = status === "skipped"
 
-          // Add time spent
-          if (timeSpentMinutes && nowCompleted) {
-            actualHoursSpent += timeSpentMinutes / 60
+            // Update counts
+            if (!wasCompleted && nowCompleted) completedCount++
+            if (wasCompleted && !nowCompleted) completedCount--
+            if (!wasSkipped && nowSkipped) skippedCount++
+            if (wasSkipped && !nowSkipped) skippedCount--
+
+            // Add time spent
+            if (timeSpentMinutes && nowCompleted) {
+              actualHoursSpent += timeSpentMinutes / 60
+            }
+
+            return {
+              ...q,
+              status,
+              ...(nowCompleted && { completedAt: new Date(), score }),
+              ...(status === "pending" && { completedAt: null, score: null }),
+            }
           }
+          return q
+        }),
+      }))
 
-          return {
-            ...q,
-            status,
-            ...(nowCompleted && { completedAt: new Date(), score }),
-            ...(status === 'pending' && { completedAt: null, score: null }),
-          }
-        }
-        return q
-      }),
-    }))
+      if (!questionFound) {
+        throw new Error("QUESTION_NOT_FOUND")
+      }
 
-    if (!questionFound) {
-      return NextResponse.json(
-        { error: 'Question not found in roadmap' },
-        { status: 404 }
-      )
-    }
+      // Calculate progress
+      const totalQuestions = roadmapData.totalQuestions || 0
+      const isOnTrack = calculateIsOnTrack(updatedPlans, roadmapData.interviewDate)
 
-    // Calculate progress
-    const totalQuestions = roadmapData.totalQuestions || 0
-    const isOnTrack = calculateIsOnTrack(updatedPlans, roadmapData.interviewDate)
+      // Update the document within the transaction
+      transaction.update(docRef, {
+        dailyPlans: updatedPlans,
+        questionsCompleted: completedCount,
+        questionsSkipped: skippedCount,
+        actualHoursSpent,
+        isOnTrack,
+        updatedAt: new Date(),
+      })
 
-    // Update the document
-    await docRef.update({
-      dailyPlans: updatedPlans,
-      questionsCompleted: completedCount,
-      questionsSkipped: skippedCount,
-      actualHoursSpent,
-      isOnTrack,
-      updatedAt: new Date(),
+      return {
+        questionsCompleted: completedCount,
+        questionsSkipped: skippedCount,
+        progress: Math.round((completedCount / totalQuestions) * 100),
+        isOnTrack,
+        totalQuestions,
+      }
     })
 
     return NextResponse.json({
       success: true,
-      questionsCompleted: completedCount,
-      questionsSkipped: skippedCount,
-      progress: Math.round((completedCount / totalQuestions) * 100),
-      isOnTrack,
+      ...result,
     })
   } catch (error) {
-    console.error('Error updating roadmap progress:', error)
+    // Handle transaction-specific errors
+    if (error instanceof Error) {
+      if (error.message === "ROADMAP_NOT_FOUND") {
+        return NextResponse.json({ error: "Roadmap not found" }, { status: 404 })
+      }
+      if (error.message === "UNAUTHORIZED") {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+      }
+      if (error.message === "QUESTION_NOT_FOUND") {
+        return NextResponse.json({ error: "Question not found in roadmap" }, { status: 404 })
+      }
+    }
+
+    logger.error("Error updating roadmap progress:", { error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to update progress' },
+      { error: error instanceof Error ? error.message : "Failed to update progress" },
       { status: 500 }
     )
   }
@@ -155,10 +165,10 @@ function calculateIsOnTrack(dailyPlans: any[], interviewDate: any): boolean {
   // Calculate actual progress
   let completedQuestions = 0
   let totalQuestions = 0
-  dailyPlans.forEach(plan => {
+  dailyPlans.forEach((plan) => {
     plan.questions?.forEach((q: any) => {
       totalQuestions++
-      if (q.status === 'completed') completedQuestions++
+      if (q.status === "completed") completedQuestions++
     })
   })
 

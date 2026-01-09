@@ -11,32 +11,39 @@ import { Profile } from "@/lib/types"
 import Stripe from "stripe"
 import { logger } from "@/lib/logger"
 import { syncSubscriptionFromStripe } from "@/lib/stripe-helpers"
+import { sensitiveOperationRateLimit } from "@/lib/rate-limit"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-12-15.clover" as any,
 })
 
 // Mark route as dynamic to avoid build-time issues with server-only packages
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
 /**
  * API endpoint to create a Stripe Customer Portal session
  * Allows users to manage their subscription, update payment methods, and cancel
  */
 export async function POST(request: NextRequest) {
+  // Apply rate limiting to prevent abuse
+  const rateLimitResponse = await sensitiveOperationRateLimit(request)
+  if (rateLimitResponse) {
+    return rateLimitResponse
+  }
+
   try {
     // Get user ID from Firebase ID token in Authorization header
     const userId = await getUserIdFromRequest(request)
 
     if (!userId) {
       logger.warn("Customer portal: Unauthorized - no valid user ID", {
-        hasAuthHeader: !!request.headers.get("authorization")
+        hasAuthHeader: !!request.headers.get("authorization"),
       })
 
       return NextResponse.json(
         {
           error: "Unauthorized",
-          message: "Authentication failed. Please sign in again."
+          message: "Authentication failed. Please sign in again.",
         },
         { status: 401 }
       )
@@ -52,7 +59,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: "Profile not found",
-          message: "User profile does not exist. Please contact support."
+          message: "User profile does not exist. Please contact support.",
         },
         { status: 404 }
       )
@@ -67,7 +74,7 @@ export async function POST(request: NextRequest) {
       userId,
       hasCustomerId: !!stripeCustomerId,
       subscriptionType,
-      subscriptionTier: profile.subscription_tier
+      subscriptionTier: profile.subscription_tier,
     })
 
     // STEP 1: If customer ID is missing but we have a subscription ID, try to get it from Stripe
@@ -80,12 +87,17 @@ export async function POST(request: NextRequest) {
         if (stripeCustomerId) {
           await profileRef.update({
             stripe_customer_id: stripeCustomerId,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
-          logger.info("Customer portal: Retrieved customer ID from subscription", { userId, customerId: stripeCustomerId })
+          logger.info("Customer portal: Retrieved customer ID from subscription", {
+            userId,
+            customerId: stripeCustomerId,
+          })
         }
       } catch (stripeError) {
-        logger.error("Customer portal: Failed to retrieve subscription from Stripe", { error: stripeError })
+        logger.error("Customer portal: Failed to retrieve subscription from Stripe", {
+          error: stripeError,
+        })
       }
     }
 
@@ -96,16 +108,16 @@ export async function POST(request: NextRequest) {
         await stripe.customers.retrieve(stripeCustomerId)
       } catch (stripeError: any) {
         // Customer doesn't exist - clear it from profile
-        if (stripeError?.code === 'resource_missing') {
+        if (stripeError?.code === "resource_missing") {
           logger.warn("Customer portal: Invalid customer ID, clearing from profile", {
             userId,
-            invalidCustomerId: stripeCustomerId
+            invalidCustomerId: stripeCustomerId,
           })
 
           // Clear invalid customer ID
           await profileRef.update({
             stripe_customer_id: null,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
 
           stripeCustomerId = undefined
@@ -113,7 +125,9 @@ export async function POST(request: NextRequest) {
           // Try to recover from subscription ID if available (monthly plans)
           if (profile.stripe_subscription_id) {
             try {
-              const subscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id)
+              const subscription = await stripe.subscriptions.retrieve(
+                profile.stripe_subscription_id
+              )
               const validCustomerId = subscription.customer as string
 
               // Verify this customer exists
@@ -122,13 +136,17 @@ export async function POST(request: NextRequest) {
               // Update with valid customer ID
               await profileRef.update({
                 stripe_customer_id: validCustomerId,
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
               })
 
               stripeCustomerId = validCustomerId
-              logger.info("Customer portal: Recovered valid customer ID from subscription", { userId })
+              logger.info("Customer portal: Recovered valid customer ID from subscription", {
+                userId,
+              })
             } catch (recoveryError) {
-              logger.error("Customer portal: Failed to recover customer ID from subscription", { error: recoveryError })
+              logger.error("Customer portal: Failed to recover customer ID from subscription", {
+                error: recoveryError,
+              })
             }
           }
         } else {
@@ -148,7 +166,7 @@ export async function POST(request: NextRequest) {
         })
 
         // First, look for a customer with matching userId in metadata (safest)
-        const matchingCustomer = customers.data.find(c => c.metadata?.userId === userId)
+        const matchingCustomer = customers.data.find((c) => c.metadata?.userId === userId)
 
         if (matchingCustomer) {
           // Verify customer is valid
@@ -159,12 +177,17 @@ export async function POST(request: NextRequest) {
             // Update profile with found customer ID
             await profileRef.update({
               stripe_customer_id: stripeCustomerId,
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
             })
 
-            logger.info("Customer portal: Found customer with matching userId metadata", { userId, customerId: stripeCustomerId })
+            logger.info("Customer portal: Found customer with matching userId metadata", {
+              userId,
+              customerId: stripeCustomerId,
+            })
           } catch {
-            logger.warn("Customer portal: Matching customer is invalid", { customerId: matchingCustomer.id })
+            logger.warn("Customer portal: Matching customer is invalid", {
+              customerId: matchingCustomer.id,
+            })
           }
         } else if (customers.data.length === 1) {
           // Only ONE customer with this email - likely safe to use
@@ -177,20 +200,28 @@ export async function POST(request: NextRequest) {
             // Update profile with found customer ID
             await profileRef.update({
               stripe_customer_id: stripeCustomerId,
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
             })
 
-            logger.info("Customer portal: Found single customer by email (no metadata match)", { userId, customerId: stripeCustomerId })
+            logger.info("Customer portal: Found single customer by email (no metadata match)", {
+              userId,
+              customerId: stripeCustomerId,
+            })
           } catch {
-            logger.warn("Customer portal: Single customer is invalid", { customerId: singleCustomer.id })
+            logger.warn("Customer portal: Single customer is invalid", {
+              customerId: singleCustomer.id,
+            })
           }
         } else if (customers.data.length > 1) {
           // Multiple customers with same email but no userId match - can't safely determine which
-          logger.warn("Customer portal: Multiple customers with email, none match userId - cannot auto-link", {
-            userId,
-            email: userEmail,
-            customerCount: customers.data.length
-          })
+          logger.warn(
+            "Customer portal: Multiple customers with email, none match userId - cannot auto-link",
+            {
+              userId,
+              email: userEmail,
+              customerCount: customers.data.length,
+            }
+          )
         }
       } catch (emailSearchError) {
         logger.error("Customer portal: Email search failed", { error: emailSearchError })
@@ -201,7 +232,7 @@ export async function POST(request: NextRequest) {
     if (!stripeCustomerId && profile.subscription_tier === "pro") {
       logger.info("Customer portal: Attempting automatic sync for Pro user", {
         userId,
-        subscriptionType
+        subscriptionType,
       })
 
       try {
@@ -215,13 +246,13 @@ export async function POST(request: NextRequest) {
             stripeCustomerId = syncedProfile.stripe_customer_id
             logger.info("Customer portal: Sync successful, validated customer ID", {
               userId,
-              customerId: stripeCustomerId
+              customerId: stripeCustomerId,
             })
           } catch (validationError) {
             logger.error("Customer portal: Synced customer ID is invalid", {
               userId,
               customerId: syncedProfile.stripe_customer_id,
-              error: validationError
+              error: validationError,
             })
           }
         }
@@ -236,7 +267,7 @@ export async function POST(request: NextRequest) {
         userId,
         subscriptionTier: profile.subscription_tier,
         subscriptionType,
-        hasEmail: !!userEmail
+        hasEmail: !!userEmail,
       })
 
       if (profile.subscription_tier === "pro") {
@@ -247,7 +278,7 @@ export async function POST(request: NextRequest) {
             error: "Subscription data incomplete",
             message: isYearly
               ? "Your yearly subscription billing information could not be found. Please contact support@codesparring.dev for assistance."
-              : "Your subscription information is incomplete. Please try 'Sync Subscription Status' or contact support@codesparring.dev if the issue persists."
+              : "Your subscription information is incomplete. Please try 'Sync Subscription Status' or contact support@codesparring.dev if the issue persists.",
           },
           { status: 400 }
         )
@@ -256,7 +287,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             error: "No active subscription found",
-            message: "You don't have an active subscription to manage."
+            message: "You don't have an active subscription to manage.",
           },
           { status: 400 }
         )
@@ -281,7 +312,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: "Stripe customer not found",
-          message: "Your subscription information could not be found. Please contact support."
+          message: "Your subscription information could not be found. Please contact support.",
         },
         { status: 404 }
       )
@@ -290,10 +321,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Failed to create portal session",
-        message: "An error occurred while opening the subscription portal. Please try again or contact support."
+        message:
+          "An error occurred while opening the subscription portal. Please try again or contact support.",
       },
       { status: 500 }
     )
   }
 }
-

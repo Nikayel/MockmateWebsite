@@ -8,6 +8,7 @@ import {
   type SessionVector,
   type SessionMetrics,
 } from "@/lib/rag"
+import { verifyAuth } from "@/lib/auth-helpers"
 
 /**
  * API endpoint to vectorize and store session data for RAG
@@ -15,8 +16,16 @@ import {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Verify authentication
+    const authResult = await verifyAuth(request)
+    if (!authResult.authenticated || !authResult.userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+
+    const authenticatedUserId = authResult.userId
+
     const {
-      userId,
+      userId: requestUserId,
       sessionId,
       scenarioId,
       scenarioTitle,
@@ -30,11 +39,11 @@ export async function POST(request: NextRequest) {
       scores,
     } = await request.json()
 
-    if (!userId || !sessionId || !scenarioId) {
-      return NextResponse.json(
-        { error: "userId, sessionId, and scenarioId are required" },
-        { status: 400 }
-      )
+    // Use authenticated userId, ignore any userId from request body for security
+    const userId = authenticatedUserId
+
+    if (!sessionId || !scenarioId) {
+      return NextResponse.json({ error: "sessionId and scenarioId are required" }, { status: 400 })
     }
 
     // Build session metrics from the provided data
@@ -76,8 +85,8 @@ export async function POST(request: NextRequest) {
       ),
 
       // Problem context
-      problemDifficulty: interactionMetrics?.problemDifficulty || 'medium',
-      problemType: interactionMetrics?.problemType || 'dsa',
+      problemDifficulty: interactionMetrics?.problemDifficulty || "medium",
+      problemType: interactionMetrics?.problemType || "dsa",
 
       // Final scores
       correctnessScore: scores?.correctness || (testsPassed / testsTotal) * 100,
@@ -88,7 +97,7 @@ export async function POST(request: NextRequest) {
     const metricsVector = vectorizeSessionMetrics(sessionMetrics)
 
     // Extract and vectorize code features
-    const codeFeatures = extractCodeFeatures(code || '', language || 'javascript')
+    const codeFeatures = extractCodeFeatures(code || "", language || "javascript")
     const codeVector = vectorizeCodeFeatures(codeFeatures)
 
     // Combine vectors (metrics + code features)
@@ -99,7 +108,7 @@ export async function POST(request: NextRequest) {
       userId,
       sessionId,
       scenarioId,
-      scenarioTitle: scenarioTitle || 'Unknown Problem',
+      scenarioTitle: scenarioTitle || "Unknown Problem",
       timestamp: new Date(),
       vector: combinedVector,
       scores: {
@@ -111,9 +120,9 @@ export async function POST(request: NextRequest) {
         overall: scores?.overall || 0,
       },
       metadata: {
-        difficulty: sessionMetrics.problemDifficulty || 'medium',
-        type: sessionMetrics.problemType || 'dsa',
-        language: language || 'javascript',
+        difficulty: sessionMetrics.problemDifficulty || "medium",
+        type: sessionMetrics.problemType || "dsa",
+        language: language || "javascript",
         duration: timeSpent || 0,
       },
     }
@@ -150,14 +159,14 @@ function getComplexityScore(estimated?: string, optimal?: string): number {
 
   // Complexity rankings (lower index = better)
   const complexityRanking = [
-    'O(1)',
-    'O(log n)',
-    'O(n)',
-    'O(n log n)',
-    'O(n²)',
-    'O(n³)',
-    'O(2^n)',
-    'O(n!)',
+    "O(1)",
+    "O(log n)",
+    "O(n)",
+    "O(n log n)",
+    "O(n²)",
+    "O(n³)",
+    "O(2^n)",
+    "O(n!)",
   ]
 
   const estimatedIdx = complexityRanking.indexOf(estimated)

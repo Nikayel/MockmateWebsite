@@ -11,6 +11,8 @@ import { rateLimit } from "@/lib/rate-limit"
 import { validateProblemText, validateUserCode, withTimeout, TimeoutError } from "@/lib/rag/utils"
 import { embedAndStoreHint, getSimilarHintsFromRAG } from "@/lib/rag"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
+import { verifyAuth } from "@/lib/auth-helpers"
+import { logger } from "@/lib/logger"
 
 // Rate limit: 15 requests per minute for hint generation (AI-intensive)
 const hintRateLimit = rateLimit({
@@ -33,6 +35,14 @@ const hintRateLimit = rateLimit({
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify authentication
+    const authResult = await verifyAuth(request)
+    if (!authResult.authenticated || !authResult.userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+
+    const authenticatedUserId = authResult.userId
+
     // Apply rate limiting
     const rateLimitResponse = await hintRateLimit(request)
     if (rateLimitResponse) {
@@ -41,6 +51,9 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { action, ...params } = body
+
+    // Override userId from request body with authenticated userId for security
+    params.userId = authenticatedUserId
 
     switch (action) {
       case "generate":
@@ -51,7 +64,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
     }
   } catch (error) {
-    console.error("[Hint Agent API] Error:", error)
+    logger.error("[Hint Agent API] Error:", { error })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Hint generation failed" },
       { status: 500 }
@@ -170,12 +183,10 @@ async function handleGenerateHints(params: {
         },
       }))
 
-      console.log(
-        `[Hints API] Retrieved ${ragHints.length} hints from RAG for problem: ${problemId}`
-      )
+      logger.info("[Hints API] Retrieved hints from RAG", { count: ragHints.length, problemId })
     } catch (ragError) {
       // Non-blocking - continue without RAG hints
-      console.warn("[Hints API] RAG hint retrieval failed:", ragError)
+      logger.warn("[Hints API] RAG hint retrieval failed:", { error: ragError })
     }
 
     // Generate new hints with timeout (45 seconds for AI-intensive operation)
@@ -201,7 +212,7 @@ async function handleGenerateHints(params: {
       problemPattern,
       difficulty,
       userId
-    ).catch((err) => console.error("[Hints API] Failed to store hints in RAG:", err))
+    ).catch((err) => logger.error("[Hints API] Failed to store hints in RAG:", { error: err }))
 
     return NextResponse.json({
       hints: uniqueHints,
@@ -241,7 +252,7 @@ async function storeHintsInRAG(
 
   if (hintsToStore.length === 0) return
 
-  console.log(`[Hints API] Storing ${hintsToStore.length} hints in RAG for problem: ${problemId}`)
+  logger.info("[Hints API] Storing hints in RAG", { count: hintsToStore.length, problemId })
 
   for (const hint of hintsToStore) {
     try {
@@ -255,7 +266,7 @@ async function storeHintsInRAG(
       })
     } catch (err) {
       // Log but don't fail - storing hints is non-critical
-      console.warn(`[Hints API] Failed to store hint ${hint.id}:`, err)
+      logger.warn("[Hints API] Failed to store hint:", { hintId: hint.id, error: err })
     }
   }
 }
@@ -351,7 +362,7 @@ async function handleGetNextHint(params: {
         }
       }
     } catch (ragError) {
-      console.warn("[Hints API] RAG retrieval failed for get-next:", ragError)
+      logger.warn("[Hints API] RAG retrieval failed for get-next:", { error: ragError })
     }
   }
 
@@ -387,7 +398,7 @@ async function handleGetNextHint(params: {
       category: hint.category,
       tags: hint.metadata?.relatedConcepts || [],
       userId,
-    }).catch((err) => console.warn("[Hints API] Failed to store hint:", err))
+    }).catch((err) => logger.warn("[Hints API] Failed to store hint:", { error: err }))
   }
 
   return NextResponse.json({

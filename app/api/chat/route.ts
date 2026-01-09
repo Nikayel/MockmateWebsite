@@ -271,6 +271,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 })
     }
 
+    // Input validation: reject oversized messages to prevent abuse
+    const MAX_INPUT_MESSAGE_LENGTH = 10000 // 10KB limit for user input
+    if (message && message.length > MAX_INPUT_MESSAGE_LENGTH) {
+      logger.warn("[Chat API] Message too large", { messageLength: message.length })
+      return NextResponse.json(
+        {
+          error: `Message exceeds maximum length of ${MAX_INPUT_MESSAGE_LENGTH} characters`,
+        },
+        { status: 400 }
+      )
+    }
+
+    // Input validation: reject oversized code context
+    const MAX_CODE_CONTEXT_LENGTH = 100000 // 100KB limit for code
+    if (currentCode && currentCode.length > MAX_CODE_CONTEXT_LENGTH) {
+      logger.warn("[Chat API] Code context too large", { codeLength: currentCode.length })
+      return NextResponse.json(
+        {
+          error: `Code context exceeds maximum length of ${MAX_CODE_CONTEXT_LENGTH} characters`,
+        },
+        { status: 400 }
+      )
+    }
+
     // Build user context string for personalized responses
     const userInfo = userContext as UserContext
     // Extract first name or last name from full_name or email

@@ -7,7 +7,7 @@ import { executeWithPiston, parseExecutionOutput } from "@/lib/piston"
 import { logger } from "@/lib/logger"
 
 // Mark route as dynamic to avoid build-time issues
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
 // Validate test results with improved edge case handling
 function validateResult(actual: any, expected: any, testCase: any, scenarioType: string): boolean {
@@ -30,9 +30,14 @@ function validateResult(actual: any, expected: any, testCase: any, scenarioType:
       if (actual.length === 2) {
         const nums = testCase.input.nums
         // Ensure indices are valid and different
-        if (actual[0] >= 0 && actual[0] < nums.length &&
-            actual[1] >= 0 && actual[1] < nums.length &&
-            actual[0] !== actual[1]) { // Indices must be different
+        if (
+          actual[0] >= 0 &&
+          actual[0] < nums.length &&
+          actual[1] >= 0 &&
+          actual[1] < nums.length &&
+          actual[0] !== actual[1]
+        ) {
+          // Indices must be different
           return nums[actual[0]] + nums[actual[1]] === testCase.input.target
         }
       }
@@ -59,7 +64,7 @@ function validateResult(actual: any, expected: any, testCase: any, scenarioType:
 
     // Default array comparison (order matters)
     return expected.every((val: any, idx: number) => {
-      if (typeof val === 'number' && typeof actual[idx] === 'number') {
+      if (typeof val === "number" && typeof actual[idx] === "number") {
         return Math.abs(val - actual[idx]) < 0.0001
       }
       return val === actual[idx]
@@ -67,19 +72,19 @@ function validateResult(actual: any, expected: any, testCase: any, scenarioType:
   }
 
   // For boolean results
-  if (typeof expected === 'boolean' && typeof actual === 'boolean') {
+  if (typeof expected === "boolean" && typeof actual === "boolean") {
     return expected === actual
   }
 
   // For numeric results (with tolerance for floating point)
-  if (typeof expected === 'number' && typeof actual === 'number') {
+  if (typeof expected === "number" && typeof actual === "number") {
     // Use relative tolerance for large numbers, absolute for small
     const tolerance = Math.max(0.0001, Math.abs(expected) * 0.0001)
     return Math.abs(expected - actual) < tolerance
   }
 
   // For string results (case-sensitive by default, but allow case-insensitive if specified)
-  if (typeof expected === 'string' && typeof actual === 'string') {
+  if (typeof expected === "string" && typeof actual === "string") {
     if (testCase.caseSensitive === false) {
       return expected.toLowerCase() === actual.toLowerCase()
     }
@@ -87,7 +92,7 @@ function validateResult(actual: any, expected: any, testCase: any, scenarioType:
   }
 
   // For object comparisons (deep equality)
-  if (typeof expected === 'object' && typeof actual === 'object' && !Array.isArray(expected)) {
+  if (typeof expected === "object" && typeof actual === "object" && !Array.isArray(expected)) {
     try {
       // Handle nested objects
       const expectedKeys = Object.keys(expected).sort()
@@ -95,8 +100,13 @@ function validateResult(actual: any, expected: any, testCase: any, scenarioType:
 
       if (expectedKeys.length !== actualKeys.length) return false
 
-      return expectedKeys.every(key => {
-        return validateResult(actual[key], expected[key], { ...testCase, orderMatters: true }, scenarioType)
+      return expectedKeys.every((key) => {
+        return validateResult(
+          actual[key],
+          expected[key],
+          { ...testCase, orderMatters: true },
+          scenarioType
+        )
       })
     } catch {
       // Fallback to JSON comparison
@@ -112,7 +122,7 @@ function validateResult(actual: any, expected: any, testCase: any, scenarioType:
  * Build full code with supporting codebase files for bugfix/add-functionality scenarios
  */
 function buildFullCode(code: string, scenario: any, language: string): string {
-  if (scenario.type !== 'bugfix' && scenario.type !== 'add-functionality') {
+  if (scenario.type !== "bugfix" && scenario.type !== "add-functionality") {
     return code
   }
 
@@ -128,27 +138,32 @@ function buildFullCode(code: string, scenario: any, language: string): string {
       let fileContent = file.content
 
       // For JavaScript/TypeScript, remove ES6 export/import statements
-      if (language === 'javascript' || language === 'typescript') {
-        fileContent = fileContent.replace(/export\s+(function|const|let|var|class|default)\s+/g, '$1 ')
-        fileContent = fileContent.replace(/export\s*\{[^}]*\}/g, '')
-        fileContent = fileContent.replace(/import\s+.*?from\s+['"][^'"]*['"]\s*;?/g, '')
-        fileContent = fileContent.replace(/import\s+['"][^'"]*['"]\s*;?/g, '')
+      if (language === "javascript" || language === "typescript") {
+        fileContent = fileContent.replace(
+          /export\s+(function|const|let|var|class|default)\s+/g,
+          "$1 "
+        )
+        fileContent = fileContent.replace(/export\s*\{[^}]*\}/g, "")
+        fileContent = fileContent.replace(/import\s+.*?from\s+['"][^'"]*['"]\s*;?/g, "")
+        fileContent = fileContent.replace(/import\s+['"][^'"]*['"]\s*;?/g, "")
       }
 
       // For Python, remove import statements from local modules
-      if (language === 'python') {
-        fileContent = fileContent.replace(/from\s+\.\w*\s+import\s+[^\n]+/g, '')
-        fileContent = fileContent.replace(/from\s+(?!typing|collections|functools|itertools|math|re|json|datetime|os|sys)\w+\s+import\s+[^\n]+/g, '')
+      if (language === "python") {
+        fileContent = fileContent.replace(/from\s+\.\w*\s+import\s+[^\n]+/g, "")
+        fileContent = fileContent.replace(
+          /from\s+(?!typing|collections|functools|itertools|math|re|json|datetime|os|sys)\w+\s+import\s+[^\n]+/g,
+          ""
+        )
       }
 
-      const header = language === 'python'
-        ? `# File: ${file.fileName}\n`
-        : `// File: ${file.fileName}\n`
+      const header =
+        language === "python" ? `# File: ${file.fileName}\n` : `// File: ${file.fileName}\n`
       return header + fileContent
     })
-    .join('\n\n')
+    .join("\n\n")
 
-  return supportingCode + '\n\n' + code
+  return supportingCode + "\n\n" + code
 }
 
 export async function POST(request: NextRequest) {
@@ -167,7 +182,7 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
-    const { code, scenarioId, language = 'javascript', sessionId, userId } = await request.json()
+    const { code, scenarioId, language = "javascript", sessionId, userId } = await request.json()
 
     logger.info("Execute API called", { scenarioId, language, codeLength: code?.length })
 
@@ -176,18 +191,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Code is required" }, { status: 400 })
     }
 
+    // Input validation: max code length to prevent DoS attacks
+    const MAX_CODE_LENGTH = 100000 // 100KB limit
+    if (code.length > MAX_CODE_LENGTH) {
+      logger.warn("Execute API: Code too large", { scenarioId, codeLength: code.length })
+      return NextResponse.json(
+        {
+          error: `Code exceeds maximum length of ${MAX_CODE_LENGTH} characters`,
+        },
+        { status: 400 }
+      )
+    }
+
     if (!scenarioId) {
       logger.warn("Execute API: Missing scenarioId")
       return NextResponse.json({ error: "Scenario ID is required" }, { status: 400 })
     }
 
     // Validate language parameter
-    const validLanguages = ['javascript', 'typescript', 'python']
+    const validLanguages = ["javascript", "typescript", "python"]
     if (!validLanguages.includes(language)) {
       logger.warn("Execute API: Invalid language", { language, scenarioId })
-      return NextResponse.json({
-        error: `Unsupported language: ${language}. Supported languages are: ${validLanguages.join(', ')}`
-      }, { status: 400 })
+      return NextResponse.json(
+        {
+          error: `Unsupported language: ${language}. Supported languages are: ${validLanguages.join(", ")}`,
+        },
+        { status: 400 }
+      )
     }
 
     // Get scenario from scenarios.ts
@@ -195,14 +225,22 @@ export async function POST(request: NextRequest) {
 
     if (!scenario) {
       logger.warn("Execute API: Scenario not found", { scenarioId })
-      return NextResponse.json({ error: `Scenario '${scenarioId}' not found. The problem may have been removed or renamed.` }, { status: 404 })
+      return NextResponse.json(
+        {
+          error: `Scenario '${scenarioId}' not found. The problem may have been removed or renamed.`,
+        },
+        { status: 404 }
+      )
     }
 
     // Get test cases from scenario (only DSA and some other types have testCases)
-    const testCases = 'testCases' in scenario ? (scenario.testCases || []) : []
+    const testCases = "testCases" in scenario ? scenario.testCases || [] : []
 
     if (testCases.length === 0) {
-      return NextResponse.json({ error: "No test cases defined for this scenario" }, { status: 400 })
+      return NextResponse.json(
+        { error: "No test cases defined for this scenario" },
+        { status: 400 }
+      )
     }
 
     // Build full code with supporting files for bugfix/add-functionality
@@ -225,13 +263,13 @@ export async function POST(request: NextRequest) {
             expected: testCase.expected,
             actual: null,
             passed: false,
-            error: executionResult.error || 'Execution failed',
+            error: executionResult.error || "Execution failed",
           })
           continue
         }
 
         // Parse the output (now returns { result, consoleLogs })
-        const parsed = parseExecutionOutput(executionResult.output || '')
+        const parsed = parseExecutionOutput(executionResult.output || "")
         const actualResult = parsed.result
 
         // Collect console logs from all test runs
@@ -262,7 +300,7 @@ export async function POST(request: NextRequest) {
           expected: testCase.expected,
           actual: null,
           passed: false,
-          error: error instanceof Error ? error.message : 'Unknown execution error',
+          error: error instanceof Error ? error.message : "Unknown execution error",
         })
       }
     }
@@ -294,7 +332,7 @@ export async function POST(request: NextRequest) {
       totalTests: totalCount,
       passedTests: passedCount,
       executionTimeMs,
-    }).catch(err => logger.error("Analytics tracking error", { error: err }))
+    }).catch((err) => logger.error("Analytics tracking error", { error: err }))
 
     return NextResponse.json({
       success: allPassed,
@@ -309,10 +347,10 @@ export async function POST(request: NextRequest) {
       error: null,
     })
   } catch (error) {
-    logger.error("Execute API error", { error, endpoint: '/api/execute' })
+    logger.error("Execute API error", { error, endpoint: "/api/execute" })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to execute code" },
-      { status: 500 },
+      { status: 500 }
     )
   }
 }

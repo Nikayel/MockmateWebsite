@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from "next/server"
 import {
   generateRecommendations,
   getNextProblemRecommendation,
   type RecommendationRequest,
   type CatalogProblem,
-} from '@/lib/agents/recommendation-agent'
-import type { DSAPattern } from '@/lib/types/dsa-patterns'
+} from "@/lib/agents/recommendation-agent"
+import type { DSAPattern } from "@/lib/types/dsa-patterns"
+import { verifyAuth } from "@/lib/auth-helpers"
+import { logger } from "@/lib/logger"
 
 /**
  * Recommendation Agent API
@@ -20,24 +22,32 @@ import type { DSAPattern } from '@/lib/types/dsa-patterns'
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify authentication
+    const authResult = await verifyAuth(request)
+    if (!authResult.authenticated || !authResult.userId) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+
+    const authenticatedUserId = authResult.userId
+
     const body = await request.json()
     const { action, ...params } = body
 
+    // Override userId from request body with authenticated userId for security
+    params.userId = authenticatedUserId
+
     switch (action) {
-      case 'recommend':
+      case "recommend":
         return handleRecommend(params)
-      case 'get-next':
+      case "get-next":
         return handleGetNext(params)
       default:
-        return NextResponse.json(
-          { error: `Unknown action: ${action}` },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
     }
   } catch (error) {
-    console.error('[Recommendation Agent API] Error:', error)
+    logger.error("[Recommendation Agent API] Error:", { error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Recommendation failed' },
+      { error: error instanceof Error ? error.message : "Recommendation failed" },
       { status: 500 }
     )
   }
@@ -71,15 +81,12 @@ async function handleRecommend(params: {
 
   // Validate required fields
   if (!userId) {
-    return NextResponse.json(
-      { error: 'userId is required' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: "userId is required" }, { status: 400 })
   }
 
   if (!catalog || !Array.isArray(catalog) || catalog.length === 0) {
     return NextResponse.json(
-      { error: 'catalog array is required and must not be empty' },
+      { error: "catalog array is required and must not be empty" },
       { status: 400 }
     )
   }
@@ -89,8 +96,8 @@ async function handleRecommend(params: {
     userId,
     targetCompany: targetCompany as string | undefined,
     targetPatterns: targetPatterns as DSAPattern[] | undefined,
-    preferredDifficulty: preferredDifficulty as 'easy' | 'medium' | 'hard' | 'adaptive' | undefined,
-    sessionGoal: sessionGoal as 'practice' | 'learn-new' | 'review' | 'challenge' | undefined,
+    preferredDifficulty: preferredDifficulty as "easy" | "medium" | "hard" | "adaptive" | undefined,
+    sessionGoal: sessionGoal as "practice" | "learn-new" | "review" | "challenge" | undefined,
     availableTimeMinutes,
     excludeProblemIds,
     limit,
@@ -117,25 +124,19 @@ async function handleGetNext(params: {
   wasSuccessful: boolean
   catalog: CatalogProblem[]
 }) {
-  const {
-    userId,
-    currentProblemId,
-    currentPattern,
-    wasSuccessful,
-    catalog,
-  } = params
+  const { userId, currentProblemId, currentPattern, wasSuccessful, catalog } = params
 
   // Validate required fields
   if (!userId || !currentProblemId || !currentPattern) {
     return NextResponse.json(
-      { error: 'userId, currentProblemId, and currentPattern are required' },
+      { error: "userId, currentProblemId, and currentPattern are required" },
       { status: 400 }
     )
   }
 
   if (!catalog || !Array.isArray(catalog) || catalog.length === 0) {
     return NextResponse.json(
-      { error: 'catalog array is required and must not be empty' },
+      { error: "catalog array is required and must not be empty" },
       { status: 400 }
     )
   }
@@ -151,14 +152,14 @@ async function handleGetNext(params: {
   if (!recommendation) {
     return NextResponse.json({
       recommendation: null,
-      message: 'No more recommendations available',
+      message: "No more recommendations available",
     })
   }
 
   return NextResponse.json({
     recommendation,
     message: wasSuccessful
-      ? 'Great job! Here\'s your next challenge.'
-      : 'Keep practicing! Here\'s a similar problem to reinforce your skills.',
+      ? "Great job! Here's your next challenge."
+      : "Keep practicing! Here's a similar problem to reinforce your skills.",
   })
 }

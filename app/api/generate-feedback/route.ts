@@ -68,6 +68,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Code and scenario title are required" }, { status: 400 })
     }
 
+    // Input validation: reject oversized code to prevent abuse
+    const MAX_CODE_LENGTH = 100000 // 100KB limit
+    if (code.length > MAX_CODE_LENGTH) {
+      logger.warn("[Feedback API] Code too large", { codeLength: code.length })
+      return NextResponse.json(
+        {
+          error: `Code exceeds maximum length of ${MAX_CODE_LENGTH} characters`,
+        },
+        { status: 400 }
+      )
+    }
+
+    // Input validation: reject oversized conversation transcript
+    const MAX_TRANSCRIPT_LENGTH = 200000 // 200KB limit
+    if (
+      conversationTranscript &&
+      typeof conversationTranscript === "string" &&
+      conversationTranscript.length > MAX_TRANSCRIPT_LENGTH
+    ) {
+      logger.warn("[Feedback API] Transcript too large", {
+        transcriptLength: conversationTranscript.length,
+      })
+      return NextResponse.json(
+        {
+          error: `Conversation transcript exceeds maximum length`,
+        },
+        { status: 400 }
+      )
+    }
+
     // Calculate collaboration message count
     const collaborationMessages =
       (aiCollaborationMetrics?.partnerMessagesSent || 0) +
