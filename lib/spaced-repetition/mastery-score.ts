@@ -393,14 +393,14 @@ export function quickMasteryScore(params: {
   // Fallback when no test data: derive mastery from performance score
   // IMPORTANT: Properly extract technical portion by removing communication component
 
-  // Interview score breakdown (from scoring-algorithms.ts):
-  // - Understanding: 30% (technical)
+  // Interview score breakdown (from SCORE_WEIGHTS.performance in lib/scoring/types.ts):
+  // - Understanding: 25% (technical)
   // - Problem-Solving: 25% (technical)
-  // - Code Quality: 25% (technical)
+  // - Code Quality: 30% (technical)
   // - Communication: 20% (NON-technical - exclude this for mastery)
   //
-  // Formula: performance = 0.30*U + 0.25*PS + 0.25*CQ + 0.20*C
-  // Technical = 0.30*U + 0.25*PS + 0.25*CQ (80% of components)
+  // Formula: performance = 0.25*U + 0.25*PS + 0.30*CQ + 0.20*C
+  // Technical components = 0.25*U + 0.25*PS + 0.30*CQ (80% of total weight)
   //
   // To extract technical score, we:
   // 1. Assume communication was average (50/100 = 0.50 normalized)
@@ -409,11 +409,11 @@ export function quickMasteryScore(params: {
   // 4. Rescale from 80-point scale to 100-point scale: (technical / 0.80)
 
   const assumedCommunicationScore = 50 // Average communication performance
-  const communicationContribution = 0.20 * assumedCommunicationScore // 10 points
+  const communicationContribution = 0.2 * assumedCommunicationScore // 10 points
   const technicalPoints = performanceScore - communicationContribution
 
   // Rescale from 80-point max to 100-point scale
-  const baseScore = technicalPoints / 0.80
+  const baseScore = technicalPoints / 0.8
 
   // Apply hint penalty - heavier for spaced repetition
   // Each hint indicates they needed help understanding the pattern

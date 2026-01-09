@@ -12,10 +12,14 @@ import {
   BookOpen,
   Sparkles,
   Layers,
-  Shield
+  Shield,
+  MessageSquareOff,
+  Copy,
+  Brain,
 } from "lucide-react"
 import { LearningRecommendations } from "@/components/LearningRecommendations"
 import { NextProblemRecommendations } from "@/components/NextProblemRecommendations"
+import { ScoreInfoTooltip } from "@/components/ui/score-info-tooltip"
 import type { FeedbackSection } from "@/lib/feedback/parsers"
 
 interface FeedbackSectionsProps {
@@ -30,6 +34,11 @@ interface FeedbackSectionsProps {
   overallScore: number
   constitutionalAICritique?: any
   onNewProblem?: () => void
+  // New props for warnings
+  silentSolution?: boolean
+  aiCopyingDetected?: boolean
+  aiOverlapPercentage?: number
+  masteryScore?: number
 }
 
 export function FeedbackSections({
@@ -43,7 +52,11 @@ export function FeedbackSections({
   feedback,
   overallScore,
   constitutionalAICritique,
-  onNewProblem
+  onNewProblem,
+  silentSolution,
+  aiCopyingDetected,
+  aiOverlapPercentage,
+  masteryScore,
 }: FeedbackSectionsProps) {
   const [showCode, setShowCode] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
@@ -52,11 +65,85 @@ export function FeedbackSections({
 
   return (
     <div className="w-full space-y-4">
+      {/* Warning Banners - Show important feedback penalties */}
+      {silentSolution && (
+        <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4">
+          <div className="flex items-center gap-2 text-yellow-400">
+            <MessageSquareOff className="h-4 w-4" />
+            <span className="text-xs font-medium">Silent Solution Detected</span>
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-zinc-400">
+            You solved the problem but didn&apos;t explain your approach. In real FAANG interviews,
+            <span className="font-medium text-yellow-400"> communication is required</span> —
+            interviewers want to understand your thought process. Your Communication score was
+            capped, limiting your overall grade.
+          </p>
+          <p className="mt-2 text-[10px] text-zinc-500">
+            💡 Tip: Talk through your approach before coding. Discuss trade-offs and complexity as
+            you go.
+          </p>
+        </div>
+      )}
+
+      {aiCopyingDetected && (
+        <div className="rounded-xl border border-orange-500/30 bg-orange-500/10 p-4">
+          <div className="flex items-center gap-2 text-orange-400">
+            <Copy className="h-4 w-4" />
+            <span className="text-xs font-medium">
+              AI Copying Detected ({aiOverlapPercentage}% overlap)
+            </span>
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-zinc-400">
+            Your solution closely matches AI Partner suggestions. In real interviews,
+            <span className="font-medium text-orange-400">
+              {" "}
+              you must understand and adapt suggestions
+            </span>
+            , not copy them directly. Your Understanding score was reduced.
+          </p>
+          <p className="mt-2 text-[10px] text-zinc-500">
+            💡 Tip: Use AI as a collaborator, not a solution provider. Ask questions and build
+            understanding.
+          </p>
+        </div>
+      )}
+
+      {/* Mastery Score - Shows what affects spaced repetition */}
+      {masteryScore !== undefined && (
+        <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/50 p-4">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-xs text-zinc-400">
+              <Brain className="h-3.5 w-3.5 text-violet-400" />
+              Pattern Mastery
+              <ScoreInfoTooltip type="mastery" />
+            </span>
+            <span
+              className={`font-mono text-sm ${
+                masteryScore >= 80
+                  ? "text-emerald-400"
+                  : masteryScore >= 60
+                    ? "text-amber-400"
+                    : "text-red-400"
+              }`}
+            >
+              {masteryScore}%
+            </span>
+          </div>
+          <p className="mt-2 text-[10px] text-zinc-500">
+            {masteryScore >= 80
+              ? "Great! This problem won't repeat often in your practice queue."
+              : masteryScore >= 60
+                ? "Good progress! You'll see this problem again in a few days to reinforce learning."
+                : "Keep practicing! This problem will appear more frequently until you master it."}
+          </p>
+        </div>
+      )}
+
       {/* What Worked / To Improve - Side by side compact */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {/* What Worked */}
-        <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4">
-          <div className="flex items-center gap-1.5 mb-3">
+        <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/50 p-4">
+          <div className="mb-3 flex items-center gap-1.5">
             <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
             <span className="text-xs font-medium text-emerald-400">What Worked</span>
           </div>
@@ -64,7 +151,7 @@ export function FeedbackSections({
             {sections.whatWorked.length > 0 ? (
               sections.whatWorked.slice(0, 3).map((item, i) => (
                 <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
-                  <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                  <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
                   <span className="line-clamp-2">{item}</span>
                 </li>
               ))
@@ -75,8 +162,8 @@ export function FeedbackSections({
         </div>
 
         {/* To Improve */}
-        <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4">
-          <div className="flex items-center gap-1.5 mb-3">
+        <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/50 p-4">
+          <div className="mb-3 flex items-center gap-1.5">
             <Target className="h-3.5 w-3.5 text-amber-400" />
             <span className="text-xs font-medium text-amber-400">To Improve</span>
           </div>
@@ -84,7 +171,7 @@ export function FeedbackSections({
             {sections.fixNext.length > 0 ? (
               sections.fixNext.slice(0, 3).map((item, i) => (
                 <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
                   <span className="line-clamp-2">{item}</span>
                 </li>
               ))
@@ -102,23 +189,27 @@ export function FeedbackSections({
           <>
             <button
               onClick={() => setShowCode(!showCode)}
-              className="w-full flex items-center justify-between p-3 bg-zinc-900/50 border border-zinc-800/50 rounded-xl hover:bg-zinc-800/30 transition-colors"
+              className="flex w-full items-center justify-between rounded-xl border border-zinc-800/50 bg-zinc-900/50 p-3 transition-colors hover:bg-zinc-800/30"
             >
               <div className="flex items-center gap-2">
-                {problemType === 'system-design' ? (
+                {problemType === "system-design" ? (
                   <Layers className="h-3.5 w-3.5 text-zinc-400" />
                 ) : (
                   <Code className="h-3.5 w-3.5 text-zinc-400" />
                 )}
                 <span className="text-xs font-medium text-zinc-300">
-                  {problemType === 'system-design' ? 'Your Design' : 'Your Solution'}
+                  {problemType === "system-design" ? "Your Design" : "Your Solution"}
                 </span>
               </div>
-              {showCode ? <ChevronUp className="h-3.5 w-3.5 text-zinc-500" /> : <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />}
+              {showCode ? (
+                <ChevronUp className="h-3.5 w-3.5 text-zinc-500" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
+              )}
             </button>
             {showCode && (
-              <div className="bg-zinc-950 border border-zinc-800/50 rounded-xl p-4 max-h-64 overflow-auto">
-                <pre className="text-xs text-zinc-300 font-mono whitespace-pre-wrap">
+              <div className="max-h-64 overflow-auto rounded-xl border border-zinc-800/50 bg-zinc-950 p-4">
+                <pre className="font-mono text-xs whitespace-pre-wrap text-zinc-300">
                   <code>{code}</code>
                 </pre>
               </div>
@@ -131,16 +222,20 @@ export function FeedbackSections({
           <>
             <button
               onClick={() => setShowRecommendations(!showRecommendations)}
-              className="w-full flex items-center justify-between p-3 bg-zinc-900/50 border border-zinc-800/50 rounded-xl hover:bg-zinc-800/30 transition-colors"
+              className="flex w-full items-center justify-between rounded-xl border border-zinc-800/50 bg-zinc-900/50 p-3 transition-colors hover:bg-zinc-800/30"
             >
               <div className="flex items-center gap-2">
                 <Sparkles className="h-3.5 w-3.5 text-violet-400" />
                 <span className="text-xs font-medium text-zinc-300">Learning Recommendations</span>
               </div>
-              {showRecommendations ? <ChevronUp className="h-3.5 w-3.5 text-zinc-500" /> : <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />}
+              {showRecommendations ? (
+                <ChevronUp className="h-3.5 w-3.5 text-zinc-500" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
+              )}
             </button>
             {showRecommendations && (
-              <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-xl p-4 space-y-4">
+              <div className="space-y-4 rounded-xl border border-zinc-800/50 bg-zinc-900/30 p-4">
                 <LearningRecommendations
                   userId={userId}
                   currentProblemType={problemType}
@@ -166,21 +261,27 @@ export function FeedbackSections({
           <>
             <button
               onClick={() => setShowDetails(!showDetails)}
-              className="w-full flex items-center justify-between p-3 bg-zinc-900/50 border border-zinc-800/50 rounded-xl hover:bg-zinc-800/30 transition-colors"
+              className="flex w-full items-center justify-between rounded-xl border border-zinc-800/50 bg-zinc-900/50 p-3 transition-colors hover:bg-zinc-800/30"
             >
               <div className="flex items-center gap-2">
                 <BookOpen className="h-3.5 w-3.5 text-zinc-400" />
                 <span className="text-xs font-medium text-zinc-300">Action Plan</span>
-                <span className="text-[10px] text-zinc-600">({sections.actionPlan.length} steps)</span>
+                <span className="text-[10px] text-zinc-600">
+                  ({sections.actionPlan.length} steps)
+                </span>
               </div>
-              {showDetails ? <ChevronUp className="h-3.5 w-3.5 text-zinc-500" /> : <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />}
+              {showDetails ? (
+                <ChevronUp className="h-3.5 w-3.5 text-zinc-500" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
+              )}
             </button>
             {showDetails && (
-              <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-xl p-4">
+              <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/30 p-4">
                 <ol className="space-y-2">
                   {sections.actionPlan.map((item, i) => (
                     <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
-                      <span className="w-5 h-5 bg-zinc-800 text-zinc-400 rounded flex items-center justify-center text-[10px] font-medium shrink-0">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-zinc-800 text-[10px] font-medium text-zinc-400">
                         {i + 1}
                       </span>
                       <span>{item}</span>
@@ -197,30 +298,50 @@ export function FeedbackSections({
           <>
             <button
               onClick={() => setShowQualityCheck(!showQualityCheck)}
-              className="w-full flex items-center justify-between p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl hover:bg-yellow-500/20 transition-colors"
+              className="flex w-full items-center justify-between rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-3 transition-colors hover:bg-yellow-500/20"
             >
               <div className="flex items-center gap-2">
                 <Shield className="h-3.5 w-3.5 text-yellow-400" />
-                <span className="text-xs font-medium text-yellow-400">Quality Check (Constitutional AI)</span>
+                <span className="text-xs font-medium text-yellow-400">
+                  Quality Check (Constitutional AI)
+                </span>
               </div>
-              {showQualityCheck ? <ChevronUp className="h-3.5 w-3.5 text-yellow-500" /> : <ChevronDown className="h-3.5 w-3.5 text-yellow-500" />}
+              {showQualityCheck ? (
+                <ChevronUp className="h-3.5 w-3.5 text-yellow-500" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5 text-yellow-500" />
+              )}
             </button>
             {showQualityCheck && (
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 space-y-3">
-                <p className="text-yellow-400 font-semibold text-xs">Our AI reviewed its own work for fairness and accuracy.</p>
+              <div className="space-y-3 rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-4">
+                <p className="text-xs font-semibold text-yellow-400">
+                  Our AI reviewed its own work for fairness and accuracy.
+                </p>
 
                 {constitutionalAICritique.scoreCritique && (
-                  <div className="bg-zinc-900/50 border border-yellow-500/20 rounded-lg p-3">
-                    <p className="font-semibold mb-2 text-xs text-yellow-300">Score Adjustments:</p>
-                    <p className="text-[10px] text-zinc-300 mb-3">{constitutionalAICritique.scoreCritique.reasoning}</p>
-                    <div className="grid grid-cols-2 gap-2 text-[10px] mb-3 p-2 bg-zinc-800/50 rounded">
-                      <div className="text-zinc-400">Original Overall: <span className="text-zinc-200">{constitutionalAICritique.scoreCritique.originalScores.overall}</span></div>
-                      <div className="text-yellow-400">Adjusted: <span className="font-semibold">{constitutionalAICritique.scoreCritique.adjustedScores.overall}</span></div>
+                  <div className="rounded-lg border border-yellow-500/20 bg-zinc-900/50 p-3">
+                    <p className="mb-2 text-xs font-semibold text-yellow-300">Score Adjustments:</p>
+                    <p className="mb-3 text-[10px] text-zinc-300">
+                      {constitutionalAICritique.scoreCritique.reasoning}
+                    </p>
+                    <div className="mb-3 grid grid-cols-2 gap-2 rounded bg-zinc-800/50 p-2 text-[10px]">
+                      <div className="text-zinc-400">
+                        Original Overall:{" "}
+                        <span className="text-zinc-200">
+                          {constitutionalAICritique.scoreCritique.originalScores.overall}
+                        </span>
+                      </div>
+                      <div className="text-yellow-400">
+                        Adjusted:{" "}
+                        <span className="font-semibold">
+                          {constitutionalAICritique.scoreCritique.adjustedScores.overall}
+                        </span>
+                      </div>
                     </div>
                     <ul className="space-y-2">
                       {constitutionalAICritique.scoreCritique.critiques.map((c: any, i: number) => (
                         <li key={i} className="flex items-start gap-2 text-[10px] text-zinc-300">
-                          <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-[9px] font-medium capitalize shrink-0">
+                          <span className="shrink-0 rounded bg-yellow-500/20 px-2 py-0.5 text-[9px] font-medium text-yellow-400 capitalize">
                             {c.aspect}
                           </span>
                           <span>{c.issue}</span>
@@ -231,18 +352,24 @@ export function FeedbackSections({
                 )}
 
                 {constitutionalAICritique.feedbackCritique && (
-                  <div className="bg-zinc-900/50 border border-yellow-500/20 rounded-lg p-3">
-                    <p className="font-semibold mb-2 text-xs text-yellow-300">Feedback Improvements:</p>
-                    <p className="text-[10px] text-zinc-300 mb-3">{constitutionalAICritique.feedbackCritique.reasoning}</p>
+                  <div className="rounded-lg border border-yellow-500/20 bg-zinc-900/50 p-3">
+                    <p className="mb-2 text-xs font-semibold text-yellow-300">
+                      Feedback Improvements:
+                    </p>
+                    <p className="mb-3 text-[10px] text-zinc-300">
+                      {constitutionalAICritique.feedbackCritique.reasoning}
+                    </p>
                     <ul className="space-y-2">
-                      {constitutionalAICritique.feedbackCritique.critiques.map((c: any, i: number) => (
-                        <li key={i} className="flex items-start gap-2 text-[10px] text-zinc-300">
-                          <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-[9px] font-medium capitalize shrink-0">
-                            {c.aspect}
-                          </span>
-                          <span>{c.issue}</span>
-                        </li>
-                      ))}
+                      {constitutionalAICritique.feedbackCritique.critiques.map(
+                        (c: any, i: number) => (
+                          <li key={i} className="flex items-start gap-2 text-[10px] text-zinc-300">
+                            <span className="shrink-0 rounded bg-yellow-500/20 px-2 py-0.5 text-[9px] font-medium text-yellow-400 capitalize">
+                              {c.aspect}
+                            </span>
+                            <span>{c.issue}</span>
+                          </li>
+                        )
+                      )}
                     </ul>
                   </div>
                 )}
@@ -254,9 +381,9 @@ export function FeedbackSections({
 
       {/* Footer */}
       <p className="text-center text-[10px] text-zinc-600">
-        {problemType === 'system-design'
+        {problemType === "system-design"
           ? "Graded like real FAANG system design interviews"
-          : problemType === 'bugfix'
+          : problemType === "bugfix"
             ? "Graded on debugging process & fix quality"
             : "Graded like real Meta/Google interviews"}
       </p>

@@ -31,19 +31,19 @@ interface ScoreExplanation {
 
 const SCORE_EXPLANATIONS: Record<ScoreInfoType, ScoreExplanation> = {
   overall: {
-    title: "Overall Score",
+    title: "Mock Interview Score",
     description:
-      "Your complete interview performance including code quality, problem-solving, understanding, and how well you communicated your approach.",
+      "What you'd likely get in a real FAANG interview. Includes code quality (30%), problem-solving (25%), understanding (25%), and communication (20%). Communication is crucial - a silent optimal solution is a C at best.",
   },
   technical: {
-    title: "Technical Score",
+    title: "Code-Only Score",
     description:
-      "Code-focused performance only. Measures your understanding, problem-solving, and code quality - excludes communication.",
+      "Pure coding ability without communication. Weights: Code Quality (60%), Problem-Solving (25%), Understanding (15%). Use this to track your raw technical skills separately from presentation.",
   },
   mastery: {
-    title: "Mastery Score",
+    title: "Pattern Mastery",
     description:
-      "How well your code works - based purely on test pass rate. Used to schedule your review sessions.",
+      "How well you've learned this problem pattern. Based on correctness (60%), time efficiency (25%), and independence (15%). Higher mastery = longer intervals between reviews in spaced repetition.",
   },
   mastered: {
     title: "Mastered",

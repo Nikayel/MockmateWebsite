@@ -129,10 +129,30 @@ export async function getExistingSessionScores(
   const data = doc.data()
   if (!data) return null
 
+  // Calculate approximate technical score if missing
+  // Technical score excludes communication, so we estimate by removing 20% communication contribution
+  // Performance = 0.25*U + 0.25*PS + 0.30*CQ + 0.20*C
+  // Assume average communication (50) contributes 10 points, rescale remaining 80% to 100%
+  const estimatedTechnicalScore =
+    data.technicalScore ??
+    (data.scoreBreakdown
+      ? Math.round(
+          data.scoreBreakdown.understandingScore * 0.15 +
+            data.scoreBreakdown.problemSolvingScore * 0.25 +
+            data.scoreBreakdown.codeQualityScore * 0.6
+        )
+      : Math.max(0, Math.round((data.performanceScore - 10) / 0.8)))
+
+  // Mastery score is harder to estimate - use a conservative approach
+  // It's based on correctness, time, and independence which we don't have
+  // Use performance minus a buffer (mastery typically lower than performance)
+  const estimatedMasteryScore =
+    data.masteryScore ?? Math.max(0, Math.round((data.performanceScore ?? 0) * 0.9 - 5))
+
   return {
     performanceScore: data.performanceScore ?? 0,
-    technicalScore: data.technicalScore ?? data.performanceScore ?? 0, // Fallback for old data
-    masteryScore: data.masteryScore ?? data.performanceScore ?? 0, // Fallback for old data
+    technicalScore: estimatedTechnicalScore,
+    masteryScore: estimatedMasteryScore,
     breakdown: data.scoreBreakdown ?? {
       understandingScore: 0,
       problemSolvingScore: 0,

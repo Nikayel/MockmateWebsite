@@ -16,11 +16,13 @@ import { ScoreBreakdown, SCORE_WEIGHTS } from "./types"
 /**
  * Calculate technical score from score breakdown
  *
- * Original weights: U=25%, PS=25%, CQ=30%, Comm=20%
- * Technical reweights (excluding 20% communication):
- * - Understanding: 25/80 = 31.25%
- * - Problem-Solving: 25/80 = 31.25%
- * - Code Quality: 30/80 = 37.5%
+ * Uses SCORE_WEIGHTS.technical from types.ts:
+ * - Code Quality: 60% (tests, efficiency, readability)
+ * - Problem Solving: 25% (debugging, optimization)
+ * - Understanding: 15% (explained approach, complexity)
+ *
+ * This weights heavily on OBJECTIVE metrics (code quality)
+ * rather than normalizing the interview weights.
  *
  * @param breakdown - Score breakdown with all components
  * @returns Technical score (0-100)

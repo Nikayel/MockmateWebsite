@@ -1,12 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import {
-  RotateCcw,
-  Play,
-  Download,
-  XCircle
-} from "lucide-react"
+import { RotateCcw, Play, Download, XCircle } from "lucide-react"
 
 interface FeedbackActionsProps {
   onRetry?: () => void
@@ -58,13 +53,15 @@ async function generatePDF(
 
   doc.setFontSize(11)
   doc.setFont("helvetica", "normal")
+  // Weights from SCORE_WEIGHTS.performance in lib/scoring/types.ts
+  // Understanding: 25%, Problem-Solving: 25%, Code Quality: 30%, Communication: 20%
   const criteria = [
-    { name: "Understanding", score: scores.understanding, weight: "30%" },
+    { name: "Understanding", score: scores.understanding, weight: "25%" },
     { name: "Problem-Solving", score: scores.problemSolving, weight: "25%" },
-    { name: "Code Quality", score: scores.codeQuality, weight: "25%" },
+    { name: "Code Quality", score: scores.codeQuality, weight: "30%" },
     { name: "Communication", score: scores.communication, weight: "20%" },
   ]
-  criteria.forEach(c => {
+  criteria.forEach((c) => {
     doc.text(`${c.name} (${c.weight}): ${c.score}%`, margin + 5, y)
     y += 6
   })
@@ -95,7 +92,7 @@ export function FeedbackActions({
   overallScore,
   problemTitle,
   grade,
-  scores
+  scores,
 }: FeedbackActionsProps) {
   const handleExport = async () => {
     if (onExport) {
@@ -109,7 +106,7 @@ export function FeedbackActions({
     <div className="flex border-t border-zinc-800/50 text-xs">
       <button
         onClick={onRetry}
-        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-colors"
+        className="flex flex-1 items-center justify-center gap-1.5 py-2.5 text-zinc-400 transition-colors hover:bg-zinc-800/50 hover:text-white"
       >
         <RotateCcw className="h-3.5 w-3.5" />
         Retry
@@ -117,7 +114,7 @@ export function FeedbackActions({
       <div className="w-px bg-zinc-800/50" />
       <button
         onClick={onNewProblem}
-        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-white hover:bg-zinc-800/50 transition-colors"
+        className="flex flex-1 items-center justify-center gap-1.5 py-2.5 text-white transition-colors hover:bg-zinc-800/50"
       >
         <Play className="h-3.5 w-3.5" />
         New Problem
@@ -125,7 +122,7 @@ export function FeedbackActions({
       <div className="w-px bg-zinc-800/50" />
       <button
         onClick={handleExport}
-        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-colors"
+        className="flex flex-1 items-center justify-center gap-1.5 py-2.5 text-zinc-400 transition-colors hover:bg-zinc-800/50 hover:text-white"
       >
         <Download className="h-3.5 w-3.5" />
         Export
@@ -135,7 +132,7 @@ export function FeedbackActions({
           <div className="w-px bg-zinc-800/50" />
           <button
             onClick={onEndInterview}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+            className="flex flex-1 items-center justify-center gap-1.5 py-2.5 text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300"
           >
             <XCircle className="h-3.5 w-3.5" />
             End

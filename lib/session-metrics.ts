@@ -13,13 +13,14 @@ import { adminDb } from "./firebase-admin"
 import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { trackUsageEvent } from "./usage-tracking"
 import type { InteractionMetrics, ScoreBreakdown } from "./scoring"
-import { calculateUserScore, getPerformanceFeedback, SCORE_WEIGHTS } from "./scoring"
+import { calculateUserScore, getPerformanceFeedback } from "./scoring"
 import {
   calculateMasteryScore,
   fromInteractionMetrics,
   type MasteryScoreResult,
 } from "./spaced-repetition/mastery-score"
 import { analyzeMessage } from "./scoring/keyword-detection"
+import { calculateTechnicalScore } from "./scoring/technical-score"
 
 // =============================================================================
 // TYPES
@@ -761,24 +762,7 @@ async function syncScoreToInterviewSession(
   }
 }
 
-/**
- * Calculate technical score from score breakdown
- * Uses canonical weights from SCORE_WEIGHTS.technical:
- * - Code Quality: 60% (tests, efficiency, readability)
- * - Problem Solving: 25% (debugging, optimization)
- * - Understanding: 15% (explained approach, complexity)
- */
-function calculateTechnicalScore(breakdown: ScoreBreakdown): number {
-  const codeQuality = breakdown.codeQualityScore || 0
-  const problemSolving = breakdown.problemSolvingScore || 0
-  const understanding = breakdown.understandingScore || 0
-  const {
-    codeQuality: cqWeight,
-    problemSolving: psWeight,
-    understanding: uWeight,
-  } = SCORE_WEIGHTS.technical
-  return Math.round(codeQuality * cqWeight + problemSolving * psWeight + understanding * uWeight)
-}
+// calculateTechnicalScore is imported from ./scoring/technical-score
 
 /**
  * Update user's aggregate statistics

@@ -66,7 +66,7 @@ export function MetricsOverview() {
   const { firebaseUser } = useAuth()
   const [metrics, setMetrics] = useState<QuickMetrics | null>(null)
   const [loading, setLoading] = useState(true)
-  const [showOverallScore, setShowOverallScore] = useState(false) // Default to technical score
+  const [showOverallScore, setShowOverallScore] = useState(true) // Default to Interview Score (includes communication)
 
   useEffect(() => {
     const loadMetrics = async () => {
@@ -234,7 +234,7 @@ export function MetricsOverview() {
           <div className="mb-1 flex items-center justify-between">
             <span className="flex items-center gap-1 text-xs text-gray-400">
               <Target className="h-3 w-3" />
-              {showOverallScore ? "Interview Score" : "Technical Score"}
+              {showOverallScore ? "Mock Interview Score" : "Code-Only Score"}
               <ScoreInfoTooltip type={showOverallScore ? "overall" : "technical"} />
             </span>
             <div className="flex items-center gap-2">
@@ -255,7 +255,9 @@ export function MetricsOverview() {
                   </button>
                 </TooltipTrigger>
                 <TooltipContent className="bg-zinc-800 text-zinc-200">
-                  <p>Toggle score type</p>
+                  <p>
+                    {showOverallScore ? "Switch to Code-Only Score" : "Switch to Interview Score"}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -266,8 +268,8 @@ export function MetricsOverview() {
           />
           <div className="mt-1 text-[10px] text-gray-500">
             {showOverallScore
-              ? "Overall interview performance (includes communication 20%)"
-              : "Code-focused score (understanding, problem solving, code quality)"}
+              ? "What you'd likely get in a real interview (communication matters!)"
+              : "Pure coding ability only (excludes communication)"}
           </div>
         </div>
 
