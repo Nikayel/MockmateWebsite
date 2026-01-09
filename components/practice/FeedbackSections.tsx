@@ -16,7 +16,11 @@ import {
   MessageSquareOff,
   Copy,
   Brain,
+  MessageCircle,
+  User,
+  Bot,
 } from "lucide-react"
+import type { ChatMessage } from "@/lib/types"
 import { LearningRecommendations } from "@/components/LearningRecommendations"
 import { NextProblemRecommendations } from "@/components/NextProblemRecommendations"
 import { ScoreInfoTooltip } from "@/components/ui/score-info-tooltip"
@@ -39,6 +43,9 @@ interface FeedbackSectionsProps {
   aiCopyingDetected?: boolean
   aiOverlapPercentage?: number
   masteryScore?: number
+  // Chat history
+  chatMessages?: ChatMessage[]
+  interviewerMessages?: ChatMessage[]
 }
 
 export function FeedbackSections({
@@ -57,11 +64,20 @@ export function FeedbackSections({
   aiCopyingDetected,
   aiOverlapPercentage,
   masteryScore,
+  chatMessages,
+  interviewerMessages,
 }: FeedbackSectionsProps) {
   const [showCode, setShowCode] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
   const [showRecommendations, setShowRecommendations] = useState(false)
   const [showQualityCheck, setShowQualityCheck] = useState(false)
+  const [showChatHistory, setShowChatHistory] = useState(false)
+
+  // Combine and sort chat messages by timestamp if available
+  const hasChatHistory =
+    (chatMessages && chatMessages.length > 0) ||
+    (interviewerMessages && interviewerMessages.length > 0)
+  const totalMessages = (chatMessages?.length || 0) + (interviewerMessages?.length || 0)
 
   return (
     <div className="w-full space-y-4">
@@ -288,6 +304,132 @@ export function FeedbackSections({
                     </li>
                   ))}
                 </ol>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Chat History - Collapsible section showing conversation */}
+        {hasChatHistory && (
+          <>
+            <button
+              onClick={() => setShowChatHistory(!showChatHistory)}
+              className="flex w-full items-center justify-between rounded-xl border border-zinc-800/50 bg-zinc-900/50 p-3 transition-colors hover:bg-zinc-800/30"
+            >
+              <div className="flex items-center gap-2">
+                <MessageCircle className="h-3.5 w-3.5 text-sky-400" />
+                <span className="text-xs font-medium text-zinc-300">Chat History</span>
+                <span className="text-[10px] text-zinc-600">({totalMessages} messages)</span>
+              </div>
+              {showChatHistory ? (
+                <ChevronUp className="h-3.5 w-3.5 text-zinc-500" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
+              )}
+            </button>
+            {showChatHistory && (
+              <div className="space-y-4 rounded-xl border border-zinc-800/50 bg-zinc-900/30 p-4">
+                {/* AI Partner Messages */}
+                {chatMessages && chatMessages.length > 0 && (
+                  <div>
+                    <div className="mb-3 flex items-center gap-2">
+                      <Bot className="h-3.5 w-3.5 text-violet-400" />
+                      <span className="text-xs font-medium text-violet-400">
+                        AI Partner Conversation
+                      </span>
+                      <span className="text-[10px] text-zinc-600">
+                        ({chatMessages.length} messages)
+                      </span>
+                    </div>
+                    <div className="max-h-64 space-y-2 overflow-y-auto pr-2">
+                      {chatMessages.map((msg, i) => (
+                        <div
+                          key={i}
+                          className={`flex items-start gap-2 text-xs ${
+                            msg.type === "user" ? "justify-end" : "justify-start"
+                          }`}
+                        >
+                          {msg.type === "ai" && (
+                            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-500/20">
+                              <Bot className="h-3 w-3 text-violet-400" />
+                            </div>
+                          )}
+                          <div
+                            className={`max-w-[85%] rounded-lg px-3 py-2 ${
+                              msg.type === "user"
+                                ? "bg-sky-500/20 text-sky-200"
+                                : "bg-zinc-800 text-zinc-300"
+                            }`}
+                          >
+                            <p className="break-words whitespace-pre-wrap">{msg.message}</p>
+                          </div>
+                          {msg.type === "user" && (
+                            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-500/20">
+                              <User className="h-3 w-3 text-sky-400" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Interviewer Messages */}
+                {interviewerMessages && interviewerMessages.length > 0 && (
+                  <div
+                    className={
+                      chatMessages && chatMessages.length > 0 ? "border-t border-zinc-800 pt-4" : ""
+                    }
+                  >
+                    <div className="mb-3 flex items-center gap-2">
+                      <Bot className="h-3.5 w-3.5 text-amber-400" />
+                      <span className="text-xs font-medium text-amber-400">
+                        Interviewer Conversation
+                      </span>
+                      <span className="text-[10px] text-zinc-600">
+                        ({interviewerMessages.length} messages)
+                      </span>
+                    </div>
+                    <div className="max-h-64 space-y-2 overflow-y-auto pr-2">
+                      {interviewerMessages.map((msg, i) => (
+                        <div
+                          key={i}
+                          className={`flex items-start gap-2 text-xs ${
+                            msg.type === "user" ? "justify-end" : "justify-start"
+                          }`}
+                        >
+                          {msg.type === "ai" && (
+                            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/20">
+                              <Bot className="h-3 w-3 text-amber-400" />
+                            </div>
+                          )}
+                          <div
+                            className={`max-w-[85%] rounded-lg px-3 py-2 ${
+                              msg.type === "user"
+                                ? "bg-sky-500/20 text-sky-200"
+                                : "bg-zinc-800 text-zinc-300"
+                            }`}
+                          >
+                            <p className="break-words whitespace-pre-wrap">{msg.message}</p>
+                          </div>
+                          {msg.type === "user" && (
+                            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-500/20">
+                              <User className="h-3 w-3 text-sky-400" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {(!chatMessages || chatMessages.length === 0) &&
+                  (!interviewerMessages || interviewerMessages.length === 0) && (
+                    <p className="py-4 text-center text-xs text-zinc-500 italic">
+                      No chat messages recorded
+                    </p>
+                  )}
               </div>
             )}
           </>

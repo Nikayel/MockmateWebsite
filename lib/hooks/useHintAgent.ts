@@ -1,7 +1,12 @@
 "use client"
 
 import { useState, useCallback, useRef, useEffect } from "react"
-import type { GeneratedHint, HintLevel, StruggleMetrics } from "@/lib/agents/hint-agent"
+import type {
+  GeneratedHint,
+  HintLevel,
+  StruggleMetrics,
+  HintTrigger,
+} from "@/lib/agents/hint-agent"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import { logger } from "@/lib/logger"
 
@@ -43,6 +48,7 @@ interface UseHintAgentReturn {
 
   // Actions
   generateHints: () => Promise<void>
+  regenerateHints: (trigger: HintTrigger) => Promise<void>
   revealHint: (hintId: string) => void
   getNextHint: () => Promise<GeneratedHint | null>
   updateStruggleMetrics: (metrics: Partial<StruggleMetrics>) => void
@@ -70,6 +76,7 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
   const [isPersonalized, setIsPersonalized] = useState(false)
   const [revealedHintIds, setRevealedHintIds] = useState<Set<string>>(new Set())
   const [elapsedMinutes, setElapsedMinutes] = useState(0)
+  const [lastTrigger, setLastTrigger] = useState<HintTrigger>("initial")
 
   // Refs for tracking
   const struggleMetricsRef = useRef<StruggleMetrics>({
@@ -106,48 +113,74 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
     }
   }, [])
 
-  // Generate hints from API
+  // Generate hints from API (internal, uses lastTrigger state)
+  const generateHintsInternal = useCallback(
+    async (trigger: HintTrigger = "initial") => {
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        const response = await fetch("/api/agents/hints", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "generate",
+            userId,
+            problemId,
+            problemTitle,
+            problemText,
+            problemPattern,
+            difficulty,
+            userCode: userCodeRef.current,
+            language: "javascript",
+            struggleMetrics: struggleMetricsRef.current,
+            testResults: testResultsRef.current,
+            existingHints: staticHints,
+            trigger,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error("Failed to generate hints")
+        }
+
+        const data = await response.json()
+
+        setHints(data.hints || [])
+        setStruggleLevel(data.struggleLevel || "none")
+        setRecommendedLevel(data.recommendedRevealLevel || 1)
+        setIsPersonalized(data.personalizationApplied || false)
+      } catch (err) {
+        logger.error("[useHintAgent] Generate error", { error: err, problemId, userId, trigger })
+        setError(err instanceof Error ? err.message : "Failed to generate hints")
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [userId, problemId, problemTitle, problemText, problemPattern, difficulty, staticHints]
+  )
+
+  // Generate hints (for backwards compatibility, uses 'initial' trigger)
   const generateHints = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
+    await generateHintsInternal("initial")
+  }, [generateHintsInternal])
 
-    try {
-      const response = await fetch("/api/agents/hints", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "generate",
-          userId,
-          problemId,
-          problemTitle,
-          problemText,
-          problemPattern,
-          difficulty,
-          userCode: userCodeRef.current,
-          language: "javascript",
-          struggleMetrics: struggleMetricsRef.current,
-          testResults: testResultsRef.current,
-          existingHints: staticHints,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to generate hints")
+  // Regenerate hints with a specific trigger (event-driven)
+  const regenerateHints = useCallback(
+    async (trigger: HintTrigger) => {
+      // Skip initial regeneration if no code written yet
+      if (
+        trigger === "initial" &&
+        (!userCodeRef.current || userCodeRef.current.trim().length < 20)
+      ) {
+        return
       }
 
-      const data = await response.json()
-
-      setHints(data.hints || [])
-      setStruggleLevel(data.struggleLevel || "none")
-      setRecommendedLevel(data.recommendedRevealLevel || 1)
-      setIsPersonalized(data.personalizationApplied || false)
-    } catch (err) {
-      logger.error("[useHintAgent] Generate error", { error: err, problemId, userId })
-      setError(err instanceof Error ? err.message : "Failed to generate hints")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [userId, problemId, problemTitle, problemText, problemPattern, difficulty, staticHints])
+      setLastTrigger(trigger)
+      await generateHintsInternal(trigger)
+    },
+    [generateHintsInternal]
+  )
 
   // Auto-generate hints on mount
   useEffect(() => {
@@ -271,6 +304,7 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
             total: number
             failingTests?: string[]
           }) => void
+          regenerateHints: (trigger: HintTrigger) => Promise<void>
         }
       }
     ).__hintAgent = {
@@ -286,12 +320,15 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
           struggleMetricsRef.current.testsFailed++
         }
       },
+      regenerateHints: async (trigger: HintTrigger) => {
+        await regenerateHints(trigger)
+      },
     }
 
     return () => {
       delete (window as { __hintAgent?: unknown }).__hintAgent
     }
-  }, [])
+  }, [regenerateHints])
 
   return {
     hints,
@@ -304,6 +341,7 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
     revealedHintIds,
     elapsedMinutes,
     generateHints,
+    regenerateHints,
     revealHint,
     getNextHint,
     updateStruggleMetrics,

@@ -101,6 +101,9 @@ export function useTestExecution({
         estimatedTimeComplexity = "O(n log n)"
       }
 
+      // Get optimal complexity from scenario (needed for bounded space check)
+      const optimalSpaceComplexity = (selectedScenario as any)?.optimalComplexity?.space || "N/A"
+
       // Estimate space complexity based on data structures
       // Only count CREATION of new data structures, not access/indexing
       const hasHashMapCreation =
@@ -126,14 +129,21 @@ export function useTestExecution({
         /\.filter\s*\(/.test(codeToAnalyze) || // .filter() creates new array
         /\[\s*for\s+/.test(codeToAnalyze) // [x for x in ...] list comprehension
 
+      // Check if this is a bounded space problem (e.g., 26-char alphabet, digits only)
+      // If optimal space is O(1) but code uses hash map/array, it's likely bounded
+      // Common bounded space problems: anagrams, character frequency, digit counting
+      const isBoundedSpaceProblem = optimalSpaceComplexity === "O(1)"
+
       let estimatedSpaceComplexity = "O(1)"
       if (hasHashMapCreation || hasArrayCreation) {
-        estimatedSpaceComplexity = "O(n)"
+        // If the problem's optimal is O(1), trust that - it means the data structure
+        // has bounded size (e.g., 26 chars for alphabet, 10 digits, etc.)
+        // Otherwise, assume the data structure grows with input size
+        estimatedSpaceComplexity = isBoundedSpaceProblem ? "O(1)" : "O(n)"
       }
 
-      // Get optimal complexity from scenario
+      // Get optimal time complexity from scenario
       const optimalTimeComplexity = (selectedScenario as any)?.optimalComplexity?.time || "N/A"
-      const optimalSpaceComplexity = (selectedScenario as any)?.optimalComplexity?.space || "N/A"
 
       // Calculate efficiency score (0-100)
       let efficiencyScore = 100

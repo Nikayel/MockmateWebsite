@@ -2,6 +2,7 @@
 
 import { parseFeedback } from "@/lib/feedback/parsers"
 import { ScoreDisplay, FeedbackSections, FeedbackActions } from "@/components/practice"
+import type { ChatMessage } from "@/lib/types"
 
 interface PracticeFeedbackProps {
   feedback: string
@@ -19,6 +20,8 @@ interface PracticeFeedbackProps {
   problemTitle?: string
   code?: string
   language?: string
+  chatMessages?: ChatMessage[]
+  interviewerMessages?: ChatMessage[]
   onRetry?: () => void
   onNewProblem?: () => void
   onExport?: () => void
@@ -41,6 +44,8 @@ export default function PracticeFeedback({
   problemTitle,
   code,
   language = "javascript",
+  chatMessages,
+  interviewerMessages,
   onRetry,
   onNewProblem,
   onExport,
@@ -170,6 +175,8 @@ export default function PracticeFeedback({
         overallScore={overallScore}
         constitutionalAICritique={constitutionalAICritique}
         onNewProblem={onNewProblem}
+        chatMessages={chatMessages}
+        interviewerMessages={interviewerMessages}
       />
     </div>
   )

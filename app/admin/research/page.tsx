@@ -1,12 +1,27 @@
 "use client"
 
+import { useState } from "react"
 import { useAuth } from "@/lib/auth-context"
-import { AdminLayout, DataTable, Column, renderBadge } from "@/components/admin/shared"
+import { AdminLayout, DataTable, renderBadge } from "@/components/admin/shared"
 import { useResearchData } from "@/lib/hooks/useResearchData"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { useEnhancedResearch } from "@/lib/hooks/useEnhancedResearch"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  SignificanceTestCard,
+  PredictionAccuracyPanel,
+  SampleSizeAnalysisPanel,
+  QualityScorePanel,
+  RecommendationsPanel,
+} from "@/components/admin/research"
 import {
   FlaskConical,
   Database,
@@ -26,10 +41,46 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Minus,
+  Download,
+  FileJson,
+  FileSpreadsheet,
+  ChevronDown,
 } from "lucide-react"
+
+// Helper component for trend indicators
+interface TrendIndicatorProps {
+  label: string
+  direction: "improving" | "declining" | "stable"
+  slope: number
+}
+
+function TrendIndicator({ label, direction, slope }: TrendIndicatorProps) {
+  const Icon =
+    direction === "improving" ? TrendingUp : direction === "declining" ? TrendingDown : Minus
+  const colorClass =
+    direction === "improving"
+      ? "text-green-400"
+      : direction === "declining"
+        ? "text-red-400"
+        : "text-gray-400"
+
+  const slopeDisplay =
+    direction === "stable" ? "Stable" : `${slope > 0 ? "+" : ""}${(slope * 100).toFixed(2)}%/day`
+
+  return (
+    <div className="flex flex-col items-center rounded-lg bg-gray-800/50 p-3">
+      <Icon className={`mb-1 h-5 w-5 ${colorClass}`} />
+      <span className="mb-1 text-xs text-gray-400">{label}</span>
+      <span className={`text-sm font-medium ${colorClass}`}>{slopeDisplay}</span>
+    </div>
+  )
+}
 
 export default function ResearchDashboard() {
   const { firebaseUser } = useAuth()
+  const [activeTab, setActiveTab] = useState("overview")
+
+  // Basic research data
   const {
     data,
     loading,
@@ -41,6 +92,13 @@ export default function ResearchDashboard() {
     migrating,
     backfilling,
   } = useResearchData(firebaseUser)
+
+  // Enhanced statistical analysis
+  const {
+    data: enhancedData,
+    loading: enhancedLoading,
+    exportData,
+  } = useEnhancedResearch(firebaseUser)
 
   const { distribution, comparison, insights, recentEvents } = data || {}
   const sm2Stats = comparison?.sm2
@@ -60,6 +118,47 @@ export default function ResearchDashboard() {
       refreshing={refreshing}
       actions={
         <>
+          {/* Export Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800">
+                <Download className="mr-2 h-4 w-4" />
+                Export
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="border-gray-700 bg-gray-900">
+              <DropdownMenuItem
+                onClick={() => exportData("csv", "events", "30d")}
+                className="cursor-pointer text-gray-300 hover:bg-gray-800"
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Events (CSV, 30d)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => exportData("csv", "events", "all")}
+                className="cursor-pointer text-gray-300 hover:bg-gray-800"
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Events (CSV, All)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => exportData("csv", "summary")}
+                className="cursor-pointer text-gray-300 hover:bg-gray-800"
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                User Summaries (CSV)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => exportData("json", "comparison")}
+                className="cursor-pointer text-gray-300 hover:bg-gray-800"
+              >
+                <FileJson className="mr-2 h-4 w-4" />
+                Comparison (JSON)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Button
             onClick={migrateUsers}
             variant="outline"
@@ -241,73 +340,271 @@ export default function ResearchDashboard() {
         </div>
       )}
 
-      {/* Recent Events Table */}
-      {recentEvents && (
-        <DataTable
-          title="Recent Review Events"
-          description="Latest spaced repetition reviews across both algorithms"
-          data={recentEvents.slice(0, 20)}
-          columns={[
-            {
-              key: "algorithm",
-              label: "Algorithm",
-              render: (value) =>
-                renderBadge(value.toUpperCase(), value === "fsrs" ? "default" : "default"),
-            },
-            { key: "pattern", label: "Pattern" },
-            {
-              key: "difficulty",
-              label: "Difficulty",
-              render: (value) =>
-                renderBadge(
-                  value,
-                  value === "easy" ? "success" : value === "medium" ? "warning" : "error"
-                ),
-            },
-            { key: "score", label: "Score", align: "right" },
-            {
-              key: "interval_days",
-              label: "Next Interval",
-              align: "right",
-              render: (v) => `${v}d`,
-            },
-            {
-              key: "actual_retention",
-              label: "Retention",
-              align: "center",
-              render: (value) =>
-                value ? (
-                  <CheckCircle className="mx-auto h-4 w-4 text-green-400" />
-                ) : (
-                  <XCircle className="mx-auto h-4 w-4 text-red-400" />
-                ),
-            },
-            {
-              key: "retention_as_predicted",
-              label: "Predicted",
-              align: "center",
-              render: (value) =>
-                value ? (
-                  <CheckCircle className="mx-auto h-4 w-4 text-[#00d9ff]" />
-                ) : (
-                  <Minus className="mx-auto h-4 w-4 text-gray-500" />
-                ),
-            },
-            {
-              key: "timestamp",
-              label: "Time",
-              render: (value) => new Date(value).toLocaleString(),
-            },
-          ]}
-          keyExtractor={(event) => event.id}
-          emptyMessage="No review events recorded yet. Data will appear as users practice."
-        />
-      )}
+      {/* Tabbed Advanced Analysis Section */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4 bg-gray-800/50">
+          <TabsTrigger value="overview" className="data-[state=active]:bg-gray-700">
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="statistics" className="data-[state=active]:bg-gray-700">
+            Statistics
+          </TabsTrigger>
+          <TabsTrigger value="predictions" className="data-[state=active]:bg-gray-700">
+            Predictions
+          </TabsTrigger>
+          <TabsTrigger value="events" className="data-[state=active]:bg-gray-700">
+            Events
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Last Updated */}
-      <p className="text-center text-xs text-gray-500">
-        Last updated: {data?.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : "Unknown"}
-      </p>
+        {/* Overview Tab - Research Quality & Recommendations */}
+        <TabsContent value="overview" className="space-y-4">
+          {enhancedData && (
+            <>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <QualityScorePanel qualityScore={enhancedData.qualityScore} />
+                <SampleSizeAnalysisPanel analysis={enhancedData.sampleAnalysis} />
+              </div>
+              <RecommendationsPanel recommendations={enhancedData.recommendations} />
+            </>
+          )}
+          {enhancedLoading && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-[#00d9ff]" />
+              <span className="ml-2 text-gray-400">Loading enhanced analysis...</span>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Statistics Tab - Significance Tests */}
+        <TabsContent value="statistics" className="space-y-4">
+          {enhancedData?.significanceTests && (
+            <>
+              <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
+                <BarChart3 className="h-5 w-5 text-[#00d9ff]" />
+                Statistical Significance Tests
+              </h3>
+              <p className="mb-4 text-sm text-gray-400">
+                T-tests comparing SM-2 and FSRS performance. p &lt; 0.05 indicates statistical
+                significance.
+              </p>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <SignificanceTestCard
+                  title="Retention Rate"
+                  test={enhancedData.significanceTests.retention}
+                  description="% of reviews where user recalled correctly"
+                />
+                <SignificanceTestCard
+                  title="Average Score"
+                  test={enhancedData.significanceTests.score}
+                  description="Performance score on practice problems"
+                />
+                <SignificanceTestCard
+                  title="Interval Accuracy"
+                  test={enhancedData.significanceTests.intervalAccuracy}
+                  description="How well scheduled intervals predict retention"
+                />
+              </div>
+
+              {/* Confidence Intervals */}
+              {enhancedData.confidenceIntervals && (
+                <Card className="mt-4 border-gray-800 bg-gray-900/50">
+                  <CardHeader>
+                    <CardTitle className="text-base">95% Confidence Intervals</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <h4 className="mb-2 text-sm font-medium text-blue-400">SM-2</h4>
+                        <div className="space-y-1 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Retention</span>
+                            <span className="text-gray-300">
+                              {(enhancedData.confidenceIntervals.sm2Retention.lower * 100).toFixed(
+                                1
+                              )}
+                              % -{" "}
+                              {(enhancedData.confidenceIntervals.sm2Retention.upper * 100).toFixed(
+                                1
+                              )}
+                              %
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Score</span>
+                            <span className="text-gray-300">
+                              {enhancedData.confidenceIntervals.sm2Score.lower.toFixed(1)} -{" "}
+                              {enhancedData.confidenceIntervals.sm2Score.upper.toFixed(1)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="mb-2 text-sm font-medium text-purple-400">FSRS</h4>
+                        <div className="space-y-1 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Retention</span>
+                            <span className="text-gray-300">
+                              {(enhancedData.confidenceIntervals.fsrsRetention.lower * 100).toFixed(
+                                1
+                              )}
+                              % -{" "}
+                              {(enhancedData.confidenceIntervals.fsrsRetention.upper * 100).toFixed(
+                                1
+                              )}
+                              %
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Score</span>
+                            <span className="text-gray-300">
+                              {enhancedData.confidenceIntervals.fsrsScore.lower.toFixed(1)} -{" "}
+                              {enhancedData.confidenceIntervals.fsrsScore.upper.toFixed(1)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+          {enhancedLoading && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-[#00d9ff]" />
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Predictions Tab - Accuracy Metrics */}
+        <TabsContent value="predictions" className="space-y-4">
+          {enhancedData?.predictionAccuracy && (
+            <>
+              <PredictionAccuracyPanel
+                sm2Metrics={enhancedData.predictionAccuracy.sm2}
+                fsrsMetrics={enhancedData.predictionAccuracy.fsrs}
+                comparison={enhancedData.predictionAccuracy.comparison}
+              />
+
+              {/* Trend Analysis */}
+              {enhancedData.trends && (
+                <Card className="border-gray-800 bg-gray-900/50">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <TrendingUp className="h-4 w-4 text-[#00d9ff]" />
+                      30-Day Trends
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                      <TrendIndicator
+                        label="SM-2 Retention"
+                        direction={enhancedData.trends.sm2Retention.direction}
+                        slope={enhancedData.trends.sm2Retention.slope}
+                      />
+                      <TrendIndicator
+                        label="FSRS Retention"
+                        direction={enhancedData.trends.fsrsRetention.direction}
+                        slope={enhancedData.trends.fsrsRetention.slope}
+                      />
+                      <TrendIndicator
+                        label="SM-2 Score"
+                        direction={enhancedData.trends.sm2Score.direction}
+                        slope={enhancedData.trends.sm2Score.slope}
+                      />
+                      <TrendIndicator
+                        label="FSRS Score"
+                        direction={enhancedData.trends.fsrsScore.direction}
+                        slope={enhancedData.trends.fsrsScore.slope}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+          {enhancedLoading && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-[#00d9ff]" />
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Events Tab - Recent Activity */}
+        <TabsContent value="events" className="space-y-4">
+          {recentEvents && (
+            <DataTable
+              title="Recent Review Events"
+              description="Latest spaced repetition reviews across both algorithms"
+              data={recentEvents.slice(0, 20)}
+              columns={[
+                {
+                  key: "algorithm",
+                  label: "Algorithm",
+                  render: (value) =>
+                    renderBadge(value.toUpperCase(), value === "fsrs" ? "default" : "default"),
+                },
+                { key: "pattern", label: "Pattern" },
+                {
+                  key: "difficulty",
+                  label: "Difficulty",
+                  render: (value) =>
+                    renderBadge(
+                      value,
+                      value === "easy" ? "success" : value === "medium" ? "warning" : "error"
+                    ),
+                },
+                { key: "score", label: "Score", align: "right" },
+                {
+                  key: "interval_days",
+                  label: "Next Interval",
+                  align: "right",
+                  render: (v) => `${v}d`,
+                },
+                {
+                  key: "actual_retention",
+                  label: "Retention",
+                  align: "center",
+                  render: (value) =>
+                    value ? (
+                      <CheckCircle className="mx-auto h-4 w-4 text-green-400" />
+                    ) : (
+                      <XCircle className="mx-auto h-4 w-4 text-red-400" />
+                    ),
+                },
+                {
+                  key: "retention_as_predicted",
+                  label: "Predicted",
+                  align: "center",
+                  render: (value) =>
+                    value ? (
+                      <CheckCircle className="mx-auto h-4 w-4 text-[#00d9ff]" />
+                    ) : (
+                      <Minus className="mx-auto h-4 w-4 text-gray-500" />
+                    ),
+                },
+                {
+                  key: "timestamp",
+                  label: "Time",
+                  render: (value) => new Date(value).toLocaleString(),
+                },
+              ]}
+              keyExtractor={(event) => event.id}
+              emptyMessage="No review events recorded yet. Data will appear as users practice."
+            />
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Metadata */}
+      {enhancedData?.metadata && (
+        <p className="text-center text-xs text-gray-500">
+          Analysis: {enhancedData.metadata.totalEventsAnalyzed.toLocaleString()} events from{" "}
+          {enhancedData.metadata.totalUsersAnalyzed.toLocaleString()} users | Last updated:{" "}
+          {new Date(enhancedData.metadata.analysisTimestamp).toLocaleString()}
+        </p>
+      )}
     </AdminLayout>
   )
 }

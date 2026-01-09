@@ -47,7 +47,8 @@
       "Bash(export PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:$PATH\")",
       "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:$PATH\" npx tsc:*)",
       "Bash(/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin/npx tsc:*)",
-      "Bash(export PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:$PATH\")"
+      "Bash(export PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:$PATH\")",
+      "Bash(/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin/node /Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin/npx tsc:*)"
     ]
   }
 }

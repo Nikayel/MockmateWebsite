@@ -1,22 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from "next/server"
 import {
   generateHints,
   getNextHint,
   type HintGenerationRequest,
   type StruggleMetrics,
   type GeneratedHint,
-} from '@/lib/agents/hint-agent'
-import { rateLimit } from '@/lib/rate-limit'
-import { validateProblemText, validateUserCode, withTimeout, TimeoutError } from '@/lib/rag/utils'
-import { embedAndStoreHint, getSimilarHintsFromRAG } from '@/lib/rag'
-import type { DSAPattern } from '@/lib/types/dsa-patterns'
+  type HintTrigger,
+} from "@/lib/agents/hint-agent"
+import { rateLimit } from "@/lib/rate-limit"
+import { validateProblemText, validateUserCode, withTimeout, TimeoutError } from "@/lib/rag/utils"
+import { embedAndStoreHint, getSimilarHintsFromRAG } from "@/lib/rag"
+import type { DSAPattern } from "@/lib/types/dsa-patterns"
 
 // Rate limit: 15 requests per minute for hint generation (AI-intensive)
 const hintRateLimit = rateLimit({
   interval: 60 * 1000,
   uniqueTokenPerInterval: 500,
   maxRequests: 15,
-  prefix: 'rl:hints'
+  prefix: "rl:hints",
 })
 
 /**
@@ -42,20 +43,17 @@ export async function POST(request: NextRequest) {
     const { action, ...params } = body
 
     switch (action) {
-      case 'generate':
+      case "generate":
         return handleGenerateHints(params)
-      case 'get-next':
+      case "get-next":
         return handleGetNextHint(params)
       default:
-        return NextResponse.json(
-          { error: `Unknown action: ${action}` },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
     }
   } catch (error) {
-    console.error('[Hint Agent API] Error:', error)
+    console.error("[Hint Agent API] Error:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Hint generation failed' },
+      { error: error instanceof Error ? error.message : "Hint generation failed" },
       { status: 500 }
     )
   }
@@ -80,6 +78,7 @@ async function handleGenerateHints(params: {
     failingTests?: string[]
   }
   existingHints?: string[]
+  trigger?: HintTrigger
 }) {
   const {
     userId,
@@ -87,38 +86,30 @@ async function handleGenerateHints(params: {
     problemTitle,
     problemText,
     problemPattern,
-    difficulty = 'medium',
-    userCode = '',
-    language = 'javascript',
+    difficulty = "medium",
+    userCode = "",
+    language = "javascript",
     struggleMetrics = {},
     testResults,
     existingHints,
+    trigger = "initial",
   } = params
 
   // Validate required fields
   if (!userId || !problemId) {
-    return NextResponse.json(
-      { error: 'userId and problemId are required' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: "userId and problemId are required" }, { status: 400 })
   }
 
   // Validate and sanitize problem text
   const problemValidation = validateProblemText(problemText)
   if (!problemValidation.valid) {
-    return NextResponse.json(
-      { error: problemValidation.error },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: problemValidation.error }, { status: 400 })
   }
 
   // Validate user code if provided
   const codeValidation = validateUserCode(userCode)
   if (!codeValidation.valid) {
-    return NextResponse.json(
-      { error: codeValidation.error },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: codeValidation.error }, { status: 400 })
   }
 
   // Build full struggle metrics with defaults
@@ -139,12 +130,13 @@ async function handleGenerateHints(params: {
     problemTitle,
     problemText: problemValidation.sanitized!,
     problemPattern: problemPattern as DSAPattern | undefined,
-    difficulty: difficulty as 'easy' | 'medium' | 'hard',
+    difficulty: difficulty as "easy" | "medium" | "hard",
     userCode: codeValidation.sanitized!,
     language,
     struggleMetrics: fullMetrics,
     existingHints,
     testResults,
+    trigger,
   }
 
   try {
@@ -166,11 +158,11 @@ async function handleGenerateHints(params: {
       ragHints = similarHints.map((h, idx) => ({
         id: `rag_${h.id}`,
         level: (h.level || 2) as 1 | 2 | 3 | 4,
-        category: (h.category || 'approach') as GeneratedHint['category'],
+        category: (h.category || "approach") as GeneratedHint["category"],
         title: `Insight from ${h.problemTitle}`,
         content: h.content,
         isBlurred: true,
-        source: 'rag' as const,
+        source: "rag" as const,
         relevanceScore: h.similarity,
         metadata: {
           pattern: h.pattern as DSAPattern,
@@ -178,25 +170,23 @@ async function handleGenerateHints(params: {
         },
       }))
 
-      console.log(`[Hints API] Retrieved ${ragHints.length} hints from RAG for problem: ${problemId}`)
+      console.log(
+        `[Hints API] Retrieved ${ragHints.length} hints from RAG for problem: ${problemId}`
+      )
     } catch (ragError) {
       // Non-blocking - continue without RAG hints
-      console.warn('[Hints API] RAG hint retrieval failed:', ragError)
+      console.warn("[Hints API] RAG hint retrieval failed:", ragError)
     }
 
     // Generate new hints with timeout (45 seconds for AI-intensive operation)
-    const response = await withTimeout(
-      generateHints(request),
-      45000,
-      'Hint generation'
-    )
+    const response = await withTimeout(generateHints(request), 45000, "Hint generation")
 
     // Merge RAG hints with generated hints (RAG first for variety)
     const allHints = [...ragHints, ...response.hints]
 
     // Deduplicate by content similarity (simple check)
     const seenContent = new Set<string>()
-    const uniqueHints = allHints.filter(hint => {
+    const uniqueHints = allHints.filter((hint) => {
       const contentKey = hint.content.substring(0, 50).toLowerCase()
       if (seenContent.has(contentKey)) return false
       seenContent.add(contentKey)
@@ -205,13 +195,13 @@ async function handleGenerateHints(params: {
 
     // Store generated hints in RAG for future retrieval (non-blocking)
     storeHintsInRAG(
-      response.hints.filter(h => h.source === 'ai' || h.source === 'pattern-knowledge'),
+      response.hints.filter((h) => h.source === "ai" || h.source === "pattern-knowledge"),
       problemId,
       problemTitle,
       problemPattern,
       difficulty,
       userId
-    ).catch(err => console.error('[Hints API] Failed to store hints in RAG:', err))
+    ).catch((err) => console.error("[Hints API] Failed to store hints in RAG:", err))
 
     return NextResponse.json({
       hints: uniqueHints,
@@ -227,7 +217,7 @@ async function handleGenerateHints(params: {
   } catch (error) {
     if (error instanceof TimeoutError) {
       return NextResponse.json(
-        { error: 'Hint generation timed out. Please try again.' },
+        { error: "Hint generation timed out. Please try again." },
         { status: 504 }
       )
     }
@@ -247,9 +237,7 @@ async function storeHintsInRAG(
   userId: string
 ): Promise<void> {
   // Only store AI-generated and pattern-knowledge hints (not RAG or user-history)
-  const hintsToStore = hints.filter(h =>
-    h.source === 'ai' || h.source === 'pattern-knowledge'
-  )
+  const hintsToStore = hints.filter((h) => h.source === "ai" || h.source === "pattern-knowledge")
 
   if (hintsToStore.length === 0) return
 
@@ -257,19 +245,14 @@ async function storeHintsInRAG(
 
   for (const hint of hintsToStore) {
     try {
-      await embedAndStoreHint(
-        problemId,
-        hint.content,
-        hint.level,
-        {
-          problemTitle,
-          problemType: difficulty === 'hard' ? 'dsa-hard' : 'dsa',
-          pattern: problemPattern || hint.metadata?.pattern,
-          category: hint.category,
-          tags: hint.metadata?.relatedConcepts || [],
-          userId,
-        }
-      )
+      await embedAndStoreHint(problemId, hint.content, hint.level, {
+        problemTitle,
+        problemType: difficulty === "hard" ? "dsa-hard" : "dsa",
+        pattern: problemPattern || hint.metadata?.pattern,
+        category: hint.category,
+        tags: hint.metadata?.relatedConcepts || [],
+        userId,
+      })
     } catch (err) {
       // Log but don't fail - storing hints is non-critical
       console.warn(`[Hints API] Failed to store hint ${hint.id}:`, err)
@@ -303,9 +286,9 @@ async function handleGetNextHint(params: {
     problemTitle,
     problemText,
     problemPattern,
-    difficulty = 'medium',
-    userCode = '',
-    language = 'javascript',
+    difficulty = "medium",
+    userCode = "",
+    language = "javascript",
     struggleMetrics = {},
     testResults,
     previousHintIds = [],
@@ -314,7 +297,7 @@ async function handleGetNextHint(params: {
   // Validate required fields
   if (!userId || !problemId || !problemText) {
     return NextResponse.json(
-      { error: 'userId, problemId, and problemText are required' },
+      { error: "userId, problemId, and problemText are required" },
       { status: 400 }
     )
   }
@@ -333,17 +316,13 @@ async function handleGetNextHint(params: {
   // First, try to get a relevant hint from RAG if we haven't shown many hints yet
   if (previousHintIds.length < 2) {
     try {
-      const ragHints = await getSimilarHintsFromRAG(
-        problemText,
-        userCode,
-        {
-          problemId,
-          pattern: problemPattern,
-          hintLevel: (previousHintIds.length + 1) as 1 | 2 | 3 | 4,
-          limit: 1,
-          minSimilarity: 0.6, // Higher threshold for single hint
-        }
-      )
+      const ragHints = await getSimilarHintsFromRAG(problemText, userCode, {
+        problemId,
+        pattern: problemPattern,
+        hintLevel: (previousHintIds.length + 1) as 1 | 2 | 3 | 4,
+        limit: 1,
+        minSimilarity: 0.6, // Higher threshold for single hint
+      })
 
       if (ragHints.length > 0) {
         const ragHint = ragHints[0]
@@ -351,12 +330,12 @@ async function handleGetNextHint(params: {
         if (!previousHintIds.includes(`rag_${ragHint.id}`)) {
           const hint: GeneratedHint = {
             id: `rag_${ragHint.id}`,
-            level: (ragHint.level || (previousHintIds.length + 1)) as 1 | 2 | 3 | 4,
-            category: (ragHint.category || 'approach') as GeneratedHint['category'],
+            level: (ragHint.level || previousHintIds.length + 1) as 1 | 2 | 3 | 4,
+            category: (ragHint.category || "approach") as GeneratedHint["category"],
             title: `Insight from ${ragHint.problemTitle}`,
             content: ragHint.content,
             isBlurred: true,
-            source: 'rag',
+            source: "rag",
             relevanceScore: ragHint.similarity,
             metadata: {
               pattern: ragHint.pattern as DSAPattern,
@@ -366,13 +345,13 @@ async function handleGetNextHint(params: {
 
           return NextResponse.json({
             hint,
-            message: 'Retrieved similar hint from knowledge base',
-            source: 'rag',
+            message: "Retrieved similar hint from knowledge base",
+            source: "rag",
           })
         }
       }
     } catch (ragError) {
-      console.warn('[Hints API] RAG retrieval failed for get-next:', ragError)
+      console.warn("[Hints API] RAG retrieval failed for get-next:", ragError)
     }
   }
 
@@ -383,7 +362,7 @@ async function handleGetNextHint(params: {
     problemTitle,
     problemText,
     problemPattern: problemPattern as DSAPattern | undefined,
-    difficulty: difficulty as 'easy' | 'medium' | 'hard',
+    difficulty: difficulty as "easy" | "medium" | "hard",
     userCode,
     language,
     struggleMetrics: fullMetrics,
@@ -395,30 +374,25 @@ async function handleGetNextHint(params: {
   if (!hint) {
     return NextResponse.json({
       hint: null,
-      message: 'No more hints available',
+      message: "No more hints available",
     })
   }
 
   // Store the new hint in RAG for future use (non-blocking)
-  if (hint.source === 'ai' || hint.source === 'pattern-knowledge') {
-    embedAndStoreHint(
-      problemId,
-      hint.content,
-      hint.level,
-      {
-        problemTitle,
-        problemType: difficulty === 'hard' ? 'dsa-hard' : 'dsa',
-        pattern: problemPattern || hint.metadata?.pattern,
-        category: hint.category,
-        tags: hint.metadata?.relatedConcepts || [],
-        userId,
-      }
-    ).catch(err => console.warn('[Hints API] Failed to store hint:', err))
+  if (hint.source === "ai" || hint.source === "pattern-knowledge") {
+    embedAndStoreHint(problemId, hint.content, hint.level, {
+      problemTitle,
+      problemType: difficulty === "hard" ? "dsa-hard" : "dsa",
+      pattern: problemPattern || hint.metadata?.pattern,
+      category: hint.category,
+      tags: hint.metadata?.relatedConcepts || [],
+      userId,
+    }).catch((err) => console.warn("[Hints API] Failed to store hint:", err))
   }
 
   return NextResponse.json({
     hint,
-    message: 'Hint generated successfully',
+    message: "Hint generated successfully",
     source: hint.source,
   })
 }

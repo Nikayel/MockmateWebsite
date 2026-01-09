@@ -91,7 +91,7 @@ export default function RoadmapPage() {
   const [showEndRoadmapDialog, setShowEndRoadmapDialog] = useState(false)
   const [isArchiving, setIsArchiving] = useState(false)
   const [showDayUnlockModal, setShowDayUnlockModal] = useState(false)
-  const [lastCompletedDayIndex, setLastCompletedDayIndex] = useState<number | null>(null)
+  const [acknowledgedDays, setAcknowledgedDays] = useState<Set<number>>(new Set())
 
   // Get today's plan
   const today = new Date()
@@ -212,6 +212,23 @@ export default function RoadmapPage() {
     markQuestionCompleted(scenarioId)
   }
 
+  // Load acknowledged days from localStorage when roadmap changes
+  useEffect(() => {
+    if (!roadmap?.id) return
+    const storageKey = `roadmap-acknowledged-days-${roadmap.id}`
+    const stored = localStorage.getItem(storageKey)
+    if (stored) {
+      try {
+        const days = JSON.parse(stored) as number[]
+        setAcknowledgedDays(new Set(days))
+      } catch {
+        setAcknowledgedDays(new Set())
+      }
+    } else {
+      setAcknowledgedDays(new Set())
+    }
+  }, [roadmap?.id])
+
   // Check if current day was just completed and show unlock modal
   useEffect(() => {
     if (!roadmap) return
@@ -224,16 +241,26 @@ export default function RoadmapPage() {
     )
     const hasNextDay = selectedDayIndex < roadmap.dailyPlans.length - 1
 
-    // Show unlock modal if day is complete and there's a next day
-    if (allCompleted && hasNextDay && lastCompletedDayIndex !== selectedDayIndex) {
-      setLastCompletedDayIndex(selectedDayIndex)
+    // Show unlock modal if day is complete, there's a next day, and user hasn't acknowledged this day
+    if (allCompleted && hasNextDay && !acknowledgedDays.has(selectedDayIndex)) {
       setShowDayUnlockModal(true)
     }
-  }, [roadmap?.dailyPlans, selectedDayIndex, lastCompletedDayIndex])
+  }, [roadmap?.dailyPlans, selectedDayIndex, acknowledgedDays])
+
+  // Mark day as acknowledged and persist to localStorage
+  const acknowledgeDayCompletion = (dayIndex: number) => {
+    if (!roadmap?.id) return
+    const newAcknowledged = new Set(acknowledgedDays)
+    newAcknowledged.add(dayIndex)
+    setAcknowledgedDays(newAcknowledged)
+    const storageKey = `roadmap-acknowledged-days-${roadmap.id}`
+    localStorage.setItem(storageKey, JSON.stringify([...newAcknowledged]))
+  }
 
   // Handle unlocking next day
   const handleUnlockNextDay = () => {
     if (!roadmap) return
+    acknowledgeDayCompletion(selectedDayIndex)
     const nextDayIndex = selectedDayIndex + 1
     if (nextDayIndex < roadmap.dailyPlans.length) {
       selectDay(nextDayIndex)
@@ -243,6 +270,7 @@ export default function RoadmapPage() {
 
   // Handle taking a break (just close modal)
   const handleTakeBreak = () => {
+    acknowledgeDayCompletion(selectedDayIndex)
     setShowDayUnlockModal(false)
   }
 
@@ -893,7 +921,10 @@ export default function RoadmapPage() {
         {roadmap && (
           <DayUnlockModal
             isOpen={showDayUnlockModal}
-            onClose={() => setShowDayUnlockModal(false)}
+            onClose={() => {
+              acknowledgeDayCompletion(selectedDayIndex)
+              setShowDayUnlockModal(false)
+            }}
             onUnlockNextDay={handleUnlockNextDay}
             onTakeBreak={handleTakeBreak}
             completedDay={selectedDayIndex + 1}

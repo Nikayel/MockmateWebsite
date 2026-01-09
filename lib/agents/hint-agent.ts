@@ -11,11 +11,11 @@
  * - RAG-enhanced context for relevant hints
  */
 
-import { getContextBuilder } from '@/lib/rag/context-builder'
-import { getPatternKnowledge } from '@/lib/rag/knowledge-base/dsa-knowledge'
-import { getUserPerformanceRAG } from '@/lib/rag/user-performance-rag'
-import { advancedRetrieve } from '@/lib/rag/retrieval/advanced-retrieval'
-import type { DSAPattern } from '@/lib/types/dsa-patterns'
+import { getContextBuilder } from "@/lib/rag/context-builder"
+import { getPatternKnowledge } from "@/lib/rag/knowledge-base/dsa-knowledge"
+import { getUserPerformanceRAG } from "@/lib/rag/user-performance-rag"
+import { advancedRetrieve } from "@/lib/rag/retrieval/advanced-retrieval"
+import type { DSAPattern } from "@/lib/types/dsa-patterns"
 
 /**
  * Hint difficulty levels
@@ -29,7 +29,23 @@ export type HintLevel = 1 | 2 | 3 | 4
 /**
  * Hint category for UI grouping
  */
-export type HintCategory = 'conceptual' | 'approach' | 'implementation' | 'optimization' | 'debugging'
+export type HintCategory =
+  | "conceptual"
+  | "approach"
+  | "implementation"
+  | "optimization"
+  | "debugging"
+
+/**
+ * What triggered hint generation - affects which hints are shown
+ */
+export type HintTrigger =
+  | "initial" // Page load
+  | "test_failed" // User ran tests and some failed
+  | "test_passed" // User ran tests and all passed
+  | "stuck" // User inactive for X minutes
+  | "manual" // User clicked "get hint"
+  | "code_change" // Significant code change detected
 
 /**
  * Single generated hint
@@ -41,7 +57,7 @@ export interface GeneratedHint {
   title: string
   content: string
   isBlurred: boolean
-  source: 'ai' | 'rag' | 'pattern-knowledge' | 'user-history'
+  source: "ai" | "rag" | "pattern-knowledge" | "user-history"
   relevanceScore: number
   metadata?: {
     pattern?: DSAPattern
@@ -72,7 +88,7 @@ export interface HintGenerationRequest {
   problemTitle: string
   problemText: string
   problemPattern?: DSAPattern
-  difficulty: 'easy' | 'medium' | 'hard'
+  difficulty: "easy" | "medium" | "hard"
   userCode: string
   language: string
   struggleMetrics: StruggleMetrics
@@ -82,6 +98,7 @@ export interface HintGenerationRequest {
     total: number
     failingTests?: string[]
   }
+  trigger?: HintTrigger
 }
 
 /**
@@ -89,7 +106,7 @@ export interface HintGenerationRequest {
  */
 export interface HintGenerationResponse {
   hints: GeneratedHint[]
-  struggleLevel: 'none' | 'mild' | 'moderate' | 'high'
+  struggleLevel: "none" | "mild" | "moderate" | "high"
   recommendedRevealLevel: HintLevel
   personalizationApplied: boolean
   metadata: {
@@ -103,7 +120,7 @@ export interface HintGenerationResponse {
 /**
  * Calculate user's struggle level based on metrics
  */
-function calculateStruggleLevel(metrics: StruggleMetrics): 'none' | 'mild' | 'moderate' | 'high' {
+function calculateStruggleLevel(metrics: StruggleMetrics): "none" | "mild" | "moderate" | "high" {
   let score = 0
 
   // Time factor (more time = more struggle)
@@ -131,10 +148,10 @@ function calculateStruggleLevel(metrics: StruggleMetrics): 'none' | 'mild' | 'mo
   if (metrics.codeChanges > 20 && metrics.testsFailed > 0) score += 1
 
   // Map score to struggle level
-  if (score >= 7) return 'high'
-  if (score >= 4) return 'moderate'
-  if (score >= 2) return 'mild'
-  return 'none'
+  if (score >= 7) return "high"
+  if (score >= 4) return "moderate"
+  if (score >= 2) return "mild"
+  return "none"
 }
 
 /**
@@ -142,11 +159,11 @@ function calculateStruggleLevel(metrics: StruggleMetrics): 'none' | 'mild' | 'mo
  */
 function getRecommendedRevealLevel(struggleLevel: string, hintsRevealed: number): HintLevel {
   switch (struggleLevel) {
-    case 'high':
+    case "high":
       return Math.min(3 + Math.floor(hintsRevealed / 2), 4) as HintLevel
-    case 'moderate':
+    case "moderate":
       return Math.min(2 + Math.floor(hintsRevealed / 3), 3) as HintLevel
-    case 'mild':
+    case "mild":
       return Math.min(1 + Math.floor(hintsRevealed / 4), 2) as HintLevel
     default:
       return 1
@@ -163,7 +180,10 @@ function generateHintId(): string {
 /**
  * Analyze code to understand where user is stuck
  */
-function analyzeCodeState(code: string, language: string): {
+function analyzeCodeState(
+  code: string,
+  language: string
+): {
   hasFunction: boolean
   hasLoops: boolean
   hasDataStructure: boolean
@@ -211,11 +231,11 @@ function generatePatternHints(
     hints.push({
       id: generateHintId(),
       level: 1,
-      category: 'conceptual',
-      title: 'Pattern Recognition',
+      category: "conceptual",
+      title: "Pattern Recognition",
       content: `This is a ${knowledge.displayName} problem. ${knowledge.whenToUse[0]}`,
       isBlurred: true,
-      source: 'pattern-knowledge',
+      source: "pattern-knowledge",
       relevanceScore: 0.9,
       metadata: {
         pattern,
@@ -229,11 +249,11 @@ function generatePatternHints(
     hints.push({
       id: generateHintId(),
       level: 2,
-      category: 'approach',
-      title: 'Key Insight',
+      category: "approach",
+      title: "Key Insight",
       content: knowledge.keyInsights[0],
       isBlurred: true,
-      source: 'pattern-knowledge',
+      source: "pattern-knowledge",
       relevanceScore: 0.85,
       metadata: { pattern },
     })
@@ -242,14 +262,19 @@ function generatePatternHints(
       hints.push({
         id: generateHintId(),
         level: 2,
-        category: 'implementation',
-        title: 'Data Structure Suggestion',
-        content: `Consider using a ${pattern.includes('hash') ? 'hash map for O(1) lookups' :
-          pattern.includes('tree') ? 'tree traversal approach' :
-          pattern.includes('graph') ? 'graph representation (adjacency list)' :
-          'suitable data structure for this pattern'}`,
+        category: "implementation",
+        title: "Data Structure Suggestion",
+        content: `Consider using a ${
+          pattern.includes("hash")
+            ? "hash map for O(1) lookups"
+            : pattern.includes("tree")
+              ? "tree traversal approach"
+              : pattern.includes("graph")
+                ? "graph representation (adjacency list)"
+                : "suitable data structure for this pattern"
+        }`,
         isBlurred: true,
-        source: 'pattern-knowledge',
+        source: "pattern-knowledge",
         relevanceScore: 0.8,
         metadata: { pattern },
       })
@@ -261,16 +286,17 @@ function generatePatternHints(
     hints.push({
       id: generateHintId(),
       level: 3,
-      category: 'implementation',
-      title: 'Implementation Guide',
-      content: knowledge.keyInsights.slice(0, 2).join(' ') +
+      category: "implementation",
+      title: "Implementation Guide",
+      content:
+        knowledge.keyInsights.slice(0, 2).join(" ") +
         ` The typical time complexity is ${knowledge.timeComplexity.typical}.`,
       isBlurred: true,
-      source: 'pattern-knowledge',
+      source: "pattern-knowledge",
       relevanceScore: 0.75,
       metadata: {
         pattern,
-        codeSnippet: knowledge.codeTemplate?.split('\n').slice(0, 5).join('\n'),
+        codeSnippet: knowledge.codeTemplate?.split("\n").slice(0, 5).join("\n"),
       },
     })
 
@@ -278,11 +304,11 @@ function generatePatternHints(
     hints.push({
       id: generateHintId(),
       level: 3,
-      category: 'debugging',
-      title: 'Common Pitfalls',
-      content: `Watch out for: ${knowledge.commonMistakes.slice(0, 2).join(', ')}`,
+      category: "debugging",
+      title: "Common Pitfalls",
+      content: `Watch out for: ${knowledge.commonMistakes.slice(0, 2).join(", ")}`,
       isBlurred: true,
-      source: 'pattern-knowledge',
+      source: "pattern-knowledge",
       relevanceScore: 0.7,
       metadata: { pattern },
     })
@@ -293,11 +319,11 @@ function generatePatternHints(
     hints.push({
       id: generateHintId(),
       level: 4,
-      category: 'implementation',
-      title: 'Solution Approach',
-      content: `Here's the general approach: ${knowledge.codeTemplate?.split('\n').slice(0, 8).join('\n')}`,
+      category: "implementation",
+      title: "Solution Approach",
+      content: `Here's the general approach: ${knowledge.codeTemplate?.split("\n").slice(0, 8).join("\n")}`,
       isBlurred: true,
-      source: 'pattern-knowledge',
+      source: "pattern-knowledge",
       relevanceScore: 0.65,
       metadata: {
         pattern,
@@ -315,7 +341,9 @@ function generatePatternHints(
 function generateCodeStateHints(
   codeState: ReturnType<typeof analyzeCodeState>,
   problemText: string,
-  level: HintLevel
+  level: HintLevel,
+  trigger?: HintTrigger,
+  testResults?: { passed: number; total: number; failingTests?: string[] }
 ): GeneratedHint[] {
   const hints: GeneratedHint[] = []
   const problemLower = problemText.toLowerCase()
@@ -325,66 +353,77 @@ function generateCodeStateHints(
     hints.push({
       id: generateHintId(),
       level: 1,
-      category: 'approach',
-      title: 'Getting Started',
-      content: 'Start by defining your function signature and identifying the input/output. What data structure would best represent your intermediate results?',
+      category: "approach",
+      title: "Getting Started",
+      content:
+        "Start by defining your function signature and identifying the input/output. What data structure would best represent your intermediate results?",
       isBlurred: true,
-      source: 'ai',
+      source: "ai",
       relevanceScore: 0.9,
     })
   }
 
-  if (!codeState.hasEdgeCases && level >= 2) {
+  // Edge case hint - only show when:
+  // 1. Tests just failed (trigger === 'test_failed'), OR
+  // 2. User has made significant progress (approximateProgress >= 40) and code lacks edge case handling
+  const shouldShowEdgeCaseHint =
+    trigger === "test_failed" || (codeState.approximateProgress >= 40 && !codeState.hasEdgeCases)
+
+  if (shouldShowEdgeCaseHint && level >= 2) {
     hints.push({
       id: generateHintId(),
       level: 2,
-      category: 'debugging',
-      title: 'Edge Cases',
-      content: 'Consider edge cases: empty input, single element, null values, or extreme values. These often trip up solutions.',
+      category: "debugging",
+      title: "Edge Cases",
+      content:
+        "Consider edge cases: empty input, single element, null values, or extreme values. These often trip up solutions.",
       isBlurred: true,
-      source: 'ai',
+      source: "ai",
       relevanceScore: 0.75,
     })
   }
 
   // Problem-specific hints
-  if (problemLower.includes('two sum') || problemLower.includes('pair')) {
+  if (problemLower.includes("two sum") || problemLower.includes("pair")) {
     if (!codeState.hasDataStructure && level >= 2) {
       hints.push({
         id: generateHintId(),
         level: 2,
-        category: 'implementation',
-        title: 'Optimization Hint',
-        content: 'Instead of checking every pair (O(n²)), think about what you\'re looking for at each element. Could you store something that helps you find the answer in O(1)?',
+        category: "implementation",
+        title: "Optimization Hint",
+        content:
+          "Instead of checking every pair (O(n²)), think about what you're looking for at each element. Could you store something that helps you find the answer in O(1)?",
         isBlurred: true,
-        source: 'ai',
+        source: "ai",
         relevanceScore: 0.85,
       })
     }
   }
 
-  if (problemLower.includes('palindrome')) {
+  if (problemLower.includes("palindrome")) {
     hints.push({
       id: generateHintId(),
       level: 1,
-      category: 'conceptual',
-      title: 'Palindrome Property',
-      content: 'A palindrome reads the same forwards and backwards. How could you verify this efficiently?',
+      category: "conceptual",
+      title: "Palindrome Property",
+      content:
+        "A palindrome reads the same forwards and backwards. How could you verify this efficiently?",
       isBlurred: true,
-      source: 'ai',
+      source: "ai",
       relevanceScore: 0.85,
     })
   }
 
-  if (problemLower.includes('sorted') || problemLower.includes('binary search')) {
+  if (problemLower.includes("sorted") || problemLower.includes("binary search")) {
     hints.push({
       id: generateHintId(),
       level: 1,
-      category: 'conceptual',
-      title: 'Sorted Array Advantage',
-      content: 'When an array is sorted, you can eliminate half the search space at each step. What algorithm exploits this property?',
+      category: "conceptual",
+      title: "Sorted Array Advantage",
+      content:
+        "When an array is sorted, you can eliminate half the search space at each step. What algorithm exploits this property?",
       isBlurred: true,
-      source: 'ai',
+      source: "ai",
       relevanceScore: 0.85,
     })
   }
@@ -395,7 +434,9 @@ function generateCodeStateHints(
 /**
  * Main hint generation function
  */
-export async function generateHints(request: HintGenerationRequest): Promise<HintGenerationResponse> {
+export async function generateHints(
+  request: HintGenerationRequest
+): Promise<HintGenerationResponse> {
   const startTime = Date.now()
   const hints: GeneratedHint[] = []
 
@@ -428,7 +469,9 @@ export async function generateHints(request: HintGenerationRequest): Promise<Hin
   const codeHints = generateCodeStateHints(
     codeState,
     request.problemText,
-    recommendedRevealLevel
+    recommendedRevealLevel,
+    request.trigger,
+    request.testResults
   )
   hints.push(...codeHints)
 
@@ -451,11 +494,11 @@ export async function generateHints(request: HintGenerationRequest): Promise<Hin
           hints.push({
             id: generateHintId(),
             level: 3,
-            category: 'approach',
-            title: 'Related Insight',
-            content: doc.text.substring(0, 300) + (doc.text.length > 300 ? '...' : ''),
+            category: "approach",
+            title: "Related Insight",
+            content: doc.text.substring(0, 300) + (doc.text.length > 300 ? "..." : ""),
             isBlurred: true,
-            source: 'rag',
+            source: "rag",
             relevanceScore: doc.finalScore || 0.6,
             metadata: {
               relatedConcepts: doc.metadata?.tags as string[],
@@ -465,7 +508,7 @@ export async function generateHints(request: HintGenerationRequest): Promise<Hin
       }
     }
   } catch (error) {
-    console.error('[HintAgent] RAG context error:', error)
+    console.error("[HintAgent] RAG context error:", error)
   }
 
   // 4. Try to get user history hints for personalization
@@ -478,18 +521,18 @@ export async function generateHints(request: HintGenerationRequest): Promise<Hin
 
       // Check if this pattern is a weakness
       const patternProf = profile.patternProficiency.find(
-        p => p.pattern === request.problemPattern
+        (p) => p.pattern === request.problemPattern
       )
 
-      if (patternProf && patternProf.proficiencyLevel === 'novice') {
+      if (patternProf && patternProf.proficiencyLevel === "novice") {
         hints.push({
           id: generateHintId(),
           level: 1,
-          category: 'conceptual',
-          title: 'Personalized Tip',
+          category: "conceptual",
+          title: "Personalized Tip",
           content: `Based on your history, ${request.problemPattern} problems are newer to you. Focus on understanding the core pattern before optimizing.`,
           isBlurred: true,
-          source: 'user-history',
+          source: "user-history",
           relevanceScore: 0.8,
           metadata: {
             pattern: request.problemPattern,
@@ -500,7 +543,7 @@ export async function generateHints(request: HintGenerationRequest): Promise<Hin
       // If user has strong related patterns, leverage that
       if (profile.strengths.length > 0 && request.problemPattern) {
         const problemPattern = request.problemPattern
-        const relatedStrength = profile.strengths.find(s => {
+        const relatedStrength = profile.strengths.find((s) => {
           const knowledge = getPatternKnowledge(s)
           return knowledge?.relatedPatterns?.includes(problemPattern)
         })
@@ -509,18 +552,18 @@ export async function generateHints(request: HintGenerationRequest): Promise<Hin
           hints.push({
             id: generateHintId(),
             level: 2,
-            category: 'approach',
-            title: 'Build on Your Strengths',
+            category: "approach",
+            title: "Build on Your Strengths",
             content: `You're strong at ${relatedStrength}. This problem uses similar concepts - think about how you'd apply those techniques here.`,
             isBlurred: true,
-            source: 'user-history',
+            source: "user-history",
             relevanceScore: 0.75,
           })
         }
       }
     }
   } catch (error) {
-    console.error('[HintAgent] User history error:', error)
+    console.error("[HintAgent] User history error:", error)
   }
 
   // 5. Add test-failure specific hints
@@ -531,11 +574,11 @@ export async function generateHints(request: HintGenerationRequest): Promise<Hin
       hints.push({
         id: generateHintId(),
         level: 2,
-        category: 'debugging',
-        title: 'Test Analysis',
+        category: "debugging",
+        title: "Test Analysis",
         content: `You're passing ${request.testResults.passed}/${request.testResults.total} tests. Focus on understanding what the failing cases have in common - are they edge cases, large inputs, or special values?`,
         isBlurred: true,
-        source: 'ai',
+        source: "ai",
         relevanceScore: 0.85,
       })
     }
@@ -544,11 +587,11 @@ export async function generateHints(request: HintGenerationRequest): Promise<Hin
       hints.push({
         id: generateHintId(),
         level: 3,
-        category: 'debugging',
-        title: 'Failing Test Hint',
+        category: "debugging",
+        title: "Failing Test Hint",
         content: `Look at the failing test: ${request.testResults.failingTests[0]}. Trace through your code with this input - where does the actual output diverge from expected?`,
         isBlurred: true,
-        source: 'ai',
+        source: "ai",
         relevanceScore: 0.8,
       })
     }
@@ -561,9 +604,9 @@ export async function generateHints(request: HintGenerationRequest): Promise<Hin
   })
 
   // Filter to unique hints and limit count
-  const uniqueHints = hints.filter((hint, index, self) =>
-    index === self.findIndex(h => h.title === hint.title)
-  ).slice(0, 8)
+  const uniqueHints = hints
+    .filter((hint, index, self) => index === self.findIndex((h) => h.title === hint.title))
+    .slice(0, 8)
 
   return {
     hints: uniqueHints,
@@ -589,18 +632,19 @@ export async function getNextHint(
   const response = await generateHints(request)
 
   // Find the next unrevealed hint
-  const nextHint = response.hints.find(h => !previousHintIds.includes(h.id))
+  const nextHint = response.hints.find((h) => !previousHintIds.includes(h.id))
 
   if (!nextHint) {
     // All hints revealed, generate a more direct one
     return {
       id: generateHintId(),
       level: 4,
-      category: 'implementation',
-      title: 'Additional Guidance',
-      content: 'You\'ve seen all available hints. Try reviewing them again, or consider breaking the problem into smaller subproblems. What\'s the simplest version of this problem you could solve?',
+      category: "implementation",
+      title: "Additional Guidance",
+      content:
+        "You've seen all available hints. Try reviewing them again, or consider breaking the problem into smaller subproblems. What's the simplest version of this problem you could solve?",
       isBlurred: true,
-      source: 'ai',
+      source: "ai",
       relevanceScore: 0.5,
     }
   }
@@ -616,7 +660,10 @@ class HintAgent {
     return generateHints(request)
   }
 
-  async getNext(request: HintGenerationRequest, previousHintIds: string[]): Promise<GeneratedHint | null> {
+  async getNext(
+    request: HintGenerationRequest,
+    previousHintIds: string[]
+  ): Promise<GeneratedHint | null> {
     return getNextHint(request, previousHintIds)
   }
 }

@@ -74,6 +74,12 @@ export interface ProfileQuota {
   last_session_start?: string // Track when last paid session started
 }
 
+export interface ChatMessage {
+  type: "user" | "ai"
+  message: string
+  timestamp?: number
+}
+
 export interface InterviewSession {
   id: string
   user_id: string
@@ -102,6 +108,8 @@ export interface InterviewSession {
     language?: string
     elapsed_time?: number
     test_results?: Array<any>
+    chat_messages?: ChatMessage[]
+    interviewer_messages?: ChatMessage[]
   }
 }
 

@@ -9,9 +9,9 @@ import type {
   ScoreResult,
   ExtendedScoreResult,
   ConversationValidation,
-  PreScreenResult
-} from './types'
-import { analyzeCodeCompleteness, isBlankDesignTemplate } from './completeness-analysis'
+  PreScreenResult,
+} from "./types"
+import { analyzeCodeCompleteness, isBlankDesignTemplate } from "./completeness-analysis"
 
 // ============================================================================
 // SYSTEM DESIGN SCORING
@@ -41,7 +41,8 @@ export function calculateSystemDesignScores(
 
   // Determine engagement level
   const hasNoConversation = !preScreen.hasContent || preScreen.candidateMessageCount === 0
-  const hasMinimalConversation = preScreen.candidateMessageCount > 0 && preScreen.candidateMessageCount < 3
+  const hasMinimalConversation =
+    preScreen.candidateMessageCount > 0 && preScreen.candidateMessageCount < 3
   const hasMinimalContent = preScreen.avgMessageLength < 30 // Very short messages
   const hasNoContent = hasNoConversation && hasBlankDesignNotes
 
@@ -49,11 +50,11 @@ export function calculateSystemDesignScores(
   // This is a clear "didn't even try" scenario
   if (hasNoContent) {
     return {
-      understanding: 5,   // No requirements gathering - they typed nothing
-      problemSolving: 5,  // No architecture discussion - no engagement at all
-      codeQuality: 5,     // No design - blank template
-      communication: 5,   // Zero communication
-      overall: 5          // Fail - did not participate
+      understanding: 5, // No requirements gathering - they typed nothing
+      problemSolving: 5, // No architecture discussion - no engagement at all
+      codeQuality: 5, // No design - blank template
+      communication: 5, // Zero communication
+      overall: 5, // Fail - did not participate
     }
   }
 
@@ -70,7 +71,7 @@ export function calculateSystemDesignScores(
         problemSolving: 10,
         codeQuality: 10,
         communication: Math.min(15, aiValidation.communicationScore),
-        overall: 11 // Clear fail
+        overall: 11, // Clear fail
       }
     }
 
@@ -81,7 +82,7 @@ export function calculateSystemDesignScores(
       problemSolving: Math.min(maxScore, aiValidation.alternativesDiscussed ? 18 : 12),
       codeQuality: 10, // No design documented
       communication: commScore,
-      overall: Math.round((18 + 18 + 10 + commScore) / 5) // ~14-16 range
+      overall: Math.round((18 + 18 + 10 + commScore) / 5), // ~14-16 range
     }
   }
 
@@ -90,11 +91,11 @@ export function calculateSystemDesignScores(
   if (hasNoConversation || (hasMinimalConversation && hasMinimalContent)) {
     // Cap scores - can't get good communication score without communicating
     return {
-      understanding: 25,  // Some credit for reading the problem
+      understanding: 25, // Some credit for reading the problem
       problemSolving: 25, // Some credit for attempting design notes
-      codeQuality: 30,    // They at least wrote something
-      communication: 10,  // Did not communicate
-      overall: 22         // Low D/F range - need to discuss with interviewer
+      codeQuality: 30, // They at least wrote something
+      communication: 10, // Did not communicate
+      overall: 22, // Low D/F range - need to discuss with interviewer
     }
   }
 
@@ -104,13 +105,14 @@ export function calculateSystemDesignScores(
   // UNDERSTANDING = Requirements gathering + approach explanation
   let understanding = 25 // Lower base - must earn points
   if (aiValidation.approachExplained && aiValidation.isCoherent) {
-    const approachBonus = {
-      'excellent': 55,
-      'good': 40,
-      'basic': 25,
-      'poor': 10,
-      'none': 0
-    }[aiValidation.approachQuality] || 0
+    const approachBonus =
+      {
+        excellent: 55,
+        good: 40,
+        basic: 25,
+        poor: 10,
+        none: 0,
+      }[aiValidation.approachQuality] || 0
     understanding = Math.min(95, understanding + approachBonus)
   }
   // Penalize if no coherent discussion
@@ -169,10 +171,10 @@ export function calculateSystemDesignScores(
 
   // System design weighting: Communication is most important
   const overall = Math.round(
-    understanding * 0.20 +      // Requirements & understanding
-    problemSolving * 0.30 +     // Architecture & scalability
-    codeQuality * 0.20 +        // Design depth
-    communication * 0.30        // Critical for system design
+    understanding * 0.2 + // Requirements & understanding
+      problemSolving * 0.3 + // Architecture & scalability
+      codeQuality * 0.2 + // Design depth
+      communication * 0.3 // Critical for system design
   )
 
   return {
@@ -180,7 +182,7 @@ export function calculateSystemDesignScores(
     problemSolving: Math.round(problemSolving),
     codeQuality: Math.round(codeQuality),
     communication: Math.round(communication),
-    overall
+    overall,
   }
 }
 
@@ -214,13 +216,14 @@ export function calculateBugFixScores(
 
   // Bonus for explaining the bug
   if (aiValidation.approachExplained && aiValidation.isCoherent) {
-    const approachBonus = {
-      'excellent': 15,
-      'good': 10,
-      'basic': 5,
-      'poor': 2,
-      'none': 0
-    }[aiValidation.approachQuality] || 0
+    const approachBonus =
+      {
+        excellent: 15,
+        good: 10,
+        basic: 5,
+        poor: 2,
+        none: 0,
+      }[aiValidation.approachQuality] || 0
     understanding = Math.min(98, understanding + approachBonus)
   }
 
@@ -250,10 +253,10 @@ export function calculateBugFixScores(
 
   // Bug fix weighting: Understanding the bug is most important
   const overall = Math.round(
-    understanding * 0.35 +      // Finding + explaining the bug
-    problemSolving * 0.25 +     // Debugging approach
-    codeQuality * 0.20 +        // Clean fix
-    communication * 0.20        // Explaining process
+    understanding * 0.35 + // Finding + explaining the bug
+      problemSolving * 0.25 + // Debugging approach
+      codeQuality * 0.2 + // Clean fix
+      communication * 0.2 // Explaining process
   )
 
   return {
@@ -261,7 +264,7 @@ export function calculateBugFixScores(
     problemSolving: Math.round(problemSolving),
     codeQuality: Math.round(codeQuality),
     communication: Math.round(communication),
-    overall
+    overall,
   }
 }
 
@@ -281,12 +284,12 @@ export function calculateValidatedScores(
   code?: string
 ): ScoreResult {
   // SYSTEM DESIGN SCORING - conversation-based, no test pass rate
-  if (scenarioType === 'system-design') {
+  if (scenarioType === "system-design") {
     return calculateSystemDesignScores(preScreen, aiValidation, code)
   }
 
   // BUG FIX SCORING - emphasize debugging process
-  if (scenarioType === 'bugfix') {
+  if (scenarioType === "bugfix") {
     return calculateBugFixScores(passRate, preScreen, aiValidation)
   }
 
@@ -294,12 +297,24 @@ export function calculateValidatedScores(
 
   // CRITICAL: Check if solution is incomplete/stub code FIRST
   // This prevents giving credit for edge case handling when the actual algorithm is missing
-  const codeCompleteness = code ? analyzeCodeCompleteness(code, 'python') : { isIncomplete: false, reason: '', hasBaseCase: false, hasActualLogic: true, stubPatterns: [] }
+  const codeCompleteness = code
+    ? analyzeCodeCompleteness(code, "python")
+    : {
+        isIncomplete: false,
+        reason: "",
+        hasBaseCase: false,
+        hasActualLogic: true,
+        stubPatterns: [],
+      }
 
   // If solution is incomplete AND has very low pass rate, cap all scores severely
   // This catches cases like: only base case check with 'pass', getting 1 test to pass
   const isIncompleteSolution = codeCompleteness.isIncomplete
-  const hasOnlyBaseCasePassing = passRate > 0 && passRate < 30 && codeCompleteness.hasBaseCase && !codeCompleteness.hasActualLogic
+  const hasOnlyBaseCasePassing =
+    passRate > 0 &&
+    passRate < 30 &&
+    codeCompleteness.hasBaseCase &&
+    !codeCompleteness.hasActualLogic
   const maxScoreForIncomplete = 25 // Cap at 25% for incomplete solutions
 
   // === UNDERSTANDING SCORE (30%) ===
@@ -316,13 +331,14 @@ export function calculateValidatedScores(
 
   // Bonus for explaining approach (only if AI validated as real explanation)
   if (aiValidation.approachExplained && aiValidation.isCoherent) {
-    const approachBonus = {
-      'excellent': 12,
-      'good': 8,
-      'basic': 4,
-      'poor': 2,
-      'none': 0
-    }[aiValidation.approachQuality] || 0
+    const approachBonus =
+      {
+        excellent: 12,
+        good: 8,
+        basic: 4,
+        poor: 2,
+        none: 0,
+      }[aiValidation.approachQuality] || 0
     understanding = Math.min(98, understanding + approachBonus)
   }
 
@@ -346,7 +362,7 @@ export function calculateValidatedScores(
   // Primary: test pass rate + code efficiency
   // Secondary: edge cases and alternatives discussed
   const effScore = efficiencyMetrics?.efficiencyScore || 50
-  let problemSolving = Math.round((passRate * 0.6) + (effScore * 0.4))
+  let problemSolving = Math.round(passRate * 0.6 + effScore * 0.4)
 
   // Bonus only if AI validated these as real discussions (not keyword stuffing)
   // AND solution has actual implementation
@@ -365,11 +381,7 @@ export function calculateValidatedScores(
   // === CODE QUALITY SCORE (25%) ===
   // Purely algorithmic - based on test results and efficiency
   // This CAN'T be gamed through conversation
-  let codeQuality = Math.min(100, Math.round(
-    passRate * 0.50 +
-    effScore * 0.30 +
-    50 * 0.20
-  ))
+  let codeQuality = Math.min(100, Math.round(passRate * 0.5 + effScore * 0.3 + 50 * 0.2))
 
   // CRITICAL: Cap code quality for incomplete solutions
   // Stub code with a passing edge case test is NOT quality code
@@ -412,17 +424,25 @@ export function calculateValidatedScores(
   const isOptimalSolution = passRate >= 100 && (effScore || 0) >= 80
   const isCorrectSolution = passRate >= 100
 
+  // Treat complexity + trade-off discussion as equivalent to explaining approach
+  // In real FAANG interviews, discussing trade-offs and complexity IS explaining your approach
+  // Example: "I'll use two hash maps because it's more readable" + "O(n) time, O(1) space"
+  const hasApproachIndicators =
+    aiValidation.approachExplained ||
+    (aiValidation.complexityDiscussed && aiValidation.alternativesDiscussed)
+
   // NO difficulty bonus - easy problems still require communication
-  if (aiValidation.approachExplained && aiValidation.isCoherent && aiValidation.approachQuality !== 'none') {
-    // Explained approach = this is what we want
+  if (hasApproachIndicators && aiValidation.isCoherent && aiValidation.approachQuality !== "none") {
+    // Explained approach (directly or via trade-offs + complexity) = this is what we want
     // But quality matters - just saying "I'll loop" isn't enough
-    const qualityBonus = {
-      'excellent': 20,
-      'good': 12,
-      'basic': 5,
-      'poor': 0,
-      'none': 0
-    }[aiValidation.approachQuality] || 0
+    const qualityBonus =
+      {
+        excellent: 20,
+        good: 12,
+        basic: 5,
+        poor: 0,
+        none: 0,
+      }[aiValidation.approachQuality] || 0
 
     if (isOptimalSolution) {
       communication = Math.min(95, communication + qualityBonus)
@@ -431,8 +451,16 @@ export function calculateValidatedScores(
     } else {
       communication = Math.min(70, communication + Math.floor(qualityBonus / 2))
     }
+  } else if (aiValidation.complexityDiscussed || aiValidation.alternativesDiscussed) {
+    // Partial indicators - discussed complexity OR trade-offs but not both
+    // This is better than silent but not as good as full explanation
+    if (isCorrectSolution) {
+      communication = Math.min(60, communication)
+    } else {
+      communication = Math.min(50, communication)
+    }
   } else {
-    // DID NOT explain approach - this is a problem even if solution is correct
+    // No indicators at all - truly silent coder
     // Real interviewers care about thought process, not just the answer
     if (isCorrectSolution) {
       // Correct but silent = poor communication, cap at 45
@@ -444,24 +472,27 @@ export function calculateValidatedScores(
   }
 
   // Minimum floor only if they actually had MEANINGFUL conversation
-  // Requires: 3+ messages, approach explained with at least basic quality
+  // Requires: 3+ messages, approach explained (or demonstrated via trade-offs + complexity)
   // NOTE: This floor is HIGHER than silent solution caps - that's intentional
   // The difference is whether they EXPLAINED their approach, not just chatted
-  if (preScreen.hasContent &&
-      preScreen.candidateMessageCount >= 3 &&
-      preScreen.avgMessageLength >= 50 && // Raised from 40 to require more substance
-      aiValidation.isCoherent &&
-      aiValidation.approachExplained &&
-      aiValidation.approachQuality !== 'none' &&
-      aiValidation.approachQuality !== 'poor') {
+  if (
+    preScreen.hasContent &&
+    preScreen.candidateMessageCount >= 3 &&
+    preScreen.avgMessageLength >= 50 && // Raised from 40 to require more substance
+    aiValidation.isCoherent &&
+    hasApproachIndicators && // Use the combined check instead of just approachExplained
+    aiValidation.approachQuality !== "none" &&
+    aiValidation.approachQuality !== "poor"
+  ) {
     // Only apply floor if they actually explained approach well
-    const qualityFloor = {
-      'excellent': 65,
-      'good': 55,
-      'basic': 45,
-      'poor': 35,
-      'none': 25
-    }[aiValidation.approachQuality] || 35
+    const qualityFloor =
+      {
+        excellent: 65,
+        good: 55,
+        basic: 45,
+        poor: 35,
+        none: 25,
+      }[aiValidation.approachQuality] || 35
     communication = Math.max(qualityFloor, communication)
   }
 
@@ -470,10 +501,7 @@ export function calculateValidatedScores(
 
   // === OVERALL SCORE ===
   let overall = Math.round(
-    understanding * 0.30 +
-    problemSolving * 0.25 +
-    codeQuality * 0.25 +
-    communication * 0.20
+    understanding * 0.3 + problemSolving * 0.25 + codeQuality * 0.25 + communication * 0.2
   )
 
   // FINAL CAP: Incomplete solutions CANNOT pass (cap at 30%)
@@ -488,7 +516,7 @@ export function calculateValidatedScores(
     problemSolving: Math.round(problemSolving),
     codeQuality: Math.round(codeQuality),
     communication: Math.round(communication),
-    overall
+    overall,
   }
 }
 
@@ -514,10 +542,11 @@ export function applyScoreFloors(
 ): ExtendedScoreResult {
   const isOptimal = (efficiencyScore || 0) >= 80
   // Only boost if they actually explained with at least basic quality
-  const explainedApproach = aiValidation.approachExplained &&
+  const explainedApproach =
+    aiValidation.approachExplained &&
     aiValidation.isCoherent &&
-    aiValidation.approachQuality !== 'none' &&
-    aiValidation.approachQuality !== 'poor'
+    aiValidation.approachQuality !== "none" &&
+    aiValidation.approachQuality !== "poor"
   const hasGoodComm = aiValidation.communicationScore >= 60 && explainedApproach
 
   // Detect silent solutions - correct but no communication

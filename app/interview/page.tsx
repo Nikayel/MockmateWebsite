@@ -218,7 +218,29 @@ function InterviewPageContent() {
   const [code, setCode] = useState("")
   const [selectedLanguage, setSelectedLanguage] = useState<
     "javascript" | "typescript" | "python" | "java" | "cpp" | "csharp" | "go" | "rust"
-  >("javascript")
+  >(() => {
+    // Initialize from localStorage if available (client-side only)
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("mockmate_preferred_language")
+      if (
+        saved &&
+        ["javascript", "typescript", "python", "java", "cpp", "csharp", "go", "rust"].includes(
+          saved
+        )
+      ) {
+        return saved as
+          | "javascript"
+          | "typescript"
+          | "python"
+          | "java"
+          | "cpp"
+          | "csharp"
+          | "go"
+          | "rust"
+      }
+    }
+    return "javascript"
+  })
 
   // Filters (handled inside ScenarioBrowser now)
   const [completedProblems, setCompletedProblems] = useState<string[]>([])
@@ -234,6 +256,43 @@ function InterviewPageContent() {
   const [chatInput, setChatInput] = useState("")
   const [interviewerInput, setInterviewerInput] = useState("")
   // Note: isLoadingChat and isLoadingInterviewer are from useInterviewStore above
+
+  // Track topics the interviewer has already asked about to prevent repetitive questions
+  const [recentNudgeTopics, setRecentNudgeTopics] = useState<string[]>([])
+
+  // Extract topics from AI interviewer messages to avoid repetition
+  const extractTopicsFromMessage = (message: string): string[] => {
+    const topics: string[] = []
+    const lowerMsg = message.toLowerCase()
+
+    // Common interview question patterns
+    if (lowerMsg.includes("time complexity") || lowerMsg.includes("time and space")) {
+      topics.push("time complexity")
+    }
+    if (lowerMsg.includes("space complexity")) {
+      topics.push("space complexity")
+    }
+    if (lowerMsg.includes("edge case") || lowerMsg.includes("edge-case")) {
+      topics.push("edge cases")
+    }
+    if (lowerMsg.includes("walk me through") || lowerMsg.includes("explain your")) {
+      topics.push("approach explanation")
+    }
+    if (lowerMsg.includes("optimize") || lowerMsg.includes("more efficient")) {
+      topics.push("optimization")
+    }
+    if (
+      lowerMsg.includes("test") &&
+      (lowerMsg.includes("how would") || lowerMsg.includes("what"))
+    ) {
+      topics.push("testing")
+    }
+    if (lowerMsg.includes("alternative") || lowerMsg.includes("other approach")) {
+      topics.push("alternative approaches")
+    }
+
+    return topics
+  }
 
   // Track pending auto-send to avoid duplicate sends
   const pendingAutoSendRef = useRef<{ interviewer: boolean; partner: boolean }>({
@@ -1217,6 +1276,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           isProactive: true,
           elapsedTime: elapsedTime,
           edgeCases: getEdgeCasesForInterviewer(),
+          // Pass recent topics to prevent repetitive questions
+          recentNudgeTopics: recentNudgeTopics,
         }),
       })
 
@@ -1224,6 +1285,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
       if (data.reply) {
         setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+        // Track topics from this proactive message
+        const newTopics = extractTopicsFromMessage(data.reply)
+        if (newTopics.length > 0) {
+          setRecentNudgeTopics((prev) => [...prev, ...newTopics].slice(-10))
+        }
       }
     } catch (error) {
       console.error("Proactive interviewer error:", error)
@@ -1334,6 +1400,8 @@ Interviews are conversations, not just coding exercises.`
           isProactive: true,
           elapsedTime: elapsedTime,
           edgeCases: getEdgeCasesForInterviewer(),
+          // Pass recent topics to prevent repetitive questions
+          recentNudgeTopics: recentNudgeTopics,
         }),
       })
 
@@ -1341,6 +1409,11 @@ Interviews are conversations, not just coding exercises.`
 
       if (data.reply) {
         setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+        // Track topics from this proactive message
+        const newTopics = extractTopicsFromMessage(data.reply)
+        if (newTopics.length > 0) {
+          setRecentNudgeTopics((prev) => [...prev, ...newTopics].slice(-10))
+        }
       }
     } catch (error) {
       console.error("Proactive interviewer error:", error)
@@ -1636,6 +1709,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           scenarioType: selectedScenario?.type,
           isProactive: false,
           edgeCases: getEdgeCasesForInterviewer(),
+          // Pass recent topics to prevent repetitive questions
+          recentNudgeTopics: recentNudgeTopics,
         }),
       })
 
@@ -2081,6 +2156,7 @@ Here's what I expect:
 Take a breath, study the prompt on the left, and tell me how you plan to attack this.`
 
     setInterviewerMessages([{ type: "ai", message: initialMessage }])
+    setRecentNudgeTopics([]) // Reset tracked topics for new interview
     // Only set chat messages for non-DSA scenarios (DSA has no AI partner)
     if (!isDSA) {
       setChatMessages([
@@ -2210,6 +2286,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     setCode("")
     setInterviewerMessages([])
     setChatMessages([])
+    setRecentNudgeTopics([])
     setTestResults([])
     setTestSummary({ total: 0, passed: 0, failed: 0, passRate: 0 })
     setStartTime(null)
@@ -2467,6 +2544,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             isPostInterview: showPostInterviewDiscussion,
             isEndingSession: isEndingSession,
             edgeCases: isInterviewer ? getEdgeCasesForInterviewer() : undefined,
+            // Pass recent topics to prevent repetitive questions
+            recentNudgeTopics: isInterviewer ? recentNudgeTopics : undefined,
           }),
         })
 
@@ -2491,6 +2570,18 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
         if (data.reply) {
           setMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+
+          // Track topics from interviewer messages to avoid repetitive questions
+          if (isInterviewer) {
+            const newTopics = extractTopicsFromMessage(data.reply)
+            if (newTopics.length > 0) {
+              setRecentNudgeTopics((prev) => {
+                const updated = [...prev, ...newTopics]
+                // Keep only last 10 topics to avoid memory bloat
+                return updated.slice(-10)
+              })
+            }
+          }
 
           // Track AI response for scoring (fire-and-forget)
           if (currentSessionId && firebaseUser) {
@@ -2913,6 +3004,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           isPostInterview: true,
           isEndingSession: false,
           edgeCases: getEdgeCasesForInterviewer(),
+          // Pass recent topics to prevent repetitive questions
+          recentNudgeTopics: recentNudgeTopics,
         }),
       })
 
@@ -2990,6 +3083,36 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       if (data.results) {
         setTestResults(data.results)
         setTestSummary(data.summary)
+
+        // Wire up to hint agent - regenerate hints based on test outcome
+        const hintAgent = (
+          window as unknown as {
+            __hintAgent?: {
+              updateTestResults: (r: {
+                passed: number
+                total: number
+                failingTests?: string[]
+              }) => void
+              regenerateHints: (t: string) => Promise<void>
+            }
+          }
+        ).__hintAgent
+        if (hintAgent) {
+          hintAgent.updateTestResults({
+            passed: data.summary.passed,
+            total: data.summary.total,
+            failingTests: data.results
+              .filter((r: TestResult) => !r.passed)
+              .map((r: TestResult) => r.description),
+          })
+
+          // Regenerate hints based on test outcome
+          if (data.summary.failed > 0) {
+            hintAgent.regenerateHints("test_failed")
+          } else if (data.summary.passed === data.summary.total) {
+            hintAgent.regenerateHints("test_passed")
+          }
+        }
 
         // Store console logs from execution
         if (data.consoleLogs && data.consoleLogs.length > 0) {
@@ -3119,6 +3242,36 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       if (data.results) {
         setTestResults(data.results)
         setTestSummary(data.summary)
+
+        // Wire up to hint agent - regenerate hints based on test outcome (submit flow)
+        const hintAgentSubmit = (
+          window as unknown as {
+            __hintAgent?: {
+              updateTestResults: (r: {
+                passed: number
+                total: number
+                failingTests?: string[]
+              }) => void
+              regenerateHints: (t: string) => Promise<void>
+            }
+          }
+        ).__hintAgent
+        if (hintAgentSubmit) {
+          hintAgentSubmit.updateTestResults({
+            passed: data.summary.passed,
+            total: data.summary.total,
+            failingTests: data.results
+              .filter((r: TestResult) => !r.passed)
+              .map((r: TestResult) => r.description),
+          })
+
+          // Regenerate hints based on test outcome
+          if (data.summary.failed > 0) {
+            hintAgentSubmit.regenerateHints("test_failed")
+          } else if (data.summary.passed === data.summary.total) {
+            hintAgentSubmit.regenerateHints("test_passed")
+          }
+        }
 
         // Store console logs from execution
         if (data.consoleLogs && data.consoleLogs.length > 0) {
@@ -3274,6 +3427,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     onChange={(e) => {
                       const newLang = e.target.value as typeof selectedLanguage
                       setSelectedLanguage(newLang)
+                      // Persist language preference to localStorage
+                      localStorage.setItem("mockmate_preferred_language", newLang)
                       if (!isLanguageSupported(newLang)) {
                         toast.warning(`${newLang.toUpperCase()} execution coming soon`, {
                           description:
@@ -4506,7 +4661,20 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   </p>
                   <div className="flex items-center gap-2 text-sm text-gray-500">
                     <Clock className="h-4 w-4" />
-                    <span>This usually takes 5-10 seconds</span>
+                    <span>This usually takes 30 seconds to 2 minutes</span>
+                  </div>
+                  <div className="mt-6 flex flex-col items-center gap-3">
+                    <p className="text-xs text-gray-500">
+                      Don&apos;t want to wait? Your results will be saved.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push("/dashboard")}
+                      className="text-gray-400 hover:text-white"
+                    >
+                      Go to Dashboard
+                    </Button>
                   </div>
                 </div>
               ) : (

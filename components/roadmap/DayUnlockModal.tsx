@@ -12,7 +12,7 @@ import {
   Clock,
   CheckCircle2,
 } from "lucide-react"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 interface DayUnlockModalProps {
   isOpen: boolean
@@ -64,7 +64,11 @@ export function DayUnlockModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="border-none bg-transparent p-0 shadow-none sm:max-w-md">
+      <DialogContent
+        className="border-none bg-transparent p-0 shadow-none sm:max-w-md"
+        aria-describedby={undefined}
+      >
+        <DialogTitle className="sr-only">Day {completedDay} Complete</DialogTitle>
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
