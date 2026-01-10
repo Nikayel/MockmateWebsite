@@ -56,3 +56,15 @@ export {
   type ParamType,
   type OutputComparisonMode,
 } from './ast-validator'
+
+export {
+  // True AST-based validation
+  extractSignature,
+  generateInputsFromSignature,
+  validateWithAST,
+
+  // Types
+  type FunctionSignature,
+  type ParamInfo,
+  type TypeInfo,
+} from './ast-parser'
