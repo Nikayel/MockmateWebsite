@@ -260,6 +260,16 @@ function wrapCodeForExecution(code: string, language: string, testInput: any): s
     const funcMatch = code.match(/def\s+(\w+)\s*\(/)
     const funcName = funcMatch ? funcMatch[1] : "solution"
 
+    // Check if this is a class-based problem (has operations and values arrays)
+    const isClassBased =
+      inputKeys.includes("operations") &&
+      inputKeys.includes("values") &&
+      Array.isArray(testInput.operations)
+
+    // For class-based problems, extract the class name instead of function name
+    const classMatch = code.match(/class\s+(\w+)/)
+    const className = classMatch ? classMatch[1] : null
+
     // Python wrapper with print capture and common imports/classes for DSA problems
     return `
 import json
@@ -363,10 +373,34 @@ try:
     _input = json.loads('${inputJson.replace(/'/g, "\\'")}')
     _input_keys = json.loads('${inputKeysJson.replace(/'/g, "\\'")}')
 
+${
+  isClassBased && className
+    ? `
+    # Class-based problem execution (e.g., LRUCache, MinStack)
+    _operations = _input[_input_keys.index('operations')]
+    _values = _input[_input_keys.index('values')]
+    _results = []
+    _instance = None
+
+    for i, op in enumerate(_operations):
+        args = _values[i] if i < len(_values) else []
+        if op == '${className}' or i == 0:
+            # Constructor call
+            _instance = ${className}(*args)
+            _results.append(None)
+        else:
+            # Method call
+            method = getattr(_instance, op)
+            result = method(*args)
+            _results.append(result)
+
+    _result = _results
+`
+    : `
     # Keywords that indicate TreeNode conversion needed
     _tree_keywords = {'root', 'tree', 'node', 'p', 'q', 't1', 't2', 'left', 'right', 'subroot'}
     # Keywords that indicate ListNode conversion needed (includes 'values' used in test cases)
-    _list_keywords = {'head', 'list', 'l1', 'l2', 'values'}
+    _list_keywords = {'head', 'list', 'l1', 'l2'}
 
     # Convert array inputs to TreeNode/ListNode based on parameter name
     _processed_input = []
@@ -412,6 +446,8 @@ try:
     # If result is None and input was a tree, convert to [] for empty tree
     elif _result is None and _had_tree_input:
         _result = []
+`
+}
 
     # Output format: LOGS|||RESULT
     print = _original_print  # Restore for final output
@@ -428,11 +464,23 @@ except Exception as e:
   }
 
   // JavaScript/TypeScript
+  // Check if this is a class-based problem (has operations and values arrays)
+  const jsIsClassBased =
+    inputKeys.includes("operations") &&
+    inputKeys.includes("values") &&
+    Array.isArray(testInput.operations)
+
+  // For class-based problems, extract the class name
+  const jsClassMatch = code.match(/class\s+(\w+)/)
+  const jsClassName = jsClassMatch ? jsClassMatch[1] : null
+
   // Try to find the function name or use common patterns
-  const funcMatch = code.match(
+  const jsFuncMatch = code.match(
     /(?:function\s+(\w+)|const\s+(\w+)\s*=|let\s+(\w+)\s*=|var\s+(\w+)\s*=)/
   )
-  const funcName = funcMatch ? funcMatch[1] || funcMatch[2] || funcMatch[3] || funcMatch[4] : null
+  const jsFuncName = jsFuncMatch
+    ? jsFuncMatch[1] || jsFuncMatch[2] || jsFuncMatch[3] || jsFuncMatch[4]
+    : null
 
   // JavaScript wrapper with console capture and common DSA classes
   return `
@@ -550,10 +598,38 @@ ${code}
 // Execute with test input
 try {
   const _input = ${inputJson};
+  const _inputKeys = ${inputKeysJson};
+
+${
+  jsIsClassBased && jsClassName
+    ? `
+  // Class-based problem execution (e.g., LRUCache, MinStack)
+  const _operations = _input[_inputKeys.indexOf('operations')];
+  const _values = _input[_inputKeys.indexOf('values')];
+  const _results = [];
+  let _instance = null;
+
+  for (let i = 0; i < _operations.length; i++) {
+    const op = _operations[i];
+    const args = _values[i] || [];
+    if (op === '${jsClassName}' || i === 0) {
+      // Constructor call
+      _instance = new ${jsClassName}(...args);
+      _results.push(null);
+    } else {
+      // Method call
+      const result = _instance[op](...args);
+      _results.push(result === undefined ? null : result);
+    }
+  }
+
+  let _result = _results;
+`
+    : `
   let _func;
 
   // Try to find the function
-  ${funcName ? `if (typeof ${funcName} === 'function') _func = ${funcName};` : ""}
+  ${jsFuncName ? `if (typeof ${jsFuncName} === 'function') _func = ${jsFuncName};` : ""}
   if (!_func && typeof solution === 'function') _func = solution;
   if (!_func && typeof twoSum === 'function') _func = twoSum;
   if (!_func && typeof main === 'function') _func = main;
@@ -580,8 +656,7 @@ try {
   // Keywords that indicate TreeNode/ListNode conversion needed
   const _treeKeywords = new Set(['root', 'tree', 'node', 'p', 'q', 't1', 't2', 'left', 'right', 'subroot']);
   // Includes 'values' which is used in linked list test cases
-  const _listKeywords = new Set(['head', 'list', 'l1', 'l2', 'values']);
-  const _inputKeys = ${inputKeysJson};
+  const _listKeywords = new Set(['head', 'list', 'l1', 'l2']);
 
   // Process input - convert arrays to TreeNode/ListNode based on parameter name
   const _processedInput = _input.map((arg, i) => {
@@ -620,6 +695,8 @@ try {
   else if (_result === null && _hadTreeInput) {
     _result = [];
   }
+`
+}
 
   // Restore and output
   console.log = _originalLog;
