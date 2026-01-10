@@ -50,7 +50,7 @@ Return true if you can reach the last index, or false otherwise.`,
       typescript: `function canJump(nums: number[]): boolean {
   // Use greedy approach to track max reachable position
 }`,
-      python: `def canJump(nums: List[int]) -> bool:
+      python: `def canJump(nums: list[int]) -> bool:
     # Use greedy approach to track max reachable position
     pass`,
       java: `class Solution {
@@ -137,7 +137,7 @@ Return the minimum number of jumps to reach nums[n - 1]. The test cases are gene
       typescript: `function jump(nums: number[]): number {
   // Find minimum jumps using greedy BFS approach
 }`,
-      python: `def jump(nums: List[int]) -> int:
+      python: `def jump(nums: list[int]) -> int:
     # Find minimum jumps using greedy BFS approach
     pass`,
       java: `class Solution {
@@ -223,7 +223,7 @@ Given two integer arrays gas and cost, return the starting gas station's index i
       typescript: `function canCompleteCircuit(gas: number[], cost: number[]): number {
   // Find starting station using greedy approach
 }`,
-      python: `def canCompleteCircuit(gas: List[int], cost: List[int]) -> int:
+      python: `def canCompleteCircuit(gas: list[int], cost: list[int]) -> int:
     # Find starting station using greedy approach
     pass`,
       java: `class Solution {
@@ -308,7 +308,7 @@ Return the least number of units of times that the CPU will take to finish all t
       typescript: `function leastInterval(tasks: string[], n: number): number {
   // Calculate minimum intervals using greedy/math approach
 }`,
-      python: `def leastInterval(tasks: List[str], n: int) -> int:
+      python: `def leastInterval(tasks: list[str], n: int) -> int:
     # Calculate minimum intervals using greedy/math approach
     pass`,
       java: `class Solution {
@@ -388,7 +388,7 @@ Return a list of integers representing the size of these parts.`,
       typescript: `function partitionLabels(s: string): number[] {
   // Use greedy two-pass approach
 }`,
-      python: `def partitionLabels(s: str) -> List[int]:
+      python: `def partitionLabels(s: str) -> list[int]:
     # Use greedy two-pass approach
     pass`,
       java: `class Solution {
@@ -468,7 +468,7 @@ Given an integer array hand where hand[i] is the value written on the ith card a
       typescript: `function isNStraightHand(hand: number[], groupSize: number): boolean {
   // Use greedy approach with sorting
 }`,
-      python: `def isNStraightHand(hand: List[int], groupSize: int) -> bool:
+      python: `def isNStraightHand(hand: list[int], groupSize: int) -> bool:
     # Use greedy approach with sorting
     pass`,
       java: `class Solution {
@@ -642,7 +642,7 @@ Return true if it is possible to obtain the target triplet [x, y, z] as an eleme
       typescript: `function mergeTriplets(triplets: number[][], target: number[]): boolean {
   // Use greedy filtering approach
 }`,
-      python: `def mergeTriplets(triplets: List[List[int]], target: List[int]) -> bool:
+      python: `def mergeTriplets(triplets: list[list[int]], target: list[int]) -> bool:
     # Use greedy filtering approach
     pass`,
       java: `class Solution {

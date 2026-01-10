@@ -414,18 +414,49 @@ impl LRUCache {
       "Don't forget to link remaining nodes",
     ],
     starterCode: {
-      javascript: `function merge_two_sorted_lists() {
-  // Your code here
+      javascript: `function mergeTwoLists(list1, list2) {
+  // Write your solution here
+
 }`,
-      python: `def merge_two_sorted_lists():
-    # Your code here
+      typescript: `function mergeTwoLists(list1: ListNode | null, list2: ListNode | null): ListNode | null {
+  // Write your solution here
+
+}`,
+      python: `def mergeTwoLists(list1, list2):
+    # Write your solution here
     pass`,
     },
     optimalComplexity: {
       time: "O(n + m)",
       space: "O(1)",
     },
-    testCases: [],
+    testCases: [
+      {
+        input: { list1: [1, 2, 4], list2: [1, 3, 4] },
+        expected: [1, 1, 2, 3, 4, 4],
+        description: "Merge two lists with interleaving values",
+      },
+      {
+        input: { list1: [], list2: [] },
+        expected: [],
+        description: "Both lists empty",
+      },
+      {
+        input: { list1: [], list2: [0] },
+        expected: [0],
+        description: "One empty list",
+      },
+      {
+        input: { list1: [1, 2, 3], list2: [4, 5, 6] },
+        expected: [1, 2, 3, 4, 5, 6],
+        description: "No interleaving needed",
+      },
+      {
+        input: { list1: [5], list2: [1, 2, 4] },
+        expected: [1, 2, 4, 5],
+        description: "Single element in first list",
+      },
+    ],
   },
   {
     id: "dsa-copy-list-random-pointer",
@@ -437,11 +468,23 @@ impl LRUCache {
     description: "Deep copy a linked list with random pointers.",
     tags: ["linked-list", "hash-table"],
     estimatedTime: 25,
-    problemStatement: `A linked list of length n is given such that each node contains an additional random pointer, which could point to any node in the list, or null. Construct a deep copy of the list.`,
+    problemStatement: `A linked list of length n is given such that each node contains an additional random pointer, which could point to any node in the list, or null.
+
+Construct a deep copy of the list. The deep copy should consist of exactly n brand new nodes, where each new node has its value set to the value of its corresponding original node. Both the next and random pointer of the new nodes should point to new nodes in the copied list such that the pointers in the original list and copied list represent the same list state.`,
     examples: [
       {
-        input: "[[7,null],[13,0],[11,4],[10,2],[1,0]]",
+        input: "head = [[7,null],[13,0],[11,4],[10,2],[1,0]]",
         output: "[[7,null],[13,0],[11,4],[10,2],[1,0]]",
+        explanation:
+          "Each [val, random_index] pair represents a node with val and random pointing to node at random_index",
+      },
+      {
+        input: "head = [[1,1],[2,1]]",
+        output: "[[1,1],[2,1]]",
+      },
+      {
+        input: "head = [[3,null],[3,0],[3,null]]",
+        output: "[[3,null],[3,0],[3,null]]",
       },
     ],
     constraints: [
@@ -453,20 +496,71 @@ impl LRUCache {
       "Use HashMap to map old nodes to new nodes",
       "First pass: create all nodes",
       "Second pass: connect next and random pointers",
+      "Alternative: Interleave new nodes with old, then separate",
     ],
     starterCode: {
-      javascript: `function copy_list_random_pointer() {
-  // Your code here
+      javascript: `function copyRandomList(head) {
+  // Write your solution here
+  // Each node has: val, next, random
+
 }`,
-      python: `def copy_list_random_pointer():
-    # Your code here
+      typescript: `function copyRandomList(head: Node | null): Node | null {
+  // Write your solution here
+
+}`,
+      python: `def copyRandomList(head):
+    # Write your solution here
+    # Each node has: val, next, random
     pass`,
     },
     optimalComplexity: {
       time: "O(n)",
       space: "O(n)",
     },
-    testCases: [],
+    testCases: [
+      {
+        input: {
+          head: [
+            [7, null],
+            [13, 0],
+            [11, 4],
+            [10, 2],
+            [1, 0],
+          ],
+        },
+        expected: [
+          [7, null],
+          [13, 0],
+          [11, 4],
+          [10, 2],
+          [1, 0],
+        ],
+        description: "List with various random pointers",
+      },
+      {
+        input: {
+          head: [
+            [1, 1],
+            [2, 1],
+          ],
+        },
+        expected: [
+          [1, 1],
+          [2, 1],
+        ],
+        description: "Random pointing to same node",
+      },
+      {
+        input: { head: [] },
+        expected: [],
+        description: "Empty list",
+      },
+      {
+        input: { head: [[1, null]] },
+        expected: [[1, null]],
+        description: "Single node with null random",
+      },
+    ],
   },
   {
     id: "dsa-reorder-list",

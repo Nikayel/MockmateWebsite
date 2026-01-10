@@ -92,14 +92,19 @@ You must write an algorithm with O(log n) runtime complexity.`,
       },
       // Edge cases
       {
-        input: { nums: [2, 2, 2, 2, 2], target: 2 },
-        expected: 0,
-        description: "Edge: All same elements (returns any valid index)",
-      },
-      {
         input: { nums: [-10, -5, 0, 5, 10], target: -10 },
         expected: 0,
         description: "Edge: Negative numbers, target at start",
+      },
+      {
+        input: { nums: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], target: 10 },
+        expected: 9,
+        description: "Edge: Large array, target at end",
+      },
+      {
+        input: { nums: [1, 2], target: 1 },
+        expected: 0,
+        description: "Edge: Two elements, target is first",
       },
     ],
   },

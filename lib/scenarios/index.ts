@@ -142,6 +142,8 @@ async function loadDSAByPattern(pattern: DSAPattern): Promise<DSAScenario[]> {
       scenarios = dpModule.dpScenarios.filter((s) => s.pattern === pattern)
       break
     case 'heap':
+    case 'heap-priority-queue':
+    case 'priority-queue':
       const heapModule = await import('./dsa/heap')
       scenarios = heapModule.heapScenarios
       break

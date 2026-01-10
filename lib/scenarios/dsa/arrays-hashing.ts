@@ -347,8 +347,10 @@ An Anagram is a word or phrase formed by rearranging the letters of a different 
     testCases: [
       {
         input: { strs: ["eat", "tea", "tan", "ate", "nat", "bat"] },
-        expected: [["bat"], ["nat", "tan"], ["ate", "eat", "tea"]],
-        description: "Multiple anagram groups",
+        expected: [["ate", "eat", "tea"], ["bat"], ["nat", "tan"]],
+        description: "Multiple anagram groups (order-independent comparison)",
+        // Note: Groups sorted by first element, inner arrays sorted alphabetically
+        compareAsSet: true,
       },
       {
         input: { strs: [""] },
@@ -366,12 +368,14 @@ An Anagram is a word or phrase formed by rearranging the letters of a different 
           ["ab", "ba"],
           ["abc", "bca", "cab"],
         ],
-        description: "Multiple groups of different sizes",
+        description: "Multiple groups (order-independent comparison)",
+        compareAsSet: true,
       },
       {
         input: { strs: ["a", "b", "c"] },
         expected: [["a"], ["b"], ["c"]],
-        description: "No anagrams",
+        description: "No anagrams (order-independent comparison)",
+        compareAsSet: true,
       },
     ],
   },

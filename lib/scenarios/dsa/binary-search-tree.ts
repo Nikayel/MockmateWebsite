@@ -3,18 +3,18 @@
  * Pattern: binary-search-tree
  */
 
-import type { DSAScenario } from '../types'
+import type { DSAScenario } from "../types"
 
 export const binarySearchTreeScenarios: DSAScenario[] = [
   {
-    id: 'dsa-valid-binary-search-tree',
-    title: 'Validate Binary Search Tree',
-    type: 'dsa',
-    pattern: 'binary-search-tree',
-    difficulty: 'medium',
-    companies: ['Amazon', 'Meta', 'Microsoft', 'Google'],
-    description: 'Determine if a binary tree is a valid BST',
-    tags: ['tree', 'binary-search-tree', 'depth-first-search'],
+    id: "dsa-valid-binary-search-tree",
+    title: "Validate Binary Search Tree",
+    type: "dsa",
+    pattern: "binary-search-tree",
+    difficulty: "medium",
+    companies: ["Amazon", "Meta", "Microsoft", "Google"],
+    description: "Determine if a binary tree is a valid BST",
+    tags: ["tree", "binary-search-tree", "depth-first-search"],
     estimatedTime: 20,
     problemStatement: `Given the root of a binary tree, determine if it is a valid binary search tree (BST).
 
@@ -24,23 +24,23 @@ A valid BST is defined as follows:
 - Both the left and right subtrees must also be binary search trees.`,
     examples: [
       {
-        input: 'root = [2,1,3]',
-        output: 'true',
+        input: "root = [2,1,3]",
+        output: "true",
       },
       {
-        input: 'root = [5,1,4,null,null,3,6]',
-        output: 'false',
-        explanation: 'The root node\'s value is 5 but its right child\'s value is 4.',
+        input: "root = [5,1,4,null,null,3,6]",
+        output: "false",
+        explanation: "The root node's value is 5 but its right child's value is 4.",
       },
     ],
     constraints: [
-      'The number of nodes in the tree is in the range [1, 10^4]',
-      '-2^31 <= Node.val <= 2^31 - 1',
+      "The number of nodes in the tree is in the range [1, 10^4]",
+      "-2^31 <= Node.val <= 2^31 - 1",
     ],
     hints: [
-      'Use recursion with min and max bounds',
-      'For each node, check if it\'s within its valid range',
-      'Update bounds when recursing to left and right',
+      "Use recursion with min and max bounds",
+      "For each node, check if it's within its valid range",
+      "Update bounds when recursing to left and right",
     ],
     starterCode: {
       javascript: `function isValidBST(root) {
@@ -56,74 +56,74 @@ A valid BST is defined as follows:
     pass`,
     },
     optimalComplexity: {
-      time: 'O(n)',
-      space: 'O(h)',
+      time: "O(n)",
+      space: "O(h)",
     },
     testCases: [
       {
         input: { tree: [2, 1, 3] },
         expected: true,
-        description: 'Valid BST: [2,1,3]',
+        description: "Valid BST: [2,1,3]",
       },
       {
         input: { tree: [5, 1, 4, null, null, 3, 6] },
         expected: false,
-        description: 'Invalid: right child 4 < root 5',
+        description: "Invalid: right child 4 < root 5",
       },
       {
         input: { tree: [1] },
         expected: true,
-        description: 'Single node',
+        description: "Single node",
       },
       {
         input: { tree: [2, 2, 2] },
         expected: false,
-        description: 'Duplicate values',
+        description: "Duplicate values",
       },
       {
         input: { tree: [5, 1, 6, null, null, 4, 7] },
         expected: false,
-        description: 'Invalid: left child of 6 is 4 (< 5)',
+        description: "Invalid: left child of 6 is 4 (< 5)",
       },
     ],
   },
   {
-    id: 'dsa-lowest-common-ancestor-bst',
-    title: 'Lowest Common Ancestor of BST',
-    type: 'dsa',
-    pattern: 'binary-search-tree',
-    difficulty: 'medium',
-    companies: ['Meta', 'Amazon', 'Microsoft', 'Google'],
-    description: 'Find the lowest common ancestor in a binary search tree',
-    tags: ['tree', 'binary-search-tree', 'depth-first-search'],
+    id: "dsa-lowest-common-ancestor-bst",
+    title: "Lowest Common Ancestor of BST",
+    type: "dsa",
+    pattern: "binary-search-tree",
+    difficulty: "medium",
+    companies: ["Meta", "Amazon", "Microsoft", "Google"],
+    description: "Find the lowest common ancestor in a binary search tree",
+    tags: ["tree", "binary-search-tree", "depth-first-search"],
     estimatedTime: 20,
     problemStatement: `Given a binary search tree (BST), find the lowest common ancestor (LCA) node of two given nodes in the BST.
 
 According to the definition of LCA: "The lowest common ancestor is defined between two nodes p and q as the lowest node in T that has both p and q as descendants (where we allow a node to be a descendant of itself)."`,
     examples: [
       {
-        input: 'root = [6,2,8,0,4,7,9,null,null,3,5], p = 2, q = 8',
-        output: '6',
-        explanation: 'The LCA of nodes 2 and 8 is 6.',
+        input: "root = [6,2,8,0,4,7,9,null,null,3,5], p = 2, q = 8",
+        output: "6",
+        explanation: "The LCA of nodes 2 and 8 is 6.",
       },
       {
-        input: 'root = [6,2,8,0,4,7,9,null,null,3,5], p = 2, q = 4',
-        output: '2',
-        explanation: 'The LCA of nodes 2 and 4 is 2.',
+        input: "root = [6,2,8,0,4,7,9,null,null,3,5], p = 2, q = 4",
+        output: "2",
+        explanation: "The LCA of nodes 2 and 4 is 2.",
       },
     ],
     constraints: [
-      'The number of nodes in the tree is in the range [2, 10^5]',
-      '-10^9 <= Node.val <= 10^9',
-      'All Node.val are unique',
-      'p != q',
-      'p and q will exist in the BST',
+      "The number of nodes in the tree is in the range [2, 10^5]",
+      "-10^9 <= Node.val <= 10^9",
+      "All Node.val are unique",
+      "p != q",
+      "p and q will exist in the BST",
     ],
     hints: [
-      'Use the BST property: left < node < right',
-      'If both nodes are smaller, go left',
-      'If both nodes are larger, go right',
-      'Otherwise, current node is the LCA',
+      "Use the BST property: left < node < right",
+      "If both nodes are smaller, go left",
+      "If both nodes are larger, go right",
+      "Otherwise, current node is the LCA",
     ],
     starterCode: {
       javascript: `function lowestCommonAncestor(root, p, q) {
@@ -139,136 +139,118 @@ According to the definition of LCA: "The lowest common ancestor is defined betwe
     pass`,
     },
     optimalComplexity: {
-      time: 'O(h)',
-      space: 'O(1)',
+      time: "O(h)",
+      space: "O(1)",
     },
     testCases: [
       {
         input: { tree: [6, 2, 8, 0, 4, 7, 9, null, null, 3, 5], p: 2, q: 8 },
         expected: 6,
-        description: 'LCA of 2 and 8 is 6',
+        description: "LCA of 2 and 8 is 6",
       },
       {
         input: { tree: [6, 2, 8, 0, 4, 7, 9, null, null, 3, 5], p: 2, q: 4 },
         expected: 2,
-        description: 'LCA of 2 and 4 is 2 (ancestor of itself)',
+        description: "LCA of 2 and 4 is 2 (ancestor of itself)",
       },
       {
         input: { tree: [2, 1, 3], p: 1, q: 3 },
         expected: 2,
-        description: 'Simple tree: LCA is root',
+        description: "Simple tree: LCA is root",
       },
       {
         input: { tree: [6, 2, 8, 0, 4, 7, 9], p: 0, q: 4 },
         expected: 2,
-        description: 'Both nodes in left subtree',
+        description: "Both nodes in left subtree",
       },
       {
         input: { tree: [6, 2, 8, 0, 4, 7, 9], p: 7, q: 9 },
         expected: 8,
-        description: 'Both nodes in right subtree',
+        description: "Both nodes in right subtree",
+      },
+    ],
+  },
+  // Note: Duplicate 'dsa-validate-bst' removed - use 'dsa-valid-binary-search-tree' above
+  {
+    id: "dsa-kth-smallest-bst",
+    title: "Kth Smallest Element in BST",
+    type: "dsa",
+    pattern: "binary-search-tree",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta"],
+    description: "Find the kth smallest element in a BST.",
+    tags: ["tree", "dfs", "bst"],
+    estimatedTime: 20,
+    problemStatement: `Given the root of a binary search tree, and an integer k, return the kth smallest value (1-indexed) of all the values of the nodes in the tree.`,
+    examples: [
+      {
+        input: "root = [3,1,4,null,2], k = 1",
+        output: "1",
+      },
+      {
+        input: "root = [5,3,6,2,4,null,null,1], k = 3",
+        output: "3",
+      },
+    ],
+    constraints: [
+      "The number of nodes in the tree is n.",
+      "1 <= k <= n <= 10^4",
+      "0 <= Node.val <= 10^4",
+    ],
+    hints: [
+      "Inorder traversal of BST gives sorted order",
+      "Return the kth element during inorder traversal",
+      "Can optimize with counter variable",
+    ],
+    starterCode: {
+      javascript: `function kthSmallest(root, k) {
+  // Write your solution here
+
+}`,
+      typescript: `function kthSmallest(root: TreeNode | null, k: number): number {
+  // Write your solution here
+
+}`,
+      python: `def kthSmallest(root, k):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: {
+      time: "O(h + k)",
+      space: "O(h)",
+    },
+    testCases: [
+      {
+        input: { root: [3, 1, 4, null, 2], k: 1 },
+        expected: 1,
+        description: "k=1, return smallest",
+      },
+      {
+        input: { root: [5, 3, 6, 2, 4, null, null, 1], k: 3 },
+        expected: 3,
+        description: "k=3, third smallest",
+      },
+      {
+        input: { root: [1], k: 1 },
+        expected: 1,
+        description: "Single node",
+      },
+      {
+        input: { root: [2, 1, 3], k: 2 },
+        expected: 2,
+        description: "Root is kth smallest",
       },
     ],
   },
   {
-    id: 'dsa-validate-bst',
-    title: 'Validate Binary Search Tree',
-    type: 'dsa',
-    pattern: 'binary-search-tree',
-    difficulty: 'medium',
-    companies: ["Amazon", "Google", "Meta", "Microsoft"],
-    description: 'Determine if a binary tree is a valid binary search tree.',
-    tags: ["tree", "dfs", "bst"],
-    estimatedTime: 20,
-    problemStatement: `Given the root of a binary tree, determine if it is a valid binary search tree (BST). A valid BST is defined as follows: The left subtree of a node contains only nodes with keys less than the node's key. The right subtree of a node contains only nodes with keys greater than the node's key. Both the left and right subtrees must also be binary search trees.`,
-    examples: [
-    {
-      input: 'root = [2,1,3]',
-      output: 'true'
-    },
-    {
-      input: 'root = [5,1,4,null,null,3,6]',
-      output: 'false',
-      explanation: 'The root node\'s value is 5 but its right child\'s value is 4.'
-    }
-  ],
-    constraints: [
-    'The number of nodes in the tree is in the range [1, 10^4].',
-    '-2^31 <= Node.val <= 2^31 - 1'
-  ],
-    hints: [
-    'Keep track of valid range for each node',
-    'Use inorder traversal - should be strictly increasing',
-    'Pass min and max values down the tree'
-  ],
-    starterCode: {
-      javascript: `function validate_bst() {
-  // Your code here
-}`,
-      python: `def validate_bst():
-    # Your code here
-    pass`
-    },
-    optimalComplexity: {
-      time: 'O(n)',
-      space: 'O(n)'
-    },
-    testCases: []
-  },
-  {
-    id: 'dsa-kth-smallest-bst',
-    title: 'Kth Smallest Element in BST',
-    type: 'dsa',
-    pattern: 'binary-search-tree',
-    difficulty: 'medium',
-    companies: ["Amazon", "Google", "Meta"],
-    description: 'Find the kth smallest element in a BST.',
-    tags: ["tree", "dfs", "bst"],
-    estimatedTime: 20,
-    problemStatement: `Given the root of a binary search tree and an integer k, return the kth smallest value (1-indexed) in the tree.`,
-    examples: [
-    {
-      input: 'root = [3,1,4,null,2], k = 1',
-      output: '1'
-    },
-    {
-      input: 'root = [5,3,6,2,4,null,null,1], k = 3',
-      output: '3'
-    }
-  ],
-    constraints: [
-    'The number of nodes in the tree is n.',
-    '1 <= k <= n <= 10^4',
-    '0 <= Node.val <= 10^4'
-  ],
-    hints: [
-    'Inorder traversal of BST gives sorted order',
-    'Return the kth element during inorder traversal',
-    'Can optimize with counter variable'
-  ],
-    starterCode: {
-      javascript: `function kth_smallest_bst() {
-  // Your code here
-}`,
-      python: `def kth_smallest_bst():
-    # Your code here
-    pass`
-    },
-    optimalComplexity: {
-      time: 'O(n)',
-      space: 'O(n)'
-    },
-    testCases: []
-  },
-  {
-    id: 'dsa-delete-node-bst',
-    title: 'Delete Node in a BST',
-    type: 'dsa',
-    pattern: 'binary-search-tree',
-    difficulty: 'medium',
-    companies: ['Amazon', 'Google', 'Microsoft'],
-    description: 'Delete a node from a binary search tree',
-    tags: ['tree', 'bst', 'recursion'],
+    id: "dsa-delete-node-bst",
+    title: "Delete Node in a BST",
+    type: "dsa",
+    pattern: "binary-search-tree",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Microsoft"],
+    description: "Delete a node from a binary search tree",
+    tags: ["tree", "bst", "recursion"],
     estimatedTime: 25,
     problemStatement: `Given a root node reference of a BST and a key, delete the node with the given key in the BST. Return the root node reference (possibly updated) of the BST.
 
@@ -277,26 +259,26 @@ Basically, the deletion can be divided into two stages:
 2. If the node is found, delete the node.`,
     examples: [
       {
-        input: 'root = [5,3,6,2,4,null,7], key = 3',
-        output: '[5,4,6,2,null,null,7]',
-        explanation: 'One valid answer is [5,4,6,2,null,null,7].',
+        input: "root = [5,3,6,2,4,null,7], key = 3",
+        output: "[5,4,6,2,null,null,7]",
+        explanation: "One valid answer is [5,4,6,2,null,null,7].",
       },
       {
-        input: 'root = [5,3,6,2,4,null,7], key = 0',
-        output: '[5,3,6,2,4,null,7]',
-        explanation: 'The tree does not contain a node with value = 0.',
+        input: "root = [5,3,6,2,4,null,7], key = 0",
+        output: "[5,3,6,2,4,null,7]",
+        explanation: "The tree does not contain a node with value = 0.",
       },
     ],
     constraints: [
-      'The number of nodes in the tree is in range [0, 10^4]',
-      '-10^5 <= Node.val <= 10^5',
-      'Each node has a unique value',
-      'root is a valid binary search tree',
+      "The number of nodes in the tree is in range [0, 10^4]",
+      "-10^5 <= Node.val <= 10^5",
+      "Each node has a unique value",
+      "root is a valid binary search tree",
     ],
     hints: [
-      'Handle three cases: leaf node, one child, two children',
-      'For two children, find inorder successor (smallest in right subtree)',
-      'Replace value with successor, then delete successor',
+      "Handle three cases: leaf node, one child, two children",
+      "For two children, find inorder successor (smallest in right subtree)",
+      "Replace value with successor, then delete successor",
     ],
     starterCode: {
       javascript: `function deleteNode(root, key) {
@@ -318,48 +300,56 @@ Basically, the deletion can be divided into two stages:
 }`,
     },
     optimalComplexity: {
-      time: 'O(h)',
-      space: 'O(h)',
+      time: "O(h)",
+      space: "O(h)",
     },
     testCases: [
-      { input: { root: [5,3,6,2,4,null,7], key: 3 }, expected: [5,4,6,2,null,null,7], description: 'Delete node with two children' },
-      { input: { root: [5,3,6,2,4,null,7], key: 0 }, expected: [5,3,6,2,4,null,7], description: 'Key not found' },
+      {
+        input: { root: [5, 3, 6, 2, 4, null, 7], key: 3 },
+        expected: [5, 4, 6, 2, null, null, 7],
+        description: "Delete node with two children",
+      },
+      {
+        input: { root: [5, 3, 6, 2, 4, null, 7], key: 0 },
+        expected: [5, 3, 6, 2, 4, null, 7],
+        description: "Key not found",
+      },
     ],
   },
   {
-    id: 'dsa-convert-sorted-array-bst',
-    title: 'Convert Sorted Array to Binary Search Tree',
-    type: 'dsa',
-    pattern: 'binary-search-tree',
-    difficulty: 'easy',
-    companies: ['Amazon', 'Google', 'Microsoft', 'Apple'],
-    description: 'Convert sorted array to height-balanced BST',
-    tags: ['tree', 'bst', 'divide-and-conquer', 'array'],
+    id: "dsa-convert-sorted-array-bst",
+    title: "Convert Sorted Array to Binary Search Tree",
+    type: "dsa",
+    pattern: "binary-search-tree",
+    difficulty: "easy",
+    companies: ["Amazon", "Google", "Microsoft", "Apple"],
+    description: "Convert sorted array to height-balanced BST",
+    tags: ["tree", "bst", "divide-and-conquer", "array"],
     estimatedTime: 20,
     problemStatement: `Given an integer array nums where the elements are sorted in ascending order, convert it to a height-balanced binary search tree.
 
 A height-balanced binary tree is a binary tree in which the depth of the two subtrees of every node never differs by more than one.`,
     examples: [
       {
-        input: 'nums = [-10,-3,0,5,9]',
-        output: '[0,-3,9,-10,null,5]',
-        explanation: 'One valid BST is [0,-3,9,-10,null,5].',
+        input: "nums = [-10,-3,0,5,9]",
+        output: "[0,-3,9,-10,null,5]",
+        explanation: "One valid BST is [0,-3,9,-10,null,5].",
       },
       {
-        input: 'nums = [1,3]',
-        output: '[3,1] or [1,null,3]',
-        explanation: 'Either tree is valid.',
+        input: "nums = [1,3]",
+        output: "[3,1] or [1,null,3]",
+        explanation: "Either tree is valid.",
       },
     ],
     constraints: [
-      '1 <= nums.length <= 10^4',
-      '-10^4 <= nums[i] <= 10^4',
-      'nums is sorted in strictly increasing order',
+      "1 <= nums.length <= 10^4",
+      "-10^4 <= nums[i] <= 10^4",
+      "nums is sorted in strictly increasing order",
     ],
     hints: [
-      'Choose middle element as root for balance',
-      'Recursively build left subtree from left half',
-      'Recursively build right subtree from right half',
+      "Choose middle element as root for balance",
+      "Recursively build left subtree from left half",
+      "Recursively build right subtree from right half",
     ],
     starterCode: {
       javascript: `function sortedArrayToBST(nums) {
@@ -381,46 +371,50 @@ A height-balanced binary tree is a binary tree in which the depth of the two sub
 }`,
     },
     optimalComplexity: {
-      time: 'O(n)',
-      space: 'O(log n)',
+      time: "O(n)",
+      space: "O(log n)",
     },
     testCases: [
-      { input: { nums: [-10,-3,0,5,9] }, expected: "valid BST", description: 'Build balanced BST' },
-      { input: { nums: [1,3] }, expected: "valid BST", description: 'Two elements' },
+      {
+        input: { nums: [-10, -3, 0, 5, 9] },
+        expected: "valid BST",
+        description: "Build balanced BST",
+      },
+      { input: { nums: [1, 3] }, expected: "valid BST", description: "Two elements" },
     ],
   },
   {
-    id: 'dsa-two-sum-bst',
-    title: 'Two Sum IV - Input is a BST',
-    type: 'dsa',
-    pattern: 'binary-search-tree',
-    difficulty: 'easy',
-    companies: ['Amazon', 'Meta', 'Google'],
-    description: 'Find if two nodes in BST sum to target value',
-    tags: ['tree', 'bst', 'two-pointers', 'hash-table'],
+    id: "dsa-two-sum-bst",
+    title: "Two Sum IV - Input is a BST",
+    type: "dsa",
+    pattern: "binary-search-tree",
+    difficulty: "easy",
+    companies: ["Amazon", "Meta", "Google"],
+    description: "Find if two nodes in BST sum to target value",
+    tags: ["tree", "bst", "two-pointers", "hash-table"],
     estimatedTime: 20,
     problemStatement: `Given the root of a binary search tree and an integer k, return true if there exist two elements in the BST such that their sum is equal to k, or false otherwise.`,
     examples: [
       {
-        input: 'root = [5,3,6,2,4,null,7], k = 9',
-        output: 'true',
-        explanation: '2 + 7 = 9 or 3 + 6 = 9',
+        input: "root = [5,3,6,2,4,null,7], k = 9",
+        output: "true",
+        explanation: "2 + 7 = 9 or 3 + 6 = 9",
       },
       {
-        input: 'root = [5,3,6,2,4,null,7], k = 28',
-        output: 'false',
+        input: "root = [5,3,6,2,4,null,7], k = 28",
+        output: "false",
       },
     ],
     constraints: [
-      'The number of nodes in the tree is in range [1, 10^4]',
-      '-10^4 <= Node.val <= 10^4',
-      'root is guaranteed to be a valid binary search tree',
-      '-10^5 <= k <= 10^5',
+      "The number of nodes in the tree is in range [1, 10^4]",
+      "-10^4 <= Node.val <= 10^4",
+      "root is guaranteed to be a valid binary search tree",
+      "-10^5 <= k <= 10^5",
     ],
     hints: [
-      'Use inorder traversal to get sorted array, then use two pointers',
-      'Alternative: use a hash set during traversal',
-      'For each node, check if (k - node.val) exists in the tree',
+      "Use inorder traversal to get sorted array, then use two pointers",
+      "Alternative: use a hash set during traversal",
+      "For each node, check if (k - node.val) exists in the tree",
     ],
     starterCode: {
       javascript: `function findTarget(root, k) {
@@ -442,23 +436,31 @@ A height-balanced binary tree is a binary tree in which the depth of the two sub
 }`,
     },
     optimalComplexity: {
-      time: 'O(n)',
-      space: 'O(n)',
+      time: "O(n)",
+      space: "O(n)",
     },
     testCases: [
-      { input: { root: [5,3,6,2,4,null,7], k: 9 }, expected: true, description: 'Target exists' },
-      { input: { root: [5,3,6,2,4,null,7], k: 28 }, expected: false, description: 'Target does not exist' },
+      {
+        input: { root: [5, 3, 6, 2, 4, null, 7], k: 9 },
+        expected: true,
+        description: "Target exists",
+      },
+      {
+        input: { root: [5, 3, 6, 2, 4, null, 7], k: 28 },
+        expected: false,
+        description: "Target does not exist",
+      },
     ],
   },
   {
-    id: 'dsa-bst-iterator',
-    title: 'Binary Search Tree Iterator',
-    type: 'dsa',
-    pattern: 'binary-search-tree',
-    difficulty: 'medium',
-    companies: ['Meta', 'Amazon', 'Microsoft', 'Google'],
-    description: 'Implement an iterator over a BST',
-    tags: ['tree', 'bst', 'design', 'stack'],
+    id: "dsa-bst-iterator",
+    title: "Binary Search Tree Iterator",
+    type: "dsa",
+    pattern: "binary-search-tree",
+    difficulty: "medium",
+    companies: ["Meta", "Amazon", "Microsoft", "Google"],
+    description: "Implement an iterator over a BST",
+    tags: ["tree", "bst", "design", "stack"],
     estimatedTime: 25,
     problemStatement: `Implement the BSTIterator class that represents an iterator over the in-order traversal of a binary search tree (BST):
 
@@ -471,19 +473,20 @@ Notice that by initializing the pointer to a non-existent smallest number, the f
 You may assume that next() calls will always be valid.`,
     examples: [
       {
-        input: 'BSTIterator([7, 3, 15, null, null, 9, 20]); next(); next(); hasNext(); next(); hasNext(); next(); hasNext(); next(); hasNext();',
-        output: '3, 7, true, 9, true, 15, true, 20, false',
+        input:
+          "BSTIterator([7, 3, 15, null, null, 9, 20]); next(); next(); hasNext(); next(); hasNext(); next(); hasNext(); next(); hasNext();",
+        output: "3, 7, true, 9, true, 15, true, 20, false",
       },
     ],
     constraints: [
-      'The number of nodes in the tree is in range [1, 10^5]',
-      '0 <= Node.val <= 10^6',
-      'At most 10^5 calls will be made to hasNext and next',
+      "The number of nodes in the tree is in range [1, 10^5]",
+      "0 <= Node.val <= 10^6",
+      "At most 10^5 calls will be made to hasNext and next",
     ],
     hints: [
-      'Use a stack to simulate inorder traversal',
-      'Push all left children initially',
-      'When calling next(), pop from stack and push right child\'s left descendants',
+      "Use a stack to simulate inorder traversal",
+      "Push all left children initially",
+      "When calling next(), pop from stack and push right child's left descendants",
     ],
     starterCode: {
       javascript: `class BSTIterator {
@@ -541,44 +544,73 @@ You may assume that next() calls will always be valid.`,
 }`,
     },
     optimalComplexity: {
-      time: 'O(1) average for next()',
-      space: 'O(h)',
+      time: "O(1) average for next()",
+      space: "O(h)",
     },
-    testCases: [],
+    testCases: [
+      {
+        input: {
+          root: [7, 3, 15, null, null, 9, 20],
+          operations: [
+            "next",
+            "next",
+            "hasNext",
+            "next",
+            "hasNext",
+            "next",
+            "hasNext",
+            "next",
+            "hasNext",
+          ],
+        },
+        expected: [3, 7, true, 9, true, 15, true, 20, false],
+        description: "Full traversal",
+      },
+      {
+        input: { root: [3, 1, 4, null, 2], operations: ["hasNext", "next", "next"] },
+        expected: [true, 1, 2],
+        description: "Partial traversal",
+      },
+      {
+        input: { root: [1], operations: ["next", "hasNext"] },
+        expected: [1, false],
+        description: "Single node",
+      },
+    ],
   },
   {
-    id: 'dsa-range-sum-bst',
-    title: 'Range Sum of BST',
-    type: 'dsa',
-    pattern: 'binary-search-tree',
-    difficulty: 'easy',
-    companies: ['Meta', 'Amazon', 'Google'],
-    description: 'Calculate sum of values within a range in BST',
-    tags: ['tree', 'bst', 'dfs'],
+    id: "dsa-range-sum-bst",
+    title: "Range Sum of BST",
+    type: "dsa",
+    pattern: "binary-search-tree",
+    difficulty: "easy",
+    companies: ["Meta", "Amazon", "Google"],
+    description: "Calculate sum of values within a range in BST",
+    tags: ["tree", "bst", "dfs"],
     estimatedTime: 15,
     problemStatement: `Given the root node of a binary search tree and two integers low and high, return the sum of values of all nodes with a value in the inclusive range [low, high].`,
     examples: [
       {
-        input: 'root = [10,5,15,3,7,null,18], low = 7, high = 15',
-        output: '32',
-        explanation: 'Nodes 7, 10, and 15 are in range [7, 15]. 7 + 10 + 15 = 32.',
+        input: "root = [10,5,15,3,7,null,18], low = 7, high = 15",
+        output: "32",
+        explanation: "Nodes 7, 10, and 15 are in range [7, 15]. 7 + 10 + 15 = 32.",
       },
       {
-        input: 'root = [10,5,15,3,7,13,18,1,null,6], low = 6, high = 10',
-        output: '23',
-        explanation: 'Nodes 6, 7, and 10 are in range [6, 10]. 6 + 7 + 10 = 23.',
+        input: "root = [10,5,15,3,7,13,18,1,null,6], low = 6, high = 10",
+        output: "23",
+        explanation: "Nodes 6, 7, and 10 are in range [6, 10]. 6 + 7 + 10 = 23.",
       },
     ],
     constraints: [
-      'The number of nodes in the tree is in range [1, 2 * 10^4]',
-      '1 <= Node.val <= 10^5',
-      '1 <= low <= high <= 10^5',
-      'All Node.val are unique',
+      "The number of nodes in the tree is in range [1, 2 * 10^4]",
+      "1 <= Node.val <= 10^5",
+      "1 <= low <= high <= 10^5",
+      "All Node.val are unique",
     ],
     hints: [
-      'Use BST property to prune search space',
-      'If node value < low, only search right subtree',
-      'If node value > high, only search left subtree',
+      "Use BST property to prune search space",
+      "If node value < low, only search right subtree",
+      "If node value > high, only search left subtree",
     ],
     starterCode: {
       javascript: `function rangeSumBST(root, low, high) {
@@ -600,23 +632,31 @@ You may assume that next() calls will always be valid.`,
 }`,
     },
     optimalComplexity: {
-      time: 'O(n)',
-      space: 'O(h)',
+      time: "O(n)",
+      space: "O(h)",
     },
     testCases: [
-      { input: { root: [10,5,15,3,7,null,18], low: 7, high: 15 }, expected: 32, description: 'Standard range' },
-      { input: { root: [10,5,15,3,7,13,18,1,null,6], low: 6, high: 10 }, expected: 23, description: 'Another range' },
+      {
+        input: { root: [10, 5, 15, 3, 7, null, 18], low: 7, high: 15 },
+        expected: 32,
+        description: "Standard range",
+      },
+      {
+        input: { root: [10, 5, 15, 3, 7, 13, 18, 1, null, 6], low: 6, high: 10 },
+        expected: 23,
+        description: "Another range",
+      },
     ],
   },
   {
-    id: 'dsa-serialize-deserialize-bst',
-    title: 'Serialize and Deserialize BST',
-    type: 'dsa',
-    pattern: 'binary-search-tree',
-    difficulty: 'medium',
-    companies: ['Amazon', 'Google', 'Meta', 'Microsoft'],
-    description: 'Design algorithm to serialize and deserialize a BST',
-    tags: ['tree', 'bst', 'design', 'string'],
+    id: "dsa-serialize-deserialize-bst",
+    title: "Serialize and Deserialize BST",
+    type: "dsa",
+    pattern: "binary-search-tree",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: "Design algorithm to serialize and deserialize a BST",
+    tags: ["tree", "bst", "design", "string"],
     estimatedTime: 30,
     problemStatement: `Serialization is converting a data structure or object into a sequence of bits so that it can be stored in a file or memory buffer, or transmitted across a network connection link to be reconstructed later in the same or another computer environment.
 
@@ -625,23 +665,23 @@ Design an algorithm to serialize and deserialize a binary search tree. There is 
 The encoded string should be as compact as possible.`,
     examples: [
       {
-        input: 'root = [2,1,3]',
-        output: '[2,1,3]',
+        input: "root = [2,1,3]",
+        output: "[2,1,3]",
       },
       {
-        input: 'root = []',
-        output: '[]',
+        input: "root = []",
+        output: "[]",
       },
     ],
     constraints: [
-      'The number of nodes in the tree is in range [0, 10^4]',
-      '0 <= Node.val <= 10^4',
-      'The input tree is guaranteed to be a binary search tree',
+      "The number of nodes in the tree is in range [0, 10^4]",
+      "0 <= Node.val <= 10^4",
+      "The input tree is guaranteed to be a binary search tree",
     ],
     hints: [
-      'Preorder traversal uniquely defines a BST (no need for null markers)',
-      'Use BST property during deserialization',
-      'Pass bounds (min, max) to validate placement during rebuild',
+      "Preorder traversal uniquely defines a BST (no need for null markers)",
+      "Use BST property during deserialization",
+      "Pass bounds (min, max) to validate placement during rebuild",
     ],
     starterCode: {
       javascript: `class Codec {
@@ -683,10 +723,31 @@ The encoded string should be as compact as possible.`,
 }`,
     },
     optimalComplexity: {
-      time: 'O(n)',
-      space: 'O(n)',
+      time: "O(n)",
+      space: "O(n)",
     },
-    testCases: [],
+    testCases: [
+      {
+        input: { root: [2, 1, 3] },
+        expected: [2, 1, 3],
+        description: "Simple BST",
+      },
+      {
+        input: { root: [] },
+        expected: [],
+        description: "Empty tree",
+      },
+      {
+        input: { root: [5, 3, 7, 2, 4, 6, 8] },
+        expected: [5, 3, 7, 2, 4, 6, 8],
+        description: "Complete BST",
+      },
+      {
+        input: { root: [1, null, 2, null, 3] },
+        expected: [1, null, 2, null, 3],
+        description: "Right-skewed BST",
+      },
+    ],
   },
 ]
 

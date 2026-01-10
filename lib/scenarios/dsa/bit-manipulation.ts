@@ -54,7 +54,7 @@ You must implement a solution with a linear runtime complexity and use only cons
       typescript: `function singleNumber(nums: number[]): number {
   // Use XOR to find the single number
 }`,
-      python: `def singleNumber(nums: List[int]) -> int:
+      python: `def singleNumber(nums: list[int]) -> int:
     # Use XOR to find the single number
     pass`,
       java: `class Solution {
@@ -219,7 +219,7 @@ You must implement a solution with a linear runtime complexity and use only cons
       typescript: `function countBits(n: number): number[] {
   // Use DP to count bits for each number
 }`,
-      python: `def countBits(n: int) -> List[int]:
+      python: `def countBits(n: int) -> list[int]:
     # Use DP to count bits for each number
     pass`,
       java: `class Solution {
@@ -380,7 +380,7 @@ Note:
       typescript: `function missingNumber(nums: number[]): number {
   // Find the missing number using XOR or math
 }`,
-      python: `def missingNumber(nums: List[int]) -> int:
+      python: `def missingNumber(nums: list[int]) -> int:
     # Find the missing number using XOR or math
     pass`,
       java: `class Solution {

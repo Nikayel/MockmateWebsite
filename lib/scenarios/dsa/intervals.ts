@@ -132,7 +132,7 @@ Return intervals after the insertion.`,
       typescript: `function insert(intervals: number[][], newInterval: number[]): number[][] {
   // Insert and merge the new interval
 }`,
-      python: `def insert(intervals: List[List[int]], newInterval: List[int]) -> List[List[int]]:
+      python: `def insert(intervals: list[list[int]], newInterval: list[int]) -> list[list[int]]:
     # Insert and merge the new interval
     pass`,
       java: `class Solution {
@@ -216,7 +216,7 @@ Return intervals after the insertion.`,
       typescript: `function eraseOverlapIntervals(intervals: number[][]): number {
   // Find minimum removals using greedy approach
 }`,
-      python: `def eraseOverlapIntervals(intervals: List[List[int]]) -> int:
+      python: `def eraseOverlapIntervals(intervals: list[list[int]]) -> int:
     # Find minimum removals using greedy approach
     pass`,
       java: `class Solution {
@@ -295,7 +295,7 @@ Return intervals after the insertion.`,
       typescript: `function minMeetingRooms(intervals: number[][]): number {
   // Find minimum rooms using heap or two pointers
 }`,
-      python: `def minMeetingRooms(intervals: List[List[int]]) -> int:
+      python: `def minMeetingRooms(intervals: list[list[int]]) -> int:
     # Find minimum rooms using heap or two pointers
     pass`,
       java: `class Solution {

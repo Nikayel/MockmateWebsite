@@ -196,7 +196,7 @@ Each word must be constructed from letters of sequentially adjacent cells, where
       typescript: `function findWords(board: string[][], words: string[]): string[] {
   // Build trie and search using backtracking
 }`,
-      python: `def findWords(board: List[List[str]], words: List[str]) -> List[str]:
+      python: `def findWords(board: list[list[str]], words: list[str]) -> list[str]:
     # Build trie and search using backtracking
     pass`,
       java: `class Solution {
@@ -304,11 +304,11 @@ Implement the AutocompleteSystem class:
   }
 }`,
       python: `class AutocompleteSystem:
-    def __init__(self, sentences: List[str], times: List[int]):
+    def __init__(self, sentences: list[str], times: List[int]):
         # Initialize trie with historical data
         pass
 
-    def input(self, c: str) -> List[str]:
+    def input(self, c: str) -> list[str]:
         # Return top 3 hot sentences for current prefix
         return []`,
     },
@@ -383,7 +383,7 @@ Note that the same word in the dictionary may be reused multiple times in the se
       typescript: `function wordBreak(s: string, wordDict: string[]): boolean {
   // Use trie + DP to check if string can be segmented
 }`,
-      python: `def wordBreak(s: str, wordDict: List[str]) -> bool:
+      python: `def wordBreak(s: str, wordDict: list[str]) -> bool:
     # Use trie + DP to check if string can be segmented
     pass`,
       java: `class Solution {
@@ -476,7 +476,7 @@ Return the sentence after the replacement.`,
       typescript: `function replaceWords(dictionary: string[], sentence: string): string {
   // Build trie from dictionary and replace words
 }`,
-      python: `def replaceWords(dictionary: List[str], sentence: str) -> str:
+      python: `def replaceWords(dictionary: list[str], sentence: str) -> str:
     # Build trie from dictionary and replace words
     pass`,
       java: `class Solution {
