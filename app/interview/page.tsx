@@ -3509,13 +3509,17 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               code,
               language: selectedLanguage,
               elapsedTime,
-              chatMessages: messages.slice(-50),
+              chatMessages: chatMessages.slice(-50),
               interviewerMessages: interviewerMessages.slice(-50),
               testResults: data.results.slice(0, 20).map((r: any) => ({
                 description: r.description || "",
                 passed: r.passed || false,
-                expected: typeof r.expected === "object" ? JSON.stringify(r.expected) : String(r.expected ?? ""),
-                actual: typeof r.actual === "object" ? JSON.stringify(r.actual) : String(r.actual ?? ""),
+                expected:
+                  typeof r.expected === "object"
+                    ? JSON.stringify(r.expected)
+                    : String(r.expected ?? ""),
+                actual:
+                  typeof r.actual === "object" ? JSON.stringify(r.actual) : String(r.actual ?? ""),
               })),
             })
           } catch (markError) {
