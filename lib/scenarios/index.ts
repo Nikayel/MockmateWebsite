@@ -142,6 +142,8 @@ async function loadDSAByPattern(pattern: DSAPattern): Promise<DSAScenario[]> {
       scenarios = dpModule.dpScenarios.filter((s) => s.pattern === pattern)
       break
     case 'heap':
+    case 'heap-priority-queue':
+    case 'priority-queue':
       const heapModule = await import('./dsa/heap')
       scenarios = heapModule.heapScenarios
       break
@@ -195,8 +197,8 @@ async function loadBugFixScenarios(): Promise<BugFixScenario[]> {
     return loadedModules.get('bugfix') as BugFixScenario[]
   }
 
-  const module = await import('./bugfix')
-  const scenarios = module.bugFixScenarios
+  const bugfixModule = await import('./bugfix')
+  const scenarios = bugfixModule.bugFixScenarios
   loadedModules.set('bugfix', scenarios)
   return scenarios
 }
@@ -209,8 +211,8 @@ async function loadSystemDesignScenarios(): Promise<SystemDesignScenario[]> {
     return loadedModules.get('system-design') as SystemDesignScenario[]
   }
 
-  const module = await import('./system-design')
-  const scenarios = module.systemDesignScenarios
+  const systemDesignModule = await import('./system-design')
+  const scenarios = systemDesignModule.systemDesignScenarios
   loadedModules.set('system-design', scenarios)
   return scenarios
 }

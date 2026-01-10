@@ -97,6 +97,45 @@ export const veevaData: CompanyQuestionData = {
     midLevel: "$160k - $220k TC",
     seniorLevel: "$220k - $320k TC",
   },
+
+  coreValues: {
+    principles: [
+      "Do the Right Thing - ethics and compliance matter",
+      "Customer Success - help life sciences succeed",
+      "Employee Success - invest in people",
+      "Speed - move quickly without sacrificing quality",
+    ],
+    behavioralExpectations: [
+      "Demonstrate understanding of life sciences industry",
+      "Show commitment to data integrity and compliance",
+      "Exhibit customer-focused problem solving",
+      "Display strong SQL and database skills",
+      "Show you can work in regulated environments",
+    ],
+    valueKeywords: [
+      "life sciences",
+      "pharma",
+      "compliance",
+      "data integrity",
+      "customer success",
+      "enterprise",
+      "Salesforce",
+    ],
+  },
+
+  engineeringCulture: {
+    philosophy: [
+      "Life sciences and pharma domain expertise valued",
+      "Data integrity and compliance are paramount",
+      "Salesforce platform knowledge is a plus",
+      "Enterprise software experience preferred",
+      "Work-life balance focused culture",
+    ],
+    techStack: ["Java", "Python", "JavaScript/React", "Salesforce", "AWS", "PostgreSQL"],
+    codeReviewStyle: "thorough reviews with compliance focus",
+    deploymentPhilosophy: "careful staged deployments with validation",
+    documentationExpectations: "comprehensive documentation for regulatory compliance",
+  },
 }
 
 export const doordashData: CompanyQuestionData = {
@@ -197,6 +236,47 @@ export const doordashData: CompanyQuestionData = {
     midLevel: "$200k - $300k TC",
     seniorLevel: "$320k - $450k TC",
   },
+
+  coreValues: {
+    principles: [
+      "Be Customer Obsessed - put customers first",
+      "Be an Owner - act like the company is yours",
+      "Make Room at the Table - diverse perspectives matter",
+      "Default to Transparency - share information openly",
+      "Operate with Grit - persevere through challenges",
+      "One Team, One Fight - work together",
+    ],
+    behavioralExpectations: [
+      "Demonstrate customer-first thinking in decisions",
+      "Show ownership mentality and accountability",
+      "Exhibit resilience and ability to overcome obstacles",
+      "Display collaborative and inclusive behavior",
+      "Show passion for logistics and efficiency",
+    ],
+    valueKeywords: [
+      "customer obsessed",
+      "ownership",
+      "transparency",
+      "grit",
+      "logistics",
+      "delivery",
+      "marketplace",
+    ],
+  },
+
+  engineeringCulture: {
+    philosophy: [
+      "Real-time delivery systems at scale",
+      "Marketplace dynamics - supply and demand",
+      "Graph and optimization algorithms are core",
+      "Fast-paced startup culture",
+      "Data-driven decision making",
+    ],
+    techStack: ["Kotlin", "Python", "Go", "React Native", "Kubernetes", "PostgreSQL", "Redis"],
+    codeReviewStyle: "fast reviews focused on shipping",
+    deploymentPhilosophy: "continuous deployment with feature flags",
+    documentationExpectations: "documentation for critical systems and APIs",
+  },
 }
 
 export const instacartData: CompanyQuestionData = {
@@ -290,6 +370,46 @@ export const instacartData: CompanyQuestionData = {
     entryLevel: "$140k - $170k TC",
     midLevel: "$180k - $280k TC",
     seniorLevel: "$300k - $420k TC",
+  },
+
+  coreValues: {
+    principles: [
+      "Customers First - shoppers and retailers are our priority",
+      "Move Fast - iterate quickly and learn",
+      "Act Like an Owner - take responsibility",
+      "Do More With Less - be resourceful",
+      "Give a Damn - care about quality and impact",
+    ],
+    behavioralExpectations: [
+      "Demonstrate customer-centric thinking",
+      "Show resourcefulness and creative problem-solving",
+      "Exhibit ownership and accountability",
+      "Display passion for retail/grocery domain",
+      "Show you can work in fast-paced environment",
+    ],
+    valueKeywords: [
+      "customers first",
+      "grocery",
+      "retail",
+      "ownership",
+      "fast",
+      "logistics",
+      "routing",
+    ],
+  },
+
+  engineeringCulture: {
+    philosophy: [
+      "Grocery and retail domain focus",
+      "Routing and optimization problems",
+      "Real-time inventory and pricing systems",
+      "Customer-centric approach to engineering",
+      "Moderate pace compared to pure startups",
+    ],
+    techStack: ["Python", "Go", "React", "PostgreSQL", "Kubernetes", "AWS"],
+    codeReviewStyle: "collaborative reviews with focus on quality",
+    deploymentPhilosophy: "continuous deployment with testing",
+    documentationExpectations: "documentation for services and APIs",
   },
 }
 
@@ -407,6 +527,46 @@ export const robinhoodData: CompanyQuestionData = {
     midLevel: "$200k - $320k TC",
     seniorLevel: "$350k - $500k TC",
   },
+
+  coreValues: {
+    principles: [
+      "Safety First - protect customers and their money",
+      "Participation is Power - democratize finance",
+      "Customers Come First - make investing accessible",
+      "Radical Customer Focus - obsess over user experience",
+      "First Principles Thinking - question assumptions",
+    ],
+    behavioralExpectations: [
+      "Demonstrate passion for democratizing finance",
+      "Show understanding of financial markets and trading",
+      "Exhibit strong focus on security and reliability",
+      "Display customer-centric problem solving",
+      "Show you can work under regulatory constraints",
+    ],
+    valueKeywords: [
+      "democratize",
+      "finance",
+      "trading",
+      "security",
+      "customer focus",
+      "first principles",
+      "accessibility",
+    ],
+  },
+
+  engineeringCulture: {
+    philosophy: [
+      "Fintech and trading domain focus",
+      "Real-time data processing at scale",
+      "Security and compliance are critical",
+      "High code quality bar",
+      "Mission-driven culture",
+    ],
+    techStack: ["Python", "Go", "Elixir", "React Native", "PostgreSQL", "Kafka", "AWS"],
+    codeReviewStyle: "thorough reviews with security focus",
+    deploymentPhilosophy: "careful staged deployments for financial systems",
+    documentationExpectations: "comprehensive documentation for compliance",
+  },
 }
 
 export const squareData: CompanyQuestionData = {
@@ -504,6 +664,46 @@ export const squareData: CompanyQuestionData = {
     entryLevel: "$140k - $170k TC",
     midLevel: "$190k - $300k TC",
     seniorLevel: "$320k - $480k TC",
+  },
+
+  coreValues: {
+    principles: [
+      "Inclusion - economic empowerment for all",
+      "Purpose - build products that matter",
+      "Discipline - do more with less",
+      "Collaboration - work together effectively",
+      "Excellence - strive for the highest quality",
+    ],
+    behavioralExpectations: [
+      "Demonstrate passion for economic empowerment",
+      "Show understanding of payments and fintech",
+      "Exhibit reliability and fault tolerance mindset",
+      "Display customer-focused problem solving",
+      "Show you can work across multiple products/domains",
+    ],
+    valueKeywords: [
+      "economic empowerment",
+      "payments",
+      "fintech",
+      "inclusion",
+      "reliability",
+      "purpose",
+      "discipline",
+    ],
+  },
+
+  engineeringCulture: {
+    philosophy: [
+      "Payments and fintech expertise",
+      "Multiple products - Square, Cash App, Bitcoin",
+      "Reliability and fault tolerance paramount",
+      "Economic empowerment mission",
+      "Mobile-first for many products",
+    ],
+    techStack: ["Java", "Kotlin", "Ruby", "Go", "React", "MySQL", "Kubernetes"],
+    codeReviewStyle: "thorough reviews focused on reliability",
+    deploymentPhilosophy: "staged rollouts with extensive testing",
+    documentationExpectations: "comprehensive documentation for payment flows",
   },
 }
 
@@ -608,6 +808,46 @@ export const figmaData: CompanyQuestionData = {
     entryLevel: "$150k - $180k TC",
     midLevel: "$200k - $320k TC",
     seniorLevel: "$350k - $500k TC",
+  },
+
+  coreValues: {
+    principles: [
+      "Play as a Team - collaboration over competition",
+      "Run with It - ownership and initiative",
+      "Make it Happen - resourcefulness and execution",
+      "Build for Everyone - accessibility and inclusion",
+      "Grow - continuous learning and improvement",
+    ],
+    behavioralExpectations: [
+      "Demonstrate collaborative and team-oriented mindset",
+      "Show passion for design and creative tools",
+      "Exhibit understanding of real-time collaboration challenges",
+      "Display strong problem-solving with complex systems",
+      "Show you value accessibility and inclusive design",
+    ],
+    valueKeywords: [
+      "design",
+      "collaboration",
+      "real-time",
+      "accessibility",
+      "growth",
+      "team",
+      "creative tools",
+    ],
+  },
+
+  engineeringCulture: {
+    philosophy: [
+      "Design tools domain focus",
+      "Real-time collaboration is the core challenge",
+      "CRDTs and operational transformation knowledge valued",
+      "Graph problems are common (design = graph)",
+      "Strong design sensibility expected",
+    ],
+    techStack: ["TypeScript", "C++", "WebGL", "React", "PostgreSQL", "Redis"],
+    codeReviewStyle: "collaborative reviews with design considerations",
+    deploymentPhilosophy: "continuous deployment with careful testing",
+    documentationExpectations: "documentation for complex systems and APIs",
   },
 }
 

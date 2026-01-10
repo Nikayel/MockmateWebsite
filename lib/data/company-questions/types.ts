@@ -107,6 +107,22 @@ export interface CompanyQuestionData {
     midLevel: string
     seniorLevel: string
   }
+
+  // Core values and leadership principles (for RAG context during interviews)
+  coreValues?: {
+    principles: string[] // Key leadership principles or cultural values
+    behavioralExpectations: string[] // What they look for in behavioral interviews
+    valueKeywords: string[] // Keywords that resonate with the company
+  }
+
+  // Engineering culture and technical philosophy
+  engineeringCulture?: {
+    philosophy: string[] // How they approach engineering
+    techStack: string[] // Primary technologies
+    codeReviewStyle: string // e.g., "thorough", "async", "pair programming"
+    deploymentPhilosophy: string // e.g., "continuous deployment", "weekly releases"
+    documentationExpectations: string // e.g., "design docs required", "minimal"
+  }
 }
 
 export interface UserRoadmapAssessment {

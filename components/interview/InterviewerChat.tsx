@@ -1,11 +1,90 @@
 "use client"
 
-import { useRef, useEffect, useState } from "react"
-import { Brain, User, MessageSquare, Send, Mic, MicOff } from "lucide-react"
+import { useRef, useEffect, useState, useCallback } from "react"
+import { Brain, User, MessageSquare, Send, Mic, MicOff, ChevronDown } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useInterviewStore, type ChatMessage } from "@/lib/stores"
+
+/**
+ * Smart Auto-Scroll Hook
+ * Research-based UX implementation:
+ * - Preserves user's reading position when scrolled up (respects user intent)
+ * - Auto-scrolls only when user is near bottom (within threshold)
+ * - Shows indicator for new messages when scrolled up
+ * - Smooth scroll behavior for better UX
+ *
+ * Sources: NN/G Chat UX Guidelines, Slack/Discord scroll behavior patterns
+ */
+function useSmartScroll(dependencies: any[]) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const endRef = useRef<HTMLDivElement>(null)
+  const [isAtBottom, setIsAtBottom] = useState(true)
+  const [hasNewMessages, setHasNewMessages] = useState(false)
+  const userScrolledRef = useRef(false)
+  const lastMessageCountRef = useRef(0)
+
+  // Threshold in pixels - user is considered "at bottom" if within this distance
+  const SCROLL_THRESHOLD = 100
+
+  const checkIfAtBottom = useCallback(() => {
+    if (!containerRef.current) return true
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current
+    return scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD
+  }, [])
+
+  const handleScroll = useCallback(() => {
+    const atBottom = checkIfAtBottom()
+    setIsAtBottom(atBottom)
+
+    // If user scrolled to bottom manually, clear new message indicator
+    if (atBottom) {
+      setHasNewMessages(false)
+      userScrolledRef.current = false
+    } else {
+      userScrolledRef.current = true
+    }
+  }, [checkIfAtBottom])
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    if (endRef.current) {
+      endRef.current.scrollIntoView({ behavior, block: "end" })
+      setHasNewMessages(false)
+      userScrolledRef.current = false
+      setIsAtBottom(true)
+    }
+  }, [])
+
+  // Auto-scroll effect
+  useEffect(() => {
+    const messageCount = dependencies[0]?.length || 0
+    const hasNewContent = messageCount > lastMessageCountRef.current
+    lastMessageCountRef.current = messageCount
+
+    if (!containerRef.current) return
+
+    // Auto-scroll if user is at bottom or hasn't scrolled up
+    if (isAtBottom || !userScrolledRef.current) {
+      // Use requestAnimationFrame for smoother scroll after DOM update
+      requestAnimationFrame(() => {
+        scrollToBottom("smooth")
+      })
+    } else if (hasNewContent) {
+      // User is scrolled up and there are new messages
+      setHasNewMessages(true)
+    }
+  }, dependencies)
+
+  return {
+    containerRef,
+    endRef,
+    isAtBottom,
+    hasNewMessages,
+    scrollToBottom,
+    handleScroll,
+  }
+}
 
 // Sable thinking messages - creative status indicators like Claude Code
 const SABLE_THINKING_MESSAGES = [
@@ -36,7 +115,6 @@ export function InterviewerChat({
   inputValue,
   onInputChange,
 }: InterviewerChatProps) {
-  const chatEndRef = useRef<HTMLDivElement>(null)
   const {
     interviewerMessages,
     isInterviewStarted,
@@ -45,10 +123,21 @@ export function InterviewerChat({
     isGeneratingDiscussion,
   } = useInterviewStore()
 
+  // Smart auto-scroll with user scroll position tracking
+  // Dependencies: messages, loading state, recording state (for STT updates)
+  const {
+    containerRef: chatContainerRef,
+    endRef: chatEndRef,
+    isAtBottom,
+    hasNewMessages,
+    scrollToBottom,
+    handleScroll,
+  } = useSmartScroll([interviewerMessages, isLoadingInterviewer, isGeneratingDiscussion, isRecording])
+
   // Rotating thinking message
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0)
 
-  // Rotate thinking messages every 2 seconds when AI is loading
+  // Rotate thinking messages every 2.5 seconds when AI is loading
   useEffect(() => {
     if (isLoadingInterviewer || isGeneratingDiscussion) {
       // Start with a random message
@@ -62,12 +151,13 @@ export function InterviewerChat({
     }
   }, [isLoadingInterviewer, isGeneratingDiscussion])
 
-  // Auto-scroll chat
+  // Auto-scroll when AI starts/stops responding (loading state changes)
   useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" })
+    if (isLoadingInterviewer || isGeneratingDiscussion) {
+      // When AI starts responding, scroll to show the thinking indicator
+      scrollToBottom("smooth")
     }
-  }, [interviewerMessages])
+  }, [isLoadingInterviewer, isGeneratingDiscussion, scrollToBottom])
 
   const handleSubmit = async () => {
     if (inputValue.trim() && !isLoadingInterviewer) {
@@ -96,13 +186,17 @@ export function InterviewerChat({
         </CardTitle>
       </CardHeader>
       <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
-        <div
-          className="mb-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-2"
-          role="log"
-          aria-label="Interview chat messages"
-          aria-live="polite"
-          aria-relevant="additions"
-        >
+        {/* Chat messages container with smart scroll */}
+        <div className="relative mb-2 min-h-0 flex-1">
+          <div
+            ref={chatContainerRef}
+            onScroll={handleScroll}
+            className="absolute inset-0 space-y-2 overflow-y-auto pr-2 scroll-smooth"
+            role="log"
+            aria-label="Interview chat messages"
+            aria-live="polite"
+            aria-relevant="additions"
+          >
           {interviewerMessages.length === 0 ? (
             <div className="py-8 text-center text-gray-400">
               <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
@@ -163,6 +257,18 @@ export function InterviewerChat({
               )}
               <div ref={chatEndRef} />
             </>
+          )}
+          </div>
+          {/* Scroll to bottom button - appears when user scrolls up and new messages arrive */}
+          {(hasNewMessages || !isAtBottom) && interviewerMessages.length > 0 && (
+            <button
+              onClick={() => scrollToBottom("smooth")}
+              className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-gray-600 bg-gray-800/95 px-3 py-1.5 text-xs text-gray-300 shadow-lg backdrop-blur-sm transition-all hover:bg-gray-700 hover:text-white"
+              aria-label="Scroll to latest messages"
+            >
+              <ChevronDown className="h-3 w-3" />
+              {hasNewMessages ? "New messages" : "Scroll to bottom"}
+            </button>
           )}
         </div>
         {(isInterviewStarted || showPostInterviewDiscussion) && (
@@ -236,8 +342,17 @@ export function AIChatPartner({
   inputValue,
   onInputChange,
 }: AIChatPartnerProps) {
-  const chatEndRef = useRef<HTMLDivElement>(null)
   const { chatMessages, isLoadingChat } = useInterviewStore()
+
+  // Smart auto-scroll with user scroll position tracking
+  const {
+    containerRef: chatContainerRef,
+    endRef: chatEndRef,
+    isAtBottom,
+    hasNewMessages,
+    scrollToBottom,
+    handleScroll,
+  } = useSmartScroll([chatMessages, isLoadingChat, isRecording])
 
   // Rotating thinking message
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0)
@@ -256,12 +371,12 @@ export function AIChatPartner({
     }
   }, [isLoadingChat])
 
-  // Auto-scroll chat
+  // Auto-scroll when AI starts responding
   useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" })
+    if (isLoadingChat) {
+      scrollToBottom("smooth")
     }
-  }, [chatMessages])
+  }, [isLoadingChat, scrollToBottom])
 
   const handleSubmit = async () => {
     if (inputValue.trim() && !isLoadingChat) {
@@ -282,7 +397,13 @@ export function AIChatPartner({
         <Brain className="h-3 w-3 text-[#00d9ff]" />
         <span className="text-xs font-medium text-white">AI Partner</span>
       </div>
-      <div className="mb-2 min-h-0 flex-1 space-y-1 overflow-y-auto rounded bg-gray-800/30 p-2">
+      {/* Chat container with smart scroll */}
+      <div className="relative mb-2 min-h-0 flex-1">
+        <div
+          ref={chatContainerRef}
+          onScroll={handleScroll}
+          className="absolute inset-0 space-y-1 overflow-y-auto rounded bg-gray-800/30 p-2 scroll-smooth"
+        >
         {chatMessages.map((msg, index) => (
           <div
             key={`chat-${msg.type}-${index}`}
@@ -333,6 +454,18 @@ export function AIChatPartner({
           </div>
         )}
         <div ref={chatEndRef} />
+        </div>
+        {/* Scroll to bottom button for AI Partner */}
+        {(hasNewMessages || !isAtBottom) && chatMessages.length > 0 && (
+          <button
+            onClick={() => scrollToBottom("smooth")}
+            className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-gray-600 bg-gray-700/95 px-2 py-1 text-xs text-gray-300 shadow-lg backdrop-blur-sm transition-all hover:bg-gray-600 hover:text-white"
+            aria-label="Scroll to latest messages"
+          >
+            <ChevronDown className="h-2.5 w-2.5" />
+            {hasNewMessages ? "New" : "Bottom"}
+          </button>
+        )}
       </div>
       <div className="flex flex-shrink-0 space-x-1">
         <Input

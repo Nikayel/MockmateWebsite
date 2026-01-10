@@ -493,19 +493,27 @@ function InterviewPageContent() {
     }
   }, [isInterviewStarted, selectedScenario, currentSessionId])
 
-  // Warn user before leaving page during active interview
+  // Warn user before leaving page during active interview or while feedback is generating
   useEffect(() => {
-    if (!isInterviewStarted || showFeedback) return
+    // Keep warning active if:
+    // 1. Interview is in progress and feedback not shown yet
+    // 2. OR we're generating discussion (feedback is being evaluated)
+    const shouldWarn = (isInterviewStarted && !showFeedback) || isGeneratingDiscussion
+
+    if (!shouldWarn) return
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault()
-      e.returnValue = "You have an active interview session. Are you sure you want to leave?"
-      return e.returnValue
+      const message = isGeneratingDiscussion
+        ? "Your solution is being evaluated. Are you sure you want to leave?"
+        : "You have an active interview session. Are you sure you want to leave?"
+      e.returnValue = message
+      return message
     }
 
     window.addEventListener("beforeunload", handleBeforeUnload)
     return () => window.removeEventListener("beforeunload", handleBeforeUnload)
-  }, [isInterviewStarted, showFeedback])
+  }, [isInterviewStarted, showFeedback, isGeneratingDiscussion])
 
   // Separate effect to handle auth check with delay to prevent race condition on refresh
   useEffect(() => {
@@ -3493,6 +3501,29 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           markQuestionEvaluating(selectedScenario.id)
         }
 
+        // Mark session as evaluating IMMEDIATELY after submit (before post-interview chat)
+        // This ensures if user leaves during post-interview discussion, session shows as "evaluating"
+        if (currentSessionId && user) {
+          try {
+            await markSessionEvaluating(currentSessionId, {
+              code,
+              language: selectedLanguage,
+              elapsedTime,
+              chatMessages: messages.slice(-50),
+              interviewerMessages: interviewerMessages.slice(-50),
+              testResults: data.results.slice(0, 20).map((r: any) => ({
+                description: r.description || "",
+                passed: r.passed || false,
+                expected: typeof r.expected === "object" ? JSON.stringify(r.expected) : String(r.expected ?? ""),
+                actual: typeof r.actual === "object" ? JSON.stringify(r.actual) : String(r.actual ?? ""),
+              })),
+            })
+          } catch (markError) {
+            console.error("Failed to mark session as evaluating:", markError)
+            // Continue anyway - non-critical
+          }
+        }
+
         // Proceed to post-interview discussion
         setIsRunningTests(false)
         setShowPostInterviewDiscussion(true)
@@ -4170,7 +4201,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3">
                       <div
                         ref={editorContainerRef}
-                        className="relative min-h-0 flex-1 overflow-hidden rounded border border-gray-700"
+                        className="relative min-h-0 flex-1 overflow-auto rounded border border-gray-700"
                       >
                         <ErrorBoundary>
                           <CodeEditor
