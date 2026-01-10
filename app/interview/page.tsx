@@ -493,19 +493,27 @@ function InterviewPageContent() {
     }
   }, [isInterviewStarted, selectedScenario, currentSessionId])
 
-  // Warn user before leaving page during active interview
+  // Warn user before leaving page during active interview or while feedback is generating
   useEffect(() => {
-    if (!isInterviewStarted || showFeedback) return
+    // Keep warning active if:
+    // 1. Interview is in progress and feedback not shown yet
+    // 2. OR we're generating discussion (feedback is being evaluated)
+    const shouldWarn = (isInterviewStarted && !showFeedback) || isGeneratingDiscussion
+
+    if (!shouldWarn) return
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault()
-      e.returnValue = "You have an active interview session. Are you sure you want to leave?"
-      return e.returnValue
+      const message = isGeneratingDiscussion
+        ? "Your solution is being evaluated. Are you sure you want to leave?"
+        : "You have an active interview session. Are you sure you want to leave?"
+      e.returnValue = message
+      return message
     }
 
     window.addEventListener("beforeunload", handleBeforeUnload)
     return () => window.removeEventListener("beforeunload", handleBeforeUnload)
-  }, [isInterviewStarted, showFeedback])
+  }, [isInterviewStarted, showFeedback, isGeneratingDiscussion])
 
   // Separate effect to handle auth check with delay to prevent race condition on refresh
   useEffect(() => {

@@ -528,67 +528,86 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="divide-y divide-zinc-800/50">
-                  {sessions.map((session) => (
-                    <Link
-                      key={session.id}
-                      href={
-                        session.completed_at
-                          ? `/sessions/${session.id}`
-                          : `/interview?session=${session.id}&scenario=${session.scenario_id}`
-                      }
-                      className="flex items-center gap-3 p-3 transition-colors hover:bg-zinc-800/30 sm:p-4"
-                    >
-                      {/* Score indicator */}
-                      <div
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-mono text-sm sm:h-11 sm:w-11 ${
-                          session.performance_score
-                            ? session.performance_score >= 80
-                              ? "bg-emerald-500/10 text-emerald-400"
-                              : session.performance_score >= 60
-                                ? "bg-amber-500/10 text-amber-400"
-                                : "bg-red-500/10 text-red-400"
-                            : !session.completed_at
-                              ? "bg-amber-500/10 text-amber-400"
-                              : "bg-zinc-800 text-zinc-500"
-                        }`}
+                  {sessions.map((session) => {
+                    // Determine session state: completed, evaluating, or in-progress
+                    // Note: Legacy sessions may not have feedback_status, treat completed_at as complete
+                    const isEvaluating = session.feedback_status === "pending"
+                    const isCompleted = session.completed_at && (session.feedback_status === "complete" || !session.feedback_status)
+                    const isInProgress = !session.completed_at && !isEvaluating
+
+                    // Link to session detail if completed or evaluating, otherwise reopen interview
+                    const href =
+                      isCompleted || isEvaluating
+                        ? `/sessions/${session.id}`
+                        : `/interview?session=${session.id}&scenario=${session.scenario_id}`
+
+                    return (
+                      <Link
+                        key={session.id}
+                        href={href}
+                        className="flex items-center gap-3 p-3 transition-colors hover:bg-zinc-800/30 sm:p-4"
                       >
-                        {session.performance_score
-                          ? Math.round(session.performance_score)
-                          : !session.completed_at
-                            ? "..."
-                            : "—"}
-                      </div>
-
-                      {/* Content */}
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-0.5 flex items-center gap-2">
-                          <span className="truncate text-sm font-medium text-white">
-                            {session.topic}
-                          </span>
-                          <span
-                            className={`text-[10px] tracking-wider uppercase ${getDifficultyStyle(session.difficulty)}`}
-                          >
-                            {session.difficulty}
-                          </span>
+                        {/* Score indicator */}
+                        <div
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-mono text-sm sm:h-11 sm:w-11 ${
+                            session.performance_score
+                              ? session.performance_score >= 80
+                                ? "bg-emerald-500/10 text-emerald-400"
+                                : session.performance_score >= 60
+                                  ? "bg-amber-500/10 text-amber-400"
+                                  : "bg-red-500/10 text-red-400"
+                              : isEvaluating
+                                ? "bg-blue-500/10 text-blue-400"
+                                : isInProgress
+                                  ? "bg-amber-500/10 text-amber-400"
+                                  : "bg-zinc-800 text-zinc-500"
+                          }`}
+                        >
+                          {session.performance_score
+                            ? Math.round(session.performance_score)
+                            : isEvaluating
+                              ? "⏳"
+                              : isInProgress
+                                ? "..."
+                                : "—"}
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-zinc-500">
-                          <span>
-                            {new Date(session.started_at).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })}
-                          </span>
-                          {!session.completed_at && (
-                            <Badge className="border-0 bg-amber-500/10 px-1.5 py-0 text-[10px] text-amber-400">
-                              In Progress
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
 
-                      <ChevronRight className="h-4 w-4 shrink-0 text-zinc-600" />
-                    </Link>
-                  ))}
+                        {/* Content */}
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-0.5 flex items-center gap-2">
+                            <span className="truncate text-sm font-medium text-white">
+                              {session.topic}
+                            </span>
+                            <span
+                              className={`text-[10px] tracking-wider uppercase ${getDifficultyStyle(session.difficulty)}`}
+                            >
+                              {session.difficulty}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-zinc-500">
+                            <span>
+                              {new Date(session.started_at).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                              })}
+                            </span>
+                            {isEvaluating && (
+                              <Badge className="border-0 bg-blue-500/10 px-1.5 py-0 text-[10px] text-blue-400">
+                                Evaluating
+                              </Badge>
+                            )}
+                            {isInProgress && (
+                              <Badge className="border-0 bg-amber-500/10 px-1.5 py-0 text-[10px] text-amber-400">
+                                In Progress
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        <ChevronRight className="h-4 w-4 shrink-0 text-zinc-600" />
+                      </Link>
+                    )
+                  })}
                 </div>
               )}
             </div>

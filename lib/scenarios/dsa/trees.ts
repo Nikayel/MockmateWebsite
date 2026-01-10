@@ -489,7 +489,7 @@ A height-balanced binary tree is a binary tree in which the depth of the two sub
       typescript: `function rightSideView(root: TreeNode | null): number[] {
   // Return nodes visible from right side
 }`,
-      python: `def rightSideView(root: Optional[TreeNode]) -> List[int]:
+      python: `def rightSideView(root: Optional[TreeNode]) -> list[int]:
     # Return nodes visible from right side
     pass`,
       java: `class Solution {
@@ -642,7 +642,7 @@ Return the number of good nodes in the binary tree.`,
       typescript: `function buildTree(preorder: number[], inorder: number[]): TreeNode | null {
   // Build tree from traversals
 }`,
-      python: `def buildTree(preorder: List[int], inorder: List[int]) -> Optional[TreeNode]:
+      python: `def buildTree(preorder: list[int], inorder: list[int]) -> Optional[TreeNode]:
     # Build tree from traversals
     pass`,
       java: `class Solution {
@@ -927,7 +927,7 @@ According to the definition of LCA on Wikipedia: "The lowest common ancestor is 
       typescript: `function levelOrder(root: TreeNode | null): number[][] {
   // Use BFS to traverse level by level
 }`,
-      python: `def levelOrder(root: Optional[TreeNode]) -> List[List[int]]:
+      python: `def levelOrder(root: Optional[TreeNode]) -> list[list[int]]:
     # Use BFS to traverse level by level
     pass`,
       java: `class Solution {
