@@ -78,6 +78,7 @@ export interface DSAScenario extends BaseScenario {
     input: any
     expected: any
     description: string
+    compareAsSet?: boolean
   }[]
 }
 
@@ -101,6 +102,7 @@ export interface BugFixScenario extends BaseScenario {
     input: any
     expected: any
     description: string
+    compareAsSet?: boolean
   }[]
 }
 

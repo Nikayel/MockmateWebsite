@@ -13,29 +13,30 @@
  * NOTE: All scenarios use pure JavaScript/Python for sandbox testability.
  */
 
-import type { BaseScenario } from './scenarios';
+import type { BaseScenario } from "./scenarios"
 
 export interface AddFunctionalityScenario extends BaseScenario {
-  type: 'add-functionality';
-  problemStatement: string;
-  featureRequirements: string[];
+  type: "add-functionality"
+  problemStatement: string
+  featureRequirements: string[]
   existingCode: {
-    [language: string]: string;
-  };
+    [language: string]: string
+  }
   codebaseFiles: {
     [language: string]: {
-      fileName: string;
-      content: string;
-      description: string;
-    }[];
-  };
-  hints: string[];
+      fileName: string
+      content: string
+      description: string
+    }[]
+  }
+  hints: string[]
   testCases: {
-    input: any;
-    expected: any;
-    description: string;
-  }[];
-  acceptanceCriteria: string[];
+    input: any
+    expected: any
+    description: string
+    compareAsSet?: boolean
+  }[]
+  acceptanceCriteria: string[]
 }
 
 // =============================================================================
@@ -47,13 +48,14 @@ export const addFunctionalityScenarios: AddFunctionalityScenario[] = [
   // SCENARIO 1: Trie-based Autocomplete with Ranking
   // ============================================================================
   {
-    id: 'add-feature-autocomplete-trie',
-    title: 'Add Ranking to Autocomplete System',
-    type: 'add-functionality',
-    difficulty: 'medium',
-    companies: ['Google', 'Amazon', 'Meta', 'Microsoft'],
-    description: 'Implement ranked autocomplete suggestions using a Trie data structure with frequency-based ranking',
-    tags: ['trie', 'data-structures', 'algorithms', 'search'],
+    id: "add-feature-autocomplete-trie",
+    title: "Add Ranking to Autocomplete System",
+    type: "add-functionality",
+    difficulty: "medium",
+    companies: ["Google", "Amazon", "Meta", "Microsoft"],
+    description:
+      "Implement ranked autocomplete suggestions using a Trie data structure with frequency-based ranking",
+    tags: ["trie", "data-structures", "algorithms", "search"],
     estimatedTime: 35,
     problemStatement: `You're building an autocomplete system for a search engine. The existing Trie supports basic prefix search, but users want suggestions ranked by popularity.
 
@@ -65,11 +67,11 @@ export const addFunctionalityScenarios: AddFunctionalityScenario[] = [
 
 **Context:** This autocomplete powers a search bar with millions of queries. Ranking quality directly impacts user experience.`,
     featureRequirements: [
-      'insert(word) - insert word and track frequency',
-      'search(word) - search and increment frequency if found',
-      'getSuggestions(prefix, k) - return top K suggestions by frequency',
-      'Handle ties by alphabetical order',
-      'Efficient prefix traversal using the Trie structure',
+      "insert(word) - insert word and track frequency",
+      "search(word) - search and increment frequency if found",
+      "getSuggestions(prefix, k) - return top K suggestions by frequency",
+      "Handle ties by alphabetical order",
+      "Efficient prefix traversal using the Trie structure",
     ],
     existingCode: {
       javascript: `// autocomplete.js - Trie-based autocomplete system
@@ -292,7 +294,7 @@ def test_autocomplete(operations):
     codebaseFiles: {
       javascript: [
         {
-          fileName: 'utils/stringUtils.js',
+          fileName: "utils/stringUtils.js",
           content: `// String utilities for autocomplete
 // Use these helpers in your implementation
 
@@ -319,10 +321,10 @@ function sortByFrequencyThenAlpha(items) {
 }
 
 module.exports = { compareAlphabetically, sortByFrequencyThenAlpha };`,
-          description: 'String utilities - use sortByFrequencyThenAlpha for ranking suggestions',
+          description: "String utilities - use sortByFrequencyThenAlpha for ranking suggestions",
         },
         {
-          fileName: 'data/sampleQueries.js',
+          fileName: "data/sampleQueries.js",
           content: `// Sample queries showing expected behavior
 // Use this to understand the ranking logic
 
@@ -353,12 +355,12 @@ const sampleData = {
 };
 
 module.exports = sampleData;`,
-          description: 'Sample data showing expected ranking behavior',
+          description: "Sample data showing expected ranking behavior",
         },
       ],
       python: [
         {
-          fileName: 'utils/string_utils.py',
+          fileName: "utils/string_utils.py",
           content: `# String utilities for autocomplete
 # Use these helpers in your implementation
 
@@ -379,74 +381,80 @@ def sort_by_frequency_then_alpha(items):
     Returns: Sorted list
     """
     return sorted(items, key=lambda x: (-x['frequency'], x['word']))`,
-          description: 'String utilities - use sort_by_frequency_then_alpha for ranking',
+          description: "String utilities - use sort_by_frequency_then_alpha for ranking",
         },
       ],
     },
     hints: [
-      'Increment frequency in insert() when node.isEndOfWord is already true',
-      'Also increment frequency in search() when the word is found',
-      'Use _findPrefixNode() to navigate to the prefix, then _collectWords()',
-      'Sort collected words using the utility function, then slice top k',
-      'Remember to handle the case where prefix doesn\'t exist (return empty array)',
+      "Increment frequency in insert() when node.isEndOfWord is already true",
+      "Also increment frequency in search() when the word is found",
+      "Use _findPrefixNode() to navigate to the prefix, then _collectWords()",
+      "Sort collected words using the utility function, then slice top k",
+      "Remember to handle the case where prefix doesn't exist (return empty array)",
     ],
     testCases: [
       {
-        input: { operations: [
-          { type: 'insert', word: 'apple' },
-          { type: 'insert', word: 'app' },
-          { type: 'insert', word: 'application' },
-          { type: 'suggest', prefix: 'app', k: 3 }
-        ]},
+        input: {
+          operations: [
+            { type: "insert", word: "apple" },
+            { type: "insert", word: "app" },
+            { type: "insert", word: "application" },
+            { type: "suggest", prefix: "app", k: 3 },
+          ],
+        },
         expected: [
-          { type: 'insert', word: 'apple' },
-          { type: 'insert', word: 'app' },
-          { type: 'insert', word: 'application' },
-          { type: 'suggest', prefix: 'app', suggestions: ['app', 'apple', 'application'] }
+          { type: "insert", word: "apple" },
+          { type: "insert", word: "app" },
+          { type: "insert", word: "application" },
+          { type: "suggest", prefix: "app", suggestions: ["app", "apple", "application"] },
         ],
-        description: 'Basic suggestions sorted alphabetically (same frequency)',
+        description: "Basic suggestions sorted alphabetically (same frequency)",
       },
       {
-        input: { operations: [
-          { type: 'insert', word: 'car' },
-          { type: 'insert', word: 'car' },
-          { type: 'insert', word: 'car' },
-          { type: 'insert', word: 'cat' },
-          { type: 'suggest', prefix: 'ca', k: 2 }
-        ]},
+        input: {
+          operations: [
+            { type: "insert", word: "car" },
+            { type: "insert", word: "car" },
+            { type: "insert", word: "car" },
+            { type: "insert", word: "cat" },
+            { type: "suggest", prefix: "ca", k: 2 },
+          ],
+        },
         expected: [
-          { type: 'insert', word: 'car' },
-          { type: 'insert', word: 'car' },
-          { type: 'insert', word: 'car' },
-          { type: 'insert', word: 'cat' },
-          { type: 'suggest', prefix: 'ca', suggestions: ['car', 'cat'] }
+          { type: "insert", word: "car" },
+          { type: "insert", word: "car" },
+          { type: "insert", word: "car" },
+          { type: "insert", word: "cat" },
+          { type: "suggest", prefix: "ca", suggestions: ["car", "cat"] },
         ],
-        description: 'Frequency ranking - car (freq 3) before cat (freq 1)',
+        description: "Frequency ranking - car (freq 3) before cat (freq 1)",
       },
       {
-        input: { operations: [
-          { type: 'insert', word: 'test' },
-          { type: 'search', word: 'test' },
-          { type: 'search', word: 'test' },
-          { type: 'insert', word: 'testing' },
-          { type: 'suggest', prefix: 'test', k: 2 }
-        ]},
+        input: {
+          operations: [
+            { type: "insert", word: "test" },
+            { type: "search", word: "test" },
+            { type: "search", word: "test" },
+            { type: "insert", word: "testing" },
+            { type: "suggest", prefix: "test", k: 2 },
+          ],
+        },
         expected: [
-          { type: 'insert', word: 'test' },
-          { type: 'search', word: 'test', found: true },
-          { type: 'search', word: 'test', found: true },
-          { type: 'insert', word: 'testing' },
-          { type: 'suggest', prefix: 'test', suggestions: ['test', 'testing'] }
+          { type: "insert", word: "test" },
+          { type: "search", word: "test", found: true },
+          { type: "search", word: "test", found: true },
+          { type: "insert", word: "testing" },
+          { type: "suggest", prefix: "test", suggestions: ["test", "testing"] },
         ],
-        description: 'Search increments frequency - test (3) before testing (1)',
+        description: "Search increments frequency - test (3) before testing (1)",
       },
     ],
     acceptanceCriteria: [
-      'Insert increments frequency for existing words',
-      'Search increments frequency for found words',
-      'Suggestions are ranked by frequency (descending)',
-      'Ties are broken alphabetically',
-      'Returns at most k suggestions',
+      "Insert increments frequency for existing words",
+      "Search increments frequency for found words",
+      "Suggestions are ranked by frequency (descending)",
+      "Ties are broken alphabetically",
+      "Returns at most k suggestions",
     ],
   },
 
@@ -454,13 +462,14 @@ def sort_by_frequency_then_alpha(items):
   // SCENARIO 2: State Management with Undo/Redo History
   // ============================================================================
   {
-    id: 'add-feature-state-history',
-    title: 'Add Undo/Redo to State Manager',
-    type: 'add-functionality',
-    difficulty: 'hard',
-    companies: ['Google', 'Meta', 'Notion', 'Figma', 'Microsoft'],
-    description: 'Implement undo/redo functionality for a state management system using the Command pattern',
-    tags: ['design-patterns', 'state-management', 'command-pattern'],
+    id: "add-feature-state-history",
+    title: "Add Undo/Redo to State Manager",
+    type: "add-functionality",
+    difficulty: "hard",
+    companies: ["Google", "Meta", "Notion", "Figma", "Microsoft"],
+    description:
+      "Implement undo/redo functionality for a state management system using the Command pattern",
+    tags: ["design-patterns", "state-management", "command-pattern"],
     estimatedTime: 40,
     problemStatement: `You're building a state management library (like Redux). Users want undo/redo capability for their application state.
 
@@ -472,12 +481,12 @@ def sort_by_frequency_then_alpha(items):
 
 **Context:** This state manager is used in a collaborative design tool. Undo/redo is critical for user experience.`,
     featureRequirements: [
-      'setState(newState) - update state and add to history',
-      'undo() - revert to previous state',
-      'redo() - re-apply undone state',
-      'canUndo() / canRedo() - check if operations are possible',
-      'Max history size of 50 states',
-      'Clear redo stack when new state is set',
+      "setState(newState) - update state and add to history",
+      "undo() - revert to previous state",
+      "redo() - re-apply undone state",
+      "canUndo() / canRedo() - check if operations are possible",
+      "Max history size of 50 states",
+      "Clear redo stack when new state is set",
     ],
     existingCode: {
       javascript: `// stateManager.js - State management with history
@@ -737,7 +746,7 @@ def test_state_history(operations):
     codebaseFiles: {
       javascript: [
         {
-          fileName: 'utils/deepCopy.js',
+          fileName: "utils/deepCopy.js",
           content: `// Deep copy utility for state management
 // Use this to avoid mutation issues
 
@@ -765,10 +774,10 @@ function deepCopy(obj) {
 }
 
 module.exports = { deepCopy };`,
-          description: 'Deep copy utility - use this when saving state to history stacks',
+          description: "Deep copy utility - use this when saving state to history stacks",
         },
         {
-          fileName: 'docs/historyPattern.md',
+          fileName: "docs/historyPattern.md",
           content: `# Undo/Redo Implementation Pattern
 
 ## History Stack Approach
@@ -803,12 +812,12 @@ The history stack approach is simpler than the Command pattern for state-based s
 ### Memory Management
 Always enforce maxHistory to prevent memory leaks.
 When undoStack.length >= maxHistory, remove the oldest entry (shift).`,
-          description: 'Documentation explaining the history stack pattern for undo/redo',
+          description: "Documentation explaining the history stack pattern for undo/redo",
         },
       ],
       python: [
         {
-          fileName: 'utils/deep_copy.py',
+          fileName: "utils/deep_copy.py",
           content: `# Deep copy utility for state management
 # Use this to avoid mutation issues
 
@@ -822,77 +831,76 @@ def deep_copy(obj):
     Returns: Deep copy
     """
     return copy.deepcopy(obj)`,
-          description: 'Deep copy utility - use this when saving state to history stacks',
+          description: "Deep copy utility - use this when saving state to history stacks",
         },
       ],
     },
     hints: [
-      'Always deep copy state before pushing to stacks to avoid mutation',
-      'In setState(), save current state BEFORE updating it',
-      'Remember to clear redoStack in setState() - new changes invalidate redo',
-      'Check if stacks are non-empty before popping in undo/redo',
-      'For maxHistory, use shift() or pop(0) to remove oldest entries',
+      "Always deep copy state before pushing to stacks to avoid mutation",
+      "In setState(), save current state BEFORE updating it",
+      "Remember to clear redoStack in setState() - new changes invalidate redo",
+      "Check if stacks are non-empty before popping in undo/redo",
+      "For maxHistory, use shift() or pop(0) to remove oldest entries",
     ],
     testCases: [
       {
-        input: { operations: [
-          { type: 'set', state: { count: 1 } },
-          { type: 'set', state: { count: 2 } },
-          { type: 'undo' },
-        ]},
+        input: {
+          operations: [
+            { type: "set", state: { count: 1 } },
+            { type: "set", state: { count: 2 } },
+            { type: "undo" },
+          ],
+        },
         expected: [
-          { type: 'set', state: { count: 1 } },
-          { type: 'set', state: { count: 2 } },
-          { type: 'undo', success: true, state: { count: 1 } }
+          { type: "set", state: { count: 1 } },
+          { type: "set", state: { count: 2 } },
+          { type: "undo", success: true, state: { count: 1 } },
         ],
-        description: 'Basic undo restores previous state',
+        description: "Basic undo restores previous state",
       },
       {
-        input: { operations: [
-          { type: 'set', state: { count: 1 } },
-          { type: 'undo' },
-          { type: 'redo' },
-        ]},
+        input: {
+          operations: [{ type: "set", state: { count: 1 } }, { type: "undo" }, { type: "redo" }],
+        },
         expected: [
-          { type: 'set', state: { count: 1 } },
-          { type: 'undo', success: true, state: { count: 0 } },
-          { type: 'redo', success: true, state: { count: 1 } }
+          { type: "set", state: { count: 1 } },
+          { type: "undo", success: true, state: { count: 0 } },
+          { type: "redo", success: true, state: { count: 1 } },
         ],
-        description: 'Redo restores undone state',
+        description: "Redo restores undone state",
       },
       {
-        input: { operations: [
-          { type: 'set', state: { count: 1 } },
-          { type: 'undo' },
-          { type: 'set', state: { count: 5 } },
-          { type: 'canRedo' },
-        ]},
+        input: {
+          operations: [
+            { type: "set", state: { count: 1 } },
+            { type: "undo" },
+            { type: "set", state: { count: 5 } },
+            { type: "canRedo" },
+          ],
+        },
         expected: [
-          { type: 'set', state: { count: 1 } },
-          { type: 'undo', success: true, state: { count: 0 } },
-          { type: 'set', state: { count: 5 } },
-          { type: 'canRedo', result: false }
+          { type: "set", state: { count: 1 } },
+          { type: "undo", success: true, state: { count: 0 } },
+          { type: "set", state: { count: 5 } },
+          { type: "canRedo", result: false },
         ],
-        description: 'New setState clears redo stack',
+        description: "New setState clears redo stack",
       },
       {
-        input: { operations: [
-          { type: 'canUndo' },
-          { type: 'undo' },
-        ]},
+        input: { operations: [{ type: "canUndo" }, { type: "undo" }] },
         expected: [
-          { type: 'canUndo', result: false },
-          { type: 'undo', success: false, state: { count: 0 } }
+          { type: "canUndo", result: false },
+          { type: "undo", success: false, state: { count: 0 } },
         ],
-        description: 'Cannot undo with empty history',
+        description: "Cannot undo with empty history",
       },
     ],
     acceptanceCriteria: [
-      'Undo reverts to previous state',
-      'Redo restores undone state',
-      'New setState clears redo stack',
-      'canUndo/canRedo return correct values',
-      'Maximum history size is enforced',
+      "Undo reverts to previous state",
+      "Redo restores undone state",
+      "New setState clears redo stack",
+      "canUndo/canRedo return correct values",
+      "Maximum history size is enforced",
     ],
   },
 
@@ -900,13 +908,13 @@ def deep_copy(obj):
   // SCENARIO 3: Event Aggregation System
   // ============================================================================
   {
-    id: 'add-feature-event-aggregator',
-    title: 'Add Grouping to Event Aggregator',
-    type: 'add-functionality',
-    difficulty: 'medium',
-    companies: ['Meta', 'Slack', 'Discord', 'Google'],
-    description: 'Implement event grouping and aggregation for a notification-like system',
-    tags: ['aggregation', 'data-structures', 'events'],
+    id: "add-feature-event-aggregator",
+    title: "Add Grouping to Event Aggregator",
+    type: "add-functionality",
+    difficulty: "medium",
+    companies: ["Meta", "Slack", "Discord", "Google"],
+    description: "Implement event grouping and aggregation for a notification-like system",
+    tags: ["aggregation", "data-structures", "events"],
     estimatedTime: 35,
     problemStatement: `You're building an event aggregation system for a social platform. Events should be grouped when similar (e.g., "John and 3 others liked your post").
 
@@ -918,11 +926,11 @@ def deep_copy(obj):
 
 **Context:** Users receive hundreds of events daily. Grouping improves readability and reduces noise.`,
     featureRequirements: [
-      'addEvent(event) - add event and group with similar events',
-      'getAggregatedEvents(limit) - return grouped events',
-      'Group by type AND targetId within time window (1 hour)',
+      "addEvent(event) - add event and group with similar events",
+      "getAggregatedEvents(limit) - return grouped events",
+      "Group by type AND targetId within time window (1 hour)",
       'Display format: "actor1 and N others [action] your [target]"',
-      'Mark events as read/unread',
+      "Mark events as read/unread",
     ],
     existingCode: {
       javascript: `// eventAggregator.js - Event aggregation system
@@ -1185,7 +1193,7 @@ def test_event_aggregator(operations):
     codebaseFiles: {
       javascript: [
         {
-          fileName: 'utils/groupBy.js',
+          fileName: "utils/groupBy.js",
           content: `// Grouping utilities for event aggregation
 
 /**
@@ -1215,10 +1223,10 @@ function createEventGroupKey(event) {
 }
 
 module.exports = { groupBy, createEventGroupKey };`,
-          description: 'Grouping utilities - use these to group events by type and target',
+          description: "Grouping utilities - use these to group events by type and target",
         },
         {
-          fileName: 'data/sampleEvents.js',
+          fileName: "data/sampleEvents.js",
           content: `// Sample events showing expected grouping behavior
 
 const sampleEvents = [
@@ -1235,12 +1243,12 @@ const sampleEvents = [
 // ]
 
 module.exports = { sampleEvents };`,
-          description: 'Sample events showing expected grouping and formatting',
+          description: "Sample events showing expected grouping and formatting",
         },
       ],
       python: [
         {
-          fileName: 'utils/group_by.py',
+          fileName: "utils/group_by.py",
           content: `# Grouping utilities for event aggregation
 from collections import defaultdict
 
@@ -1263,67 +1271,148 @@ def group_by(items, key_fn):
 def create_event_group_key(event):
     """Create grouping key for events"""
     return f"{event['type']}:{event.get('target_id', event.get('targetId'))}"`,
-          description: 'Grouping utilities - use these to group events by type and target',
+          description: "Grouping utilities - use these to group events by type and target",
         },
       ],
     },
     hints: [
-      'Use createEventGroupKey() to generate consistent keys for grouping',
-      'When adding event, check if group exists with same key AND recent timestamp',
-      'Store actors array in grouped events: { actors: [{id, name}], ... }',
+      "Use createEventGroupKey() to generate consistent keys for grouping",
+      "When adding event, check if group exists with same key AND recent timestamp",
+      "Store actors array in grouped events: { actors: [{id, name}], ... }",
       'Format display: first actor name + "and N others" if multiple actors',
-      'Sort aggregated results by most recent timestamp (descending)',
+      "Sort aggregated results by most recent timestamp (descending)",
     ],
     testCases: [
       {
-        input: { operations: [
-          { type: 'add', event: { type: 'like', actorId: 'u1', actorName: 'John', targetId: 'post1', targetType: 'post' } },
-          { type: 'get', limit: 10 },
-        ]},
+        input: {
+          operations: [
+            {
+              type: "add",
+              event: {
+                type: "like",
+                actorId: "u1",
+                actorName: "John",
+                targetId: "post1",
+                targetType: "post",
+              },
+            },
+            { type: "get", limit: 10 },
+          ],
+        },
         expected: [
-          { type: 'add', eventType: 'like' },
-          { type: 'get', count: 1, events: [{ displayText: 'John liked your post', actorCount: 1, targetId: 'post1' }] }
+          { type: "add", eventType: "like" },
+          {
+            type: "get",
+            count: 1,
+            events: [{ displayText: "John liked your post", actorCount: 1, targetId: "post1" }],
+          },
         ],
-        description: 'Single event displays correctly',
+        description: "Single event displays correctly",
       },
       {
-        input: { operations: [
-          { type: 'add', event: { type: 'like', actorId: 'u1', actorName: 'John', targetId: 'post1', targetType: 'post', timestamp: 1000 } },
-          { type: 'add', event: { type: 'like', actorId: 'u2', actorName: 'Jane', targetId: 'post1', targetType: 'post', timestamp: 1100 } },
-          { type: 'add', event: { type: 'like', actorId: 'u3', actorName: 'Bob', targetId: 'post1', targetType: 'post', timestamp: 1200 } },
-          { type: 'get', limit: 10 },
-        ]},
+        input: {
+          operations: [
+            {
+              type: "add",
+              event: {
+                type: "like",
+                actorId: "u1",
+                actorName: "John",
+                targetId: "post1",
+                targetType: "post",
+                timestamp: 1000,
+              },
+            },
+            {
+              type: "add",
+              event: {
+                type: "like",
+                actorId: "u2",
+                actorName: "Jane",
+                targetId: "post1",
+                targetType: "post",
+                timestamp: 1100,
+              },
+            },
+            {
+              type: "add",
+              event: {
+                type: "like",
+                actorId: "u3",
+                actorName: "Bob",
+                targetId: "post1",
+                targetType: "post",
+                timestamp: 1200,
+              },
+            },
+            { type: "get", limit: 10 },
+          ],
+        },
         expected: [
-          { type: 'add', eventType: 'like' },
-          { type: 'add', eventType: 'like' },
-          { type: 'add', eventType: 'like' },
-          { type: 'get', count: 1, events: [{ displayText: 'John and 2 others liked your post', actorCount: 3, targetId: 'post1' }] }
+          { type: "add", eventType: "like" },
+          { type: "add", eventType: "like" },
+          { type: "add", eventType: "like" },
+          {
+            type: "get",
+            count: 1,
+            events: [
+              {
+                displayText: "John and 2 others liked your post",
+                actorCount: 3,
+                targetId: "post1",
+              },
+            ],
+          },
         ],
-        description: 'Multiple likes on same post are grouped',
+        description: "Multiple likes on same post are grouped",
       },
       {
-        input: { operations: [
-          { type: 'add', event: { type: 'like', actorId: 'u1', actorName: 'John', targetId: 'post1', targetType: 'post' } },
-          { type: 'add', event: { type: 'comment', actorId: 'u2', actorName: 'Jane', targetId: 'post1', targetType: 'post' } },
-          { type: 'get', limit: 10 },
-        ]},
+        input: {
+          operations: [
+            {
+              type: "add",
+              event: {
+                type: "like",
+                actorId: "u1",
+                actorName: "John",
+                targetId: "post1",
+                targetType: "post",
+              },
+            },
+            {
+              type: "add",
+              event: {
+                type: "comment",
+                actorId: "u2",
+                actorName: "Jane",
+                targetId: "post1",
+                targetType: "post",
+              },
+            },
+            { type: "get", limit: 10 },
+          ],
+        },
         expected: [
-          { type: 'add', eventType: 'like' },
-          { type: 'add', eventType: 'comment' },
-          { type: 'get', count: 2, events: [
-            { displayText: 'Jane commented on your post', actorCount: 1, targetId: 'post1' },
-            { displayText: 'John liked your post', actorCount: 1, targetId: 'post1' }
-          ]}
+          { type: "add", eventType: "like" },
+          { type: "add", eventType: "comment" },
+          {
+            type: "get",
+            count: 2,
+            events: [
+              { displayText: "Jane commented on your post", actorCount: 1, targetId: "post1" },
+              { displayText: "John liked your post", actorCount: 1, targetId: "post1" },
+            ],
+          },
         ],
-        description: 'Different event types are not grouped together',
+        description: "Different event types are not grouped together",
       },
     ],
     acceptanceCriteria: [
-      'Events with same type and targetId are grouped',
+      "Events with same type and targetId are grouped",
       'Grouped events show "X and N others" format',
-      'Single events show simple format',
-      'Events are sorted by most recent',
-      'Different event types remain separate',
+      "Single events show simple format",
+      "Events are sorted by most recent",
+      "Different event types remain separate",
     ],
   },
 
@@ -1331,13 +1420,13 @@ def create_event_group_key(event):
   // SCENARIO 4: Cache with TTL Expiration (EXISTING - TESTABLE)
   // ============================================================================
   {
-    id: 'add-feature-cache-system',
-    title: 'Add TTL Expiration to Cache',
-    type: 'add-functionality',
-    difficulty: 'medium',
-    companies: ['Amazon', 'Google', 'Meta', 'Microsoft'],
-    description: 'Add time-to-live (TTL) expiration feature to an existing cache system',
-    tags: ['cache', 'data-structures', 'time-based'],
+    id: "add-feature-cache-system",
+    title: "Add TTL Expiration to Cache",
+    type: "add-functionality",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: "Add time-to-live (TTL) expiration feature to an existing cache system",
+    tags: ["cache", "data-structures", "time-based"],
     estimatedTime: 30,
     problemStatement: `You're working on a caching system. The existing cache supports get/set operations but doesn't support TTL expiration.
 
@@ -1350,12 +1439,12 @@ def create_event_group_key(event):
 
 **Context:** This cache is used by multiple microservices. TTL is critical for avoiding stale data.`,
     featureRequirements: [
-      'set(key, value, ttlMs) - store with optional TTL in milliseconds',
-      'get(key) - returns null if expired or not found',
-      'has(key) - returns false if expired',
-      'delete(key) - removes entry',
-      'size() - returns count of non-expired entries',
-      'cleanup() - removes all expired entries',
+      "set(key, value, ttlMs) - store with optional TTL in milliseconds",
+      "get(key) - returns null if expired or not found",
+      "has(key) - returns false if expired",
+      "delete(key) - removes entry",
+      "size() - returns count of non-expired entries",
+      "cleanup() - removes all expired entries",
     ],
     existingCode: {
       javascript: `// cache.js - Simple cache implementation
@@ -1547,7 +1636,7 @@ def test_cache(operations):
     codebaseFiles: {
       javascript: [
         {
-          fileName: 'utils/time.js',
+          fileName: "utils/time.js",
           content: `// Time utilities for cache
 // Use these for time-based operations
 
@@ -1562,12 +1651,13 @@ function isExpired(expiresAt) {
 }
 
 module.exports = { getCurrentTime, isExpired };`,
-          description: 'Time utilities - use getCurrentTime() instead of Date.now() for testability',
+          description:
+            "Time utilities - use getCurrentTime() instead of Date.now() for testability",
         },
       ],
       python: [
         {
-          fileName: 'utils/time_utils.py',
+          fileName: "utils/time_utils.py",
           content: `# Time utilities for cache
 # Use these for time-based operations
 
@@ -1585,62 +1675,68 @@ def is_expired(expires_at):
     if expires_at is None:
         return False
     return get_current_time() >= expires_at`,
-          description: 'Time utilities - use get_current_time() for testability',
+          description: "Time utilities - use get_current_time() for testability",
         },
       ],
     },
     hints: [
-      'Store expiration timestamp along with value (e.g., { value, expiresAt })',
-      'Calculate expiresAt as getCurrentTime() + ttlMs when setting',
-      'In get(), check if entry exists AND is not expired',
-      'Use the isExpired() utility from time.js',
-      'For cleanup(), iterate through entries and delete expired ones',
+      "Store expiration timestamp along with value (e.g., { value, expiresAt })",
+      "Calculate expiresAt as getCurrentTime() + ttlMs when setting",
+      "In get(), check if entry exists AND is not expired",
+      "Use the isExpired() utility from time.js",
+      "For cleanup(), iterate through entries and delete expired ones",
     ],
     testCases: [
       {
-        input: { operations: [
-          { type: 'set', key: 'a', value: 1 },
-          { type: 'get', key: 'a' }
-        ]},
+        input: {
+          operations: [
+            { type: "set", key: "a", value: 1 },
+            { type: "get", key: "a" },
+          ],
+        },
         expected: [
-          { type: 'set', key: 'a' },
-          { type: 'get', key: 'a', value: 1 }
+          { type: "set", key: "a" },
+          { type: "get", key: "a", value: 1 },
         ],
-        description: 'Basic set and get without TTL',
+        description: "Basic set and get without TTL",
       },
       {
-        input: { operations: [
-          { type: 'set', key: 'b', value: 2 },
-          { type: 'has', key: 'b' },
-          { type: 'has', key: 'c' }
-        ]},
+        input: {
+          operations: [
+            { type: "set", key: "b", value: 2 },
+            { type: "has", key: "b" },
+            { type: "has", key: "c" },
+          ],
+        },
         expected: [
-          { type: 'set', key: 'b' },
-          { type: 'has', key: 'b', exists: true },
-          { type: 'has', key: 'c', exists: false }
+          { type: "set", key: "b" },
+          { type: "has", key: "b", exists: true },
+          { type: "has", key: "c", exists: false },
         ],
-        description: 'has() returns correct boolean',
+        description: "has() returns correct boolean",
       },
       {
-        input: { operations: [
-          { type: 'set', key: 'x', value: 10 },
-          { type: 'set', key: 'y', value: 20 },
-          { type: 'size' }
-        ]},
+        input: {
+          operations: [
+            { type: "set", key: "x", value: 10 },
+            { type: "set", key: "y", value: 20 },
+            { type: "size" },
+          ],
+        },
         expected: [
-          { type: 'set', key: 'x' },
-          { type: 'set', key: 'y' },
-          { type: 'size', count: 2 }
+          { type: "set", key: "x" },
+          { type: "set", key: "y" },
+          { type: "size", count: 2 },
         ],
-        description: 'size() returns correct count',
+        description: "size() returns correct count",
       },
     ],
     acceptanceCriteria: [
-      'All existing functionality still works',
-      'TTL expiration works correctly',
-      'Expired entries are not returned by get()',
-      'size() only counts non-expired entries',
-      'cleanup() removes expired entries',
+      "All existing functionality still works",
+      "TTL expiration works correctly",
+      "Expired entries are not returned by get()",
+      "size() only counts non-expired entries",
+      "cleanup() removes expired entries",
     ],
   },
 
@@ -1648,13 +1744,13 @@ def is_expired(expires_at):
   // SCENARIO 5: Sliding Window Rate Limiter (EXISTING - TESTABLE)
   // ============================================================================
   {
-    id: 'add-feature-rate-limiter',
-    title: 'Add Sliding Window Rate Limiter',
-    type: 'add-functionality',
-    difficulty: 'medium',
-    companies: ['Amazon', 'Google', 'Stripe', 'Cloudflare'],
-    description: 'Implement a sliding window rate limiter for API requests',
-    tags: ['rate-limiting', 'algorithms', 'api'],
+    id: "add-feature-rate-limiter",
+    title: "Add Sliding Window Rate Limiter",
+    type: "add-functionality",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Stripe", "Cloudflare"],
+    description: "Implement a sliding window rate limiter for API requests",
+    tags: ["rate-limiting", "algorithms", "api"],
     estimatedTime: 30,
     problemStatement: `You're building an API rate limiter. The existing implementation uses a fixed window, which allows request bursts at window boundaries.
 
@@ -1666,11 +1762,11 @@ def is_expired(expires_at):
 
 **Context:** This rate limiter protects backend services from abuse. Accurate limiting is critical.`,
     featureRequirements: [
-      'isAllowed(clientId) - check if request is allowed',
-      'Sliding window algorithm (not fixed window)',
-      'Return { allowed, remaining, resetTime } from check',
-      'Support configurable limits per client',
-      'Efficient cleanup of old entries',
+      "isAllowed(clientId) - check if request is allowed",
+      "Sliding window algorithm (not fixed window)",
+      "Return { allowed, remaining, resetTime } from check",
+      "Support configurable limits per client",
+      "Efficient cleanup of old entries",
     ],
     existingCode: {
       javascript: `// rate-limiter.js - Implement sliding window rate limiter
@@ -1863,7 +1959,7 @@ def test_rate_limiter(operations):
     codebaseFiles: {
       javascript: [
         {
-          fileName: 'utils/timeWindow.js',
+          fileName: "utils/timeWindow.js",
           content: `// Time window utilities for rate limiting
 
 /**
@@ -1891,12 +1987,12 @@ function calculateResetTime(timestamps, windowMs) {
 }
 
 module.exports = { filterToWindow, calculateResetTime };`,
-          description: 'Time window utilities for rate limiting calculations',
+          description: "Time window utilities for rate limiting calculations",
         },
       ],
       python: [
         {
-          fileName: 'utils/time_window.py',
+          fileName: "utils/time_window.py",
           content: `# Time window utilities for rate limiting
 import time
 
@@ -1922,72 +2018,78 @@ def calculate_reset_time(timestamps, window_ms):
         return int(time.time() * 1000)
     oldest = min(timestamps)
     return oldest + window_ms`,
-          description: 'Time window utilities for rate limiting calculations',
+          description: "Time window utilities for rate limiting calculations",
         },
       ],
     },
     hints: [
-      'Store timestamps as array for each client: clients.set(clientId, [])',
-      'At start of isAllowed(), filter out timestamps older than windowStart',
-      'Check length after filtering: if < maxRequests, allow and add timestamp',
-      'remaining = maxRequests - timestamps.length',
-      'resetTime = oldest timestamp in window + windowMs',
+      "Store timestamps as array for each client: clients.set(clientId, [])",
+      "At start of isAllowed(), filter out timestamps older than windowStart",
+      "Check length after filtering: if < maxRequests, allow and add timestamp",
+      "remaining = maxRequests - timestamps.length",
+      "resetTime = oldest timestamp in window + windowMs",
     ],
     testCases: [
       {
-        input: { operations: [
-          { type: 'check', clientId: 'user1' },
-          { type: 'check', clientId: 'user1' },
-          { type: 'count', clientId: 'user1' },
-        ]},
+        input: {
+          operations: [
+            { type: "check", clientId: "user1" },
+            { type: "check", clientId: "user1" },
+            { type: "count", clientId: "user1" },
+          ],
+        },
         expected: [
-          { type: 'check', clientId: 'user1', allowed: true, remaining: 4 },
-          { type: 'check', clientId: 'user1', allowed: true, remaining: 3 },
-          { type: 'count', clientId: 'user1', count: 2 }
+          { type: "check", clientId: "user1", allowed: true, remaining: 4 },
+          { type: "check", clientId: "user1", allowed: true, remaining: 3 },
+          { type: "count", clientId: "user1", count: 2 },
         ],
-        description: 'Basic rate limiting counts requests',
+        description: "Basic rate limiting counts requests",
       },
       {
-        input: { operations: [
-          { type: 'check', clientId: 'user2' },
-          { type: 'check', clientId: 'user2' },
-          { type: 'check', clientId: 'user2' },
-          { type: 'check', clientId: 'user2' },
-          { type: 'check', clientId: 'user2' },
-          { type: 'check', clientId: 'user2' },
-        ]},
+        input: {
+          operations: [
+            { type: "check", clientId: "user2" },
+            { type: "check", clientId: "user2" },
+            { type: "check", clientId: "user2" },
+            { type: "check", clientId: "user2" },
+            { type: "check", clientId: "user2" },
+            { type: "check", clientId: "user2" },
+          ],
+        },
         expected: [
-          { type: 'check', clientId: 'user2', allowed: true, remaining: 4 },
-          { type: 'check', clientId: 'user2', allowed: true, remaining: 3 },
-          { type: 'check', clientId: 'user2', allowed: true, remaining: 2 },
-          { type: 'check', clientId: 'user2', allowed: true, remaining: 1 },
-          { type: 'check', clientId: 'user2', allowed: true, remaining: 0 },
-          { type: 'check', clientId: 'user2', allowed: false, remaining: 0 }
+          { type: "check", clientId: "user2", allowed: true, remaining: 4 },
+          { type: "check", clientId: "user2", allowed: true, remaining: 3 },
+          { type: "check", clientId: "user2", allowed: true, remaining: 2 },
+          { type: "check", clientId: "user2", allowed: true, remaining: 1 },
+          { type: "check", clientId: "user2", allowed: true, remaining: 0 },
+          { type: "check", clientId: "user2", allowed: false, remaining: 0 },
         ],
-        description: 'Blocks requests after limit reached',
+        description: "Blocks requests after limit reached",
       },
       {
-        input: { operations: [
-          { type: 'check', clientId: 'user3' },
-          { type: 'check', clientId: 'user3' },
-          { type: 'reset', clientId: 'user3' },
-          { type: 'count', clientId: 'user3' },
-        ]},
+        input: {
+          operations: [
+            { type: "check", clientId: "user3" },
+            { type: "check", clientId: "user3" },
+            { type: "reset", clientId: "user3" },
+            { type: "count", clientId: "user3" },
+          ],
+        },
         expected: [
-          { type: 'check', clientId: 'user3', allowed: true, remaining: 4 },
-          { type: 'check', clientId: 'user3', allowed: true, remaining: 3 },
-          { type: 'reset', clientId: 'user3' },
-          { type: 'count', clientId: 'user3', count: 0 }
+          { type: "check", clientId: "user3", allowed: true, remaining: 4 },
+          { type: "check", clientId: "user3", allowed: true, remaining: 3 },
+          { type: "reset", clientId: "user3" },
+          { type: "count", clientId: "user3", count: 0 },
         ],
-        description: 'Reset clears request history',
+        description: "Reset clears request history",
       },
     ],
     acceptanceCriteria: [
-      'Requests under limit are allowed',
-      'Requests over limit are blocked',
-      'Remaining count decreases correctly',
-      'Reset clears the history',
-      'Different clients have separate limits',
+      "Requests under limit are allowed",
+      "Requests over limit are blocked",
+      "Remaining count decreases correctly",
+      "Reset clears the history",
+      "Different clients have separate limits",
     ],
   },
 
@@ -1995,13 +2097,13 @@ def calculate_reset_time(timestamps, window_ms):
   // SCENARIO 6: Fuzzy Text Search (EXISTING - TESTABLE)
   // ============================================================================
   {
-    id: 'add-feature-text-search',
-    title: 'Add Fuzzy Matching to Text Search',
-    type: 'add-functionality',
-    difficulty: 'medium',
-    companies: ['Algolia', 'Elasticsearch', 'Google', 'Slack'],
-    description: 'Implement fuzzy text search with Levenshtein distance',
-    tags: ['search', 'algorithms', 'string-matching'],
+    id: "add-feature-text-search",
+    title: "Add Fuzzy Matching to Text Search",
+    type: "add-functionality",
+    difficulty: "medium",
+    companies: ["Algolia", "Elasticsearch", "Google", "Slack"],
+    description: "Implement fuzzy text search with Levenshtein distance",
+    tags: ["search", "algorithms", "string-matching"],
     estimatedTime: 35,
     problemStatement: `You're building a search feature for an application. The existing search only supports exact matching, but users want fuzzy search to handle typos.
 
@@ -2013,11 +2115,11 @@ def calculate_reset_time(timestamps, window_ms):
 
 **Context:** This search powers a product catalog. Users often mistype product names.`,
     featureRequirements: [
-      'search(query, maxDistance) - fuzzy search with max edit distance',
-      'Implement Levenshtein distance calculation',
-      'Rank results: exact match > prefix match > fuzzy match',
-      'Return relevance score with each result',
-      'Case-insensitive matching',
+      "search(query, maxDistance) - fuzzy search with max edit distance",
+      "Implement Levenshtein distance calculation",
+      "Rank results: exact match > prefix match > fuzzy match",
+      "Return relevance score with each result",
+      "Case-insensitive matching",
     ],
     existingCode: {
       javascript: `// textSearch.js - Text search with fuzzy matching
@@ -2227,7 +2329,7 @@ def test_text_search(operations):
     codebaseFiles: {
       javascript: [
         {
-          fileName: 'utils/stringMetrics.js',
+          fileName: "utils/stringMetrics.js",
           content: `// String comparison utilities
 
 /**
@@ -2261,12 +2363,12 @@ function contains(str, substring) {
  */
 
 module.exports = { startsWith, contains };`,
-          description: 'String utilities and Levenshtein algorithm explanation',
+          description: "String utilities and Levenshtein algorithm explanation",
         },
       ],
       python: [
         {
-          fileName: 'utils/string_metrics.py',
+          fileName: "utils/string_metrics.py",
           content: `# String comparison utilities
 
 def starts_with(string, prefix):
@@ -2290,69 +2392,75 @@ def contains(string, substring):
 #      dp[i-1][j-1] + cost # substitution (cost = 0 if chars match, 1 otherwise)
 #    )
 # 4. Return dp[m][n]`,
-          description: 'String utilities and Levenshtein algorithm explanation',
+          description: "String utilities and Levenshtein algorithm explanation",
         },
       ],
     },
     hints: [
-      'For Levenshtein: create 2D array dp[a.length+1][b.length+1]',
-      'Initialize dp[i][0] = i and dp[0][j] = j',
-      'For prefix match: check if item.text.startsWith(query)',
-      'Check matches in order: exact first, then prefix, then fuzzy',
-      'Only add to results if score > 0 or within maxDistance',
+      "For Levenshtein: create 2D array dp[a.length+1][b.length+1]",
+      "Initialize dp[i][0] = i and dp[0][j] = j",
+      "For prefix match: check if item.text.startsWith(query)",
+      "Check matches in order: exact first, then prefix, then fuzzy",
+      "Only add to results if score > 0 or within maxDistance",
     ],
     testCases: [
       {
-        input: { operations: [
-          { type: 'add', text: 'apple' },
-          { type: 'add', text: 'application' },
-          { type: 'add', text: 'banana' },
-          { type: 'search', query: 'apple' },
-        ]},
+        input: {
+          operations: [
+            { type: "add", text: "apple" },
+            { type: "add", text: "application" },
+            { type: "add", text: "banana" },
+            { type: "search", query: "apple" },
+          ],
+        },
         expected: [
-          { type: 'add', text: 'apple' },
-          { type: 'add', text: 'application' },
-          { type: 'add', text: 'banana' },
-          { type: 'search', query: 'apple', results: [
-            { text: 'apple', score: 100, matchType: 'exact' }
-          ]}
+          { type: "add", text: "apple" },
+          { type: "add", text: "application" },
+          { type: "add", text: "banana" },
+          {
+            type: "search",
+            query: "apple",
+            results: [{ text: "apple", score: 100, matchType: "exact" }],
+          },
         ],
-        description: 'Exact match returns highest score',
+        description: "Exact match returns highest score",
       },
       {
-        input: { operations: [
-          { type: 'add', text: 'apple' },
-          { type: 'add', text: 'application' },
-          { type: 'search', query: 'app' },
-        ]},
+        input: {
+          operations: [
+            { type: "add", text: "apple" },
+            { type: "add", text: "application" },
+            { type: "search", query: "app" },
+          ],
+        },
         expected: [
-          { type: 'add', text: 'apple' },
-          { type: 'add', text: 'application' },
-          { type: 'search', query: 'app', results: [
-            { text: 'apple', score: 80, matchType: 'prefix' },
-            { text: 'application', score: 80, matchType: 'prefix' }
-          ]}
+          { type: "add", text: "apple" },
+          { type: "add", text: "application" },
+          {
+            type: "search",
+            query: "app",
+            results: [
+              { text: "apple", score: 80, matchType: "prefix" },
+              { text: "application", score: 80, matchType: "prefix" },
+            ],
+          },
         ],
-        description: 'Prefix match returns medium score',
+        description: "Prefix match returns medium score",
       },
       {
-        input: { operations: [
-          { type: 'distance', a: 'kitten', b: 'sitting' },
-        ]},
-        expected: [
-          { type: 'distance', a: 'kitten', b: 'sitting', distance: 3 }
-        ],
-        description: 'Levenshtein distance calculation',
+        input: { operations: [{ type: "distance", a: "kitten", b: "sitting" }] },
+        expected: [{ type: "distance", a: "kitten", b: "sitting", distance: 3 }],
+        description: "Levenshtein distance calculation",
       },
     ],
     acceptanceCriteria: [
-      'Exact matches return score 100',
-      'Prefix matches return score 80',
-      'Fuzzy matches return score based on edit distance',
-      'Results are sorted by score descending',
-      'Levenshtein distance is calculated correctly',
+      "Exact matches return score 100",
+      "Prefix matches return score 80",
+      "Fuzzy matches return score based on edit distance",
+      "Results are sorted by score descending",
+      "Levenshtein distance is calculated correctly",
     ],
   },
-];
+]
 
-export default addFunctionalityScenarios;
+export default addFunctionalityScenarios
