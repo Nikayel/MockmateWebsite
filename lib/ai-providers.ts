@@ -30,7 +30,7 @@ import {
 import { logger } from "./logger"
 
 // Provider types
-export type AIProvider = "gemini" | "gemini-lite" | "deepseek" | "claude"
+export type AIProvider = "gemini" | "gemini-lite" | "deepseek" | "deepseek-chat" | "claude"
 export type TaskComplexity = "simple" | "standard" | "complex"
 
 // Response structure
@@ -54,7 +54,7 @@ interface ProviderConfig {
 }
 
 // Provider configurations - Updated Dec 2025 pricing
-// Strategy: Gemini Flash Lite for simple/chat (cheapest), Flash for standard, Deepseek for critique
+// Strategy: Gemini Flash Lite for simple/chat (cheapest), Flash for standard, DeepSeek for critique
 const PROVIDERS: Record<AIProvider, ProviderConfig> = {
   gemini: {
     name: "gemini",
@@ -84,6 +84,16 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     temperature: 0.7,
     costPer1kTokens: 0.00137, // Averaged - only used for Constitutional AI critique (~$0.003/critique)
   },
+  "deepseek-chat": {
+    name: "deepseek-chat",
+    enabled: !!process.env.DEEPSEEK_API_KEY,
+    apiKey: process.env.DEEPSEEK_API_KEY,
+    baseUrl: "https://api.deepseek.com/v1",
+    model: "deepseek-chat", // V3 model - $0.27/1M input, $1.10/1M output - fast chat fallback
+    maxTokens: 1024,
+    temperature: 0.7,
+    costPer1kTokens: 0.000685, // Averaged - cheaper than reasoner, good for chat
+  },
   claude: {
     name: "claude",
     enabled: !!process.env.ANTHROPIC_API_KEY,
@@ -99,9 +109,9 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
 // Fallback order based on task complexity
 // Cost-optimized: Flash Lite for simple (cheapest), Flash for standard, Claude for complex quality
 const FALLBACK_ORDER: Record<TaskComplexity, AIProvider[]> = {
-  simple: ["gemini-lite", "gemini", "deepseek", "claude"], // Chat, hints - cheapest path (Flash Lite)
-  standard: ["gemini", "gemini-lite", "deepseek", "claude"], // Interview interactions - balanced
-  complex: ["gemini", "claude", "deepseek"], // Feedback generation - quality matters
+  simple: ["gemini-lite", "gemini", "deepseek-chat", "claude"], // Chat, hints - cheapest path (Flash Lite -> deepseek-chat)
+  standard: ["gemini", "gemini-lite", "deepseek-chat", "claude"], // Interview interactions - balanced
+  complex: ["gemini", "claude", "deepseek"], // Feedback generation - quality matters (uses reasoner)
 }
 
 // Retry configuration
@@ -364,6 +374,7 @@ async function callProvider(
     case "gemini-lite":
       return callGemini(systemPrompt, userMessage, history, config)
     case "deepseek":
+    case "deepseek-chat":
       return callDeepseek(systemPrompt, userMessage, history, config)
     case "claude":
       return callClaude(systemPrompt, userMessage, history, config)
@@ -733,6 +744,10 @@ export function getProviderStatus(): Record<AIProvider, { enabled: boolean; mode
       model: PROVIDERS["gemini-lite"].model,
     },
     deepseek: { enabled: PROVIDERS.deepseek.enabled, model: PROVIDERS.deepseek.model },
+    "deepseek-chat": {
+      enabled: PROVIDERS["deepseek-chat"].enabled,
+      model: PROVIDERS["deepseek-chat"].model,
+    },
     claude: { enabled: PROVIDERS.claude.enabled, model: PROVIDERS.claude.model },
   }
 }

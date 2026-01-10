@@ -467,17 +467,22 @@ export async function createInterviewSession(
   pattern?: string // DSA pattern for stats aggregation (e.g., "arrays-hashing", "two-pointers")
 ): Promise<string> {
   const sessionRef = doc(collection(db, "interview_sessions"))
-  const sessionData = {
+  // Build session data, only including defined fields (Firestore doesn't allow undefined)
+  const sessionData: Record<string, any> = {
     id: sessionRef.id,
     user_id: userId,
     topic: scenarioTitle,
     type: scenarioType,
     pattern: pattern || scenarioType, // Store pattern for stats, fallback to type
-    scenario_id: scenarioId, // Store scenario ID for reopening
     difficulty: difficulty,
     started_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
+  }
+
+  // Only add scenario_id if it's defined
+  if (scenarioId) {
+    sessionData.scenario_id = scenarioId
   }
 
   await setDoc(sessionRef, sessionData)
