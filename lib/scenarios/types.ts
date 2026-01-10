@@ -4,6 +4,7 @@
  */
 
 import { DSAPattern } from "../types/dsa-patterns"
+import type { ValidatorConfig, ReferenceSolution } from "../validators/types"
 
 export type ScenarioType =
   | "dsa"
@@ -79,7 +80,14 @@ export interface DSAScenario extends BaseScenario {
     expected: any
     description: string
     compareAsSet?: boolean
+    orderMatters?: boolean
+    // Optional property-based validation config
+    // If not provided, auto-detection kicks in based on scenario ID
+    validation?: ValidatorConfig
   }[]
+  // Optional reference solution for dynamic validation
+  // Allows running canonical solution and comparing outputs
+  referenceSolution?: ReferenceSolution
 }
 
 export interface BugFixScenario extends BaseScenario {
@@ -103,7 +111,10 @@ export interface BugFixScenario extends BaseScenario {
     expected: any
     description: string
     compareAsSet?: boolean
+    orderMatters?: boolean
+    validation?: ValidatorConfig
   }[]
+  referenceSolution?: ReferenceSolution
 }
 
 export interface SystemDesignScenario extends BaseScenario {
