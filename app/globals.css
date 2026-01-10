@@ -601,3 +601,68 @@
     animation: none !important;
   }
 }
+
+/* ===== CHAT & SCROLL UX IMPROVEMENTS ===== */
+/*
+ * Research-based chat scroll behavior:
+ * - Smooth native scrolling for better mobile experience
+ * - Custom scrollbar styling for desktop
+ * - Scroll-snap for message alignment (optional)
+ * Sources: NN/G Mobile UX, Slack/Discord scroll patterns
+ */
+
+/* Smooth scroll for chat containers */
+.scroll-smooth {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
+}
+
+/* Custom scrollbar for chat panels - subtle and unobtrusive */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Firefox scrollbar styling */
+.overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+/* Ensure CodeMirror editor has proper scrolling */
+.cm-editor .cm-scroller {
+  overflow: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Editor wrapper should allow content to scroll */
+.editor-wrapper {
+  overflow: auto;
+  min-height: 0; /* Critical for flex container scrolling */
+}
+
+/* New message indicator animation */
+@keyframes new-message-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(0, 217, 255, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(0, 217, 255, 0);
+  }
+}
+
+.has-new-messages {
+  animation: new-message-pulse 2s ease-in-out infinite;
+}

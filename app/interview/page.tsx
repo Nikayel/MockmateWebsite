@@ -4194,7 +4194,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3">
                       <div
                         ref={editorContainerRef}
-                        className="relative min-h-0 flex-1 overflow-hidden rounded border border-gray-700"
+                        className="relative min-h-0 flex-1 overflow-auto rounded border border-gray-700"
                       >
                         <ErrorBoundary>
                           <CodeEditor
