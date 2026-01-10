@@ -1,5 +1,7 @@
 "use client"
 
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { AuthenticatedDashboard } from "./AuthenticatedDashboard"
 
@@ -12,13 +14,21 @@ interface HomePageClientProps {
 /**
  * Client component that handles auth state and conditionally renders:
  * - Marketing content (SSR'd) for non-authenticated users
- * - Authenticated dashboard for logged-in users
+ * - Redirects authenticated users to /dashboard
  *
  * This allows the marketing content to be fully SSR'd and visible to crawlers,
- * while still showing the dashboard to authenticated users.
+ * while redirecting authenticated users to the dashboard.
  */
 export function HomePageClient({ header, footer, marketingContent }: HomePageClientProps) {
   const { user, initialized } = useAuth()
+  const router = useRouter()
+
+  // Redirect authenticated users to dashboard
+  useEffect(() => {
+    if (initialized && user) {
+      router.push("/dashboard")
+    }
+  }, [user, initialized, router])
 
   // While auth is initializing, show the SSR'd marketing content
   // This ensures crawlers always see the marketing page
@@ -26,9 +36,13 @@ export function HomePageClient({ header, footer, marketingContent }: HomePageCli
     return <>{marketingContent}</>
   }
 
-  // If user is authenticated, show the dashboard
+  // If user is authenticated, show loading while redirecting
   if (user) {
-    return <AuthenticatedDashboard header={header} footer={footer} />
+    return (
+      <main className="bg-background flex min-h-screen items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+      </main>
+    )
   }
 
   // Not authenticated - show the SSR'd marketing content

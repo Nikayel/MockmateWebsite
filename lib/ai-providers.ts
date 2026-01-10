@@ -31,7 +31,7 @@ import { logger } from "./logger"
 
 // Provider types
 export type AIProvider = "gemini" | "gemini-lite" | "deepseek" | "deepseek-chat" | "claude"
-export type TaskComplexity = "simple" | "standard" | "complex"
+export type TaskComplexity = "simple" | "standard" | "complex" | "dialogue" | "code" | "critique"
 
 // Response structure
 export interface AIResponse {
@@ -112,6 +112,9 @@ const FALLBACK_ORDER: Record<TaskComplexity, AIProvider[]> = {
   simple: ["gemini-lite", "gemini", "deepseek-chat", "claude"], // Chat, hints - cheapest path (Flash Lite -> deepseek-chat)
   standard: ["gemini", "gemini-lite", "deepseek-chat", "claude"], // Interview interactions - balanced
   complex: ["gemini", "claude", "deepseek"], // Feedback generation - quality matters (uses reasoner)
+  dialogue: ["claude", "gemini-lite", "deepseek-chat"], // for the conversation in the chat
+  code: ["deepseek-chat", "gemini", "claude"],
+  critique: ["deepseek", "claude", "gemini"],
 }
 
 // Retry configuration

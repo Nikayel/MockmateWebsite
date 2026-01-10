@@ -235,24 +235,45 @@ Analyze and return this exact JSON structure (no markdown, no explanation):
 VALIDATION RULES:
 - isCoherent: false if responses are gibberish, random words, or nonsensical
 - responsesRelevant: false if candidate responses don't relate to questions asked
-- approachExplained: true ONLY if they explicitly described their algorithm/strategy BEFORE or WHILE coding (e.g., "I'll use a hashmap to...", "My approach is..."). Just saying "let me try" or typing code silently does NOT count.
-- approachQuality:
-  * "none" - No explanation at all, just coded silently
-  * "poor" - Single vague sentence like "I'll loop through"
-  * "basic" - Mentioned the approach but no reasoning
-  * "good" - Explained approach with some reasoning
-  * "excellent" - Detailed explanation with trade-offs discussed
-- complexityDiscussed: true ONLY if they explicitly mentioned time/space complexity (e.g., "O(n)", "linear time")
-- complexityAccurate: ONLY true if stated complexity matches actual code complexity
-- communicationScore: Be STRICT - silent coding is poor communication:
-  * 0-20: No communication - typed code without talking
-  * 20-40: Minimal - answered one question briefly, no approach explanation
-  * 40-60: Basic - explained approach OR answered questions, not both
-  * 60-80: Good - explained approach AND engaged with questions AND discussed complexity
-  * 80-100: Excellent - proactive communication, discussed trade-offs, complexity, edge cases
 
-CRITICAL: If candidate message count < 3 OR average message length < 30 characters, communication score should be < 40.
-Solving a problem correctly but SILENTLY is a communication FAILURE in real interviews.
+- approachExplained: true if they described HOW they will solve the problem in ANY natural way.
+  EXAMPLES OF APPROACH EXPLAINED (mark as TRUE):
+  * "I'm thinking I can multiply each item by its left and then by its right" ✓
+  * "I'll use two pointers starting from both ends" ✓
+  * "First I'll build a prefix array, then iterate backwards" ✓
+  * "So if we start from the left, there's nothing, so I'd say it's one..." (tracing through logic) ✓
+  * "I want to loop over and keep track of the running product" ✓
+  * Walking through an example step-by-step to show their thinking ✓
+
+  EXAMPLES OF NO APPROACH (mark as FALSE):
+  * Just typing code without saying anything ✗
+  * "Let me try" then immediately coding ✗
+  * Only asking clarifying questions but never explaining strategy ✗
+
+- approachQuality (only if approachExplained is true):
+  * "poor" - Single vague sentence like "I'll loop through" with no detail
+  * "basic" - Mentioned the general idea but minimal reasoning
+  * "good" - Explained approach clearly, walked through examples or logic
+  * "excellent" - Detailed explanation with trade-offs, alternatives, or optimizations discussed
+
+- complexityDiscussed: true if they mentioned time/space complexity (e.g., "O(n)", "linear", "constant space")
+- complexityAccurate: true ONLY if stated complexity matches actual code complexity
+- edgeCasesConsidered: true if they mentioned edge cases like empty arrays, zeros, negatives, duplicates, etc.
+- alternativesDiscussed: true if they mentioned other approaches or trade-offs
+
+- communicationScore: Evaluate the OVERALL quality of communication:
+  * 0-20: No communication - typed code silently
+  * 20-40: Minimal - brief answers, no real explanation
+  * 40-60: Basic - some explanation but incomplete engagement
+  * 60-80: Good - explained approach, engaged with interviewer, discussed complexity
+  * 80-100: Excellent - proactive, thorough explanations, edge cases, trade-offs
+
+  IMPORTANT: If the candidate walked through their thinking step-by-step (even conversationally),
+  traced through examples, AND discussed complexity - that's 60-80 range minimum.
+  Don't penalize natural/conversational communication style.
+
+CRITICAL: Silent coding (no explanation at all) = communication score < 40.
+But conversational explanations count! "I'm thinking..." or tracing through examples IS explaining.
 
 Return ONLY the JSON object, nothing else.`
 
@@ -268,11 +289,43 @@ Return ONLY the JSON object, nothing else.`
     const jsonMatch = response.text.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0])
+
+      // Calculate engagement metrics from transcript for sanity checks
+      const candidateMessages = transcript.filter((m) => m.role === "candidate")
+      const totalCandidateChars = candidateMessages.reduce((sum, m) => sum + m.content.length, 0)
+      const avgMessageLength = totalCandidateChars / Math.max(1, candidateMessages.length)
+      const hasSubstantialEngagement = candidateMessages.length >= 5 && avgMessageLength >= 80
+
+      // SAFETY NET: If AI says approachExplained=false but there's strong engagement,
+      // check if they discussed complexity (which implies they explained their thinking)
+      let approachExplained = Boolean(parsed.approachExplained)
+      let approachQuality = parsed.approachQuality || "none"
+      let communicationScore = Math.min(100, Math.max(0, Number(parsed.communicationScore) || 50))
+
+      // Override if AI seems wrong: substantial engagement + complexity discussed = they explained
+      if (!approachExplained && hasSubstantialEngagement && Boolean(parsed.complexityDiscussed)) {
+        logger.warn(
+          "[AI Validation] Overriding approachExplained - substantial engagement with complexity discussion detected",
+          {
+            candidateMessageCount: candidateMessages.length,
+            avgMessageLength: Math.round(avgMessageLength),
+            complexityDiscussed: parsed.complexityDiscussed,
+            originalApproachExplained: parsed.approachExplained,
+          }
+        )
+        approachExplained = true
+        approachQuality = approachQuality === "none" ? "basic" : approachQuality
+        // Boost communication score if it seems too low for the engagement level
+        if (communicationScore < 55) {
+          communicationScore = Math.max(communicationScore, 60)
+        }
+      }
+
       return {
         isCoherent: Boolean(parsed.isCoherent),
         responsesRelevant: Boolean(parsed.responsesRelevant),
-        approachExplained: Boolean(parsed.approachExplained),
-        approachQuality: parsed.approachQuality || "none",
+        approachExplained,
+        approachQuality,
         complexityDiscussed: Boolean(parsed.complexityDiscussed),
         complexityAccurate: Boolean(parsed.complexityAccurate),
         statedComplexity: parsed.statedComplexity || null,
@@ -280,7 +333,7 @@ Return ONLY the JSON object, nothing else.`
         questionsAnswered: Number(parsed.questionsAnswered) || 0,
         edgeCasesConsidered: Boolean(parsed.edgeCasesConsidered),
         alternativesDiscussed: Boolean(parsed.alternativesDiscussed),
-        communicationScore: Math.min(100, Math.max(0, Number(parsed.communicationScore) || 50)),
+        communicationScore,
       }
     }
   } catch (error) {

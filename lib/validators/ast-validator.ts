@@ -9,8 +9,8 @@
  * This handles ANY valid solution style automatically!
  */
 
-import { executeWithPiston } from '@/lib/piston'
-import type { ReferenceSolution } from './types'
+import { executeWithPiston } from "@/lib/piston"
+import type { ReferenceSolution } from "./types"
 
 // Re-export for backwards compatibility
 export type { ReferenceSolution }
@@ -44,27 +44,27 @@ export interface ParamSpec {
 }
 
 export type ParamType =
-  | 'int'
-  | 'float'
-  | 'string'
-  | 'boolean'
-  | 'array'
-  | 'matrix'  // 2D array
-  | 'object'
-  | 'linkedlist'
-  | 'tree'
+  | "int"
+  | "float"
+  | "string"
+  | "boolean"
+  | "array"
+  | "matrix" // 2D array
+  | "object"
+  | "linkedlist"
+  | "tree"
 
 export interface InputConstraint {
-  type: 'sum-exists' | 'sorted' | 'unique' | 'custom'
-  params?: string[]  // Which params this constraint applies to
+  type: "sum-exists" | "sorted" | "unique" | "custom"
+  params?: string[] // Which params this constraint applies to
   customFn?: (inputs: Record<string, any>) => boolean
 }
 
 export type OutputComparisonMode =
-  | 'exact'           // Must match exactly
-  | 'set'             // Order doesn't matter
-  | 'any-valid'       // Multiple valid answers exist
-  | 'property-based'  // Check properties, not values
+  | "exact" // Must match exactly
+  | "set" // Order doesn't matter
+  | "any-valid" // Multiple valid answers exist
+  | "property-based" // Check properties, not values
 
 /**
  * Generate random test inputs based on specification
@@ -94,35 +94,37 @@ export function generateTestInputs(spec: InputSpec, count: number = 5): Record<s
 
 function generateValue(param: ParamSpec): any {
   switch (param.type) {
-    case 'int':
+    case "int":
       return randomInt(param.min ?? -1000, param.max ?? 1000)
 
-    case 'float':
+    case "float":
       return randomFloat(param.min ?? -1000, param.max ?? 1000)
 
-    case 'string':
+    case "string":
       return randomString(param.minLength ?? 1, param.maxLength ?? 20)
 
-    case 'boolean':
+    case "boolean":
       return Math.random() > 0.5
 
-    case 'array':
+    case "array":
       const len = randomInt(param.minLength ?? 1, param.maxLength ?? 10)
       const arr: any[] = []
       for (let i = 0; i < len; i++) {
-        arr.push(generateValue({
-          name: 'element',
-          type: param.elementType ?? 'int',
-          min: param.elementMin,
-          max: param.elementMax,
-        }))
+        arr.push(
+          generateValue({
+            name: "element",
+            type: param.elementType ?? "int",
+            min: param.elementMin,
+            max: param.elementMax,
+          })
+        )
       }
       if (!param.allowDuplicates) {
         return [...new Set(arr)]
       }
       return arr
 
-    case 'matrix':
+    case "matrix":
       const rows = randomInt(param.minLength ?? 1, param.maxLength ?? 5)
       const cols = randomInt(param.minLength ?? 1, param.maxLength ?? 5)
       const matrix: any[][] = []
@@ -140,12 +142,16 @@ function generateValue(param: ParamSpec): any {
   }
 }
 
-function applyConstraint(input: Record<string, any>, constraint: InputConstraint, params: ParamSpec[]): void {
+function applyConstraint(
+  input: Record<string, any>,
+  constraint: InputConstraint,
+  params: ParamSpec[]
+): void {
   switch (constraint.type) {
-    case 'sum-exists':
+    case "sum-exists":
       // Ensure target is a sum of two elements in the array
-      const arrayParam = params.find(p => p.type === 'array')
-      const targetParam = params.find(p => p.name === 'target')
+      const arrayParam = params.find((p) => p.type === "array")
+      const targetParam = params.find((p) => p.name === "target")
       if (arrayParam && targetParam && input[arrayParam.name]?.length >= 2) {
         const arr = input[arrayParam.name]
         const i = randomInt(0, arr.length - 1)
@@ -155,21 +161,21 @@ function applyConstraint(input: Record<string, any>, constraint: InputConstraint
       }
       break
 
-    case 'sorted':
+    case "sorted":
       const sortParam = constraint.params?.[0]
       if (sortParam && Array.isArray(input[sortParam])) {
         input[sortParam] = input[sortParam].sort((a: number, b: number) => a - b)
       }
       break
 
-    case 'unique':
+    case "unique":
       const uniqueParam = constraint.params?.[0]
       if (uniqueParam && Array.isArray(input[uniqueParam])) {
         input[uniqueParam] = [...new Set(input[uniqueParam])]
       }
       break
 
-    case 'custom':
+    case "custom":
       if (constraint.customFn) {
         // Re-generate until constraint is satisfied (with limit)
         let attempts = 0
@@ -194,8 +200,8 @@ function randomFloat(min: number, max: number): number {
 
 function randomString(minLen: number, maxLen: number): string {
   const len = randomInt(minLen, maxLen)
-  const chars = 'abcdefghijklmnopqrstuvwxyz'
-  let result = ''
+  const chars = "abcdefghijklmnopqrstuvwxyz"
+  let result = ""
   for (let i = 0; i < len; i++) {
     result += chars[randomInt(0, chars.length - 1)]
   }
@@ -205,11 +211,16 @@ function randomString(minLen: number, maxLen: number): string {
 /**
  * Wrap user code to call the function with given input
  */
-function wrapCode(code: string, functionName: string, input: Record<string, any>, language: string): string {
+function wrapCode(
+  code: string,
+  functionName: string,
+  input: Record<string, any>,
+  language: string
+): string {
   const inputJson = JSON.stringify(input)
 
   switch (language) {
-    case 'python':
+    case "python":
       return `
 import json
 ${code}
@@ -219,13 +230,15 @@ __result__ = ${functionName}(**__input__)
 print(json.dumps(__result__))
 `
 
-    case 'javascript':
-    case 'typescript':
+    case "javascript":
+    case "typescript":
       return `
 ${code}
 
 const __input__ = ${inputJson};
-const __result__ = ${functionName}(${Object.keys(input).map(k => `__input__.${k}`).join(', ')});
+const __result__ = ${functionName}(${Object.keys(input)
+        .map((k) => `__input__.${k}`)
+        .join(", ")});
 console.log(JSON.stringify(__result__));
 `
 
@@ -237,16 +250,19 @@ console.log(JSON.stringify(__result__));
 /**
  * Run code and get output
  */
-async function runCode(code: string, language: string): Promise<{ success: boolean; output: any; error?: string }> {
+async function runCode(
+  code: string,
+  language: string
+): Promise<{ success: boolean; output: any; error?: string }> {
   try {
     const result = await executeWithPiston(code, language, {})
 
     if (!result.success || result.error) {
-      return { success: false, output: null, error: result.error }
+      return { success: false, output: null, error: result.error ?? undefined }
     }
 
     // Parse JSON output
-    const outputStr = (result.output || '').trim()
+    const outputStr = (result.output || "").trim()
     try {
       return { success: true, output: JSON.parse(outputStr) }
     } catch {
@@ -256,7 +272,7 @@ async function runCode(code: string, language: string): Promise<{ success: boole
     return {
       success: false,
       output: null,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : "Unknown error",
     }
   }
 }
@@ -267,9 +283,9 @@ async function runCode(code: string, language: string): Promise<{ success: boole
 function compareOutputs(
   userOutput: any,
   referenceOutput: any,
-  mode: OutputComparisonMode = 'exact'
+  mode: OutputComparisonMode = "exact"
 ): boolean {
-  if (mode === 'set') {
+  if (mode === "set") {
     // Order doesn't matter
     if (!Array.isArray(userOutput) || !Array.isArray(referenceOutput)) {
       return JSON.stringify(userOutput) === JSON.stringify(referenceOutput)
@@ -289,7 +305,7 @@ function compareOutputs(
 export async function validateWithReference(
   userCode: string,
   reference: ReferenceSolution,
-  language: 'python' | 'javascript' | 'typescript',
+  language: "python" | "javascript" | "typescript",
   testInputs?: Record<string, any>[]
 ): Promise<{
   passed: boolean
@@ -302,7 +318,11 @@ export async function validateWithReference(
   }>
 }> {
   // Generate test inputs if not provided
-  const inputs = testInputs || generateTestInputs(reference.inputSpec, 5)
+  // Handle case where inputSpec is undefined
+  const inputSpec: InputSpec = reference.inputSpec
+    ? { params: reference.inputSpec.params, constraints: reference.inputSpec.constraints }
+    : { params: [] }
+  const inputs = testInputs || generateTestInputs(inputSpec, 5)
 
   const referenceCode = reference.code[language] || reference.code.python
   const results: Array<{
@@ -326,7 +346,7 @@ export async function validateWithReference(
         userOutput: null,
         referenceOutput: null,
         passed: false,
-        error: `Reference solution error: ${refResult.error}`
+        error: `Reference solution error: ${refResult.error}`,
       })
       allPassed = false
       continue
@@ -342,18 +362,14 @@ export async function validateWithReference(
         userOutput: null,
         referenceOutput: refResult.output,
         passed: false,
-        error: `User code error: ${userResult.error}`
+        error: `User code error: ${userResult.error}`,
       })
       allPassed = false
       continue
     }
 
     // Compare outputs
-    const passed = compareOutputs(
-      userResult.output,
-      refResult.output,
-      reference.outputComparison
-    )
+    const passed = compareOutputs(userResult.output, refResult.output, reference.outputComparison)
 
     if (!passed) {
       allPassed = false
@@ -363,7 +379,7 @@ export async function validateWithReference(
       input,
       userOutput: userResult.output,
       referenceOutput: refResult.output,
-      passed
+      passed,
     })
   }
 
@@ -374,8 +390,8 @@ export async function validateWithReference(
  * Example reference solutions for common problems
  */
 export const ReferenceSolutions: Record<string, ReferenceSolution> = {
-  'two-sum': {
-    functionName: 'twoSum',
+  "two-sum": {
+    functionName: "twoSum",
     code: {
       python: `
 def twoSum(nums, target):
@@ -397,22 +413,28 @@ function twoSum(nums, target) {
   }
   return [];
 }
-`
+`,
     },
     inputSpec: {
       params: [
-        { name: 'nums', type: 'array', elementType: 'int', minLength: 2, maxLength: 20, elementMin: -100, elementMax: 100 },
-        { name: 'target', type: 'int' }
+        {
+          name: "nums",
+          type: "array",
+          elementType: "int",
+          minLength: 2,
+          maxLength: 20,
+          elementMin: -100,
+          elementMax: 100,
+        },
+        { name: "target", type: "int" },
       ],
-      constraints: [
-        { type: 'sum-exists' }
-      ]
+      constraints: [{ type: "sum-exists" }],
     },
-    outputComparison: 'set'  // [0,1] == [1,0]
+    outputComparison: "set", // [0,1] == [1,0]
   },
 
-  'valid-palindrome': {
-    functionName: 'isPalindrome',
+  "valid-palindrome": {
+    functionName: "isPalindrome",
     code: {
       python: `
 def isPalindrome(s):
@@ -424,18 +446,16 @@ function isPalindrome(s) {
   const clean = s.toLowerCase().replace(/[^a-z0-9]/g, '');
   return clean === clean.split('').reverse().join('');
 }
-`
+`,
     },
     inputSpec: {
-      params: [
-        { name: 's', type: 'string', minLength: 0, maxLength: 50 }
-      ]
+      params: [{ name: "s", type: "string", minLength: 0, maxLength: 50 }],
     },
-    outputComparison: 'exact'
+    outputComparison: "exact",
   },
 
-  'group-anagrams': {
-    functionName: 'groupAnagrams',
+  "group-anagrams": {
+    functionName: "groupAnagrams",
     code: {
       python: `
 from collections import defaultdict
@@ -456,13 +476,11 @@ function groupAnagrams(strs) {
   }
   return Object.values(groups);
 }
-`
+`,
     },
     inputSpec: {
-      params: [
-        { name: 'strs', type: 'array', elementType: 'string', minLength: 1, maxLength: 10 }
-      ]
+      params: [{ name: "strs", type: "array", elementType: "string", minLength: 1, maxLength: 10 }],
     },
-    outputComparison: 'any-valid'  // Order of groups doesn't matter
-  }
+    outputComparison: "any-valid", // Order of groups doesn't matter
+  },
 }

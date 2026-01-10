@@ -267,8 +267,47 @@ function wrapCodeForExecution(code: string, language: string, testInput: any): s
       Array.isArray(testInput.operations)
 
     // For class-based problems, extract the class name instead of function name
-    const classMatch = code.match(/class\s+(\w+)/)
-    const className = classMatch ? classMatch[1] : null
+    // Strategy: Use the class name from operations array (most reliable)
+    // This prevents matching helper classes like Node, ListNode, TreeNode, etc.
+    let className: string | null = null
+
+    if (isClassBased && testInput.operations && testInput.operations.length > 0) {
+      // The first operation is typically the class name (e.g., "LRUCache", "MinStack", "Trie")
+      const operationClassName = testInput.operations[0]
+      // Find the class definition that matches this name
+      const specificClassMatch = code.match(new RegExp(`class\\s+${operationClassName}\\s*[:(]`))
+      if (specificClassMatch) {
+        className = operationClassName
+      }
+    }
+
+    // Fallback: if we didn't find a match, find all classes and exclude common helper classes
+    if (!className) {
+      const allClasses = code.matchAll(/class\s+(\w+)/g)
+      const helperClassNames = new Set([
+        "Node",
+        "ListNode",
+        "TreeNode",
+        "TrieNode",
+        "GraphNode",
+        "NestedInteger",
+      ])
+
+      for (const match of allClasses) {
+        const foundClassName = match[1]
+        // Skip common helper classes
+        if (!helperClassNames.has(foundClassName)) {
+          className = foundClassName
+          break
+        }
+      }
+
+      // Last resort: use the first class found (old behavior)
+      if (!className) {
+        const classMatch = code.match(/class\s+(\w+)/)
+        className = classMatch ? classMatch[1] : null
+      }
+    }
 
     // Python wrapper with print capture and common imports/classes for DSA problems
     return `
@@ -471,8 +510,47 @@ except Exception as e:
     Array.isArray(testInput.operations)
 
   // For class-based problems, extract the class name
-  const jsClassMatch = code.match(/class\s+(\w+)/)
-  const jsClassName = jsClassMatch ? jsClassMatch[1] : null
+  // Strategy: Use the class name from operations array (most reliable)
+  // This prevents matching helper classes like Node, ListNode, TreeNode, etc.
+  let jsClassName: string | null = null
+
+  if (jsIsClassBased && testInput.operations && testInput.operations.length > 0) {
+    // The first operation is typically the class name (e.g., "LRUCache", "MinStack", "Trie")
+    const operationClassName = testInput.operations[0]
+    // Find the class definition that matches this name
+    const specificClassMatch = code.match(new RegExp(`class\\s+${operationClassName}\\s*[{(]`))
+    if (specificClassMatch) {
+      jsClassName = operationClassName
+    }
+  }
+
+  // Fallback: if we didn't find a match, find all classes and exclude common helper classes
+  if (!jsClassName) {
+    const allClasses = code.matchAll(/class\s+(\w+)/g)
+    const helperClassNames = new Set([
+      "Node",
+      "ListNode",
+      "TreeNode",
+      "TrieNode",
+      "GraphNode",
+      "NestedInteger",
+    ])
+
+    for (const match of allClasses) {
+      const foundClassName = match[1]
+      // Skip common helper classes
+      if (!helperClassNames.has(foundClassName)) {
+        jsClassName = foundClassName
+        break
+      }
+    }
+
+    // Last resort: use the first class found (old behavior)
+    if (!jsClassName) {
+      const jsClassMatch = code.match(/class\s+(\w+)/)
+      jsClassName = jsClassMatch ? jsClassMatch[1] : null
+    }
+  }
 
   // Try to find the function name or use common patterns
   const jsFuncMatch = code.match(

@@ -1046,7 +1046,7 @@ Keep it conversational and real - like you're actually debriefing someone after 
     }
 
     // Determine task complexity for provider selection
-    const complexity: TaskComplexity = isProactive ? "standard" : "simple"
+    const complexity: TaskComplexity = role == "interviewer" ? "dialogue" : "code"
 
     // Use AI provider abstraction with fallback
     const aiResponse = await generateAIResponse(systemPrompt, fullUserMessage, history, {
