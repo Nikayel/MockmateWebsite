@@ -725,6 +725,13 @@ Let's continue!`
                 },
               ])
             }
+            // Restore elapsed time and test results
+            if (savedState?.elapsedTime) {
+              setElapsedTime(savedState.elapsedTime)
+            }
+            if (savedState?.testResults && savedState.testResults.length > 0) {
+              setTestResults(savedState.testResults)
+            }
             toast.success("Session resumed")
           } else {
             // Fresh start - no previous progress

@@ -179,6 +179,25 @@ export default function RoadmapPage() {
             }
             console.log("[Roadmap] Setting active roadmap:", roadmap.id, roadmap.companyName)
             setActiveRoadmap(roadmap)
+
+            // Calculate and set the correct day index immediately after loading
+            // This prevents the flash of wrong day on initial navigation
+            const now = new Date()
+            const localTodayForInit = getLocalDateComponents(now)
+            const correctDayIndex =
+              roadmap.dailyPlans?.findIndex((plan: any) => {
+                const planDate = new Date(plan.date)
+                const planDateComponents = getUTCDateComponents(planDate)
+                return (
+                  planDateComponents.year === localTodayForInit.year &&
+                  planDateComponents.month === localTodayForInit.month &&
+                  planDateComponents.day === localTodayForInit.day
+                )
+              }) ?? -1
+
+            if (correctDayIndex >= 0) {
+              selectDay(correctDayIndex)
+            }
           } else {
             console.log("[Roadmap] No active roadmap found in response")
           }
@@ -203,13 +222,16 @@ export default function RoadmapPage() {
   }, [user?.id, firebaseUser, initialized, setActiveRoadmap])
 
   // Set selected day to today on initial mount only
+  // NOTE: We use todayIndex as a dependency to handle the case where todayIndex
+  // is calculated before roadmap is loaded. This ensures we select the correct day
+  // as soon as both are available.
   useEffect(() => {
-    if (roadmap && todayIndex >= 0) {
-      // Only auto-select today on first load, not on every change
+    if (roadmap && todayIndex >= 0 && selectedDayIndex !== todayIndex) {
+      // Only auto-select today on first load or when date changes
       selectDay(todayIndex)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roadmap?.id]) // Only run when roadmap changes, not on every selectedDayIndex change
+  }, [roadmap?.id, todayIndex]) // Re-run when todayIndex changes to ensure correct day selection
 
   const handleStartQuestion = (scenarioId: string) => {
     // Navigate to interview with this scenario
@@ -407,6 +429,24 @@ export default function RoadmapPage() {
               })) || [],
           }
           setActiveRoadmap(roadmap)
+
+          // Calculate and set the correct day index immediately
+          const now = new Date()
+          const localTodayForReactivate = getLocalDateComponents(now)
+          const correctDayIndex =
+            roadmap.dailyPlans?.findIndex((plan: any) => {
+              const planDate = new Date(plan.date)
+              const planDateComponents = getUTCDateComponents(planDate)
+              return (
+                planDateComponents.year === localTodayForReactivate.year &&
+                planDateComponents.month === localTodayForReactivate.month &&
+                planDateComponents.day === localTodayForReactivate.day
+              )
+            }) ?? -1
+
+          if (correctDayIndex >= 0) {
+            selectDay(correctDayIndex)
+          }
         }
       }
 

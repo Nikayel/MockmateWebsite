@@ -160,12 +160,16 @@ export const useRoadmapStore = create<RoadmapState>()(
         }),
 
       // Roadmap actions
+      // NOTE: We don't reset selectedDayIndex here - the page component
+      // calls selectDay() immediately after loading to set the correct day.
+      // This prevents a flash of the wrong day on initial navigation.
       setActiveRoadmap: (roadmap) =>
-        set({
+        set((state) => ({
           activeRoadmap: roadmap,
           wizardStep: roadmap ? "complete" : "company",
-          selectedDayIndex: 0,
-        }),
+          // Keep current selectedDayIndex - the page will set it correctly
+          selectedDayIndex: state.selectedDayIndex,
+        })),
 
       markQuestionCompleted: (scenarioId, score, timeSpentMinutes) => {
         const state = get()
