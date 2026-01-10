@@ -719,6 +719,25 @@ CRITICAL INSTRUCTIONS:
       }).catch((err) => logger.error("Analytics tracking error", { error: err }))
     }
 
+    // Calculate mastery score (technical score) for all requests
+    // Technical score = Mastery score = objective metrics without communication
+    // This is returned to the frontend for the Overall/Technical toggle
+    const difficulty = (scenarioDifficulty || efficiencyMetrics?.difficulty || "medium") as
+      | "easy"
+      | "medium"
+      | "hard"
+    const masteryScoreForResponse = calculateMasteryScore({
+      testCasesPassed: testsPassed,
+      testCasesTotal: testsTotal,
+      timeSpentMinutes: timeSpent ? Math.round(timeSpent / 60) : 0,
+      hintsUsed: interactionMetrics?.hintsUsed || 0,
+      hintsTotal: 5,
+      problemDifficulty: difficulty as Difficulty,
+      approachExplained: aiValidation.approachExplained,
+      complexityDiscussed: aiValidation.complexityDiscussed,
+      interviewerMessagesCount: aiValidation.questionsAsked || 0,
+    })
+
     // Update learning state for spaced repetition email reminders
     // Also update problem-level mastery for enhanced SM-2 spaced repetition
     // Use scenarioId (e.g., 'dsa-two-sum') for spaced repetition tracking, not sessionId (Firebase session UUID)
@@ -841,6 +860,7 @@ CRITICAL INSTRUCTIONS:
     return NextResponse.json({
       feedback: finalFeedback,
       performanceScore: scores.overall,
+      technicalScore: masteryScoreForResponse.masteryScore, // Technical = Mastery (objective metrics)
       scores: scores, // Full score breakdown
       structured: structuredFeedback, // Full structured data
       // Flags for frontend warnings

@@ -234,7 +234,7 @@ export function MetricsOverview() {
           <div className="mb-1 flex items-center justify-between">
             <span className="flex items-center gap-1 text-xs text-gray-400">
               <Target className="h-3 w-3" />
-              {showOverallScore ? "Mock Interview Score" : "Code-Only Score"}
+              {showOverallScore ? "Mock Interview Score" : "Technical Score"}
               <ScoreInfoTooltip type={showOverallScore ? "overall" : "technical"} />
             </span>
             <div className="flex items-center gap-2">
@@ -256,7 +256,7 @@ export function MetricsOverview() {
                 </TooltipTrigger>
                 <TooltipContent className="bg-zinc-800 text-zinc-200">
                   <p>
-                    {showOverallScore ? "Switch to Code-Only Score" : "Switch to Interview Score"}
+                    {showOverallScore ? "Switch to Technical Score" : "Switch to Interview Score"}
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -269,7 +269,7 @@ export function MetricsOverview() {
           <div className="mt-1 text-[10px] text-gray-500">
             {showOverallScore
               ? "What you'd likely get in a real interview (communication matters!)"
-              : "Pure coding ability only (excludes communication)"}
+              : "Objective metrics: test pass rate, time efficiency, independence"}
           </div>
         </div>
 

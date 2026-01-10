@@ -2,10 +2,15 @@
  * Scoring Types
  *
  * Centralized type definitions for the scoring system.
- * Three distinct scores serve different purposes:
+ * Two distinct scores serve different purposes:
  * - performanceScore: Full interview evaluation (includes communication)
- * - technicalScore: Code-focused evaluation (excludes communication)
- * - masteryScore: Test pass rate for spaced repetition scheduling
+ * - technicalScore: Objective code metrics (= masteryScore)
+ *
+ * Technical Score is now unified with Mastery Score for simplicity.
+ * Both measure objective coding ability without communication:
+ * - Correctness (60%): test pass rate
+ * - Time Efficiency (25%): how quickly solved relative to expected time
+ * - Independence (15%): minimal hint usage
  */
 
 /**
@@ -24,8 +29,8 @@ export interface ScoreBreakdown {
  */
 export interface SessionScores {
   performanceScore: number // Full score with communication (0-100)
-  technicalScore: number // Code-only: U + PS + CQ (0-100)
-  masteryScore: number // Test pass rate for SR (0-100)
+  technicalScore: number // Objective metrics: correctness + time + independence (= masteryScore)
+  masteryScore: number // Same as technicalScore, used for spaced repetition scheduling
   breakdown: ScoreBreakdown
 }
 
@@ -85,13 +90,7 @@ export interface ScorePersistenceInput {
  *
  * Philosophy:
  * - Performance Score = Full interview simulation (communication matters)
- * - Technical Score = Code-focused (tests, efficiency, hints used)
- * - Mastery Score = Spaced repetition (correctness, time, independence)
- *
- * For Technical Score, we weight heavily on what we can OBJECTIVELY measure:
- * - Code Quality (60%): test pass rate, efficiency, readability
- * - Problem Solving (25%): debugging, optimization attempts, structured approach
- * - Understanding (15%): explained approach, complexity analysis (bonus, not penalty)
+ * - Technical Score = Mastery Score = Objective code metrics (no communication)
  */
 export const SCORE_WEIGHTS = {
   // Performance score (full interview simulation)
@@ -101,10 +100,11 @@ export const SCORE_WEIGHTS = {
     codeQuality: 0.3,
     communication: 0.2,
   },
-  // Technical score (code-focused, heavily weighted on objective metrics)
+  // Technical score = Mastery score (objective metrics only)
+  // Calculated in lib/spaced-repetition/mastery-score.ts
   technical: {
-    codeQuality: 0.6, // 60% - Tests passed, efficiency, readability
-    problemSolving: 0.25, // 25% - Debugging, optimization, structured approach
-    understanding: 0.15, // 15% - Explained approach, complexity (bonus)
+    correctness: 0.6, // 60% - Test pass rate
+    timeEfficiency: 0.25, // 25% - Time relative to expected
+    independence: 0.15, // 15% - Minimal hint usage
   },
 } as const

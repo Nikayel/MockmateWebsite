@@ -555,6 +555,52 @@ export async function updateInterviewSession(
 }
 
 /**
+ * Mark a session as being evaluated (feedback generation in progress)
+ * This should be called BEFORE feedback generation starts to prevent
+ * the session from being reopened while evaluation is in progress
+ */
+export async function markSessionEvaluating(
+  sessionId: string,
+  state: {
+    code: string
+    language: string
+    elapsedTime: number
+    chatMessages?: Array<{ type: string; message: string }>
+    interviewerMessages?: Array<{ type: string; message: string }>
+    testResults?: Array<any>
+  }
+): Promise<void> {
+  try {
+    const sessionRef = doc(db, "interview_sessions", sessionId)
+    await setDoc(
+      sessionRef,
+      {
+        feedback_status: "pending",
+        final_code: state.code,
+        language: state.language,
+        elapsed_time: state.elapsedTime,
+        // Save full session state for recovery
+        session_state: {
+          code: state.code,
+          language: state.language,
+          elapsed_time: state.elapsedTime,
+          chat_messages: state.chatMessages?.slice(-50), // Keep last 50 messages
+          interviewer_messages: state.interviewerMessages?.slice(-50),
+          test_results: state.testResults?.slice(-20),
+          saved_at: new Date().toISOString(),
+        },
+        updated_at: new Date().toISOString(),
+      },
+      { merge: true }
+    )
+  } catch (error) {
+    console.error("Failed to mark session as evaluating:", error)
+    // Re-throw so caller knows the mark failed
+    throw error
+  }
+}
+
+/**
  * Save in-progress session state for recovery
  * Called periodically during active interview
  */
@@ -578,9 +624,9 @@ export async function saveSessionState(
           code: state.code,
           language: state.selectedLanguage,
           elapsed_time: state.elapsedTime,
-          chat_messages: state.chatMessages?.slice(-20), // Keep last 20 messages
-          interviewer_messages: state.interviewerMessages?.slice(-20),
-          test_results: state.testResults?.slice(-10),
+          chat_messages: state.chatMessages?.slice(-50), // Keep last 50 messages
+          interviewer_messages: state.interviewerMessages?.slice(-50),
+          test_results: state.testResults?.slice(-20),
           saved_at: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),
@@ -654,13 +700,18 @@ export async function getSessionState(sessionId: string): Promise<{
 }
 
 /**
- * Find the latest submitted session for a scenario
- * Returns the session ID if found and it was completed/submitted
+ * Find the latest submitted or evaluating session for a scenario
+ * Returns the session ID if found and it was completed/submitted or is being evaluated
  */
 export async function findLatestSubmittedSession(
   userId: string,
   scenarioId: string
-): Promise<{ sessionId: string; completedAt: string } | null> {
+): Promise<{
+  sessionId: string
+  completedAt?: string
+  feedbackStatus?: FeedbackStatus
+  isEvaluating?: boolean
+} | null> {
   try {
     const sessionsRef = collection(db, "interview_sessions")
     const q = query(
@@ -677,11 +728,41 @@ export async function findLatestSubmittedSession(
     const doc = snapshot.docs[0]
     const data = doc.data()
 
-    // Only return if the session was completed (has completed_at)
+    // Return if the session was completed (has completed_at)
     if (data.completed_at) {
       return {
         sessionId: doc.id,
         completedAt: data.completed_at,
+        feedbackStatus: data.feedback_status,
+        isEvaluating: data.feedback_status === "pending",
+      }
+    }
+
+    // Also return if the session is being evaluated (has feedback_status = "pending")
+    // This happens when user submitted but feedback generation is still in progress
+    if (data.feedback_status === "pending") {
+      return {
+        sessionId: doc.id,
+        feedbackStatus: data.feedback_status,
+        isEvaluating: true,
+      }
+    }
+
+    // Check if session has saved state (user was working on it)
+    // but only if it's not an abandoned session (older than 24 hours without activity)
+    if (data.session_state?.saved_at) {
+      const savedAt = new Date(data.session_state.saved_at)
+      const hoursSinceSave = (Date.now() - savedAt.getTime()) / (1000 * 60 * 60)
+
+      // If saved within last 24 hours and has significant progress, treat as in-progress
+      if (
+        hoursSinceSave < 24 &&
+        (data.session_state.elapsed_time > 60 ||
+          (data.session_state.chat_messages && data.session_state.chat_messages.length > 1))
+      ) {
+        // This is an in-progress session, not a submitted one
+        // Return null so the interview page can restore it
+        return null
       }
     }
 

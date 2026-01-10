@@ -20,7 +20,6 @@ import {
   type MasteryScoreResult,
 } from "./spaced-repetition/mastery-score"
 import { analyzeMessage } from "./scoring/keyword-detection"
-import { calculateTechnicalScore } from "./scoring/technical-score"
 
 // =============================================================================
 // TYPES
@@ -668,8 +667,8 @@ async function persistSessionMetrics(state: SessionMetricsState): Promise<void> 
  */
 async function storeSessionSummary(summary: SessionSummary): Promise<void> {
   try {
-    // Calculate technical score for syncing
-    const technicalScore = calculateTechnicalScore(summary.scoreBreakdown)
+    // Technical score is now the same as mastery score (objective metrics)
+    const technicalScore = summary.masteryScore
 
     // Store in user's session history
     await adminDb
@@ -762,16 +761,14 @@ async function syncScoreToInterviewSession(
   }
 }
 
-// calculateTechnicalScore is imported from ./scoring/technical-score
-
 /**
  * Update user's aggregate statistics
  */
 async function updateUserAggregateStats(summary: SessionSummary): Promise<void> {
   const userStatsRef = adminDb.collection("user_stats").doc(summary.userId)
 
-  // Calculate technical score from breakdown
-  const technicalScore = calculateTechnicalScore(summary.scoreBreakdown)
+  // Technical score is now the same as mastery score (objective metrics)
+  const technicalScore = summary.masteryScore
 
   await adminDb.runTransaction(async (transaction) => {
     const doc = await transaction.get(userStatsRef)

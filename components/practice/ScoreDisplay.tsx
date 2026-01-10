@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { Progress } from "@/components/ui/progress"
 import {
   Lightbulb,
@@ -22,6 +23,13 @@ interface ScoreDisplayProps {
   sections: FeedbackSection
   overallScore: number
   performanceScore: number
+  technicalScore?: number // Pre-calculated technical score from backend
+  scoreBreakdown?: {
+    understandingScore?: number
+    problemSolvingScore?: number
+    codeQualityScore?: number
+    communicationScore?: number
+  }
   testsPassed: number
   testsTotal: number
   elapsedTime: number
@@ -55,6 +63,8 @@ export function ScoreDisplay({
   sections,
   overallScore,
   performanceScore,
+  technicalScore: technicalScoreProp,
+  scoreBreakdown,
   testsPassed,
   testsTotal,
   elapsedTime,
@@ -64,7 +74,7 @@ export function ScoreDisplay({
   spaceComplexity,
   efficiencyScore,
 }: ScoreDisplayProps) {
-  const { grade, color } = getLetterGrade(overallScore)
+  const [showTechnicalOnly, setShowTechnicalOnly] = useState(false)
   const feedbackLower = feedback.toLowerCase()
 
   // Derived metrics based on problem type
@@ -101,12 +111,34 @@ export function ScoreDisplay({
 
   const normalizeScore = (score: number) => (score <= 10 ? score * 10 : score)
 
+  // Use stored score breakdown if available, otherwise fall back to parsed sections
   const scores = {
-    understanding: normalizeScore(sections.scores.understanding || 0),
-    problemSolving: normalizeScore(sections.scores.problemSolving || 0),
-    codeQuality: normalizeScore(sections.scores.codeQuality || 0),
-    communication: normalizeScore(sections.scores.communication || 0),
+    understanding: normalizeScore(
+      scoreBreakdown?.understandingScore ?? sections.scores.understanding ?? 0
+    ),
+    problemSolving: normalizeScore(
+      scoreBreakdown?.problemSolvingScore ?? sections.scores.problemSolving ?? 0
+    ),
+    codeQuality: normalizeScore(
+      scoreBreakdown?.codeQualityScore ?? sections.scores.codeQuality ?? 0
+    ),
+    communication: normalizeScore(
+      scoreBreakdown?.communicationScore ?? sections.scores.communication ?? 0
+    ),
   }
+
+  // Use stored technical score if available, otherwise calculate from breakdown
+  // Technical score weights from lib/scoring/types.ts:
+  // codeQuality: 60%, problemSolving: 25%, understanding: 15%
+  const technicalScore =
+    technicalScoreProp ??
+    Math.round(
+      scores.codeQuality * 0.6 + scores.problemSolving * 0.25 + scores.understanding * 0.15
+    )
+
+  // Use technical or overall score based on toggle
+  const displayScore = showTechnicalOnly ? technicalScore : overallScore
+  const { grade, color } = getLetterGrade(displayScore)
 
   // Score items config based on problem type
   const scoreItems =
@@ -207,27 +239,46 @@ export function ScoreDisplay({
     <div className="w-full space-y-4">
       {/* Screen reader */}
       <div role="status" aria-live="polite" className="sr-only">
-        Interview feedback loaded. Grade: {grade}. Score: {overallScore}/100.
+        Interview feedback loaded. Grade: {grade}. Score: {displayScore}/100.
       </div>
 
       {/* Compact Header with Grade */}
       <div className="overflow-hidden rounded-2xl border border-zinc-800/50 bg-zinc-900/50">
         <div className="p-5">
           <div className="flex items-start gap-4">
-            {/* Grade Circle - Compact */}
-            <div
-              className={cn(
-                "flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border",
-                overallScore >= 80
-                  ? "border-emerald-500/30 bg-emerald-500/10"
-                  : overallScore >= 60
-                    ? "border-sky-500/30 bg-sky-500/10"
-                    : overallScore >= 40
-                      ? "border-amber-500/30 bg-amber-500/10"
-                      : "border-red-500/30 bg-red-500/10"
-              )}
-            >
-              <span className={cn("text-xl font-bold", color)}>{grade}</span>
+            {/* Grade Circle - Compact with score toggle */}
+            <div className="flex shrink-0 flex-col items-center gap-2">
+              <div
+                className={cn(
+                  "flex h-14 w-14 items-center justify-center rounded-xl border",
+                  displayScore >= 80
+                    ? "border-emerald-500/30 bg-emerald-500/10"
+                    : displayScore >= 60
+                      ? "border-sky-500/30 bg-sky-500/10"
+                      : displayScore >= 40
+                        ? "border-amber-500/30 bg-amber-500/10"
+                        : "border-red-500/30 bg-red-500/10"
+                )}
+              >
+                <span className={cn("text-xl font-bold", color)}>{grade}</span>
+              </div>
+              {/* Score type toggle */}
+              <button
+                onClick={() => setShowTechnicalOnly(!showTechnicalOnly)}
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors",
+                  showTechnicalOnly
+                    ? "bg-violet-500/20 text-violet-400"
+                    : "bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700"
+                )}
+                title={
+                  showTechnicalOnly
+                    ? "Technical score: Test pass rate (60%), Time efficiency (25%), Independence (15%)"
+                    : "Overall score: Includes communication (20%)"
+                }
+              >
+                {showTechnicalOnly ? "Technical" : "Overall"}
+              </button>
             </div>
 
             {/* TL;DR */}

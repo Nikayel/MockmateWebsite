@@ -19,11 +19,7 @@ import {
   getSessionState,
   updateInterviewSession,
 } from "@/lib/firestore-helpers"
-import {
-  getOrCreateGuestId,
-  markFreeTrialUsed,
-  saveGuestSessionData,
-} from "@/lib/guest-session"
+import { getOrCreateGuestId, markFreeTrialUsed, saveGuestSessionData } from "@/lib/guest-session"
 import { toast } from "sonner"
 
 export interface SessionState {
@@ -97,7 +93,8 @@ export async function startInterviewSession({
   if (userId && firebaseUser) {
     try {
       // Create session document
-      const scenarioPattern = ("pattern" in scenario ? scenario.pattern : scenario.type) || "unknown"
+      const scenarioPattern =
+        ("pattern" in scenario ? scenario.pattern : scenario.type) || "unknown"
       const sessionId = await createInterviewSession(
         userId,
         scenario.title,
@@ -158,7 +155,8 @@ export async function startInterviewSession({
   // Create session for guest user
   if (isGuestMode && guestId) {
     try {
-      const scenarioPattern = ("pattern" in scenario ? scenario.pattern : scenario.type) || "unknown"
+      const scenarioPattern =
+        ("pattern" in scenario ? scenario.pattern : scenario.type) || "unknown"
       const response = await fetch("/api/guest-session", {
         method: "POST",
         headers: {
@@ -271,9 +269,9 @@ export async function autoSaveSession({
               code: sessionState.code,
               language: sessionState.selectedLanguage,
               elapsedTime: sessionState.elapsedTime,
-              chatMessages: sessionState.chatMessages.slice(-20), // Limit messages
-              interviewerMessages: sessionState.interviewerMessages.slice(-20),
-              testResults: sessionState.testResults.slice(-10),
+              chatMessages: sessionState.chatMessages.slice(-50), // Keep last 50 messages
+              interviewerMessages: sessionState.interviewerMessages.slice(-50),
+              testResults: sessionState.testResults.slice(-20),
             },
           }),
         })
@@ -348,7 +346,9 @@ export async function restoreSession({
       // Check API for saved session state
       if (sessionId) {
         try {
-          const response = await fetch(`/api/guest-session?sessionId=${sessionId}&guestId=${guestId}`)
+          const response = await fetch(
+            `/api/guest-session?sessionId=${sessionId}&guestId=${guestId}`
+          )
           if (response.ok) {
             const data = await response.json()
             if (data.session?.session_state) {

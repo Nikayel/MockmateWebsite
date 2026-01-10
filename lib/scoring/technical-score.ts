@@ -1,104 +1,70 @@
 /**
  * Technical Score Calculator
  *
- * Calculates a code-focused score that excludes communication.
- * This score measures pure technical ability:
- * - Understanding: How well user understood the problem
- * - Problem-Solving: Approach and algorithm selection
- * - Code Quality: Correctness, efficiency, cleanliness
+ * @deprecated Technical score is now unified with Mastery score.
  *
- * Communication is excluded because technical skill should be
- * measured independently from presentation ability.
+ * Technical score = Mastery score = objective code metrics:
+ * - Correctness (60%): test pass rate
+ * - Time Efficiency (25%): how quickly solved relative to expected time
+ * - Independence (15%): minimal hint usage
+ *
+ * Use calculateMasteryScore from lib/spaced-repetition/mastery-score.ts instead.
+ *
+ * These functions are kept for backwards compatibility but should not be used
+ * for new code. They return a fallback calculation based on score breakdown.
  */
 
 import { ScoreBreakdown, SCORE_WEIGHTS } from "./types"
 
 /**
- * Calculate technical score from score breakdown
- *
- * Uses SCORE_WEIGHTS.technical from types.ts:
- * - Code Quality: 60% (tests, efficiency, readability)
- * - Problem Solving: 25% (debugging, optimization)
- * - Understanding: 15% (explained approach, complexity)
- *
- * This weights heavily on OBJECTIVE metrics (code quality)
- * rather than normalizing the interview weights.
- *
- * @param breakdown - Score breakdown with all components
- * @returns Technical score (0-100)
+ * @deprecated Use masteryScore directly from session data.
+ * This fallback uses the old AI-based calculation for backwards compatibility.
  */
 export function calculateTechnicalScore(breakdown: ScoreBreakdown): number {
-  const { understanding, problemSolving, codeQuality } = SCORE_WEIGHTS.technical
-
+  // Fallback: use a weighted average of code quality and problem solving
+  // This is only used when masteryScore is not available
   const score =
-    breakdown.understandingScore * understanding +
-    breakdown.problemSolvingScore * problemSolving +
-    breakdown.codeQualityScore * codeQuality
+    breakdown.codeQualityScore * 0.6 +
+    breakdown.problemSolvingScore * 0.25 +
+    breakdown.understandingScore * 0.15
 
   return Math.round(score)
 }
 
 /**
- * Calculate technical score from individual components
- * Useful when you don't have a full ScoreBreakdown object
- *
- * @param understandingScore - Understanding score (0-100)
- * @param problemSolvingScore - Problem-solving score (0-100)
- * @param codeQualityScore - Code quality score (0-100)
- * @returns Technical score (0-100)
+ * @deprecated Use masteryScore directly from session data.
  */
 export function calculateTechnicalScoreFromComponents(
   understandingScore: number,
   problemSolvingScore: number,
   codeQualityScore: number
 ): number {
-  const { understanding, problemSolving, codeQuality } = SCORE_WEIGHTS.technical
-
-  const score =
-    understandingScore * understanding +
-    problemSolvingScore * problemSolving +
-    codeQualityScore * codeQuality
+  const score = codeQualityScore * 0.6 + problemSolvingScore * 0.25 + understandingScore * 0.15
 
   return Math.round(score)
 }
 
 /**
- * Get the contribution of each component to the technical score
- * Useful for displaying breakdown in UI
- *
- * @param breakdown - Score breakdown with all components
- * @returns Object with each component's contribution
+ * @deprecated Technical score is now mastery-based.
+ * This function returns mastery-based breakdown.
  */
-export function getTechnicalScoreContribution(breakdown: ScoreBreakdown): {
-  understanding: { score: number; weight: number; contribution: number }
-  problemSolving: { score: number; weight: number; contribution: number }
-  codeQuality: { score: number; weight: number; contribution: number }
-  total: number
+export function getTechnicalScoreContribution(_breakdown: ScoreBreakdown): {
+  correctness: { weight: number; description: string }
+  timeEfficiency: { weight: number; description: string }
+  independence: { weight: number; description: string }
 } {
-  const weights = SCORE_WEIGHTS.technical
-
-  const understandingContribution = breakdown.understandingScore * weights.understanding
-  const problemSolvingContribution = breakdown.problemSolvingScore * weights.problemSolving
-  const codeQualityContribution = breakdown.codeQualityScore * weights.codeQuality
-
   return {
-    understanding: {
-      score: breakdown.understandingScore,
-      weight: weights.understanding,
-      contribution: Math.round(understandingContribution),
+    correctness: {
+      weight: SCORE_WEIGHTS.technical.correctness,
+      description: "Test pass rate",
     },
-    problemSolving: {
-      score: breakdown.problemSolvingScore,
-      weight: weights.problemSolving,
-      contribution: Math.round(problemSolvingContribution),
+    timeEfficiency: {
+      weight: SCORE_WEIGHTS.technical.timeEfficiency,
+      description: "Time relative to expected",
     },
-    codeQuality: {
-      score: breakdown.codeQualityScore,
-      weight: weights.codeQuality,
-      contribution: Math.round(codeQualityContribution),
+    independence: {
+      weight: SCORE_WEIGHTS.technical.independence,
+      description: "Minimal hint usage",
     },
-    total: Math.round(
-      understandingContribution + problemSolvingContribution + codeQualityContribution
-    ),
   }
 }

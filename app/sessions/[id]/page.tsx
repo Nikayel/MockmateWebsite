@@ -206,6 +206,8 @@ export default function SessionDetailPage() {
             <PracticeFeedback
               feedback={session.feedback}
               performanceScore={session.performance_score || 0}
+              technicalScore={session.technical_score ?? session.mastery_score}
+              scoreBreakdown={session.score_breakdown}
               testsPassed={
                 session.tests_passed ??
                 (session.test_results?.filter((t: any) => t.passed).length || 0)

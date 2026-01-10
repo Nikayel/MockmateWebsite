@@ -91,6 +91,8 @@ export interface InterviewSession {
   pattern?: string // DSA pattern: 'arrays-hashing', 'two-pointers', etc.
   scenario_id?: string // scenario ID for reopening sessions
   performance_score?: number
+  technical_score?: number // Code-focused score (= mastery score, excludes communication)
+  mastery_score?: number // Same as technical_score, for backwards compatibility
   feedback?: string
   feedback_status?: "pending" | "complete" | "failed" // Track feedback generation state
   // Additional completion data
@@ -102,6 +104,13 @@ export interface InterviewSession {
   time_complexity?: string
   space_complexity?: string
   efficiency_score?: number
+  // Score breakdown for detailed analysis
+  score_breakdown?: {
+    understandingScore?: number
+    problemSolvingScore?: number
+    codeQualityScore?: number
+    communicationScore?: number
+  }
   // Session state (for recovery)
   session_state?: {
     code?: string

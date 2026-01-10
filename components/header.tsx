@@ -40,7 +40,7 @@ export function Header() {
     >
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <Link href="/" className="group flex items-center space-x-2">
+          <Link href={user ? "/dashboard" : "/"} className="group flex items-center space-x-2">
             <Logo size={32} className="text-accent transition-transform group-hover:scale-105" />
             <span className="font-heading text-2xl font-bold tracking-tight">
               <span className="text-white">Code</span>

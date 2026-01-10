@@ -36,9 +36,9 @@ const SCORE_EXPLANATIONS: Record<ScoreInfoType, ScoreExplanation> = {
       "What you'd likely get in a real FAANG interview. Includes code quality (30%), problem-solving (25%), understanding (25%), and communication (20%). Communication is crucial - a silent optimal solution is a C at best.",
   },
   technical: {
-    title: "Code-Only Score",
+    title: "Technical Score",
     description:
-      "Pure coding ability without communication. Weights: Code Quality (60%), Problem-Solving (25%), Understanding (15%). Use this to track your raw technical skills separately from presentation.",
+      "Objective coding ability based on measurable metrics: Test Pass Rate (60%), Time Efficiency (25%), and Independence (15%). Excludes communication - pure technical execution. Same as mastery score.",
   },
   mastery: {
     title: "Pattern Mastery",

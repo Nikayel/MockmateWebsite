@@ -7,6 +7,13 @@ import type { ChatMessage } from "@/lib/types"
 interface PracticeFeedbackProps {
   feedback: string
   performanceScore: number
+  technicalScore?: number // Code-focused score (excludes communication)
+  scoreBreakdown?: {
+    understandingScore?: number
+    problemSolvingScore?: number
+    codeQualityScore?: number
+    communicationScore?: number
+  }
   constitutionalAICritique?: any
   testsPassed: number
   testsTotal: number
@@ -31,6 +38,8 @@ interface PracticeFeedbackProps {
 export default function PracticeFeedback({
   feedback,
   performanceScore,
+  technicalScore,
+  scoreBreakdown,
   constitutionalAICritique,
   testsPassed,
   testsTotal,
@@ -140,6 +149,8 @@ export default function PracticeFeedback({
         sections={sections}
         overallScore={overallScore}
         performanceScore={performanceScore}
+        technicalScore={technicalScore}
+        scoreBreakdown={scoreBreakdown}
         testsPassed={testsPassed}
         testsTotal={testsTotal}
         elapsedTime={elapsedTime}

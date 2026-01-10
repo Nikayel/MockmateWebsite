@@ -62,6 +62,7 @@ import {
   saveSessionState,
   getSessionState,
   findLatestSubmittedSession,
+  markSessionEvaluating,
 } from "@/lib/firestore-helpers"
 import {
   getOrCreateGuestId,
@@ -213,6 +214,13 @@ function InterviewPageContent() {
   const [showPostInterviewDiscussion, setShowPostInterviewDiscussion] = useState(false)
   const [comprehensiveFeedback, setComprehensiveFeedback] = useState<string>("")
   const [performanceScore, setPerformanceScore] = useState<number | null>(null)
+  const [technicalScore, setTechnicalScore] = useState<number | null>(null) // Mastery-based technical score
+  const [scoreBreakdown, setScoreBreakdown] = useState<{
+    understandingScore?: number
+    problemSolvingScore?: number
+    codeQualityScore?: number
+    communicationScore?: number
+  } | null>(null)
   const [constitutionalAICritique, setConstitutionalAICritique] = useState<any>(null)
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false) // Track AI feedback generation
   const [isGeneratingDiscussion, setIsGeneratingDiscussion] = useState(false)
@@ -759,13 +767,19 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       else if (scenarioId && !sessionId && (fromRoadmap || fromPractice)) {
         const scenario = getScenarioById(scenarioId)
         if (scenario) {
-          // Check if there's already a submitted session for this scenario
+          // Check if there's already a submitted or evaluating session for this scenario
           if (user?.id) {
             const existingSession = await findLatestSubmittedSession(user.id, scenarioId)
             if (existingSession) {
-              toast.info("Session already submitted", {
-                description: "Redirecting to your results...",
-              })
+              if (existingSession.isEvaluating) {
+                toast.info("Session is being evaluated", {
+                  description: "Redirecting to your results...",
+                })
+              } else {
+                toast.info("Session already submitted", {
+                  description: "Redirecting to your results...",
+                })
+              }
               router.push(`/sessions/${existingSession.sessionId}`)
               return
             }
@@ -1634,6 +1648,22 @@ Ask ONE focused question based on these observations.`)
 
       if (currentSessionId && user && code.trim()) {
         try {
+          // Mark session as evaluating BEFORE feedback generation starts
+          // This prevents the session from being reopened if user refreshes
+          try {
+            await markSessionEvaluating(currentSessionId, {
+              code,
+              language: selectedLanguage,
+              elapsedTime,
+              chatMessages,
+              interviewerMessages,
+              testResults,
+            })
+          } catch (markError) {
+            console.error("Failed to mark session as evaluating:", markError)
+            // Continue anyway - this is non-critical
+          }
+
           // Prepare conversation transcript for content-based evaluation
           // This allows the AI to evaluate WHAT was said, not just message counts
           const conversationTranscript = [
@@ -1677,9 +1707,20 @@ Ask ONE focused question based on these observations.`)
             const feedbackData = await feedbackResponse.json()
             comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
             calculatedPerformanceScore = feedbackData.performanceScore || calculatedPerformanceScore
-            // Store score breakdown for metrics (pattern ranking)
+            // Store technical score (mastery-based) for Overall/Technical toggle
+            if (feedbackData.technicalScore !== undefined) {
+              setTechnicalScore(feedbackData.technicalScore)
+            }
+            // Store score breakdown for metrics (pattern ranking) and display
             if (feedbackData.scores) {
               scoreBreakdownData = feedbackData.scores
+              // Also set state for PracticeFeedback component
+              setScoreBreakdown({
+                understandingScore: feedbackData.scores.understanding,
+                problemSolvingScore: feedbackData.scores.problemSolving,
+                codeQualityScore: feedbackData.scores.codeQuality,
+                communicationScore: feedbackData.scores.communication,
+              })
             }
             // Store Constitutional AI critique if present
             if (feedbackData.constitutionalAICritique) {
@@ -2076,6 +2117,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setWorkspaceContext([])
     setComprehensiveFeedback("")
     setPerformanceScore(null)
+    setTechnicalScore(null)
+    setScoreBreakdown(null)
 
     // Initialize code based on scenario type
     let initialCode: string
@@ -2325,6 +2368,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     setShowPostInterviewDiscussion(false)
     setComprehensiveFeedback("")
     setPerformanceScore(null)
+    setTechnicalScore(null)
+    setScoreBreakdown(null)
     setIsGeneratingDiscussion(false)
     setShowScenarioBrowser(true)
     setCode("")
@@ -2905,6 +2950,24 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       let comprehensiveFeedback = `Completed system design interview: ${selectedScenario?.title}`
       let calculatedPerformanceScore = 0
 
+      // Mark session as evaluating BEFORE feedback generation starts
+      // This prevents the session from being reopened if user refreshes
+      if (currentSessionId && user) {
+        try {
+          await markSessionEvaluating(currentSessionId, {
+            code: code || "// Design notes completed via discussion",
+            language: "notes",
+            elapsedTime,
+            chatMessages,
+            interviewerMessages,
+            testResults: [],
+          })
+        } catch (markError) {
+          console.error("Failed to mark session as evaluating:", markError)
+          // Continue anyway - this is non-critical
+        }
+      }
+
       // Prepare conversation transcript for content-based evaluation
       // This allows the AI to evaluate WHAT was said, not just message counts
       const conversationTranscript = [
@@ -2953,9 +3016,20 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         const feedbackData = await feedbackResponse.json()
         comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
         calculatedPerformanceScore = feedbackData.scores?.overall || 0
-        // Store score breakdown for technical score calculations
+        // Store technical score (mastery-based) for Overall/Technical toggle
+        if (feedbackData.technicalScore !== undefined) {
+          setTechnicalScore(feedbackData.technicalScore)
+        }
+        // Store score breakdown for technical score calculations and display
         if (feedbackData.scores) {
           systemDesignScoreBreakdown = feedbackData.scores
+          // Also set state for PracticeFeedback component
+          setScoreBreakdown({
+            understandingScore: feedbackData.scores.understanding,
+            problemSolvingScore: feedbackData.scores.problemSolving,
+            codeQualityScore: feedbackData.scores.codeQuality,
+            communicationScore: feedbackData.scores.communication,
+          })
         }
       }
 
@@ -4775,6 +4849,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     <PracticeFeedback
                       feedback={comprehensiveFeedback || ""}
                       performanceScore={performanceScore ?? 0}
+                      technicalScore={technicalScore ?? undefined}
+                      scoreBreakdown={scoreBreakdown || undefined}
                       constitutionalAICritique={constitutionalAICritique}
                       testsPassed={testSummary.passed}
                       testsTotal={testSummary.total}
