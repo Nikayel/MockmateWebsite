@@ -20,6 +20,21 @@ import { Profile, ProfileQuota } from "./types"
 import { PRICING_CONFIG } from "./config"
 
 /**
+ * Sanitize test results for Firestore storage
+ * Firestore doesn't support nested arrays, so we stringify complex values
+ */
+function sanitizeTestResultsForFirestore(testResults: Array<any>): Array<any> {
+  return testResults.map((t: any) => ({
+    description: t.description,
+    passed: t.passed,
+    input: JSON.stringify(t.input),
+    expected: JSON.stringify(t.expected),
+    actual: JSON.stringify(t.actual),
+    error: t.error,
+  }))
+}
+
+/**
  * Create or update user profile in Firestore
  */
 export async function createOrUpdateProfile(
@@ -521,7 +536,7 @@ export async function updateInterviewSession(
     if (additionalData.code) updateData.final_code = additionalData.code
     if (additionalData.language) updateData.language = additionalData.language
     if (additionalData.testResults) {
-      updateData.test_results = additionalData.testResults
+      updateData.test_results = sanitizeTestResultsForFirestore(additionalData.testResults)
       updateData.tests_passed = additionalData.testResults.filter((t: any) => t.passed).length
       updateData.tests_total = additionalData.testResults.length
     }
@@ -586,7 +601,9 @@ export async function markSessionEvaluating(
           elapsed_time: state.elapsedTime,
           chat_messages: state.chatMessages?.slice(-50), // Keep last 50 messages
           interviewer_messages: state.interviewerMessages?.slice(-50),
-          test_results: state.testResults?.slice(-20),
+          test_results: state.testResults
+            ? sanitizeTestResultsForFirestore(state.testResults.slice(-20))
+            : undefined,
           saved_at: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),
@@ -626,7 +643,9 @@ export async function saveSessionState(
           elapsed_time: state.elapsedTime,
           chat_messages: state.chatMessages?.slice(-50), // Keep last 50 messages
           interviewer_messages: state.interviewerMessages?.slice(-50),
-          test_results: state.testResults?.slice(-20),
+          test_results: state.testResults
+            ? sanitizeTestResultsForFirestore(state.testResults.slice(-20))
+            : undefined,
           saved_at: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),
@@ -972,7 +991,7 @@ export async function updateGuestInterviewSession(
     if (updateData.code) data.final_code = updateData.code
     if (updateData.language) data.language = updateData.language
     if (updateData.testResults) {
-      data.test_results = updateData.testResults
+      data.test_results = sanitizeTestResultsForFirestore(updateData.testResults)
       data.tests_passed = updateData.testResults.filter((t: any) => t.passed).length
       data.tests_total = updateData.testResults.length
     }
