@@ -7,6 +7,37 @@
  * 3. Flexible output parsing/normalization
  */
 
+/**
+ * Reference solution for dynamic validation
+ * Imported from ast-validator.ts - re-exported here for convenience
+ */
+export interface ReferenceSolution {
+  code: {
+    python: string
+    javascript: string
+    typescript?: string
+  }
+  functionName: string
+  inputSpec?: {
+    params: Array<{
+      name: string
+      type: 'int' | 'float' | 'string' | 'boolean' | 'array' | 'matrix' | 'object'
+      minLength?: number
+      maxLength?: number
+      min?: number
+      max?: number
+      elementType?: 'int' | 'float' | 'string' | 'boolean'
+      elementMin?: number
+      elementMax?: number
+    }>
+    constraints?: Array<{
+      type: 'sum-exists' | 'sorted' | 'unique' | 'custom'
+      params?: string[]
+    }>
+  }
+  outputComparison?: 'exact' | 'set' | 'any-valid' | 'property-based'
+}
+
 export type ValidationMode =
   | 'exact'           // Must match exactly (default for simple cases)
   | 'property'        // Must satisfy defined properties

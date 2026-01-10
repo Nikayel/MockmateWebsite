@@ -25,6 +25,7 @@ export {
   type Property,
   type ValidatorConfig,
   type ValidatedTestCase,
+  type ReferenceSolution,
 
   // Property builders for common patterns
   PropertyBuilders,
@@ -49,8 +50,7 @@ export {
   generateTestInputs,
   ReferenceSolutions,
 
-  // Types
-  type ReferenceSolution,
+  // Types (ReferenceSolution exported from ./types)
   type InputSpec,
   type ParamSpec,
   type ParamType,
