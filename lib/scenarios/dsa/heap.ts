@@ -197,51 +197,7 @@ public:
     },
     testCases: []
   },
-  {
-    id: 'dsa-top-k-frequent',
-    title: 'Top K Frequent Elements',
-    type: 'dsa',
-    pattern: 'heap-priority-queue',
-    difficulty: 'medium',
-    companies: ["Amazon", "Google", "Meta"],
-    description: 'Find k most frequent elements in array.',
-    tags: ["heap", "hash-table", "bucket-sort"],
-    estimatedTime: 25,
-    problemStatement: `Given an integer array nums and an integer k, return the k most frequent elements. The answer can be returned in any order.`,
-    examples: [
-    {
-      input: 'nums = [1,1,1,2,2,3], k = 2',
-      output: '[1,2]'
-    },
-    {
-      input: 'nums = [1], k = 1',
-      output: '[1]'
-    }
-  ],
-    constraints: [
-    '1 <= nums.length <= 10^5',
-    '1 <= k <= number of unique elements',
-    '-10^4 <= nums[i] <= 10^4'
-  ],
-    hints: [
-    'Count frequencies with HashMap',
-    'Use min heap of size k to track top k',
-    'Or use bucket sort: O(n) time'
-  ],
-    starterCode: {
-      javascript: `function top_k_frequent() {
-  // Your code here
-}`,
-      python: `def top_k_frequent():
-    # Your code here
-    pass`
-    },
-    optimalComplexity: {
-      time: 'O(n log k) heap, O(n) bucket',
-      space: 'O(n)'
-    },
-    testCases: []
-  },
+  // Note: Duplicate 'dsa-top-k-frequent' removed - use 'dsa-top-k-frequent-elements' in arrays-hashing
   {
     id: 'dsa-task-scheduler',
     title: 'Task Scheduler',

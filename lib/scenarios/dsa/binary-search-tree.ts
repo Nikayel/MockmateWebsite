@@ -170,51 +170,7 @@ According to the definition of LCA: "The lowest common ancestor is defined betwe
       },
     ],
   },
-  {
-    id: 'dsa-validate-bst',
-    title: 'Validate Binary Search Tree',
-    type: 'dsa',
-    pattern: 'binary-search-tree',
-    difficulty: 'medium',
-    companies: ["Amazon", "Google", "Meta", "Microsoft"],
-    description: 'Determine if a binary tree is a valid binary search tree.',
-    tags: ["tree", "dfs", "bst"],
-    estimatedTime: 20,
-    problemStatement: `Given the root of a binary tree, determine if it is a valid binary search tree (BST). A valid BST is defined as follows: The left subtree of a node contains only nodes with keys less than the node's key. The right subtree of a node contains only nodes with keys greater than the node's key. Both the left and right subtrees must also be binary search trees.`,
-    examples: [
-    {
-      input: 'root = [2,1,3]',
-      output: 'true'
-    },
-    {
-      input: 'root = [5,1,4,null,null,3,6]',
-      output: 'false',
-      explanation: 'The root node\'s value is 5 but its right child\'s value is 4.'
-    }
-  ],
-    constraints: [
-    'The number of nodes in the tree is in the range [1, 10^4].',
-    '-2^31 <= Node.val <= 2^31 - 1'
-  ],
-    hints: [
-    'Keep track of valid range for each node',
-    'Use inorder traversal - should be strictly increasing',
-    'Pass min and max values down the tree'
-  ],
-    starterCode: {
-      javascript: `function validate_bst() {
-  // Your code here
-}`,
-      python: `def validate_bst():
-    # Your code here
-    pass`
-    },
-    optimalComplexity: {
-      time: 'O(n)',
-      space: 'O(n)'
-    },
-    testCases: []
-  },
+  // Note: Duplicate 'dsa-validate-bst' removed - use 'dsa-valid-binary-search-tree' above
   {
     id: 'dsa-kth-smallest-bst',
     title: 'Kth Smallest Element in BST',
