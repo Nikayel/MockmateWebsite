@@ -5,43 +5,48 @@ import { enforceQuota } from "@/lib/quota-enforcement"
 import { trackCodeExecutionServer } from "@/lib/analytics-server"
 import { executeWithPiston, parseExecutionOutput } from "@/lib/piston"
 import { logger } from "@/lib/logger"
+import { validateResultEnhanced, Normalizers } from "@/lib/validators"
 
 // Mark route as dynamic to avoid build-time issues
 export const dynamic = "force-dynamic"
 
-// Validate test results with improved edge case handling
-function validateResult(actual: any, expected: any, testCase: any, scenarioType: string): boolean {
+// Validate test results using property-based validation system
+function validateResult(
+  actual: any,
+  expected: any,
+  testCase: any,
+  scenarioType: string,
+  scenarioId: string = "",
+  language: string = "javascript"
+): boolean {
+  // Parse the output to handle different formats (tuples, sets, etc.)
+  const parsedActual = Normalizers.parseOutput(actual)
+
   // Handle null/undefined cases first
   if (expected === null || expected === undefined) {
-    return actual === null || actual === undefined
+    return parsedActual === null || parsedActual === undefined
   }
-  if (actual === null || actual === undefined) {
+  if (parsedActual === null || parsedActual === undefined) {
     return false
   }
 
-  // For DSA array problems (like two-sum), check if arrays are equal
+  // Use the new property-based validation system
+  // This automatically detects problem patterns and validates appropriately
+  const result = validateResultEnhanced(parsedActual, testCase, scenarioId, language)
+
+  if (result.passed) {
+    return true
+  }
+
+  // Fallback: Legacy validation for cases not yet covered by property validators
+  return legacyValidateResult(parsedActual, expected, testCase, scenarioType)
+}
+
+// Legacy validation logic (kept for backwards compatibility)
+function legacyValidateResult(actual: any, expected: any, testCase: any, scenarioType: string): boolean {
+  // For DSA array problems, check if arrays are equal
   if (Array.isArray(expected) && Array.isArray(actual)) {
     if (expected.length !== actual.length) return false
-
-    // For problems like two-sum, order might not matter
-    // Check if it's a valid solution
-    if (testCase.input.nums && testCase.input.target !== undefined) {
-      // Two-sum style: verify the result points to values that sum to target
-      if (actual.length === 2) {
-        const nums = testCase.input.nums
-        // Ensure indices are valid and different
-        if (
-          actual[0] >= 0 &&
-          actual[0] < nums.length &&
-          actual[1] >= 0 &&
-          actual[1] < nums.length &&
-          actual[0] !== actual[1]
-        ) {
-          // Indices must be different
-          return nums[actual[0]] + nums[actual[1]] === testCase.input.target
-        }
-      }
-    }
 
     // For array of arrays (like 2D arrays), deep compare
     if (expected.length > 0 && Array.isArray(expected[0])) {
@@ -52,7 +57,7 @@ function validateResult(actual: any, expected: any, testCase: any, scenarioType:
     }
 
     // For arrays where order doesn't matter (set-like), check as sets
-    if (testCase.orderMatters === false) {
+    if (testCase.orderMatters === false || testCase.compareAsSet) {
       const expectedSet = new Set(expected.map((x: any) => JSON.stringify(x)))
       const actualSet = new Set(actual.map((x: any) => JSON.stringify(x)))
       if (expectedSet.size !== actualSet.size) return false
@@ -101,7 +106,7 @@ function validateResult(actual: any, expected: any, testCase: any, scenarioType:
       if (expectedKeys.length !== actualKeys.length) return false
 
       return expectedKeys.every((key) => {
-        return validateResult(
+        return legacyValidateResult(
           actual[key],
           expected[key],
           { ...testCase, orderMatters: true },
@@ -277,8 +282,8 @@ export async function POST(request: NextRequest) {
           allConsoleLogs = [...allConsoleLogs, ...parsed.consoleLogs]
         }
 
-        // Validate result
-        const passed = validateResult(actualResult, testCase.expected, testCase, scenario.type)
+        // Validate result using property-based validation
+        const passed = validateResult(actualResult, testCase.expected, testCase, scenario.type, scenarioId, language)
 
         if (!passed) {
           allPassed = false
