@@ -7,64 +7,75 @@
  * 3. Auto-detection of problem patterns
  * 4. Reference solution execution - run canonical solution, compare outputs
  *
- * Usage:
- *   import { validateResultEnhanced } from '@/lib/validators'
- *   const result = validateResultEnhanced(userOutput, testCase, scenarioId, language)
+ * Primary exports (currently used):
+ *   import { validateResultEnhanced, Normalizers } from '@/lib/validators'
+ *   import { extractSignature, validateWithAST } from '@/lib/validators'
  *
- *   // Or use reference-based validation:
- *   import { validateWithReference, ReferenceSolutions } from '@/lib/validators'
- *   const result = await validateWithReference(userCode, ReferenceSolutions['two-sum'], 'python')
+ * For scenarios with explicit validators:
+ *   import { PropertyBuilders, type ValidatorConfig } from '@/lib/validators'
  */
 
+// ============================================
+// ACTIVELY USED EXPORTS
+// ============================================
+
+// Used by app/api/execute/route.ts
+export { validateResultEnhanced } from './runner'
+export { Normalizers } from './types'
+
+// Used by app/api/execute/ast/route.ts
 export {
-  // Types
+  extractSignature,
+  generateInputsFromSignature,
+  validateWithAST,
+  type FunctionSignature,
+} from './ast-parser'
+
+// ============================================
+// AVAILABLE FOR FUTURE USE
+// These are exported for scenarios that want explicit validator config
+// ============================================
+
+export {
+  // Types for scenario definitions
   type ValidationMode,
-  type OutputNormalization,
-  type ValidatorContext,
-  type ValidatorFn,
-  type Property,
   type ValidatorConfig,
-  type ValidatedTestCase,
   type ReferenceSolution,
+  type ValidatedTestCase,
 
-  // Property builders for common patterns
+  // Property builders for common DSA patterns
   PropertyBuilders,
-
-  // Output normalizers
-  Normalizers,
 } from './types'
 
 export {
-  // Main validation functions
-  validateOutput,
-  validateResultEnhanced,
-  convertLegacyTestCase,
+  // Reference solution based validation
+  validateWithReference,
+  generateTestInputs,
+  ReferenceSolutions,
+  type InputSpec,
+  type ParamSpec,
+  type OutputComparisonMode,
+} from './ast-validator'
 
-  // Result type
+// ============================================
+// INTERNAL EXPORTS (used by other validator files)
+// ============================================
+
+export {
+  validateOutput,
+  convertLegacyTestCase,
   type ValidationResult,
 } from './runner'
 
 export {
-  // Reference-based validation (AST-inspired approach)
-  validateWithReference,
-  generateTestInputs,
-  ReferenceSolutions,
-
-  // Types (ReferenceSolution exported from ./types)
-  type InputSpec,
-  type ParamSpec,
-  type ParamType,
-  type OutputComparisonMode,
-} from './ast-validator'
+  type OutputNormalization,
+  type ValidatorContext,
+  type ValidatorFn,
+  type Property,
+} from './types'
 
 export {
-  // True AST-based validation
-  extractSignature,
-  generateInputsFromSignature,
-  validateWithAST,
-
-  // Types
-  type FunctionSignature,
   type ParamInfo,
   type TypeInfo,
+  type ParamType,
 } from './ast-parser'

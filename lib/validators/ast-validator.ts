@@ -10,24 +10,10 @@
  */
 
 import { executeWithPiston } from '@/lib/piston'
+import type { ReferenceSolution } from './types'
 
-/**
- * Reference solution configuration
- */
-export interface ReferenceSolution {
-  // The canonical correct solution
-  code: {
-    python: string
-    javascript: string
-    typescript?: string
-  }
-  // Function name to call
-  functionName: string
-  // Input parameter specification for generating test cases
-  inputSpec: InputSpec
-  // How to compare outputs
-  outputComparison?: OutputComparisonMode
-}
+// Re-export for backwards compatibility
+export type { ReferenceSolution }
 
 /**
  * Input specification for generating test cases

@@ -10,7 +10,26 @@ import { validateResultEnhanced, Normalizers } from "@/lib/validators"
 // Mark route as dynamic to avoid build-time issues
 export const dynamic = "force-dynamic"
 
-// Validate test results using property-based validation system
+/**
+ * Validate test results using property-based validation system
+ *
+ * Validation flow:
+ * 1. Parse output to handle different formats (tuples, sets, etc.)
+ * 2. Try property-based validation (auto-detects patterns like two-sum, anagrams)
+ * 3. Fall back to legacy validation for patterns not yet covered
+ *
+ * Property-based validation handles:
+ * - two-sum: validates indices point to values summing to target
+ * - group-anagrams: validates groups contain only anagrams
+ * - palindrome: validates boolean matches expected check
+ * - cycle-detection: validates boolean for cycle presence
+ *
+ * Legacy fallback handles:
+ * - 2D array comparisons
+ * - Set-like array comparisons (orderMatters=false)
+ * - Object deep equality
+ * - String/number comparisons
+ */
 function validateResult(
   actual: any,
   expected: any,
@@ -39,6 +58,7 @@ function validateResult(
   }
 
   // Fallback: Legacy validation for cases not yet covered by property validators
+  // TODO: Gradually migrate all patterns to property-based validation
   return legacyValidateResult(parsedActual, expected, testCase, scenarioType)
 }
 
