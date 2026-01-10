@@ -3494,6 +3494,29 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           markQuestionEvaluating(selectedScenario.id)
         }
 
+        // Mark session as evaluating IMMEDIATELY after submit (before post-interview chat)
+        // This ensures if user leaves during post-interview discussion, session shows as "evaluating"
+        if (currentSessionId && user) {
+          try {
+            await markSessionEvaluating(currentSessionId, {
+              code,
+              language: selectedLanguage,
+              elapsedTime,
+              chatMessages: messages.slice(-50),
+              interviewerMessages: interviewerMessages.slice(-50),
+              testResults: data.results.slice(0, 20).map((r: any) => ({
+                description: r.description || "",
+                passed: r.passed || false,
+                expected: typeof r.expected === "object" ? JSON.stringify(r.expected) : String(r.expected ?? ""),
+                actual: typeof r.actual === "object" ? JSON.stringify(r.actual) : String(r.actual ?? ""),
+              })),
+            })
+          } catch (markError) {
+            console.error("Failed to mark session as evaluating:", markError)
+            // Continue anyway - non-critical
+          }
+        }
+
         // Proceed to post-interview discussion
         setIsRunningTests(false)
         setShowPostInterviewDiscussion(true)
