@@ -73,68 +73,84 @@ function parseBulletList(text: string, preferNumbered: boolean = false): string[
   const trimmed = text.trim()
   if (!trimmed) return []
 
-  // Try different bullet patterns in order of preference
-  const bulletPatterns = [
-    /\n[-•*]\s*/, // Standard bullets with newline: -, •, *
-    /\s[-•*]\s+(?=[A-Z])/, // Inline bullets followed by capital letter (e.g., "* Implemented")
-    /\n\d+\.\s*/, // Numbered: 1., 2., etc.
-  ]
+  // BEST approach: Extract lines that look like bullet points directly
+  // This handles all formats: "- item", "• item", "* item", "1. item"
+  const bulletLineRegex = /^[\s]*[-•*]\s+(.+)$/gm
+  const numberedLineRegex = /^[\s]*\d+[.)]\s+(.+)$/gm
 
-  // Try pattern based on preference
-  const pattern = preferNumbered ? bulletPatterns[2] : bulletPatterns[0]
-  let items = trimmed
-    .split(pattern)
-    .map((s) => s.trim())
-    .filter((s) => s && s.length > 0)
-
-  // If no items found with newline pattern, try inline bullet pattern
-  if (items.length <= 1 && !preferNumbered) {
-    items = trimmed
-      .split(bulletPatterns[1])
-      .map((s) => s.trim())
-      .filter((s) => s && s.length > 0)
-  }
-
-  // If still no items, try the alternate pattern
-  if (items.length <= 1) {
-    const altPattern = preferNumbered ? bulletPatterns[0] : bulletPatterns[2]
-    items = trimmed
-      .split(altPattern)
-      .map((s) => s.trim())
-      .filter((s) => s && s.length > 0)
-  }
-
-  // If still no items, try splitting by lines that start with bullet chars
-  if (items.length <= 1) {
-    const lines = trimmed.split("\n")
-    items = lines
-      .map((line) => line.replace(/^[-•*\d.)\s]+/, "").trim())
-      .filter((s) => s && s.length > 5) // Filter out very short lines
-  }
-
-  // Final fallback: split on " * " or " - " patterns (inline bullets)
-  if (items.length <= 1) {
-    items = trimmed
-      .split(/\s+[-*•]\s+/)
-      .map((s) => s.trim())
-      .filter((s) => s && s.length > 10)
-  }
-
-  // Last fallback: if text is just paragraphs, split by sentences
-  if (items.length === 0) {
-    const sentences = trimmed
-      .split(/(?<=[.!?])\s+/)
-      .map((s) => s.trim())
-      .filter((s) => s && s.length > 10 && !s.startsWith("**"))
-    if (sentences.length > 0) {
-      items = sentences.slice(0, 5) // Max 5 items from sentence fallback
+  // Try bullet points first (unless preferNumbered)
+  if (!preferNumbered) {
+    const bulletMatches = [...trimmed.matchAll(bulletLineRegex)]
+    if (bulletMatches.length > 0) {
+      const items = bulletMatches.map((m) => m[1].trim()).filter((s) => s && s.length > 3)
+      if (items.length > 0) {
+        return filterHeaderLines(items)
+      }
     }
   }
 
-  // Remove any items that are just section headers or empty-looking
+  // Try numbered lists
+  const numberedMatches = [...trimmed.matchAll(numberedLineRegex)]
+  if (numberedMatches.length > 0) {
+    const items = numberedMatches.map((m) => m[1].trim()).filter((s) => s && s.length > 3)
+    if (items.length > 0) {
+      return filterHeaderLines(items)
+    }
+  }
+
+  // Try bullet points if we preferred numbered but found none
+  if (preferNumbered) {
+    const bulletMatches = [...trimmed.matchAll(bulletLineRegex)]
+    if (bulletMatches.length > 0) {
+      const items = bulletMatches.map((m) => m[1].trim()).filter((s) => s && s.length > 3)
+      if (items.length > 0) {
+        return filterHeaderLines(items)
+      }
+    }
+  }
+
+  // Fallback: split by lines and clean up bullet prefixes
+  const lines = trimmed.split("\n")
+  let items = lines
+    .map((line) => line.replace(/^[\s]*[-•*\d.)\s]+/, "").trim())
+    .filter((s) => s && s.length > 5)
+
+  if (items.length > 0) {
+    return filterHeaderLines(items)
+  }
+
+  // Final fallback: split on inline bullet patterns
+  items = trimmed
+    .split(/\s+[-*•]\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s && s.length > 10)
+
+  if (items.length > 0) {
+    return filterHeaderLines(items)
+  }
+
+  // Last resort: split by sentences
+  const sentences = trimmed
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s && s.length > 10 && !s.startsWith("**"))
+
+  if (sentences.length > 0) {
+    return filterHeaderLines(sentences.slice(0, 5))
+  }
+
+  return []
+}
+
+/**
+ * Filter out section headers and other non-content lines
+ */
+function filterHeaderLines(items: string[]): string[] {
   return items.filter(
     (item) =>
-      item.length > 3 && !item.startsWith("**") && !item.match(/^(What|Fix|To|Action|Score)/)
+      item.length > 3 &&
+      !item.startsWith("**") &&
+      !item.match(/^(What Worked|Fix Next|To Improve|Action Plan|Score Snapshot)/i)
   )
 }
 

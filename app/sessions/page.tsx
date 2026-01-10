@@ -256,6 +256,18 @@ export default function SessionsPage() {
                             <Play className="mr-1.5 h-3 w-3" />
                             Continue
                           </Button>
+                        ) : isFeedbackPending ? (
+                          <Link href={`/sessions/${session.id}`}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-xs text-blue-400 hover:text-blue-300"
+                            >
+                              <Clock className="mr-1.5 h-3 w-3" />
+                              View Status
+                              <ChevronRight className="ml-1 h-3 w-3" />
+                            </Button>
+                          </Link>
                         ) : hasFeedback ? (
                           <Link href={`/sessions/${session.id}`}>
                             <Button
@@ -269,7 +281,9 @@ export default function SessionsPage() {
                             </Button>
                           </Link>
                         ) : (
-                          <ChevronRight className="h-4 w-4 text-zinc-600" />
+                          <Link href={`/sessions/${session.id}`}>
+                            <ChevronRight className="h-4 w-4 text-zinc-600 hover:text-zinc-400" />
+                          </Link>
                         )}
                       </div>
                     </div>
