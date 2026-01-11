@@ -8,7 +8,12 @@ import { AnnouncementProvider } from "@/components/announcements"
 import { CookieConsent } from "@/components/CookieConsent"
 import { ConsentAnalytics } from "@/components/ConsentAnalytics"
 import { PerformancePolyfill } from "@/components/performance-polyfill"
-import { OrganizationJsonLd, SoftwareApplicationJsonLd, WebSiteJsonLd, FounderPersonJsonLd } from "@/components/seo/JsonLd"
+import {
+  OrganizationJsonLd,
+  SoftwareApplicationJsonLd,
+  WebSiteJsonLd,
+  FounderPersonJsonLd,
+} from "@/components/seo/JsonLd"
 import "./globals.css"
 
 const workSans = Work_Sans({
@@ -25,8 +30,9 @@ const openSans = Open_Sans({
 
 const siteConfig = {
   name: "CodeSparring",
-  tagline: "Ace Your Tech Interview with AI Mock Practice",
-  description: "Practice coding interviews with an AI interviewer available 24/7. Talk through problems out loud, get instant feedback, and master DSA patterns. Better than grinding LeetCode alone.",
+  tagline: "Train the Skill Interviews Actually Test",
+  description:
+    "LeetCode tests problem-solving. Real interviews test performance under pressure. Practice with an AI interviewer that gives real feedback on how you communicate and think out loud—24/7, no scheduling.",
   url: process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.dev",
   // OG images are now dynamically generated via app/opengraph-image.tsx
 }
@@ -89,13 +95,9 @@ export const metadata: Metadata = {
   // Favicon and icons - dynamically generated via app/icon.tsx and app/apple-icon.tsx
   // Keep SVG as fallback for browsers that support it
   icons: {
-    icon: [
-      { url: "/icon-codesparring.svg", type: "image/svg+xml" },
-    ],
+    icon: [{ url: "/icon-codesparring.svg", type: "image/svg+xml" }],
     shortcut: "/icon-codesparring.svg",
-    apple: [
-      { url: "/icon-codesparring.svg", type: "image/svg+xml" },
-    ],
+    apple: [{ url: "/icon-codesparring.svg", type: "image/svg+xml" }],
   },
 
   // Canonical URL
@@ -190,7 +192,7 @@ html {
         {/* Skip link for keyboard accessibility - hidden until focused */}
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-accent focus:text-accent-foreground focus:rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+          className="focus:bg-accent focus:text-accent-foreground focus:ring-ring sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:rounded-md focus:px-4 focus:py-2 focus:ring-2 focus:outline-none"
         >
           Skip to main content
         </a>
@@ -198,9 +200,7 @@ html {
         <ErrorBoundaryProvider>
           <AuthProvider>
             <AnnouncementProvider>
-              <div id="main-content">
-                {children}
-              </div>
+              <div id="main-content">{children}</div>
               <Toaster position="top-right" richColors />
               <CookieConsent />
               <ConsentAnalytics />
