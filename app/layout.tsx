@@ -13,6 +13,7 @@ import {
   SoftwareApplicationJsonLd,
   WebSiteJsonLd,
   FounderPersonJsonLd,
+  HomepagePositioningFAQJsonLd,
 } from "@/components/seo/JsonLd"
 import "./globals.css"
 
@@ -57,12 +58,18 @@ export const metadata: Metadata = {
   },
   description: siteConfig.description,
   keywords: [
-    // Primary keywords
+    // Primary keywords - differentiation focus
     "coding interview prep",
     "mock interview",
     "AI interviewer",
-    "DSA practice",
+    "interview performance training",
     "LeetCode alternative",
+    // Competitive positioning keywords
+    "better than LeetCode",
+    "LeetCode vs CodeSparring",
+    "cheap mock interviews",
+    "Interviewing.io alternative",
+    "voice coding interview practice",
     // Long-tail keywords
     "tech interview preparation",
     "software engineering interview",
@@ -70,18 +77,22 @@ export const metadata: Metadata = {
     "Google interview prep",
     "Amazon interview questions",
     "Meta coding interview",
-    // Algorithm keywords
-    "algorithm practice",
-    "data structures practice",
-    "coding interview questions",
-    "two pointers leetcode",
-    "dynamic programming practice",
-    "binary search problems",
+    // Problem keywords
+    "why I fail coding interviews",
+    "LeetCode not enough",
+    "interview anxiety practice",
+    "practice thinking out loud coding",
     // Feature keywords
     "voice mock interview",
     "AI coding tutor",
     "spaced repetition coding",
     "interview practice app",
+    "24/7 mock interviews",
+    // Algorithm keywords
+    "DSA practice",
+    "algorithm practice",
+    "data structures practice",
+    "coding interview questions",
     // Related searches
     "how to pass coding interview",
     "coding interview tips",
@@ -160,6 +171,7 @@ export default function RootLayout({
         <OrganizationJsonLd />
         <SoftwareApplicationJsonLd />
         <FounderPersonJsonLd />
+        <HomepagePositioningFAQJsonLd />
         <style>{`
 html {
   font-family: ${openSans.style.fontFamily};
