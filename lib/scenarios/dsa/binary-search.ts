@@ -476,6 +476,124 @@ public:
       { input: { nums1: [1, 2], nums2: [3, 4] }, expected: 2.5, description: "Even total length" },
     ],
   },
+  {
+    id: "dsa-first-bad-version",
+    title: "First Bad Version",
+    type: "dsa",
+    pattern: "binary-search",
+    difficulty: "easy",
+    companies: ["Google", "Amazon", "Meta", "Microsoft"],
+    description: "Find the first bad version using binary search with minimal API calls",
+    tags: ["binary-search", "interactive"],
+    estimatedTime: 15,
+    problemStatement: `You are a product manager and currently leading a team to develop a new product. Unfortunately, the latest version of your product fails the quality check. Since each version is developed based on the previous version, all the versions after a bad version are also bad.
+
+Suppose you have n versions [1, 2, ..., n] and you want to find out the first bad one, which causes all the following ones to be bad.
+
+You are given an API bool isBadVersion(version) which returns whether version is bad. Implement a function to find the first bad version. You should minimize the number of calls to the API.`,
+    examples: [
+      {
+        input: "n = 5, bad = 4",
+        output: "4",
+        explanation:
+          "isBadVersion(3) -> false, isBadVersion(5) -> true, isBadVersion(4) -> true. So 4 is the first bad version.",
+      },
+      {
+        input: "n = 1, bad = 1",
+        output: "1",
+      },
+    ],
+    constraints: ["1 <= bad <= n <= 2^31 - 1"],
+    hints: [
+      "Classic binary search application",
+      "Search for leftmost true in a boolean array",
+      "If mid is bad, first bad is at mid or before",
+      "If mid is good, first bad is after mid",
+    ],
+    starterCode: {
+      javascript: `function firstBadVersion(n) {
+  // isBadVersion(version) is a predefined API
+  // Write your solution here
+
+}`,
+      typescript: `function firstBadVersion(n: number): number {
+  // isBadVersion(version: number): boolean is a predefined API
+  // Write your solution here
+
+}`,
+      python: `def firstBadVersion(n):
+    # isBadVersion(version) is a predefined API
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(log n)", space: "O(1)" },
+    testCases: [
+      { input: { n: 5, bad: 4 }, expected: 4, description: "First bad at 4" },
+      { input: { n: 1, bad: 1 }, expected: 1, description: "Only one version, it's bad" },
+      { input: { n: 100, bad: 50 }, expected: 50, description: "Bad in middle" },
+      { input: { n: 10, bad: 1 }, expected: 1, description: "First version is bad" },
+      { input: { n: 10, bad: 10 }, expected: 10, description: "Last version is first bad" },
+    ],
+  },
+  {
+    id: "dsa-search-insert-position",
+    title: "Search Insert Position",
+    type: "dsa",
+    pattern: "binary-search",
+    difficulty: "easy",
+    companies: ["Google", "Amazon", "Microsoft", "Apple"],
+    description: "Find the index where a target should be inserted in a sorted array",
+    tags: ["array", "binary-search"],
+    estimatedTime: 15,
+    problemStatement: `Given a sorted array of distinct integers and a target value, return the index if the target is found. If not, return the index where it would be if it were inserted in order.
+
+You must write an algorithm with O(log n) runtime complexity.`,
+    examples: [
+      { input: "nums = [1,3,5,6], target = 5", output: "2" },
+      { input: "nums = [1,3,5,6], target = 2", output: "1" },
+      { input: "nums = [1,3,5,6], target = 7", output: "4" },
+    ],
+    constraints: [
+      "1 <= nums.length <= 10^4",
+      "-10^4 <= nums[i] <= 10^4",
+      "nums contains distinct values sorted in ascending order.",
+      "-10^4 <= target <= 10^4",
+    ],
+    hints: [
+      "Binary search for leftmost position where element >= target",
+      "If found, return index; if not, return where it should be",
+      "Final left pointer will be the insertion position",
+    ],
+    starterCode: {
+      javascript: `function searchInsert(nums, target) {
+  // Write your solution here
+
+}`,
+      typescript: `function searchInsert(nums: number[], target: number): number {
+  // Write your solution here
+
+}`,
+      python: `def searchInsert(nums, target):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(log n)", space: "O(1)" },
+    testCases: [
+      { input: { nums: [1, 3, 5, 6], target: 5 }, expected: 2, description: "Target found" },
+      {
+        input: { nums: [1, 3, 5, 6], target: 2 },
+        expected: 1,
+        description: "Insert between elements",
+      },
+      { input: { nums: [1, 3, 5, 6], target: 7 }, expected: 4, description: "Insert at end" },
+      { input: { nums: [1, 3, 5, 6], target: 0 }, expected: 0, description: "Insert at beginning" },
+      {
+        input: { nums: [1], target: 0 },
+        expected: 0,
+        description: "Single element, insert before",
+      },
+    ],
+  },
 ]
 
 export default binarySearchScenarios

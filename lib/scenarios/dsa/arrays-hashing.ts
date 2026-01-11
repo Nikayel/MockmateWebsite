@@ -763,6 +763,172 @@ You must write an algorithm that runs in O(n) time and uses only constant extra 
       { input: { nums: [1] }, expected: [], description: "No duplicates" },
     ],
   },
+  {
+    id: "dsa-next-permutation",
+    title: "Next Permutation",
+    type: "dsa",
+    pattern: "arrays-hashing",
+    difficulty: "medium",
+    companies: ["Google", "Amazon", "Microsoft", "Meta", "Apple"],
+    description: "Find the next lexicographically greater permutation of numbers",
+    tags: ["array", "two-pointers"],
+    estimatedTime: 25,
+    problemStatement: `A permutation of an array of integers is an arrangement of its members into a sequence or linear order.
+
+The next permutation of an array of integers is the next lexicographically greater permutation of its integer. If such arrangement is not possible, the array must be rearranged as the lowest possible order (i.e., sorted in ascending order).
+
+For example:
+- For arr = [1,2,3], the next permutation is [1,3,2].
+- For arr = [3,2,1], the next permutation is [1,2,3] (no greater permutation exists).
+- For arr = [1,1,5], the next permutation is [1,5,1].
+
+The replacement must be in place and use only constant extra memory.`,
+    examples: [
+      { input: "nums = [1,2,3]", output: "[1,3,2]" },
+      { input: "nums = [3,2,1]", output: "[1,2,3]" },
+      { input: "nums = [1,1,5]", output: "[1,5,1]" },
+    ],
+    constraints: ["1 <= nums.length <= 100", "0 <= nums[i] <= 100"],
+    hints: [
+      "Find the largest index i such that nums[i] < nums[i+1]",
+      "If no such index exists, reverse the entire array",
+      "Find the largest index j > i such that nums[i] < nums[j], swap them",
+      "Reverse the suffix starting at i+1",
+    ],
+    starterCode: {
+      javascript: `function nextPermutation(nums) {
+  // Modify nums in-place to the next permutation
+
+}`,
+      typescript: `function nextPermutation(nums: number[]): void {
+  // Modify nums in-place to the next permutation
+
+}`,
+      python: `def nextPermutation(nums):
+    # Modify nums in-place to the next permutation
+    pass`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(1)" },
+    testCases: [
+      { input: { nums: [1, 2, 3] }, expected: [1, 3, 2], description: "Standard case" },
+      { input: { nums: [3, 2, 1] }, expected: [1, 2, 3], description: "Descending - wrap around" },
+      { input: { nums: [1, 1, 5] }, expected: [1, 5, 1], description: "With duplicates" },
+      { input: { nums: [1] }, expected: [1], description: "Single element" },
+      { input: { nums: [1, 3, 2] }, expected: [2, 1, 3], description: "Mid-array swap" },
+      { input: { nums: [2, 3, 1] }, expected: [3, 1, 2], description: "Complex case" },
+    ],
+  },
+  {
+    id: "dsa-majority-element",
+    title: "Majority Element",
+    type: "dsa",
+    pattern: "arrays-hashing",
+    difficulty: "easy",
+    companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple"],
+    description: "Find the element that appears more than n/2 times using Boyer-Moore algorithm",
+    tags: ["array", "hash-table", "divide-and-conquer", "sorting", "counting"],
+    estimatedTime: 15,
+    problemStatement: `Given an array nums of size n, return the majority element.
+
+The majority element is the element that appears more than ⌊n / 2⌋ times. You may assume that the majority element always exists in the array.
+
+Follow-up: Could you solve the problem in linear time and in O(1) space?`,
+    examples: [
+      { input: "nums = [3,2,3]", output: "3" },
+      { input: "nums = [2,2,1,1,1,2,2]", output: "2" },
+    ],
+    constraints: ["n == nums.length", "1 <= n <= 5 * 10^4", "-10^9 <= nums[i] <= 10^9"],
+    hints: [
+      "Hash map solution: count frequencies, return element with count > n/2",
+      "Sorting solution: majority element will always be at n/2 index",
+      "Boyer-Moore Voting Algorithm: O(n) time, O(1) space",
+      "Boyer-Moore: maintain candidate and count, increment/decrement based on match",
+    ],
+    starterCode: {
+      javascript: `function majorityElement(nums) {
+  // Write your solution here
+
+}`,
+      typescript: `function majorityElement(nums: number[]): number {
+  // Write your solution here
+
+}`,
+      python: `def majorityElement(nums):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(1)" },
+    testCases: [
+      { input: { nums: [3, 2, 3] }, expected: 3, description: "Simple majority" },
+      { input: { nums: [2, 2, 1, 1, 1, 2, 2] }, expected: 2, description: "Longer array" },
+      { input: { nums: [1] }, expected: 1, description: "Single element" },
+      { input: { nums: [1, 1, 1, 1] }, expected: 1, description: "All same" },
+      { input: { nums: [6, 5, 5] }, expected: 5, description: "Majority at end" },
+    ],
+  },
+  {
+    id: "dsa-rotate-array",
+    title: "Rotate Array",
+    type: "dsa",
+    pattern: "arrays-hashing",
+    difficulty: "medium",
+    companies: ["Amazon", "Microsoft", "Meta", "Apple"],
+    description: "Rotate an array to the right by k steps in-place",
+    tags: ["array", "math", "two-pointers"],
+    estimatedTime: 20,
+    problemStatement: `Given an integer array nums, rotate the array to the right by k steps, where k is non-negative.
+
+Follow up:
+- Try to come up with as many solutions as you can. There are at least three different ways to solve this problem.
+- Could you do it in-place with O(1) extra space?`,
+    examples: [
+      {
+        input: "nums = [1,2,3,4,5,6,7], k = 3",
+        output: "[5,6,7,1,2,3,4]",
+        explanation:
+          "rotate 1 step: [7,1,2,3,4,5,6], rotate 2 steps: [6,7,1,2,3,4,5], rotate 3 steps: [5,6,7,1,2,3,4]",
+      },
+      {
+        input: "nums = [-1,-100,3,99], k = 2",
+        output: "[3,99,-1,-100]",
+      },
+    ],
+    constraints: ["1 <= nums.length <= 10^5", "-2^31 <= nums[i] <= 2^31 - 1", "0 <= k <= 10^5"],
+    hints: [
+      "Use modulo: k = k % nums.length to handle k > length",
+      "Reverse approach: reverse all, reverse first k, reverse rest",
+      "Cyclic replacement: place each element at its final position",
+    ],
+    starterCode: {
+      javascript: `function rotate(nums, k) {
+  // Modify nums in-place
+
+}`,
+      typescript: `function rotate(nums: number[], k: number): void {
+  // Modify nums in-place
+
+}`,
+      python: `def rotate(nums, k):
+    # Modify nums in-place
+    pass`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(1)" },
+    testCases: [
+      {
+        input: { nums: [1, 2, 3, 4, 5, 6, 7], k: 3 },
+        expected: [5, 6, 7, 1, 2, 3, 4],
+        description: "Standard rotation",
+      },
+      {
+        input: { nums: [-1, -100, 3, 99], k: 2 },
+        expected: [3, 99, -1, -100],
+        description: "Negative numbers",
+      },
+      { input: { nums: [1, 2], k: 3 }, expected: [2, 1], description: "k > length" },
+      { input: { nums: [1], k: 0 }, expected: [1], description: "No rotation" },
+      { input: { nums: [1, 2, 3], k: 3 }, expected: [1, 2, 3], description: "k equals length" },
+    ],
+  },
 ]
 
 // Re-export for convenience

@@ -240,6 +240,7 @@ function bugFixToEmbeddingText(scenario: BugFixScenario): string {
 
 /**
  * Convert company data to rich text for embedding
+ * Includes core values, engineering culture, and behavioral expectations for RAG
  */
 function companyToEmbeddingText(company: CompanyQuestionData): string {
   const parts = [
@@ -285,6 +286,38 @@ function companyToEmbeddingText(company: CompanyQuestionData): string {
     `## Tips`,
     ...company.interviewProcess.tips.map((t) => `- ${t}`),
   ]
+
+  // Add core values if available (for RAG context during interviews)
+  if (company.coreValues) {
+    parts.push(
+      ``,
+      `## Core Values & Leadership Principles`,
+      ...company.coreValues.principles.map((p) => `- ${p}`),
+      ``,
+      `## Behavioral Expectations`,
+      ...company.coreValues.behavioralExpectations.map((b) => `- ${b}`),
+      ``,
+      `## Value Keywords`,
+      `Keywords: ${company.coreValues.valueKeywords.join(", ")}`
+    )
+  }
+
+  // Add engineering culture if available
+  if (company.engineeringCulture) {
+    parts.push(
+      ``,
+      `## Engineering Culture & Philosophy`,
+      ...company.engineeringCulture.philosophy.map((p) => `- ${p}`),
+      ``,
+      `## Tech Stack`,
+      `Technologies: ${company.engineeringCulture.techStack.join(", ")}`,
+      ``,
+      `## Engineering Practices`,
+      `Code Review: ${company.engineeringCulture.codeReviewStyle}`,
+      `Deployment: ${company.engineeringCulture.deploymentPhilosophy}`,
+      `Documentation: ${company.engineeringCulture.documentationExpectations}`
+    )
+  }
 
   return parts.join("\n")
 }

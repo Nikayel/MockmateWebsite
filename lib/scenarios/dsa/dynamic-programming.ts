@@ -638,6 +638,264 @@ You may assume that you have an infinite number of each kind of coin.`,
       },
     ],
   },
+  {
+    id: "dsa-longest-common-subsequence",
+    title: "Longest Common Subsequence",
+    type: "dsa",
+    pattern: "dp-lcs",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple"],
+    description: "Find the length of the longest common subsequence of two strings",
+    tags: ["dynamic-programming", "string"],
+    estimatedTime: 25,
+    problemStatement: `Given two strings text1 and text2, return the length of their longest common subsequence. If there is no common subsequence, return 0.
+
+A subsequence of a string is a new string generated from the original string with some characters (can be none) deleted without changing the relative order of the remaining characters.
+
+For example, "ace" is a subsequence of "abcde".
+
+A common subsequence of two strings is a subsequence that is common to both strings.`,
+    examples: [
+      {
+        input: 'text1 = "abcde", text2 = "ace"',
+        output: "3",
+        explanation: 'The longest common subsequence is "ace" with length 3.',
+      },
+      {
+        input: 'text1 = "abc", text2 = "abc"',
+        output: "3",
+        explanation: 'The longest common subsequence is "abc" with length 3.',
+      },
+      {
+        input: 'text1 = "abc", text2 = "def"',
+        output: "0",
+        explanation: "No common subsequence exists.",
+      },
+    ],
+    constraints: [
+      "1 <= text1.length, text2.length <= 1000",
+      "text1 and text2 consist of only lowercase English characters.",
+    ],
+    hints: [
+      "Use 2D DP: dp[i][j] = LCS of text1[0..i-1] and text2[0..j-1]",
+      "If text1[i-1] == text2[j-1]: dp[i][j] = dp[i-1][j-1] + 1",
+      "Else: dp[i][j] = max(dp[i-1][j], dp[i][j-1])",
+      "Can optimize space to O(min(m,n)) using 1D array",
+    ],
+    starterCode: {
+      javascript: `function longestCommonSubsequence(text1, text2) {
+  // Write your solution here
+
+}`,
+      typescript: `function longestCommonSubsequence(text1: string, text2: string): number {
+  // Write your solution here
+
+}`,
+      python: `def longestCommonSubsequence(text1, text2):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(m * n)", space: "O(min(m, n))" },
+    testCases: [
+      { input: { text1: "abcde", text2: "ace" }, expected: 3, description: "LCS = 'ace'" },
+      { input: { text1: "abc", text2: "abc" }, expected: 3, description: "Identical strings" },
+      { input: { text1: "abc", text2: "def" }, expected: 0, description: "No common chars" },
+      { input: { text1: "bl", text2: "yby" }, expected: 1, description: "Single char LCS" },
+      { input: { text1: "psnw", text2: "vozsh" }, expected: 1, description: "Complex case" },
+    ],
+  },
+  {
+    id: "dsa-01-knapsack",
+    title: "0/1 Knapsack Problem",
+    type: "dsa",
+    pattern: "dp-knapsack",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Microsoft", "Goldman Sachs"],
+    description: "Maximize value in a knapsack with weight constraint (classic DP problem)",
+    tags: ["dynamic-programming", "array"],
+    estimatedTime: 30,
+    problemStatement: `You are given weights and values of n items. You have a knapsack with a maximum weight capacity W.
+
+Each item can only be selected once (0/1 property). Return the maximum total value that can be put in the knapsack.
+
+For each item, you either include it completely or exclude it (no fractional items).`,
+    examples: [
+      {
+        input: "weights = [1, 2, 3], values = [6, 10, 12], W = 5",
+        output: "22",
+        explanation: "Select items with weights 2 and 3 (values 10 + 12 = 22)",
+      },
+      {
+        input: "weights = [1, 3, 4, 5], values = [1, 4, 5, 7], W = 7",
+        output: "9",
+        explanation: "Select items with weights 3 and 4 (values 4 + 5 = 9)",
+      },
+    ],
+    constraints: ["1 <= n <= 100", "1 <= weights[i], values[i] <= 1000", "1 <= W <= 1000"],
+    hints: [
+      "2D DP: dp[i][w] = max value using first i items with capacity w",
+      "For each item: include it (if fits) or exclude it",
+      "dp[i][w] = max(dp[i-1][w], dp[i-1][w-weight[i]] + value[i])",
+      "Iterate backwards for 1D space optimization",
+    ],
+    starterCode: {
+      javascript: `function knapsack(weights, values, W) {
+  // Write your solution here
+
+}`,
+      typescript: `function knapsack(weights: number[], values: number[], W: number): number {
+  // Write your solution here
+
+}`,
+      python: `def knapsack(weights, values, W):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(n * W)", space: "O(W)" },
+    testCases: [
+      {
+        input: { weights: [1, 2, 3], values: [6, 10, 12], W: 5 },
+        expected: 22,
+        description: "Standard case",
+      },
+      {
+        input: { weights: [1, 3, 4, 5], values: [1, 4, 5, 7], W: 7 },
+        expected: 9,
+        description: "Medium case",
+      },
+      { input: { weights: [10], values: [100], W: 5 }, expected: 0, description: "Item too heavy" },
+      { input: { weights: [1, 2], values: [5, 6], W: 3 }, expected: 11, description: "Take both" },
+      {
+        input: { weights: [2, 2, 2], values: [1, 2, 3], W: 4 },
+        expected: 5,
+        description: "Choose best pair",
+      },
+    ],
+  },
+  {
+    id: "dsa-partition-equal-subset-sum",
+    title: "Partition Equal Subset Sum",
+    type: "dsa",
+    pattern: "dp-knapsack",
+    difficulty: "medium",
+    companies: ["Amazon", "Meta", "Google", "Microsoft"],
+    description: "Determine if array can be partitioned into two subsets with equal sum",
+    tags: ["dynamic-programming", "array"],
+    estimatedTime: 25,
+    problemStatement: `Given an integer array nums, return true if you can partition the array into two subsets such that the sum of the elements in both subsets is equal, or false otherwise.`,
+    examples: [
+      {
+        input: "nums = [1,5,11,5]",
+        output: "true",
+        explanation: "The array can be partitioned as [1, 5, 5] and [11].",
+      },
+      {
+        input: "nums = [1,2,3,5]",
+        output: "false",
+        explanation: "The array cannot be partitioned into equal sum subsets.",
+      },
+    ],
+    constraints: ["1 <= nums.length <= 200", "1 <= nums[i] <= 100"],
+    hints: [
+      "If total sum is odd, impossible to partition equally",
+      "Reduces to: can we find subset with sum = totalSum/2?",
+      "This is a 0/1 Knapsack problem variant",
+      "dp[i] = true if sum i is achievable",
+    ],
+    starterCode: {
+      javascript: `function canPartition(nums) {
+  // Write your solution here
+
+}`,
+      typescript: `function canPartition(nums: number[]): boolean {
+  // Write your solution here
+
+}`,
+      python: `def canPartition(nums):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(n * sum)", space: "O(sum)" },
+    testCases: [
+      { input: { nums: [1, 5, 11, 5] }, expected: true, description: "[1,5,5] and [11]" },
+      { input: { nums: [1, 2, 3, 5] }, expected: false, description: "Cannot partition" },
+      { input: { nums: [1, 2, 3, 4] }, expected: true, description: "[1,4] and [2,3]" },
+      { input: { nums: [2, 2, 1, 1] }, expected: true, description: "[2,1] and [2,1]" },
+      { input: { nums: [1, 1, 1, 1, 1] }, expected: false, description: "Odd count of 1s" },
+    ],
+  },
+  {
+    id: "dsa-regular-expression-matching",
+    title: "Regular Expression Matching",
+    type: "dsa",
+    pattern: "dp-2d",
+    difficulty: "hard",
+    companies: ["Google", "Amazon", "Meta", "Microsoft", "Apple"],
+    description: "Implement regular expression matching with '.' and '*' support",
+    tags: ["dynamic-programming", "string", "recursion"],
+    estimatedTime: 40,
+    problemStatement: `Given an input string s and a pattern p, implement regular expression matching with support for '.' and '*' where:
+
+- '.' Matches any single character.
+- '*' Matches zero or more of the preceding element.
+
+The matching should cover the entire input string (not partial).`,
+    examples: [
+      {
+        input: 's = "aa", p = "a"',
+        output: "false",
+        explanation: '"a" does not match the entire string "aa".',
+      },
+      {
+        input: 's = "aa", p = "a*"',
+        output: "true",
+        explanation: '"*" means zero or more of the preceding element, "a".',
+      },
+      {
+        input: 's = "ab", p = ".*"',
+        output: "true",
+        explanation: '".*" means zero or more (*) of any character (.).',
+      },
+    ],
+    constraints: [
+      "1 <= s.length <= 20",
+      "1 <= p.length <= 20",
+      "s contains only lowercase English letters.",
+      "p contains only lowercase English letters, '.', and '*'.",
+      "It is guaranteed for each '*', there will be a previous valid character to match.",
+    ],
+    hints: [
+      "2D DP: dp[i][j] = true if s[0..i-1] matches p[0..j-1]",
+      "If p[j-1] is not '*': dp[i][j] = dp[i-1][j-1] && (s[i-1] matches p[j-1])",
+      "If p[j-1] is '*': either use it 0 times (dp[i][j-2]) or use it (match + dp[i-1][j])",
+      "'.' matches any single character",
+    ],
+    starterCode: {
+      javascript: `function isMatch(s, p) {
+  // Write your solution here
+
+}`,
+      typescript: `function isMatch(s: string, p: string): boolean {
+  // Write your solution here
+
+}`,
+      python: `def isMatch(s, p):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(m * n)", space: "O(m * n)" },
+    testCases: [
+      { input: { s: "aa", p: "a" }, expected: false, description: "Pattern too short" },
+      { input: { s: "aa", p: "a*" }, expected: true, description: "Star matches multiple" },
+      { input: { s: "ab", p: ".*" }, expected: true, description: "Dot star matches all" },
+      { input: { s: "aab", p: "c*a*b" }, expected: true, description: "c* matches zero c's" },
+      {
+        input: { s: "mississippi", p: "mis*is*p*." },
+        expected: false,
+        description: "Complex case",
+      },
+    ],
+  },
 ]
 
 export default dpScenarios

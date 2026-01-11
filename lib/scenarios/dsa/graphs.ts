@@ -623,6 +623,240 @@ Given two words, beginWord and endWord, and a dictionary wordList, return the nu
       },
     ],
   },
+  {
+    id: "dsa-course-schedule-ii",
+    title: "Course Schedule II",
+    type: "dsa",
+    pattern: "topological-sort",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple"],
+    description: "Find the order to take courses using topological sort (Kahn's algorithm)",
+    tags: ["graph", "dfs", "bfs", "topological-sort"],
+    estimatedTime: 30,
+    problemStatement: `There are a total of numCourses courses you have to take, labeled from 0 to numCourses - 1. You are given an array prerequisites where prerequisites[i] = [ai, bi] indicates that you must take course bi first if you want to take course ai.
+
+Return the ordering of courses you should take to finish all courses. If there are many valid answers, return any of them. If it is impossible to finish all courses, return an empty array.`,
+    examples: [
+      {
+        input: "numCourses = 2, prerequisites = [[1,0]]",
+        output: "[0,1]",
+        explanation: "Take course 0 first, then course 1.",
+      },
+      {
+        input: "numCourses = 4, prerequisites = [[1,0],[2,0],[3,1],[3,2]]",
+        output: "[0,2,1,3] or [0,1,2,3]",
+        explanation: "Multiple valid orderings exist.",
+      },
+      {
+        input: "numCourses = 1, prerequisites = []",
+        output: "[0]",
+      },
+    ],
+    constraints: [
+      "1 <= numCourses <= 2000",
+      "0 <= prerequisites.length <= numCourses * (numCourses - 1)",
+      "prerequisites[i].length == 2",
+      "0 <= ai, bi < numCourses",
+      "ai != bi",
+      "All the pairs [ai, bi] are distinct.",
+    ],
+    hints: [
+      "Build adjacency list and track in-degrees for each node",
+      "Use Kahn's algorithm: start with nodes having 0 in-degree",
+      "Process queue, decrement in-degrees, add new 0-degree nodes",
+      "If result size < numCourses, there's a cycle",
+    ],
+    starterCode: {
+      javascript: `function findOrder(numCourses, prerequisites) {
+  // Write your solution here
+
+}`,
+      typescript: `function findOrder(numCourses: number, prerequisites: number[][]): number[] {
+  // Write your solution here
+
+}`,
+      python: `def findOrder(numCourses, prerequisites):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(V + E)", space: "O(V + E)" },
+    testCases: [
+      {
+        input: { numCourses: 2, prerequisites: [[1, 0]] },
+        expected: [0, 1],
+        description: "Simple dependency",
+      },
+      {
+        input: {
+          numCourses: 4,
+          prerequisites: [
+            [1, 0],
+            [2, 0],
+            [3, 1],
+            [3, 2],
+          ],
+        },
+        expected: [0, 1, 2, 3],
+        description: "Multiple dependencies",
+        compareAsSet: false,
+      },
+      { input: { numCourses: 1, prerequisites: [] }, expected: [0], description: "Single course" },
+      {
+        input: {
+          numCourses: 2,
+          prerequisites: [
+            [0, 1],
+            [1, 0],
+          ],
+        },
+        expected: [],
+        description: "Cycle - impossible",
+      },
+    ],
+  },
+  {
+    id: "dsa-alien-dictionary",
+    title: "Alien Dictionary",
+    type: "dsa",
+    pattern: "topological-sort",
+    difficulty: "hard",
+    companies: ["Google", "Amazon", "Meta", "Microsoft", "Apple"],
+    description: "Derive the order of letters in an alien language using topological sort",
+    tags: ["graph", "topological-sort", "string", "dfs", "bfs"],
+    estimatedTime: 35,
+    problemStatement: `There is a new alien language that uses the English alphabet. However, the order of the letters is unknown to you.
+
+You are given a list of strings words from the alien language's dictionary, where the strings are sorted lexicographically by the rules of this new language.
+
+Derive the order of letters in this language. If the order is invalid, return an empty string. If there are multiple valid orderings, return any of them.`,
+    examples: [
+      {
+        input: 'words = ["wrt","wrf","er","ett","rftt"]',
+        output: '"wertf"',
+        explanation: "From the words, we can derive: w < e, r < t, t < f, e < r",
+      },
+      {
+        input: 'words = ["z","x"]',
+        output: '"zx"',
+      },
+      {
+        input: 'words = ["z","x","z"]',
+        output: '""',
+        explanation: "The order is invalid, so return empty string.",
+      },
+    ],
+    constraints: [
+      "1 <= words.length <= 100",
+      "1 <= words[i].length <= 100",
+      "words[i] consists of only lowercase English letters.",
+    ],
+    hints: [
+      "Compare adjacent words to build directed edges",
+      "First differing character gives us ordering: char1 < char2",
+      "Check for invalid case: shorter word comes after longer prefix",
+      "Run topological sort (Kahn's or DFS) on the graph",
+    ],
+    starterCode: {
+      javascript: `function alienOrder(words) {
+  // Write your solution here
+
+}`,
+      typescript: `function alienOrder(words: string[]): string {
+  // Write your solution here
+
+}`,
+      python: `def alienOrder(words):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(C) where C is total characters", space: "O(1) - max 26 letters" },
+    testCases: [
+      {
+        input: { words: ["wrt", "wrf", "er", "ett", "rftt"] },
+        expected: "wertf",
+        description: "Standard case",
+      },
+      { input: { words: ["z", "x"] }, expected: "zx", description: "Two words" },
+      { input: { words: ["z", "x", "z"] }, expected: "", description: "Invalid order" },
+      { input: { words: ["abc", "ab"] }, expected: "", description: "Invalid: prefix comes after" },
+    ],
+  },
+  {
+    id: "dsa-all-paths-source-target",
+    title: "All Paths From Source to Target",
+    type: "dsa",
+    pattern: "graphs",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta", "Bloomberg"],
+    description: "Find all paths from source (0) to target (n-1) in a DAG",
+    tags: ["graph", "dfs", "backtracking"],
+    estimatedTime: 25,
+    problemStatement: `Given a directed acyclic graph (DAG) of n nodes labeled from 0 to n - 1, find all possible paths from node 0 to node n - 1 and return them in any order.
+
+The graph is given as follows: graph[i] is a list of all nodes you can visit from node i (i.e., there is a directed edge from node i to node graph[i][j]).`,
+    examples: [
+      {
+        input: "graph = [[1,2],[3],[3],[]]",
+        output: "[[0,1,3],[0,2,3]]",
+        explanation: "There are two paths: 0 -> 1 -> 3 and 0 -> 2 -> 3.",
+      },
+      {
+        input: "graph = [[4,3,1],[3,2,4],[3],[4],[]]",
+        output: "[[0,4],[0,3,4],[0,1,3,4],[0,1,2,3,4],[0,1,4]]",
+      },
+    ],
+    constraints: [
+      "n == graph.length",
+      "2 <= n <= 15",
+      "0 <= graph[i][j] < n",
+      "graph[i][j] != i (no self-loops)",
+      "All the elements of graph[i] are unique.",
+      "The input graph is guaranteed to be a DAG.",
+    ],
+    hints: [
+      "Use DFS/backtracking from source to explore all paths",
+      "When you reach target (n-1), add current path to result",
+      "Since it's a DAG, no need to track visited nodes",
+      "Can also use BFS with path tracking",
+    ],
+    starterCode: {
+      javascript: `function allPathsSourceTarget(graph) {
+  // Write your solution here
+
+}`,
+      typescript: `function allPathsSourceTarget(graph: number[][]): number[][] {
+  // Write your solution here
+
+}`,
+      python: `def allPathsSourceTarget(graph):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(2^n * n)", space: "O(n) for recursion" },
+    testCases: [
+      {
+        input: { graph: [[1, 2], [3], [3], []] },
+        expected: [
+          [0, 1, 3],
+          [0, 2, 3],
+        ],
+        description: "Two paths",
+      },
+      {
+        input: { graph: [[4, 3, 1], [3, 2, 4], [3], [4], []] },
+        expected: [
+          [0, 4],
+          [0, 3, 4],
+          [0, 1, 3, 4],
+          [0, 1, 2, 3, 4],
+          [0, 1, 4],
+        ],
+        description: "Multiple paths",
+        compareAsSet: true,
+      },
+      { input: { graph: [[1], []] }, expected: [[0, 1]], description: "Single path" },
+    ],
+  },
 ]
 
 export default graphsScenarios
