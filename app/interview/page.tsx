@@ -74,7 +74,8 @@ import {
 } from "@/lib/guest-session"
 import { SignupPrompt } from "@/components/SignupPrompt"
 import { useRoadmapStore } from "@/lib/stores/roadmap-store"
-import { useInterviewStore } from "@/lib/stores"
+import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
+import type { CompanyId } from "@/lib/data/company-questions/types"
 import {
   scenarios,
   filterScenarios,
@@ -126,6 +127,11 @@ const GradingCriteriaTooltip = nextDynamic(
 
 const CodeConsole = nextDynamic(
   () => import("@/components/interview/CodeConsole").then((mod) => ({ default: mod.CodeConsole })),
+  { ssr: false }
+)
+
+const CompanyPicker = nextDynamic(
+  () => import("@/components/interview").then((mod) => ({ default: mod.CompanyPicker })),
   { ssr: false }
 )
 
@@ -203,8 +209,16 @@ function InterviewPageContent() {
   const { markQuestionCompleted, markQuestionEvaluating, addActualTime, activeRoadmap } =
     useRoadmapStore()
   // Use store for loading states so InterviewerChat component can see them
-  const { isLoadingChat, isLoadingInterviewer, setIsLoadingChat, setIsLoadingInterviewer } =
-    useInterviewStore()
+  const {
+    isLoadingChat,
+    isLoadingInterviewer,
+    setIsLoadingChat,
+    setIsLoadingInterviewer,
+    targetCompany,
+    setTargetCompany,
+    showCompanyPicker,
+    setShowCompanyPicker,
+  } = useInterviewStore()
   const [isLoading, setIsLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
   const [showScenarioBrowser, setShowScenarioBrowser] = useState(true)
@@ -462,6 +476,50 @@ function InterviewPageContent() {
     }
     return () => document.documentElement.classList.remove("focus-mode-active")
   }, [focusMode])
+
+  // Keyboard shortcut for Focus Mode (Cmd/Ctrl+K then Z - VS Code style)
+  // Also supports Escape to exit focus mode
+  useEffect(() => {
+    let waitingForZ = false
+    let timeoutId: NodeJS.Timeout | null = null
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape exits focus mode
+      if (e.key === "Escape" && focusMode) {
+        setFocusMode(false)
+        return
+      }
+
+      // Cmd/Ctrl + K starts the chord
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault()
+        waitingForZ = true
+        // Reset after 1 second if Z isn't pressed
+        timeoutId = setTimeout(() => {
+          waitingForZ = false
+        }, 1000)
+        return
+      }
+
+      // Z completes the chord
+      if (waitingForZ && e.key === "z") {
+        e.preventDefault()
+        waitingForZ = false
+        if (timeoutId) clearTimeout(timeoutId)
+        setFocusMode(!focusMode)
+        // Auto-enable calm mode when entering focus
+        if (!focusMode && !calmMode) {
+          setCalmMode(true)
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+  }, [focusMode, calmMode, setFocusMode, setCalmMode])
 
   // Code protection state
   const [protectedElements, setProtectedElements] = useState<ReturnType<
@@ -1337,6 +1395,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           currentCode: code,
           scenarioTitle: selectedScenario?.title,
           scenarioType: selectedScenario?.type,
+          scenarioCompany: targetCompany, // Target company for RAG context
           isProactive: true,
           elapsedTime: elapsedTime,
           edgeCases: getEdgeCasesForInterviewer(),
@@ -1461,6 +1520,7 @@ Interviews are conversations, not just coding exercises.`
           currentCode: code,
           scenarioTitle: selectedScenario?.title,
           scenarioType: selectedScenario?.type,
+          scenarioCompany: targetCompany, // Target company for RAG context
           isProactive: true,
           elapsedTime: elapsedTime,
           edgeCases: getEdgeCasesForInterviewer(),
@@ -1704,6 +1764,7 @@ Ask ONE focused question based on these observations.`)
               scenarioId: selectedScenario?.id,
               scenarioDifficulty: selectedScenario?.difficulty,
               scenarioPattern: (selectedScenario as any)?.pattern,
+              scenarioCompany: targetCompany, // Target company for company-specific feedback
               testResults: testResults,
               language: selectedLanguage,
               timeSpent: elapsedTime,
@@ -1798,6 +1859,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           currentCode: code,
           scenarioTitle: selectedScenario?.title,
           scenarioType: selectedScenario?.type,
+          scenarioCompany: targetCompany, // Target company for RAG context
           isProactive: false,
           edgeCases: getEdgeCasesForInterviewer(),
           // Pass recent topics to prevent repetitive questions
@@ -1986,7 +2048,10 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     }
   }
 
-  const startInterview = async (scenarioOverride?: Scenario) => {
+  const startInterview = async (
+    scenarioOverride?: Scenario,
+    companyOverride?: InterviewTargetCompany
+  ) => {
     // Use passed scenario if provided, otherwise use state (handles race condition)
     const scenario = scenarioOverride || selectedScenario
 
@@ -1999,6 +2064,38 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     if (scenarioOverride) {
       setSelectedScenario(scenarioOverride)
     }
+
+    // Determine target company:
+    // 1. If override provided (from company picker), use it
+    // 2. If from roadmap, use roadmap's target company
+    // 3. If freeball with multiple companies and no selection, show picker
+    // 4. If freeball with single company, use that company
+    // 5. Otherwise, use "freeball" (generic)
+    let effectiveTargetCompany: InterviewTargetCompany = companyOverride ?? targetCompany
+
+    if (!effectiveTargetCompany) {
+      // Check if coming from roadmap
+      if (activeRoadmap?.targetCompany) {
+        effectiveTargetCompany = activeRoadmap.targetCompany
+      }
+      // Check if scenario has companies tagged
+      else if (scenario.companies && scenario.companies.length > 0) {
+        if (scenario.companies.length === 1) {
+          // Single company - auto-select it
+          effectiveTargetCompany = scenario.companies[0].toLowerCase() as CompanyId
+        } else {
+          // Multiple companies - show picker
+          setShowCompanyPicker(true)
+          return // Wait for user to pick
+        }
+      } else {
+        // No companies tagged - freeball
+        effectiveTargetCompany = "freeball"
+      }
+    }
+
+    // Store the target company in state
+    setTargetCompany(effectiveTargetCompany)
 
     // Check usage limit before starting - redirect to limit page (skip for DSA questions)
     if (user && usageLimit && !usageLimit.allowed && scenario.type !== "dsa") {
@@ -2020,7 +2117,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           scenario.type,
           scenario.difficulty,
           scenario.id,
-          scenarioPattern
+          scenarioPattern,
+          effectiveTargetCompany // Pass target company for RAG + analytics
         )
         setCurrentSessionId(sessionId)
 
@@ -2079,6 +2177,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             scenarioId: scenario.id,
             difficulty: scenario.difficulty,
             pattern: scenarioPattern,
+            targetCompany: effectiveTargetCompany, // Pass target company for RAG + analytics
           }),
         })
 
@@ -2644,6 +2743,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             currentCode: code,
             scenarioTitle: selectedScenario?.title,
             scenarioType: selectedScenario?.type,
+            scenarioCompany: targetCompany, // Target company for RAG context
             isProactive: false,
             isPostInterview: showPostInterviewDiscussion,
             isEndingSession: isEndingSession,
@@ -3009,6 +3109,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           scenarioId: selectedScenario.id,
           scenarioDifficulty: selectedScenario.difficulty,
           scenarioPattern: (selectedScenario as any)?.pattern,
+          scenarioCompany: targetCompany, // Target company for company-specific feedback
           testResults: [], // No tests for system design
           language: "notes",
           timeSpent: elapsedTime,
@@ -3166,6 +3267,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           currentCode: code,
           scenarioTitle: selectedScenario?.title,
           scenarioType: selectedScenario?.type,
+          scenarioCompany: targetCompany, // Target company for RAG context
           isProactive: false,
           isPostInterview: true,
           isEndingSession: false,
@@ -3618,8 +3720,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             <div
               className={`mx-auto flex w-full flex-1 flex-col gap-1 ${isResultView ? "overflow-visible" : "overflow-hidden"}`}
             >
-              {/* Compact Top Bar - Cognitive Load Optimized */}
-              <div className="flex flex-shrink-0 items-center justify-between gap-2 pt-2">
+              {/* Compact Top Bar - Cognitive Load Optimized
+                  Focus mode: fades to 30% opacity, reveals on hover */}
+              <div
+                className={`focus-header flex flex-shrink-0 items-center justify-between gap-2 pt-2 transition-all duration-300`}
+              >
                 {/* Left: Problem info */}
                 <div className="flex min-w-0 flex-1 items-center space-x-2">
                   <h2 className="max-w-[200px] truncate text-sm font-semibold text-white sm:max-w-md">
@@ -3743,7 +3848,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     <span className="hidden lg:inline">{calmMode ? "Calm" : "Calm"}</span>
                   </button>
 
-                  {/* Focus Mode Toggle - Desktop only */}
+                  {/* Focus Mode Toggle - Desktop only
+                      Keyboard shortcut: Cmd/Ctrl+K, Z (VS Code style chord) */}
                   <button
                     onClick={() => {
                       const newFocusMode = !focusMode
@@ -3758,7 +3864,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         ? "bg-accent text-accent-foreground"
                         : "bg-secondary/50 text-muted-foreground hover:text-foreground"
                     }`}
-                    title={focusMode ? "Exit Focus Mode" : "Focus Mode (editor only + calm colors)"}
+                    title={focusMode ? "Exit Focus Mode (Esc)" : "Focus Mode ⌘K Z"}
                   >
                     {focusMode ? (
                       <Minimize2 className="h-3 w-3" />
@@ -4160,7 +4266,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   </Card>
 
                   {/* Center: Code Editor with Terminal/Console
-                      - Always visible in focus mode
+                      - Expands to full width in focus mode
                       - Only visible when activePanel === 'editor' (mobile)
                   */}
                   <Card
@@ -4954,6 +5060,20 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           }}
           fileName={selectedFile.path}
           content={selectedFile.content}
+        />
+      )}
+
+      {/* Company Picker Dialog (for freeball sessions) */}
+      {selectedScenario && (
+        <CompanyPicker
+          open={showCompanyPicker}
+          onClose={() => setShowCompanyPicker(false)}
+          onSelect={(company) => {
+            setShowCompanyPicker(false)
+            // Restart the interview flow with the selected company
+            startInterview(selectedScenario, company)
+          }}
+          scenarioCompanies={selectedScenario.companies || []}
         />
       )}
 

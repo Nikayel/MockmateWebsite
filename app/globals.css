@@ -52,7 +52,7 @@
   /* Slightly off-white for less glare */
   --editor-gutter: oklch(0.97 0 0);
   --editor-line-active: oklch(0.96 0.005 210);
-  --editor-selection: oklch(0.70 0.08 210 / 0.20);
+  --editor-selection: oklch(0.7 0.08 210 / 0.2);
 }
 
 .dark {
@@ -84,7 +84,7 @@
   /* WCAG AA compliant: ~5:1 contrast ratio against dark background */
 
   /* Calmer accent colors - 40% desaturated per research */
-  --accent: oklch(0.70 0.08 210);
+  --accent: oklch(0.7 0.08 210);
   /* Calmer Cyan #5fb4d9 - reduced from 0.134 to 0.08 saturation */
   --accent-foreground: oklch(0.14 0 0);
   --neural: oklch(0.75 0.11 157);
@@ -92,39 +92,39 @@
   --destructive: oklch(0.62 0.16 15);
   /* Calmer Error #d96666 - reduced from 0.27 to 0.16 */
   --destructive-foreground: oklch(0.92 0 0);
-  --border: oklch(0.30 0.003 260);
+  --border: oklch(0.3 0.003 260);
   /* Warmer border #444450 */
   --input: oklch(0.22 0.003 260);
-  --ring: oklch(0.70 0.08 210);
+  --ring: oklch(0.7 0.08 210);
 
   /* Editor-specific colors - slightly lighter than background per research */
   --editor-bg: oklch(0.16 0.003 260);
   /* #222228 - lighter than app bg */
   --editor-gutter: oklch(0.18 0.003 260);
-  --editor-line-active: oklch(0.20 0.005 260);
-  --editor-selection: oklch(0.50 0.06 210 / 0.25);
+  --editor-line-active: oklch(0.2 0.005 260);
+  --editor-selection: oklch(0.5 0.06 210 / 0.25);
   /* Calmer selection highlight */
 
   /* Chart colors - also softened */
-  --chart-1: oklch(0.70 0.08 210);
+  --chart-1: oklch(0.7 0.08 210);
   /* Calmer Cyan */
   --chart-2: oklch(0.75 0.11 157);
   /* Calmer Green */
-  --chart-3: oklch(0.78 0.10 85);
+  --chart-3: oklch(0.78 0.1 85);
   /* Calmer Yellow */
   --chart-4: oklch(0.58 0.15 310);
   /* Calmer Magenta */
-  --chart-5: oklch(0.50 0.10 270);
+  --chart-5: oklch(0.5 0.1 270);
   /* Calmer Purple */
 
   --sidebar: oklch(0.14 0.005 260);
   --sidebar-foreground: oklch(0.92 0 0);
-  --sidebar-primary: oklch(0.70 0.08 210);
+  --sidebar-primary: oklch(0.7 0.08 210);
   --sidebar-primary-foreground: oklch(0.14 0 0);
   --sidebar-accent: oklch(0.22 0.003 260);
   --sidebar-accent-foreground: oklch(0.92 0 0);
-  --sidebar-border: oklch(0.30 0.003 260);
-  --sidebar-ring: oklch(0.70 0.08 210);
+  --sidebar-border: oklch(0.3 0.003 260);
+  --sidebar-ring: oklch(0.7 0.08 210);
 }
 
 /*
@@ -136,7 +136,9 @@
 
 /* Smooth transition for all color changes */
 .dark {
-  transition: background-color 0.5s ease, border-color 0.3s ease;
+  transition:
+    background-color 0.5s ease,
+    border-color 0.3s ease;
 }
 
 .dark.calm {
@@ -148,9 +150,9 @@
   /* Very muted accent - almost desaturated for minimal stimulation */
   --accent: oklch(0.65 0.05 210);
   /* Very calm blue #7ab8cc */
-  --neural: oklch(0.70 0.07 160);
+  --neural: oklch(0.7 0.07 160);
   /* Sage green #7dc9a0 */
-  --destructive: oklch(0.60 0.10 15);
+  --destructive: oklch(0.6 0.1 15);
   /* Muted coral #c08080 */
 
   /* Reduced border visibility for less visual noise */
@@ -158,13 +160,13 @@
 
   /* Calm editor colors */
   --editor-bg: oklch(0.17 0.006 240);
-  --editor-selection: oklch(0.45 0.04 210 / 0.20);
+  --editor-selection: oklch(0.45 0.04 210 / 0.2);
 
   /* Calm mode specific overrides for hardcoded Tailwind colors */
-  --calm-success: oklch(0.65 0.10 160); /* Muted green */
-  --calm-warning: oklch(0.70 0.08 85);  /* Muted amber */
-  --calm-error: oklch(0.60 0.08 25);    /* Muted red */
-  --calm-info: oklch(0.65 0.06 220);    /* Muted blue */
+  --calm-success: oklch(0.65 0.1 160); /* Muted green */
+  --calm-warning: oklch(0.7 0.08 85); /* Muted amber */
+  --calm-error: oklch(0.6 0.08 25); /* Muted red */
+  --calm-info: oklch(0.65 0.06 220); /* Muted blue */
 }
 
 /* Calm mode utility classes for interview page */
@@ -174,15 +176,15 @@
 }
 
 .dark.calm .calm-success {
-  color: oklch(0.70 0.12 160) !important; /* Softer green */
+  color: oklch(0.7 0.12 160) !important; /* Softer green */
 }
 
 .dark.calm .calm-error {
-  color: oklch(0.65 0.10 25) !important; /* Softer red */
+  color: oklch(0.65 0.1 25) !important; /* Softer red */
 }
 
 .dark.calm .calm-warning {
-  color: oklch(0.72 0.10 85) !important; /* Softer yellow */
+  color: oklch(0.72 0.1 85) !important; /* Softer yellow */
 }
 
 .dark.calm .calm-accent {
@@ -198,7 +200,7 @@
 
 /* Calm timer - less anxiety-inducing colors */
 .dark.calm .timer-warning {
-  color: oklch(0.70 0.06 85) !important; /* Muted yellow instead of bright */
+  color: oklch(0.7 0.06 85) !important; /* Muted yellow instead of bright */
 }
 
 .dark.calm .timer-danger {
@@ -214,14 +216,16 @@
   animation-duration: 2s; /* Slower spin */
 }
 
-/* Focus mode styles */
-.focus-mode-active .focus-hide {
-  display: none !important;
+/* Focus mode styles - Distraction-free coding
+   Header dims in focus mode but reveals on hover */
+
+.focus-mode-active .focus-header {
+  opacity: 0.4;
+  transition: opacity 0.3s ease;
 }
 
-.focus-mode-active .focus-center {
-  max-width: 900px;
-  margin: 0 auto;
+.focus-mode-active .focus-header:hover {
+  opacity: 1;
 }
 
 @theme inline {
@@ -267,7 +271,7 @@
   --color-editor-bg: var(--editor-bg, var(--card));
   --color-editor-gutter: var(--editor-gutter, var(--secondary));
   --color-editor-line-active: var(--editor-line-active, var(--muted));
-  --color-editor-selection: var(--editor-selection, oklch(0.50 0.06 210 / 0.25));
+  --color-editor-selection: var(--editor-selection, oklch(0.5 0.06 210 / 0.25));
 
   /* Custom fonts */
   --font-sans: var(--font-open-sans);
@@ -315,7 +319,6 @@
 
 /* Neural Pulse - Calmer version for nodes and connection points */
 @keyframes neural-pulse {
-
   0%,
   100% {
     box-shadow:
@@ -334,27 +337,29 @@
 
 /* Glow Pulse - Softer accent glow effect */
 @keyframes glow-pulse {
-
   0%,
   100% {
     box-shadow: 0 0 16px rgba(95, 180, 217, 0.3);
   }
 
   50% {
-    box-shadow: 0 0 28px rgba(95, 180, 217, 0.5), 0 0 40px rgba(95, 180, 217, 0.25);
+    box-shadow:
+      0 0 28px rgba(95, 180, 217, 0.5),
+      0 0 40px rgba(95, 180, 217, 0.25);
   }
 }
 
 /* Neural Glow - Calmer success/green glow */
 @keyframes neural-glow {
-
   0%,
   100% {
     box-shadow: 0 0 16px rgba(95, 217, 154, 0.3);
   }
 
   50% {
-    box-shadow: 0 0 28px rgba(95, 217, 154, 0.5), 0 0 40px rgba(95, 217, 154, 0.25);
+    box-shadow:
+      0 0 28px rgba(95, 217, 154, 0.5),
+      0 0 40px rgba(95, 217, 154, 0.25);
   }
 }
 
@@ -371,7 +376,6 @@
 
 /* Float - Gentle floating motion */
 @keyframes float {
-
   0%,
   100% {
     transform: translateY(0) translateX(0);
@@ -425,7 +429,6 @@
 
 /* Magnetic - Button hover effect */
 @keyframes magnetic {
-
   0%,
   100% {
     transform: translate(0, 0);
@@ -434,7 +437,8 @@
 
 /* Audio Waveform - Voice recording visualization */
 @keyframes waveform {
-  0%, 100% {
+  0%,
+  100% {
     height: 4px;
   }
   50% {
@@ -462,10 +466,12 @@
 }
 
 .animate-shimmer {
-  background: linear-gradient(90deg,
-      transparent 0%,
-      rgba(95, 180, 217, 0.08) 50%,
-      transparent 100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(95, 180, 217, 0.08) 50%,
+    transparent 100%
+  );
   background-size: 200% 100%;
   animation: shimmer 3s linear infinite;
 }
@@ -655,7 +661,8 @@
 
 /* New message indicator animation */
 @keyframes new-message-pulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 0 0 rgba(0, 217, 255, 0.4);
   }
   50% {
