@@ -14,6 +14,7 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { logger } from "./logger"
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
@@ -46,7 +47,7 @@ export async function getCachedModel(
   const now = new Date()
 
   if (cached && (now.getTime() - cached.createdAt.getTime()) < CACHE_TTL_MS) {
-    console.log(`[Gemini Cache] Using cached model for key: ${cacheKey}`)
+    logger.debug("Using cached Gemini model", { cacheKey })
     return cached.model
   }
 
@@ -55,7 +56,7 @@ export async function getCachedModel(
     // additional setup. For now, we use simple model instance caching.
     // Future improvement: Implement full prompt caching when SDK supports it robustly.
 
-    console.log(`[Gemini Cache] Creating new model instance for key: ${cacheKey}`)
+    logger.debug("Creating new Gemini model instance", { cacheKey })
 
     const model = genAI.getGenerativeModel({
       model: modelName,
@@ -70,10 +71,10 @@ export async function getCachedModel(
 
     return model
   } catch (error) {
-    console.error(`[Gemini Cache] Failed to create model for key ${cacheKey}:`, error)
+    logger.error("Failed to create Gemini model", { cacheKey, error })
 
     // Fallback: create model without caching
-    console.warn(`[Gemini Cache] Falling back to non-cached model`)
+    logger.warn("Falling back to non-cached Gemini model", { cacheKey })
     return genAI.getGenerativeModel({
       model: modelName,
       systemInstruction: systemInstruction,
@@ -87,7 +88,7 @@ export async function getCachedModel(
  */
 export function clearCache(cacheKey: string): void {
   modelCache.delete(cacheKey)
-  console.log(`[Gemini Cache] Cleared cache for key: ${cacheKey}`)
+  logger.debug("Cleared Gemini cache", { cacheKey })
 }
 
 /**
@@ -95,7 +96,7 @@ export function clearCache(cacheKey: string): void {
  */
 export function clearAllCaches(): void {
   modelCache.clear()
-  console.log(`[Gemini Cache] Cleared all caches`)
+  logger.debug("Cleared all Gemini caches")
 }
 
 /**
@@ -129,7 +130,7 @@ export function cleanupExpiredCaches(): void {
   }
 
   if (removed > 0) {
-    console.log(`[Gemini Cache] Cleaned up ${removed} expired cache(s)`)
+    logger.debug("Cleaned up expired Gemini caches", { count: removed })
   }
 }
 

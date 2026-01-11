@@ -141,15 +141,10 @@ export default function RoadmapPage() {
         }
 
         // Load active roadmap from Firebase (source of truth)
-        console.log("[Roadmap] Fetching active roadmap...")
         const activeResponse = await fetch("/api/roadmap", { headers: authHeaders })
 
-        if (!activeResponse.ok) {
-          const errorText = await activeResponse.text()
-          console.error("[Roadmap] API error:", activeResponse.status, errorText)
-        } else {
+        if (activeResponse.ok) {
           const activeData = await activeResponse.json()
-          console.log("[Roadmap] API response:", activeData)
 
           if (activeData.roadmap) {
             // Convert date strings back to Date objects for the store
@@ -177,7 +172,6 @@ export default function RoadmapPage() {
                   targetDate: new Date(m.targetDate),
                 })) || [],
             }
-            console.log("[Roadmap] Setting active roadmap:", roadmap.id, roadmap.companyName)
             setActiveRoadmap(roadmap)
 
             // Calculate and set the correct day index immediately after loading
@@ -198,8 +192,6 @@ export default function RoadmapPage() {
             if (correctDayIndex >= 0) {
               selectDay(correctDayIndex)
             }
-          } else {
-            console.log("[Roadmap] No active roadmap found in response")
           }
         }
 
@@ -211,8 +203,8 @@ export default function RoadmapPage() {
             setAllRoadmaps(allData.roadmaps)
           }
         }
-      } catch (error) {
-        console.error("Error loading roadmaps:", error)
+      } catch {
+        // Error loading roadmaps - will show empty state
       } finally {
         setIsLoadingRoadmap(false)
       }
