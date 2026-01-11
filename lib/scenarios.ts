@@ -75,6 +75,15 @@ export type Company =
   | "Alibaba"
   | "Dropbox"
   | "Box"
+  | "Goldman Sachs"
+  | "Jane Street"
+  | "Coinbase"
+  | "Robinhood"
+  | "Square"
+  | "Databricks"
+  | "Snowflake"
+  | "Palantir"
+  | "Veeva"
 
 export interface BaseScenario {
   id: string

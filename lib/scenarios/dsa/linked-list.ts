@@ -700,6 +700,198 @@ Construct a deep copy of the list. The deep copy should consist of exactly n bra
       },
     ],
   },
+  {
+    id: "dsa-linked-list-cycle-ii",
+    title: "Linked List Cycle II",
+    type: "dsa",
+    pattern: "linked-list",
+    difficulty: "medium",
+    companies: ["Amazon", "Microsoft", "Meta", "Google", "Apple"],
+    description: "Find the node where the cycle begins in a linked list",
+    tags: ["linked-list", "two-pointers", "hash-table"],
+    estimatedTime: 25,
+    problemStatement: `Given the head of a linked list, return the node where the cycle begins. If there is no cycle, return null.
+
+There is a cycle in a linked list if there is some node in the list that can be reached again by continuously following the next pointer.
+
+Do not modify the linked list.
+
+Follow up: Can you solve it using O(1) memory?`,
+    examples: [
+      {
+        input: "head = [3,2,0,-4], pos = 1",
+        output: "Node at index 1 (value 2)",
+        explanation: "There is a cycle, where tail connects to the second node.",
+      },
+      {
+        input: "head = [1,2], pos = 0",
+        output: "Node at index 0 (value 1)",
+        explanation: "Tail connects to the first node.",
+      },
+      {
+        input: "head = [1], pos = -1",
+        output: "null",
+        explanation: "There is no cycle.",
+      },
+    ],
+    constraints: [
+      "The number of the nodes in the list is in the range [0, 10^4]",
+      "-10^5 <= Node.val <= 10^5",
+      "pos is -1 or a valid index in the linked-list",
+    ],
+    hints: [
+      "Use Floyd's Cycle Detection (fast/slow pointers) to detect cycle",
+      "When they meet, move one pointer back to head",
+      "Move both pointers one step at a time - they'll meet at cycle start",
+      "Mathematical proof: distance from head to cycle start = distance from meeting point to cycle start",
+    ],
+    starterCode: {
+      javascript: `function detectCycle(head) {
+  // Write your solution here
+
+}`,
+      typescript: `function detectCycle(head: ListNode | null): ListNode | null {
+  // Write your solution here
+
+}`,
+      python: `def detectCycle(head):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(1)" },
+    testCases: [
+      { input: { values: [3, 2, 0, -4], pos: 1 }, expected: 1, description: "Cycle at index 1" },
+      { input: { values: [1, 2], pos: 0 }, expected: 0, description: "Cycle at head" },
+      { input: { values: [1], pos: -1 }, expected: null, description: "No cycle" },
+      { input: { values: [1, 2, 3, 4, 5], pos: 2 }, expected: 2, description: "Cycle at middle" },
+    ],
+  },
+  {
+    id: "dsa-intersection-two-linked-lists",
+    title: "Intersection of Two Linked Lists",
+    type: "dsa",
+    pattern: "linked-list",
+    difficulty: "easy",
+    companies: ["Amazon", "Meta", "Microsoft", "Google", "Apple"],
+    description: "Find the node where two linked lists intersect",
+    tags: ["linked-list", "two-pointers", "hash-table"],
+    estimatedTime: 20,
+    problemStatement: `Given the heads of two singly linked-lists headA and headB, return the node at which the two lists intersect. If the two linked lists have no intersection at all, return null.
+
+The linked lists must retain their original structure after the function returns.
+
+Note that the linked lists may intersect at different positions, and the intersection is defined based on reference, not value.`,
+    examples: [
+      {
+        input: "listA = [4,1,8,4,5], listB = [5,6,1,8,4,5], intersectVal = 8",
+        output: "Reference to node with value 8",
+        explanation: "The intersected node's value is 8.",
+      },
+      {
+        input: "listA = [1,9,1,2,4], listB = [3,2,4], intersectVal = 2",
+        output: "Reference to node with value 2",
+      },
+      {
+        input: "listA = [2,6,4], listB = [1,5], intersectVal = 0",
+        output: "null",
+        explanation: "The two lists do not intersect.",
+      },
+    ],
+    constraints: [
+      "The number of nodes of listA is in the m.",
+      "The number of nodes of listB is in the n.",
+      "1 <= m, n <= 3 * 10^4",
+      "1 <= Node.val <= 10^5",
+    ],
+    hints: [
+      "Two pointer approach: traverse both lists",
+      "When one reaches end, redirect to the other list's head",
+      "If they intersect, they'll meet at intersection after at most m+n steps",
+      "If no intersection, both will be null at the same time",
+    ],
+    starterCode: {
+      javascript: `function getIntersectionNode(headA, headB) {
+  // Write your solution here
+
+}`,
+      typescript: `function getIntersectionNode(headA: ListNode | null, headB: ListNode | null): ListNode | null {
+  // Write your solution here
+
+}`,
+      python: `def getIntersectionNode(headA, headB):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(m + n)", space: "O(1)" },
+    testCases: [
+      {
+        input: { listA: [4, 1, 8, 4, 5], listB: [5, 6, 1, 8, 4, 5], intersectAt: 8 },
+        expected: 8,
+        description: "Intersection exists",
+      },
+      {
+        input: { listA: [1, 9, 1, 2, 4], listB: [3, 2, 4], intersectAt: 2 },
+        expected: 2,
+        description: "Different lengths",
+      },
+      {
+        input: { listA: [2, 6, 4], listB: [1, 5], intersectAt: null },
+        expected: null,
+        description: "No intersection",
+      },
+    ],
+  },
+  {
+    id: "dsa-remove-duplicates-sorted-list",
+    title: "Remove Duplicates from Sorted List",
+    type: "dsa",
+    pattern: "linked-list",
+    difficulty: "easy",
+    companies: ["Amazon", "Microsoft", "Meta"],
+    description: "Remove all duplicates from a sorted linked list",
+    tags: ["linked-list"],
+    estimatedTime: 15,
+    problemStatement: `Given the head of a sorted linked list, delete all duplicates such that each element appears only once. Return the linked list sorted as well.`,
+    examples: [
+      { input: "head = [1,1,2]", output: "[1,2]" },
+      { input: "head = [1,1,2,3,3]", output: "[1,2,3]" },
+    ],
+    constraints: [
+      "The number of nodes in the list is in the range [0, 300].",
+      "-100 <= Node.val <= 100",
+      "The list is guaranteed to be sorted in ascending order.",
+    ],
+    hints: [
+      "Since the list is sorted, duplicates will be adjacent",
+      "Traverse the list and skip nodes with same value",
+      "Update next pointer to skip duplicates",
+    ],
+    starterCode: {
+      javascript: `function deleteDuplicates(head) {
+  // Write your solution here
+
+}`,
+      typescript: `function deleteDuplicates(head: ListNode | null): ListNode | null {
+  // Write your solution here
+
+}`,
+      python: `def deleteDuplicates(head):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(1)" },
+    testCases: [
+      { input: { values: [1, 1, 2] }, expected: [1, 2], description: "Two duplicates" },
+      {
+        input: { values: [1, 1, 2, 3, 3] },
+        expected: [1, 2, 3],
+        description: "Multiple duplicates",
+      },
+      { input: { values: [] }, expected: [], description: "Empty list" },
+      { input: { values: [1] }, expected: [1], description: "Single node" },
+      { input: { values: [1, 1, 1] }, expected: [1], description: "All duplicates" },
+    ],
+  },
 ]
 
 export default linkedListScenarios

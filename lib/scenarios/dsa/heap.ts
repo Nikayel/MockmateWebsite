@@ -459,6 +459,73 @@ The median is the middle value in an ordered integer list. If the size of the li
       { input: { s: "aaab" }, expected: "", description: "Impossible" },
     ],
   },
+  {
+    id: "dsa-rearrange-string-k-distance",
+    title: "Rearrange String k Distance Apart",
+    type: "dsa",
+    pattern: "heap-priority-queue",
+    difficulty: "hard",
+    companies: ["Google", "Amazon", "Meta", "Microsoft"],
+    description: "Rearrange string so same characters are at least k distance apart",
+    tags: ["string", "heap", "greedy", "hash-table", "queue"],
+    estimatedTime: 35,
+    problemStatement: `Given a string s and an integer k, rearrange the string such that the same characters are at least distance k from each other. If it is not possible to rearrange the string, return an empty string "".`,
+    examples: [
+      {
+        input: 's = "aabbcc", k = 3',
+        output: '"abcabc"',
+        explanation: "Same characters are at least 3 positions apart.",
+      },
+      {
+        input: 's = "aaabc", k = 3',
+        output: '""',
+        explanation: "It's not possible to rearrange.",
+      },
+      {
+        input: 's = "aaadbbcc", k = 2',
+        output: '"abacabcd"',
+        explanation: "Same characters are at least 2 positions apart.",
+      },
+    ],
+    constraints: [
+      "1 <= s.length <= 3 * 10^5",
+      "s consists of only lowercase English letters.",
+      "0 <= k <= s.length",
+    ],
+    hints: [
+      "Use a max heap to always pick the most frequent available character",
+      "Use a wait queue to track characters that can't be used yet",
+      "After placing a character, it must wait k turns before being available",
+      "If heap is empty but string not complete, impossible",
+    ],
+    starterCode: {
+      javascript: `function rearrangeString(s, k) {
+  // Write your solution here
+
+}`,
+      typescript: `function rearrangeString(s: string, k: number): string {
+  // Write your solution here
+
+}`,
+      python: `def rearrangeString(s, k):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public String rearrangeString(String s, int k) {
+        // Write your solution here
+        return "";
+    }
+}`,
+    },
+    optimalComplexity: { time: "O(n log 26) = O(n)", space: "O(26) = O(1)" },
+    testCases: [
+      { input: { s: "aabbcc", k: 3 }, expected: "abcabc", description: "Valid rearrangement" },
+      { input: { s: "aaabc", k: 3 }, expected: "", description: "Impossible" },
+      { input: { s: "aaadbbcc", k: 2 }, expected: "abacabcd", description: "k=2 spacing" },
+      { input: { s: "aa", k: 0 }, expected: "aa", description: "k=0 means no restriction" },
+      { input: { s: "aabb", k: 2 }, expected: "abab", description: "Alternating" },
+    ],
+  },
 ]
 
 export default heapScenarios
