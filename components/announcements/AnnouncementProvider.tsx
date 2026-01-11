@@ -6,19 +6,7 @@ import { toast } from "sonner"
 import { AnnouncementBanner } from "./AnnouncementBanner"
 import { AnnouncementModal } from "./AnnouncementModal"
 import { cn } from "@/lib/utils"
-
-interface Announcement {
-  id: string
-  title: string
-  message: string
-  type: "banner" | "modal" | "toast" | "page"
-  priority: "info" | "warning" | "critical" | "success"
-  dismissible: boolean
-  cta?: {
-    text: string
-    url: string
-  }
-}
+import type { Announcement } from "@/lib/types/announcements"
 
 interface AnnouncementContextValue {
   announcements: Announcement[]

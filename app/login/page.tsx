@@ -63,8 +63,6 @@ function LoginPageContent() {
         // Create/update profile in Firestore immediately
         // This ensures profile exists for both GitHub and Google logins
         try {
-          console.log("Creating/updating profile for user:", firebaseUser.uid)
-
           // Check if this is a new user (first time login)
           const isNewUser = firebaseUser.metadata.creationTime === firebaseUser.metadata.lastSignInTime
 
@@ -74,8 +72,6 @@ function LoginPageContent() {
             firebaseUser.displayName,
             firebaseUser.photoURL
           )
-
-          console.log("Profile created/updated successfully for:", firebaseUser.uid)
 
           // Check for pending guest session migration
           const pendingMigration = localStorage.getItem("pending_guest_migration")
@@ -94,7 +90,6 @@ function LoginPageContent() {
               }
 
               if (migrationGuestId) {
-                console.log("Migrating guest session for:", migrationGuestId)
                 const token = await firebaseUser.getIdToken()
                 const migrationResponse = await fetch("/api/guest-session/migrate", {
                   method: "POST",
@@ -121,13 +116,10 @@ function LoginPageContent() {
                   if (guestSessionData?.sessionId) {
                     localStorage.setItem("auth_redirect", `sessions/${guestSessionData.sessionId}`)
                   }
-                } else {
-                  console.log("No sessions to migrate or migration skipped:", migrationResult)
                 }
               }
-            } catch (migrationError) {
+            } catch {
               // Non-blocking - don't fail login if migration fails
-              console.warn("Guest session migration failed:", migrationError)
             } finally {
               // Clean up migration markers
               localStorage.removeItem("pending_guest_migration")
@@ -137,7 +129,6 @@ function LoginPageContent() {
           // Send welcome email and create in-app notification for new users
           if (isNewUser && firebaseUser.email) {
             try {
-              console.log("Sending welcome notification for new user:", firebaseUser.uid)
               const token = await firebaseUser.getIdToken()
               const welcomeResponse = await fetch("/api/email/welcome", {
                 method: "POST",
@@ -152,15 +143,11 @@ function LoginPageContent() {
                 }),
               })
 
-              if (welcomeResponse.ok) {
-                const result = await welcomeResponse.json()
-                console.log("Welcome notification sent:", result)
-              } else {
-                console.warn("Welcome notification failed:", await welcomeResponse.text())
+              if (!welcomeResponse.ok) {
+                // Non-critical - user can still use the app
               }
-            } catch (welcomeError) {
+            } catch {
               // Non-blocking - user can still use the app
-              console.warn("Failed to send welcome notification:", welcomeError)
             }
           }
 
@@ -178,14 +165,9 @@ function LoginPageContent() {
             router.push("/dashboard")
           }
         } catch (profileError: any) {
-          console.error("Failed to create/update profile:", profileError)
-          console.error("Error code:", profileError.code)
-          console.error("Error message:", profileError.message)
-
           // Only show error toast for critical errors, not for permission issues
           // Permission issues might be temporary and the user can still use the app
           if (profileError.code === "permission-denied") {
-            console.warn("Profile creation failed due to permissions - user can still use the app")
             // Don't show error toast for permission issues - they might resolve on retry
           } else {
             // Show error for other issues, but don't block the user
@@ -229,7 +211,6 @@ function LoginPageContent() {
       await signInWithGitHub()
       // After popup closes, onAuthStateChanged will handle the redirect
     } catch (error) {
-      console.error("Login failed:", error)
       toast.error("Login failed", {
         description: error instanceof Error ? error.message : "Please try again",
       })
@@ -255,7 +236,6 @@ function LoginPageContent() {
       await signInWithGoogle()
       // After popup closes, onAuthStateChanged will handle the redirect
     } catch (error) {
-      console.error("Login failed:", error)
       toast.error("Login failed", {
         description: error instanceof Error ? error.message : "Please try again",
       })

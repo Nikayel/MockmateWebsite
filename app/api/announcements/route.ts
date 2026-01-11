@@ -9,27 +9,19 @@ import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { verifyToken } from "@/lib/admin/rbac"
 import { Timestamp, FieldValue } from "firebase-admin/firestore"
+import { logger } from "@/lib/logger"
+import type { Announcement } from "@/lib/types/announcements"
 
 export const dynamic = "force-dynamic"
 
-export interface UserAnnouncement {
-  id: string
-  title: string
-  message: string
-  type: "banner" | "modal" | "toast" | "page"
-  priority: "info" | "warning" | "critical" | "success"
-  dismissible: boolean
-  cta?: {
-    text: string
-    url: string
-  }
-}
+// Re-export for backwards compatibility
+export type UserAnnouncement = Announcement
 
 // GET - Fetch active announcements for the current user
 export async function GET(request: NextRequest) {
   try {
     if (!adminDb) {
-      console.log("[User Announcements API] Database not available")
+      logger.debug("[Announcements] Database not available")
       return NextResponse.json({ success: true, announcements: [] })
     }
 
@@ -72,9 +64,9 @@ export async function GET(request: NextRequest) {
     try {
       snapshot = await adminDb.collection("announcements").get()
 
-      console.log("[User Announcements API] Total announcements in DB:", snapshot.docs.length)
+      logger.debug("[Announcements] Total announcements in DB:", snapshot.docs.length)
     } catch (queryError) {
-      console.error("[User Announcements API] Query error:", queryError)
+      logger.error("[Announcements] Query error:", queryError)
       return NextResponse.json({ success: true, announcements: [] })
     }
 
@@ -110,13 +102,13 @@ export async function GET(request: NextRequest) {
 
       // Skip inactive announcements
       if (!data.active) {
-        console.log("[User Announcements API] Skipping", announcementId, "- not active")
+        logger.debug("[Announcements] Skipping", announcementId, "- not active")
         continue
       }
 
       // Skip dismissed announcements (if dismissible)
       if (data.dismissible && dismissedIds.includes(announcementId)) {
-        console.log("[User Announcements API] Skipping", announcementId, "- dismissed by user")
+        logger.debug("[Announcements] Skipping", announcementId, "- dismissed by user")
         continue
       }
 
@@ -191,7 +183,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      console.log("[User Announcements API] Including announcement:", announcementId, data.title)
+      logger.debug("[Announcements] Including announcement:", announcementId, data.title)
       announcements.push({
         id: announcementId,
         title: data.title,
@@ -239,7 +231,7 @@ export async function GET(request: NextRequest) {
       announcements: limitedAnnouncements,
     })
   } catch (error) {
-    console.error("[User Announcements API] GET Error:", error)
+    logger.error("[Announcements] GET Error:", error)
     return NextResponse.json({ success: true, announcements: [] })
   }
 }
@@ -326,7 +318,7 @@ export async function POST(request: NextRequest) {
       announcementId,
     })
   } catch (error) {
-    console.error("[User Announcements API] POST Error:", error)
+    logger.error("[Announcements] POST Error:", error)
     return NextResponse.json(
       { success: false, error: "Failed to dismiss announcement" },
       { status: 500 }

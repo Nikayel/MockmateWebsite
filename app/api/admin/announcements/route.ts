@@ -9,31 +9,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { verifyToken, getAdminRole } from "@/lib/admin/rbac"
 import { Timestamp } from "firebase-admin/firestore"
+import type { FullAnnouncement } from "@/lib/types/announcements"
 
 export const dynamic = "force-dynamic"
 
-export interface Announcement {
-  id: string
-  title: string
-  message: string
-  type: "banner" | "modal" | "toast" | "page"
-  priority: "info" | "warning" | "critical" | "success"
-  targetAudience: "all" | "free" | "pro" | "enterprise" | "specific"
-  targetUserIds?: string[]
-  startDate: string
-  endDate?: string
-  dismissible: boolean
-  active: boolean
-  createdBy: string
-  createdAt: string
-  updatedAt: string
-  views: number
-  dismissals: number
-  cta?: {
-    text: string
-    url: string
-  }
-}
+// Re-export for backwards compatibility
+export type Announcement = FullAnnouncement
 
 // GET - List announcements
 export async function GET(request: NextRequest) {

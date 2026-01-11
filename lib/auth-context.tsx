@@ -60,15 +60,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           setLoading(false)
           setInitialized(true)
-        }, (error) => {
+        }, () => {
           if (!mounted) return
-          console.error("Auth state change error:", error)
+          // Auth state change error - continue anyway
           authStateResolved = true
           setLoading(false)
           setInitialized(true)
         })
-      } catch (error) {
-        console.error("Failed to initialize Firebase Auth:", error)
+      } catch {
+        // Failed to initialize Firebase Auth
         if (mounted) {
           setLoading(false)
           setInitialized(true)
@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Firebase should respond quickly, but if it doesn't, we mark as initialized anyway
     const timeout = setTimeout(() => {
       if (mounted && !authStateResolved) {
-        console.warn("Auth initialization timeout - marking as initialized")
+        // Auth initialization timeout - mark as initialized anyway
         setLoading(false)
         setInitialized(true)
       }
@@ -103,9 +103,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         // Force token refresh
         await firebaseUser.getIdToken(true)
-        console.log("ID token refreshed successfully")
-      } catch (error) {
-        console.error("Failed to refresh token:", error)
+      } catch {
+        // Token refresh failed - will retry on next interval
       }
     }
 
@@ -121,8 +120,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (timeUntilExpiration < 10 * 60 * 1000) {
           await refreshToken()
         }
-      } catch (error) {
-        console.error("Failed to check token expiration:", error)
+      } catch {
+        // Failed to check token expiration - will check on next interval
       }
     }
 

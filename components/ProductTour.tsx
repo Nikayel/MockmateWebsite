@@ -145,9 +145,8 @@ export function ProductTour({ isOpen, userId, userName, onComplete, onSkip }: Pr
         tour_completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }, { merge: true })
-      console.log("Tour completion saved")
-    } catch (error) {
-      console.error("Failed to save tour completion:", error)
+    } catch {
+      // Non-blocking - tour completion tracking is not critical
     }
     onComplete()
   }
@@ -161,8 +160,8 @@ export function ProductTour({ isOpen, userId, userName, onComplete, onSkip }: Pr
         tour_completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }, { merge: true })
-    } catch (error) {
-      console.error("Failed to save tour skip:", error)
+    } catch {
+      // Non-blocking - tour skip tracking is not critical
     }
     onSkip()
   }

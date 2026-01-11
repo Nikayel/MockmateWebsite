@@ -13,6 +13,7 @@ import {
   SendSmtpEmail,
   CreateContact,
 } from "@getbrevo/brevo";
+import { logger } from "@/lib/logger";
 
 // Lazy-initialized API instances with API key configured
 let emailApi: TransactionalEmailsApi | null = null;
@@ -28,7 +29,7 @@ function getEmailApi(): TransactionalEmailsApi {
     emailApi = new TransactionalEmailsApi();
     // Set API key using the SDK's setApiKey method
     emailApi.setApiKey(TransactionalEmailsApiApiKeys.apiKey, apiKey);
-    console.log("[Brevo] Email API initialized successfully");
+    logger.debug("Brevo Email API initialized");
   }
   return emailApi;
 }
@@ -43,7 +44,7 @@ function getContactsApi(): ContactsApi {
     contactsApi = new ContactsApi();
     // Set API key using the SDK's setApiKey method
     contactsApi.setApiKey(ContactsApiApiKeys.apiKey, apiKey);
-    console.log("[Brevo] Contacts API initialized successfully");
+    logger.debug("Brevo Contacts API initialized");
   }
   return contactsApi;
 }
@@ -133,7 +134,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<EmailResult>
 
       const result = await api.sendTransacEmail(message);
 
-      console.log(`[Brevo] Email sent successfully to ${options.to.map(r => r.email).join(", ")}`);
+      logger.info("Email sent successfully", { recipients: options.to.map(r => r.email) });
 
       return {
         success: true,
@@ -153,8 +154,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<EmailResult>
 
       if (isRetryable && attempt < MAX_RETRIES - 1) {
         const delayMs = INITIAL_DELAY_MS * Math.pow(2, attempt);
-        console.warn(`[Brevo] Transient error, retrying in ${delayMs}ms (attempt ${attempt + 1}/${MAX_RETRIES}):`,
-          error?.body?.message || error?.message);
+        logger.warn("Brevo transient error, retrying", { delayMs, attempt: attempt + 1, maxRetries: MAX_RETRIES, error: error?.body?.message || error?.message });
         await sleep(delayMs);
         continue;
       }
@@ -164,7 +164,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<EmailResult>
     }
   }
 
-  console.error("[Brevo] Failed to send email after retries:", lastError?.body || lastError?.message || lastError);
+  logger.error("Failed to send email after retries", { error: lastError?.body?.message || lastError?.message });
   return {
     success: false,
     error: lastError?.body?.message || lastError?.message || "Unknown error"
@@ -180,7 +180,7 @@ export async function upsertContact(
   listIds?: number[]
 ): Promise<boolean> {
   if (!process.env.BREVO_API_KEY) {
-    console.warn("[Brevo] API key not configured, skipping contact upsert");
+    logger.warn("Brevo API key not configured, skipping contact upsert");
     return false;
   }
 
@@ -200,14 +200,14 @@ export async function upsertContact(
     }
 
     await api.createContact(contact);
-    console.log(`[Brevo] Contact upserted: ${email}`);
+    logger.debug("Contact upserted", { email });
     return true;
   } catch (error: any) {
     // Ignore "contact already exists" errors when updateEnabled is true
     if (error?.body?.code === "duplicate_parameter") {
       return true;
     }
-    console.error("[Brevo] Failed to upsert contact:", error?.body || error?.message || error);
+    logger.error("Failed to upsert contact", { email, error: error?.body?.message || error?.message });
     return false;
   }
 }

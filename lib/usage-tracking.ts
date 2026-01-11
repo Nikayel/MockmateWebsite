@@ -9,11 +9,15 @@
  * - Free tier: $0.50 (limited sessions)
  * - Pro tier: $25/month budget cap
  * - Enterprise: $100/month budget cap
+ *
+ * NOTE: For new code, consider using the segregated event types from
+ * @/lib/types/usage-events.ts which follow Interface Segregation Principle.
  */
 
 import { adminDb } from './firebase-admin'
 import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { countTokens } from './token-counter'
+import { logger } from './logger'
 
 // Cost per 1K tokens for each provider (input + output averaged) - Dec 2025
 export const PROVIDER_COSTS = {
@@ -125,7 +129,7 @@ export async function trackUsageEvent(event: Omit<UsageEvent, 'id' | 'createdAt'
     // Also update the user's aggregate usage for the current period
     await updateUserAggregateUsage(event)
   } catch (error) {
-    console.error('[Usage Tracking] Failed to track event:', error)
+    logger.error('Failed to track usage event', { error, eventType: event.eventType })
     // Don't throw - usage tracking failures shouldn't break the app
   }
 }

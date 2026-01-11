@@ -12,19 +12,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-
-interface Announcement {
-  id: string
-  title: string
-  message: string
-  type: "banner" | "modal" | "toast" | "page"
-  priority: "info" | "warning" | "critical" | "success"
-  dismissible: boolean
-  cta?: {
-    text: string
-    url: string
-  }
-}
+import type { Announcement } from "@/lib/types/announcements"
 
 interface AnnouncementBannerProps {
   announcement: Announcement
