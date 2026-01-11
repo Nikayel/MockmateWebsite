@@ -15,127 +15,122 @@ interface PricingPageClientProps {
 }
 
 export function PricingPageClient({ faqs }: PricingPageClientProps) {
-  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('yearly')
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("yearly")
   const [openFaq, setOpenFaq] = useState<number | null>(null)
-  const proPricing = getProPricing('website')
+  const proPricing = getProPricing("website")
 
-  const currentProPrice = billingPeriod === 'yearly'
-    ? proPricing.yearly
-    : proPricing.monthly
+  const currentProPrice = billingPeriod === "yearly" ? proPricing.yearly : proPricing.monthly
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="bg-background min-h-screen">
       <Header />
 
       {/* Pricing Section - Above the fold */}
       <section className="pt-20 pb-8">
-        <div className="container mx-auto px-4 max-w-4xl">
-
+        <div className="container mx-auto max-w-4xl px-4">
           {/* Minimal Header */}
-          <div className="text-center mb-4">
-            <h1 className="text-2xl md:text-3xl font-bold text-white">
-              Choose Your Plan
-            </h1>
+          <div className="mb-4 text-center">
+            <h1 className="text-2xl font-bold text-white md:text-3xl">Choose Your Plan</h1>
           </div>
 
           {/* Billing Toggle - Inline */}
-          <div className="flex justify-center mb-5">
+          <div className="mb-5 flex justify-center">
             <div className="inline-flex items-center gap-1 text-sm">
               <button
-                onClick={() => setBillingPeriod('monthly')}
-                className={`px-3 py-1 rounded-full transition-all ${
-                  billingPeriod === 'monthly' ? "text-white bg-white/10" : "text-gray-500 hover:text-white"
+                onClick={() => setBillingPeriod("monthly")}
+                className={`rounded-full px-3 py-1 transition-all ${
+                  billingPeriod === "monthly"
+                    ? "bg-white/10 text-white"
+                    : "text-gray-500 hover:text-white"
                 }`}
               >
                 Monthly
               </button>
               <button
-                onClick={() => setBillingPeriod('yearly')}
-                className={`px-3 py-1 rounded-full transition-all ${
-                  billingPeriod === 'yearly' ? "text-white bg-white/10" : "text-gray-500 hover:text-white"
+                onClick={() => setBillingPeriod("yearly")}
+                className={`rounded-full px-3 py-1 transition-all ${
+                  billingPeriod === "yearly"
+                    ? "bg-white/10 text-white"
+                    : "text-gray-500 hover:text-white"
                 }`}
               >
                 Annually
               </button>
-              {billingPeriod === 'yearly' && (
-                <span className="text-green-400 text-xs ml-1">Save 25%</span>
+              {billingPeriod === "yearly" && (
+                <span className="ml-1 text-xs text-green-400">Save 25%</span>
               )}
             </div>
           </div>
 
           {/* Pricing Cards - Ultra Compact */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 max-w-2xl mx-auto">
-
+          <div className="mx-auto mb-4 grid max-w-2xl grid-cols-1 gap-4 md:grid-cols-2">
             {/* Free Plan */}
-            <div className="rounded-xl p-5 border bg-white/[0.02] border-white/10">
-              <h3 className="text-base font-semibold text-white mb-3">Free</h3>
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <h3 className="mb-3 text-base font-semibold text-white">Free</h3>
 
-              <div className="text-4xl font-bold text-white mb-2">Free</div>
+              <div className="mb-2 text-4xl font-bold text-white">Free</div>
 
               <Link href="/interview">
                 <Button
                   variant="outline"
-                  className="w-full border-white/20 text-white hover:bg-white/10 mb-4"
+                  className="mb-4 w-full border-white/20 text-white hover:bg-white/10"
                 >
                   Get Started
                 </Button>
               </Link>
 
-              <p className="text-gray-400 text-xs mb-2">Try before you commit.</p>
+              <p className="mb-2 text-xs text-gray-400">Try before you commit.</p>
 
               <ul className="space-y-1.5 text-sm text-gray-400">
                 <li className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-gray-500" />
-                  2 interview scenarios/month
+                  <Check className="h-3.5 w-3.5 text-gray-500" />
+                  20+ problems, unlimited practice
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-gray-500" />
-                  All 200+ DSA problems
+                  <Check className="h-3.5 w-3.5 text-gray-500" />2 full interview scenarios
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-gray-500" />
+                  <Check className="h-3.5 w-3.5 text-gray-500" />
                   AI interviewer feedback
                 </li>
               </ul>
             </div>
 
             {/* Pro Plan */}
-            <div className="rounded-xl p-5 border-2 bg-gradient-to-br from-accent/5 to-transparent border-accent/50">
-              <h3 className="text-base font-semibold text-white mb-3">Pro</h3>
+            <div className="from-accent/5 border-accent/50 rounded-xl border-2 bg-gradient-to-br to-transparent p-5">
+              <h3 className="mb-3 text-base font-semibold text-white">Pro</h3>
 
-              <div className="flex items-baseline gap-1 mb-2">
-                <span className="text-4xl font-bold text-accent">
+              <div className="mb-2 flex items-baseline gap-1">
+                <span className="text-accent text-4xl font-bold">
                   {currentProPrice.priceDisplay}
                 </span>
-                <span className="text-gray-400 text-sm">{currentProPrice.period}</span>
+                <span className="text-sm text-gray-400">{currentProPrice.period}</span>
               </div>
 
               <Link href="/upgrade">
-                <Button
-                  className="w-full bg-accent hover:bg-accent/90 text-black font-semibold mb-4"
-                >
+                <Button className="bg-accent hover:bg-accent/90 mb-4 w-full font-semibold text-black">
                   Subscribe
                 </Button>
               </Link>
 
-              <p className="text-gray-400 text-xs mb-2">Everything you need to get hired.</p>
+              <p className="mb-2 text-xs text-gray-400">Everything you need to get hired.</p>
 
-              <p className="text-xs text-gray-500 mb-2">Everything in Free, plus...</p>
+              <p className="mb-2 text-xs text-gray-500">Everything in Free, plus...</p>
               <ul className="space-y-1.5 text-sm text-gray-300">
                 <li className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-accent" />
+                  <Check className="text-accent h-3.5 w-3.5" />
                   350+ problems/month
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-accent" />
+                  <Check className="text-accent h-3.5 w-3.5" />
                   Spaced repetition scheduling
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-accent" />
+                  <Check className="text-accent h-3.5 w-3.5" />
                   Personalized study roadmap
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-3.5 h-3.5 text-accent" />
+                  <Check className="text-accent h-3.5 w-3.5" />
                   Priority support
                 </li>
               </ul>
@@ -143,28 +138,28 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
           </div>
 
           {/* Trust - Single line */}
-          <p className="text-center text-xs text-gray-600 mb-8">
+          <p className="mb-8 text-center text-xs text-gray-600">
             30-day money-back guarantee · Cancel anytime · Used by engineers at Google, Meta, Amazon
           </p>
         </div>
       </section>
 
       {/* Comparison Stats - Compact */}
-      <section className="py-8 bg-background border-t border-white/5">
+      <section className="bg-background border-t border-white/5 py-8">
         <div className="container mx-auto px-4">
-          <div className="max-w-2xl mx-auto">
+          <div className="mx-auto max-w-2xl">
             <div className="grid grid-cols-3 gap-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-accent">$0.63</div>
-                <div className="text-gray-500 text-xs">per day (yearly)</div>
+                <div className="text-accent text-2xl font-bold">$0.63</div>
+                <div className="text-xs text-gray-500">per day (yearly)</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-white">350+</div>
-                <div className="text-gray-500 text-xs">problems/month</div>
+                <div className="text-xs text-gray-500">problems/month</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-400">29%</div>
-                <div className="text-gray-500 text-xs">cheaper than LeetCode</div>
+                <div className="text-xs text-gray-500">cheaper than LeetCode</div>
               </div>
             </div>
           </div>
@@ -172,26 +167,23 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-12 bg-background border-t border-white/5">
+      <section className="bg-background border-t border-white/5 py-12">
         <div className="container mx-auto px-4">
-          <div className="max-w-2xl mx-auto">
-            <h2 className="text-xl font-bold text-white text-center mb-6">
+          <div className="mx-auto max-w-2xl">
+            <h2 className="mb-6 text-center text-xl font-bold text-white">
               Frequently Asked Questions
             </h2>
             <div className="space-y-2">
               {faqs.map((faq, idx) => (
-                <div
-                  key={idx}
-                  className="rounded-lg border border-white/10 overflow-hidden"
-                >
+                <div key={idx} className="overflow-hidden rounded-lg border border-white/10">
                   <button
                     onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
-                    className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-white/5 transition-colors"
+                    className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-white/5"
                   >
-                    <span className="text-white text-sm font-medium">{faq.question}</span>
+                    <span className="text-sm font-medium text-white">{faq.question}</span>
                     <ChevronDown
                       className={cn(
-                        "w-4 h-4 text-gray-500 transition-transform",
+                        "h-4 w-4 text-gray-500 transition-transform",
                         openFaq === idx && "rotate-180"
                       )}
                     />
@@ -205,7 +197,7 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
                         transition={{ duration: 0.2 }}
                         className="overflow-hidden"
                       >
-                        <p className="px-4 pb-3 text-gray-400 text-sm leading-relaxed">
+                        <p className="px-4 pb-3 text-sm leading-relaxed text-gray-400">
                           {faq.answer}
                         </p>
                       </motion.div>

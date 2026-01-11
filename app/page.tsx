@@ -3,6 +3,7 @@ import { HeroSection } from "@/components/hero-section"
 import { ProblemTeaser } from "@/components/problem-teaser"
 import { FeaturesSection } from "@/components/features-section"
 import { AIAssistedSection } from "@/components/ai-assisted-section"
+import { ComparisonSection } from "@/components/comparison-section"
 import { MetricsMarketingSection } from "@/components/metrics-marketing-section"
 import { Footer } from "@/components/footer"
 import { HomePageClient } from "@/components/home/HomePageClient"
@@ -26,22 +27,17 @@ export default function HomePage() {
 
   // Marketing content - this is SSR'd and visible to crawlers
   const marketingContent = (
-    <main className="min-h-screen bg-background">
+    <main className="bg-background min-h-screen">
       <Header />
       <HeroSection />
       <ProblemTeaser />
       <AIAssistedSection />
+      <ComparisonSection />
       <FeaturesSection />
       <MetricsMarketingSection />
       <Footer />
     </main>
   )
 
-  return (
-    <HomePageClient
-      header={header}
-      footer={footer}
-      marketingContent={marketingContent}
-    />
-  )
+  return <HomePageClient header={header} footer={footer} marketingContent={marketingContent} />
 }

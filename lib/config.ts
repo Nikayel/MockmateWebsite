@@ -11,10 +11,10 @@ export const PRICING_CONFIG = {
     period: "",
     description: "Try CodeSparring and see if it's right for you",
     sessionsPerMonth: 2,
-    sessionsDisplay: "2 interview scenarios per month",
+    sessionsDisplay: "20+ problems, unlimited practice",
     features: [
-      "2 interview scenarios per month",
-      "All 200+ DSA problems available",
+      "20+ problems with unlimited practice",
+      "2 full interview scenarios included",
       "AI interviewer with real-time feedback",
       "Performance tracking & analytics",
       "Web-based Monaco code editor",
@@ -68,15 +68,18 @@ export const PRICING_CONFIG = {
     valueProps: [
       {
         title: "Unlimited Practice per Scenario",
-        description: "Each scenario unlocks 10+ DSA problems. Practice each problem as many times as you need—only the scenario counts against your limit.",
+        description:
+          "Each scenario unlocks 10+ DSA problems. Practice each problem as many times as you need—only the scenario counts against your limit.",
       },
       {
         title: "Spaced Repetition System",
-        description: "AI schedules your reviews at the scientifically optimal time for long-term retention. Never forget what you've learned.",
+        description:
+          "AI schedules your reviews at the scientifically optimal time for long-term retention. Never forget what you've learned.",
       },
       {
         title: "Personalized Study Roadmap",
-        description: "Get a custom prep plan based on your target company, interview date, and skill gaps. Updated daily based on your progress.",
+        description:
+          "Get a custom prep plan based on your target company, interview date, and skill gaps. Updated daily based on your progress.",
       },
     ],
     // Complete feature list for Pro
@@ -137,7 +140,9 @@ export const APP_CONFIG = {
 } as const
 
 // Helper function to get pricing based on platform
-export function getProPricing(platform: 'website' | 'vscode' = 'website'): typeof PRICING_CONFIG.pro.website {
+export function getProPricing(
+  platform: "website" | "vscode" = "website"
+): typeof PRICING_CONFIG.pro.website {
   return PRICING_CONFIG.pro[platform] as typeof PRICING_CONFIG.pro.website
 }
 

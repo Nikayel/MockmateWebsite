@@ -51,7 +51,8 @@ export function OrganizationJsonLd() {
       width: 512,
       height: 512,
     },
-    description: "AI-powered coding interview practice platform with voice-enabled mock interviews and spaced repetition learning.",
+    description:
+      "AI-powered coding interview practice platform with voice-enabled mock interviews and spaced repetition learning.",
     foundingDate: "2025",
     founder: {
       "@type": "Person",
@@ -69,7 +70,8 @@ export function OrganizationJsonLd() {
         "Nikayeel Ali Jamal",
       ],
       jobTitle: "Founder & CEO",
-      description: "Computer Science student at Sacramento State. Built CodeSparring to help engineers prepare for technical interviews with AI.",
+      description:
+        "Computer Science student at Sacramento State. Built CodeSparring to help engineers prepare for technical interviews with AI.",
       url: "https://linkedin.com/in/nikayel-ali",
       sameAs: [
         "https://linkedin.com/in/nikayel-ali",
@@ -77,10 +79,7 @@ export function OrganizationJsonLd() {
         "https://twitter.com/codesparring",
       ],
     },
-    sameAs: [
-      "https://twitter.com/codesparring",
-      "https://linkedin.com/company/codesparring",
-    ],
+    sameAs: ["https://twitter.com/codesparring", "https://linkedin.com/company/codesparring"],
     contactPoint: {
       "@type": "ContactPoint",
       email: "nikayel@codesparring.dev",
@@ -105,14 +104,15 @@ export function SoftwareApplicationJsonLd() {
     applicationCategory: "EducationalApplication",
     operatingSystem: "Web",
     url: SITE_URL,
-    description: "AI mock interview platform for coding interviews. Practice DSA problems with voice-enabled AI feedback and spaced repetition learning.",
+    description:
+      "AI mock interview platform for coding interviews. Practice DSA problems with voice-enabled AI feedback and spaced repetition learning.",
     offers: [
       {
         "@type": "Offer",
         name: "Free Plan",
         price: "0",
         priceCurrency: "USD",
-        description: "2 interview scenarios per month with full AI feedback",
+        description: "20+ problems with unlimited practice and full AI feedback",
       },
       {
         "@type": "Offer",
@@ -219,7 +219,8 @@ export function HowToJsonLd() {
     "@context": "https://schema.org",
     "@type": "HowTo",
     name: "How to Prepare for Coding Interviews with CodeSparring",
-    description: "A science-backed approach to acing coding interviews using spaced repetition and AI-powered practice.",
+    description:
+      "A science-backed approach to acing coding interviews using spaced repetition and AI-powered practice.",
     step: [
       {
         "@type": "HowToStep",
@@ -310,11 +311,7 @@ export function ArticleJsonLd({
 }
 
 // BreadcrumbList Schema - for navigation trail in SERP
-export function BreadcrumbJsonLd({
-  items,
-}: {
-  items: Array<{ name: string; url: string }>
-}) {
+export function BreadcrumbJsonLd({ items }: { items: Array<{ name: string; url: string }> }) {
   const schema = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -343,18 +340,13 @@ export function FounderPersonJsonLd() {
     "@id": "https://linkedin.com/in/nikayel-ali#person",
     name: "Nikayel Ali Jamal",
     // Multiple alternate names for different search variations
-    alternateName: [
-      "Nikayel Jamal",
-      "Nikayel Ali",
-      "Nikayeel Jamal",
-      "Nikayeel Ali",
-      "Nikayel",
-    ],
+    alternateName: ["Nikayel Jamal", "Nikayel Ali", "Nikayeel Jamal", "Nikayeel Ali", "Nikayel"],
     givenName: "Nikayel",
     familyName: "Jamal",
     additionalName: "Ali",
     jobTitle: "Founder & Software Engineer",
-    description: "Computer Science student at Sacramento State University. Founder of CodeSparring, an AI-powered coding interview preparation platform. Passionate about helping developers ace technical interviews through spaced repetition and AI mock interviews.",
+    description:
+      "Computer Science student at Sacramento State University. Founder of CodeSparring, an AI-powered coding interview preparation platform. Passionate about helping developers ace technical interviews through spaced repetition and AI mock interviews.",
     url: "https://linkedin.com/in/nikayel-ali",
     image: `${SITE_URL}/api/logo.png`,
     // Educational background
