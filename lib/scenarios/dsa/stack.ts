@@ -1119,6 +1119,229 @@ Return the number of car fleets that will arrive at the destination.`,
       { input: { target: 100, position: [0, 2, 4], speed: [4, 2, 1] }, expected: 1, description: "All merge" },
     ],
   },
+  {
+    id: "dsa-trapping-rain-water",
+    title: "Trapping Rain Water",
+    type: "dsa",
+    pattern: "stack",
+    difficulty: "hard",
+    companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple", "Goldman Sachs", "Bloomberg"],
+    description: "Calculate how much water can be trapped after rain",
+    tags: ["stack", "two-pointers", "dynamic-programming", "monotonic-stack"],
+    estimatedTime: 30,
+    problemStatement: `Given n non-negative integers representing an elevation map where the width of each bar is 1, compute how much water it can trap after raining.`,
+    examples: [
+      { input: "height = [0,1,0,2,1,0,1,3,2,1,2,1]", output: "6", explanation: "The elevation map traps 6 units of rain water." },
+      { input: "height = [4,2,0,3,2,5]", output: "9" },
+    ],
+    constraints: ["n == height.length", "1 <= n <= 2 * 10^4", "0 <= height[i] <= 10^5"],
+    hints: [
+      "For each position, water = min(maxLeft, maxRight) - height",
+      "Two pointers: track leftMax, rightMax, fill from lower side",
+      "Stack: maintain decreasing monotonic stack, calculate water when popping",
+      "DP: precompute leftMax[] and rightMax[] arrays",
+    ],
+    starterCode: {
+      javascript: `function trap(height) {\n  // Use two pointers or stack\n}`,
+      typescript: `function trap(height: number[]): number {\n  // Use two pointers or stack\n}`,
+      python: `def trap(height: list[int]) -> int:\n    # Use two pointers or stack\n    pass`,
+      java: `class Solution {\n    public int trap(int[] height) {\n        // Use two pointers or stack\n        return 0;\n    }\n}`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(1) with two pointers" },
+    testCases: [
+      { input: { height: [0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1] }, expected: 6, description: "Standard case" },
+      { input: { height: [4, 2, 0, 3, 2, 5] }, expected: 9, description: "Valley in middle" },
+      { input: { height: [1, 2, 3, 4, 5] }, expected: 0, description: "Ascending - no water" },
+    ],
+  },
+  {
+    id: "dsa-next-greater-element-i",
+    title: "Next Greater Element I",
+    type: "dsa",
+    pattern: "stack",
+    difficulty: "easy",
+    companies: ["Amazon", "Google", "Bloomberg"],
+    description: "Find the next greater element for each element from a subset",
+    tags: ["stack", "hash-table", "monotonic-stack"],
+    estimatedTime: 15,
+    problemStatement: `The next greater element of some element x in an array is the first greater element that is to the right of x in the same array.
+
+You are given two distinct 0-indexed integer arrays nums1 and nums2, where nums1 is a subset of nums2.
+
+For each 0 <= i < nums1.length, find the index j such that nums1[i] == nums2[j] and determine the next greater element of nums2[j] in nums2. If there is no next greater element, then the answer for this query is -1.
+
+Return an array ans of length nums1.length such that ans[i] is the next greater element as described above.`,
+    examples: [
+      { input: "nums1 = [4,1,2], nums2 = [1,3,4,2]", output: "[-1,3,-1]", explanation: "For 4: no greater to right. For 1: 3 is next greater. For 2: no greater." },
+      { input: "nums1 = [2,4], nums2 = [1,2,3,4]", output: "[3,-1]" },
+    ],
+    constraints: ["1 <= nums1.length <= nums2.length <= 1000", "0 <= nums1[i], nums2[i] <= 10^4", "All integers in nums1 and nums2 are unique."],
+    hints: [
+      "Use monotonic decreasing stack on nums2",
+      "Build a map from element to its next greater",
+      "Look up each element of nums1 in the map",
+    ],
+    starterCode: {
+      javascript: `function nextGreaterElement(nums1, nums2) {\n  // Use monotonic stack + hashmap\n}`,
+      typescript: `function nextGreaterElement(nums1: number[], nums2: number[]): number[] {\n  // Use monotonic stack + hashmap\n}`,
+      python: `def nextGreaterElement(nums1: list[int], nums2: list[int]) -> list[int]:\n    # Use monotonic stack + hashmap\n    pass`,
+      java: `class Solution {\n    public int[] nextGreaterElement(int[] nums1, int[] nums2) {\n        // Use monotonic stack + hashmap\n        return new int[0];\n    }\n}`,
+    },
+    optimalComplexity: { time: "O(n + m)", space: "O(n)" },
+    testCases: [
+      { input: { nums1: [4, 1, 2], nums2: [1, 3, 4, 2] }, expected: [-1, 3, -1], description: "Mixed results" },
+      { input: { nums1: [2, 4], nums2: [1, 2, 3, 4] }, expected: [3, -1], description: "Ascending array" },
+    ],
+  },
+  {
+    id: "dsa-next-greater-element-ii",
+    title: "Next Greater Element II",
+    type: "dsa",
+    pattern: "stack",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta", "Bloomberg"],
+    description: "Find next greater element in a circular array",
+    tags: ["stack", "array", "monotonic-stack"],
+    estimatedTime: 20,
+    problemStatement: `Given a circular integer array nums (i.e., the next element of nums[nums.length - 1] is nums[0]), return the next greater number for every element in nums.
+
+The next greater number of a number x is the first greater number to its traversing-order next in the array, which means you could search circularly to find its next greater number. If it doesn't exist, return -1 for this number.`,
+    examples: [
+      { input: "nums = [1,2,1]", output: "[2,-1,2]", explanation: "First 1's next greater is 2; 2 has none; Second 1's next greater is 2 (circular)." },
+      { input: "nums = [1,2,3,4,3]", output: "[2,3,4,-1,4]" },
+    ],
+    constraints: ["1 <= nums.length <= 10^4", "-10^9 <= nums[i] <= 10^9"],
+    hints: [
+      "Iterate through array twice (or use modulo) to handle circularity",
+      "Use monotonic decreasing stack storing indices",
+      "On second pass, only pop from stack (don't push)",
+    ],
+    starterCode: {
+      javascript: `function nextGreaterElements(nums) {\n  // Circular monotonic stack\n}`,
+      typescript: `function nextGreaterElements(nums: number[]): number[] {\n  // Circular monotonic stack\n}`,
+      python: `def nextGreaterElements(nums: list[int]) -> list[int]:\n    # Circular monotonic stack\n    pass`,
+      java: `class Solution {\n    public int[] nextGreaterElements(int[] nums) {\n        // Circular monotonic stack\n        return new int[0];\n    }\n}`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(n)" },
+    testCases: [
+      { input: { nums: [1, 2, 1] }, expected: [2, -1, 2], description: "Circular wrap" },
+      { input: { nums: [1, 2, 3, 4, 3] }, expected: [2, 3, 4, -1, 4], description: "Peak in middle" },
+    ],
+  },
+  {
+    id: "dsa-online-stock-span",
+    title: "Online Stock Span",
+    type: "dsa",
+    pattern: "stack",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Bloomberg", "Goldman Sachs"],
+    description: "Calculate stock price span using monotonic stack",
+    tags: ["stack", "design", "monotonic-stack", "data-stream"],
+    estimatedTime: 25,
+    problemStatement: `Design an algorithm that collects daily price quotes for some stock and returns the span of that stock's price for the current day.
+
+The span of the stock's price in one day is the maximum number of consecutive days (starting from that day and going backward) for which the stock price was less than or equal to the price of that day.
+
+For example, if the prices of the stock in the last four days is [7,2,1,2] and the price of the stock today is 2, then the span of today is 4 because starting from today, the price of the stock was less than or equal 2 for 4 consecutive days.
+
+Implement the StockSpanner class:
+- StockSpanner() Initializes the object.
+- int next(int price) Returns the span of the stock's price given that today's price is price.`,
+    examples: [
+      { input: '["StockSpanner", "next", "next", "next", "next", "next", "next", "next"]\n[[], [100], [80], [60], [70], [60], [75], [85]]', output: "[null, 1, 1, 1, 2, 1, 4, 6]" },
+    ],
+    constraints: ["1 <= price <= 10^5", "At most 10^4 calls will be made to next."],
+    hints: [
+      "Use monotonic decreasing stack of (price, span) pairs",
+      "When new price >= stack top, pop and accumulate spans",
+      "Push (price, accumulated_span) onto stack",
+    ],
+    starterCode: {
+      javascript: `class StockSpanner {\n  constructor() {\n    // Initialize stack\n  }\n\n  next(price) {\n    // Calculate span using monotonic stack\n  }\n}`,
+      typescript: `class StockSpanner {\n  constructor() {\n    // Initialize stack\n  }\n\n  next(price: number): number {\n    // Calculate span using monotonic stack\n  }\n}`,
+      python: `class StockSpanner:\n    def __init__(self):\n        # Initialize stack\n        pass\n\n    def next(self, price: int) -> int:\n        # Calculate span using monotonic stack\n        pass`,
+      java: `class StockSpanner {\n    public StockSpanner() {\n        // Initialize stack\n    }\n\n    public int next(int price) {\n        // Calculate span using monotonic stack\n        return 0;\n    }\n}`,
+    },
+    optimalComplexity: { time: "O(1) amortized per call", space: "O(n)" },
+    testCases: [
+      { input: { ops: ["StockSpanner", "next", "next", "next", "next"], args: [[], [100], [80], [60], [70]] }, expected: [null, 1, 1, 1, 2], description: "Basic operations" },
+    ],
+  },
+  {
+    id: "dsa-132-pattern",
+    title: "132 Pattern",
+    type: "dsa",
+    pattern: "stack",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Microsoft", "Apple"],
+    description: "Find if there exists a 132 pattern in array",
+    tags: ["stack", "array", "monotonic-stack"],
+    estimatedTime: 25,
+    problemStatement: `Given an array of n integers nums, a 132 pattern is a subsequence of three integers nums[i], nums[j] and nums[k] such that i < j < k and nums[i] < nums[k] < nums[j].
+
+Return true if there is a 132 pattern in nums, otherwise, return false.`,
+    examples: [
+      { input: "nums = [1,2,3,4]", output: "false", explanation: "No 132 pattern exists." },
+      { input: "nums = [3,1,4,2]", output: "true", explanation: "There is a 132 pattern: [1, 4, 2]." },
+      { input: "nums = [-1,3,2,0]", output: "true", explanation: "There are three 132 patterns: [-1, 3, 2], [-1, 3, 0] and [-1, 2, 0]." },
+    ],
+    constraints: ["n == nums.length", "1 <= n <= 2 * 10^5", "-10^9 <= nums[i] <= 10^9"],
+    hints: [
+      "Iterate from right to left",
+      "Use stack to track potential 'k' values (the '2' in 132)",
+      "Track the largest popped value as potential 'k'",
+      "If current value < k, we found a valid i (the '1')",
+    ],
+    starterCode: {
+      javascript: `function find132pattern(nums) {\n  // Use stack, iterate right to left\n}`,
+      typescript: `function find132pattern(nums: number[]): boolean {\n  // Use stack, iterate right to left\n}`,
+      python: `def find132pattern(nums: list[int]) -> bool:\n    # Use stack, iterate right to left\n    pass`,
+      java: `class Solution {\n    public boolean find132pattern(int[] nums) {\n        // Use stack, iterate right to left\n        return false;\n    }\n}`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(n)" },
+    testCases: [
+      { input: { nums: [1, 2, 3, 4] }, expected: false, description: "Strictly increasing" },
+      { input: { nums: [3, 1, 4, 2] }, expected: true, description: "Has 132 pattern" },
+      { input: { nums: [-1, 3, 2, 0] }, expected: true, description: "Multiple patterns" },
+    ],
+  },
+  {
+    id: "dsa-max-frequency-stack",
+    title: "Maximum Frequency Stack",
+    type: "dsa",
+    pattern: "stack",
+    difficulty: "hard",
+    companies: ["Amazon", "Google", "Meta", "Microsoft", "Bloomberg"],
+    description: "Design a stack that pops the most frequent element",
+    tags: ["stack", "hash-table", "design"],
+    estimatedTime: 35,
+    problemStatement: `Design a stack-like data structure to push elements to the stack and pop the most frequent element from the stack.
+
+Implement the FreqStack class:
+- FreqStack() constructs an empty frequency stack.
+- void push(int val) pushes an integer val onto the top of the stack.
+- int pop() removes and returns the most frequent element in the stack. If there is a tie, the element closest to the top is removed and returned.`,
+    examples: [
+      { input: '["FreqStack", "push", "push", "push", "push", "push", "push", "pop", "pop", "pop", "pop"]\n[[], [5], [7], [5], [7], [4], [5], [], [], [], []]', output: "[null, null, null, null, null, null, null, 5, 7, 5, 4]", explanation: "After pushes, frequencies are 5:3, 7:2, 4:1. Pop returns 5 (most frequent), then 7, 5, 4." },
+    ],
+    constraints: ["0 <= val <= 10^9", "At most 2 * 10^4 calls will be made to push and pop."],
+    hints: [
+      "Track frequency of each element in a hashmap",
+      "For each frequency level, maintain a stack of elements",
+      "Track maxFrequency to know which stack to pop from",
+      "On pop: pop from stack at maxFreq, decrement freq, update maxFreq if needed",
+    ],
+    starterCode: {
+      javascript: `class FreqStack {\n  constructor() {\n    // Initialize freq map and frequency stacks\n  }\n\n  push(val) {\n    // Increment freq, push to appropriate stack\n  }\n\n  pop() {\n    // Pop from max frequency stack\n  }\n}`,
+      typescript: `class FreqStack {\n  constructor() {\n    // Initialize freq map and frequency stacks\n  }\n\n  push(val: number): void {\n    // Increment freq, push to appropriate stack\n  }\n\n  pop(): number {\n    // Pop from max frequency stack\n  }\n}`,
+      python: `class FreqStack:\n    def __init__(self):\n        # Initialize freq map and frequency stacks\n        pass\n\n    def push(self, val: int) -> None:\n        # Increment freq, push to appropriate stack\n        pass\n\n    def pop(self) -> int:\n        # Pop from max frequency stack\n        pass`,
+      java: `class FreqStack {\n    public FreqStack() {\n        // Initialize freq map and frequency stacks\n    }\n\n    public void push(int val) {\n        // Increment freq, push to appropriate stack\n    }\n\n    public int pop() {\n        // Pop from max frequency stack\n        return 0;\n    }\n}`,
+    },
+    optimalComplexity: { time: "O(1) per operation", space: "O(n)" },
+    testCases: [
+      { input: { ops: ["FreqStack", "push", "push", "push", "pop"], args: [[], [5], [7], [5], []] }, expected: [null, null, null, null, 5], description: "Pop most frequent" },
+    ],
+  },
 ]
 
 export default stackScenarios
