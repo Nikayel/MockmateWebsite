@@ -1303,6 +1303,302 @@ Initially, all next pointers are set to NULL.`,
       { input: { root: [] }, expected: [], description: "Empty tree" },
     ],
   },
+
+  // ==================== BST & ADVANCED TREE PROBLEMS ====================
+  {
+    id: "dsa-validate-bst",
+    title: "Validate Binary Search Tree",
+    type: "dsa",
+    pattern: "trees",
+    difficulty: "medium",
+    companies: ["Amazon", "Meta", "Google", "Microsoft", "Apple", "Bloomberg"],
+    description: "Determine if a binary tree is a valid BST",
+    tags: ["binary-search-tree", "dfs", "recursion"],
+    estimatedTime: 20,
+    problemStatement: `Given the root of a binary tree, determine if it is a valid binary search tree (BST).
+
+A valid BST is defined as follows:
+- The left subtree of a node contains only nodes with keys less than the node's key.
+- The right subtree of a node contains only nodes with keys greater than the node's key.
+- Both the left and right subtrees must also be binary search trees.`,
+    examples: [
+      { input: "root = [2,1,3]", output: "true" },
+      { input: "root = [5,1,4,null,null,3,6]", output: "false", explanation: "The root node's value is 5 but its right child's value is 4." },
+    ],
+    constraints: ["The number of nodes in the tree is in the range [1, 10^4].", "-2^31 <= Node.val <= 2^31 - 1"],
+    hints: [
+      "Pass min/max bounds down the tree",
+      "Left child must be < current, right child must be > current",
+      "Or use inorder traversal - should be strictly increasing",
+      "Watch out for duplicate values (not allowed in BST)",
+    ],
+    starterCode: {
+      javascript: `function isValidBST(root) {\n  // Validate BST using bounds or inorder\n}`,
+      typescript: `function isValidBST(root: TreeNode | null): boolean {\n  // Validate BST using bounds or inorder\n}`,
+      python: `def isValidBST(root: Optional[TreeNode]) -> bool:\n    # Validate BST using bounds or inorder\n    pass`,
+      java: `class Solution {\n    public boolean isValidBST(TreeNode root) {\n        // Validate BST\n        return false;\n    }\n}`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(h)" },
+    testCases: [
+      { input: { root: [2, 1, 3] }, expected: true, description: "Valid BST" },
+      { input: { root: [5, 1, 4, null, null, 3, 6] }, expected: false, description: "Invalid - right subtree violation" },
+      { input: { root: [5, 4, 6, null, null, 3, 7] }, expected: false, description: "Invalid - 3 < 5 but in right subtree" },
+    ],
+  },
+  {
+    id: "dsa-kth-smallest-bst",
+    title: "Kth Smallest Element in a BST",
+    type: "dsa",
+    pattern: "trees",
+    difficulty: "medium",
+    companies: ["Amazon", "Meta", "Google", "Microsoft", "Uber", "LinkedIn"],
+    description: "Find the kth smallest element in a BST",
+    tags: ["binary-search-tree", "dfs", "inorder"],
+    estimatedTime: 20,
+    problemStatement: `Given the root of a binary search tree, and an integer k, return the kth smallest value (1-indexed) of all the values of the nodes in the tree.`,
+    examples: [
+      { input: "root = [3,1,4,null,2], k = 1", output: "1" },
+      { input: "root = [5,3,6,2,4,null,null,1], k = 3", output: "3" },
+    ],
+    constraints: ["The number of nodes in the tree is n.", "1 <= k <= n <= 10^4", "0 <= Node.val <= 10^4"],
+    hints: [
+      "Inorder traversal of BST gives sorted order",
+      "Stop early once you've found kth element",
+      "Can also use iterative approach with stack",
+      "Follow-up: augment tree with subtree sizes for O(h) queries",
+    ],
+    starterCode: {
+      javascript: `function kthSmallest(root, k) {\n  // Use inorder traversal\n}`,
+      typescript: `function kthSmallest(root: TreeNode | null, k: number): number {\n  // Use inorder traversal\n}`,
+      python: `def kthSmallest(root: Optional[TreeNode], k: int) -> int:\n    # Use inorder traversal\n    pass`,
+      java: `class Solution {\n    public int kthSmallest(TreeNode root, int k) {\n        // Use inorder traversal\n        return 0;\n    }\n}`,
+    },
+    optimalComplexity: { time: "O(H + k)", space: "O(H)" },
+    testCases: [
+      { input: { root: [3, 1, 4, null, 2], k: 1 }, expected: 1, description: "Smallest element" },
+      { input: { root: [5, 3, 6, 2, 4, null, null, 1], k: 3 }, expected: 3, description: "Third smallest" },
+    ],
+  },
+  {
+    id: "dsa-binary-tree-zigzag",
+    title: "Binary Tree Zigzag Level Order Traversal",
+    type: "dsa",
+    pattern: "trees",
+    difficulty: "medium",
+    companies: ["Amazon", "Meta", "Google", "Microsoft", "Apple", "Bloomberg"],
+    description: "Level order traversal alternating left-to-right and right-to-left",
+    tags: ["binary-tree", "bfs", "deque"],
+    estimatedTime: 25,
+    problemStatement: `Given the root of a binary tree, return the zigzag level order traversal of its nodes' values. (i.e., from left to right, then right to left for the next level and alternate between).`,
+    examples: [
+      { input: "root = [3,9,20,null,null,15,7]", output: "[[3],[20,9],[15,7]]" },
+      { input: "root = [1]", output: "[[1]]" },
+      { input: "root = []", output: "[]" },
+    ],
+    constraints: ["The number of nodes in the tree is in the range [0, 2000].", "-100 <= Node.val <= 100"],
+    hints: [
+      "Use BFS with level tracking",
+      "Alternate direction each level",
+      "Can reverse every other level, or use deque to add from different ends",
+      "Track even/odd levels",
+    ],
+    starterCode: {
+      javascript: `function zigzagLevelOrder(root) {\n  // BFS with alternating direction\n}`,
+      typescript: `function zigzagLevelOrder(root: TreeNode | null): number[][] {\n  // BFS with alternating direction\n}`,
+      python: `def zigzagLevelOrder(root: Optional[TreeNode]) -> list[list[int]]:\n    # BFS with alternating direction\n    pass`,
+      java: `class Solution {\n    public List<List<Integer>> zigzagLevelOrder(TreeNode root) {\n        // BFS with alternating direction\n        return new ArrayList<>();\n    }\n}`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(n)" },
+    testCases: [
+      { input: { root: [3, 9, 20, null, null, 15, 7] }, expected: [[3], [20, 9], [15, 7]], description: "Standard zigzag" },
+      { input: { root: [1] }, expected: [[1]], description: "Single node" },
+      { input: { root: [] }, expected: [], description: "Empty tree" },
+    ],
+  },
+  {
+    id: "dsa-all-nodes-distance-k",
+    title: "All Nodes Distance K in Binary Tree",
+    type: "dsa",
+    pattern: "trees",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: "Find all nodes at distance K from a target node",
+    tags: ["binary-tree", "bfs", "dfs", "graph"],
+    estimatedTime: 30,
+    problemStatement: `Given the root of a binary tree, the value of a target node target, and an integer k, return an array of the values of all nodes that have a distance k from the target node.
+
+You can return the answer in any order.`,
+    examples: [
+      { input: "root = [3,5,1,6,2,0,8,null,null,7,4], target = 5, k = 2", output: "[7,4,1]", explanation: "Nodes at distance 2 from node 5 are 7, 4, and 1." },
+      { input: "root = [1], target = 1, k = 3", output: "[]" },
+    ],
+    constraints: ["The number of nodes in the tree is in the range [1, 500].", "0 <= Node.val <= 500", "All Node.val are unique.", "target is a value of a node in the tree.", "0 <= k <= 1000"],
+    hints: [
+      "Convert tree to undirected graph (add parent pointers)",
+      "Then BFS from target node for k levels",
+      "Or DFS to find path to target, then explore at each level",
+      "Track visited nodes to avoid cycles",
+    ],
+    starterCode: {
+      javascript: `function distanceK(root, target, k) {\n  // Convert to graph + BFS\n}`,
+      typescript: `function distanceK(root: TreeNode | null, target: TreeNode | null, k: number): number[] {\n  // Convert to graph + BFS\n}`,
+      python: `def distanceK(root: TreeNode, target: TreeNode, k: int) -> list[int]:\n    # Convert to graph + BFS\n    pass`,
+      java: `class Solution {\n    public List<Integer> distanceK(TreeNode root, TreeNode target, int k) {\n        // Convert to graph + BFS\n        return new ArrayList<>();\n    }\n}`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(n)" },
+    testCases: [
+      { input: { root: [3, 5, 1, 6, 2, 0, 8, null, null, 7, 4], target: 5, k: 2 }, expected: [7, 4, 1], description: "Multiple nodes at distance K" },
+      { input: { root: [1], target: 1, k: 3 }, expected: [], description: "No nodes at distance K" },
+    ],
+  },
+  {
+    id: "dsa-convert-sorted-array-bst",
+    title: "Convert Sorted Array to Binary Search Tree",
+    type: "dsa",
+    pattern: "trees",
+    difficulty: "easy",
+    companies: ["Amazon", "Meta", "Google", "Microsoft", "Apple"],
+    description: "Convert sorted array to height-balanced BST",
+    tags: ["binary-search-tree", "divide-conquer", "recursion"],
+    estimatedTime: 15,
+    problemStatement: `Given an integer array nums where the elements are sorted in ascending order, convert it to a height-balanced binary search tree.
+
+A height-balanced binary tree is a binary tree in which the depth of the two subtrees of every node never differs by more than one.`,
+    examples: [
+      { input: "nums = [-10,-3,0,5,9]", output: "[0,-3,9,-10,null,5]", explanation: "Any valid height-balanced BST is accepted." },
+      { input: "nums = [1,3]", output: "[3,1]", explanation: "[1,null,3] and [3,1] are both valid." },
+    ],
+    constraints: ["1 <= nums.length <= 10^4", "-10^4 <= nums[i] <= 10^4", "nums is sorted in strictly increasing order."],
+    hints: [
+      "Middle element becomes root for balance",
+      "Recursively build left subtree from left half",
+      "Recursively build right subtree from right half",
+      "Similar to binary search partitioning",
+    ],
+    starterCode: {
+      javascript: `function sortedArrayToBST(nums) {\n  // Build balanced BST\n}`,
+      typescript: `function sortedArrayToBST(nums: number[]): TreeNode | null {\n  // Build balanced BST\n}`,
+      python: `def sortedArrayToBST(nums: list[int]) -> Optional[TreeNode]:\n    # Build balanced BST\n    pass`,
+      java: `class Solution {\n    public TreeNode sortedArrayToBST(int[] nums) {\n        // Build balanced BST\n        return null;\n    }\n}`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(log n)" },
+    testCases: [
+      { input: { nums: [-10, -3, 0, 5, 9] }, expected: [0, -3, 9, -10, null, 5], description: "5 elements" },
+      { input: { nums: [1, 3] }, expected: [3, 1], description: "2 elements" },
+      { input: { nums: [1] }, expected: [1], description: "Single element" },
+    ],
+  },
+  {
+    id: "dsa-bst-iterator",
+    title: "Binary Search Tree Iterator",
+    type: "dsa",
+    pattern: "trees",
+    difficulty: "medium",
+    companies: ["Amazon", "Meta", "Google", "Microsoft", "LinkedIn", "Salesforce"],
+    description: "Implement an iterator over a BST with next() and hasNext()",
+    tags: ["binary-search-tree", "stack", "design", "iterator"],
+    estimatedTime: 25,
+    problemStatement: `Implement the BSTIterator class that represents an iterator over the in-order traversal of a binary search tree (BST):
+
+- BSTIterator(TreeNode root) Initializes the iterator with the root node of a BST.
+- boolean hasNext() Returns true if there exists a number in the traversal to the right of the pointer.
+- int next() Moves the pointer to the right, then returns the number at the pointer.
+
+Calls to hasNext and next should run in average O(1) time and use O(h) memory, where h is the height of the tree.`,
+    examples: [
+      { input: '["BSTIterator", "next", "next", "hasNext", "next", "hasNext", "next", "hasNext", "next", "hasNext"]\n[[[7, 3, 15, null, null, 9, 20]], [], [], [], [], [], [], [], [], []]', output: "[null, 3, 7, true, 9, true, 15, true, 20, false]" },
+    ],
+    constraints: ["The number of nodes in the tree is in the range [1, 10^5].", "0 <= Node.val <= 10^6", "At most 10^5 calls will be made to hasNext and next."],
+    hints: [
+      "Use a stack to simulate inorder traversal",
+      "Push all left children initially",
+      "On next(), pop top, push all left children of right child",
+      "This gives amortized O(1) and O(h) space",
+    ],
+    starterCode: {
+      javascript: `class BSTIterator {\n  constructor(root) {\n    // Initialize iterator\n  }\n\n  next() {\n    // Return next smallest\n  }\n\n  hasNext() {\n    // Check if more elements exist\n  }\n}`,
+      typescript: `class BSTIterator {\n  constructor(root: TreeNode | null) {\n    // Initialize iterator\n  }\n\n  next(): number {\n    // Return next smallest\n  }\n\n  hasNext(): boolean {\n    // Check if more elements exist\n  }\n}`,
+      python: `class BSTIterator:\n    def __init__(self, root: Optional[TreeNode]):\n        # Initialize iterator\n        pass\n\n    def next(self) -> int:\n        # Return next smallest\n        pass\n\n    def hasNext(self) -> bool:\n        # Check if more elements exist\n        pass`,
+      java: `class BSTIterator {\n    public BSTIterator(TreeNode root) {\n        // Initialize iterator\n    }\n\n    public int next() {\n        // Return next smallest\n        return 0;\n    }\n\n    public boolean hasNext() {\n        // Check if more elements exist\n        return false;\n    }\n}`,
+    },
+    optimalComplexity: { time: "O(1) avg per call", space: "O(h)" },
+    testCases: [
+      { input: { ops: ["BSTIterator", "next", "next", "hasNext", "next", "hasNext"], args: [[[7, 3, 15, null, null, 9, 20]], [], [], [], [], []] }, expected: [null, 3, 7, true, 9, true], description: "Iterator operations" },
+    ],
+  },
+  {
+    id: "dsa-vertical-order-traversal",
+    title: "Vertical Order Traversal of a Binary Tree",
+    type: "dsa",
+    pattern: "trees",
+    difficulty: "hard",
+    companies: ["Amazon", "Meta", "Google", "Microsoft", "Bloomberg"],
+    description: "Return vertical order traversal with special ordering rules",
+    tags: ["binary-tree", "bfs", "dfs", "sorting", "hash-table"],
+    estimatedTime: 35,
+    problemStatement: `Given the root of a binary tree, calculate the vertical order traversal of the binary tree.
+
+For each node at position (row, col), its left and right children will be at positions (row + 1, col - 1) and (row + 1, col + 1) respectively. The root is at (0, 0).
+
+The vertical order traversal of a binary tree is a list of top-to-bottom orderings for each column index starting from the leftmost column and ending on the rightmost column. If two nodes are in the same row and column, order them by their values.`,
+    examples: [
+      { input: "root = [3,9,20,null,null,15,7]", output: "[[9],[3,15],[20],[7]]" },
+      { input: "root = [1,2,3,4,5,6,7]", output: "[[4],[2],[1,5,6],[3],[7]]" },
+    ],
+    constraints: ["The number of nodes in the tree is in the range [1, 1000].", "0 <= Node.val <= 1000"],
+    hints: [
+      "Track (col, row, val) for each node",
+      "Use BFS or DFS to traverse",
+      "Sort by col, then row, then val",
+      "Group by column for final result",
+    ],
+    starterCode: {
+      javascript: `function verticalTraversal(root) {\n  // Track col, row, val and sort\n}`,
+      typescript: `function verticalTraversal(root: TreeNode | null): number[][] {\n  // Track col, row, val and sort\n}`,
+      python: `def verticalTraversal(root: Optional[TreeNode]) -> list[list[int]]:\n    # Track col, row, val and sort\n    pass`,
+      java: `class Solution {\n    public List<List<Integer>> verticalTraversal(TreeNode root) {\n        // Track col, row, val and sort\n        return new ArrayList<>();\n    }\n}`,
+    },
+    optimalComplexity: { time: "O(n log n)", space: "O(n)" },
+    testCases: [
+      { input: { root: [3, 9, 20, null, null, 15, 7] }, expected: [[9], [3, 15], [20], [7]], description: "Standard vertical traversal" },
+      { input: { root: [1, 2, 3, 4, 5, 6, 7] }, expected: [[4], [2], [1, 5, 6], [3], [7]], description: "Same position nodes sorted by value" },
+    ],
+  },
+  {
+    id: "dsa-recover-bst",
+    title: "Recover Binary Search Tree",
+    type: "dsa",
+    pattern: "trees",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Microsoft", "Bloomberg"],
+    description: "Recover BST where exactly two nodes were swapped",
+    tags: ["binary-search-tree", "dfs", "inorder", "morris-traversal"],
+    estimatedTime: 30,
+    problemStatement: `You are given the root of a binary search tree (BST), where the values of exactly two nodes of the tree were swapped by mistake. Recover the tree without changing its structure.`,
+    examples: [
+      { input: "root = [1,3,null,null,2]", output: "[3,1,null,null,2]", explanation: "3 and 1 are swapped" },
+      { input: "root = [3,1,4,null,null,2]", output: "[2,1,4,null,null,3]", explanation: "2 and 3 are swapped" },
+    ],
+    constraints: ["The number of nodes in the tree is in the range [2, 1000].", "-2^31 <= Node.val <= 2^31 - 1"],
+    hints: [
+      "Inorder traversal should be sorted",
+      "Find two nodes out of place",
+      "First bad: prev > curr (prev is first swap)",
+      "Second bad: prev > curr again (curr is second swap)",
+      "Morris traversal for O(1) space",
+    ],
+    starterCode: {
+      javascript: `function recoverTree(root) {\n  // Find and swap two nodes\n}`,
+      typescript: `function recoverTree(root: TreeNode | null): void {\n  // Find and swap two nodes\n}`,
+      python: `def recoverTree(root: Optional[TreeNode]) -> None:\n    # Find and swap two nodes\n    pass`,
+      java: `class Solution {\n    public void recoverTree(TreeNode root) {\n        // Find and swap two nodes\n    }\n}`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(1) with Morris" },
+    testCases: [
+      { input: { root: [1, 3, null, null, 2] }, expected: [3, 1, null, null, 2], description: "Adjacent swap" },
+      { input: { root: [3, 1, 4, null, null, 2] }, expected: [2, 1, 4, null, null, 3], description: "Non-adjacent swap" },
+    ],
+  },
 ]
 
 export default treesScenarios

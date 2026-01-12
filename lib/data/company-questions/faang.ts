@@ -52,6 +52,15 @@ export const googleData: CompanyQuestionData = {
       frequency: "common",
     },
     { scenarioId: "word-ladder", title: "Word Ladder", frequency: "occasional" },
+    // Trees & BST
+    { scenarioId: "dsa-validate-bst", title: "Validate Binary Search Tree", frequency: "common", lastReported: "2025 Q1" },
+    { scenarioId: "dsa-all-nodes-distance-k", title: "All Nodes Distance K in Binary Tree", frequency: "common", lastReported: "2025 Q1" },
+    { scenarioId: "dsa-binary-tree-zigzag", title: "Binary Tree Zigzag Level Order Traversal", frequency: "common" },
+    // Stack
+    { scenarioId: "dsa-trapping-rain-water", title: "Trapping Rain Water", frequency: "very_common", lastReported: "2025 Q1" },
+    // BFS/DFS
+    { scenarioId: "dsa-open-the-lock", title: "Open the Lock", frequency: "occasional" },
+    { scenarioId: "dsa-evaluate-division", title: "Evaluate Division", frequency: "common" },
   ],
 
   interviewProcess: {
@@ -225,6 +234,13 @@ export const metaData: CompanyQuestionData = {
       title: "Dot Product of Two Sparse Vectors",
       frequency: "common",
     },
+    // Trees - Meta asks a lot of tree traversal variants
+    { scenarioId: "dsa-vertical-order-traversal", title: "Vertical Order Traversal of a Binary Tree", frequency: "very_common", lastReported: "2025 Q1" },
+    { scenarioId: "dsa-binary-tree-zigzag", title: "Binary Tree Zigzag Level Order Traversal", frequency: "common" },
+    { scenarioId: "dsa-validate-bst", title: "Validate Binary Search Tree", frequency: "common" },
+    // BFS - Multi-source BFS is common at Meta
+    { scenarioId: "dsa-walls-and-gates", title: "Walls and Gates", frequency: "common", lastReported: "2025 Q1" },
+    { scenarioId: "dsa-shortest-path-binary-matrix", title: "Shortest Path in Binary Matrix", frequency: "common" },
   ],
 
   interviewProcess: {
@@ -366,6 +382,16 @@ export const amazonData: CompanyQuestionData = {
       frequency: "occasional",
     },
     { scenarioId: "word-search-ii", title: "Word Search II", frequency: "occasional" },
+    // Trees & BST - Amazon loves BST problems
+    { scenarioId: "dsa-validate-bst", title: "Validate Binary Search Tree", frequency: "common", lastReported: "2025 Q1" },
+    { scenarioId: "dsa-kth-smallest-bst", title: "Kth Smallest Element in a BST", frequency: "common" },
+    { scenarioId: "dsa-bst-iterator", title: "Binary Search Tree Iterator", frequency: "occasional" },
+    // Stack - Monotonic stack patterns
+    { scenarioId: "dsa-trapping-rain-water", title: "Trapping Rain Water", frequency: "common" },
+    { scenarioId: "dsa-next-greater-element-i", title: "Next Greater Element I", frequency: "occasional" },
+    // Graphs
+    { scenarioId: "dsa-keys-and-rooms", title: "Keys and Rooms", frequency: "occasional" },
+    { scenarioId: "dsa-find-town-judge", title: "Find the Town Judge", frequency: "occasional" },
   ],
 
   interviewProcess: {
@@ -807,6 +833,14 @@ export const microsoftData: CompanyQuestionData = {
     },
     { scenarioId: "meeting-rooms-ii", title: "Meeting Rooms II", frequency: "common" },
     { scenarioId: "spiral-matrix", title: "Spiral Matrix", frequency: "occasional" },
+    // Trees - Microsoft loves tree problems
+    { scenarioId: "dsa-binary-tree-zigzag", title: "Binary Tree Zigzag Level Order Traversal", frequency: "common" },
+    { scenarioId: "dsa-recover-bst", title: "Recover Binary Search Tree", frequency: "occasional" },
+    { scenarioId: "dsa-kth-smallest-bst", title: "Kth Smallest Element in a BST", frequency: "common" },
+    // Stack
+    { scenarioId: "dsa-132-pattern", title: "132 Pattern", frequency: "occasional" },
+    // Graphs
+    { scenarioId: "dsa-is-graph-bipartite", title: "Is Graph Bipartite?", frequency: "occasional" },
   ],
 
   interviewProcess: {

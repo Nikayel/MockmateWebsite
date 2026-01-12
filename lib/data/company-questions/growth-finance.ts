@@ -987,6 +987,13 @@ export const bloombergData: CompanyQuestionData = {
     { scenarioId: "move-zeroes", title: "Move Zeroes", frequency: "common" },
     { scenarioId: "first-unique-char", title: "First Unique Character", frequency: "common" },
     { scenarioId: "word-pattern", title: "Word Pattern", frequency: "occasional" },
+    // Stack - Bloomberg is famous for stack/queue problems
+    { scenarioId: "dsa-max-frequency-stack", title: "Maximum Frequency Stack", frequency: "common", lastReported: "2025 Q1" },
+    { scenarioId: "dsa-next-greater-element-ii", title: "Next Greater Element II", frequency: "common" },
+    { scenarioId: "dsa-online-stock-span", title: "Online Stock Span", frequency: "common" },
+    // Trees
+    { scenarioId: "dsa-validate-bst", title: "Validate Binary Search Tree", frequency: "common" },
+    { scenarioId: "dsa-vertical-order-traversal", title: "Vertical Order Traversal", frequency: "occasional" },
   ],
 
   interviewProcess: {
