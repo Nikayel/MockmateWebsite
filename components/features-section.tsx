@@ -1,7 +1,19 @@
 "use client"
 
 import { MagneticButton } from "@/components/ui/magnetic-button"
-import { Play, Mic, Code2, Wrench, Layers, Shield, Zap, Bot, Clock, Building2, Sparkles } from "lucide-react"
+import {
+  Play,
+  Mic,
+  Code2,
+  Wrench,
+  Layers,
+  Shield,
+  Zap,
+  Bot,
+  Clock,
+  Building2,
+  Sparkles,
+} from "lucide-react"
 import Link from "next/link"
 import { motion, useScroll, useTransform } from "framer-motion"
 import { useRef } from "react"
@@ -26,16 +38,19 @@ const features = [
     id: "ai-collaboration",
     label: "AI Collaboration",
     title: "Use AI during interviews. Never penalized.",
-    description: "Like Meta's new interview format—you can ask your AI partner for hints, debugging help, or algorithm suggestions. We grade you on understanding, not whether you used AI.",
-    highlight: "Simulates real AI-enabled interview formats",
+    description:
+      "Like Meta's new interview format—ask your AI partner for debugging help, architecture feedback, or implementation suggestions. We grade you on understanding, not whether you used AI.",
+    highlight: "Available in System Design, Bug Fix & Add Functionality",
     visual: (
-      <div className="flex items-center gap-3 p-4 rounded-xl bg-white/5 border border-white/10">
-        <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center">
-          <Bot className="w-5 h-5 text-accent" />
+      <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-4">
+        <div className="bg-accent/20 flex h-10 w-10 items-center justify-center rounded-full">
+          <Bot className="text-accent h-5 w-5" />
         </div>
         <div className="flex-1">
-          <p className="text-sm text-white/70">"Can you help me think through the edge cases here?"</p>
-          <p className="text-xs text-white/40 mt-1">AI Partner is typing...</p>
+          <p className="text-sm text-white/70">
+            "Can you help me think through the edge cases here?"
+          </p>
+          <p className="mt-1 text-xs text-white/40">AI Partner is typing...</p>
         </div>
       </div>
     ),
@@ -44,17 +59,22 @@ const features = [
     id: "voice-interviewer",
     label: "Voice-Enabled",
     title: "Talk through your approach. The AI listens.",
-    description: "Real interviews are conversations, not typing tests. Speak your thought process, and our AI interviewer responds naturally with follow-up questions—just like a real interviewer would.",
+    description:
+      "Real interviews are conversations, not typing tests. Speak your thought process, and our AI interviewer responds naturally with follow-up questions—just like a real interviewer would.",
     highlight: "Two channels: Interviewer + AI Partner",
     visual: (
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/10 border border-accent/20">
-          <Mic className="w-4 h-4 text-accent animate-pulse" />
-          <span className="text-sm text-white/70">"I'm thinking a two-pointer approach here..."</span>
+        <div className="bg-accent/10 border-accent/20 flex items-center gap-2 rounded-lg border p-3">
+          <Mic className="text-accent h-4 w-4 animate-pulse" />
+          <span className="text-sm text-white/70">
+            "I'm thinking a two-pointer approach here..."
+          </span>
         </div>
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-white/5 border border-white/10 ml-4">
-          <span className="text-xs text-accent font-medium">AI:</span>
-          <span className="text-sm text-white/60">"Good intuition. What's your time complexity?"</span>
+        <div className="ml-4 flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-3">
+          <span className="text-accent text-xs font-medium">AI:</span>
+          <span className="text-sm text-white/60">
+            "Good intuition. What's your time complexity?"
+          </span>
         </div>
       </div>
     ),
@@ -63,17 +83,19 @@ const features = [
     id: "real-codebases",
     label: "Real-World Code",
     title: "Multi-file codebases. Not just LeetCode.",
-    description: "Practice with real production contexts—payment processing bugs, feature implementations, e-commerce systems. Understand existing code before you write new code.",
+    description:
+      "Practice with real production contexts—payment processing bugs, feature implementations, e-commerce systems. Understand existing code before you write new code.",
     highlight: "60-minute rounds: explore → fix → implement → extend",
     visual: (
       <div className="font-mono text-xs">
-        <div className="flex items-center gap-2 text-white/40 mb-2">
-          <span className="px-2 py-0.5 rounded bg-white/10">src/</span>
-          <span className="px-2 py-0.5 rounded bg-white/10">tests/</span>
-          <span className="px-2 py-0.5 rounded bg-accent/20 text-accent">payment.ts</span>
+        <div className="mb-2 flex items-center gap-2 text-white/40">
+          <span className="rounded bg-white/10 px-2 py-0.5">src/</span>
+          <span className="rounded bg-white/10 px-2 py-0.5">tests/</span>
+          <span className="bg-accent/20 text-accent rounded px-2 py-0.5">payment.ts</span>
         </div>
         <div className="text-white/50">
-          <span className="text-purple-400">export</span> <span className="text-accent">function</span> processPayment(...)
+          <span className="text-purple-400">export</span>{" "}
+          <span className="text-accent">function</span> processPayment(...)
         </div>
       </div>
     ),
@@ -82,15 +104,18 @@ const features = [
     id: "smart-hints",
     label: "Adaptive Hints",
     title: "Progressive hints when you're stuck.",
-    description: "Our AI detects when you're struggling—stagnant code, failed tests, long pauses. It offers increasingly specific hints without giving away the answer. You stay in control.",
+    description:
+      "Our AI detects when you're struggling—stagnant code, failed tests, long pauses. It offers increasingly specific hints without giving away the answer. You stay in control.",
     highlight: "4 levels: Nudge → Guide → Explain → Reveal",
     visual: (
       <div className="flex gap-2">
         {["Nudge", "Guide", "Explain", "Reveal"].map((level, i) => (
           <div
             key={level}
-            className={`px-3 py-1.5 rounded-lg text-xs ${
-              i === 0 ? "bg-accent/20 text-accent border border-accent/30" : "bg-white/5 text-white/40 border border-white/10"
+            className={`rounded-lg px-3 py-1.5 text-xs ${
+              i === 0
+                ? "bg-accent/20 text-accent border-accent/30 border"
+                : "border border-white/10 bg-white/5 text-white/40"
             }`}
           >
             {level}
@@ -103,16 +128,20 @@ const features = [
     id: "company-prep",
     label: "70+ Scenarios",
     title: "FAANG-specific interview simulations.",
-    description: "Practice with scenarios tailored to Google, Meta, Amazon, Apple, Netflix—plus Stripe, Airbnb, Shopify, and more. Each company has different patterns and expectations.",
+    description:
+      "Practice with scenarios tailored to Google, Meta, Amazon, Apple, Netflix—plus Stripe, Airbnb, Shopify, and more. Each company has different patterns and expectations.",
     highlight: "Company-specific knowledge base via RAG",
     visual: (
       <div className="flex flex-wrap gap-2">
         {["Google", "Meta", "Amazon", "Apple", "Stripe", "Airbnb"].map((company) => (
-          <span key={company} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-white/60">
+          <span
+            key={company}
+            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/60"
+          >
             {company}
           </span>
         ))}
-        <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-white/40">
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/40">
           +64 more
         </span>
       </div>
@@ -122,16 +151,17 @@ const features = [
     id: "accessibility",
     label: "Built for Everyone",
     title: "Calm mode. Focus mode. Your pace.",
-    description: "Interview anxiety is real. Hide the timer, mute distracting colors, collapse panels you don't need. Practice in an environment that works for you.",
+    description:
+      "Interview anxiety is real. Hide the timer, mute distracting colors, collapse panels you don't need. Practice in an environment that works for you.",
     highlight: "WCAG 2.1 compliant design",
     visual: (
       <div className="flex gap-3">
-        <div className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white/60">
-          <Clock className="w-4 h-4 mb-1 opacity-50" />
+        <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60">
+          <Clock className="mb-1 h-4 w-4 opacity-50" />
           Hide Timer
         </div>
-        <div className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-white/60">
-          <Sparkles className="w-4 h-4 mb-1 opacity-50" />
+        <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60">
+          <Sparkles className="mb-1 h-4 w-4 opacity-50" />
           Calm Mode
         </div>
       </div>
@@ -143,29 +173,33 @@ export function FeaturesSection() {
   const containerRef = useRef<HTMLDivElement>(null)
 
   return (
-    <section id="features" className="relative py-24 md:py-32 overflow-hidden">
+    <section id="features" className="relative overflow-hidden py-24 md:py-32">
       {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-slate-900/50 to-background" />
+      <div className="from-background to-background absolute inset-0 bg-gradient-to-b via-slate-900/50" />
 
-      <div className="container mx-auto px-4 relative z-10">
+      <div className="relative z-10 container mx-auto px-4">
         {/* Header */}
         <motion.div
-          className="max-w-3xl mb-16"
+          className="mb-16 max-w-3xl"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
-          <span className="inline-block px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-medium mb-4">
+          <span className="bg-accent/10 border-accent/20 text-accent mb-4 inline-block rounded-full border px-3 py-1 text-xs font-medium">
             More than mock interviews
           </span>
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-heading font-bold text-white mb-6 leading-tight">
+          <h2 className="font-heading mb-6 text-3xl leading-tight font-bold text-white md:text-4xl lg:text-5xl">
             Practice the way
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-neural"> real interviews </span>
+            <span className="from-accent to-neural bg-gradient-to-r bg-clip-text text-transparent">
+              {" "}
+              real interviews{" "}
+            </span>
             actually work
           </h2>
-          <p className="text-lg text-white/60 max-w-2xl">
-            Modern tech interviews let you use AI tools. They test real-world coding, not memorization. CodeSparring simulates exactly that.
+          <p className="max-w-2xl text-lg text-white/60">
+            Modern tech interviews let you use AI tools. They test real-world coding, not
+            memorization. CodeSparring simulates exactly that.
           </p>
         </motion.div>
 
@@ -177,16 +211,16 @@ export function FeaturesSection() {
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.1 }}
         >
-          <p className="text-sm text-white/40 uppercase tracking-wider mb-4">6 Interview Types</p>
+          <p className="mb-4 text-sm tracking-wider text-white/40 uppercase">6 Interview Types</p>
           <div className="flex flex-wrap gap-3">
             {interviewTypes.map((type) => (
               <div
                 key={type.name}
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 hover:border-white/20 transition-colors"
+                className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition-colors hover:border-white/20"
               >
-                <type.icon className="w-4 h-4 text-accent" />
-                <span className="text-sm text-white font-medium">{type.name}</span>
-                <span className="text-xs text-white/40 hidden sm:inline">— {type.description}</span>
+                <type.icon className="text-accent h-4 w-4" />
+                <span className="text-sm font-medium text-white">{type.name}</span>
+                <span className="hidden text-xs text-white/40 sm:inline">— {type.description}</span>
               </div>
             ))}
           </div>
@@ -197,7 +231,7 @@ export function FeaturesSection() {
           {features.map((feature, index) => (
             <motion.div
               key={feature.id}
-              className="grid md:grid-cols-2 gap-8 md:gap-16 items-center"
+              className="grid items-center gap-8 md:grid-cols-2 md:gap-16"
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-100px" }}
@@ -205,22 +239,20 @@ export function FeaturesSection() {
             >
               {/* Text - alternates sides */}
               <div className={index % 2 === 1 ? "md:order-2" : ""}>
-                <span className="inline-block px-2 py-1 rounded bg-white/5 text-xs text-white/50 font-medium mb-4">
+                <span className="mb-4 inline-block rounded bg-white/5 px-2 py-1 text-xs font-medium text-white/50">
                   {feature.label}
                 </span>
-                <h3 className="text-2xl md:text-3xl font-bold text-white mb-4 leading-tight">
+                <h3 className="mb-4 text-2xl leading-tight font-bold text-white md:text-3xl">
                   {feature.title}
                 </h3>
-                <p className="text-white/60 mb-4 leading-relaxed">
-                  {feature.description}
-                </p>
-                <p className="text-sm text-accent">
-                  {feature.highlight}
-                </p>
+                <p className="mb-4 leading-relaxed text-white/60">{feature.description}</p>
+                <p className="text-accent text-sm">{feature.highlight}</p>
               </div>
 
               {/* Visual */}
-              <div className={`p-6 rounded-2xl bg-white/[0.02] border border-white/10 ${index % 2 === 1 ? "md:order-1" : ""}`}>
+              <div
+                className={`rounded-2xl border border-white/10 bg-white/[0.02] p-6 ${index % 2 === 1 ? "md:order-1" : ""}`}
+              >
                 {feature.visual}
               </div>
             </motion.div>
@@ -229,19 +261,19 @@ export function FeaturesSection() {
 
         {/* CTA */}
         <motion.div
-          className="text-center mt-24"
+          className="mt-24 text-center"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
-          <p className="text-white/50 mb-6">
+          <p className="mb-6 text-white/50">
             Ready to practice the way top companies actually interview?
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex flex-col justify-center gap-3 sm:flex-row">
             <Link href="/interview">
               <MagneticButton size="lg" variant="primary" glowColor="accent">
-                <Play className="w-5 h-5" />
+                <Play className="h-5 w-5" />
                 Try It Free
               </MagneticButton>
             </Link>
