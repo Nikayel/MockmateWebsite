@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
-import { getDueProblems } from "@/lib/spaced-repetition"
+import { getDueProblems, getMaxDailyReviews } from "@/lib/spaced-repetition"
 import { logger } from "@/lib/logger"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import type { Difficulty } from "@/lib/spaced-repetition"
@@ -45,7 +45,19 @@ export async function GET(request: NextRequest) {
       upcomingDays: 365, // Show all problems due within a year
     })
 
-    return NextResponse.json(dueQueue)
+    // Get user's max_daily_reviews setting to determine if overwhelmed
+    const maxDailyReviews = await getMaxDailyReviews(userId)
+    const totalDue = dueQueue.stats.total_due
+    const isOverwhelmed = totalDue > maxDailyReviews
+
+    return NextResponse.json({
+      ...dueQueue,
+      settings: {
+        max_daily_reviews: maxDailyReviews,
+        is_overwhelmed: isOverwhelmed,
+        defer_count: isOverwhelmed ? totalDue - maxDailyReviews : 0,
+      },
+    })
   } catch (error) {
     logger.error("Error getting due problems", { error })
     return NextResponse.json(

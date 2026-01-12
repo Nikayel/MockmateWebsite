@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { DueItem, Algorithm } from "@/lib/hooks"
 import { ReviewCard } from "./ReviewCard"
+import { OverwhelmedBanner } from "./OverwhelmedBanner"
 
 interface ReviewSectionsProps {
   dueInMinutes: DueItem[]
@@ -32,6 +33,12 @@ interface ReviewSectionsProps {
   onMarkReviewed?: (problemId: string, scenarioId: string) => void
   skippingId: string | null
   markingReviewedId: string | null
+  // Overwhelm management props
+  maxDailyReviews?: number
+  isOverwhelmed?: boolean
+  deferCount?: number
+  onBatchDefer?: () => void
+  isDeferring?: boolean
 }
 
 // Collapsible section component for better UX
@@ -100,6 +107,12 @@ export function ReviewSections({
   onMarkReviewed,
   skippingId,
   markingReviewedId,
+  // Overwhelm management
+  maxDailyReviews = 10,
+  isOverwhelmed = false,
+  deferCount = 0,
+  onBatchDefer,
+  isDeferring = false,
 }: ReviewSectionsProps) {
   const [showAllScheduled, setShowAllScheduled] = useState(false)
 
@@ -180,7 +193,7 @@ export function ReviewSections({
           )}
         </div>
         {allDue.length > 0 && (
-          <Link href={`/interview?scenario=${allDue[0].scenario_id}`}>
+          <Link href={`/interview?scenario=${allDue[0].scenario_id}&practice=true`}>
             <Button size="sm" className="bg-white text-black hover:bg-gray-200">
               <Play className="mr-1.5 h-3 w-3" />
               Start Review
@@ -195,6 +208,17 @@ export function ReviewSections({
           <AlertTriangle className="h-4 w-4" />
           <span>{overdueCount} overdue - review soon to maintain retention</span>
         </div>
+      )}
+
+      {/* Overwhelmed banner - shown when due items exceed user's limit */}
+      {isOverwhelmed && onBatchDefer && (
+        <OverwhelmedBanner
+          totalDue={totalDue}
+          maxDailyReviews={maxDailyReviews}
+          deferCount={deferCount}
+          onDeferClick={onBatchDefer}
+          isDeferring={isDeferring}
+        />
       )}
 
       {/* FSRS Learning Steps - Due in Minutes */}

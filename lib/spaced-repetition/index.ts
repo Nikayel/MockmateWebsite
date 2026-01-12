@@ -23,7 +23,7 @@ export {
   type AlgorithmState,
   type ReviewInput,
   type ReviewOutput,
-} from './algorithm-router';
+} from "./algorithm-router"
 
 // FSRS Algorithm (Recommended - Modern, ML-optimized)
 export {
@@ -45,7 +45,7 @@ export {
   type FSRSConfig,
   type FSRSRating,
   type FSRSState,
-} from './fsrs-algorithm';
+} from "./fsrs-algorithm"
 
 // Legacy SM-2 Algorithm (kept for backward compatibility)
 export {
@@ -60,7 +60,7 @@ export {
   type SM2Output,
   type Difficulty,
   type MasteryLevel,
-} from './sm2-algorithm';
+} from "./sm2-algorithm"
 
 // Scheduler
 export {
@@ -71,11 +71,13 @@ export {
   getAllUserProblems,
   getProblemsByPattern,
   initializeProblemMasteryFromSession,
+  batchDeferProblems,
   type ProblemMastery,
   type DueItem,
   type DueQueueResult,
   type SchedulerOptions,
-} from './scheduler';
+  type BatchDeferralResult,
+} from "./scheduler"
 
 // Mastery Calculator
 export {
@@ -89,12 +91,15 @@ export {
   updateUserLearningStateSummary,
   getDailyGoalProgress,
   setDailyGoal,
+  getMaxDailyReviews,
+  setMaxDailyReviews,
+  getPracticeSettings,
   type PatternMasteryStats,
   type DifficultyStats,
   type TrendStats,
   type OverallStats,
   type UserMasteryStats,
-} from './mastery-calculator';
+} from "./mastery-calculator"
 
 // RAG Integration
 export {
@@ -103,7 +108,7 @@ export {
   getNextPracticeRecommendation,
   type SmartRecommendation,
   type RecommendationType,
-} from './rag-integration';
+} from "./rag-integration"
 
 // Research Tracker (A/B Testing Analytics)
 export {
@@ -114,7 +119,7 @@ export {
   getUserResearchSummary,
   getUserDailyMetrics,
   getRecentEvents,
-} from './research-tracker';
+} from "./research-tracker"
 
 // Mastery Score (Code-focused scoring for SR algorithm)
 // Separate from interview score - focuses on correctness, not communication
@@ -124,4 +129,4 @@ export {
   quickMasteryScore,
   type MasteryScoreInput,
   type MasteryScoreResult,
-} from './mastery-score';
+} from "./mastery-score"

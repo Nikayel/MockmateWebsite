@@ -42,6 +42,7 @@ import {
   Mail,
   Settings,
   Globe,
+  Brain,
 } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { Profile, ProfileQuota, NotificationPreferences, PaymentHistory } from "@/lib/types"
@@ -82,6 +83,12 @@ export default function AccountPage() {
   const [isSavingPrefs, setIsSavingPrefs] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
   const [userTimezone, setUserTimezone] = useState("America/Los_Angeles")
+  // Practice settings
+  const [practiceSettings, setPracticeSettings] = useState({
+    daily_goal: 5,
+    max_daily_reviews: 10,
+  })
+  const [isSavingPracticeSettings, setIsSavingPracticeSettings] = useState(false)
 
   const toggleSection = (section: string) => {
     const newExpanded = new Set(expandedSections)
@@ -416,6 +423,70 @@ export default function AccountPage() {
       toast.error("Failed to update timezone")
     } finally {
       setIsSavingPrefs(false)
+    }
+  }
+
+  // Fetch practice settings on load
+  useEffect(() => {
+    const fetchPracticeSettings = async () => {
+      if (!firebaseUser) return
+
+      try {
+        const idToken = await firebaseUser.getIdToken()
+        const res = await fetch("/api/spaced-repetition/settings", {
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+          },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setPracticeSettings({
+            daily_goal: data.daily_goal || 5,
+            max_daily_reviews: data.max_daily_reviews || 10,
+          })
+        }
+      } catch (err) {
+        console.error("Failed to fetch practice settings:", err)
+      }
+    }
+
+    if (initialized && firebaseUser) {
+      fetchPracticeSettings()
+    }
+  }, [initialized, firebaseUser])
+
+  const handleUpdatePracticeSetting = async (
+    key: "daily_goal" | "max_daily_reviews",
+    value: number
+  ) => {
+    if (!firebaseUser) return
+
+    const previousValue = practiceSettings[key]
+    setPracticeSettings((prev) => ({ ...prev, [key]: value }))
+    setIsSavingPracticeSettings(true)
+
+    try {
+      const idToken = await firebaseUser.getIdToken()
+      const res = await fetch("/api/spaced-repetition/settings", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ [key]: value }),
+      })
+
+      if (res.ok) {
+        toast.success("Setting updated")
+      } else {
+        throw new Error("Failed to update")
+      }
+    } catch (err) {
+      console.error("Failed to update practice setting:", err)
+      setPracticeSettings((prev) => ({ ...prev, [key]: previousValue }))
+      toast.error("Failed to update setting")
+    } finally {
+      setIsSavingPracticeSettings(false)
     }
   }
 
@@ -807,6 +878,78 @@ export default function AccountPage() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+
+            {/* Practice Settings */}
+            <div className="overflow-hidden rounded-xl border border-zinc-800/50 bg-zinc-900/50">
+              <button
+                onClick={() => toggleSection("practice")}
+                className="flex w-full items-center justify-between p-4 transition-colors hover:bg-zinc-800/30"
+              >
+                <div className="flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-zinc-400" />
+                  <span className="text-sm font-medium text-white">Practice Settings</span>
+                </div>
+                <ChevronDown
+                  className={`h-4 w-4 text-zinc-500 transition-transform ${expandedSections.has("practice") ? "rotate-180" : ""}`}
+                />
+              </button>
+              {expandedSections.has("practice") && (
+                <div className="space-y-4 px-4 pb-4">
+                  {/* Daily Review Limit */}
+                  <div className="flex items-center justify-between py-2">
+                    <div>
+                      <span className="text-sm text-zinc-300">Daily Review Limit</span>
+                      <p className="text-xs text-zinc-600">
+                        Max reviews shown per day. Excess items can be deferred.
+                      </p>
+                    </div>
+                    <select
+                      value={practiceSettings.max_daily_reviews}
+                      onChange={(e) =>
+                        handleUpdatePracticeSetting("max_daily_reviews", Number(e.target.value))
+                      }
+                      disabled={isSavingPracticeSettings}
+                      className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-white focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 focus:outline-none"
+                    >
+                      {[5, 10, 15, 20, 25, 30].map((n) => (
+                        <option key={n} value={n}>
+                          {n} reviews
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Daily Goal */}
+                  <div className="flex items-center justify-between border-t border-zinc-800/50 py-2 pt-4">
+                    <div>
+                      <span className="text-sm text-zinc-300">Daily Goal</span>
+                      <p className="text-xs text-zinc-600">
+                        Target problems to complete each day for streak progress.
+                      </p>
+                    </div>
+                    <select
+                      value={practiceSettings.daily_goal}
+                      onChange={(e) =>
+                        handleUpdatePracticeSetting("daily_goal", Number(e.target.value))
+                      }
+                      disabled={isSavingPracticeSettings}
+                      className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-white focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 focus:outline-none"
+                    >
+                      {[1, 3, 5, 10, 15, 20].map((n) => (
+                        <option key={n} value={n}>
+                          {n} problems
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <p className="text-[10px] text-zinc-600">
+                    When reviews exceed your daily limit, you&apos;ll see a &quot;Feeling
+                    overwhelmed?&quot; option to defer low-priority items.
+                  </p>
                 </div>
               )}
             </div>

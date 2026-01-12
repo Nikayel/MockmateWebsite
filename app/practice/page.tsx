@@ -77,6 +77,11 @@ interface DueData {
     learning_steps_due?: number
     streak_at_risk: boolean
   }
+  settings?: {
+    max_daily_reviews: number
+    is_overwhelmed: boolean
+    defer_count: number
+  }
 }
 
 export default function PracticePage() {
@@ -87,6 +92,7 @@ export default function PracticePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isPro, setIsPro] = useState<boolean | null>(null)
+  const [isDeferring, setIsDeferring] = useState(false)
 
   const getAuthToken = useCallback(async () => {
     const { auth } = await import("@/lib/firebase")
@@ -193,6 +199,41 @@ export default function PracticePage() {
       }
     } catch (err) {
       console.error("Error marking problem as reviewed:", err)
+    }
+  }
+
+  const handleBatchDefer = async () => {
+    try {
+      setIsDeferring(true)
+      const token = await getAuthToken()
+      if (!token) return
+
+      const res = await fetch("/api/spaced-repetition/batch-defer", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}), // Use user's default max_daily_reviews
+      })
+
+      if (res.ok) {
+        // Refresh due items to show updated queue
+        const dueRes = await fetch("/api/spaced-repetition/due", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+        if (dueRes.ok) {
+          const dueData = await dueRes.json()
+          setDue(dueData)
+        }
+      }
+    } catch (err) {
+      console.error("Error batch deferring problems:", err)
+    } finally {
+      setIsDeferring(false)
     }
   }
 
@@ -336,6 +377,12 @@ export default function PracticePage() {
                 onSkip={handleSkipProblem}
                 onMarkReviewed={handleMarkReviewed}
                 isLoading={isLoading}
+                // Overwhelm management
+                maxDailyReviews={due?.settings?.max_daily_reviews}
+                isOverwhelmed={due?.settings?.is_overwhelmed}
+                deferCount={due?.settings?.defer_count}
+                onBatchDefer={handleBatchDefer}
+                isDeferring={isDeferring}
               />
             </div>
 

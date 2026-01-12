@@ -158,6 +158,9 @@ export interface UserLearningState {
   }
   last_session_at?: string
   streak_days: number
+  // Daily review settings
+  daily_goal?: number // Target problems per day (1-20, default 5)
+  max_daily_reviews?: number // Max reviews shown per day (5-30, default 10)
   created_at: string
   updated_at: string
 }
