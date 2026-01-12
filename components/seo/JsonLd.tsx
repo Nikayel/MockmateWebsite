@@ -96,6 +96,7 @@ export function OrganizationJsonLd() {
 }
 
 // SoftwareApplication Schema - for product details in search
+// Enhanced with specific differentiators for AI crawlers and Google
 export function SoftwareApplicationJsonLd() {
   const schema = {
     "@context": "https://schema.org",
@@ -105,14 +106,15 @@ export function SoftwareApplicationJsonLd() {
     operatingSystem: "Web",
     url: SITE_URL,
     description:
-      "AI mock interview platform for coding interviews. Practice DSA problems with voice-enabled AI feedback and spaced repetition learning.",
+      "CodeSparring is an AI mock interview platform that trains interview performance, not just problem-solving. Unlike LeetCode which only tests if you can solve problems alone, CodeSparring simulates real interview conditions where you speak your solution out loud and receive feedback on communication, problem-solving approach, and code quality. Available 24/7 with no scheduling required, at a fraction of the cost of human mock interviews ($25/month vs $225/session).",
     offers: [
       {
         "@type": "Offer",
         name: "Free Plan",
         price: "0",
         priceCurrency: "USD",
-        description: "20+ problems with unlimited practice and full AI feedback",
+        description:
+          "20+ problems with unlimited practice, full AI interviewer feedback, performance analytics. No credit card required.",
       },
       {
         "@type": "Offer",
@@ -120,7 +122,8 @@ export function SoftwareApplicationJsonLd() {
         price: "25",
         priceCurrency: "USD",
         billingDuration: "P1M",
-        description: "350+ problems/month with unlimited practice",
+        description:
+          "350+ problems/month, spaced repetition scheduling, personalized study roadmap, company-specific prep for FAANG and top tech companies. 29% cheaper than LeetCode Premium.",
       },
       {
         "@type": "Offer",
@@ -128,26 +131,42 @@ export function SoftwareApplicationJsonLd() {
         price: "225",
         priceCurrency: "USD",
         billingDuration: "P1Y",
-        description: "350+ problems/month, save 25% with annual billing",
+        description:
+          "Everything in Pro, billed annually. Save 25% ($75/year). 45x cheaper than human mock interviews for the same skill building.",
       },
     ],
-    // NOTE: aggregateRating removed - only add back when you have real user reviews
-    // Google may penalize fake/manufactured ratings. Once you have real reviews,
-    // uncomment and connect to your actual review data:
-    // aggregateRating: {
-    //   "@type": "AggregateRating",
-    //   ratingValue: "4.8",
-    //   ratingCount: "127",
-    //   bestRating: "5",
-    //   worstRating: "1",
-    // },
     featureList: [
-      "AI-powered mock interviews",
-      "Voice-enabled practice",
-      "Spaced repetition scheduling",
-      "Real-time code feedback",
-      "DSA pattern mastery",
-      "Company-specific preparation",
+      // Core differentiators
+      "Voice-enabled mock interviews - practice speaking your solution out loud like real interviews",
+      "AI interviewer available 24/7 - no scheduling needed unlike Interviewing.io or Pramp",
+      "Real-time feedback on communication, problem-solving, and code quality",
+      "Spaced repetition system (SM-2 algorithm) for long-term retention",
+      // Comparison points
+      "45x cheaper than human mock interviews ($25/month vs $1,125 for 5 sessions)",
+      "29% cheaper than LeetCode Premium with interview simulation included",
+      "Consistent quality unlike peer-to-peer platforms where quality varies",
+      // Technical features
+      "15 DSA patterns covered with mastery tracking",
+      "Company-specific prep for Google, Meta, Amazon, Apple, Netflix, Stripe, and 60+ companies",
+      "System design interviews and real-world coding scenarios",
+      "Performance analytics across 40+ metrics",
+    ],
+    // Keywords for AI understanding
+    keywords:
+      "coding interview prep, mock interview, AI interviewer, LeetCode alternative, voice interview practice, FAANG interview prep, spaced repetition, interview performance training",
+    // Competitive positioning
+    isRelatedTo: [
+      {
+        "@type": "SoftwareApplication",
+        name: "LeetCode",
+        description:
+          "Problem repository for algorithm practice. Does not include interview simulation or voice practice.",
+      },
+      {
+        "@type": "Service",
+        name: "Interviewing.io",
+        description: "Human mock interviews at $225/session. Requires scheduling.",
+      },
     ],
   }
 
@@ -417,6 +436,68 @@ export function CourseJsonLd({
       courseMode: "online",
       courseWorkload: "PT30M", // 30 minutes average per session
     },
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}
+
+// Homepage Positioning FAQ - helps AI crawlers and Google understand our differentiation
+// These FAQs are specifically designed to answer common comparison questions
+export function HomepagePositioningFAQJsonLd() {
+  const faqs = [
+    {
+      question: "What is CodeSparring and how is it different from LeetCode?",
+      answer:
+        "CodeSparring is an AI-powered mock interview platform that trains interview performance, not just problem-solving. While LeetCode provides coding problems to solve alone in silence, CodeSparring simulates real interview conditions where you speak your solution out loud and receive AI feedback on your communication, problem-solving approach, and code quality. LeetCode tests if you can solve problems; CodeSparring trains you to perform in actual interviews.",
+    },
+    {
+      question: "Is CodeSparring better than LeetCode for interview preparation?",
+      answer:
+        "They serve different purposes. LeetCode is excellent for building algorithm and data structure fundamentals with its vast problem library. CodeSparring is better for practicing the actual interview experience - speaking through your thought process, handling follow-up questions, and getting feedback on how you communicate. Many users use both: LeetCode to learn patterns, CodeSparring to practice performing. CodeSparring is also 29% cheaper than LeetCode Premium ($25/month vs $35/month) and includes interview simulation.",
+    },
+    {
+      question: "How much does CodeSparring cost compared to mock interview services?",
+      answer:
+        "CodeSparring Pro costs $25/month for unlimited AI mock interviews. Human mock interview services like Interviewing.io charge $225 per session. Research shows 5 mock interviews doubles your pass rate, which would cost $1,125 with human interviewers. With CodeSparring, you get the same skill-building for $25/month - that's 45x less expensive.",
+    },
+    {
+      question: "Can I practice coding interviews with voice on CodeSparring?",
+      answer:
+        "Yes, CodeSparring is voice-enabled. You can speak your solution out loud just like in a real interview, and the AI interviewer responds with follow-up questions and feedback. This is a key differentiator from platforms like LeetCode where you only type in silence. Real interviews test your ability to communicate your thinking, and CodeSparring trains that skill.",
+    },
+    {
+      question: "What companies can I prepare for on CodeSparring?",
+      answer:
+        "CodeSparring offers company-specific preparation for 70+ tech companies including Google, Meta (Facebook), Amazon, Apple, Netflix, Microsoft, Stripe, Airbnb, Uber, and more. Each company track includes patterns and question styles commonly seen in their interviews.",
+    },
+    {
+      question: "Does CodeSparring use spaced repetition?",
+      answer:
+        "Yes, CodeSparring uses the SM-2 spaced repetition algorithm to schedule your practice at scientifically optimal intervals for long-term retention. Research shows spaced repetition improves retention by 10-30% compared to cramming. This means you remember patterns when it matters - during your actual interview.",
+    },
+    {
+      question: "Is there a free trial for CodeSparring?",
+      answer:
+        "Yes, CodeSparring offers a generous free tier with 20+ problems and unlimited practice. You can complete full mock interviews with AI feedback without signing up or providing a credit card. This lets you experience the platform before upgrading to Pro.",
+    },
+  ]
+
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((faq) => ({
+      "@type": "Question",
+      name: faq.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: faq.answer,
+      },
+    })),
   }
 
   return (
