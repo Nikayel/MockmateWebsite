@@ -86,6 +86,9 @@ export async function POST(request: NextRequest) {
       case "store-onboarding":
         return handleStoreOnboarding(params)
 
+      case "record-feedback":
+        return handleRecordFeedback(params)
+
       default:
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
     }
@@ -809,5 +812,47 @@ async function handleStoreOnboarding(params: { userId: string; role: string; goa
     success: true,
     embeddingId,
     message: "Onboarding data stored for personalized recommendations",
+  })
+}
+
+/**
+ * Record feedback for a hint
+ * Used to improve RAG quality over time through user feedback loop
+ */
+async function handleRecordFeedback(params: {
+  hintId: string
+  feedbackType: "helpful" | "unhelpful"
+  userId?: string
+  sessionId?: string
+  problemId?: string
+  hintText?: string
+  source?: string
+}) {
+  const { hintId, feedbackType, userId, sessionId, problemId, hintText, source } = params
+
+  if (!hintId || !feedbackType) {
+    return NextResponse.json({ error: "hintId and feedbackType are required" }, { status: 400 })
+  }
+
+  // Log feedback for analytics (in production, this would go to a database)
+  console.log("[RAG Feedback]", {
+    hintId,
+    feedbackType,
+    userId: userId || "anonymous",
+    sessionId,
+    problemId,
+    source: source || "unknown",
+    timestamp: new Date().toISOString(),
+  })
+
+  // TODO: In production, store feedback in database for:
+  // 1. Tracking hint quality metrics
+  // 2. Adjusting retrieval weights based on feedback patterns
+  // 3. Identifying low-quality hints for improvement
+  // 4. A/B testing hint generation strategies
+
+  return NextResponse.json({
+    success: true,
+    message: `Feedback recorded: ${feedbackType}`,
   })
 }
