@@ -594,6 +594,70 @@ You must write an algorithm with O(log n) runtime complexity.`,
       },
     ],
   },
+  // ==================== NEW HIGH-VALUE ADDITIONS ====================
+  {
+    id: "dsa-time-based-key-value-store",
+    title: "Time Based Key-Value Store",
+    type: "dsa",
+    pattern: "binary-search",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta", "Lyft"],
+    description: "Design a time-based key-value store with get by timestamp",
+    tags: ["binary-search", "design", "hash-table"],
+    estimatedTime: 30,
+    problemStatement: `Design a time-based key-value data structure that can store multiple values for the same key at different time stamps and retrieve the key's value at a certain timestamp.
+
+Implement the TimeMap class:
+- TimeMap() Initializes the object.
+- void set(String key, String value, int timestamp) Stores the key with the value at the given timestamp.
+- String get(String key, int timestamp) Returns a value such that set was called previously with timestamp_prev <= timestamp. If there are multiple such values, return the value with the largest timestamp_prev. If there are no values, return "".`,
+    examples: [
+      { input: '["TimeMap","set","get","get","set","get","get"]\n[[],["foo","bar",1],["foo",1],["foo",3],["foo","bar2",4],["foo",4],["foo",5]]', output: '[null,null,"bar","bar",null,"bar2","bar2"]' },
+    ],
+    constraints: ["1 <= key.length, value.length <= 100", "key and value consist of lowercase English letters and digits.", "1 <= timestamp <= 10^7", "All timestamps are strictly increasing for set.", "At most 2 * 10^5 calls to set and get."],
+    hints: ["Store {key: [(timestamp, value), ...]} where list is sorted by timestamp", "Binary search for largest timestamp <= query timestamp", "Since timestamps are increasing, list is already sorted"],
+    starterCode: {
+      javascript: `class TimeMap {\n  constructor() {\n    // Initialize\n  }\n\n  set(key, value, timestamp) {\n    // Store\n  }\n\n  get(key, timestamp) {\n    // Retrieve\n  }\n}`,
+      typescript: `class TimeMap {\n  constructor() {\n    // Initialize\n  }\n\n  set(key: string, value: string, timestamp: number): void {\n    // Store\n  }\n\n  get(key: string, timestamp: number): string {\n    // Retrieve\n  }\n}`,
+      python: `class TimeMap:\n    def __init__(self):\n        pass\n\n    def set(self, key, value, timestamp):\n        pass\n\n    def get(self, key, timestamp):\n        pass`,
+    },
+    optimalComplexity: { time: "O(1) set, O(log n) get", space: "O(n)" },
+    testCases: [
+      { input: { operations: ["set", "get", "get"], args: [["foo", "bar", 1], ["foo", 1], ["foo", 3]] }, expected: [null, "bar", "bar"], description: "Basic operations" },
+    ],
+  },
+  {
+    id: "dsa-capacity-ship-packages",
+    title: "Capacity To Ship Packages Within D Days",
+    type: "dsa",
+    pattern: "binary-search",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta"],
+    description: "Find minimum ship capacity to ship all packages within D days",
+    tags: ["binary-search", "array"],
+    estimatedTime: 25,
+    problemStatement: `A conveyor belt has packages that must be shipped within days days. The ith package has a weight of weights[i]. Each day, we load packages in order of their weights (not reordering). We may not load more weight than the ship capacity.
+
+Return the least weight capacity of the ship that will result in all packages being shipped within days days.`,
+    examples: [
+      { input: "weights = [1,2,3,4,5,6,7,8,9,10], days = 5", output: "15", explanation: "Ship 1-2, 3-4, 5-6, 7-8, 9-10 each day" },
+      { input: "weights = [3,2,2,4,1,4], days = 3", output: "6" },
+      { input: "weights = [1,2,3,1,1], days = 4", output: "3" },
+    ],
+    constraints: ["1 <= days <= weights.length <= 5 * 10^4", "1 <= weights[i] <= 500"],
+    hints: ["Binary search on ship capacity", "Min capacity = max(weights), max capacity = sum(weights)", "For each capacity, simulate shipping and count days needed"],
+    starterCode: {
+      javascript: `function shipWithinDays(weights, days) {\n  // Write your solution here\n\n}`,
+      typescript: `function shipWithinDays(weights: number[], days: number): number {\n  // Write your solution here\n\n}`,
+      python: `def shipWithinDays(weights, days):\n    # Write your solution here\n    pass`,
+    },
+    optimalComplexity: { time: "O(n * log(sum))", space: "O(1)" },
+    testCases: [
+      { input: { weights: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], days: 5 }, expected: 15, description: "Standard case" },
+      { input: { weights: [3, 2, 2, 4, 1, 4], days: 3 }, expected: 6, description: "Uneven weights" },
+      { input: { weights: [1, 2, 3, 1, 1], days: 4 }, expected: 3, description: "Light packages" },
+    ],
+  },
 ]
 
 export default binarySearchScenarios

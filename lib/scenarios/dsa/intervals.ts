@@ -332,6 +332,36 @@ Return intervals after the insertion.`,
       },
     ],
   },
+  // ==================== NEW HIGH-VALUE ADDITIONS ====================
+  {
+    id: 'dsa-meeting-rooms',
+    title: 'Meeting Rooms',
+    type: 'dsa',
+    pattern: 'intervals',
+    difficulty: 'easy',
+    companies: ['Amazon', 'Meta', 'Google', 'Microsoft'],
+    description: 'Check if a person can attend all meetings',
+    tags: ['array', 'sorting', 'intervals'],
+    estimatedTime: 15,
+    problemStatement: `Given an array of meeting time intervals where intervals[i] = [starti, endi], determine if a person could attend all meetings.`,
+    examples: [
+      { input: 'intervals = [[0,30],[5,10],[15,20]]', output: 'false', explanation: 'Meeting [0,30] overlaps with [5,10] and [15,20].' },
+      { input: 'intervals = [[7,10],[2,4]]', output: 'true', explanation: "Meetings don't overlap." },
+    ],
+    constraints: ['0 <= intervals.length <= 10^4', 'intervals[i].length == 2', '0 <= starti < endi <= 10^6'],
+    hints: ['Sort by start time', 'Check if any meeting starts before previous one ends', 'If any overlap found, return false'],
+    starterCode: {
+      javascript: `function canAttendMeetings(intervals) {\n  // Write your solution here\n\n}`,
+      typescript: `function canAttendMeetings(intervals: number[][]): boolean {\n  // Write your solution here\n\n}`,
+      python: `def canAttendMeetings(intervals):\n    # Write your solution here\n    pass`,
+    },
+    optimalComplexity: { time: 'O(n log n)', space: 'O(1)' },
+    testCases: [
+      { input: { intervals: [[0, 30], [5, 10], [15, 20]] }, expected: false, description: 'Overlapping meetings' },
+      { input: { intervals: [[7, 10], [2, 4]] }, expected: true, description: 'No overlap' },
+      { input: { intervals: [] }, expected: true, description: 'No meetings' },
+    ],
+  },
 ]
 
 export default intervalsScenarios

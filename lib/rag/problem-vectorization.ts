@@ -643,6 +643,7 @@ async function vectorizePatternKnowledge(
     "trie",
     "heap",
     "graphs",
+    "union-find",
     "backtracking",
     "greedy",
     "intervals",
@@ -704,7 +705,7 @@ export async function vectorizeAllProblems(
   // Count totals
   let totalProblems = 0
   const totalCompanies = ALL_COMPANIES.length
-  const totalPatternKnowledge = 17 // Number of patterns
+  const totalPatternKnowledge = 18 // Number of patterns
   let totalSystemDesign = 0
   let totalBugFix = 0
 

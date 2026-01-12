@@ -1137,6 +1137,172 @@ The length of a path between two nodes is represented by the number of edges bet
       },
     ],
   },
+  // ==================== NEW HIGH-VALUE ADDITIONS ====================
+  {
+    id: "dsa-path-sum",
+    title: "Path Sum",
+    type: "dsa",
+    pattern: "trees",
+    difficulty: "easy",
+    companies: ["Amazon", "Meta", "Google", "Microsoft"],
+    description: "Check if tree has root-to-leaf path with given sum",
+    tags: ["binary-tree", "dfs", "recursion"],
+    estimatedTime: 15,
+    problemStatement: `Given the root of a binary tree and an integer targetSum, return true if the tree has a root-to-leaf path such that adding up all the values along the path equals targetSum.
+
+A leaf is a node with no children.`,
+    examples: [
+      { input: "root = [5,4,8,11,null,13,4,7,2,null,null,null,1], targetSum = 22", output: "true", explanation: "Path 5 → 4 → 11 → 2 = 22" },
+      { input: "root = [1,2,3], targetSum = 5", output: "false" },
+      { input: "root = [], targetSum = 0", output: "false" },
+    ],
+    constraints: ["The number of nodes in the tree is in the range [0, 5000].", "-1000 <= Node.val <= 1000", "-1000 <= targetSum <= 1000"],
+    hints: ["Use DFS, subtracting node value from targetSum", "At leaf, check if remaining sum equals node value", "Handle empty tree case"],
+    starterCode: {
+      javascript: `function hasPathSum(root, targetSum) {\n  // Write your solution here\n\n}`,
+      typescript: `function hasPathSum(root: TreeNode | null, targetSum: number): boolean {\n  // Write your solution here\n\n}`,
+      python: `def hasPathSum(root, targetSum):\n    # Write your solution here\n    pass`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(h)" },
+    testCases: [
+      { input: { root: [5, 4, 8, 11, null, 13, 4, 7, 2, null, null, null, 1], targetSum: 22 }, expected: true, description: "Valid path exists" },
+      { input: { root: [1, 2, 3], targetSum: 5 }, expected: false, description: "No valid path" },
+      { input: { root: [], targetSum: 0 }, expected: false, description: "Empty tree" },
+    ],
+  },
+  {
+    id: "dsa-path-sum-ii",
+    title: "Path Sum II",
+    type: "dsa",
+    pattern: "trees",
+    difficulty: "medium",
+    companies: ["Amazon", "Meta", "Google", "Microsoft"],
+    description: "Find all root-to-leaf paths with given sum",
+    tags: ["binary-tree", "dfs", "backtracking"],
+    estimatedTime: 25,
+    problemStatement: `Given the root of a binary tree and an integer targetSum, return all root-to-leaf paths where the sum of the node values in the path equals targetSum. Each path should be returned as a list of the node values, not node references.`,
+    examples: [
+      { input: "root = [5,4,8,11,null,13,4,7,2,null,null,5,1], targetSum = 22", output: "[[5,4,11,2],[5,8,4,5]]" },
+      { input: "root = [1,2,3], targetSum = 5", output: "[]" },
+    ],
+    constraints: ["The number of nodes in the tree is in the range [0, 5000].", "-1000 <= Node.val <= 1000", "-1000 <= targetSum <= 1000"],
+    hints: ["Use DFS with backtracking", "Track current path and remaining sum", "Add path to result when at leaf with sum = 0", "Remove last node when backtracking"],
+    starterCode: {
+      javascript: `function pathSum(root, targetSum) {\n  // Write your solution here\n\n}`,
+      typescript: `function pathSum(root: TreeNode | null, targetSum: number): number[][] {\n  // Write your solution here\n\n}`,
+      python: `def pathSum(root, targetSum):\n    # Write your solution here\n    pass`,
+    },
+    optimalComplexity: { time: "O(n^2)", space: "O(n)" },
+    testCases: [
+      { input: { root: [5, 4, 8, 11, null, 13, 4, 7, 2, null, null, 5, 1], targetSum: 22 }, expected: [[5, 4, 11, 2], [5, 8, 4, 5]], description: "Multiple paths" },
+      { input: { root: [1, 2, 3], targetSum: 5 }, expected: [], description: "No valid paths" },
+    ],
+  },
+  {
+    id: "dsa-flatten-binary-tree",
+    title: "Flatten Binary Tree to Linked List",
+    type: "dsa",
+    pattern: "trees",
+    difficulty: "medium",
+    companies: ["Amazon", "Meta", "Google", "Microsoft"],
+    description: "Flatten binary tree to linked list in-place using preorder",
+    tags: ["binary-tree", "dfs", "linked-list"],
+    estimatedTime: 25,
+    problemStatement: `Given the root of a binary tree, flatten the tree into a "linked list":
+
+- The "linked list" should use the same TreeNode class where the right child pointer points to the next node in the list and the left child pointer is always null.
+- The "linked list" should be in the same order as a pre-order traversal of the binary tree.`,
+    examples: [
+      { input: "root = [1,2,5,3,4,null,6]", output: "[1,null,2,null,3,null,4,null,5,null,6]" },
+      { input: "root = []", output: "[]" },
+      { input: "root = [0]", output: "[0]" },
+    ],
+    constraints: ["The number of nodes in the tree is in the range [0, 2000].", "-100 <= Node.val <= 100"],
+    hints: [
+      "Morris traversal for O(1) space",
+      "Or reverse postorder (right, left, root) and link",
+      "For each node, connect left subtree's rightmost to right subtree",
+      "Move left to right, set left to null",
+    ],
+    starterCode: {
+      javascript: `function flatten(root) {\n  // Write your solution here (modify in-place)\n\n}`,
+      typescript: `function flatten(root: TreeNode | null): void {\n  // Write your solution here\n\n}`,
+      python: `def flatten(root):\n    # Write your solution here\n    pass`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(1) with Morris" },
+    testCases: [
+      { input: { root: [1, 2, 5, 3, 4, null, 6] }, expected: [1, null, 2, null, 3, null, 4, null, 5, null, 6], description: "Standard tree" },
+      { input: { root: [] }, expected: [], description: "Empty tree" },
+      { input: { root: [0] }, expected: [0], description: "Single node" },
+    ],
+  },
+  {
+    id: "dsa-sum-root-to-leaf",
+    title: "Sum Root to Leaf Numbers",
+    type: "dsa",
+    pattern: "trees",
+    difficulty: "medium",
+    companies: ["Amazon", "Meta", "Google"],
+    description: "Sum all root-to-leaf numbers formed by paths",
+    tags: ["binary-tree", "dfs"],
+    estimatedTime: 20,
+    problemStatement: `You are given the root of a binary tree containing digits from 0 to 9 only. Each root-to-leaf path in the tree represents a number.
+
+Return the total sum of all root-to-leaf numbers.`,
+    examples: [
+      { input: "root = [1,2,3]", output: "25", explanation: "12 + 13 = 25" },
+      { input: "root = [4,9,0,5,1]", output: "1026", explanation: "495 + 491 + 40 = 1026" },
+    ],
+    constraints: ["The number of nodes in the tree is in the range [1, 1000].", "0 <= Node.val <= 9", "The depth of the tree will not exceed 10."],
+    hints: ["DFS passing current number formed so far", "At each node: num = num * 10 + node.val", "At leaf, add num to total"],
+    starterCode: {
+      javascript: `function sumNumbers(root) {\n  // Write your solution here\n\n}`,
+      typescript: `function sumNumbers(root: TreeNode | null): number {\n  // Write your solution here\n\n}`,
+      python: `def sumNumbers(root):\n    # Write your solution here\n    pass`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(h)" },
+    testCases: [
+      { input: { root: [1, 2, 3] }, expected: 25, description: "12 + 13" },
+      { input: { root: [4, 9, 0, 5, 1] }, expected: 1026, description: "495 + 491 + 40" },
+    ],
+  },
+  {
+    id: "dsa-populating-next-right",
+    title: "Populating Next Right Pointers in Each Node",
+    type: "dsa",
+    pattern: "trees",
+    difficulty: "medium",
+    companies: ["Amazon", "Meta", "Google", "Microsoft"],
+    description: "Connect nodes at same level using next pointers",
+    tags: ["binary-tree", "bfs", "dfs"],
+    estimatedTime: 25,
+    problemStatement: `You are given a perfect binary tree where all leaves are on the same level, and every parent has two children.
+
+Populate each next pointer to point to its next right node. If there is no next right node, the next pointer should be set to NULL.
+
+Initially, all next pointers are set to NULL.`,
+    examples: [
+      { input: "root = [1,2,3,4,5,6,7]", output: "[1,#,2,3,#,4,5,6,7,#]", explanation: "# denotes null next pointers" },
+      { input: "root = []", output: "[]" },
+    ],
+    constraints: ["The number of nodes in the tree is in the range [0, 2^12 - 1].", "-1000 <= Node.val <= 1000"],
+    hints: [
+      "BFS level by level, connect nodes in same level",
+      "For O(1) space: use next pointers from previous level",
+      "node.left.next = node.right",
+      "node.right.next = node.next?.left",
+    ],
+    starterCode: {
+      javascript: `function connect(root) {\n  // Write your solution here\n\n}`,
+      typescript: `function connect(root: Node | null): Node | null {\n  // Write your solution here\n\n}`,
+      python: `def connect(root):\n    # Write your solution here\n    pass`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(1)" },
+    testCases: [
+      { input: { root: [1, 2, 3, 4, 5, 6, 7] }, expected: [1, "#", 2, 3, "#", 4, 5, 6, 7, "#"], description: "Perfect binary tree" },
+      { input: { root: [] }, expected: [], description: "Empty tree" },
+    ],
+  },
 ]
 
 export default treesScenarios

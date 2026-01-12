@@ -896,6 +896,673 @@ The matching should cover the entire input string (not partial).`,
       },
     ],
   },
+  // ==================== NEW HIGH-VALUE ADDITIONS ====================
+  {
+    id: "dsa-house-robber-ii",
+    title: "House Robber II",
+    type: "dsa",
+    pattern: "dp-1d",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: "Maximum robbery with circular house arrangement",
+    tags: ["dynamic-programming", "array"],
+    estimatedTime: 25,
+    problemStatement: `You are a professional robber planning to rob houses along a street. Each house has a certain amount of money stashed. All houses at this place are arranged in a circle. That means the first house is the neighbor of the last one. Meanwhile, adjacent houses have a security system connected, and it will automatically contact the police if two adjacent houses were broken into on the same night.
+
+Given an integer array nums representing the amount of money of each house, return the maximum amount of money you can rob tonight without alerting the police.`,
+    examples: [
+      {
+        input: "nums = [2,3,2]",
+        output: "3",
+        explanation: "You cannot rob house 1 (money = 2) and then rob house 3 (money = 2), because they are adjacent houses.",
+      },
+      {
+        input: "nums = [1,2,3,1]",
+        output: "4",
+        explanation: "Rob house 1 (money = 1) and then rob house 3 (money = 3). Total = 1 + 3 = 4.",
+      },
+      {
+        input: "nums = [1,2,3]",
+        output: "3",
+      },
+    ],
+    constraints: ["1 <= nums.length <= 100", "0 <= nums[i] <= 1000"],
+    hints: [
+      "Since houses are circular, you can't rob both first and last house",
+      "Run House Robber I twice: once for houses 0 to n-2, once for houses 1 to n-1",
+      "Return max of both results",
+    ],
+    starterCode: {
+      javascript: `function rob(nums) {
+  // Write your solution here
+
+}`,
+      typescript: `function rob(nums: number[]): number {
+  // Write your solution here
+
+}`,
+      python: `def rob(nums):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(1)" },
+    testCases: [
+      { input: { nums: [2, 3, 2] }, expected: 3, description: "Cannot rob first and last" },
+      { input: { nums: [1, 2, 3, 1] }, expected: 4, description: "Rob house 1 and 3" },
+      { input: { nums: [1, 2, 3] }, expected: 3, description: "Rob middle house" },
+      { input: { nums: [1] }, expected: 1, description: "Single house" },
+      { input: { nums: [1, 2] }, expected: 2, description: "Two houses - pick larger" },
+    ],
+  },
+  {
+    id: "dsa-decode-ways",
+    title: "Decode Ways",
+    type: "dsa",
+    pattern: "dp-1d",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple"],
+    description: "Count ways to decode a digit string into letters",
+    tags: ["dynamic-programming", "string"],
+    estimatedTime: 25,
+    problemStatement: `A message containing letters from A-Z can be encoded into numbers using the following mapping:
+
+'A' -> "1"
+'B' -> "2"
+...
+'Z' -> "26"
+
+To decode an encoded message, all the digits must be grouped then mapped back into letters using the reverse of the mapping above (there may be multiple ways).
+
+Given a string s containing only digits, return the number of ways to decode it.`,
+    examples: [
+      {
+        input: 's = "12"',
+        output: "2",
+        explanation: '"12" could be decoded as "AB" (1 2) or "L" (12).',
+      },
+      {
+        input: 's = "226"',
+        output: "3",
+        explanation: '"226" could be decoded as "BZ" (2 26), "VF" (22 6), or "BBF" (2 2 6).',
+      },
+      {
+        input: 's = "06"',
+        output: "0",
+        explanation: '"06" cannot be mapped because leading zeros are invalid.',
+      },
+    ],
+    constraints: ["1 <= s.length <= 100", "s contains only digits and may contain leading zero(s)."],
+    hints: [
+      "dp[i] = number of ways to decode s[0:i]",
+      "Single digit: if s[i-1] != '0', dp[i] += dp[i-1]",
+      "Two digits: if 10 <= s[i-2:i] <= 26, dp[i] += dp[i-2]",
+      "Handle leading zeros carefully - '0' alone is invalid",
+    ],
+    starterCode: {
+      javascript: `function numDecodings(s) {
+  // Write your solution here
+
+}`,
+      typescript: `function numDecodings(s: string): number {
+  // Write your solution here
+
+}`,
+      python: `def numDecodings(s):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(1)" },
+    testCases: [
+      { input: { s: "12" }, expected: 2, description: "AB or L" },
+      { input: { s: "226" }, expected: 3, description: "BZ, VF, or BBF" },
+      { input: { s: "06" }, expected: 0, description: "Leading zero invalid" },
+      { input: { s: "10" }, expected: 1, description: "Only J (10)" },
+      { input: { s: "2101" }, expected: 1, description: "Complex with zeros" },
+      { input: { s: "11106" }, expected: 2, description: "AAJ F or KJF" },
+    ],
+  },
+  {
+    id: "dsa-maximum-product-subarray",
+    title: "Maximum Product Subarray",
+    type: "dsa",
+    pattern: "dp-1d",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta", "Microsoft", "LinkedIn"],
+    description: "Find the contiguous subarray with the largest product",
+    tags: ["dynamic-programming", "array"],
+    estimatedTime: 25,
+    problemStatement: `Given an integer array nums, find a subarray that has the largest product, and return the product.
+
+The test cases are generated so that the answer will fit in a 32-bit integer.`,
+    examples: [
+      {
+        input: "nums = [2,3,-2,4]",
+        output: "6",
+        explanation: "[2,3] has the largest product 6.",
+      },
+      {
+        input: "nums = [-2,0,-1]",
+        output: "0",
+        explanation: "The result cannot be 2, because [-2,-1] is not a subarray.",
+      },
+    ],
+    constraints: ["1 <= nums.length <= 2 * 10^4", "-10 <= nums[i] <= 10", "The product of any prefix or suffix of nums is guaranteed to fit in a 32-bit integer."],
+    hints: [
+      "Track both max and min product ending at each position",
+      "Negative * negative can become positive max",
+      "When current num is negative, swap max and min",
+      "Reset when seeing 0",
+    ],
+    starterCode: {
+      javascript: `function maxProduct(nums) {
+  // Write your solution here
+
+}`,
+      typescript: `function maxProduct(nums: number[]): number {
+  // Write your solution here
+
+}`,
+      python: `def maxProduct(nums):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(1)" },
+    testCases: [
+      { input: { nums: [2, 3, -2, 4] }, expected: 6, description: "[2,3] = 6" },
+      { input: { nums: [-2, 0, -1] }, expected: 0, description: "Zero breaks subarray" },
+      { input: { nums: [-2, 3, -4] }, expected: 24, description: "Negative * negative" },
+      { input: { nums: [2] }, expected: 2, description: "Single element" },
+      { input: { nums: [-2] }, expected: -2, description: "Single negative" },
+      { input: { nums: [0, 2] }, expected: 2, description: "Zero at start" },
+    ],
+  },
+  {
+    id: "dsa-target-sum",
+    title: "Target Sum",
+    type: "dsa",
+    pattern: "dp-knapsack",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: "Count ways to assign + and - to reach target sum",
+    tags: ["dynamic-programming", "array", "backtracking"],
+    estimatedTime: 30,
+    problemStatement: `You are given an integer array nums and an integer target.
+
+You want to build an expression out of nums by adding one of the symbols '+' and '-' before each integer in nums and then concatenate all the integers.
+
+Return the number of different expressions that you can build, which evaluates to target.`,
+    examples: [
+      {
+        input: "nums = [1,1,1,1,1], target = 3",
+        output: "5",
+        explanation: "-1 + 1 + 1 + 1 + 1 = 3, +1 - 1 + 1 + 1 + 1 = 3, etc. There are 5 ways.",
+      },
+      {
+        input: "nums = [1], target = 1",
+        output: "1",
+      },
+    ],
+    constraints: ["1 <= nums.length <= 20", "0 <= nums[i] <= 1000", "0 <= sum(nums[i]) <= 1000", "-1000 <= target <= 1000"],
+    hints: [
+      "Let P = sum of positive numbers, N = sum of negative numbers",
+      "P - N = target and P + N = sum",
+      "So P = (target + sum) / 2 - this is a subset sum problem!",
+      "Count subsets with sum P using DP",
+    ],
+    starterCode: {
+      javascript: `function findTargetSumWays(nums, target) {
+  // Write your solution here
+
+}`,
+      typescript: `function findTargetSumWays(nums: number[], target: number): number {
+  // Write your solution here
+
+}`,
+      python: `def findTargetSumWays(nums, target):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(n * sum)", space: "O(sum)" },
+    testCases: [
+      { input: { nums: [1, 1, 1, 1, 1], target: 3 }, expected: 5, description: "Five ones to make 3" },
+      { input: { nums: [1], target: 1 }, expected: 1, description: "Single element" },
+      { input: { nums: [1, 0], target: 1 }, expected: 2, description: "Zero can be +0 or -0" },
+      { input: { nums: [1, 2, 1], target: 0 }, expected: 2, description: "+1-2+1 or -1+2-1" },
+    ],
+  },
+  {
+    id: "dsa-minimum-path-sum",
+    title: "Minimum Path Sum",
+    type: "dsa",
+    pattern: "dp-2d",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta", "Goldman Sachs"],
+    description: "Find minimum sum path from top-left to bottom-right in a grid",
+    tags: ["dynamic-programming", "array", "matrix"],
+    estimatedTime: 20,
+    problemStatement: `Given a m x n grid filled with non-negative numbers, find a path from top left to bottom right, which minimizes the sum of all numbers along its path.
+
+Note: You can only move either down or right at any point in time.`,
+    examples: [
+      {
+        input: "grid = [[1,3,1],[1,5,1],[4,2,1]]",
+        output: "7",
+        explanation: "The path 1 → 3 → 1 → 1 → 1 minimizes the sum.",
+      },
+      {
+        input: "grid = [[1,2,3],[4,5,6]]",
+        output: "12",
+      },
+    ],
+    constraints: ["m == grid.length", "n == grid[i].length", "1 <= m, n <= 200", "0 <= grid[i][j] <= 200"],
+    hints: [
+      "dp[i][j] = minimum sum to reach cell (i,j)",
+      "dp[i][j] = grid[i][j] + min(dp[i-1][j], dp[i][j-1])",
+      "First row/column only have one path to them",
+      "Can optimize space to O(n) using 1D array",
+    ],
+    starterCode: {
+      javascript: `function minPathSum(grid) {
+  // Write your solution here
+
+}`,
+      typescript: `function minPathSum(grid: number[][]): number {
+  // Write your solution here
+
+}`,
+      python: `def minPathSum(grid):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(m * n)", space: "O(n)" },
+    testCases: [
+      { input: { grid: [[1, 3, 1], [1, 5, 1], [4, 2, 1]] }, expected: 7, description: "3x3 grid" },
+      { input: { grid: [[1, 2, 3], [4, 5, 6]] }, expected: 12, description: "2x3 grid" },
+      { input: { grid: [[1]] }, expected: 1, description: "Single cell" },
+      { input: { grid: [[1, 2], [1, 1]] }, expected: 3, description: "2x2 grid" },
+    ],
+  },
+  {
+    id: "dsa-palindromic-substrings",
+    title: "Palindromic Substrings",
+    type: "dsa",
+    pattern: "dp-2d",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: "Count the number of palindromic substrings",
+    tags: ["dynamic-programming", "string", "two-pointers"],
+    estimatedTime: 25,
+    problemStatement: `Given a string s, return the number of palindromic substrings in it.
+
+A string is a palindrome when it reads the same backward as forward.
+
+A substring is a contiguous sequence of characters within the string.`,
+    examples: [
+      {
+        input: 's = "abc"',
+        output: "3",
+        explanation: 'Three palindromic substrings: "a", "b", "c".',
+      },
+      {
+        input: 's = "aaa"',
+        output: "6",
+        explanation: 'Six palindromic substrings: "a", "a", "a", "aa", "aa", "aaa".',
+      },
+    ],
+    constraints: ["1 <= s.length <= 1000", "s consists of lowercase English letters."],
+    hints: [
+      "Expand around center technique: for each center, expand outward",
+      "Two types of centers: single character (odd length) and between characters (even length)",
+      "Total 2n-1 possible centers",
+      "Or use DP: dp[i][j] = true if s[i:j+1] is palindrome",
+    ],
+    starterCode: {
+      javascript: `function countSubstrings(s) {
+  // Write your solution here
+
+}`,
+      typescript: `function countSubstrings(s: string): number {
+  // Write your solution here
+
+}`,
+      python: `def countSubstrings(s):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(n^2)", space: "O(1) with expand around center" },
+    testCases: [
+      { input: { s: "abc" }, expected: 3, description: "No multi-char palindromes" },
+      { input: { s: "aaa" }, expected: 6, description: "All substrings are palindromes" },
+      { input: { s: "aba" }, expected: 4, description: "a, b, a, aba" },
+      { input: { s: "a" }, expected: 1, description: "Single character" },
+    ],
+  },
+  {
+    id: "dsa-longest-palindromic-subsequence",
+    title: "Longest Palindromic Subsequence",
+    type: "dsa",
+    pattern: "dp-2d",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "LinkedIn", "Microsoft"],
+    description: "Find the length of the longest palindromic subsequence",
+    tags: ["dynamic-programming", "string"],
+    estimatedTime: 30,
+    problemStatement: `Given a string s, find the longest palindromic subsequence's length in s.
+
+A subsequence is a sequence that can be derived from another sequence by deleting some or no elements without changing the order of the remaining elements.`,
+    examples: [
+      {
+        input: 's = "bbbab"',
+        output: "4",
+        explanation: 'One possible longest palindromic subsequence is "bbbb".',
+      },
+      {
+        input: 's = "cbbd"',
+        output: "2",
+        explanation: 'One possible longest palindromic subsequence is "bb".',
+      },
+    ],
+    constraints: ["1 <= s.length <= 1000", "s consists only of lowercase English letters."],
+    hints: [
+      "dp[i][j] = LPS length for s[i:j+1]",
+      "If s[i] == s[j]: dp[i][j] = dp[i+1][j-1] + 2",
+      "Else: dp[i][j] = max(dp[i+1][j], dp[i][j-1])",
+      "Fill diagonal (single chars) first, then expand",
+    ],
+    starterCode: {
+      javascript: `function longestPalindromeSubseq(s) {
+  // Write your solution here
+
+}`,
+      typescript: `function longestPalindromeSubseq(s: string): number {
+  // Write your solution here
+
+}`,
+      python: `def longestPalindromeSubseq(s):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(n^2)", space: "O(n^2) or O(n) optimized" },
+    testCases: [
+      { input: { s: "bbbab" }, expected: 4, description: "bbbb is LPS" },
+      { input: { s: "cbbd" }, expected: 2, description: "bb is LPS" },
+      { input: { s: "a" }, expected: 1, description: "Single character" },
+      { input: { s: "abcba" }, expected: 5, description: "Whole string is palindrome" },
+      { input: { s: "abaaba" }, expected: 6, description: "Whole string is palindrome" },
+    ],
+  },
+  {
+    id: "dsa-best-time-buy-sell-stock-ii",
+    title: "Best Time to Buy and Sell Stock II",
+    type: "dsa",
+    pattern: "dp-1d",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    description: "Maximize profit with unlimited transactions",
+    tags: ["dynamic-programming", "array", "greedy"],
+    estimatedTime: 20,
+    problemStatement: `You are given an integer array prices where prices[i] is the price of a given stock on the ith day.
+
+On each day, you may decide to buy and/or sell the stock. You can only hold at most one share of the stock at any time. However, you can buy it then immediately sell it on the same day.
+
+Find and return the maximum profit you can achieve.`,
+    examples: [
+      {
+        input: "prices = [7,1,5,3,6,4]",
+        output: "7",
+        explanation: "Buy on day 2 (price = 1) and sell on day 3 (price = 5), profit = 4. Then buy on day 4 (price = 3) and sell on day 5 (price = 6), profit = 3. Total = 7.",
+      },
+      {
+        input: "prices = [1,2,3,4,5]",
+        output: "4",
+        explanation: "Buy on day 1 (price = 1) and sell on day 5 (price = 5), profit = 4.",
+      },
+      {
+        input: "prices = [7,6,4,3,1]",
+        output: "0",
+        explanation: "No profitable transactions possible.",
+      },
+    ],
+    constraints: ["1 <= prices.length <= 3 * 10^4", "0 <= prices[i] <= 10^4"],
+    hints: [
+      "Greedy: collect all upward price movements",
+      "If prices[i] > prices[i-1], add the difference to profit",
+      "Equivalent to buying every valley and selling every peak",
+    ],
+    starterCode: {
+      javascript: `function maxProfit(prices) {
+  // Write your solution here
+
+}`,
+      typescript: `function maxProfit(prices: number[]): number {
+  // Write your solution here
+
+}`,
+      python: `def maxProfit(prices):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(1)" },
+    testCases: [
+      { input: { prices: [7, 1, 5, 3, 6, 4] }, expected: 7, description: "Two transactions" },
+      { input: { prices: [1, 2, 3, 4, 5] }, expected: 4, description: "One long transaction" },
+      { input: { prices: [7, 6, 4, 3, 1] }, expected: 0, description: "No profit possible" },
+    ],
+  },
+  {
+    id: "dsa-best-time-buy-sell-stock-cooldown",
+    title: "Best Time to Buy and Sell Stock with Cooldown",
+    type: "dsa",
+    pattern: "dp-1d",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta"],
+    description: "Maximize profit with cooldown period after selling",
+    tags: ["dynamic-programming", "array"],
+    estimatedTime: 30,
+    problemStatement: `You are given an array prices where prices[i] is the price of a given stock on the ith day.
+
+Find the maximum profit you can achieve. You may complete as many transactions as you like with the following restrictions:
+
+- After you sell your stock, you cannot buy stock on the next day (i.e., cooldown one day).
+
+Note: You may not engage in multiple transactions simultaneously (i.e., you must sell the stock before you buy again).`,
+    examples: [
+      {
+        input: "prices = [1,2,3,0,2]",
+        output: "3",
+        explanation: "Buy on day 1, sell on day 2. Cooldown on day 3. Buy on day 4, sell on day 5.",
+      },
+      {
+        input: "prices = [1]",
+        output: "0",
+      },
+    ],
+    constraints: ["1 <= prices.length <= 5000", "0 <= prices[i] <= 1000"],
+    hints: [
+      "State machine approach: hold, sold, rest",
+      "hold[i] = max(hold[i-1], rest[i-1] - prices[i])",
+      "sold[i] = hold[i-1] + prices[i]",
+      "rest[i] = max(rest[i-1], sold[i-1])",
+    ],
+    starterCode: {
+      javascript: `function maxProfit(prices) {
+  // Write your solution here
+
+}`,
+      typescript: `function maxProfit(prices: number[]): number {
+  // Write your solution here
+
+}`,
+      python: `def maxProfit(prices):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(1)" },
+    testCases: [
+      { input: { prices: [1, 2, 3, 0, 2] }, expected: 3, description: "With cooldown" },
+      { input: { prices: [1] }, expected: 0, description: "Single day" },
+      { input: { prices: [1, 2] }, expected: 1, description: "Simple profit" },
+    ],
+  },
+  {
+    id: "dsa-triangle",
+    title: "Triangle",
+    type: "dsa",
+    pattern: "dp-2d",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Microsoft"],
+    description: "Find minimum path sum from top to bottom of triangle",
+    tags: ["dynamic-programming", "array"],
+    estimatedTime: 25,
+    problemStatement: `Given a triangle array, return the minimum path sum from top to bottom.
+
+For each step, you may move to an adjacent number of the row below. More formally, if you are on index i on the current row, you may move to either index i or index i + 1 on the next row.`,
+    examples: [
+      {
+        input: "triangle = [[2],[3,4],[6,5,7],[4,1,8,3]]",
+        output: "11",
+        explanation: "The minimum path sum from top to bottom is 2 + 3 + 5 + 1 = 11.",
+      },
+      {
+        input: "triangle = [[-10]]",
+        output: "-10",
+      },
+    ],
+    constraints: ["1 <= triangle.length <= 200", "triangle[0].length == 1", "triangle[i].length == triangle[i - 1].length + 1", "-10^4 <= triangle[i][j] <= 10^4"],
+    hints: [
+      "Work bottom-up: start from second-to-last row",
+      "dp[i] = min path sum from row to bottom",
+      "dp[i] = triangle[row][i] + min(dp[i], dp[i+1])",
+      "O(n) space by reusing bottom row",
+    ],
+    starterCode: {
+      javascript: `function minimumTotal(triangle) {
+  // Write your solution here
+
+}`,
+      typescript: `function minimumTotal(triangle: number[][]): number {
+  // Write your solution here
+
+}`,
+      python: `def minimumTotal(triangle):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(n^2)", space: "O(n)" },
+    testCases: [
+      { input: { triangle: [[2], [3, 4], [6, 5, 7], [4, 1, 8, 3]] }, expected: 11, description: "Standard triangle" },
+      { input: { triangle: [[-10]] }, expected: -10, description: "Single element" },
+      { input: { triangle: [[2], [3, 4]] }, expected: 5, description: "Two rows" },
+    ],
+  },
+  {
+    id: "dsa-maximal-square",
+    title: "Maximal Square",
+    type: "dsa",
+    pattern: "dp-2d",
+    difficulty: "medium",
+    companies: ["Amazon", "Google", "Meta", "Apple"],
+    description: "Find the largest square containing only 1's",
+    tags: ["dynamic-programming", "matrix"],
+    estimatedTime: 25,
+    problemStatement: `Given an m x n binary matrix filled with 0's and 1's, find the largest square containing only 1's and return its area.`,
+    examples: [
+      {
+        input: 'matrix = [["1","0","1","0","0"],["1","0","1","1","1"],["1","1","1","1","1"],["1","0","0","1","0"]]',
+        output: "4",
+        explanation: "The largest square has side length 2.",
+      },
+      {
+        input: 'matrix = [["0","1"],["1","0"]]',
+        output: "1",
+      },
+      {
+        input: 'matrix = [["0"]]',
+        output: "0",
+      },
+    ],
+    constraints: ["m == matrix.length", "n == matrix[i].length", "1 <= m, n <= 300", "matrix[i][j] is '0' or '1'."],
+    hints: [
+      "dp[i][j] = side length of largest square with bottom-right corner at (i,j)",
+      "If matrix[i][j] == '1': dp[i][j] = min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]) + 1",
+      "Track maximum side length seen",
+      "Return maxSide^2",
+    ],
+    starterCode: {
+      javascript: `function maximalSquare(matrix) {
+  // Write your solution here
+
+}`,
+      typescript: `function maximalSquare(matrix: string[][]): number {
+  // Write your solution here
+
+}`,
+      python: `def maximalSquare(matrix):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(m * n)", space: "O(n)" },
+    testCases: [
+      { input: { matrix: [["1", "0", "1", "0", "0"], ["1", "0", "1", "1", "1"], ["1", "1", "1", "1", "1"], ["1", "0", "0", "1", "0"]] }, expected: 4, description: "2x2 square" },
+      { input: { matrix: [["0", "1"], ["1", "0"]] }, expected: 1, description: "1x1 squares only" },
+      { input: { matrix: [["0"]] }, expected: 0, description: "No 1's" },
+      { input: { matrix: [["1"]] }, expected: 1, description: "Single 1" },
+    ],
+  },
+  {
+    id: "dsa-min-cost-climbing-stairs",
+    title: "Min Cost Climbing Stairs",
+    type: "dsa",
+    pattern: "dp-1d",
+    difficulty: "easy",
+    companies: ["Amazon", "Google", "Microsoft"],
+    description: "Find minimum cost to reach the top of stairs",
+    tags: ["dynamic-programming", "array"],
+    estimatedTime: 15,
+    problemStatement: `You are given an integer array cost where cost[i] is the cost of ith step on a staircase. Once you pay the cost, you can either climb one or two steps.
+
+You can either start from the step with index 0, or the step with index 1.
+
+Return the minimum cost to reach the top of the floor.`,
+    examples: [
+      {
+        input: "cost = [10,15,20]",
+        output: "15",
+        explanation: "Start at index 1, pay 15, climb two steps to reach the top.",
+      },
+      {
+        input: "cost = [1,100,1,1,1,100,1,1,100,1]",
+        output: "6",
+        explanation: "Optimal path: 0 → 2 → 4 → 6 → 7 → 9 → top. Total cost = 1+1+1+1+1+1 = 6.",
+      },
+    ],
+    constraints: ["2 <= cost.length <= 1000", "0 <= cost[i] <= 999"],
+    hints: [
+      "dp[i] = minimum cost to reach step i",
+      "dp[i] = cost[i] + min(dp[i-1], dp[i-2])",
+      "Top is step n (one past last index)",
+      "Can optimize to O(1) space",
+    ],
+    starterCode: {
+      javascript: `function minCostClimbingStairs(cost) {
+  // Write your solution here
+
+}`,
+      typescript: `function minCostClimbingStairs(cost: number[]): number {
+  // Write your solution here
+
+}`,
+      python: `def minCostClimbingStairs(cost):
+    # Write your solution here
+    pass`,
+    },
+    optimalComplexity: { time: "O(n)", space: "O(1)" },
+    testCases: [
+      { input: { cost: [10, 15, 20] }, expected: 15, description: "Start at index 1" },
+      { input: { cost: [1, 100, 1, 1, 1, 100, 1, 1, 100, 1] }, expected: 6, description: "Skip expensive steps" },
+      { input: { cost: [0, 0, 0, 1] }, expected: 0, description: "Can reach top for free" },
+    ],
+  },
 ]
 
 export default dpScenarios
