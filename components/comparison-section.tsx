@@ -2,21 +2,18 @@
 
 import { useRef, useEffect, useState, useCallback } from "react"
 import { motion, useInView, useSpring, useTransform } from "framer-motion"
-import { Mic, Clock, Brain, Zap, ArrowRight } from "lucide-react"
+import { Check, X, ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { MagneticButton } from "@/components/ui/magnetic-button"
 
 /**
- * Comparison Section - Premium redesign
+ * Comparison Section - V2
  *
- * Design philosophy:
- * - Motion with meaning: every animation tells part of the story
- * - Visual hierarchy: the win is obvious at a glance
- * - Professional restraint: smooth, subtle, intentional
- * - Narrative flow: expensive → transformation → value
+ * Brings back competitive positioning (LeetCode, Interviewing.io)
+ * with a more distinctive visual approach
  */
 
-// Smooth spring-based price counter
+// Spring-based price counter
 function AnimatedPrice({
   value,
   delay = 0,
@@ -48,9 +45,7 @@ function AnimatedPrice({
 
   useEffect(() => {
     if (isInView) {
-      const timer = setTimeout(() => {
-        spring.set(value)
-      }, delay)
+      const timer = setTimeout(() => spring.set(value), delay)
       return () => clearTimeout(timer)
     }
   }, [isInView, value, spring, delay])
@@ -62,260 +57,258 @@ function AnimatedPrice({
   )
 }
 
-// Strike-through animation - the "defeat" moment
+// Strike-through animation
 function StrikeThrough({ show, delay = 0 }: { show: boolean; delay?: number }) {
   return (
     <motion.span
-      className="absolute top-1/2 right-0 left-0 h-[3px] origin-left bg-gradient-to-r from-red-500/90 via-red-400/80 to-red-500/60"
+      className="absolute top-1/2 right-0 left-0 h-[3px] origin-left bg-gradient-to-r from-red-500/80 to-red-400/60"
       initial={{ scaleX: 0 }}
       animate={show ? { scaleX: 1 } : { scaleX: 0 }}
-      transition={{
-        delay,
-        duration: 0.5,
-        ease: [0.32, 0.72, 0, 1],
-      }}
+      transition={{ delay, duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
     />
   )
 }
 
-// Value advantage card - replaces boring table rows
-function AdvantageCard({
-  icon: Icon,
-  title,
-  subtitle,
+// Comparison row - styled differently than typical tables
+function ComparisonRow({
+  feature,
+  leetcode,
+  interviewing,
+  codesparring,
   index,
 }: {
-  icon: React.ComponentType<{ className?: string }>
-  title: string
-  subtitle: string
+  feature: string
+  leetcode: boolean | string
+  interviewing: boolean | string
+  codesparring: boolean
   index: number
 }) {
   const ref = useRef(null)
-  const isInView = useInView(ref, { once: true, amount: 0.3 })
+  const isInView = useInView(ref, { once: true, amount: 0.5 })
+
+  const renderCell = (value: boolean | string, isWinner = false) => {
+    if (typeof value === "string") {
+      return <span className="text-muted-foreground/60 text-xs">{value}</span>
+    }
+    if (value) {
+      return (
+        <Check className={`h-4 w-4 ${isWinner ? "text-neural" : "text-muted-foreground/50"}`} />
+      )
+    }
+    return <X className="text-muted-foreground/30 h-4 w-4" />
+  }
 
   return (
     <motion.div
       ref={ref}
-      className="group relative"
-      initial={{ opacity: 0, y: 20 }}
-      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+      className="grid grid-cols-[1fr_60px_60px_60px] items-center gap-2 py-3 sm:grid-cols-[1fr_80px_80px_80px] sm:gap-4"
+      initial={{ opacity: 0, x: -10 }}
+      animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: -10 }}
       transition={{
-        delay: 0.08 * index + 0.2,
-        duration: 0.5,
+        delay: 0.05 * index,
+        duration: 0.4,
         ease: [0.25, 0.46, 0.45, 0.94],
       }}
     >
-      <div className="border-border/50 bg-card/30 hover:border-accent/30 hover:bg-card/50 relative flex items-start gap-3 rounded-xl border p-4 transition-all duration-300">
-        {/* Icon */}
-        <div className="bg-accent/10 ring-accent/20 group-hover:bg-accent/15 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ring-1 transition-all">
-          <Icon className="text-accent h-4 w-4" />
-        </div>
-
-        {/* Content */}
-        <div className="min-w-0 flex-1">
-          <h4 className="text-foreground text-sm font-medium">{title}</h4>
-          <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">{subtitle}</p>
-        </div>
-      </div>
-    </motion.div>
-  )
-}
-
-// The multiplier badge - the hero stat
-function MultiplierBadge({ delay = 0 }: { delay?: number }) {
-  const ref = useRef(null)
-  const isInView = useInView(ref, { once: true, amount: 0.5 })
-
-  return (
-    <motion.div
-      ref={ref}
-      className="border-neural/30 bg-neural/10 inline-flex items-center gap-2 rounded-full border px-4 py-2"
-      initial={{ opacity: 0, scale: 0.8, y: 10 }}
-      animate={isInView ? { opacity: 1, scale: 1, y: 0 } : { opacity: 0, scale: 0.8, y: 10 }}
-      transition={{
-        delay,
-        duration: 0.6,
-        type: "spring",
-        stiffness: 150,
-        damping: 15,
-      }}
-    >
-      <span className="text-neural text-2xl font-bold sm:text-3xl">45×</span>
-      <span className="text-neural/80 text-sm">less expensive</span>
+      <span className="text-foreground/90 text-sm">{feature}</span>
+      <div className="flex justify-center">{renderCell(leetcode)}</div>
+      <div className="flex justify-center">{renderCell(interviewing)}</div>
+      <div className="flex justify-center">{renderCell(codesparring, true)}</div>
     </motion.div>
   )
 }
 
 export function ComparisonSection() {
   const sectionRef = useRef(null)
-  const isInView = useInView(sectionRef, { once: true, amount: 0.15 })
+  const isInView = useInView(sectionRef, { once: true, amount: 0.1 })
   const [showStrike, setShowStrike] = useState(false)
 
   const handlePriceComplete = useCallback(() => {
     setShowStrike(true)
   }, [])
 
-  const advantages = [
+  const features = [
     {
-      icon: Mic,
-      title: "Voice-first practice",
-      subtitle: "Talk through problems exactly like a real interview",
+      feature: "Talk through problems out loud",
+      leetcode: false,
+      interviewing: true,
+      codesparring: true,
     },
     {
-      icon: Clock,
-      title: "Available 24/7",
-      subtitle: "No scheduling, no waiting for availability",
+      feature: "Available 24/7, no scheduling",
+      leetcode: true,
+      interviewing: false,
+      codesparring: true,
     },
     {
-      icon: Brain,
-      title: "Adaptive difficulty",
-      subtitle: "Real-time hints calibrated to your level",
+      feature: "Real-time feedback as you code",
+      leetcode: false,
+      interviewing: true,
+      codesparring: true,
     },
     {
-      icon: Zap,
-      title: "Spaced repetition",
-      subtitle: "Science-backed retention for lasting skills",
+      feature: "Consistent interviewer quality",
+      leetcode: "N/A",
+      interviewing: "Varies",
+      codesparring: true,
+    },
+    {
+      feature: "Spaced repetition system",
+      leetcode: false,
+      interviewing: false,
+      codesparring: true,
+    },
+    {
+      feature: "Unlimited practice",
+      leetcode: true,
+      interviewing: false,
+      codesparring: true,
     },
   ]
 
   return (
     <section ref={sectionRef} className="bg-background relative overflow-hidden py-20 lg:py-28">
-      {/* Subtle ambient glow */}
+      {/* Ambient glow */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="from-accent/[0.04] absolute top-0 left-1/2 h-[500px] w-[800px] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] via-transparent to-transparent" />
+        <div className="from-accent/[0.03] absolute top-0 left-1/2 h-[600px] w-[900px] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] via-transparent to-transparent" />
       </div>
 
       <div className="relative z-10 container mx-auto px-4">
-        <div className="mx-auto max-w-3xl">
-          {/* Section header */}
+        <div className="mx-auto max-w-4xl">
+          {/* Header */}
           <motion.div
-            className="mb-14 text-center"
+            className="mb-12 text-center"
             initial={{ opacity: 0, y: 20 }}
             animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-            transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+            transition={{ duration: 0.6 }}
           >
             <h2 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
               <span className="text-foreground">The real cost of </span>
               <span className="text-accent">interview prep</span>
             </h2>
-            <p className="text-muted-foreground mx-auto mt-4 max-w-xl text-sm sm:text-base">
-              Research shows 5 mock interviews doubles your pass rate. Here's what that actually
-              costs.
+            <p className="text-muted-foreground mx-auto mt-4 max-w-2xl">
+              Mock interviews with humans cost $225/session. Research shows 5 sessions doubles your
+              pass rate. Do the math.
             </p>
           </motion.div>
 
-          {/* The dramatic price comparison */}
-          <div className="mb-14">
-            {/* Old way - expensive, defeated */}
-            <motion.div
-              className="mb-6 text-center"
-              initial={{ opacity: 0 }}
-              animate={isInView ? { opacity: 1 } : { opacity: 0 }}
-              transition={{ delay: 0.2, duration: 0.5 }}
-            >
-              <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wider uppercase">
-                Human mock interviews
-              </p>
+          {/* Price comparison - the hook */}
+          <motion.div
+            className="mb-16 grid gap-4 sm:grid-cols-2"
+            initial={{ opacity: 0, y: 20 }}
+            animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+            transition={{ delay: 0.2, duration: 0.6 }}
+          >
+            {/* Interviewing.io / Human */}
+            <div className="border-border/50 bg-card/30 relative rounded-2xl border p-6">
+              <div className="mb-4">
+                <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                  Human mock interviews
+                </span>
+                <p className="text-muted-foreground/60 mt-1 text-xs">
+                  Interviewing.io, Pramp, etc.
+                </p>
+              </div>
               <div className="relative inline-block">
                 <AnimatedPrice
                   value={1125}
                   delay={400}
-                  className="text-muted-foreground/70 text-4xl font-bold sm:text-5xl"
+                  className="text-muted-foreground/60 text-4xl font-bold"
                   onComplete={handlePriceComplete}
                 />
-                <StrikeThrough show={showStrike} delay={0.3} />
+                <StrikeThrough show={showStrike} delay={0.2} />
               </div>
-              <p className="text-muted-foreground/60 mt-2 text-xs">$225/session × 5 sessions</p>
-            </motion.div>
+              <p className="text-muted-foreground/50 mt-2 text-xs">$225 × 5 sessions</p>
+            </div>
 
-            {/* Transformation divider */}
-            <motion.div
-              className="mb-6 flex items-center justify-center gap-3"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={isInView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.9 }}
-              transition={{ delay: 1.2, duration: 0.4 }}
-            >
-              <div className="to-border h-px w-12 bg-gradient-to-r from-transparent sm:w-16" />
-              <span className="text-muted-foreground text-xs font-medium">or</span>
-              <div className="to-border h-px w-12 bg-gradient-to-l from-transparent sm:w-16" />
-            </motion.div>
-
-            {/* New way - the win */}
-            <motion.div
-              className="text-center"
-              initial={{ opacity: 0, y: 15 }}
-              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 15 }}
-              transition={{ delay: 1.4, duration: 0.6 }}
-            >
-              <p className="text-accent mb-2 text-xs font-medium tracking-wider uppercase">
-                Unlimited AI mock interviews
-              </p>
-              <div className="mb-2 flex items-baseline justify-center gap-1">
+            {/* CodeSparring */}
+            <div className="border-accent/30 bg-accent/[0.03] relative rounded-2xl border p-6">
+              <div className="absolute -top-3 right-4">
+                <motion.span
+                  className="border-neural/30 bg-neural/10 text-neural inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
+                  transition={{ delay: 1.8, type: "spring", stiffness: 200 }}
+                >
+                  45× cheaper
+                </motion.span>
+              </div>
+              <div className="mb-4">
+                <span className="text-accent text-xs font-medium tracking-wider uppercase">
+                  CodeSparring
+                </span>
+                <p className="text-accent/60 mt-1 text-xs">Unlimited AI mock interviews</p>
+              </div>
+              <div className="flex items-baseline gap-1">
                 <AnimatedPrice
                   value={25}
-                  delay={1600}
-                  className="text-foreground text-5xl font-bold sm:text-6xl"
+                  delay={1200}
+                  className="text-foreground text-4xl font-bold"
                 />
-                <span className="text-muted-foreground text-lg">/mo</span>
+                <span className="text-muted-foreground">/mo</span>
               </div>
+              <p className="text-muted-foreground/70 mt-2 text-xs">Cancel anytime</p>
+            </div>
+          </motion.div>
 
-              {/* Hero stat */}
-              <motion.div
-                className="mt-5"
-                initial={{ opacity: 0 }}
-                animate={isInView ? { opacity: 1 } : { opacity: 0 }}
-                transition={{ delay: 2.2 }}
-              >
-                <MultiplierBadge delay={2.3} />
-              </motion.div>
-            </motion.div>
-          </div>
-
-          {/* What you get - advantage cards */}
+          {/* Feature comparison */}
           <motion.div
-            className="mb-10"
-            initial={{ opacity: 0 }}
-            animate={isInView ? { opacity: 1 } : { opacity: 0 }}
-            transition={{ delay: 0.6, duration: 0.5 }}
+            className="border-border/40 bg-card/20 rounded-2xl border p-4 sm:p-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
           >
-            <p className="text-muted-foreground mb-5 text-center text-xs font-medium tracking-wider uppercase">
-              What you get
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {advantages.map((advantage, index) => (
-                <AdvantageCard key={advantage.title} {...advantage} index={index} />
+            {/* Table header */}
+            <div className="border-border/30 mb-2 grid grid-cols-[1fr_60px_60px_60px] items-end gap-2 border-b pb-3 sm:grid-cols-[1fr_80px_80px_80px] sm:gap-4">
+              <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                Feature
+              </span>
+              <div className="text-center">
+                <span className="text-muted-foreground/70 text-xs font-medium">LeetCode</span>
+                <p className="text-muted-foreground/40 text-[10px]">$35/mo</p>
+              </div>
+              <div className="text-center">
+                <span className="text-muted-foreground/70 text-xs font-medium">
+                  Interviewing.io
+                </span>
+                <p className="text-muted-foreground/40 text-[10px]">$225/session</p>
+              </div>
+              <div className="text-center">
+                <span className="text-accent text-xs font-medium">CodeSparring</span>
+                <p className="text-accent/60 text-[10px]">$25/mo</p>
+              </div>
+            </div>
+
+            {/* Feature rows */}
+            <div className="divide-border/20 divide-y">
+              {features.map((row, index) => (
+                <ComparisonRow key={row.feature} {...row} index={index} />
               ))}
             </div>
           </motion.div>
 
-          {/* CTA */}
+          {/* Bottom positioning + CTA */}
           <motion.div
-            className="text-center"
-            initial={{ opacity: 0, y: 10 }}
-            animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
-            transition={{ delay: 1, duration: 0.5 }}
+            className="mt-10 text-center"
+            initial={{ opacity: 0 }}
+            animate={isInView ? { opacity: 1 } : { opacity: 0 }}
+            transition={{ delay: 0.8, duration: 0.5 }}
           >
+            <p className="text-muted-foreground mb-6 text-sm">
+              LeetCode trains problem-solving. Interviewing.io gives you humans.
+              <br />
+              <span className="text-foreground">
+                We combine the best of both—available 24/7, for 45× less.
+              </span>
+            </p>
+
             <Link href="/interview">
               <MagneticButton variant="primary" glowColor="accent" size="lg">
-                Start practicing today
+                Try it free
                 <ArrowRight className="ml-2 h-4 w-4" />
               </MagneticButton>
             </Link>
-            <p className="text-muted-foreground mt-4 text-xs">
-              Cancel anytime. No commitment required.
-            </p>
           </motion.div>
-
-          {/* Positioning statement */}
-          <motion.p
-            className="text-muted-foreground mt-12 text-center text-sm"
-            initial={{ opacity: 0 }}
-            animate={isInView ? { opacity: 1 } : { opacity: 0 }}
-            transition={{ delay: 1.2, duration: 0.5 }}
-          >
-            LeetCode trains problem-solving. We train interview performance.
-            <span className="text-foreground"> Different skills.</span>
-          </motion.p>
         </div>
       </div>
     </section>
