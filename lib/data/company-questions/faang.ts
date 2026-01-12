@@ -199,7 +199,7 @@ export const metaData: CompanyQuestionData = {
     { pattern: "dp-1d", frequency: 65, priority: 7, typicalDifficulty: "medium" },
     { pattern: "two-pointers", frequency: 75, priority: 8, typicalDifficulty: "medium" },
     { pattern: "sliding-window", frequency: 70, priority: 7, typicalDifficulty: "medium" },
-    { pattern: "string", frequency: 65, priority: 7, typicalDifficulty: "medium" },
+    { pattern: "string", frequency: 80, priority: 8, typicalDifficulty: "medium" }, // Meta emphasizes Array and String problems per 2025 data
     { pattern: "linked-list", frequency: 55, priority: 6, typicalDifficulty: "medium" },
     { pattern: "stack", frequency: 50, priority: 6, typicalDifficulty: "medium" },
   ],
@@ -211,7 +211,7 @@ export const metaData: CompanyQuestionData = {
       frequency: "very_common",
       lastReported: "2024 Q4",
     },
-    { scenarioId: "random-pick-index", title: "Random Pick with Weight", frequency: "very_common" },
+    { scenarioId: "random-pick-with-weight", title: "Random Pick with Weight", frequency: "very_common" },
     {
       scenarioId: "buildings-ocean-view",
       title: "Buildings With an Ocean View",
@@ -241,6 +241,11 @@ export const metaData: CompanyQuestionData = {
     // BFS - Multi-source BFS is common at Meta
     { scenarioId: "dsa-walls-and-gates", title: "Walls and Gates", frequency: "common", lastReported: "2025 Q1" },
     { scenarioId: "dsa-shortest-path-binary-matrix", title: "Shortest Path in Binary Matrix", frequency: "common" },
+    // High-frequency questions confirmed by 2025 market research
+    { scenarioId: "dsa-lowest-common-ancestor", title: "Lowest Common Ancestor of a Binary Tree", frequency: "very_common", lastReported: "2025 Q1" },
+    { scenarioId: "dsa-move-zeroes", title: "Move Zeroes", frequency: "common", lastReported: "2025 Q1" },
+    { scenarioId: "dsa-range-sum-bst", title: "Range Sum of BST", frequency: "common", lastReported: "2025 Q1" },
+    { scenarioId: "dsa-add-binary", title: "Add Binary", frequency: "common", lastReported: "2025 Q1" },
   ],
 
   interviewProcess: {
