@@ -464,7 +464,8 @@ export async function createInterviewSession(
   scenarioType: string,
   difficulty: "easy" | "medium" | "hard",
   scenarioId?: string,
-  pattern?: string // DSA pattern for stats aggregation (e.g., "arrays-hashing", "two-pointers")
+  pattern?: string, // DSA pattern for stats aggregation (e.g., "arrays-hashing", "two-pointers")
+  targetCompany?: string // Target company for RAG context and analytics
 ): Promise<string> {
   const sessionRef = doc(collection(db, "interview_sessions"))
   // Build session data, only including defined fields (Firestore doesn't allow undefined)
@@ -483,6 +484,11 @@ export async function createInterviewSession(
   // Only add scenario_id if it's defined
   if (scenarioId) {
     sessionData.scenario_id = scenarioId
+  }
+
+  // Only add target_company if it's defined
+  if (targetCompany) {
+    sessionData.target_company = targetCompany
   }
 
   await setDoc(sessionRef, sessionData)

@@ -64,9 +64,9 @@ export async function GET(request: NextRequest) {
     try {
       snapshot = await adminDb.collection("announcements").get()
 
-      logger.debug("[Announcements] Total announcements in DB:", snapshot.docs.length)
-    } catch (queryError) {
-      logger.error("[Announcements] Query error:", queryError)
+      logger.debug("[Announcements] Total announcements in DB", { count: snapshot.docs.length })
+    } catch (queryError: unknown) {
+      logger.error("[Announcements] Query error", { error: queryError as Error })
       return NextResponse.json({ success: true, announcements: [] })
     }
 
@@ -102,13 +102,13 @@ export async function GET(request: NextRequest) {
 
       // Skip inactive announcements
       if (!data.active) {
-        logger.debug("[Announcements] Skipping", announcementId, "- not active")
+        logger.debug("[Announcements] Skipping - not active", { announcementId })
         continue
       }
 
       // Skip dismissed announcements (if dismissible)
       if (data.dismissible && dismissedIds.includes(announcementId)) {
-        logger.debug("[Announcements] Skipping", announcementId, "- dismissed by user")
+        logger.debug("[Announcements] Skipping - dismissed by user", { announcementId })
         continue
       }
 
@@ -183,7 +183,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      logger.debug("[Announcements] Including announcement:", announcementId, data.title)
+      logger.debug("[Announcements] Including announcement", { announcementId, title: data.title })
       announcements.push({
         id: announcementId,
         title: data.title,
@@ -230,8 +230,8 @@ export async function GET(request: NextRequest) {
       success: true,
       announcements: limitedAnnouncements,
     })
-  } catch (error) {
-    logger.error("[Announcements] GET Error:", error)
+  } catch (error: unknown) {
+    logger.error("[Announcements] GET Error", { error: error as Error })
     return NextResponse.json({ success: true, announcements: [] })
   }
 }
@@ -317,8 +317,8 @@ export async function POST(request: NextRequest) {
       // Return the ID so client can store in localStorage for non-logged-in users
       announcementId,
     })
-  } catch (error) {
-    logger.error("[Announcements] POST Error:", error)
+  } catch (error: unknown) {
+    logger.error("[Announcements] POST Error", { error: error as Error })
     return NextResponse.json(
       { success: false, error: "Failed to dismiss announcement" },
       { status: 500 }

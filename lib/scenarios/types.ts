@@ -54,6 +54,7 @@ export type Company =
   | "Snowflake"
   | "Palantir"
   | "Veeva"
+  | "Salesforce"
 
 export interface BaseScenario {
   id: string
