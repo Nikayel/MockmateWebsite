@@ -16,6 +16,7 @@ import { getPatternKnowledge } from "@/lib/rag/knowledge-base/dsa-knowledge"
 import { getUserPerformanceRAG } from "@/lib/rag/user-performance-rag"
 import { advancedRetrieve } from "@/lib/rag/retrieval/advanced-retrieval"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
+import { generateLLMHint } from "./hints/llm-generator"
 
 /**
  * Hint difficulty levels
@@ -463,6 +464,31 @@ export async function generateHints(
     )
     hints.push(...patternHints)
     patternKnowledgeUsed = patternHints.length > 0
+  }
+
+  // 1.5 Generate LLM-powered hint (primary method)
+  try {
+    const llmHint = await generateLLMHint({
+      problemTitle: request.problemTitle,
+      problemText: request.problemText,
+      problemPattern: request.problemPattern,
+      difficulty: request.difficulty,
+      userCode: request.userCode,
+      language: request.language,
+      level: recommendedRevealLevel,
+      category: request.trigger === "test_failed" ? "debugging" : "approach",
+      trigger: request.trigger || "manual",
+      struggleLevel,
+      existingHints: request.existingHints,
+      testFailures: request.testResults?.failingTests,
+    })
+
+    if (llmHint) {
+      hints.unshift(llmHint) // Put LLM hint first
+    }
+  } catch (error) {
+    console.error("[HintAgent] LLM hint generation failed:", error)
+    // Falls back to existing template hints
   }
 
   // 2. Generate code-state hints

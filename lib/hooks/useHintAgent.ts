@@ -182,12 +182,13 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
     [generateHintsInternal]
   )
 
-  // Auto-generate hints on mount
-  useEffect(() => {
-    if (autoGenerate && problemText) {
-      generateHints()
-    }
-  }, [autoGenerate, problemText, generateHints])
+  // NOTE: We no longer auto-generate hints on mount.
+  // Hints should be generated when user:
+  // 1. Clicks "Get Hint" button
+  // 2. Runs tests (test_failed/test_passed trigger)
+  // 3. Is detected as stuck (stuck trigger)
+  // 4. Makes significant code changes (code_change trigger)
+  // This prevents showing hints before user has even read the problem.
 
   // Reveal a hint
   const revealHint = useCallback((hintId: string) => {
