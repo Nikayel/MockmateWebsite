@@ -178,13 +178,13 @@ export async function validateConversationWithAI(
   // Taking only the last 15 would miss the approach explanation at the start!
   let messagesToAnalyze: Array<{ role: string; content: string }> = []
 
-  if (transcript.length <= 25) {
-    // Short conversation - use all messages
+  if (transcript.length <= 40) {
+    // Short-medium conversation - use all messages to avoid losing edge case discussions
     messagesToAnalyze = transcript
   } else {
-    // Long conversation - take first 10 (approach) + last 15 (complexity/wrap-up)
-    const firstMessages = transcript.slice(0, 10)
-    const lastMessages = transcript.slice(-15)
+    // Very long conversation - take first 15 (approach) + last 20 (complexity/wrap-up)
+    const firstMessages = transcript.slice(0, 15)
+    const lastMessages = transcript.slice(-20)
     messagesToAnalyze = [
       ...firstMessages,
       { role: "system", content: "[... middle of conversation ...]" },
@@ -258,7 +258,22 @@ VALIDATION RULES:
 
 - complexityDiscussed: true if they mentioned time/space complexity (e.g., "O(n)", "linear", "constant space")
 - complexityAccurate: true ONLY if stated complexity matches actual code complexity
-- edgeCasesConsidered: true if they mentioned edge cases like empty arrays, zeros, negatives, duplicates, etc.
+- edgeCasesConsidered: true if ANY of these occurred:
+  * User proactively mentioned potential edge cases or boundary conditions
+  * User discussed what happens in special scenarios (empty input, single element, different lengths, etc.)
+  * User responded thoughtfully to interviewer's edge case questions (this COUNTS as discussing edge cases)
+  * User's approach explanation included handling special cases
+  Examples that COUNT as edge case discussion (mark as TRUE):
+  * "What if the strings are different lengths?" ✓
+  * "For empty arrays, we'd return..." ✓
+  * "The constraint says lowercase only, so we don't need to handle Unicode" ✓
+  * Responding to interviewer's "What about Unicode?" with a thoughtful answer ✓
+  * "If there's nothing in the array..." ✓
+  * "For the base case when it's empty..." ✓
+  Examples that do NOT count (mark as FALSE):
+  * Only coding without any discussion ✗
+  * Ignoring or deflecting interviewer's edge case questions ✗
+  * Single word answers to edge case questions ✗
 - alternativesDiscussed: true if they mentioned other approaches or trade-offs
 
 - communicationScore: Evaluate the OVERALL quality of communication:
@@ -301,6 +316,7 @@ Return ONLY the JSON object, nothing else.`
       let approachExplained = Boolean(parsed.approachExplained)
       let approachQuality = parsed.approachQuality || "none"
       let communicationScore = Math.min(100, Math.max(0, Number(parsed.communicationScore) || 50))
+      const edgeCasesConsidered = Boolean(parsed.edgeCasesConsidered)
 
       // Override if AI seems wrong: substantial engagement + complexity discussed = they explained
       if (!approachExplained && hasSubstantialEngagement && Boolean(parsed.complexityDiscussed)) {
@@ -321,6 +337,15 @@ Return ONLY the JSON object, nothing else.`
         }
       }
 
+      // Log validation results for debugging
+      logger.info("[AI Validation] Result", {
+        edgeCasesConsidered,
+        approachExplained,
+        complexityDiscussed: Boolean(parsed.complexityDiscussed),
+        communicationScore,
+        candidateMessageCount: candidateMessages.length,
+      })
+
       return {
         isCoherent: Boolean(parsed.isCoherent),
         responsesRelevant: Boolean(parsed.responsesRelevant),
@@ -331,7 +356,7 @@ Return ONLY the JSON object, nothing else.`
         statedComplexity: parsed.statedComplexity || null,
         questionsAsked: Number(parsed.questionsAsked) || interviewerQuestions,
         questionsAnswered: Number(parsed.questionsAnswered) || 0,
-        edgeCasesConsidered: Boolean(parsed.edgeCasesConsidered),
+        edgeCasesConsidered,
         alternativesDiscussed: Boolean(parsed.alternativesDiscussed),
         communicationScore,
       }
