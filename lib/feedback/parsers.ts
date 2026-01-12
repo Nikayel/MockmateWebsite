@@ -270,10 +270,12 @@ export function parseFeedback(feedback: string): FeedbackSection {
       sections.scores.communication > 0
 
     if (hasNewScores) {
+      // Use canonical weights from lib/scoring/types.ts SCORE_WEIGHTS.performance
+      // Understanding: 25%, Problem-Solving: 25%, Code Quality: 30%, Communication: 20%
       sections.scores.overall = Math.round(
-        sections.scores.understanding * 0.3 +
+        sections.scores.understanding * 0.25 +
           sections.scores.problemSolving * 0.25 +
-          sections.scores.codeQuality * 0.25 +
+          sections.scores.codeQuality * 0.3 +
           sections.scores.communication * 0.2
       )
     } else {

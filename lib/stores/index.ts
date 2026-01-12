@@ -16,4 +16,5 @@ export type {
   WorkspaceFile,
   UsageLimit,
   Language,
+  InterviewTargetCompany,
 } from "./interview-store"

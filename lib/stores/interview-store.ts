@@ -1,8 +1,11 @@
 import { create } from "zustand"
-import { devtools, persist } from "zustand/middleware"
+import { devtools } from "zustand/middleware"
 import type { Scenario, ScenarioType, DifficultyLevel, Company } from "@/lib/scenarios"
+import type { CompanyId } from "@/lib/data/company-questions/types"
+import type { ProtectedCodeElements } from "@/lib/code-protection"
 
 // Types
+export type InterviewTargetCompany = CompanyId | "freeball" | null
 export interface ChatMessage {
   type: "user" | "ai"
   message: string
@@ -12,9 +15,9 @@ export interface ChatMessage {
 export interface TestResult {
   description: string
   passed: boolean
-  input: any
-  expected: any
-  actual: any
+  input: unknown
+  expected: unknown
+  actual: unknown
   error: string | null
 }
 
@@ -46,7 +49,15 @@ export interface UsageLimit {
   allowed: boolean
 }
 
-export type Language = "javascript" | "typescript" | "python" | "java" | "cpp" | "csharp" | "go" | "rust"
+export type Language =
+  | "javascript"
+  | "typescript"
+  | "python"
+  | "java"
+  | "cpp"
+  | "csharp"
+  | "go"
+  | "rust"
 
 // Interview State Interface
 interface InterviewState {
@@ -70,7 +81,7 @@ interface InterviewState {
   code: string
   selectedLanguage: Language
   starterCode: string
-  protectedElements: any | null
+  protectedElements: ProtectedCodeElements | null
 
   // Chat
   interviewerMessages: ChatMessage[]
@@ -112,6 +123,10 @@ interface InterviewState {
   lastInterviewerMessageTime: number
   hasTriggeredInactivity: boolean
   hasTriggeredSilence: boolean
+
+  // Company Picker (for freeball sessions)
+  showCompanyPicker: boolean
+  targetCompany: InterviewTargetCompany
 }
 
 // Actions Interface
@@ -136,7 +151,7 @@ interface InterviewActions {
   setCode: (code: string) => void
   setSelectedLanguage: (language: Language) => void
   setStarterCode: (code: string) => void
-  setProtectedElements: (elements: any) => void
+  setProtectedElements: (elements: ProtectedCodeElements | null) => void
 
   // Chat Actions
   addInterviewerMessage: (message: ChatMessage) => void
@@ -189,6 +204,10 @@ interface InterviewActions {
   setHasTriggeredInactivity: (triggered: boolean) => void
   setHasTriggeredSilence: (triggered: boolean) => void
   resetProactiveTracking: () => void
+
+  // Company Picker Actions
+  setShowCompanyPicker: (show: boolean) => void
+  setTargetCompany: (company: InterviewTargetCompany) => void
 }
 
 // Initial State
@@ -255,6 +274,10 @@ const initialState: InterviewState = {
   lastInterviewerMessageTime: Date.now(),
   hasTriggeredInactivity: false,
   hasTriggeredSilence: false,
+
+  // Company Picker (for freeball sessions)
+  showCompanyPicker: false,
+  targetCompany: null,
 }
 
 // Create the store
@@ -264,18 +287,19 @@ export const useInterviewStore = create<InterviewState & InterviewActions>()(
       ...initialState,
 
       // Scenario Actions
-      setSelectedScenario: (scenario) => set({
-        selectedScenario: scenario,
-        // Clear test results when switching scenarios to prevent stale data
-        testResults: [],
-        testSummary: { total: 0, passed: 0, failed: 0, passRate: 0 },
-        efficiencyMetrics: null,
-        // Clear hints when switching
-        revealedHints: 0,
-        // Clear chat messages for new scenario
-        interviewerMessages: [],
-        chatMessages: [],
-      }),
+      setSelectedScenario: (scenario) =>
+        set({
+          selectedScenario: scenario,
+          // Clear test results when switching scenarios to prevent stale data
+          testResults: [],
+          testSummary: { total: 0, passed: 0, failed: 0, passRate: 0 },
+          efficiencyMetrics: null,
+          // Clear hints when switching
+          revealedHints: 0,
+          // Clear chat messages for new scenario
+          interviewerMessages: [],
+          chatMessages: [],
+        }),
       setShowScenarioBrowser: (show) => set({ showScenarioBrowser: show }),
 
       // Filter Actions
@@ -339,7 +363,10 @@ export const useInterviewStore = create<InterviewState & InterviewActions>()(
       // Chat Actions
       addInterviewerMessage: (message) =>
         set((state) => ({
-          interviewerMessages: [...state.interviewerMessages, { ...message, timestamp: Date.now() }],
+          interviewerMessages: [
+            ...state.interviewerMessages,
+            { ...message, timestamp: Date.now() },
+          ],
         })),
       addChatMessage: (message) =>
         set((state) => ({
@@ -366,8 +393,7 @@ export const useInterviewStore = create<InterviewState & InterviewActions>()(
 
       // Hints Actions
       setRevealedHints: (count) => set({ revealedHints: count }),
-      revealNextHint: () =>
-        set((state) => ({ revealedHints: state.revealedHints + 1 })),
+      revealNextHint: () => set((state) => ({ revealedHints: state.revealedHints + 1 })),
 
       // Workspace Actions
       setWorkspaceContext: (files) => set({ workspaceContext: files }),
@@ -399,7 +425,8 @@ export const useInterviewStore = create<InterviewState & InterviewActions>()(
       // Proactive Interviewer Actions
       updateCodeHash: (hash) => set({ lastCodeHash: hash }),
       updateLastCodeChangeTime: () => set({ lastCodeChangeTime: Date.now() }),
-      updateLastInterviewerMessageTime: () => set({ lastInterviewerMessageTime: Date.now(), hasTriggeredSilence: false }),
+      updateLastInterviewerMessageTime: () =>
+        set({ lastInterviewerMessageTime: Date.now(), hasTriggeredSilence: false }),
       setHasTriggeredInactivity: (triggered) => set({ hasTriggeredInactivity: triggered }),
       setHasTriggeredSilence: (triggered) => set({ hasTriggeredSilence: triggered }),
       resetProactiveTracking: () =>
@@ -410,6 +437,10 @@ export const useInterviewStore = create<InterviewState & InterviewActions>()(
           hasTriggeredSilence: false,
           lastCodeHash: "",
         }),
+
+      // Company Picker Actions
+      setShowCompanyPicker: (show) => set({ showCompanyPicker: show }),
+      setTargetCompany: (company) => set({ targetCompany: company }),
     }),
     { name: "interview-store" }
   )

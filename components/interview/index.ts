@@ -32,3 +32,6 @@ export { EnhancedHintsPanel } from "./EnhancedHintsPanel"
 
 // Voice mode toggle for live transcription
 export { VoiceModeToggle } from "./VoiceModeToggle"
+
+// Company picker for freeball sessions
+export { CompanyPicker } from "./CompanyPicker"

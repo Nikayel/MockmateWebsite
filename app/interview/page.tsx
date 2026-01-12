@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo, memo, Suspense } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import Link from "next/link"
 import nextDynamic from "next/dynamic"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -13,9 +12,8 @@ import { Input } from "@/components/ui/input"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { useVoiceInput } from "@/lib/voice"
 import { getDbLazy } from "@/lib/firebase-lazy"
-import { collection, getDocs, query, where, Firestore } from "firebase/firestore"
+import { collection, getDocs, query, where } from "firebase/firestore"
 import {
-  Play,
   Code,
   MessageSquare,
   CheckCircle,
@@ -28,8 +26,6 @@ import {
   Target,
   Send,
   PlayCircle,
-  XCircle,
-  AlertCircle,
   ArrowRight,
   ArrowLeft,
   ChevronDown,
@@ -60,7 +56,6 @@ import {
   getUserProfile,
   createInterviewSession,
   updateInterviewSession,
-  checkSessionCost,
   saveSessionState,
   getSessionState,
   findLatestSubmittedSession,
@@ -68,30 +63,16 @@ import {
 } from "@/lib/firestore-helpers"
 import {
   getOrCreateGuestId,
-  getGuestId,
   canStartFreeTrial,
   markFreeTrialUsed,
   saveGuestSessionData,
-  isGuestId,
 } from "@/lib/guest-session"
 import { SignupPrompt } from "@/components/SignupPrompt"
 import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
 import type { CompanyId } from "@/lib/data/company-questions/types"
-import {
-  scenarios,
-  filterScenarios,
-  getScenarioById,
-  type Scenario,
-  type ScenarioType,
-  type DifficultyLevel,
-  type Company,
-} from "@/lib/scenarios"
-import {
-  extractProtectedElements,
-  validateCodeProtection,
-  enforceCodeProtection,
-} from "@/lib/code-protection"
+import { getScenarioById, type Scenario } from "@/lib/scenarios"
+import { extractProtectedElements, validateCodeProtection } from "@/lib/code-protection"
 import { trackUserMessage, trackAIMessage } from "@/lib/scoring/track-chat"
 import { toast } from "sonner"
 
@@ -137,23 +118,6 @@ const CompanyPicker = nextDynamic(
   { ssr: false }
 )
 
-// Inline error fallback for components that fail to load
-function ComponentErrorFallback({ componentName }: { componentName: string }) {
-  return (
-    <div className="flex h-full items-center justify-center bg-gray-900/50 p-4">
-      <div className="text-center">
-        <div className="mb-2 text-sm text-red-400">Failed to load {componentName}</div>
-        <button
-          onClick={() => window.location.reload()}
-          className="text-xs text-[#00d9ff] hover:underline"
-        >
-          Reload page
-        </button>
-      </div>
-    </div>
-  )
-}
-
 // Dynamically import heavy components to reduce initial bundle size
 // CodeMirror 6 is used instead of Monaco for ~95% smaller bundle
 const CodeEditor = nextDynamic(
@@ -180,10 +144,8 @@ const PracticeFeedback = nextDynamic(() => import("@/components/PracticeFeedback
 // Supported languages for code execution
 // JavaScript and Python are fully supported; others are coming soon
 const SUPPORTED_LANGUAGES = ["javascript", "typescript", "python"] as const
-const COMING_SOON_LANGUAGES = ["java", "cpp", "csharp", "go", "rust"] as const
 
 type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
-type ComingSoonLanguage = (typeof COMING_SOON_LANGUAGES)[number]
 
 const isLanguageSupported = (lang: string): lang is SupportedLanguage => {
   return SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage)
@@ -198,9 +160,9 @@ interface ChatMessage {
 interface TestResult {
   description: string
   passed: boolean
-  input: any
-  expected: any
-  actual: any
+  input: unknown
+  expected: unknown
+  actual: unknown
   error: string | null
 }
 
@@ -237,7 +199,10 @@ function InterviewPageContent() {
     codeQualityScore?: number
     communicationScore?: number
   } | null>(null)
-  const [constitutionalAICritique, setConstitutionalAICritique] = useState<any>(null)
+  const [constitutionalAICritique, setConstitutionalAICritique] = useState<Record<
+    string,
+    unknown
+  > | null>(null)
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false) // Track AI feedback generation
   const [isGeneratingDiscussion, setIsGeneratingDiscussion] = useState(false)
   const [showCodeInDiscussion, setShowCodeInDiscussion] = useState(false)
@@ -329,7 +294,7 @@ function InterviewPageContent() {
   // Voice recording - using Deepgram with Web Speech API fallback
   const interviewerVoice = useVoiceInput({
     fallbackToWebSpeech: true,
-    onTranscript: (transcript, isFinal) => {
+    onTranscript: (transcript, _isFinal) => {
       setInterviewerInput(transcript)
     },
     onUtteranceEnd: (transcript) => {
@@ -340,10 +305,7 @@ function InterviewPageContent() {
         transcript.trim() &&
         !pendingAutoSendRef.current.interviewer
       ) {
-        console.log(
-          "[Live Mode] Utterance end detected, auto-sending:",
-          transcript.substring(0, 50)
-        )
+        // Live Mode: auto-send on utterance end
         pendingAutoSendRef.current.interviewer = true
         setInterviewerInput(transcript)
         // Small delay to ensure state is updated
@@ -359,17 +321,14 @@ function InterviewPageContent() {
 
   const partnerVoice = useVoiceInput({
     fallbackToWebSpeech: true,
-    onTranscript: (transcript, isFinal) => {
+    onTranscript: (transcript, _isFinal) => {
       setChatInput(transcript)
     },
     onUtteranceEnd: (transcript) => {
       // Auto-send when user stops speaking in live mode
       // Use ref to get current value (avoids stale closure issue)
       if (voiceModeLiveRef.current && transcript.trim() && !pendingAutoSendRef.current.partner) {
-        console.log(
-          "[Live Mode] Utterance end detected for partner, auto-sending:",
-          transcript.substring(0, 50)
-        )
+        // Live Mode: auto-send on utterance end for partner
         pendingAutoSendRef.current.partner = true
         setChatInput(transcript)
         setTimeout(() => {
@@ -382,12 +341,9 @@ function InterviewPageContent() {
   })
 
   // Backwards compatible aliases
-  const isRecordingPartner = partnerVoice.isRecording
   const isRecordingInterviewer = interviewerVoice.isRecording
-  const recognitionRef = useRef<any>(null) // Keep for any legacy usage
 
   // AI hints states
-  const [showAITips, setShowAITips] = useState(false)
   const [isAIPartnerExpanded, setIsAIPartnerExpanded] = useState(false) // Collapsed by default
   const [ragHints, setRagHints] = useState<{ level: number; hint: string; id?: string }[]>([])
   const [isLoadingHints, setIsLoadingHints] = useState(false)
@@ -395,7 +351,6 @@ function InterviewPageContent() {
   const [hintFeedback, setHintFeedback] = useState<Map<string, "helpful" | "unhelpful">>(new Map())
 
   // Voice mode - always auto-send on pause (research-backed simplification)
-  // Removed manual/live toggle to reduce cognitive load
   const voiceAutoSend = true // Always enabled now
   const voiceModeLiveRef = useRef(true) // Keep ref for callbacks
   const [revealedHintIndices, setRevealedHintIndices] = useState<Set<number>>(new Set()) // Track which hints are revealed
@@ -423,7 +378,6 @@ function InterviewPageContent() {
 
   // Hints
   const [revealedHints, setRevealedHints] = useState<number>(0)
-  const [hintTimers, setHintTimers] = useState<number[]>([])
 
   // Workspace context
   const [workspaceContext, setWorkspaceContext] = useState<
@@ -845,7 +799,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         const scenario = getScenarioById(scenarioId)
         if (scenario) {
           // Check if there's already a submitted or evaluating session for this scenario
-          if (user?.id) {
+          if (user?.id && !fromPractice) {
             const existingSession = await findLatestSubmittedSession(user.id, scenarioId)
             if (existingSession) {
               if (existingSession.isEvaluating) {

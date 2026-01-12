@@ -6,7 +6,7 @@ import {
   type StruggleMetrics,
   type GeneratedHint,
   type HintTrigger,
-} from "@/lib/agents/hint-agent"
+} from "@/lib/agents/hints"
 import { rateLimit } from "@/lib/rate-limit"
 import { validateProblemText, validateUserCode, withTimeout, TimeoutError } from "@/lib/rag/utils"
 import { embedAndStoreHint, getSimilarHintsFromRAG } from "@/lib/rag"
@@ -168,7 +168,7 @@ async function handleGenerateHints(params: {
       )
 
       // Convert RAG hints to GeneratedHint format
-      ragHints = similarHints.map((h, idx) => ({
+      ragHints = similarHints.map((h, _idx) => ({
         id: `rag_${h.id}`,
         level: (h.level || 2) as 1 | 2 | 3 | 4,
         category: (h.category || "approach") as GeneratedHint["category"],
