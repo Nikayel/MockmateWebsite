@@ -40,6 +40,8 @@ import {
   Eye,
   EyeOff,
   Leaf,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react"
 import {
   AlertDialog,
@@ -387,8 +389,10 @@ function InterviewPageContent() {
   // AI hints states
   const [showAITips, setShowAITips] = useState(false)
   const [isAIPartnerExpanded, setIsAIPartnerExpanded] = useState(false) // Collapsed by default
-  const [ragHints, setRagHints] = useState<{ level: number; hint: string }[]>([])
+  const [ragHints, setRagHints] = useState<{ level: number; hint: string; id?: string }[]>([])
   const [isLoadingHints, setIsLoadingHints] = useState(false)
+  const [revealedAIHintIndices, setRevealedAIHintIndices] = useState<Set<number>>(new Set())
+  const [hintFeedback, setHintFeedback] = useState<Map<string, "helpful" | "unhelpful">>(new Map())
 
   // Voice mode - always auto-send on pause (research-backed simplification)
   // Removed manual/live toggle to reduce cognitive load
@@ -2228,6 +2232,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     setRevealedHints(0)
     setRevealedHintIndices(new Set())
     setRagHints([])
+    setRevealedAIHintIndices(new Set())
+    setHintFeedback(new Map())
     setWorkspaceContext([])
     setComprehensiveFeedback("")
     setPerformanceScore(null)
@@ -2499,6 +2505,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     setRevealedHints(0)
     setRevealedHintIndices(new Set())
     setRagHints([])
+    setRevealedAIHintIndices(new Set())
+    setHintFeedback(new Map())
     setWorkspaceContext([])
     setEfficiencyMetrics(null)
     setProtectedElements(null)
@@ -2561,6 +2569,39 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       console.error("Error fetching hints:", error)
     } finally {
       setIsLoadingHints(false)
+    }
+  }
+
+  // Submit feedback for a hint (async, non-blocking)
+  const submitHintFeedback = async (hintIndex: number, feedbackType: "helpful" | "unhelpful") => {
+    const hintId = `hint-${selectedScenario?.id}-${hintIndex}`
+
+    // Update local state immediately for responsive UI
+    setHintFeedback((prev) => {
+      const newMap = new Map(prev)
+      newMap.set(hintId, feedbackType)
+      return newMap
+    })
+
+    // Send feedback to API (non-blocking)
+    try {
+      await fetch("/api/rag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "record-feedback",
+          hintId,
+          feedbackType,
+          userId: user?.id || guestId,
+          sessionId: currentSessionId,
+          problemId: selectedScenario?.id,
+          hintText: ragHints[hintIndex]?.hint,
+          source: "ai-hint",
+        }),
+      })
+    } catch (error) {
+      console.error("Error submitting hint feedback:", error)
+      // Don't revert - feedback is stored locally anyway
     }
   }
 
@@ -4020,6 +4061,105 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             </p>
                           </div>
 
+                          {/* AI Insights - Shown independently, right after description */}
+                          {isInterviewStarted && (ragHints.length > 0 || isLoadingHints) && (
+                            <div className="space-y-2">
+                              <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-purple-400 uppercase">
+                                <span className="h-4 w-1 rounded-full bg-purple-400"></span>
+                                <Sparkles className="h-4 w-4" />
+                                AI Insights
+                                <span className="text-xs font-normal text-gray-500">
+                                  ({revealedAIHintIndices.size}/{ragHints.length} revealed)
+                                </span>
+                              </h3>
+                              {isLoadingHints ? (
+                                <div className="flex items-center gap-2 rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 text-sm text-gray-400">
+                                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-purple-400 border-t-transparent" />
+                                  Generating personalized hints...
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  {ragHints.map((hint, i) => {
+                                    const hintId = `hint-${selectedScenario?.id}-${i}`
+                                    const isRevealed = revealedAIHintIndices.has(i)
+                                    const feedback = hintFeedback.get(hintId)
+
+                                    return (
+                                      <div
+                                        key={`ai-hint-${i}`}
+                                        className={`rounded-lg border transition-all ${
+                                          isRevealed
+                                            ? "border-purple-500/30 bg-purple-500/10"
+                                            : "cursor-pointer border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10"
+                                        }`}
+                                      >
+                                        {isRevealed ? (
+                                          <div className="p-3">
+                                            <div className="flex items-start justify-between gap-2">
+                                              <p className="flex-1 text-sm leading-relaxed text-purple-100">
+                                                <span className="font-medium text-purple-300">
+                                                  Level {hint.level}:
+                                                </span>{" "}
+                                                {hint.hint}
+                                              </p>
+                                              {/* Feedback buttons */}
+                                              <div className="flex flex-shrink-0 items-center gap-1">
+                                                <button
+                                                  onClick={() => submitHintFeedback(i, "helpful")}
+                                                  className={`rounded p-1 transition-colors ${
+                                                    feedback === "helpful"
+                                                      ? "bg-green-500/30 text-green-400"
+                                                      : "text-gray-500 hover:bg-green-500/10 hover:text-green-400"
+                                                  }`}
+                                                  title="Helpful"
+                                                >
+                                                  <ThumbsUp className="h-3.5 w-3.5" />
+                                                </button>
+                                                <button
+                                                  onClick={() => submitHintFeedback(i, "unhelpful")}
+                                                  className={`rounded p-1 transition-colors ${
+                                                    feedback === "unhelpful"
+                                                      ? "bg-red-500/30 text-red-400"
+                                                      : "text-gray-500 hover:bg-red-500/10 hover:text-red-400"
+                                                  }`}
+                                                  title="Not helpful"
+                                                >
+                                                  <ThumbsDown className="h-3.5 w-3.5" />
+                                                </button>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div
+                                            className="relative p-3"
+                                            onClick={() => {
+                                              setRevealedAIHintIndices(
+                                                (prev) => new Set([...prev, i])
+                                              )
+                                            }}
+                                          >
+                                            <p className="pointer-events-none text-sm leading-relaxed text-purple-200/20 blur-sm select-none">
+                                              <span className="font-medium">
+                                                Level {hint.level}:
+                                              </span>{" "}
+                                              {hint.hint.substring(0, 60)}...
+                                            </p>
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                              <div className="flex items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-500/20 px-3 py-1.5 text-xs font-medium text-purple-300">
+                                                <Eye className="h-3.5 w-3.5" />
+                                                Click to reveal hint {i + 1}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           {/* IMPROVED: Examples with better visual hierarchy */}
                           {selectedScenario.type === "dsa" &&
                             selectedScenario.examples &&
@@ -4149,32 +4289,6 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                   <p className="text-xs text-gray-400 italic">
                                     Hints will unlock every 3 minutes as you work on the problem
                                   </p>
-                                )}
-
-                                {/* RAG-powered AI Hints */}
-                                {ragHints.length > 0 && (
-                                  <div className="mt-3 border-t border-gray-700/50 pt-2">
-                                    <div className="mb-2 flex items-center gap-1">
-                                      <Sparkles className="h-3 w-3 text-purple-400" />
-                                      <span className="text-xs text-purple-400">AI Insights</span>
-                                    </div>
-                                    <div className="space-y-1">
-                                      {ragHints.map((hint, i) => (
-                                        <div
-                                          key={`rag-${i}`}
-                                          className="rounded border border-purple-500/20 bg-purple-500/10 p-1.5 text-[10px] text-purple-200"
-                                        >
-                                          {hint.hint}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                                {isLoadingHints && (
-                                  <div className="mt-2 flex items-center gap-1 text-[10px] text-gray-500">
-                                    <div className="h-2 w-2 animate-spin rounded-full border border-gray-500 border-t-transparent" />
-                                    Loading AI hints...
-                                  </div>
                                 )}
                               </div>
                             )}

@@ -166,7 +166,8 @@ export async function storeTextEmbedding(embedding: TextEmbedding): Promise<stri
 
     // Generate a unique ID
     const docId =
-      embedding.id || `${embedding.type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      embedding.id ||
+      `${embedding.type}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
 
     // Store in the vector database (Pinecone or Firestore depending on config)
     const vectorDoc: VectorDocument = {
@@ -216,6 +217,40 @@ export async function storeTextEmbedding(embedding: TextEmbedding): Promise<stri
 }
 
 /**
+ * Enrich a result with text content from metadata or Firestore
+ * This helper eliminates code duplication across multiple functions
+ */
+async function enrichResultWithText(result: SimilarResult): Promise<SimilarResult> {
+  // If text already exists in result or metadata, use it
+  if (result.text && result.text.length > 0) {
+    return result
+  }
+  if (isPineconeEnabled() && result.metadata?.text) {
+    return {
+      ...result,
+      text: result.metadata.text,
+    }
+  }
+  // Fallback to Firestore for text
+  try {
+    const doc = await adminDb.collection("text_embeddings").doc(result.id).get()
+    return {
+      ...result,
+      text: doc.data()?.text || "",
+    }
+  } catch {
+    return { ...result, text: "" }
+  }
+}
+
+/**
+ * Enrich multiple results with text content (batched for efficiency)
+ */
+async function enrichResultsWithText(results: SimilarResult[]): Promise<SimilarResult[]> {
+  return Promise.all(results.map(enrichResultWithText))
+}
+
+/**
  * Find similar texts based on embedding similarity
  */
 export async function findSimilarTexts(
@@ -236,7 +271,7 @@ export async function findSimilarTexts(
 
   return results.map((r) => ({
     id: r.id,
-    text: "", // Will be populated from metadata if needed
+    text: r.metadata?.text || "", // Get text from metadata if available
     type: r.metadata?.type || "",
     similarity: r.score,
     metadata: r.metadata || {},
@@ -263,30 +298,7 @@ export async function getSimilarProblems(
     minSimilarity: 0.3,
   })
 
-  // Enrich results with text
-  const enrichedResults = await Promise.all(
-    results.map(async (result) => {
-      // If using Pinecone, text is in metadata
-      if (isPineconeEnabled() && result.metadata?.text) {
-        return {
-          ...result,
-          text: result.metadata.text,
-        }
-      }
-      // Fallback to Firestore for text
-      try {
-        const doc = await adminDb.collection("text_embeddings").doc(result.id).get()
-        return {
-          ...result,
-          text: doc.data()?.text || result.text || "",
-        }
-      } catch {
-        return { ...result, text: result.text || "" }
-      }
-    })
-  )
-
-  return enrichedResults
+  return enrichResultsWithText(results)
 }
 
 /**
@@ -308,30 +320,7 @@ export async function getRelevantHints(
     minSimilarity: 0.35,
   })
 
-  // Enrich results with text
-  const enrichedResults = await Promise.all(
-    results.map(async (result) => {
-      // If using Pinecone, text is in metadata
-      if (isPineconeEnabled() && result.metadata?.text) {
-        return {
-          ...result,
-          text: result.metadata.text,
-        }
-      }
-      // Fallback to Firestore for text
-      try {
-        const doc = await adminDb.collection("text_embeddings").doc(result.id).get()
-        return {
-          ...result,
-          text: doc.data()?.text || result.text || "",
-        }
-      } catch {
-        return { ...result, text: result.text || "" }
-      }
-    })
-  )
-
-  return enrichedResults
+  return enrichResultsWithText(results)
 }
 
 /**
@@ -355,30 +344,7 @@ export async function getSimilarSolutions(
     problemType: options.problemType,
   })
 
-  // Enrich results with text
-  const enrichedResults = await Promise.all(
-    results.map(async (result) => {
-      // If using Pinecone, text is in metadata
-      if (isPineconeEnabled() && result.metadata?.text) {
-        return {
-          ...result,
-          text: result.metadata.text,
-        }
-      }
-      // Fallback to Firestore for text
-      try {
-        const doc = await adminDb.collection("text_embeddings").doc(result.id).get()
-        return {
-          ...result,
-          text: doc.data()?.text || result.text || "",
-        }
-      } catch {
-        return { ...result, text: result.text || "" }
-      }
-    })
-  )
-
-  return enrichedResults
+  return enrichResultsWithText(results)
 }
 
 /**

@@ -9,20 +9,20 @@
  * - Cost estimation
  */
 
-import { getHybridProvider } from './embeddings/hybrid-provider'
-import { isOpenAIAvailable } from './embeddings/openai-provider'
-import { vectorDB, getVectorDBProvider } from './vectordb'
-import { isKnowledgeBaseSeeded } from './knowledge-base/seeder'
-import { adminDb } from '@/lib/firebase-admin'
-import { FieldValue } from 'firebase-admin/firestore'
-import { Timestamp } from 'firebase-admin/firestore'
+import { getHybridProvider } from "./embeddings/hybrid-provider"
+import { isOpenAIAvailable } from "./embeddings/openai-provider"
+import { vectorDB, getVectorDBProvider } from "./vectordb"
+import { isKnowledgeBaseSeeded } from "./knowledge-base/seeder"
+import { adminDb } from "@/lib/firebase-admin"
+import { FieldValue } from "firebase-admin/firestore"
+import { Timestamp } from "firebase-admin/firestore"
 
 /**
  * Component health status
  */
 export interface ComponentHealth {
   name: string
-  status: 'healthy' | 'degraded' | 'unhealthy'
+  status: "healthy" | "degraded" | "unhealthy"
   message: string
   lastChecked: Date
   responseTimeMs?: number
@@ -33,7 +33,7 @@ export interface ComponentHealth {
  * Overall system health
  */
 export interface RAGSystemHealth {
-  status: 'healthy' | 'degraded' | 'unhealthy'
+  status: "healthy" | "degraded" | "unhealthy"
   components: ComponentHealth[]
   timestamp: Date
   uptime?: number
@@ -49,7 +49,7 @@ export interface RAGMetrics {
     byProvider: Record<string, number>
     avgLatencyMs: number
     cacheHitRate: number
-    totalTokensUsed: number  // For OpenAI
+    totalTokensUsed: number // For OpenAI
   }
 
   // Retrieval metrics
@@ -158,16 +158,16 @@ export class RAGMonitor {
     components.push(await this.checkFirestore())
 
     // Determine overall status
-    const unhealthyCount = components.filter(c => c.status === 'unhealthy').length
-    const degradedCount = components.filter(c => c.status === 'degraded').length
+    const unhealthyCount = components.filter((c) => c.status === "unhealthy").length
+    const degradedCount = components.filter((c) => c.status === "degraded").length
 
-    let status: RAGSystemHealth['status']
+    let status: RAGSystemHealth["status"]
     if (unhealthyCount > 0) {
-      status = 'unhealthy'
+      status = "unhealthy"
     } else if (degradedCount > 0) {
-      status = 'degraded'
+      status = "degraded"
     } else {
-      status = 'healthy'
+      status = "healthy"
     }
 
     return {
@@ -189,11 +189,11 @@ export class RAGMonitor {
       const health = await provider.healthCheck()
 
       return {
-        name: 'Embedding Provider',
-        status: health.healthy ? 'healthy' : 'degraded',
+        name: "Embedding Provider",
+        status: health.healthy ? "healthy" : "degraded",
         message: health.healthy
           ? `Active: ${provider.getActiveProvider()}`
-          : 'Falling back to TF-IDF',
+          : "Falling back to TF-IDF",
         lastChecked: new Date(),
         responseTimeMs: Date.now() - startTime,
         details: {
@@ -204,9 +204,9 @@ export class RAGMonitor {
       }
     } catch (error) {
       return {
-        name: 'Embedding Provider',
-        status: 'unhealthy',
-        message: error instanceof Error ? error.message : 'Unknown error',
+        name: "Embedding Provider",
+        status: "unhealthy",
+        message: error instanceof Error ? error.message : "Unknown error",
         lastChecked: new Date(),
         responseTimeMs: Date.now() - startTime,
       }
@@ -224,8 +224,8 @@ export class RAGMonitor {
       const provider = getVectorDBProvider()
 
       return {
-        name: 'Vector Database',
-        status: healthy ? 'healthy' : 'unhealthy',
+        name: "Vector Database",
+        status: healthy ? "healthy" : "unhealthy",
         message: healthy ? `Provider: ${provider}` : `${provider} is not responding`,
         lastChecked: new Date(),
         responseTimeMs: Date.now() - startTime,
@@ -235,9 +235,9 @@ export class RAGMonitor {
       }
     } catch (error) {
       return {
-        name: 'Vector Database',
-        status: 'unhealthy',
-        message: error instanceof Error ? error.message : 'Unknown error',
+        name: "Vector Database",
+        status: "unhealthy",
+        message: error instanceof Error ? error.message : "Unknown error",
         lastChecked: new Date(),
         responseTimeMs: Date.now() - startTime,
       }
@@ -255,21 +255,21 @@ export class RAGMonitor {
 
       if (!seeded) {
         return {
-          name: 'Knowledge Base',
-          status: 'degraded',
-          message: 'Knowledge base not seeded - RAG will use fallback data',
+          name: "Knowledge Base",
+          status: "degraded",
+          message: "Knowledge base not seeded - RAG will use fallback data",
           lastChecked: new Date(),
           responseTimeMs: Date.now() - startTime,
         }
       }
 
       // Check document count
-      const configDoc = await adminDb.collection('system_config').doc('knowledge_base').get()
+      const configDoc = await adminDb.collection("system_config").doc("knowledge_base").get()
       const docCount = configDoc.data()?.documentCount || 0
 
       return {
-        name: 'Knowledge Base',
-        status: 'healthy',
+        name: "Knowledge Base",
+        status: "healthy",
         message: `${docCount} documents indexed`,
         lastChecked: new Date(),
         responseTimeMs: Date.now() - startTime,
@@ -281,9 +281,9 @@ export class RAGMonitor {
       }
     } catch (error) {
       return {
-        name: 'Knowledge Base',
-        status: 'unhealthy',
-        message: error instanceof Error ? error.message : 'Unknown error',
+        name: "Knowledge Base",
+        status: "unhealthy",
+        message: error instanceof Error ? error.message : "Unknown error",
         lastChecked: new Date(),
         responseTimeMs: Date.now() - startTime,
       }
@@ -298,20 +298,20 @@ export class RAGMonitor {
 
     try {
       // Simple read test
-      await adminDb.collection('system_config').doc('health_check').get()
+      await adminDb.collection("system_config").doc("health_check").get()
 
       return {
-        name: 'Firestore',
-        status: 'healthy',
-        message: 'Connected and responsive',
+        name: "Firestore",
+        status: "healthy",
+        message: "Connected and responsive",
         lastChecked: new Date(),
         responseTimeMs: Date.now() - startTime,
       }
     } catch (error) {
       return {
-        name: 'Firestore',
-        status: 'unhealthy',
-        message: error instanceof Error ? error.message : 'Unknown error',
+        name: "Firestore",
+        status: "unhealthy",
+        message: error instanceof Error ? error.message : "Unknown error",
         lastChecked: new Date(),
         responseTimeMs: Date.now() - startTime,
       }
@@ -354,9 +354,14 @@ export class RAGMonitor {
   /**
    * Record error
    */
-  recordError(component: string, errorType: string, error: Error, context?: Record<string, unknown>): void {
+  recordError(
+    component: string,
+    errorType: string,
+    error: Error,
+    context?: Record<string, unknown>
+  ): void {
     const ragError: RAGError = {
-      id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `error-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
       component,
       errorType,
       message: error.message,
@@ -385,12 +390,8 @@ export class RAGMonitor {
     const periodEnd = new Date()
 
     // Filter metrics by period
-    const recentEmbeddings = this.metricsBuffer.embeddings.filter(
-      e => e.timestamp >= periodStart
-    )
-    const recentRetrievals = this.metricsBuffer.retrievals.filter(
-      r => r.timestamp >= periodStart
-    )
+    const recentEmbeddings = this.metricsBuffer.embeddings.filter((e) => e.timestamp >= periodStart)
+    const recentRetrievals = this.metricsBuffer.retrievals.filter((r) => r.timestamp >= periodStart)
 
     // Calculate embedding metrics
     const embeddingsByProvider: Record<string, number> = {}
@@ -411,9 +412,13 @@ export class RAGMonitor {
     }
 
     // Get knowledge base stats
-    let kbStats = { totalDocuments: 0, documentsByType: {} as Record<string, number>, lastSeeded: null as Date | null }
+    let kbStats = {
+      totalDocuments: 0,
+      documentsByType: {} as Record<string, number>,
+      lastSeeded: null as Date | null,
+    }
     try {
-      const configDoc = await adminDb.collection('system_config').doc('knowledge_base').get()
+      const configDoc = await adminDb.collection("system_config").doc("knowledge_base").get()
       if (configDoc.exists) {
         kbStats = {
           totalDocuments: configDoc.data()?.documentCount || 0,
@@ -422,7 +427,7 @@ export class RAGMonitor {
         }
       }
     } catch (e) {
-      console.error('[RAGMonitor] Error getting KB stats:', e)
+      console.error("[RAGMonitor] Error getting KB stats:", e)
     }
 
     // Get usage stats from Firestore
@@ -433,7 +438,7 @@ export class RAGMonitor {
       recommendations: 0,
     }
     try {
-      const usageDoc = await adminDb.collection('rag_analytics').doc('usage').get()
+      const usageDoc = await adminDb.collection("rag_analytics").doc("usage").get()
       if (usageDoc.exists) {
         usageByFeature = usageDoc.data()?.features || usageByFeature
       }
@@ -455,9 +460,12 @@ export class RAGMonitor {
       },
       retrieval: {
         totalQueries: recentRetrievals.length,
-        avgResultCount: recentRetrievals.length > 0 ? totalResultCount / recentRetrievals.length : 0,
-        avgRetrievalTimeMs: recentRetrievals.length > 0 ? totalRetrievalTime / recentRetrievals.length : 0,
-        avgRerankingTimeMs: recentRetrievals.length > 0 ? totalRerankTime / recentRetrievals.length : 0,
+        avgResultCount:
+          recentRetrievals.length > 0 ? totalResultCount / recentRetrievals.length : 0,
+        avgRetrievalTimeMs:
+          recentRetrievals.length > 0 ? totalRetrievalTime / recentRetrievals.length : 0,
+        avgRerankingTimeMs:
+          recentRetrievals.length > 0 ? totalRerankTime / recentRetrievals.length : 0,
       },
       knowledgeBase: kbStats,
       usageByFeature,
@@ -483,7 +491,7 @@ export class RAGMonitor {
 
     // OpenAI embedding costs (text-embedding-3-small: $0.00002 per 1K tokens)
     // Estimate ~250 tokens per embedding on average
-    const estimatedTokens = metrics.embeddings.byProvider['openai'] * 250 * (periodDays / 1)
+    const estimatedTokens = metrics.embeddings.byProvider["openai"] * 250 * (periodDays / 1)
     const openaiCost = (estimatedTokens / 1000) * 0.00002
 
     // Firestore costs (very rough estimate)
@@ -510,16 +518,24 @@ export class RAGMonitor {
   /**
    * Record feature usage
    */
-  async recordFeatureUsage(feature: 'roadmapGeneration' | 'hintGeneration' | 'performanceAnalysis' | 'recommendations'): Promise<void> {
+  async recordFeatureUsage(
+    feature: "roadmapGeneration" | "hintGeneration" | "performanceAnalysis" | "recommendations"
+  ): Promise<void> {
     try {
-      await adminDb.collection('rag_analytics').doc('usage').set({
-        features: {
-          [feature]: FieldValue.increment(1),
-        },
-        lastUpdated: Timestamp.now(),
-      }, { merge: true })
+      await adminDb
+        .collection("rag_analytics")
+        .doc("usage")
+        .set(
+          {
+            features: {
+              [feature]: FieldValue.increment(1),
+            },
+            lastUpdated: Timestamp.now(),
+          },
+          { merge: true }
+        )
     } catch (e) {
-      console.error('[RAGMonitor] Error recording feature usage:', e)
+      console.error("[RAGMonitor] Error recording feature usage:", e)
     }
   }
 
@@ -541,19 +557,22 @@ export class RAGMonitor {
       const metrics = await this.getMetrics(24)
       const health = await this.healthCheck()
 
-      await adminDb.collection('rag_analytics').doc('daily_snapshot').set({
-        metrics,
-        health: {
-          status: health.status,
-          componentCount: health.components.length,
-          healthyCount: health.components.filter(c => c.status === 'healthy').length,
-        },
-        timestamp: Timestamp.now(),
-      })
+      await adminDb
+        .collection("rag_analytics")
+        .doc("daily_snapshot")
+        .set({
+          metrics,
+          health: {
+            status: health.status,
+            componentCount: health.components.length,
+            healthyCount: health.components.filter((c) => c.status === "healthy").length,
+          },
+          timestamp: Timestamp.now(),
+        })
 
-      console.log('[RAGMonitor] Metrics snapshot saved')
+      console.log("[RAGMonitor] Metrics snapshot saved")
     } catch (error) {
-      console.error('[RAGMonitor] Error saving metrics snapshot:', error)
+      console.error("[RAGMonitor] Error saving metrics snapshot:", error)
     }
   }
 }
@@ -576,6 +595,11 @@ export async function getRAGMetrics(periodHours?: number): Promise<RAGMetrics> {
   return getRAGMonitor().getMetrics(periodHours)
 }
 
-export function recordRAGError(component: string, errorType: string, error: Error, context?: Record<string, unknown>): void {
+export function recordRAGError(
+  component: string,
+  errorType: string,
+  error: Error,
+  context?: Record<string, unknown>
+): void {
   getRAGMonitor().recordError(component, errorType, error, context)
 }

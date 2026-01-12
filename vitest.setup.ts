@@ -64,6 +64,5 @@ vi.mock("./lib/firebase-admin", () => ({
 }))
 
 // Mock environment variables
-// Use Object.defineProperty to bypass read-only restriction on NODE_ENV
-Object.defineProperty(process.env, "NODE_ENV", { value: "test", writable: true })
+// NODE_ENV is set by vitest automatically, no need to modify
 process.env.STRIPE_SECRET_KEY = "sk_test_mock"
