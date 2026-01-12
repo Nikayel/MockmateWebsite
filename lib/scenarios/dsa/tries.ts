@@ -513,4 +513,53 @@ Return the sentence after the replacement.`,
       },
     ],
   },
+  // ==================== NEW HIGH-VALUE ADDITIONS ====================
+  {
+    id: 'dsa-add-search-word',
+    title: 'Design Add and Search Words Data Structure',
+    type: 'dsa',
+    pattern: 'trie',
+    difficulty: 'medium',
+    companies: ['Amazon', 'Google', 'Meta', 'Microsoft'],
+    description: 'Design a data structure that supports adding words and searching with wildcards',
+    tags: ['trie', 'design', 'string', 'dfs'],
+    estimatedTime: 30,
+    problemStatement: `Design a data structure that supports adding new words and finding if a string matches any previously added string.
+
+Implement the WordDictionary class:
+- WordDictionary() Initializes the object.
+- void addWord(word) Adds word to the data structure, it can be matched later.
+- bool search(word) Returns true if there is any string in the data structure that matches word or false otherwise. word may contain dots '.' where dots can be matched with any letter.`,
+    examples: [
+      {
+        input: '["WordDictionary","addWord","addWord","addWord","search","search","search","search"]\n[[],["bad"],["dad"],["mad"],["pad"],["bad"],[".ad"],["b.."]]',
+        output: '[null,null,null,null,false,true,true,true]',
+        explanation: 'addWord adds words, search("pad") returns false (not added), search(".ad") matches "bad","dad","mad"',
+      },
+    ],
+    constraints: [
+      '1 <= word.length <= 25',
+      'word in addWord consists of lowercase English letters.',
+      'word in search consists of "." or lowercase English letters.',
+      'At most 10^4 calls to addWord and search.',
+    ],
+    hints: [
+      'Use Trie for efficient prefix matching',
+      'For search with ".", use DFS to try all children at that position',
+      'Mark end of word in trie nodes',
+      'Optimize by pruning invalid paths early',
+    ],
+    starterCode: {
+      javascript: `class WordDictionary {\n  constructor() {\n    // Initialize\n  }\n\n  addWord(word) {\n    // Add word to trie\n  }\n\n  search(word) {\n    // Search with wildcard support\n  }\n}`,
+      typescript: `class WordDictionary {\n  constructor() {\n    // Initialize\n  }\n\n  addWord(word: string): void {\n    // Add word to trie\n  }\n\n  search(word: string): boolean {\n    // Search with wildcard support\n  }\n}`,
+      python: `class WordDictionary:\n    def __init__(self):\n        pass\n\n    def addWord(self, word: str) -> None:\n        pass\n\n    def search(self, word: str) -> bool:\n        pass`,
+    },
+    optimalComplexity: { time: 'O(m) addWord, O(26^m) worst search with all dots', space: 'O(total chars)' },
+    testCases: [
+      { input: { operations: ['addWord', 'search'], args: [['bad'], ['bad']] }, expected: [null, true], description: 'Exact match' },
+      { input: { operations: ['addWord', 'search'], args: [['bad'], ['.ad']] }, expected: [null, true], description: 'Wildcard prefix' },
+      { input: { operations: ['addWord', 'search'], args: [['bad'], ['b..']] }, expected: [null, true], description: 'Multiple wildcards' },
+      { input: { operations: ['search'], args: [['any']] }, expected: [false], description: 'Empty dictionary' },
+    ],
+  },
 ]
