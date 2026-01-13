@@ -3,11 +3,10 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { Button } from "@/components/ui/button"
-import { ArrowRight, ExternalLink } from "lucide-react"
 import { ALL_COMPANIES, getCompanyById, CompanyId } from "@/lib/data/company-questions"
 import { BreadcrumbJsonLd } from "@/components/seo/JsonLd"
 import { CompanyPrepContent } from "@/components/interview-prep/CompanyPrepContent"
+import { CompanyHeroCTA } from "@/components/interview-prep/CompanyHeroCTA"
 
 // Generate static paths for all companies
 export async function generateStaticParams() {
@@ -145,20 +144,7 @@ export default async function CompanyPrepPage({
               </span>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Link href={`/roadmap/preview?company=${company.id}`}>
-                <Button className="bg-white text-black hover:bg-zinc-200">
-                  Create study plan
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-              <a href={company.careers_url} target="_blank" rel="noopener noreferrer">
-                <Button variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
-                  Careers page
-                  <ExternalLink className="ml-2 h-3 w-3" />
-                </Button>
-              </a>
-            </div>
+            <CompanyHeroCTA companyId={company.id} careersUrl={company.careers_url} />
           </div>
         </div>
       </section>

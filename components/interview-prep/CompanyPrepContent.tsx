@@ -1,8 +1,9 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Lock, Users, Clock } from "lucide-react"
+import { ArrowRight, Lock, Users, Clock, Crown } from "lucide-react"
 import Link from "next/link"
 import type { CompanyQuestionData } from "@/lib/data/company-questions/types"
 
@@ -17,8 +18,41 @@ const FREE_ROUNDS_COUNT = 1
 const FREE_TIPS_COUNT = 1
 
 export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
-  const { user, loading } = useAuth()
+  const { user, firebaseUser, loading, initialized } = useAuth()
   const isLoggedIn = !!user
+  const [isPro, setIsPro] = useState<boolean | null>(null)
+  const [isCheckingPro, setIsCheckingPro] = useState(false)
+
+  // Check Pro status for logged-in users
+  useEffect(() => {
+    const checkProStatus = async () => {
+      if (!initialized || !user?.id || !firebaseUser) {
+        setIsPro(null)
+        return
+      }
+
+      setIsCheckingPro(true)
+      try {
+        const token = await firebaseUser.getIdToken()
+        const response = await fetch("/api/user/subscription-status", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setIsPro(data.tier === "pro" || data.tier === "enterprise")
+        }
+      } catch {
+        // Error checking subscription - assume not pro
+        setIsPro(false)
+      } finally {
+        setIsCheckingPro(false)
+      }
+    }
+
+    checkProStatus()
+  }, [user?.id, firebaseUser, initialized])
 
   // Calculate locked counts
   const lockedPatternsCount = Math.max(0, company.topPatterns.length - FREE_PATTERNS_COUNT)
@@ -347,16 +381,52 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
 
         {/* Personalized Roadmap CTA */}
         <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-4">
-          <h3 className="text-sm font-medium text-white mb-2">Get a {company.name} study plan</h3>
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-sm font-medium text-white">Get a {company.name} study plan</h3>
+            {isLoggedIn && !isPro && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#00d9ff]/10 border border-[#00d9ff]/30 text-[10px] font-medium text-[#00d9ff]">
+                <Crown className="h-2.5 w-2.5" />
+                Pro
+              </span>
+            )}
+          </div>
           <p className="text-xs text-zinc-400 mb-3">
             Enter your interview date → we prioritize {company.name}'s top patterns → you get a day-by-day schedule.
           </p>
-          <Link href={`/roadmap/preview?company=${company.id}`}>
-            <Button size="sm" className="w-full bg-white text-black hover:bg-zinc-200 text-xs">
-              Create roadmap
-              <ArrowRight className="ml-1.5 h-3 w-3" />
-            </Button>
-          </Link>
+
+          {/* Different CTA based on auth/subscription status */}
+          {!isLoggedIn ? (
+            // Not logged in - prompt to sign up first
+            <Link href={`/login?redirect=/interview-prep/${company.id}`}>
+              <Button size="sm" className="w-full bg-white text-black hover:bg-zinc-200 text-xs">
+                Sign up to create roadmap
+                <ArrowRight className="ml-1.5 h-3 w-3" />
+              </Button>
+            </Link>
+          ) : isPro ? (
+            // Pro user - direct to roadmap creation
+            <Link href={`/roadmap/new?company=${company.id}`}>
+              <Button size="sm" className="w-full bg-white text-black hover:bg-zinc-200 text-xs">
+                Create roadmap
+                <ArrowRight className="ml-1.5 h-3 w-3" />
+              </Button>
+            </Link>
+          ) : (
+            // Free user - show upgrade CTA
+            <Link href="/upgrade">
+              <Button size="sm" className="w-full bg-[#00d9ff] text-black hover:bg-[#00d9ff]/90 text-xs">
+                <Crown className="mr-1.5 h-3 w-3" />
+                Upgrade to Pro
+              </Button>
+            </Link>
+          )}
+
+          {/* Show what Pro includes for free users */}
+          {isLoggedIn && !isPro && (
+            <p className="text-[10px] text-zinc-500 mt-2 text-center">
+              Personalized roadmap is a Pro feature
+            </p>
+          )}
         </div>
 
         {/* Urgency CTA for non-logged-in users */}
