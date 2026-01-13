@@ -134,6 +134,43 @@ MockmateWebsite/
 └── public/                   # Static assets
 ```
 
+
+---
+
+## 🎯 See It In Action
+
+<p align="center">
+    <img src="./public/screenshots/hero-interview.png" alt="CodeSparring Interview Interface" width="100%" />
+</p>p>
+
+<p align="center">
+    <em>Real-time AI interviewing with code execution, hints, and instant feedback</em>em>
+</p>p>
+
+<details>
+  <summary>📊 More Screenshots</summary>summary>
+
+### Performance Dashboard
+<p align="center">
+  <img src="./public/screenshots/dashboard.png" alt="Performance Dashboard" width="100%" />
+</p>p>
+<p align="center">
+  <em>Track your progress with spaced repetition and detailed analytics</em>em>
+</p>p>
+
+### Problem Selection
+<p align="center">
+  <img src="./public/screenshots/skill-tree.png" alt="DSA Skill Tree" width="100%" />
+</p>p>
+<p align="center">
+  <em>Choose from 200+ problems organized by pattern</em>em>
+</p>p>
+
+</details>
+
+---
+</summary>
+</em>
 ---
 
 ## Documentation
