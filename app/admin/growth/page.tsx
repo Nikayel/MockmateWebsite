@@ -53,6 +53,20 @@ interface NPSData {
   }>
 }
 
+interface DetailedReferral {
+  id: string
+  referrerEmail: string
+  referrerId: string
+  referredEmail: string
+  referredUserId: string
+  referralCode: string
+  signupDate: string
+  convertedToPro: boolean
+  convertedDate?: string
+  signupRewardStatus: 'pending' | 'paid'
+  conversionRewardStatus: 'pending' | 'credited' | 'n/a'
+}
+
 interface ReferralData {
   totalReferrals: number
   totalConversions: number
@@ -73,6 +87,7 @@ interface ReferralData {
     referrals: number
     conversions: number
   }>
+  detailedReferrals: DetailedReferral[]
 }
 
 interface RewardItem {
@@ -442,6 +457,69 @@ export default function GrowthPage() {
                 </tbody>
               </table>
               {(!referralData?.topReferrers || referralData.topReferrers.length === 0) && (
+                <p className="text-center text-gray-500 py-8">No referrals yet</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* All Referrals - Detailed View */}
+        <Card className="bg-gray-900/50 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">All Referrals</CardTitle>
+            <CardDescription>Who referred who, signup status, and reward tracking</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-800 text-gray-400">
+                    <th className="text-left py-2 px-3">Referrer</th>
+                    <th className="text-left py-2 px-3">Referred</th>
+                    <th className="text-left py-2 px-3">Code</th>
+                    <th className="text-left py-2 px-3">Signed Up</th>
+                    <th className="text-center py-2 px-3">Pro?</th>
+                    <th className="text-center py-2 px-3">$10 Owed</th>
+                    <th className="text-center py-2 px-3">Free Month</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {referralData?.detailedReferrals?.map((ref) => (
+                    <tr key={ref.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                      <td className="py-2 px-3 text-white">{ref.referrerEmail}</td>
+                      <td className="py-2 px-3 text-gray-300">{ref.referredEmail}</td>
+                      <td className="py-2 px-3 font-mono text-xs text-gray-500">{ref.referralCode}</td>
+                      <td className="py-2 px-3 text-gray-400">
+                        {new Date(ref.signupDate).toLocaleDateString()}
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        {ref.convertedToPro ? (
+                          <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Pro</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-gray-500 border-gray-700">Free</Badge>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        {ref.signupRewardStatus === 'paid' ? (
+                          <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Paid</Badge>
+                        ) : (
+                          <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Owe $10</Badge>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        {ref.conversionRewardStatus === 'credited' ? (
+                          <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">Credited</Badge>
+                        ) : ref.conversionRewardStatus === 'pending' ? (
+                          <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Pending</Badge>
+                        ) : (
+                          <span className="text-gray-600">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {(!referralData?.detailedReferrals || referralData.detailedReferrals.length === 0) && (
                 <p className="text-center text-gray-500 py-8">No referrals yet</p>
               )}
             </div>

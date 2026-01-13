@@ -454,6 +454,97 @@ export async function getUserReferralStats(userId: string): Promise<{
   }
 }
 
+export interface DetailedReferral {
+  id: string
+  referrerEmail: string
+  referrerId: string
+  referredEmail: string
+  referredUserId: string
+  referralCode: string
+  signupDate: Date
+  convertedToPro: boolean
+  convertedDate?: Date
+  // Reward status
+  signupRewardStatus: 'pending' | 'paid'
+  conversionRewardStatus: 'pending' | 'credited' | 'n/a'
+}
+
+/**
+ * Get all referrals with detailed information for admin view
+ */
+export async function getAllReferralsDetailed(): Promise<DetailedReferral[]> {
+  const referrals: DetailedReferral[] = []
+
+  try {
+    const referralsSnapshot = await adminDb
+      .collection('referrals')
+      .orderBy('signupDate', 'desc')
+      .limit(100)
+      .get()
+
+    // Get all rewards to check status
+    const rewardsSnapshot = await adminDb
+      .collection('referral_rewards')
+      .get()
+
+    // Build a map of rewards by referral
+    const rewardsByReferral = new Map<string, { signup: string; conversion: string }>()
+    for (const doc of rewardsSnapshot.docs) {
+      const data = doc.data()
+      const referralId = data.referralId
+      if (!rewardsByReferral.has(referralId)) {
+        rewardsByReferral.set(referralId, { signup: 'pending', conversion: 'n/a' })
+      }
+      const entry = rewardsByReferral.get(referralId)!
+      if (data.type === 'signup_cash') {
+        entry.signup = data.status === 'paid' ? 'paid' : 'pending'
+      } else if (data.type === 'conversion_credit') {
+        entry.conversion = data.status === 'credited' ? 'credited' : 'pending'
+      }
+    }
+
+    // Collect unique user IDs
+    const userIds = new Set<string>()
+    for (const doc of referralsSnapshot.docs) {
+      const data = doc.data()
+      userIds.add(data.referrerId)
+      userIds.add(data.referredUserId)
+    }
+
+    // Fetch all users in parallel
+    const userEmails = new Map<string, string>()
+    const userPromises = Array.from(userIds).map(async (userId) => {
+      const userDoc = await adminDb.collection('users').doc(userId).get()
+      userEmails.set(userId, userDoc.data()?.email || 'Unknown')
+    })
+    await Promise.all(userPromises)
+
+    // Build detailed referral list
+    for (const doc of referralsSnapshot.docs) {
+      const data = doc.data()
+      const rewards = rewardsByReferral.get(doc.id) || { signup: 'pending', conversion: 'n/a' }
+
+      referrals.push({
+        id: doc.id,
+        referrerEmail: userEmails.get(data.referrerId) || 'Unknown',
+        referrerId: data.referrerId,
+        referredEmail: userEmails.get(data.referredUserId) || 'Unknown',
+        referredUserId: data.referredUserId,
+        referralCode: data.referralCode,
+        signupDate: data.signupDate?.toDate() || new Date(),
+        convertedToPro: data.convertedToPro || false,
+        convertedDate: data.convertedDate?.toDate(),
+        signupRewardStatus: rewards.signup as 'pending' | 'paid',
+        conversionRewardStatus: rewards.conversion as 'pending' | 'credited' | 'n/a',
+      })
+    }
+  } catch (error) {
+    logger.error('Failed to get detailed referrals', { error })
+  }
+
+  return referrals
+}
+
 /**
  * Get admin referral statistics
  */

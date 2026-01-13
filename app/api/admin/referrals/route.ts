@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getReferralStats } from '@/lib/referrals'
+import { getReferralStats, getAllReferralsDetailed } from '@/lib/referrals'
 import {
   requirePermission,
   errorResponse,
@@ -16,7 +16,7 @@ import { PERMISSIONS } from '@/lib/admin/rbac'
 /**
  * GET /api/admin/referrals
  *
- * Get referral statistics
+ * Get referral statistics and detailed referral list
  */
 export async function GET(request: NextRequest) {
   const authResult = await requirePermission(request, PERMISSIONS.VIEW_ANALYTICS)
@@ -25,11 +25,17 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const stats = await getReferralStats()
+    const [stats, detailedReferrals] = await Promise.all([
+      getReferralStats(),
+      getAllReferralsDetailed(),
+    ])
 
     return NextResponse.json({
       success: true,
-      data: stats,
+      data: {
+        ...stats,
+        detailedReferrals,
+      },
     })
   } catch (error) {
     console.error('[Admin Referrals API] Error:', error)
