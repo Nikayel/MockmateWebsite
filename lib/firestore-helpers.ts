@@ -573,24 +573,37 @@ export async function updateInterviewSession(
     if (additionalData.efficiencyScore) updateData.efficiency_score = additionalData.efficiencyScore
     // Save score breakdown for technical score calculations (required for pattern ranking)
     if (additionalData.scoreBreakdown) {
+      const understandingScore =
+        additionalData.scoreBreakdown.understanding ||
+        additionalData.scoreBreakdown.understandingScore ||
+        0
+      const problemSolvingScore =
+        additionalData.scoreBreakdown.problemSolving ||
+        additionalData.scoreBreakdown.problemSolvingScore ||
+        0
+      const codeQualityScore =
+        additionalData.scoreBreakdown.codeQuality ||
+        additionalData.scoreBreakdown.codeQualityScore ||
+        0
+      const communicationScore =
+        additionalData.scoreBreakdown.communication ||
+        additionalData.scoreBreakdown.communicationScore ||
+        0
+
       updateData.score_breakdown = {
-        understandingScore:
-          additionalData.scoreBreakdown.understanding ||
-          additionalData.scoreBreakdown.understandingScore ||
-          0,
-        problemSolvingScore:
-          additionalData.scoreBreakdown.problemSolving ||
-          additionalData.scoreBreakdown.problemSolvingScore ||
-          0,
-        codeQualityScore:
-          additionalData.scoreBreakdown.codeQuality ||
-          additionalData.scoreBreakdown.codeQualityScore ||
-          0,
-        communicationScore:
-          additionalData.scoreBreakdown.communication ||
-          additionalData.scoreBreakdown.communicationScore ||
-          0,
+        understandingScore,
+        problemSolvingScore,
+        codeQualityScore,
+        communicationScore,
       }
+
+      // Calculate and save technical_score (excludes communication, focuses on code mastery)
+      // Uses same weights as ScoreDisplay.tsx for consistency
+      updateData.technical_score = Math.round(
+        codeQualityScore * 0.6 + problemSolvingScore * 0.25 + understandingScore * 0.15
+      )
+      // Also save as mastery_score for backwards compatibility
+      updateData.mastery_score = updateData.technical_score
     }
     // Save complexity analysis (user-stated vs code-analyzed)
     if (additionalData.complexityAnalysis) {
