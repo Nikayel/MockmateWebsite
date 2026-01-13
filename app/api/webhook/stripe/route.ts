@@ -16,7 +16,7 @@ import {
 } from "@/lib/email"
 import { logger } from "@/lib/logger"
 import { trackEventServer } from "@/lib/analytics-server"
-import { markReferralConverted } from "@/lib/referrals"
+import { markReferralConverted, voidReferralRewards } from "@/lib/referrals"
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY environment variable is required")
@@ -781,6 +781,16 @@ export async function POST(request: NextRequest) {
             stripe_payment_intent_id: charge.payment_intent as string,
             description: charge.refunded ? "Full refund" : "Partial refund",
           })
+
+          // REFERRAL CLAWBACK: Void any pending referral rewards for this user
+          // This prevents fraud where someone signs up via referral, gets the referrer $10, then refunds
+          try {
+            await voidReferralRewards(userId, `Refund processed: ${charge.refunded ? 'full' : 'partial'} refund`)
+            paymentLogger.info("Voided referral rewards due to refund", { userId })
+          } catch (clawbackError) {
+            paymentLogger.error("Failed to void referral rewards", { userId, error: clawbackError })
+            // Don't fail the webhook - clawback is non-critical
+          }
 
           // If fully refunded, downgrade user
           if (charge.refunded) {

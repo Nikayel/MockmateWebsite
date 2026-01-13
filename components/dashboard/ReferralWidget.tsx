@@ -193,6 +193,15 @@ export function ReferralWidget() {
             <span className="text-purple-400">1 free month</span> when they upgrade to Pro
           </p>
         </div>
+
+        {/* Terms Link */}
+        <a
+          href="/referral-terms"
+          className="mt-2 flex items-center justify-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-400 transition-colors"
+        >
+          Program terms apply
+          <ChevronRight className="h-3 w-3" />
+        </a>
       </CardContent>
     </Card>
   )
