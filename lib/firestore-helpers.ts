@@ -531,6 +531,23 @@ export async function updateInterviewSession(
       communication?: number
       communicationScore?: number
     }
+    // Complexity analysis - stores both user-stated and code-analyzed
+    complexityAnalysis?: {
+      codeAnalyzed: {
+        timeComplexity: string
+        spaceComplexity: string
+        confidence: "low" | "medium" | "high"
+        detectedPatterns?: string[]
+      }
+      userStated?: {
+        timeComplexity: string | null
+        spaceComplexity: string | null
+        timestamp: number
+      }
+      approachUsed?: string
+      isAccurate?: boolean
+      feedback?: string
+    }
   }
 ): Promise<void> {
   const sessionRef = doc(db, "interview_sessions", sessionId)
@@ -573,6 +590,27 @@ export async function updateInterviewSession(
           additionalData.scoreBreakdown.communication ||
           additionalData.scoreBreakdown.communicationScore ||
           0,
+      }
+    }
+    // Save complexity analysis (user-stated vs code-analyzed)
+    if (additionalData.complexityAnalysis) {
+      updateData.complexity_analysis = {
+        code_analyzed: {
+          time_complexity: additionalData.complexityAnalysis.codeAnalyzed.timeComplexity,
+          space_complexity: additionalData.complexityAnalysis.codeAnalyzed.spaceComplexity,
+          confidence: additionalData.complexityAnalysis.codeAnalyzed.confidence,
+          detected_patterns: additionalData.complexityAnalysis.codeAnalyzed.detectedPatterns || [],
+        },
+        user_stated: additionalData.complexityAnalysis.userStated
+          ? {
+              time_complexity: additionalData.complexityAnalysis.userStated.timeComplexity,
+              space_complexity: additionalData.complexityAnalysis.userStated.spaceComplexity,
+              timestamp: additionalData.complexityAnalysis.userStated.timestamp,
+            }
+          : null,
+        approach_used: additionalData.complexityAnalysis.approachUsed || null,
+        is_accurate: additionalData.complexityAnalysis.isAccurate ?? null,
+        feedback: additionalData.complexityAnalysis.feedback || null,
       }
     }
   }

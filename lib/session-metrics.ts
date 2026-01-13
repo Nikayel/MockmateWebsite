@@ -189,9 +189,6 @@ export async function initSessionMetrics(params: {
     },
   })
 
-  // Persist initial state to Firestore
-  await persistSessionMetrics(state)
-
   return state
 }
 
@@ -626,9 +623,6 @@ export async function completeSessionMetrics(params: {
     },
   })
 
-  // Persist final state
-  await persistSessionMetrics(state)
-
   // Store session summary for RAG and analytics
   await storeSessionSummary(summary)
 
@@ -641,26 +635,6 @@ export async function completeSessionMetrics(params: {
 // =============================================================================
 // PERSISTENCE
 // =============================================================================
-
-/**
- * Persist session metrics to Firestore
- */
-async function persistSessionMetrics(state: SessionMetricsState): Promise<void> {
-  try {
-    await adminDb
-      .collection("session_metrics")
-      .doc(state.sessionId)
-      .set(
-        {
-          ...state,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      )
-  } catch (error) {
-    console.error("[Session Metrics] Failed to persist:", error)
-  }
-}
 
 /**
  * Store session summary for analytics and RAG

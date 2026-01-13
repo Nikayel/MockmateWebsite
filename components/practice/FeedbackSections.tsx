@@ -25,6 +25,17 @@ import { LearningRecommendations } from "@/components/LearningRecommendations"
 import { NextProblemRecommendations } from "@/components/NextProblemRecommendations"
 import { ScoreInfoTooltip } from "@/components/ui/score-info-tooltip"
 import type { FeedbackSection } from "@/lib/feedback/parsers"
+import type { SessionComplexityAnalysis } from "@/lib/rag/knowledge-base/types"
+import { ComplexityAnalysisCard } from "./ComplexityAnalysisCard"
+
+interface AlternativeApproach {
+  name: string
+  timeComplexity: string
+  spaceComplexity: string
+  tradeOff: string
+  isOptimalTime: boolean
+  isOptimalSpace: boolean
+}
 
 interface FeedbackSectionsProps {
   sections: FeedbackSection
@@ -46,6 +57,9 @@ interface FeedbackSectionsProps {
   // Chat history
   chatMessages?: ChatMessage[]
   interviewerMessages?: ChatMessage[]
+  // Complexity analysis
+  complexityAnalysis?: SessionComplexityAnalysis | null
+  alternativeApproaches?: AlternativeApproach[]
 }
 
 export function FeedbackSections({
@@ -66,6 +80,8 @@ export function FeedbackSections({
   masteryScore,
   chatMessages,
   interviewerMessages,
+  complexityAnalysis,
+  alternativeApproaches,
 }: FeedbackSectionsProps) {
   const [showCode, setShowCode] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
@@ -154,6 +170,13 @@ export function FeedbackSections({
           </p>
         </div>
       )}
+
+      {/* Complexity Analysis - Shows user-stated vs actual complexity */}
+      <ComplexityAnalysisCard
+        complexityAnalysis={complexityAnalysis}
+        alternativeApproaches={alternativeApproaches}
+        problemType={problemType}
+      />
 
       {/* What Worked / To Improve - Side by side compact */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

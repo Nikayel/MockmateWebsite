@@ -9,32 +9,43 @@
  * - Personalized learning context
  */
 
-import { getAdvancedRetriever, type EnhancedRetrievalResult } from './retrieval/advanced-retrieval'
-import { getPatternKnowledge, patternKnowledgeToDocument } from './knowledge-base/dsa-knowledge'
-import { getCompanyInterviewKnowledge, companyKnowledgeToDocument } from './knowledge-base/company-knowledge'
-import { getEnhancedProfileService, type EnhancedUserProfile, type UserInsight } from './enhanced-user-profile'
-import { getMisconceptionTracker } from './misconception-detection'
-import type { DSAPattern } from '@/lib/types/dsa-patterns'
-import type { CompanyId } from '@/lib/data/company-questions/types'
+import { getAdvancedRetriever, type EnhancedRetrievalResult } from "./retrieval/advanced-retrieval"
+import { getPatternKnowledge, patternKnowledgeToDocument } from "./knowledge-base/dsa-knowledge"
+import {
+  getCompanyInterviewKnowledge,
+  companyKnowledgeToDocument,
+} from "./knowledge-base/company-knowledge"
+import {
+  getComplexityKnowledge,
+  getPatternComplexityRules,
+} from "./knowledge-base/complexity-knowledge"
+import {
+  getEnhancedProfileService,
+  type EnhancedUserProfile,
+  type UserInsight,
+} from "./enhanced-user-profile"
+import { getMisconceptionTracker } from "./misconception-detection"
+import type { DSAPattern } from "@/lib/types/dsa-patterns"
+import type { CompanyId } from "@/lib/data/company-questions/types"
 
 /**
  * Context types for different use cases
  */
 export type ContextType =
-  | 'roadmap-generation'
-  | 'interview-prep'
-  | 'problem-solving'
-  | 'hint-generation'
-  | 'learning-path'
-  | 'feedback-generation'
+  | "roadmap-generation"
+  | "interview-prep"
+  | "problem-solving"
+  | "hint-generation"
+  | "learning-path"
+  | "feedback-generation"
 
 /**
  * Built context result
  */
 export interface BuiltContext {
   type: ContextType
-  systemContext: string       // For system prompt
-  userContext: string         // For user message augmentation
+  systemContext: string // For system prompt
+  userContext: string // For user message augmentation
   retrievedDocs: EnhancedRetrievalResult[]
   metadata: {
     patternsIncluded: DSAPattern[]
@@ -49,7 +60,7 @@ export interface BuiltContext {
  */
 export interface RoadmapContextOptions {
   targetCompany: CompanyId
-  experienceLevel: 'intern' | 'beginner' | 'intermediate' | 'advanced'
+  experienceLevel: "intern" | "beginner" | "intermediate" | "advanced"
   daysRemaining: number
   patternFamiliarity: { pattern: DSAPattern; level: string }[]
   hoursPerDay: number
@@ -82,22 +93,21 @@ export class RAGContextBuilder {
 
     // 1. Get company-specific interview knowledge
     const companyKnowledge = getCompanyInterviewKnowledge(options.targetCompany)
-    let companyContext = ''
+    let companyContext = ""
     if (companyKnowledge) {
       companyContext = companyKnowledgeToDocument(companyKnowledge)
     }
 
     // 2. Retrieve additional company knowledge from RAG
-    const companyDocs = await this.retriever.retrieveCompanyKnowledge(
-      options.targetCompany,
-      { limit: 3 }
-    )
+    const companyDocs = await this.retriever.retrieveCompanyKnowledge(options.targetCompany, {
+      limit: 3,
+    })
     retrievedDocs.push(...companyDocs)
 
     // 3. Get pattern knowledge for weak areas
     const weakPatterns = options.patternFamiliarity
-      .filter(p => p.level === 'unknown' || p.level === 'seen')
-      .map(p => p.pattern)
+      .filter((p) => p.level === "unknown" || p.level === "seen")
+      .map((p) => p.pattern)
 
     const patternContexts: string[] = []
     for (const pattern of weakPatterns.slice(0, 5)) {
@@ -112,24 +122,24 @@ export class RAGContextBuilder {
     const { results: levelDocs } = await this.retriever.retrieve({
       query: levelQuery,
       limit: 3,
-      types: ['knowledge'],
+      types: ["knowledge"],
       enableQueryExpansion: true,
     })
     retrievedDocs.push(...levelDocs)
 
     // 5. If user exists, get their performance context
-    let userPerformanceContext = ''
+    let userPerformanceContext = ""
     if (options.userId) {
       const userDocs = await this.retriever.retrieveUserSolutions(
         options.userId,
-        'past performance patterns',
+        "past performance patterns",
         { limit: 5 }
       )
       if (userDocs.length > 0) {
         userPerformanceContext = `
 ## User's Past Performance
 Based on ${userDocs.length} previous sessions:
-${userDocs.map(d => `- Solved: ${d.metadata?.problemTitle || 'Problem'} (${d.metadata?.pattern || 'unknown pattern'})`).join('\n')}
+${userDocs.map((d) => `- Solved: ${d.metadata?.problemTitle || "Problem"} (${d.metadata?.pattern || "unknown pattern"})`).join("\n")}
 `
       }
       retrievedDocs.push(...userDocs)
@@ -143,13 +153,13 @@ ${userDocs.map(d => `- Solved: ${d.metadata?.problemTitle || 'Problem'} (${d.met
 ${companyContext}
 
 ## Company-Specific Insights from Knowledge Base
-${companyDocs.map(d => d.text).join('\n\n---\n\n')}
+${companyDocs.map((d) => d.text).join("\n\n---\n\n")}
 
 ## Weak Patterns to Focus On
-${patternContexts.slice(0, 3).join('\n\n---\n\n')}
+${patternContexts.slice(0, 3).join("\n\n---\n\n")}
 
 ## Experience Level Guidance
-${levelDocs.map(d => d.text).join('\n\n---\n\n')}
+${levelDocs.map((d) => d.text).join("\n\n---\n\n")}
 
 ${userPerformanceContext}
 
@@ -164,11 +174,11 @@ ${userPerformanceContext}
 Creating a personalized study roadmap for ${options.targetCompany} interview.
 Experience level: ${options.experienceLevel}
 Time available: ${options.daysRemaining} days, ${options.hoursPerDay} hours/day
-Weak patterns: ${weakPatterns.join(', ') || 'None identified'}
+Weak patterns: ${weakPatterns.join(", ") || "None identified"}
 `.trim()
 
     return {
-      type: 'roadmap-generation',
+      type: "roadmap-generation",
       systemContext,
       userContext,
       retrievedDocs,
@@ -189,7 +199,7 @@ Weak patterns: ${weakPatterns.join(', ') || 'None identified'}
     const retrievedDocs: EnhancedRetrievalResult[] = []
 
     // 1. Get pattern-specific knowledge if known
-    let patternContext = ''
+    let patternContext = ""
     if (options.problemPattern) {
       const knowledge = getPatternKnowledge(options.problemPattern)
       if (knowledge) {
@@ -200,20 +210,19 @@ Weak patterns: ${weakPatterns.join(', ') || 'None identified'}
     // 2. Retrieve contextual hints
     const hintDocs = await this.retriever.retrieveContextualHints(
       options.problemText,
-      options.userCode || '',
+      options.userCode || "",
       { limit: 5, pattern: options.problemPattern }
     )
     retrievedDocs.push(...hintDocs)
 
     // 3. Retrieve similar problems for reference
-    const similarProblems = await this.retriever.retrieveSimilarProblems(
-      options.problemText,
-      { limit: 3 }
-    )
+    const similarProblems = await this.retriever.retrieveSimilarProblems(options.problemText, {
+      limit: 3,
+    })
     retrievedDocs.push(...similarProblems)
 
     // 4. Get user's past solutions for similar problems
-    let userSolutionsContext = ''
+    let userSolutionsContext = ""
     if (options.userId) {
       const userSolutions = await this.retriever.retrieveUserSolutions(
         options.userId,
@@ -224,7 +233,7 @@ Weak patterns: ${weakPatterns.join(', ') || 'None identified'}
         userSolutionsContext = `
 ## Your Past Similar Solutions
 You've successfully solved similar problems before:
-${userSolutions.map(s => `- ${s.metadata?.problemTitle || 'Similar Problem'}: Used ${s.metadata?.pattern || 'pattern'} approach`).join('\n')}
+${userSolutions.map((s) => `- ${s.metadata?.problemTitle || "Similar Problem"}: Used ${s.metadata?.pattern || "pattern"} approach`).join("\n")}
 `
       }
       retrievedDocs.push(...userSolutions)
@@ -234,25 +243,29 @@ ${userSolutions.map(s => `- ${s.metadata?.problemTitle || 'Similar Problem'}: Us
 # RAG-Enhanced Hint Generation Context
 
 ## Pattern Knowledge
-${patternContext || 'Pattern not identified. Consider suggesting pattern identification.'}
+${patternContext || "Pattern not identified. Consider suggesting pattern identification."}
 
 ## Similar Problems & Approaches
-${similarProblems.map(p => `### ${p.metadata?.title || 'Similar Problem'}
-${p.text.substring(0, 500)}...`).join('\n\n')}
+${similarProblems
+  .map(
+    (p) => `### ${p.metadata?.title || "Similar Problem"}
+${p.text.substring(0, 500)}...`
+  )
+  .join("\n\n")}
 
 ## Relevant Hints from Knowledge Base
-${hintDocs.map(h => h.text).join('\n\n---\n\n')}
+${hintDocs.map((h) => h.text).join("\n\n---\n\n")}
 
 ${userSolutionsContext}
 `.trim()
 
     const userContext = `
 Problem: ${options.problemText.substring(0, 200)}...
-${options.userCode ? `Current code: ${options.userCode.substring(0, 300)}...` : 'No code written yet'}
+${options.userCode ? `Current code: ${options.userCode.substring(0, 300)}...` : "No code written yet"}
 `.trim()
 
     return {
-      type: 'hint-generation',
+      type: "hint-generation",
       systemContext,
       userContext,
       retrievedDocs,
@@ -271,7 +284,7 @@ ${options.userCode ? `Current code: ${options.userCode.substring(0, 300)}...` : 
   async buildInterviewPrepContext(options: {
     company: CompanyId
     patterns: DSAPattern[]
-    difficulty: 'easy' | 'medium' | 'hard' | 'mixed'
+    difficulty: "easy" | "medium" | "hard" | "mixed"
     userId?: string
   }): Promise<BuiltContext> {
     const startTime = Date.now()
@@ -294,9 +307,9 @@ ${options.userCode ? `Current code: ${options.userCode.substring(0, 300)}...` : 
 
     // 3. Retrieve interview tips
     const { results: tipDocs } = await this.retriever.retrieve({
-      query: `${options.company} interview tips ${options.patterns.join(' ')} ${options.difficulty}`,
+      query: `${options.company} interview tips ${options.patterns.join(" ")} ${options.difficulty}`,
       limit: 5,
-      types: ['knowledge'],
+      types: ["knowledge"],
       companies: [options.company],
       patterns: options.patterns,
       enableQueryExpansion: true,
@@ -304,16 +317,16 @@ ${options.userCode ? `Current code: ${options.userCode.substring(0, 300)}...` : 
     retrievedDocs.push(...tipDocs)
 
     // 4. Get user's history if available
-    let userHistoryContext = ''
+    let userHistoryContext = ""
     if (options.userId) {
       const userDocs = await this.retriever.retrieveUserSolutions(
         options.userId,
-        `${options.patterns.join(' ')} problems`,
+        `${options.patterns.join(" ")} problems`,
         { limit: 5 }
       )
       if (userDocs.length > 0) {
-        const passedCount = userDocs.filter(d =>
-          (d.metadata?.tags as string[])?.includes('passed')
+        const passedCount = userDocs.filter((d) =>
+          (d.metadata?.tags as string[])?.includes("passed")
         ).length
         userHistoryContext = `
 ## Your History
@@ -332,24 +345,29 @@ ${options.userCode ? `Current code: ${options.userCode.substring(0, 300)}...` : 
 ${companyContext}
 
 ## Focus Patterns
-${patternContexts.join('\n\n---\n\n')}
+${patternContexts.join("\n\n---\n\n")}
 
 ## Interview Tips
-${tipDocs.map(t => t.text).join('\n\n')}
+${tipDocs.map((t) => t.text).join("\n\n")}
 
 ${userHistoryContext}
 
 ## Difficulty Focus: ${options.difficulty}
-${options.difficulty === 'easy' ? 'Focus on building confidence with fundamentals.' :
-  options.difficulty === 'hard' ? 'Push your limits with challenging problems.' :
-  options.difficulty === 'medium' ? 'Balance difficulty for optimal learning.' :
-  'Mix difficulties for comprehensive preparation.'}
+${
+  options.difficulty === "easy"
+    ? "Focus on building confidence with fundamentals."
+    : options.difficulty === "hard"
+      ? "Push your limits with challenging problems."
+      : options.difficulty === "medium"
+        ? "Balance difficulty for optimal learning."
+        : "Mix difficulties for comprehensive preparation."
+}
 `.trim()
 
     return {
-      type: 'interview-prep',
+      type: "interview-prep",
       systemContext,
-      userContext: `Preparing for ${options.company} interview focusing on ${options.patterns.join(', ')}`,
+      userContext: `Preparing for ${options.company} interview focusing on ${options.patterns.join(", ")}`,
       retrievedDocs,
       metadata: {
         patternsIncluded: options.patterns,
@@ -368,13 +386,13 @@ ${options.difficulty === 'easy' ? 'Focus on building confidence with fundamental
     userCode: string
     testResults: { passed: number; total: number }
     pattern?: DSAPattern
-    difficulty?: 'easy' | 'medium' | 'hard'
+    difficulty?: "easy" | "medium" | "hard"
   }): Promise<BuiltContext> {
     const startTime = Date.now()
     const retrievedDocs: EnhancedRetrievalResult[] = []
 
     // 1. Get pattern-specific feedback criteria
-    let patternContext = ''
+    let patternContext = ""
     if (options.pattern) {
       const knowledge = getPatternKnowledge(options.pattern)
       if (knowledge) {
@@ -382,10 +400,10 @@ ${options.difficulty === 'easy' ? 'Focus on building confidence with fundamental
 ## Pattern: ${knowledge.displayName}
 
 ### Expected Approach
-${knowledge.keyInsights.join('\n')}
+${knowledge.keyInsights.join("\n")}
 
 ### Common Mistakes to Look For
-${knowledge.commonMistakes.join('\n')}
+${knowledge.commonMistakes.join("\n")}
 
 ### Expected Complexity
 - Time: ${knowledge.timeComplexity.typical}
@@ -398,16 +416,16 @@ ${knowledge.commonMistakes.join('\n')}
     const { results: solutionDocs } = await this.retriever.retrieve({
       query: options.problemText,
       limit: 3,
-      types: ['solution'],
+      types: ["solution"],
       enableReranking: true,
     })
     retrievedDocs.push(...solutionDocs)
 
     // 3. Get feedback guidelines
     const { results: feedbackDocs } = await this.retriever.retrieve({
-      query: 'interview feedback criteria code quality',
+      query: "interview feedback criteria code quality",
       limit: 2,
-      types: ['knowledge'],
+      types: ["knowledge"],
     })
     retrievedDocs.push(...feedbackDocs)
 
@@ -421,20 +439,24 @@ ${patternContext}
 - Pass Rate: ${Math.round((options.testResults.passed / options.testResults.total) * 100)}%
 
 ## Reference Solutions for Comparison
-${solutionDocs.map((s, i) => `### Reference ${i + 1}
-${s.text.substring(0, 500)}...`).join('\n\n')}
+${solutionDocs
+  .map(
+    (s, i) => `### Reference ${i + 1}
+${s.text.substring(0, 500)}...`
+  )
+  .join("\n\n")}
 
 ## Feedback Guidelines
-${feedbackDocs.map(f => f.text).join('\n\n')}
+${feedbackDocs.map((f) => f.text).join("\n\n")}
 
-## Difficulty: ${options.difficulty || 'Unknown'}
+## Difficulty: ${options.difficulty || "Unknown"}
 Adjust expectations based on problem difficulty.
 `.trim()
 
     return {
-      type: 'feedback-generation',
+      type: "feedback-generation",
       systemContext,
-      userContext: `Generate feedback for user's ${options.pattern || 'coding'} solution`,
+      userContext: `Generate feedback for user's ${options.pattern || "coding"} solution`,
       retrievedDocs,
       metadata: {
         patternsIncluded: options.pattern ? [options.pattern] : [],
@@ -451,7 +473,7 @@ Adjust expectations based on problem difficulty.
   async buildQueryContext(
     query: string,
     options: {
-      types?: BuiltContext['type']
+      types?: BuiltContext["type"]
       patterns?: DSAPattern[]
       companies?: CompanyId[]
       limit?: number
@@ -472,16 +494,20 @@ Adjust expectations based on problem difficulty.
 # RAG Context for Query
 
 ## Retrieved Documents
-${docs.map((d, i) => `### Document ${i + 1}: ${d.metadata?.title || 'Untitled'}
+${docs
+  .map(
+    (d, i) => `### Document ${i + 1}: ${d.metadata?.title || "Untitled"}
 Type: ${d.type}
 Relevance: ${Math.round(d.finalScore * 100)}%
 
 ${d.text}
-`).join('\n\n---\n\n')}
+`
+  )
+  .join("\n\n---\n\n")}
 `.trim()
 
     return {
-      type: options.types || 'learning-path',
+      type: options.types || "learning-path",
       systemContext,
       userContext: query,
       retrievedDocs: docs,
@@ -515,7 +541,10 @@ ${d.text}
     // Get misconceptions if relevant
     const misconceptionTracker = getMisconceptionTracker()
     const activeMisconceptions = options.problemPattern
-      ? await misconceptionTracker.getPatternMisconceptionSummary(options.userId, options.problemPattern)
+      ? await misconceptionTracker.getPatternMisconceptionSummary(
+          options.userId,
+          options.problemPattern
+        )
       : null
 
     // Build cognitive profile context
@@ -525,20 +554,21 @@ ${d.text}
     const knowledgeGapContext = this.buildKnowledgeGapContext(enhancedProfile)
 
     // Build misconception context
-    const misconceptionContext = activeMisconceptions && activeMisconceptions.count > 0
-      ? `
+    const misconceptionContext =
+      activeMisconceptions && activeMisconceptions.count > 0
+        ? `
 ## Known Misconceptions for ${options.problemPattern}
-- Common error type: ${activeMisconceptions.mostCommon || 'various'}
+- Common error type: ${activeMisconceptions.mostCommon || "various"}
 - Occurrences: ${activeMisconceptions.count}
 - Focus: ${activeMisconceptions.suggestedFocus}
 `
-      : ''
+        : ""
 
     // Build temporal context (decay, review needs)
     const temporalContext = this.buildTemporalContext(enhancedProfile, options.problemPattern)
 
     // Get pattern knowledge if applicable
-    let patternContext = ''
+    let patternContext = ""
     if (options.problemPattern) {
       const knowledge = getPatternKnowledge(options.problemPattern)
       if (knowledge) {
@@ -561,7 +591,7 @@ ${d.text}
 # Enhanced RAG Context with User Profile
 
 ## User Profile Summary
-- Level: ${enhancedProfile.interviewReadiness.overall >= 70 ? 'Advanced' : enhancedProfile.interviewReadiness.overall >= 40 ? 'Intermediate' : 'Beginner'}
+- Level: ${enhancedProfile.interviewReadiness.overall >= 70 ? "Advanced" : enhancedProfile.interviewReadiness.overall >= 40 ? "Intermediate" : "Beginner"}
 - Interview Readiness: ${enhancedProfile.interviewReadiness.overall}%
 - Learning Pace: ${enhancedProfile.cognitive.patternRecognition.speed}
 - Problem-Solving Style: ${enhancedProfile.cognitive.problemSolvingApproach.style}
@@ -575,19 +605,22 @@ ${misconceptionContext}
 ${temporalContext}
 
 ## Pattern Knowledge
-${patternContext || 'No specific pattern context'}
+${patternContext || "No specific pattern context"}
 
 ## Active Insights
-${enhancedProfile.insights.slice(0, 3).map(i => `- ${i.icon} ${i.title}: ${i.description}`).join('\n')}
+${enhancedProfile.insights
+  .slice(0, 3)
+  .map((i) => `- ${i.icon} ${i.title}: ${i.description}`)
+  .join("\n")}
 
 ## Retrieved Context
-${retrievedDocs.map(d => d.text).join('\n\n---\n\n')}
+${retrievedDocs.map((d) => d.text).join("\n\n---\n\n")}
 `.trim()
 
     const userContext = `
-User is ${enhancedProfile.interviewReadiness.overall >= 70 ? 'well-prepared' : 'still learning'}.
-${options.problemPattern ? `Working on ${options.problemPattern} problem.` : ''}
-${enhancedProfile.insights.length > 0 ? `Key insight: ${enhancedProfile.insights[0].description}` : ''}
+User is ${enhancedProfile.interviewReadiness.overall >= 70 ? "well-prepared" : "still learning"}.
+${options.problemPattern ? `Working on ${options.problemPattern} problem.` : ""}
+${enhancedProfile.insights.length > 0 ? `Key insight: ${enhancedProfile.insights[0].description}` : ""}
 `.trim()
 
     return {
@@ -606,6 +639,103 @@ ${enhancedProfile.insights.length > 0 ? `Key insight: ${enhancedProfile.insights
   }
 
   /**
+   * Build complexity context for the AI interviewer
+   * Provides knowledge about multiple approaches, trade-offs, and common mistakes
+   */
+  buildComplexityContext(problemId: string, pattern?: DSAPattern): string {
+    const complexity = getComplexityKnowledge(problemId)
+    const patternRules = pattern ? getPatternComplexityRules(pattern) : null
+
+    if (!complexity && !patternRules) {
+      return ""
+    }
+
+    let context = "## Complexity Knowledge for Interviewer\n\n"
+
+    // Problem-specific complexity data
+    if (complexity) {
+      context += `### Problem: ${complexity.problemTitle} (LeetCode #${complexity.leetcodeNumber})\n\n`
+
+      // Multiple approaches with trade-offs
+      context += "**Valid Approaches (know ALL of these):**\n\n"
+      for (const approach of complexity.approaches) {
+        const optimalMarkers: string[] = []
+        if (approach.isOptimalTime) optimalMarkers.push("optimal time")
+        if (approach.isOptimalSpace) optimalMarkers.push("optimal space")
+        const optimalNote = optimalMarkers.length > 0 ? ` [${optimalMarkers.join(", ")}]` : ""
+
+        context += `**${approach.name}**${optimalNote}\n`
+        context += `- Time: ${approach.timeComplexity}, Space: ${approach.spaceComplexity}\n`
+        context += `- Trade-off: ${approach.tradeOff}\n`
+        context += `- When to use: ${approach.whenToUse}\n\n`
+      }
+
+      // Common mistakes to watch for
+      if (complexity.commonMistakes.length > 0) {
+        context += "**Common Mistakes to Watch For:**\n"
+        for (const mistake of complexity.commonMistakes) {
+          context += `- ${mistake}\n`
+        }
+        context += "\n"
+      }
+
+      // Key operations
+      if (complexity.keyOperations.length > 0) {
+        context += "**Key Operations:**\n"
+        for (const op of complexity.keyOperations) {
+          context += `- ${op.operation}: ${op.complexity}`
+          if (op.note) context += ` (${op.note})`
+          context += "\n"
+        }
+        context += "\n"
+      }
+    }
+
+    // Pattern-level rules (fallback or additional context)
+    if (patternRules) {
+      context += `### Pattern Rules: ${pattern}\n`
+      context += `- Typical Time: ${patternRules.typicalTimeComplexity}\n`
+      context += `- Typical Space: ${patternRules.typicalSpaceComplexity}\n`
+      context += `- Key Insight: ${patternRules.keyInsight}\n`
+
+      if (patternRules.variations && patternRules.variations.length > 0) {
+        context += "\n**Variations:**\n"
+        for (const v of patternRules.variations) {
+          context += `- ${v.name}: ${v.time} / ${v.space} - ${v.note}\n`
+        }
+      }
+      context += "\n"
+    }
+
+    // Interviewer instructions for complexity questioning
+    context += `### How to Ask About Complexity
+
+**After they finish coding:**
+1. Ask "What's the time and space complexity of your solution?"
+2. Listen carefully to their answer
+
+**If they give WRONG complexity:**
+- Don't immediately correct them
+- Ask "Are you sure? Walk me through how you arrived at that"
+- Guide them to identify their error: "What's the cost of [specific operation]?"
+
+**If they give RIGHT complexity but suboptimal approach:**
+- Acknowledge: "Good analysis"
+- Probe trade-offs: "Is there a way to improve the ${complexity?.approaches.some((a) => a.isOptimalTime && !a.isOptimalSpace) ? "space" : "time"} complexity?"
+- Discuss alternatives: "What if you used a different data structure?"
+
+**If they used brute force:**
+- Ask: "Can you think of a more efficient approach?"
+- Hint at pattern: "What data structure might help with [key operation]?"
+
+**Trade-off Discussion Points:**
+${complexity?.approaches.map((a) => `- ${a.name}: ${a.tradeOff}`).join("\n") || "- Discuss time vs space trade-offs"}
+`
+
+    return context
+  }
+
+  /**
    * Build cognitive profile context for AI
    */
   private buildCognitiveContext(profile: EnhancedUserProfile): string {
@@ -619,11 +749,11 @@ ${enhancedProfile.insights.length > 0 ? `Key insight: ${enhancedProfile.insights
 - Complexity Tolerance: ${cog.workingMemory.complexityTolerance}
 
 ### Personalization Notes
-${cog.learningStyle.primary === 'example-based' ? '- Provide code examples to illustrate concepts' : ''}
-${cog.learningStyle.primary === 'visual' ? '- Use diagrams and visual explanations when possible' : ''}
-${cog.problemSolvingApproach.planningTendency === 'improviser' ? '- Encourage pseudocode before implementation' : ''}
-${cog.patternRecognition.speed === 'slow' ? '- Give more time for pattern recognition, break down steps' : ''}
-${cog.workingMemory.complexityTolerance === 'low' ? '- Break complex problems into smaller steps' : ''}
+${cog.learningStyle.primary === "example-based" ? "- Provide code examples to illustrate concepts" : ""}
+${cog.learningStyle.primary === "visual" ? "- Use diagrams and visual explanations when possible" : ""}
+${cog.problemSolvingApproach.planningTendency === "improviser" ? "- Encourage pseudocode before implementation" : ""}
+${cog.patternRecognition.speed === "slow" ? "- Give more time for pattern recognition, break down steps" : ""}
+${cog.workingMemory.complexityTolerance === "low" ? "- Break complex problems into smaller steps" : ""}
 `.trim()
   }
 
@@ -634,21 +764,21 @@ ${cog.workingMemory.complexityTolerance === 'low' ? '- Break complex problems in
     const kg = profile.knowledgeGraph
 
     if (kg.gaps.length === 0 && kg.misconceptions.length === 0) {
-      return '## Knowledge Status\nNo significant gaps or misconceptions detected.'
+      return "## Knowledge Status\nNo significant gaps or misconceptions detected."
     }
 
-    let context = '## Knowledge Gaps & Misconceptions\n'
+    let context = "## Knowledge Gaps & Misconceptions\n"
 
     if (kg.gaps.length > 0) {
-      context += '\n### Prerequisite Gaps\n'
+      context += "\n### Prerequisite Gaps\n"
       for (const gap of kg.gaps.slice(0, 3)) {
-        context += `- **${gap.pattern}**: Missing ${gap.missingPrerequisites.map(p => p.concept).join(', ')} (${gap.impact})\n`
+        context += `- **${gap.pattern}**: Missing ${gap.missingPrerequisites.map((p) => p.concept).join(", ")} (${gap.impact})\n`
       }
     }
 
     if (kg.misconceptions.length > 0) {
-      context += '\n### Active Misconceptions\n'
-      for (const m of kg.misconceptions.filter(m => m.status === 'active').slice(0, 3)) {
+      context += "\n### Active Misconceptions\n"
+      for (const m of kg.misconceptions.filter((m) => m.status === "active").slice(0, 3)) {
         context += `- **${m.pattern}**: ${m.description} (seen ${m.frequency}x)\n`
         context += `  Fix: ${m.suggestedFix}\n`
       }
@@ -663,28 +793,28 @@ ${cog.workingMemory.complexityTolerance === 'low' ? '- Break complex problems in
   private buildTemporalContext(profile: EnhancedUserProfile, pattern?: DSAPattern): string {
     const temporal = profile.temporal
 
-    let context = '## Temporal Insights\n'
+    let context = "## Temporal Insights\n"
 
     // Growth trajectory
     context += `\n### Growth Trajectory\n`
-    context += `- Current velocity: ${temporal.growth.currentVelocity > 0 ? '+' : ''}${temporal.growth.currentVelocity.toFixed(1)} points/week\n`
-    context += `- Trend: ${temporal.growth.accelerating ? 'Accelerating' : 'Steady'}\n`
+    context += `- Current velocity: ${temporal.growth.currentVelocity > 0 ? "+" : ""}${temporal.growth.currentVelocity.toFixed(1)} points/week\n`
+    context += `- Trend: ${temporal.growth.accelerating ? "Accelerating" : "Steady"}\n`
     context += `- Projected level: ${temporal.growth.projectedLevel}\n`
 
     // Decay warnings
-    const urgentDecay = temporal.skillDecay.filter(sd => sd.urgency !== 'none')
+    const urgentDecay = temporal.skillDecay.filter((sd) => sd.urgency !== "none")
     if (urgentDecay.length > 0) {
       context += `\n### Skills Needing Review\n`
       for (const sd of urgentDecay.slice(0, 3)) {
         const isCurrentPattern = pattern && sd.pattern === pattern
-        context += `- ${sd.pattern}: ${sd.daysSincePractice} days, ~${Math.round(sd.estimatedDecay)}% decay${isCurrentPattern ? ' (CURRENT)' : ''}\n`
+        context += `- ${sd.pattern}: ${sd.daysSincePractice} days, ~${Math.round(sd.estimatedDecay)}% decay${isCurrentPattern ? " (CURRENT)" : ""}\n`
       }
     }
 
     // Specific pattern context
     if (pattern) {
-      const patternDecay = temporal.skillDecay.find(sd => sd.pattern === pattern)
-      const patternReview = temporal.reviewSchedule.find(r => r.pattern === pattern)
+      const patternDecay = temporal.skillDecay.find((sd) => sd.pattern === pattern)
+      const patternReview = temporal.reviewSchedule.find((r) => r.pattern === pattern)
 
       if (patternDecay || patternReview) {
         context += `\n### Current Pattern (${pattern})\n`
@@ -717,15 +847,11 @@ export function getContextBuilder(): RAGContextBuilder {
 /**
  * Convenience functions
  */
-export async function buildRoadmapContext(
-  options: RoadmapContextOptions
-): Promise<BuiltContext> {
+export async function buildRoadmapContext(options: RoadmapContextOptions): Promise<BuiltContext> {
   return getContextBuilder().buildRoadmapContext(options)
 }
 
-export async function buildHintContext(
-  options: ProblemContextOptions
-): Promise<BuiltContext> {
+export async function buildHintContext(options: ProblemContextOptions): Promise<BuiltContext> {
   return getContextBuilder().buildHintContext(options)
 }
 
@@ -734,7 +860,7 @@ export async function buildFeedbackContext(options: {
   userCode: string
   testResults: { passed: number; total: number }
   pattern?: DSAPattern
-  difficulty?: 'easy' | 'medium' | 'hard'
+  difficulty?: "easy" | "medium" | "hard"
 }): Promise<BuiltContext> {
   return getContextBuilder().buildFeedbackContext(options)
 }
@@ -747,4 +873,12 @@ export async function buildEnhancedContext(options: {
   contextType: ContextType
 }): Promise<BuiltContext & { enhancedProfile: EnhancedUserProfile }> {
   return getContextBuilder().buildEnhancedContext(options)
+}
+
+/**
+ * Build complexity context for interviewer AI
+ * Includes multiple approaches, trade-offs, and questioning strategies
+ */
+export function buildComplexityContext(problemId: string, pattern?: DSAPattern): string {
+  return getContextBuilder().buildComplexityContext(problemId, pattern)
 }

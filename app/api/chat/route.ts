@@ -9,7 +9,11 @@ import {
 import { trackAIChatServer } from "@/lib/analytics-server"
 import { getCompanyStyle, getPatternMetadata, type DSAPattern } from "@/lib/types/dsa-patterns"
 import { logger } from "@/lib/logger"
-import { buildHintContext, buildFeedbackContext } from "@/lib/rag/context-builder"
+import {
+  buildHintContext,
+  buildFeedbackContext,
+  buildComplexityContext,
+} from "@/lib/rag/context-builder"
 import { getPatternKnowledge } from "@/lib/rag/knowledge-base/dsa-knowledge"
 import { getCompanyInterviewKnowledge } from "@/lib/rag/knowledge-base/company-knowledge"
 import type { CompanyId } from "@/lib/data/company-questions/types"
@@ -112,6 +116,7 @@ async function buildRAGContext(options: {
   scenarioPattern?: string
   scenarioCompany?: string
   scenarioType?: string
+  scenarioId?: string
   problemText?: string
   userCode?: string
   userId?: string
@@ -181,7 +186,19 @@ ${companyKnowledge.cultureTips
       }
     }
 
-    // 3. Build hint context from RAG if we have problem text
+    // 3. Build complexity knowledge context for interviewer
+    // This gives the interviewer knowledge of multiple approaches, trade-offs, and how to question about complexity
+    if (options.scenarioId || options.scenarioPattern) {
+      const complexityContext = buildComplexityContext(
+        options.scenarioId || "",
+        options.scenarioPattern as DSAPattern
+      )
+      if (complexityContext) {
+        ragContextParts.push(complexityContext)
+      }
+    }
+
+    // 4. Build hint context from RAG if we have problem text
     if (options.problemText && options.problemText.length > 20) {
       const hintContext = await buildHintContext({
         problemText: options.problemText,
@@ -796,12 +813,21 @@ Keep responses brief, actionable, and helpful. You're a tool they can use, but t
 
     let systemPrompt = systemPrompts[role as keyof typeof systemPrompts] || systemPrompts.partner
 
+    // Derive scenarioId from title for complexity lookup (e.g., "Two Sum" -> "dsa-two-sum")
+    const scenarioId = scenarioTitle
+      ? `dsa-${scenarioTitle
+          .toLowerCase()
+          .replace(/\s+/g, "-")
+          .replace(/[^a-z0-9-]/g, "")}`
+      : undefined
+
     // Enhance both interviewer and partner roles with RAG context
     const ragContext = await buildRAGContext({
       scenarioTitle,
       scenarioPattern,
       scenarioCompany,
       scenarioType,
+      scenarioId,
       problemText: scenarioTitle, // Use title as problem text
       userCode: currentCode,
       userId,
@@ -1049,8 +1075,12 @@ Keep it conversational and real - like you're actually debriefing someone after 
     const complexity: TaskComplexity = role == "interviewer" ? "dialogue" : "code"
 
     // Use AI provider abstraction with fallback
+    // Pass userId/sessionId for proper cost tracking
     const aiResponse = await generateAIResponse(systemPrompt, fullUserMessage, history, {
       complexity,
+      userId,
+      sessionId,
+      eventType: "chat_message",
     })
 
     // Validate response relevance
