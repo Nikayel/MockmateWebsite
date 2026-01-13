@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowRight, ExternalLink } from "lucide-react"
 import { ALL_COMPANIES, getCompanyById, CompanyId } from "@/lib/data/company-questions"
 import { BreadcrumbJsonLd } from "@/components/seo/JsonLd"
+import { CompanyPrepContent } from "@/components/interview-prep/CompanyPrepContent"
 
 // Generate static paths for all companies
 export async function generateStaticParams() {
@@ -162,170 +163,10 @@ export default async function CompanyPrepPage({
         </div>
       </section>
 
-      {/* Main Content Grid */}
+      {/* Main Content Grid - Client component with gating */}
       <section className="py-8">
         <div className="container mx-auto px-4">
-          <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 lg:grid-cols-3">
-            {/* Left Column - Main Content */}
-            <div className="space-y-8 lg:col-span-2">
-              {/* Top Patterns - Simplified */}
-              <div>
-                <h2 className="text-lg font-medium text-white mb-4">Key patterns</h2>
-                <div className="space-y-2">
-                  {company.topPatterns.map((pattern, idx) => (
-                    <div
-                      key={pattern.pattern}
-                      className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 p-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-zinc-600 w-5">{idx + 1}</span>
-                        <span className="text-white capitalize">
-                          {pattern.pattern.replace(/-/g, " ")}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs">
-                        <span className={
-                          pattern.typicalDifficulty === "easy" ? "text-emerald-400" :
-                          pattern.typicalDifficulty === "medium" ? "text-amber-400" : "text-rose-400"
-                        }>
-                          {pattern.typicalDifficulty}
-                        </span>
-                        <span className="text-zinc-500">{pattern.frequency}%</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Must-Know Questions - Simplified */}
-              <div>
-                <h2 className="text-lg font-medium text-white mb-4">Common questions</h2>
-                <div className="space-y-2">
-                  {company.mustKnowQuestions.map((question) => (
-                    <div
-                      key={question.scenarioId}
-                      className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 p-3"
-                    >
-                      <span className="text-white">{question.title}</span>
-                      <span className={`text-xs ${
-                        question.frequency === "very_common" ? "text-rose-400" :
-                        question.frequency === "common" ? "text-amber-400" : "text-zinc-500"
-                      }`}>
-                        {question.frequency.replace("_", " ")}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <Link href="/interview" className="block mt-4">
-                  <Button variant="outline" className="w-full border-zinc-700 text-zinc-300 hover:bg-zinc-800">
-                    Practice these
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
-              </div>
-
-              {/* Interview Process - No emojis */}
-              <div>
-                <h2 className="text-lg font-medium text-white mb-4">Interview process</h2>
-                <div className="space-y-3">
-                  {company.interviewProcess.rounds.map((round, idx) => (
-                    <div key={idx} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-white">
-                          {idx + 1}. {round.description}
-                        </span>
-                        <span className="text-xs text-zinc-500">{round.duration} min</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {round.focusAreas.map((area) => (
-                          <span key={area} className="text-xs text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded">
-                            {area}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column - Sidebar (consolidated) */}
-            <div className="space-y-6">
-              {/* Quick facts */}
-              <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-                <h3 className="text-sm font-medium text-white mb-3">Quick facts</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Pace</span>
-                    <span className={
-                      company.interviewStyle.pace === "fast" ? "text-rose-400" :
-                      company.interviewStyle.pace === "moderate" ? "text-amber-400" : "text-emerald-400"
-                    }>{company.interviewStyle.pace}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Optimal required</span>
-                    <span className={company.interviewStyle.optimalSolutionRequired ? "text-rose-400" : "text-emerald-400"}>
-                      {company.interviewStyle.optimalSolutionRequired ? "yes" : "no"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Hints given</span>
-                    <span className={company.interviewStyle.providesHints ? "text-emerald-400" : "text-amber-400"}>
-                      {company.interviewStyle.providesHints ? "yes" : "rarely"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tips - Combined */}
-              <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-                <h3 className="text-sm font-medium text-white mb-3">Tips</h3>
-                <ul className="space-y-2">
-                  {company.interviewProcess.tips.slice(0, 4).map((tip, idx) => (
-                    <li key={idx} className="text-sm text-zinc-400 flex gap-2">
-                      <span className="text-zinc-600">·</span>
-                      {tip}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Compensation - if available */}
-              {company.compensation && (
-                <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-                  <h3 className="text-sm font-medium text-white mb-3">Compensation (TC)</h3>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-zinc-500">Entry</span>
-                      <span className="text-emerald-400">{company.compensation.entryLevel}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-500">Mid</span>
-                      <span className="text-emerald-400">{company.compensation.midLevel}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-500">Senior</span>
-                      <span className="text-emerald-400">{company.compensation.seniorLevel}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Personalized Roadmap CTA */}
-              <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-4">
-                <h3 className="text-sm font-medium text-white mb-2">Get a {company.name} study plan</h3>
-                <p className="text-xs text-zinc-400 mb-3">
-                  Enter your interview date → we prioritize {company.name}'s top patterns → you get a day-by-day schedule.
-                </p>
-                <Link href={`/roadmap/preview?company=${company.id}`}>
-                  <Button size="sm" className="w-full bg-white text-black hover:bg-zinc-200 text-xs">
-                    Create roadmap
-                    <ArrowRight className="ml-1.5 h-3 w-3" />
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </div>
+          <CompanyPrepContent company={company} />
         </div>
       </section>
 
