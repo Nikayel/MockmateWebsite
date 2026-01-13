@@ -16,6 +16,7 @@ import {
 } from "@/lib/email"
 import { logger } from "@/lib/logger"
 import { trackEventServer } from "@/lib/analytics-server"
+import { markReferralConverted } from "@/lib/referrals"
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY environment variable is required")
@@ -335,6 +336,15 @@ export async function POST(request: NextRequest) {
             customerId: session.customer,
           })
 
+          // Mark referral as converted (if user was referred)
+          // This triggers the free month credit for the referrer
+          try {
+            await markReferralConverted(userId)
+          } catch (referralError) {
+            paymentLogger.error("Failed to process referral conversion", { userId, error: referralError })
+            // Don't fail the webhook - referral processing is non-critical
+          }
+
           // Track purchase for analytics and attribution
           await trackEventServer("purchase", {
             userId,
@@ -561,6 +571,15 @@ export async function POST(request: NextRequest) {
             userId,
             customerId: session.customer,
           })
+
+          // Mark referral as converted (if user was referred)
+          // This triggers the free month credit for the referrer
+          try {
+            await markReferralConverted(userId)
+          } catch (referralError) {
+            paymentLogger.error("Failed to process referral conversion", { userId, error: referralError })
+            // Don't fail the webhook - referral processing is non-critical
+          }
 
           // Track purchase for analytics and attribution
           await trackEventServer("purchase", {

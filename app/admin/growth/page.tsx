@@ -20,6 +20,9 @@ import {
   MessageSquare,
   ArrowUpRight,
   Crown,
+  DollarSign,
+  Gift,
+  Check,
 } from "lucide-react"
 
 interface NPSData {
@@ -50,6 +53,20 @@ interface NPSData {
   }>
 }
 
+interface DetailedReferral {
+  id: string
+  referrerEmail: string
+  referrerId: string
+  referredEmail: string
+  referredUserId: string
+  referralCode: string
+  signupDate: string
+  convertedToPro: boolean
+  convertedDate?: string
+  signupRewardStatus: 'pending' | 'paid'
+  conversionRewardStatus: 'pending' | 'credited' | 'n/a'
+}
+
 interface ReferralData {
   totalReferrals: number
   totalConversions: number
@@ -70,14 +87,38 @@ interface ReferralData {
     referrals: number
     conversions: number
   }>
+  detailedReferrals: DetailedReferral[]
+}
+
+interface RewardItem {
+  id: string
+  referrerId: string
+  referredUserId: string
+  type: 'signup_cash' | 'conversion_credit'
+  amount: number
+  status: string
+  createdAt: string
+  referrerEmail: string
+  referredEmail: string
+}
+
+interface RewardsData {
+  cashRewards: RewardItem[]
+  creditRewards: RewardItem[]
+  totals: {
+    pendingCash: number
+    pendingCredits: number
+  }
 }
 
 export default function GrowthPage() {
   const { firebaseUser } = useAuth()
   const [npsData, setNpsData] = useState<NPSData | null>(null)
   const [referralData, setReferralData] = useState<ReferralData | null>(null)
+  const [rewardsData, setRewardsData] = useState<RewardsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [processingReward, setProcessingReward] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
@@ -89,11 +130,14 @@ export default function GrowthPage() {
     try {
       const token = await firebaseUser.getIdToken()
 
-      const [npsRes, referralRes] = await Promise.all([
+      const [npsRes, referralRes, rewardsRes] = await Promise.all([
         fetch("/api/admin/nps", {
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch("/api/admin/referrals", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch("/api/admin/referrals/rewards", {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ])
@@ -102,13 +146,15 @@ export default function GrowthPage() {
         throw new Error("Failed to load growth data")
       }
 
-      const [nps, referrals] = await Promise.all([
+      const [nps, referrals, rewards] = await Promise.all([
         npsRes.json(),
         referralRes.json(),
+        rewardsRes.ok ? rewardsRes.json() : { success: false },
       ])
 
       if (nps.success) setNpsData(nps.data)
       if (referrals.success) setReferralData(referrals.data)
+      if (rewards.success) setRewardsData(rewards.data)
     } catch (error) {
       setError(error instanceof Error ? error.message : "Failed to load data")
     } finally {
@@ -120,6 +166,32 @@ export default function GrowthPage() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  const processReward = async (rewardId: string, notes?: string) => {
+    if (!firebaseUser) return
+
+    setProcessingReward(rewardId)
+    try {
+      const token = await firebaseUser.getIdToken()
+      const res = await fetch("/api/admin/referrals/rewards", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ rewardId, notes }),
+      })
+
+      if (res.ok) {
+        // Refresh rewards data
+        loadData()
+      }
+    } catch (error) {
+      console.error("Failed to process reward:", error)
+    } finally {
+      setProcessingReward(null)
+    }
+  }
 
   const getNPSColor = (nps: number) => {
     if (nps >= 50) return "text-green-400"
@@ -391,6 +463,69 @@ export default function GrowthPage() {
           </CardContent>
         </Card>
 
+        {/* All Referrals - Detailed View */}
+        <Card className="bg-gray-900/50 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">All Referrals</CardTitle>
+            <CardDescription>Who referred who, signup status, and reward tracking</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-800 text-gray-400">
+                    <th className="text-left py-2 px-3">Referrer</th>
+                    <th className="text-left py-2 px-3">Referred</th>
+                    <th className="text-left py-2 px-3">Code</th>
+                    <th className="text-left py-2 px-3">Signed Up</th>
+                    <th className="text-center py-2 px-3">Pro?</th>
+                    <th className="text-center py-2 px-3">$10 Owed</th>
+                    <th className="text-center py-2 px-3">Free Month</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {referralData?.detailedReferrals?.map((ref) => (
+                    <tr key={ref.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                      <td className="py-2 px-3 text-white">{ref.referrerEmail}</td>
+                      <td className="py-2 px-3 text-gray-300">{ref.referredEmail}</td>
+                      <td className="py-2 px-3 font-mono text-xs text-gray-500">{ref.referralCode}</td>
+                      <td className="py-2 px-3 text-gray-400">
+                        {new Date(ref.signupDate).toLocaleDateString()}
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        {ref.convertedToPro ? (
+                          <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Pro</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-gray-500 border-gray-700">Free</Badge>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        {ref.signupRewardStatus === 'paid' ? (
+                          <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Paid</Badge>
+                        ) : (
+                          <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Owe $10</Badge>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        {ref.conversionRewardStatus === 'credited' ? (
+                          <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">Credited</Badge>
+                        ) : ref.conversionRewardStatus === 'pending' ? (
+                          <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Pending</Badge>
+                        ) : (
+                          <span className="text-gray-600">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {(!referralData?.detailedReferrals || referralData.detailedReferrals.length === 0) && (
+                <p className="text-center text-gray-500 py-8">No referrals yet</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Weekly Trend */}
         {referralData?.weeklyTrend && referralData.weeklyTrend.length > 0 && (
           <Card className="bg-gray-900/50 border-gray-800">
@@ -410,6 +545,152 @@ export default function GrowthPage() {
             </CardContent>
           </Card>
         )}
+      </div>
+
+      {/* Rewards Management Section */}
+      <div className="space-y-6">
+        <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+          <Gift className="h-5 w-5 text-yellow-400" />
+          Rewards Management
+        </h2>
+
+        {/* Rewards Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <MetricCard
+            title="Pending Cash Payouts"
+            value={`$${rewardsData?.totals.pendingCash || 0}`}
+            subtitle={`${rewardsData?.cashRewards.length || 0} rewards waiting`}
+            icon={DollarSign}
+            valueColor="text-green-400"
+          />
+          <MetricCard
+            title="Pending Free Months"
+            value={rewardsData?.totals.pendingCredits || 0}
+            subtitle={`${rewardsData?.creditRewards.length || 0} credits waiting`}
+            icon={Gift}
+            valueColor="text-purple-400"
+          />
+        </div>
+
+        {/* Cash Rewards Table */}
+        <Card className="bg-gray-900/50 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-green-400" />
+              Pending Cash Rewards ($10 per signup)
+            </CardTitle>
+            <CardDescription>Manual PayPal payouts to referrers</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-800 text-gray-400">
+                    <th className="text-left py-2 px-3">Referrer</th>
+                    <th className="text-left py-2 px-3">Referred User</th>
+                    <th className="text-right py-2 px-3">Amount</th>
+                    <th className="text-left py-2 px-3">Date</th>
+                    <th className="text-right py-2 px-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rewardsData?.cashRewards.map((reward) => (
+                    <tr key={reward.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                      <td className="py-3 px-3 text-white">{reward.referrerEmail}</td>
+                      <td className="py-3 px-3 text-gray-400">{reward.referredEmail}</td>
+                      <td className="py-3 px-3 text-right text-green-400 font-medium">${reward.amount}</td>
+                      <td className="py-3 px-3 text-gray-500">
+                        {new Date(reward.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => processReward(reward.id)}
+                          disabled={processingReward === reward.id}
+                          className="border-green-600 text-green-400 hover:bg-green-600/20"
+                        >
+                          {processingReward === reward.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Check className="h-4 w-4 mr-1" />
+                              Mark Paid
+                            </>
+                          )}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {(!rewardsData?.cashRewards || rewardsData.cashRewards.length === 0) && (
+                <p className="text-center text-gray-500 py-8">No pending cash rewards</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Credit Rewards Table */}
+        <Card className="bg-gray-900/50 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <Gift className="h-5 w-5 text-purple-400" />
+              Pending Free Month Credits
+            </CardTitle>
+            <CardDescription>1 free month when referred user upgrades to Pro</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-800 text-gray-400">
+                    <th className="text-left py-2 px-3">Referrer</th>
+                    <th className="text-left py-2 px-3">Converted User</th>
+                    <th className="text-right py-2 px-3">Credit</th>
+                    <th className="text-left py-2 px-3">Date</th>
+                    <th className="text-right py-2 px-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rewardsData?.creditRewards.map((reward) => (
+                    <tr key={reward.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                      <td className="py-3 px-3 text-white">{reward.referrerEmail}</td>
+                      <td className="py-3 px-3 text-gray-400">{reward.referredEmail}</td>
+                      <td className="py-3 px-3 text-right text-purple-400 font-medium">
+                        {reward.amount} month{reward.amount > 1 ? 's' : ''}
+                      </td>
+                      <td className="py-3 px-3 text-gray-500">
+                        {new Date(reward.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => processReward(reward.id)}
+                          disabled={processingReward === reward.id}
+                          className="border-purple-600 text-purple-400 hover:bg-purple-600/20"
+                        >
+                          {processingReward === reward.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Check className="h-4 w-4 mr-1" />
+                              Mark Credited
+                            </>
+                          )}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {(!rewardsData?.creditRewards || rewardsData.creditRewards.length === 0) && (
+                <p className="text-center text-gray-500 py-8">No pending free month credits</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
