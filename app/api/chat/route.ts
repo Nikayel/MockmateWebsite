@@ -281,6 +281,9 @@ export async function POST(request: NextRequest) {
       isWrapUp,
       // NEW: Edge cases for interviewer to ask about
       edgeCases,
+      // NEW: Console context for interviewer awareness
+      testResults,
+      consoleLogs,
     } = await request.json()
 
     // For proactive messages (interviewer jumping in), message might be empty
@@ -438,6 +441,65 @@ DO NOT skip edge cases - real interviewers always ask about them. If they haven'
 `
         : ""
 
+    // Build console/test results context for interviewer awareness
+    interface TestResultItem {
+      description?: string
+      passed?: boolean
+      input?: unknown
+      expected?: unknown
+      actual?: unknown
+      error?: string | null
+    }
+    interface ConsoleLogItem {
+      type?: string
+      message?: string
+    }
+    const testResultsArray = testResults as TestResultItem[] | undefined
+    const consoleLogsArray = consoleLogs as ConsoleLogItem[] | undefined
+
+    let consoleContext = ""
+    if (testResultsArray && Array.isArray(testResultsArray) && testResultsArray.length > 0) {
+      const passed = testResultsArray.filter((t) => t.passed).length
+      const total = testResultsArray.length
+      const allPassed = passed === total
+
+      consoleContext = `
+CONSOLE & TEST RESULTS (IMPORTANT - BE AWARE OF THIS):
+Tests have been run: ${passed}/${total} passed ${allPassed ? "✓ ALL PASSING" : "✗ SOME FAILING"}
+
+${testResultsArray
+  .slice(0, 5)
+  .map(
+    (t, i) =>
+      `Test ${i + 1}: ${t.description || "Test case"} - ${t.passed ? "PASSED ✓" : "FAILED ✗"}${
+        !t.passed && t.error ? ` (Error: ${t.error})` : ""
+      }${!t.passed && t.expected !== undefined ? ` (Expected: ${JSON.stringify(t.expected)}, Got: ${JSON.stringify(t.actual)})` : ""}`
+  )
+  .join("\n")}
+
+${
+  allPassed
+    ? `INTERVIEWER BEHAVIOR WHEN ALL TESTS PASS:
+- DO NOT say "let's run the tests" - they already did and passed!
+- Move to follow-up questions: complexity analysis, optimizations, edge cases
+- Example: "Nice, tests are passing. What's the time complexity?" or "Good - now let's talk about how you'd optimize this"`
+    : `INTERVIEWER BEHAVIOR WHEN TESTS FAIL:
+- Acknowledge the failing tests
+- Ask them to debug: "Looks like test ${testResultsArray.findIndex((t) => !t.passed) + 1} is failing - what do you think is happening there?"
+- Help them trace through the failing case`
+}
+`
+    }
+
+    // Add console logs context if available
+    if (consoleLogsArray && Array.isArray(consoleLogsArray) && consoleLogsArray.length > 0) {
+      const recentLogs = consoleLogsArray.slice(-5)
+      consoleContext += `
+RECENT CONSOLE OUTPUT:
+${recentLogs.map((log) => `[${log.type || "log"}] ${log.message || ""}`).join("\n")}
+`
+    }
+
     // Build system design specific context with phase-based guidance
     const isSystemDesign = scenarioType === "system-design"
     const elapsedMinutes = elapsedTime ? Math.floor(elapsedTime / 60) : 0
@@ -593,6 +655,7 @@ ${companyContext}
 ${userContextString}${problemContext}
 ${isSystemDesign ? systemDesignContext : isBugFix ? bugFixContext : patternContext}
 ${edgeCaseContext}
+${consoleContext}
 
 INTERVIEW STYLE - ACT LIKE A REAL INTERVIEWER:
 You are having a natural conversation with the candidate. They may:
