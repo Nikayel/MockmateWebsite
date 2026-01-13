@@ -75,6 +75,7 @@ function parseBulletList(text: string, preferNumbered: boolean = false): string[
 
   // BEST approach: Extract lines that look like bullet points directly
   // This handles all formats: "- item", "• item", "* item", "1. item"
+  // Use matchAll with multiline to properly extract bullets even when not at line start
   const bulletLineRegex = /^[\s]*[-•*]\s+(.+)$/gm
   const numberedLineRegex = /^[\s]*\d+[.)]\s+(.+)$/gm
 
@@ -109,6 +110,18 @@ function parseBulletList(text: string, preferNumbered: boolean = false): string[
     }
   }
 
+  // NEW: Try extracting bullets that may not have leading newlines
+  // This handles cases like "**What Worked**\n- Item 1- Item 2" where bullets run together
+  // or "- Item 1 - Item 2" on a single line
+  const inlineBulletRegex = /(?:^|[^-])[-•*]\s+([^-•*\n]+?)(?=\s*[-•*]\s+|$)/g
+  const inlineMatches = [...trimmed.matchAll(inlineBulletRegex)]
+  if (inlineMatches.length > 0) {
+    const items = inlineMatches.map((m) => m[1].trim()).filter((s) => s && s.length > 3)
+    if (items.length > 0) {
+      return filterHeaderLines(items)
+    }
+  }
+
   // Fallback: split by lines and clean up bullet prefixes
   const lines = trimmed.split("\n")
   let items = lines
@@ -119,7 +132,7 @@ function parseBulletList(text: string, preferNumbered: boolean = false): string[
     return filterHeaderLines(items)
   }
 
-  // Final fallback: split on inline bullet patterns
+  // Final fallback: split on inline bullet patterns (handles "text - item1 - item2")
   items = trimmed
     .split(/\s+[-*•]\s+/)
     .map((s) => s.trim())

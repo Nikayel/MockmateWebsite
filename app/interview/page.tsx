@@ -1542,6 +1542,46 @@ Interviews are conversations, not just coding exercises.`
     }
   }
 
+  // Update spaced repetition state after completing a problem
+  // This updates the due dates and streak for the user
+  const updateSpacedRepetition = async (params: {
+    problemId: string
+    performanceScore: number
+    masteryScore?: number
+    timeSpentMinutes: number
+    hintsUsed: number
+    testCasesPassed: number
+    testCasesTotal: number
+  }) => {
+    try {
+      const token = await firebaseUser?.getIdToken()
+      if (!token) return
+
+      const response = await fetch("/api/spaced-repetition/complete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          problem_id: params.problemId,
+          performance_score: params.performanceScore,
+          mastery_score: params.masteryScore,
+          time_spent_minutes: params.timeSpentMinutes,
+          hints_used: params.hintsUsed,
+          test_cases_passed: params.testCasesPassed,
+          test_cases_total: params.testCasesTotal,
+        }),
+      })
+
+      if (!response.ok) {
+        console.error("[Spaced Repetition] Failed to update:", await response.text())
+      }
+    } catch (error) {
+      console.error("[Spaced Repetition] Failed to update:", error)
+    }
+  }
+
   // Extract edge cases from scenario for interviewer to ask about
   const getEdgeCasesForInterviewer = (): { description: string; input: unknown }[] => {
     if (!selectedScenario) return []
@@ -1857,6 +1897,26 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             testsTotal: summary.total,
             efficiencyScore: efficiencyData?.efficiencyScore || 50,
           }).catch((err) => console.error("Session metrics tracking failed:", err))
+
+          // Update spaced repetition state (due dates and streak)
+          if (selectedScenario) {
+            const hintsUsedCount = revealedHintIndices.size + revealedAIHintIndices.size
+            updateSpacedRepetition({
+              problemId: selectedScenario.id,
+              performanceScore: calculatedPerformanceScore,
+              masteryScore: scoreBreakdownData
+                ? Math.round(
+                    (scoreBreakdownData.understanding || 0) * 0.3 +
+                      (scoreBreakdownData.problemSolving || 0) * 0.4 +
+                      (scoreBreakdownData.codeQuality || 0) * 0.3
+                  )
+                : undefined,
+              timeSpentMinutes: Math.round(elapsedTime / 60),
+              hintsUsed: hintsUsedCount,
+              testCasesPassed: summary.passed,
+              testCasesTotal: summary.total,
+            }).catch((err) => console.error("Spaced repetition update failed:", err))
+          }
 
           // Mark question complete in roadmap if user came from roadmap
           if (isFromRoadmap && selectedScenario && activeRoadmap) {
@@ -3173,6 +3233,26 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             efficiencyScore: 50, // Not applicable for system design
             communicationScore: calculatedPerformanceScore,
           }).catch((err) => console.error("Session metrics tracking failed:", err))
+
+          // Update spaced repetition state (due dates and streak)
+          if (selectedScenario) {
+            const hintsUsedCount = revealedHintIndices.size + revealedAIHintIndices.size
+            updateSpacedRepetition({
+              problemId: selectedScenario.id,
+              performanceScore: calculatedPerformanceScore,
+              masteryScore: systemDesignScoreBreakdown
+                ? Math.round(
+                    (systemDesignScoreBreakdown.understanding || 0) * 0.3 +
+                      (systemDesignScoreBreakdown.problemSolving || 0) * 0.4 +
+                      (systemDesignScoreBreakdown.codeQuality || 0) * 0.3
+                  )
+                : undefined,
+              timeSpentMinutes: Math.round(elapsedTime / 60),
+              hintsUsed: hintsUsedCount,
+              testCasesPassed: 1, // System design counts as passed
+              testCasesTotal: 1,
+            }).catch((err) => console.error("Spaced repetition update failed:", err))
+          }
 
           // Mark question complete in roadmap if user came from roadmap
           // Note: Check both param patterns for compatibility
