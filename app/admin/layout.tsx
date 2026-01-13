@@ -28,6 +28,7 @@ import {
   HeartPulse,
   Rocket,
   Server,
+  CreditCard,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { logger } from "@/lib/logger"
@@ -43,6 +44,7 @@ const navigation: NavItem[] = [
   { name: "Overview", href: "/admin", icon: LayoutDashboard },
   { name: "Users", href: "/admin/users", icon: Users },
   { name: "Revenue", href: "/admin/revenue", icon: DollarSign },
+  { name: "Payments", href: "/admin/payments", icon: CreditCard },
   { name: "Growth", href: "/admin/growth", icon: Rocket, badge: "NPS" },
   { name: "Sessions", href: "/admin/sessions", icon: Activity },
   { name: "Funnel", href: "/admin/funnel", icon: TrendingUp },
