@@ -23,6 +23,14 @@ function LoginPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const redirect = searchParams.get("redirect")
+  const referralCode = searchParams.get("ref")
+
+  // Store referral code in localStorage for processing after signup
+  useEffect(() => {
+    if (referralCode) {
+      localStorage.setItem("pending_referral_code", referralCode.toUpperCase())
+    }
+  }, [referralCode])
 
   // Check if user is already logged in and redirect them
   // Use useAuth hook instead of duplicate listener to avoid conflicts
@@ -148,6 +156,29 @@ function LoginPageContent() {
               }
             } catch {
               // Non-blocking - user can still use the app
+            }
+
+            // Process referral code if present (new users only)
+            const pendingReferralCode = localStorage.getItem("pending_referral_code")
+            if (pendingReferralCode) {
+              try {
+                const token = await firebaseUser.getIdToken()
+                await fetch("/api/referral", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    referralCode: pendingReferralCode,
+                  }),
+                })
+                // Don't show toast - it's not critical to the user experience
+              } catch {
+                // Non-blocking - user can still use the app
+              } finally {
+                localStorage.removeItem("pending_referral_code")
+              }
             }
           }
 

@@ -56,6 +56,21 @@ const MetricsOverview = dynamic(
   }
 )
 
+const ReferralWidget = dynamic(
+  () => import("@/components/dashboard/ReferralWidget").then((mod) => mod.ReferralWidget),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/50 p-4">
+        <div className="animate-pulse space-y-3">
+          <div className="h-4 w-1/3 rounded bg-zinc-800"></div>
+          <div className="h-8 w-full rounded bg-zinc-800"></div>
+        </div>
+      </div>
+    ),
+  }
+)
+
 export default function DashboardPage() {
   const router = useRouter()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
@@ -613,8 +628,9 @@ export default function DashboardPage() {
             </div>
 
             {/* Metrics Overview - 2 cols on lg */}
-            <div className="lg:col-span-2" data-tour="quick-start">
+            <div className="lg:col-span-2 space-y-4" data-tour="quick-start">
               <MetricsOverview />
+              <ReferralWidget />
             </div>
           </div>
 

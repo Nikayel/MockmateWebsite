@@ -1,12 +1,14 @@
 /**
  * Referral Tracking System
  *
- * Simple referral tracking to measure organic growth.
+ * Complete referral tracking with rewards:
  * - Each user gets a unique 8-character referral code
  * - Track who referred who
  * - Calculate viral coefficient
  *
- * No rewards system - just tracking for now.
+ * REWARDS:
+ * - $10 cash when someone signs up with your code (manual payout)
+ * - 1 free month when your referral upgrades to Pro (Stripe credit)
  */
 
 import { adminDb } from './firebase-admin'
@@ -17,6 +19,10 @@ import { customAlphabet } from 'nanoid'
 // Generate URL-safe, easy-to-share referral codes
 const generateCode = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 8)
 
+// Reward amounts
+const SIGNUP_REWARD_CASH = 10 // $10 per signup (manual payout)
+const CONVERSION_REWARD_MONTHS = 1 // 1 free month when referral upgrades
+
 export interface ReferralRecord {
   referrerId: string
   referredUserId: string
@@ -24,6 +30,25 @@ export interface ReferralRecord {
   signupDate: Date
   convertedToPro: boolean
   convertedDate?: Date
+  // Reward tracking
+  signupRewardAmount: number // $10
+  signupRewardPaid: boolean
+  signupRewardPaidAt?: Date
+  conversionRewardCredited: boolean
+  conversionRewardCreditedAt?: Date
+}
+
+export interface ReferralReward {
+  id?: string
+  referrerId: string
+  referredUserId: string
+  type: 'signup_cash' | 'conversion_credit'
+  amount: number // $ for cash, months for credit
+  status: 'pending' | 'paid' | 'credited' | 'expired'
+  createdAt: Date
+  processedAt?: Date
+  processedBy?: string // Admin who processed it
+  notes?: string
 }
 
 export interface ReferralStats {
@@ -126,6 +151,7 @@ export async function getUserByReferralCode(code: string): Promise<string | null
 
 /**
  * Record a referral when a new user signs up with a referral code
+ * Creates a $10 cash reward for the referrer (pending manual payout)
  */
 export async function recordReferral(
   referredUserId: string,
@@ -158,13 +184,28 @@ export async function recordReferral(
       return false
     }
 
-    // Record the referral
-    await adminDb.collection('referrals').add({
+    // Record the referral with reward tracking
+    const referralRef = await adminDb.collection('referrals').add({
       referrerId,
       referredUserId,
       referralCode: referralCode.toUpperCase(),
       signupDate: FieldValue.serverTimestamp(),
       convertedToPro: false,
+      // Reward tracking
+      signupRewardAmount: SIGNUP_REWARD_CASH,
+      signupRewardPaid: false,
+      conversionRewardCredited: false,
+    })
+
+    // Create the $10 signup reward (pending)
+    await adminDb.collection('referral_rewards').add({
+      referrerId,
+      referredUserId,
+      referralId: referralRef.id,
+      type: 'signup_cash',
+      amount: SIGNUP_REWARD_CASH,
+      status: 'pending',
+      createdAt: FieldValue.serverTimestamp(),
     })
 
     // Update referred user's profile
@@ -174,15 +215,17 @@ export async function recordReferral(
       referredAt: FieldValue.serverTimestamp(),
     })
 
-    // Increment referrer's count
+    // Increment referrer's count and pending rewards
     await adminDb.collection('users').doc(referrerId).update({
       referralCount: FieldValue.increment(1),
+      pendingCashRewards: FieldValue.increment(SIGNUP_REWARD_CASH),
     })
 
-    logger.info('Referral recorded', {
+    logger.info('Referral recorded with $10 reward', {
       referrerId,
       referredUserId,
       referralCode,
+      rewardAmount: SIGNUP_REWARD_CASH,
     })
 
     return true
@@ -194,6 +237,7 @@ export async function recordReferral(
 
 /**
  * Mark a referral as converted (when referred user upgrades to Pro)
+ * Creates a free month credit reward for the referrer
  */
 export async function markReferralConverted(referredUserId: string): Promise<void> {
   try {
@@ -208,20 +252,36 @@ export async function markReferralConverted(referredUserId: string): Promise<voi
     const doc = snapshot.docs[0]
     if (doc.data().convertedToPro) return // Already marked
 
+    const referrerId = doc.data().referrerId
+
+    // Update the referral record
     await doc.ref.update({
       convertedToPro: true,
       convertedDate: FieldValue.serverTimestamp(),
     })
 
-    // Increment referrer's conversion count
-    const referrerId = doc.data().referrerId
-    await adminDb.collection('users').doc(referrerId).update({
-      referralConversions: FieldValue.increment(1),
-    })
-
-    logger.info('Referral marked as converted', {
+    // Create the free month credit reward (pending)
+    // This will be applied when admin processes it, or auto-applied via Stripe
+    await adminDb.collection('referral_rewards').add({
       referrerId,
       referredUserId,
+      referralId: doc.id,
+      type: 'conversion_credit',
+      amount: CONVERSION_REWARD_MONTHS,
+      status: 'pending',
+      createdAt: FieldValue.serverTimestamp(),
+    })
+
+    // Increment referrer's conversion count and pending credits
+    await adminDb.collection('users').doc(referrerId).update({
+      referralConversions: FieldValue.increment(1),
+      pendingFreeMonths: FieldValue.increment(CONVERSION_REWARD_MONTHS),
+    })
+
+    logger.info('Referral converted - free month credit created', {
+      referrerId,
+      referredUserId,
+      creditMonths: CONVERSION_REWARD_MONTHS,
     })
   } catch (error) {
     logger.error('Failed to mark referral converted', { error, referredUserId })
@@ -229,13 +289,123 @@ export async function markReferralConverted(referredUserId: string): Promise<voi
 }
 
 /**
- * Get user's referral statistics
+ * Get pending rewards for admin to process
+ */
+export async function getPendingRewards(): Promise<{
+  cashRewards: Array<ReferralReward & { referrerEmail: string; referredEmail: string }>
+  creditRewards: Array<ReferralReward & { referrerEmail: string; referredEmail: string }>
+  totals: { pendingCash: number; pendingCredits: number }
+}> {
+  const result = {
+    cashRewards: [] as Array<ReferralReward & { referrerEmail: string; referredEmail: string }>,
+    creditRewards: [] as Array<ReferralReward & { referrerEmail: string; referredEmail: string }>,
+    totals: { pendingCash: 0, pendingCredits: 0 },
+  }
+
+  try {
+    const pendingSnapshot = await adminDb
+      .collection('referral_rewards')
+      .where('status', '==', 'pending')
+      .orderBy('createdAt', 'desc')
+      .get()
+
+    for (const doc of pendingSnapshot.docs) {
+      const data = doc.data()
+
+      // Get user emails
+      const [referrerDoc, referredDoc] = await Promise.all([
+        adminDb.collection('users').doc(data.referrerId).get(),
+        adminDb.collection('users').doc(data.referredUserId).get(),
+      ])
+
+      const reward = {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        referrerEmail: referrerDoc.data()?.email || 'Unknown',
+        referredEmail: referredDoc.data()?.email || 'Unknown',
+      } as ReferralReward & { referrerEmail: string; referredEmail: string }
+
+      if (data.type === 'signup_cash') {
+        result.cashRewards.push(reward)
+        result.totals.pendingCash += data.amount
+      } else if (data.type === 'conversion_credit') {
+        result.creditRewards.push(reward)
+        result.totals.pendingCredits += data.amount
+      }
+    }
+  } catch (error) {
+    logger.error('Failed to get pending rewards', { error })
+  }
+
+  return result
+}
+
+/**
+ * Mark a cash reward as paid (admin action)
+ */
+export async function markRewardPaid(
+  rewardId: string,
+  adminUserId: string,
+  notes?: string
+): Promise<boolean> {
+  try {
+    const rewardRef = adminDb.collection('referral_rewards').doc(rewardId)
+    const rewardDoc = await rewardRef.get()
+
+    if (!rewardDoc.exists) return false
+    if (rewardDoc.data()?.status !== 'pending') return false
+
+    const { referrerId, amount, type } = rewardDoc.data()!
+
+    await rewardRef.update({
+      status: type === 'signup_cash' ? 'paid' : 'credited',
+      processedAt: FieldValue.serverTimestamp(),
+      processedBy: adminUserId,
+      notes: notes || undefined,
+    })
+
+    // Update user's pending amount
+    if (type === 'signup_cash') {
+      await adminDb.collection('users').doc(referrerId).update({
+        pendingCashRewards: FieldValue.increment(-amount),
+        totalCashEarned: FieldValue.increment(amount),
+      })
+    } else {
+      await adminDb.collection('users').doc(referrerId).update({
+        pendingFreeMonths: FieldValue.increment(-amount),
+        totalFreeMonthsEarned: FieldValue.increment(amount),
+      })
+    }
+
+    logger.info('Reward marked as processed', {
+      rewardId,
+      type,
+      amount,
+      adminUserId,
+    })
+
+    return true
+  } catch (error) {
+    logger.error('Failed to mark reward paid', { error, rewardId })
+    return false
+  }
+}
+
+/**
+ * Get user's referral statistics including rewards
  */
 export async function getUserReferralStats(userId: string): Promise<{
   referralCode: string
   referralCount: number
   conversions: number
   referredUsers: Array<{ signupDate: Date; converted: boolean }>
+  rewards: {
+    pendingCash: number // $10 per signup, not yet paid
+    totalCashEarned: number // Total paid out
+    pendingFreeMonths: number // Free months not yet applied
+    totalFreeMonthsEarned: number // Total free months credited
+  }
 }> {
   const code = await getUserReferralCode(userId)
 
@@ -260,6 +430,12 @@ export async function getUserReferralStats(userId: string): Promise<{
       referralCount: userData?.referralCount || 0,
       conversions: userData?.referralConversions || 0,
       referredUsers,
+      rewards: {
+        pendingCash: userData?.pendingCashRewards || 0,
+        totalCashEarned: userData?.totalCashEarned || 0,
+        pendingFreeMonths: userData?.pendingFreeMonths || 0,
+        totalFreeMonthsEarned: userData?.totalFreeMonthsEarned || 0,
+      },
     }
   } catch (error) {
     logger.error('Failed to get user referral stats', { error, userId })
@@ -268,6 +444,12 @@ export async function getUserReferralStats(userId: string): Promise<{
       referralCount: 0,
       conversions: 0,
       referredUsers: [],
+      rewards: {
+        pendingCash: 0,
+        totalCashEarned: 0,
+        pendingFreeMonths: 0,
+        totalFreeMonthsEarned: 0,
+      },
     }
   }
 }
