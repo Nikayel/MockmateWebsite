@@ -14,16 +14,25 @@ interface CompanyHeroCTAProps {
 export function CompanyHeroCTA({ companyId, careersUrl }: CompanyHeroCTAProps) {
   const { user, firebaseUser, initialized } = useAuth()
   const [isPro, setIsPro] = useState<boolean | null>(null)
+  const [isLoadingPro, setIsLoadingPro] = useState(false)
   const isLoggedIn = !!user
 
   // Check Pro status for logged-in users
   useEffect(() => {
     const checkProStatus = async () => {
-      if (!initialized || !user?.id || !firebaseUser) {
-        setIsPro(null)
+      // Not initialized yet - wait
+      if (!initialized) {
         return
       }
 
+      // No user - reset state
+      if (!user?.id || !firebaseUser) {
+        setIsPro(null)
+        setIsLoadingPro(false)
+        return
+      }
+
+      setIsLoadingPro(true)
       try {
         const token = await firebaseUser.getIdToken()
         const response = await fetch("/api/user/subscription-status", {
@@ -34,61 +43,53 @@ export function CompanyHeroCTA({ companyId, careersUrl }: CompanyHeroCTAProps) {
         if (response.ok) {
           const data = await response.json()
           setIsPro(data.tier === "pro" || data.tier === "enterprise")
+        } else {
+          setIsPro(false)
         }
       } catch {
         setIsPro(false)
+      } finally {
+        setIsLoadingPro(false)
       }
     }
 
     checkProStatus()
   }, [user?.id, firebaseUser, initialized])
 
-  // Determine the roadmap CTA link and text
-  const getRoadmapCTA = () => {
-    if (!isLoggedIn) {
-      return {
-        href: `/login?redirect=/interview-prep/${companyId}`,
-        text: "Create study plan",
-        showProBadge: false,
-        isUpgrade: false,
-      }
-    }
-    if (isPro) {
-      return {
-        href: `/roadmap/new?company=${companyId}`,
-        text: "Create study plan",
-        showProBadge: false,
-        isUpgrade: false,
-      }
-    }
-    // Free user
-    return {
-      href: "/upgrade",
-      text: "Create study plan",
-      showProBadge: true,
-      isUpgrade: true,
-    }
-  }
-
-  const roadmapCTA = getRoadmapCTA()
+  // Determine if we're in a loading state for Pro check
+  const isProLoading = isLoggedIn && (isPro === null || isLoadingPro)
 
   return (
     <div className="flex flex-wrap gap-3">
-      {roadmapCTA.isUpgrade ? (
-        // Free logged-in user - show upgrade CTA with Pro badge
-        <Link href={roadmapCTA.href}>
-          <Button className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/90">
-            <Crown className="mr-2 h-4 w-4" />
-            {roadmapCTA.text}
-            <span className="ml-2 text-[10px] opacity-80">Pro</span>
+      {!isLoggedIn ? (
+        // Not logged in - show normal CTA to login
+        <Link href={`/login?redirect=/interview-prep/${companyId}`}>
+          <Button className="bg-white text-black hover:bg-zinc-200">
+            Create study plan
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </Link>
+      ) : isProLoading ? (
+        // Loading state - show neutral button while checking Pro status
+        <Button className="bg-zinc-700 text-zinc-300 cursor-wait" disabled>
+          <span className="inline-block h-4 w-4 mr-2 border-2 border-zinc-500 border-t-transparent rounded-full animate-spin" />
+          Create study plan
+        </Button>
+      ) : isPro ? (
+        // Pro user - direct to roadmap creation
+        <Link href={`/roadmap/new?company=${companyId}`}>
+          <Button className="bg-white text-black hover:bg-zinc-200">
+            Create study plan
+            <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </Link>
       ) : (
-        // Not logged in or Pro user - normal CTA
-        <Link href={roadmapCTA.href}>
-          <Button className="bg-white text-black hover:bg-zinc-200">
-            {roadmapCTA.text}
-            <ArrowRight className="ml-2 h-4 w-4" />
+        // Free logged-in user - show upgrade CTA with Pro badge
+        <Link href="/upgrade">
+          <Button className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/90">
+            <Crown className="mr-2 h-4 w-4" />
+            Create study plan
+            <span className="ml-2 text-[10px] opacity-80">Pro</span>
           </Button>
         </Link>
       )}

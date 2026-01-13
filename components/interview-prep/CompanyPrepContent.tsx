@@ -18,20 +18,26 @@ const FREE_ROUNDS_COUNT = 1
 const FREE_TIPS_COUNT = 1
 
 export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
-  const { user, firebaseUser, loading, initialized } = useAuth()
+  const { user, firebaseUser, initialized } = useAuth()
   const isLoggedIn = !!user
   const [isPro, setIsPro] = useState<boolean | null>(null)
-  const [isCheckingPro, setIsCheckingPro] = useState(false)
+  const [isLoadingPro, setIsLoadingPro] = useState(false)
 
   // Check Pro status for logged-in users
   useEffect(() => {
     const checkProStatus = async () => {
-      if (!initialized || !user?.id || !firebaseUser) {
-        setIsPro(null)
+      // Not initialized yet or no user - reset state
+      if (!initialized) {
         return
       }
 
-      setIsCheckingPro(true)
+      if (!user?.id || !firebaseUser) {
+        setIsPro(null)
+        setIsLoadingPro(false)
+        return
+      }
+
+      setIsLoadingPro(true)
       try {
         const token = await firebaseUser.getIdToken()
         const response = await fetch("/api/user/subscription-status", {
@@ -42,17 +48,24 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
         if (response.ok) {
           const data = await response.json()
           setIsPro(data.tier === "pro" || data.tier === "enterprise")
+        } else {
+          // API error - default to false but don't assume
+          setIsPro(false)
         }
       } catch {
-        // Error checking subscription - assume not pro
+        // Network error - default to false
         setIsPro(false)
       } finally {
-        setIsCheckingPro(false)
+        setIsLoadingPro(false)
       }
     }
 
     checkProStatus()
   }, [user?.id, firebaseUser, initialized])
+
+  // Determine if we should show loading state for Pro-specific UI
+  // Only show loading when user is logged in and we're still checking
+  const isProLoading = isLoggedIn && (isPro === null || isLoadingPro)
 
   // Calculate locked counts
   const lockedPatternsCount = Math.max(0, company.topPatterns.length - FREE_PATTERNS_COUNT)
@@ -68,8 +81,8 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
     <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 lg:grid-cols-3">
       {/* Left Column - Main Content */}
       <div className="space-y-8 lg:col-span-2">
-        {/* Social Proof Banner - Only for non-logged-in users */}
-        {!isLoggedIn && !loading && (
+        {/* Social Proof Banner - Only for non-logged-in users after auth initialized */}
+        {!isLoggedIn && initialized && (
           <div className="rounded-lg border border-emerald-900/50 bg-emerald-950/30 p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -383,7 +396,7 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
         <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-4">
           <div className="flex items-center gap-2 mb-2">
             <h3 className="text-sm font-medium text-white">Get a {company.name} study plan</h3>
-            {isLoggedIn && !isPro && (
+            {isLoggedIn && !isProLoading && !isPro && (
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#00d9ff]/10 border border-[#00d9ff]/30 text-[10px] font-medium text-[#00d9ff]">
                 <Crown className="h-2.5 w-2.5" />
                 Pro
@@ -403,6 +416,12 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
                 <ArrowRight className="ml-1.5 h-3 w-3" />
               </Button>
             </Link>
+          ) : isProLoading ? (
+            // Loading state - show neutral button
+            <Button size="sm" className="w-full bg-zinc-700 text-zinc-300 text-xs cursor-wait" disabled>
+              <span className="inline-block h-3 w-3 mr-1.5 border-2 border-zinc-500 border-t-transparent rounded-full animate-spin" />
+              Loading...
+            </Button>
           ) : isPro ? (
             // Pro user - direct to roadmap creation
             <Link href={`/roadmap/new?company=${company.id}`}>
@@ -422,7 +441,7 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
           )}
 
           {/* Show what Pro includes for free users */}
-          {isLoggedIn && !isPro && (
+          {isLoggedIn && !isProLoading && !isPro && (
             <p className="text-[10px] text-zinc-500 mt-2 text-center">
               Personalized roadmap is a Pro feature
             </p>

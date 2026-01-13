@@ -120,14 +120,6 @@ export function GatedSidebar({
   )
 }
 
-interface CompanyStatProps {
-  companyName: string
-  companyId: string
-  patternsCount: number
-  questionsCount: number
-  roundsCount: number
-}
-
 export function SocialProofBanner({ companyName }: { companyName: string }) {
   const { user } = useAuth()
 
