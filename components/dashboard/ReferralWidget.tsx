@@ -151,22 +151,31 @@ export function ReferralWidget() {
           )}
         </div>
 
-        {/* Referral Code */}
-        <div className="mb-3 flex items-center gap-2">
-          <div className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2">
-            <p className="font-mono text-sm tracking-wider text-white">{stats.referralCode}</p>
+        {/* Shareable Link */}
+        <div className="mb-3">
+          <p className="mb-1.5 text-[10px] tracking-wide text-zinc-500 uppercase">
+            Your referral link
+          </p>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 overflow-hidden rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2">
+              <p className="truncate text-xs text-white">{stats.shareUrl}</p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyToClipboard}
+              className="shrink-0 border-zinc-700 hover:bg-zinc-800"
+            >
+              {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+            </Button>
+            <Button
+              size="sm"
+              onClick={shareNative}
+              className="shrink-0 bg-purple-600 hover:bg-purple-700"
+            >
+              <Share2 className="h-4 w-4" />
+            </Button>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={copyToClipboard}
-            className="border-zinc-700 hover:bg-zinc-800"
-          >
-            {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
-          </Button>
-          <Button size="sm" onClick={shareNative} className="bg-purple-600 hover:bg-purple-700">
-            <Share2 className="h-4 w-4" />
-          </Button>
         </div>
 
         {/* Stats */}
@@ -203,9 +212,16 @@ export function ReferralWidget() {
         <div className="mt-3 rounded-lg border border-dashed border-zinc-700 p-2">
           <p className="text-[11px] leading-relaxed text-zinc-400">
             <span className="font-medium text-purple-400">Earn rewards:</span> Get{" "}
-            <span className="text-green-400">$10</span> per signup +{" "}
-            <span className="text-purple-400">1 free month</span> when they upgrade to Pro
+            <span className="text-purple-400">1 free month</span> per signup +{" "}
+            <span className="text-green-400">$10</span> &{" "}
+            <span className="text-purple-400">1 extra month</span> when they upgrade to Pro
           </p>
+          <a
+            href="/referral-terms"
+            className="mt-1 block text-[10px] text-zinc-500 underline hover:text-zinc-400"
+          >
+            Terms & Conditions
+          </a>
         </div>
       </CardContent>
     </Card>

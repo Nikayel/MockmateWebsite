@@ -632,6 +632,8 @@ export async function markSessionEvaluating(
     chatMessages?: Array<{ type: string; message: string }>
     interviewerMessages?: Array<{ type: string; message: string }>
     testResults?: Array<any>
+    testSummary?: { total: number; passed: number; failed: number; passRate: number }
+    isPostInterviewDiscussion?: boolean
   }
 ): Promise<void> {
   try {
@@ -653,6 +655,8 @@ export async function markSessionEvaluating(
           test_results: state.testResults
             ? sanitizeTestResultsForFirestore(state.testResults.slice(-20))
             : undefined,
+          test_summary: state.testSummary,
+          is_post_interview_discussion: state.isPostInterviewDiscussion ?? true, // Default to true when marking evaluating
           saved_at: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),
@@ -679,6 +683,8 @@ export async function saveSessionState(
     chatMessages?: Array<{ type: string; message: string }>
     interviewerMessages?: Array<{ type: string; message: string }>
     testResults?: Array<any>
+    testSummary?: { total: number; passed: number; failed: number; passRate: number }
+    isPostInterviewDiscussion?: boolean
   }
 ): Promise<void> {
   try {
@@ -695,6 +701,8 @@ export async function saveSessionState(
           test_results: state.testResults
             ? sanitizeTestResultsForFirestore(state.testResults.slice(-20))
             : undefined,
+          test_summary: state.testSummary,
+          is_post_interview_discussion: state.isPostInterviewDiscussion ?? false,
           saved_at: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),
@@ -716,6 +724,8 @@ export async function getSessionState(sessionId: string): Promise<{
   chatMessages?: Array<{ type: string; message: string }>
   interviewerMessages?: Array<{ type: string; message: string }>
   testResults?: Array<any>
+  testSummary?: { total: number; passed: number; failed: number; passRate: number }
+  isPostInterviewDiscussion?: boolean
   savedAt?: string
   completedAt?: string
   feedbackStatus?: FeedbackStatus
@@ -738,6 +748,8 @@ export async function getSessionState(sessionId: string): Promise<{
       chatMessages?: Array<{ type: string; message: string }>
       interviewerMessages?: Array<{ type: string; message: string }>
       testResults?: Array<any>
+      testSummary?: { total: number; passed: number; failed: number; passRate: number }
+      isPostInterviewDiscussion?: boolean
       savedAt?: string
       completedAt?: string
       feedbackStatus?: FeedbackStatus
@@ -758,6 +770,8 @@ export async function getSessionState(sessionId: string): Promise<{
       result.chatMessages = data.session_state.chat_messages
       result.interviewerMessages = data.session_state.interviewer_messages
       result.testResults = data.session_state.test_results
+      result.testSummary = data.session_state.test_summary
+      result.isPostInterviewDiscussion = data.session_state.is_post_interview_discussion ?? false
       result.savedAt = data.session_state.saved_at
     }
 

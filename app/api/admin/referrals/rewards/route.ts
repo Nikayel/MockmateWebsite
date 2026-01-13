@@ -4,14 +4,10 @@
  * Endpoints for managing referral rewards (payouts and credits).
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { getPendingRewards, markRewardPaid } from '@/lib/referrals'
-import {
-  requirePermission,
-  errorResponse,
-  unauthorizedResponse,
-} from '@/lib/admin/middleware'
-import { PERMISSIONS } from '@/lib/admin/rbac'
+import { NextRequest, NextResponse } from "next/server"
+import { getPendingRewards, markRewardPaid } from "@/lib/referrals"
+import { requirePermission, errorResponse, unauthorizedResponse } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
 
 /**
  * GET /api/admin/referrals/rewards
@@ -32,11 +28,8 @@ export async function GET(request: NextRequest) {
       data: rewards,
     })
   } catch (error) {
-    console.error('[Admin Rewards API] Error:', error)
-    return errorResponse(
-      error instanceof Error ? error.message : 'Failed to fetch rewards',
-      500
-    )
+    console.error("[Admin Rewards API] Error:", error)
+    return errorResponse(error instanceof Error ? error.message : "Failed to fetch rewards", 500)
   }
 }
 
@@ -60,24 +53,21 @@ export async function POST(request: NextRequest) {
     const { rewardId, notes } = body
 
     if (!rewardId) {
-      return errorResponse('rewardId is required', 400)
+      return errorResponse("rewardId is required", 400)
     }
 
-    const success = await markRewardPaid(rewardId, authResult.userId!, notes)
+    const success = await markRewardPaid(rewardId, authResult.context!.userId, notes)
 
     if (!success) {
-      return errorResponse('Failed to process reward - may already be processed', 400)
+      return errorResponse("Failed to process reward - may already be processed", 400)
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Reward processed successfully',
+      message: "Reward processed successfully",
     })
   } catch (error) {
-    console.error('[Admin Rewards API] Error processing reward:', error)
-    return errorResponse(
-      error instanceof Error ? error.message : 'Failed to process reward',
-      500
-    )
+    console.error("[Admin Rewards API] Error processing reward:", error)
+    return errorResponse(error instanceof Error ? error.message : "Failed to process reward", 500)
   }
 }

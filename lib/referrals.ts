@@ -6,22 +6,23 @@
  * - Track who referred who
  * - Calculate viral coefficient
  *
- * REWARDS:
- * - $10 cash when someone signs up with your code (manual payout)
- * - 1 free month when your referral upgrades to Pro (Stripe credit)
+ * REWARDS (for referrer):
+ * - 1 free month when someone signs up with your code
+ * - $10 cash + 1 extra free month when your referral upgrades to Pro
  */
 
-import { adminDb } from './firebase-admin'
-import { FieldValue } from 'firebase-admin/firestore'
-import { logger } from './logger'
-import { customAlphabet } from 'nanoid'
+import { adminDb } from "./firebase-admin"
+import { FieldValue } from "firebase-admin/firestore"
+import { logger } from "./logger"
+import { customAlphabet } from "nanoid"
 
 // Generate URL-safe, easy-to-share referral codes
-const generateCode = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 8)
+const generateCode = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 8)
 
 // Reward amounts
-const SIGNUP_REWARD_CASH = 10 // $10 per signup (manual payout)
-const CONVERSION_REWARD_MONTHS = 1 // 1 free month when referral upgrades
+const SIGNUP_REWARD_MONTHS = 1 // 1 free month per signup
+const CONVERSION_REWARD_CASH = 10 // $10 when referral upgrades to Pro
+const CONVERSION_REWARD_MONTHS = 1 // 1 extra free month when referral upgrades
 
 export interface ReferralRecord {
   referrerId: string
@@ -31,9 +32,13 @@ export interface ReferralRecord {
   convertedToPro: boolean
   convertedDate?: Date
   // Reward tracking
-  signupRewardAmount: number // $10
-  signupRewardPaid: boolean
-  signupRewardPaidAt?: Date
+  signupRewardMonths: number // 1 free month on signup
+  signupRewardCredited: boolean
+  signupRewardCreditedAt?: Date
+  conversionRewardCash: number // $10 on Pro upgrade
+  conversionRewardCashPaid: boolean
+  conversionRewardCashPaidAt?: Date
+  conversionRewardMonths: number // 1 extra free month on Pro upgrade
   conversionRewardCredited: boolean
   conversionRewardCreditedAt?: Date
 }
@@ -42,9 +47,9 @@ export interface ReferralReward {
   id?: string
   referrerId: string
   referredUserId: string
-  type: 'signup_cash' | 'conversion_credit'
+  type: "signup_credit" | "conversion_cash" | "conversion_credit"
   amount: number // $ for cash, months for credit
-  status: 'pending' | 'paid' | 'credited' | 'expired'
+  status: "pending" | "paid" | "credited" | "expired"
   createdAt: Date
   processedAt?: Date
   processedBy?: string // Admin who processed it
@@ -78,7 +83,7 @@ export interface ReferralStats {
  */
 export async function generateReferralCode(userId: string): Promise<string> {
   // Check if user already has a code
-  const userDoc = await adminDb.collection('users').doc(userId).get()
+  const userDoc = await adminDb.collection("users").doc(userId).get()
   const existingCode = userDoc.data()?.referralCode
 
   if (existingCode) {
@@ -93,8 +98,8 @@ export async function generateReferralCode(userId: string): Promise<string> {
   while (attempts < maxAttempts) {
     // Check if code already exists
     const existing = await adminDb
-      .collection('users')
-      .where('referralCode', '==', code)
+      .collection("users")
+      .where("referralCode", "==", code)
       .limit(1)
       .get()
 
@@ -104,13 +109,16 @@ export async function generateReferralCode(userId: string): Promise<string> {
     attempts++
   }
 
-  // Save code to user
-  await adminDb.collection('users').doc(userId).update({
-    referralCode: code,
-    referralCodeCreatedAt: FieldValue.serverTimestamp(),
-  })
+  // Save code to user (use set with merge in case user doc doesn't exist yet)
+  await adminDb.collection("users").doc(userId).set(
+    {
+      referralCode: code,
+      referralCodeCreatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  )
 
-  logger.info('Generated referral code', { userId, code })
+  logger.info("Generated referral code", { userId, code })
 
   return code
 }
@@ -119,7 +127,7 @@ export async function generateReferralCode(userId: string): Promise<string> {
  * Get user's referral code (generate if doesn't exist)
  */
 export async function getUserReferralCode(userId: string): Promise<string> {
-  const userDoc = await adminDb.collection('users').doc(userId).get()
+  const userDoc = await adminDb.collection("users").doc(userId).get()
   const existingCode = userDoc.data()?.referralCode
 
   if (existingCode) {
@@ -135,8 +143,8 @@ export async function getUserReferralCode(userId: string): Promise<string> {
 export async function getUserByReferralCode(code: string): Promise<string | null> {
   try {
     const snapshot = await adminDb
-      .collection('users')
-      .where('referralCode', '==', code.toUpperCase())
+      .collection("users")
+      .where("referralCode", "==", code.toUpperCase())
       .limit(1)
       .get()
 
@@ -144,7 +152,7 @@ export async function getUserByReferralCode(code: string): Promise<string | null
 
     return snapshot.docs[0].id
   } catch (error) {
-    logger.error('Failed to lookup referral code', { error, code })
+    logger.error("Failed to lookup referral code", { error, code })
     return null
   }
 }
@@ -162,88 +170,101 @@ export async function recordReferral(
     const referrerId = await getUserByReferralCode(referralCode)
 
     if (!referrerId) {
-      logger.warn('Invalid referral code', { code: referralCode })
+      logger.warn("Invalid referral code", { code: referralCode })
       return false
     }
 
     // Don't allow self-referrals
     if (referrerId === referredUserId) {
-      logger.warn('Self-referral attempted', { userId: referredUserId })
+      logger.warn("Self-referral attempted", { userId: referredUserId })
       return false
     }
 
     // Check if this referral already exists
     const existing = await adminDb
-      .collection('referrals')
-      .where('referredUserId', '==', referredUserId)
+      .collection("referrals")
+      .where("referredUserId", "==", referredUserId)
       .limit(1)
       .get()
 
     if (!existing.empty) {
-      logger.warn('User already has a referrer', { referredUserId })
+      logger.warn("User already has a referrer", { referredUserId })
       return false
     }
 
     // Record the referral with reward tracking
-    const referralRef = await adminDb.collection('referrals').add({
+    const referralRef = await adminDb.collection("referrals").add({
       referrerId,
       referredUserId,
       referralCode: referralCode.toUpperCase(),
       signupDate: FieldValue.serverTimestamp(),
       convertedToPro: false,
-      // Reward tracking
-      signupRewardAmount: SIGNUP_REWARD_CASH,
-      signupRewardPaid: false,
+      // Reward tracking - 1 free month on signup
+      signupRewardMonths: SIGNUP_REWARD_MONTHS,
+      signupRewardCredited: false,
+      // Conversion rewards (pending until they upgrade)
+      conversionRewardCash: CONVERSION_REWARD_CASH,
+      conversionRewardCashPaid: false,
+      conversionRewardMonths: CONVERSION_REWARD_MONTHS,
       conversionRewardCredited: false,
     })
 
-    // Create the $10 signup reward (pending)
-    await adminDb.collection('referral_rewards').add({
+    // Create the 1 free month signup reward (pending)
+    await adminDb.collection("referral_rewards").add({
       referrerId,
       referredUserId,
       referralId: referralRef.id,
-      type: 'signup_cash',
-      amount: SIGNUP_REWARD_CASH,
-      status: 'pending',
+      type: "signup_credit",
+      amount: SIGNUP_REWARD_MONTHS,
+      status: "pending",
       createdAt: FieldValue.serverTimestamp(),
     })
 
     // Update referred user's profile
-    await adminDb.collection('users').doc(referredUserId).update({
-      referredBy: referrerId,
-      referredByCode: referralCode.toUpperCase(),
-      referredAt: FieldValue.serverTimestamp(),
-    })
+    await adminDb.collection("users").doc(referredUserId).set(
+      {
+        referredBy: referrerId,
+        referredByCode: referralCode.toUpperCase(),
+        referredAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    )
 
-    // Increment referrer's count and pending rewards
-    await adminDb.collection('users').doc(referrerId).update({
-      referralCount: FieldValue.increment(1),
-      pendingCashRewards: FieldValue.increment(SIGNUP_REWARD_CASH),
-    })
+    // Increment referrer's count and pending free months
+    await adminDb
+      .collection("users")
+      .doc(referrerId)
+      .set(
+        {
+          referralCount: FieldValue.increment(1),
+          pendingFreeMonths: FieldValue.increment(SIGNUP_REWARD_MONTHS),
+        },
+        { merge: true }
+      )
 
-    logger.info('Referral recorded with $10 reward', {
+    logger.info("Referral recorded with 1 free month reward", {
       referrerId,
       referredUserId,
       referralCode,
-      rewardAmount: SIGNUP_REWARD_CASH,
+      rewardMonths: SIGNUP_REWARD_MONTHS,
     })
 
     return true
   } catch (error) {
-    logger.error('Failed to record referral', { error, referredUserId, referralCode })
+    logger.error("Failed to record referral", { error, referredUserId, referralCode })
     return false
   }
 }
 
 /**
  * Mark a referral as converted (when referred user upgrades to Pro)
- * Creates a free month credit reward for the referrer
+ * Creates $10 cash + 1 extra free month reward for the referrer
  */
 export async function markReferralConverted(referredUserId: string): Promise<void> {
   try {
     const snapshot = await adminDb
-      .collection('referrals')
-      .where('referredUserId', '==', referredUserId)
+      .collection("referrals")
+      .where("referredUserId", "==", referredUserId)
       .limit(1)
       .get()
 
@@ -260,31 +281,49 @@ export async function markReferralConverted(referredUserId: string): Promise<voi
       convertedDate: FieldValue.serverTimestamp(),
     })
 
-    // Create the free month credit reward (pending)
-    // This will be applied when admin processes it, or auto-applied via Stripe
-    await adminDb.collection('referral_rewards').add({
+    // Create the $10 cash reward (pending manual payout)
+    await adminDb.collection("referral_rewards").add({
       referrerId,
       referredUserId,
       referralId: doc.id,
-      type: 'conversion_credit',
-      amount: CONVERSION_REWARD_MONTHS,
-      status: 'pending',
+      type: "conversion_cash",
+      amount: CONVERSION_REWARD_CASH,
+      status: "pending",
       createdAt: FieldValue.serverTimestamp(),
     })
 
-    // Increment referrer's conversion count and pending credits
-    await adminDb.collection('users').doc(referrerId).update({
-      referralConversions: FieldValue.increment(1),
-      pendingFreeMonths: FieldValue.increment(CONVERSION_REWARD_MONTHS),
-    })
-
-    logger.info('Referral converted - free month credit created', {
+    // Create the 1 extra free month credit reward (pending)
+    await adminDb.collection("referral_rewards").add({
       referrerId,
       referredUserId,
+      referralId: doc.id,
+      type: "conversion_credit",
+      amount: CONVERSION_REWARD_MONTHS,
+      status: "pending",
+      createdAt: FieldValue.serverTimestamp(),
+    })
+
+    // Increment referrer's conversion count, pending cash, and pending credits
+    await adminDb
+      .collection("users")
+      .doc(referrerId)
+      .set(
+        {
+          referralConversions: FieldValue.increment(1),
+          pendingCashRewards: FieldValue.increment(CONVERSION_REWARD_CASH),
+          pendingFreeMonths: FieldValue.increment(CONVERSION_REWARD_MONTHS),
+        },
+        { merge: true }
+      )
+
+    logger.info("Referral converted - $10 cash + 1 free month created", {
+      referrerId,
+      referredUserId,
+      cashReward: CONVERSION_REWARD_CASH,
       creditMonths: CONVERSION_REWARD_MONTHS,
     })
   } catch (error) {
-    logger.error('Failed to mark referral converted', { error, referredUserId })
+    logger.error("Failed to mark referral converted", { error, referredUserId })
   }
 }
 
@@ -304,9 +343,9 @@ export async function getPendingRewards(): Promise<{
 
   try {
     const pendingSnapshot = await adminDb
-      .collection('referral_rewards')
-      .where('status', '==', 'pending')
-      .orderBy('createdAt', 'desc')
+      .collection("referral_rewards")
+      .where("status", "==", "pending")
+      .orderBy("createdAt", "desc")
       .get()
 
     for (const doc of pendingSnapshot.docs) {
@@ -314,28 +353,28 @@ export async function getPendingRewards(): Promise<{
 
       // Get user emails
       const [referrerDoc, referredDoc] = await Promise.all([
-        adminDb.collection('users').doc(data.referrerId).get(),
-        adminDb.collection('users').doc(data.referredUserId).get(),
+        adminDb.collection("users").doc(data.referrerId).get(),
+        adminDb.collection("users").doc(data.referredUserId).get(),
       ])
 
       const reward = {
         id: doc.id,
         ...data,
         createdAt: data.createdAt?.toDate() || new Date(),
-        referrerEmail: referrerDoc.data()?.email || 'Unknown',
-        referredEmail: referredDoc.data()?.email || 'Unknown',
+        referrerEmail: referrerDoc.data()?.email || "Unknown",
+        referredEmail: referredDoc.data()?.email || "Unknown",
       } as ReferralReward & { referrerEmail: string; referredEmail: string }
 
-      if (data.type === 'signup_cash') {
+      if (data.type === "conversion_cash") {
         result.cashRewards.push(reward)
         result.totals.pendingCash += data.amount
-      } else if (data.type === 'conversion_credit') {
+      } else if (data.type === "signup_credit" || data.type === "conversion_credit") {
         result.creditRewards.push(reward)
         result.totals.pendingCredits += data.amount
       }
     }
   } catch (error) {
-    logger.error('Failed to get pending rewards', { error })
+    logger.error("Failed to get pending rewards", { error })
   }
 
   return result
@@ -350,35 +389,41 @@ export async function markRewardPaid(
   notes?: string
 ): Promise<boolean> {
   try {
-    const rewardRef = adminDb.collection('referral_rewards').doc(rewardId)
+    const rewardRef = adminDb.collection("referral_rewards").doc(rewardId)
     const rewardDoc = await rewardRef.get()
 
     if (!rewardDoc.exists) return false
-    if (rewardDoc.data()?.status !== 'pending') return false
+    if (rewardDoc.data()?.status !== "pending") return false
 
     const { referrerId, amount, type } = rewardDoc.data()!
 
     await rewardRef.update({
-      status: type === 'signup_cash' ? 'paid' : 'credited',
+      status: type === "signup_cash" ? "paid" : "credited",
       processedAt: FieldValue.serverTimestamp(),
       processedBy: adminUserId,
       notes: notes || undefined,
     })
 
     // Update user's pending amount
-    if (type === 'signup_cash') {
-      await adminDb.collection('users').doc(referrerId).update({
-        pendingCashRewards: FieldValue.increment(-amount),
-        totalCashEarned: FieldValue.increment(amount),
-      })
+    if (type === "signup_cash") {
+      await adminDb
+        .collection("users")
+        .doc(referrerId)
+        .update({
+          pendingCashRewards: FieldValue.increment(-amount),
+          totalCashEarned: FieldValue.increment(amount),
+        })
     } else {
-      await adminDb.collection('users').doc(referrerId).update({
-        pendingFreeMonths: FieldValue.increment(-amount),
-        totalFreeMonthsEarned: FieldValue.increment(amount),
-      })
+      await adminDb
+        .collection("users")
+        .doc(referrerId)
+        .update({
+          pendingFreeMonths: FieldValue.increment(-amount),
+          totalFreeMonthsEarned: FieldValue.increment(amount),
+        })
     }
 
-    logger.info('Reward marked as processed', {
+    logger.info("Reward marked as processed", {
       rewardId,
       type,
       amount,
@@ -387,7 +432,7 @@ export async function markRewardPaid(
 
     return true
   } catch (error) {
-    logger.error('Failed to mark reward paid', { error, rewardId })
+    logger.error("Failed to mark reward paid", { error, rewardId })
     return false
   }
 }
@@ -410,17 +455,17 @@ export async function getUserReferralStats(userId: string): Promise<{
   const code = await getUserReferralCode(userId)
 
   try {
-    const userDoc = await adminDb.collection('users').doc(userId).get()
+    const userDoc = await adminDb.collection("users").doc(userId).get()
     const userData = userDoc.data()
 
     const referralsSnapshot = await adminDb
-      .collection('referrals')
-      .where('referrerId', '==', userId)
-      .orderBy('signupDate', 'desc')
+      .collection("referrals")
+      .where("referrerId", "==", userId)
+      .orderBy("signupDate", "desc")
       .limit(50)
       .get()
 
-    const referredUsers = referralsSnapshot.docs.map(doc => ({
+    const referredUsers = referralsSnapshot.docs.map((doc) => ({
       signupDate: doc.data().signupDate?.toDate() || new Date(),
       converted: doc.data().convertedToPro || false,
     }))
@@ -438,7 +483,7 @@ export async function getUserReferralStats(userId: string): Promise<{
       },
     }
   } catch (error) {
-    logger.error('Failed to get user referral stats', { error, userId })
+    logger.error("Failed to get user referral stats", { error, userId })
     return {
       referralCode: code,
       referralCount: 0,
@@ -465,8 +510,8 @@ export interface DetailedReferral {
   convertedToPro: boolean
   convertedDate?: Date
   // Reward status
-  signupRewardStatus: 'pending' | 'paid'
-  conversionRewardStatus: 'pending' | 'credited' | 'n/a'
+  signupRewardStatus: "pending" | "credited" // 1 free month on signup
+  conversionRewardStatus: "pending" | "credited" | "n/a" // $10 + 1 month on Pro upgrade
 }
 
 /**
@@ -477,15 +522,13 @@ export async function getAllReferralsDetailed(): Promise<DetailedReferral[]> {
 
   try {
     const referralsSnapshot = await adminDb
-      .collection('referrals')
-      .orderBy('signupDate', 'desc')
+      .collection("referrals")
+      .orderBy("signupDate", "desc")
       .limit(100)
       .get()
 
     // Get all rewards to check status
-    const rewardsSnapshot = await adminDb
-      .collection('referral_rewards')
-      .get()
+    const rewardsSnapshot = await adminDb.collection("referral_rewards").get()
 
     // Build a map of rewards by referral
     const rewardsByReferral = new Map<string, { signup: string; conversion: string }>()
@@ -493,13 +536,18 @@ export async function getAllReferralsDetailed(): Promise<DetailedReferral[]> {
       const data = doc.data()
       const referralId = data.referralId
       if (!rewardsByReferral.has(referralId)) {
-        rewardsByReferral.set(referralId, { signup: 'pending', conversion: 'n/a' })
+        rewardsByReferral.set(referralId, { signup: "pending", conversion: "n/a" })
       }
       const entry = rewardsByReferral.get(referralId)!
-      if (data.type === 'signup_cash') {
-        entry.signup = data.status === 'paid' ? 'paid' : 'pending'
-      } else if (data.type === 'conversion_credit') {
-        entry.conversion = data.status === 'credited' ? 'credited' : 'pending'
+      if (data.type === "signup_credit") {
+        entry.signup = data.status === "credited" ? "credited" : "pending"
+      } else if (data.type === "conversion_credit" || data.type === "conversion_cash") {
+        // Mark conversion as credited if any conversion reward is processed
+        if (data.status === "credited" || data.status === "paid") {
+          entry.conversion = "credited"
+        } else if (entry.conversion === "n/a") {
+          entry.conversion = "pending"
+        }
       }
     }
 
@@ -514,32 +562,32 @@ export async function getAllReferralsDetailed(): Promise<DetailedReferral[]> {
     // Fetch all users in parallel
     const userEmails = new Map<string, string>()
     const userPromises = Array.from(userIds).map(async (userId) => {
-      const userDoc = await adminDb.collection('users').doc(userId).get()
-      userEmails.set(userId, userDoc.data()?.email || 'Unknown')
+      const userDoc = await adminDb.collection("users").doc(userId).get()
+      userEmails.set(userId, userDoc.data()?.email || "Unknown")
     })
     await Promise.all(userPromises)
 
     // Build detailed referral list
     for (const doc of referralsSnapshot.docs) {
       const data = doc.data()
-      const rewards = rewardsByReferral.get(doc.id) || { signup: 'pending', conversion: 'n/a' }
+      const rewards = rewardsByReferral.get(doc.id) || { signup: "pending", conversion: "n/a" }
 
       referrals.push({
         id: doc.id,
-        referrerEmail: userEmails.get(data.referrerId) || 'Unknown',
+        referrerEmail: userEmails.get(data.referrerId) || "Unknown",
         referrerId: data.referrerId,
-        referredEmail: userEmails.get(data.referredUserId) || 'Unknown',
+        referredEmail: userEmails.get(data.referredUserId) || "Unknown",
         referredUserId: data.referredUserId,
         referralCode: data.referralCode,
         signupDate: data.signupDate?.toDate() || new Date(),
         convertedToPro: data.convertedToPro || false,
         convertedDate: data.convertedDate?.toDate(),
-        signupRewardStatus: rewards.signup as 'pending' | 'paid',
-        conversionRewardStatus: rewards.conversion as 'pending' | 'credited' | 'n/a',
+        signupRewardStatus: rewards.signup as "pending" | "credited",
+        conversionRewardStatus: rewards.conversion as "pending" | "credited" | "n/a",
       })
     }
   } catch (error) {
-    logger.error('Failed to get detailed referrals', { error })
+    logger.error("Failed to get detailed referrals", { error })
   }
 
   return referrals
@@ -565,13 +613,13 @@ export async function getReferralStats(): Promise<ReferralStats> {
   try {
     // Get all referrals
     const referralsSnapshot = await adminDb
-      .collection('referrals')
-      .orderBy('signupDate', 'desc')
+      .collection("referrals")
+      .orderBy("signupDate", "desc")
       .get()
 
     stats.totalReferrals = referralsSnapshot.size
     stats.totalConversions = referralsSnapshot.docs.filter(
-      doc => doc.data().convertedToPro
+      (doc) => doc.data().convertedToPro
     ).length
 
     if (stats.totalReferrals > 0) {
@@ -589,7 +637,7 @@ export async function getReferralStats(): Promise<ReferralStats> {
       // Get week key (ISO week)
       const weekStart = new Date(signupDate)
       weekStart.setDate(weekStart.getDate() - weekStart.getDay())
-      const weekKey = weekStart.toISOString().split('T')[0]
+      const weekKey = weekStart.toISOString().split("T")[0]
 
       if (!weeklyMap.has(weekKey)) {
         weeklyMap.set(weekKey, { referrals: 0, conversions: 0 })
@@ -606,7 +654,7 @@ export async function getReferralStats(): Promise<ReferralStats> {
       .slice(0, 12) // Last 12 weeks
 
     // Count organic vs referred signups
-    const usersSnapshot = await adminDb.collection('users').get()
+    const usersSnapshot = await adminDb.collection("users").get()
     const totalUsers = usersSnapshot.size
 
     stats.referralsBySource.referred = stats.totalReferrals
@@ -641,17 +689,16 @@ export async function getReferralStats(): Promise<ReferralStats> {
 
     // Fetch user details for top referrers
     for (const [userId, counts] of topReferrerIds) {
-      const userDoc = await adminDb.collection('users').doc(userId).get()
+      const userDoc = await adminDb.collection("users").doc(userId).get()
       stats.topReferrers.push({
         userId,
-        email: userDoc.data()?.email || 'Unknown',
+        email: userDoc.data()?.email || "Unknown",
         referralCount: counts.count,
         conversions: counts.conversions,
       })
     }
-
   } catch (error) {
-    logger.error('Failed to get referral stats', { error })
+    logger.error("Failed to get referral stats", { error })
   }
 
   return stats
