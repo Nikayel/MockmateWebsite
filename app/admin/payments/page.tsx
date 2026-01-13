@@ -3,22 +3,27 @@
 import { useEffect, useState, useCallback } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MetricCard } from "@/components/admin/charts"
+import { PageHeader } from "@/components/admin/shared"
 import {
   CreditCard,
-  RefreshCw,
   Loader2,
   AlertCircle,
   DollarSign,
   TrendingDown,
   Activity,
-  XCircle,
   CheckCircle,
   Webhook,
   Ban,
 } from "lucide-react"
+import {
+  typography,
+  spacing,
+  cardStyles,
+  tableStyles,
+  badgeVariants,
+} from "@/lib/admin/design-system"
 
 interface PaymentRecord {
   id: string
@@ -103,20 +108,20 @@ export default function PaymentsPage() {
     loadData()
   }, [loadData])
 
-  const getWebhookBadgeColor = (eventType: string) => {
+  const getWebhookBadgeVariant = (eventType: string) => {
     if (eventType.includes('succeeded') || eventType.includes('paid')) {
-      return 'bg-green-500/20 text-green-400 border-green-500/30'
+      return badgeVariants.success
     }
     if (eventType.includes('failed') || eventType.includes('refund')) {
-      return 'bg-red-500/20 text-red-400 border-red-500/30'
+      return badgeVariants.error
     }
-    return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+    return badgeVariants.info
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-12 w-12 animate-spin text-[#00d9ff]" />
+        <Loader2 className="h-10 w-10 animate-spin text-[#00d9ff]" />
       </div>
     )
   }
@@ -124,39 +129,27 @@ export default function PaymentsPage() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <AlertCircle className="h-12 w-12 text-red-400" />
-        <p className="text-red-400">{error}</p>
-        <Button onClick={() => loadData()} variant="outline">
-          Retry
-        </Button>
+        <AlertCircle className="h-10 w-10 text-red-400" />
+        <p className="text-red-400 text-sm">{error}</p>
+        <button
+          onClick={() => loadData()}
+          className="text-sm text-gray-400 hover:text-white underline"
+        >
+          Try again
+        </button>
       </div>
     )
   }
 
   return (
-    <div className="space-y-8">
+    <div className={spacing.pageGap}>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-heading font-bold text-white">Payments & Webhooks</h1>
-          <p className="text-gray-400 mt-1">Monitor payments, refunds, and Stripe webhook activity</p>
-        </div>
-
-        <Button
-          onClick={loadData}
-          variant="outline"
-          size="sm"
-          disabled={refreshing}
-          className="border-gray-700 text-gray-400 hover:text-white"
-        >
-          {refreshing ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4 mr-2" />
-          )}
-          Refresh
-        </Button>
-      </div>
+      <PageHeader
+        title="Payments & Webhooks"
+        subtitle="Monitor payments, refunds, and Stripe webhook activity"
+        onRefresh={loadData}
+        refreshing={refreshing}
+      />
 
       {/* Revenue Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -166,6 +159,7 @@ export default function PaymentsPage() {
           subtitle={`${data?.paymentCount || 0} payments`}
           icon={DollarSign}
           valueColor="text-green-400"
+          iconColor="text-green-400"
         />
         <MetricCard
           title="Total Refunds"
@@ -173,6 +167,7 @@ export default function PaymentsPage() {
           subtitle={`${data?.refundCount || 0} refunds`}
           icon={TrendingDown}
           valueColor="text-red-400"
+          iconColor="text-red-400"
         />
         <MetricCard
           title="Net Revenue"
@@ -191,42 +186,46 @@ export default function PaymentsPage() {
       </div>
 
       {/* Recent Payments */}
-      <Card className="bg-gray-900/50 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
+      <Card className={cardStyles.default}>
+        <CardHeader className="pb-4">
+          <CardTitle className={typography.cardTitle}>
             <CheckCircle className="h-5 w-5 text-green-400" />
             Recent Payments
           </CardTitle>
-          <CardDescription>Successful payments from Stripe</CardDescription>
+          <CardDescription className={typography.cardDescription}>
+            Successful payments from Stripe
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className={tableStyles.container}>
+            <table className={tableStyles.table}>
               <thead>
-                <tr className="border-b border-gray-800 text-gray-400">
-                  <th className="text-left py-2 px-3">User</th>
-                  <th className="text-left py-2 px-3">Type</th>
-                  <th className="text-right py-2 px-3">Amount</th>
-                  <th className="text-left py-2 px-3">Description</th>
-                  <th className="text-left py-2 px-3">Date</th>
+                <tr className={tableStyles.headerRow}>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>User</th>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Type</th>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Amount</th>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Description</th>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Date</th>
                 </tr>
               </thead>
               <tbody>
                 {data?.recentPayments.map((payment) => (
-                  <tr key={payment.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                    <td className="py-2 px-3 text-white">{payment.userEmail || payment.userId}</td>
-                    <td className="py-2 px-3">
-                      <Badge variant="outline" className="text-gray-400 border-gray-700">
+                  <tr key={payment.id} className={tableStyles.row}>
+                    <td className={`${spacing.tableCellPadding} ${typography.tableCell}`}>
+                      {payment.userEmail || payment.userId}
+                    </td>
+                    <td className={spacing.tableCellPadding}>
+                      <Badge variant="outline" className={badgeVariants.muted}>
                         {payment.type}
                       </Badge>
                     </td>
-                    <td className="py-2 px-3 text-right text-green-400 font-medium">
+                    <td className={`${spacing.tableCellPadding} text-right text-green-400 font-medium tabular-nums`}>
                       ${payment.amount.toFixed(2)}
                     </td>
-                    <td className="py-2 px-3 text-gray-400 truncate max-w-[200px]">
+                    <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted} truncate max-w-[200px]`}>
                       {payment.description || '-'}
                     </td>
-                    <td className="py-2 px-3 text-gray-500">
+                    <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
                       {new Date(payment.createdAt).toLocaleDateString()}
                     </td>
                   </tr>
@@ -234,43 +233,47 @@ export default function PaymentsPage() {
               </tbody>
             </table>
             {(!data?.recentPayments || data.recentPayments.length === 0) && (
-              <p className="text-center text-gray-500 py-8">No recent payments</p>
+              <p className={tableStyles.emptyState}>No recent payments</p>
             )}
           </div>
         </CardContent>
       </Card>
 
       {/* Recent Refunds */}
-      <Card className="bg-gray-900/50 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
+      <Card className={cardStyles.default}>
+        <CardHeader className="pb-4">
+          <CardTitle className={typography.cardTitle}>
             <TrendingDown className="h-5 w-5 text-red-400" />
             Recent Refunds
           </CardTitle>
-          <CardDescription>Refunds processed through Stripe</CardDescription>
+          <CardDescription className={typography.cardDescription}>
+            Refunds processed through Stripe
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className={tableStyles.container}>
+            <table className={tableStyles.table}>
               <thead>
-                <tr className="border-b border-gray-800 text-gray-400">
-                  <th className="text-left py-2 px-3">User</th>
-                  <th className="text-right py-2 px-3">Amount</th>
-                  <th className="text-left py-2 px-3">Description</th>
-                  <th className="text-left py-2 px-3">Date</th>
+                <tr className={tableStyles.headerRow}>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>User</th>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Amount</th>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Description</th>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Date</th>
                 </tr>
               </thead>
               <tbody>
                 {data?.recentRefunds.map((refund) => (
-                  <tr key={refund.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                    <td className="py-2 px-3 text-white">{refund.userEmail || refund.userId}</td>
-                    <td className="py-2 px-3 text-right text-red-400 font-medium">
+                  <tr key={refund.id} className={tableStyles.row}>
+                    <td className={`${spacing.tableCellPadding} ${typography.tableCell}`}>
+                      {refund.userEmail || refund.userId}
+                    </td>
+                    <td className={`${spacing.tableCellPadding} text-right text-red-400 font-medium tabular-nums`}>
                       -${refund.amount.toFixed(2)}
                     </td>
-                    <td className="py-2 px-3 text-gray-400">
+                    <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
                       {refund.description || '-'}
                     </td>
-                    <td className="py-2 px-3 text-gray-500">
+                    <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
                       {new Date(refund.createdAt).toLocaleDateString()}
                     </td>
                   </tr>
@@ -278,54 +281,60 @@ export default function PaymentsPage() {
               </tbody>
             </table>
             {(!data?.recentRefunds || data.recentRefunds.length === 0) && (
-              <p className="text-center text-gray-500 py-8">No recent refunds</p>
+              <p className={tableStyles.emptyState}>No recent refunds</p>
             )}
           </div>
         </CardContent>
       </Card>
 
       {/* Voided Rewards (Clawbacks) */}
-      <Card className="bg-gray-900/50 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
+      <Card className={cardStyles.default}>
+        <CardHeader className="pb-4">
+          <CardTitle className={typography.cardTitle}>
             <Ban className="h-5 w-5 text-orange-400" />
             Voided Rewards (Clawbacks)
           </CardTitle>
-          <CardDescription>Referral rewards voided due to refunds or fraud</CardDescription>
+          <CardDescription className={typography.cardDescription}>
+            Referral rewards voided due to refunds or fraud
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className={tableStyles.container}>
+            <table className={tableStyles.table}>
               <thead>
-                <tr className="border-b border-gray-800 text-gray-400">
-                  <th className="text-left py-2 px-3">Referrer</th>
-                  <th className="text-left py-2 px-3">Referred User</th>
-                  <th className="text-left py-2 px-3">Type</th>
-                  <th className="text-right py-2 px-3">Amount</th>
-                  <th className="text-left py-2 px-3">Reason</th>
-                  <th className="text-left py-2 px-3">Date</th>
+                <tr className={tableStyles.headerRow}>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Referrer</th>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Referred User</th>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Type</th>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Amount</th>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Reason</th>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Date</th>
                 </tr>
               </thead>
               <tbody>
                 {data?.voidedRewards.map((reward) => (
-                  <tr key={reward.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                    <td className="py-2 px-3 text-white">{reward.referrerEmail}</td>
-                    <td className="py-2 px-3 text-gray-400">{reward.referredEmail}</td>
-                    <td className="py-2 px-3">
+                  <tr key={reward.id} className={tableStyles.row}>
+                    <td className={`${spacing.tableCellPadding} ${typography.tableCell}`}>
+                      {reward.referrerEmail}
+                    </td>
+                    <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
+                      {reward.referredEmail}
+                    </td>
+                    <td className={spacing.tableCellPadding}>
                       <Badge className={reward.type === 'signup_cash'
-                        ? "bg-green-500/20 text-green-400 border-green-500/30"
-                        : "bg-purple-500/20 text-purple-400 border-purple-500/30"
+                        ? badgeVariants.success
+                        : badgeVariants.purple
                       }>
                         {reward.type === 'signup_cash' ? '$10 Cash' : 'Free Month'}
                       </Badge>
                     </td>
-                    <td className="py-2 px-3 text-right text-orange-400 font-medium">
+                    <td className={`${spacing.tableCellPadding} text-right text-orange-400 font-medium tabular-nums`}>
                       {reward.type === 'signup_cash' ? `$${reward.amount}` : `${reward.amount} mo`}
                     </td>
-                    <td className="py-2 px-3 text-gray-400 truncate max-w-[200px]">
+                    <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted} truncate max-w-[200px]`}>
                       {reward.voidedReason}
                     </td>
-                    <td className="py-2 px-3 text-gray-500">
+                    <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
                       {reward.processedAt ? new Date(reward.processedAt).toLocaleDateString() : '-'}
                     </td>
                   </tr>
@@ -333,43 +342,45 @@ export default function PaymentsPage() {
               </tbody>
             </table>
             {(!data?.voidedRewards || data.voidedRewards.length === 0) && (
-              <p className="text-center text-gray-500 py-8">No voided rewards</p>
+              <p className={tableStyles.emptyState}>No voided rewards</p>
             )}
           </div>
         </CardContent>
       </Card>
 
       {/* Recent Webhook Events */}
-      <Card className="bg-gray-900/50 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
+      <Card className={cardStyles.default}>
+        <CardHeader className="pb-4">
+          <CardTitle className={typography.cardTitle}>
             <Webhook className="h-5 w-5 text-blue-400" />
             Recent Stripe Webhooks
           </CardTitle>
-          <CardDescription>Webhook events received from Stripe</CardDescription>
+          <CardDescription className={typography.cardDescription}>
+            Webhook events received from Stripe
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className={tableStyles.container}>
+            <table className={tableStyles.table}>
               <thead>
-                <tr className="border-b border-gray-800 text-gray-400">
-                  <th className="text-left py-2 px-3">Event Type</th>
-                  <th className="text-left py-2 px-3">Event ID</th>
-                  <th className="text-left py-2 px-3">Processed At</th>
+                <tr className={tableStyles.headerRow}>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Event Type</th>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Event ID</th>
+                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Processed At</th>
                 </tr>
               </thead>
               <tbody>
                 {data?.recentWebhooks.slice(0, 20).map((webhook) => (
-                  <tr key={webhook.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                    <td className="py-2 px-3">
-                      <Badge className={getWebhookBadgeColor(webhook.eventType)}>
+                  <tr key={webhook.id} className={tableStyles.row}>
+                    <td className={spacing.tableCellPadding}>
+                      <Badge className={getWebhookBadgeVariant(webhook.eventType)}>
                         {webhook.eventType}
                       </Badge>
                     </td>
-                    <td className="py-2 px-3 font-mono text-xs text-gray-500">
+                    <td className={`${spacing.tableCellPadding} font-mono text-xs ${typography.tableCellMuted}`}>
                       {webhook.eventId}
                     </td>
-                    <td className="py-2 px-3 text-gray-400">
+                    <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
                       {new Date(webhook.processedAt).toLocaleString()}
                     </td>
                   </tr>
@@ -377,7 +388,7 @@ export default function PaymentsPage() {
               </tbody>
             </table>
             {(!data?.recentWebhooks || data.recentWebhooks.length === 0) && (
-              <p className="text-center text-gray-500 py-8">No recent webhook events</p>
+              <p className={tableStyles.emptyState}>No recent webhook events</p>
             )}
           </div>
         </CardContent>
