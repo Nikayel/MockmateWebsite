@@ -1359,6 +1359,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           edgeCases: getEdgeCasesForInterviewer(),
           // Pass recent topics to prevent repetitive questions
           recentNudgeTopics: recentNudgeTopics,
+          // Pass test results and console logs for interviewer awareness
+          testResults: testResults,
+          consoleLogs: consoleLogs,
         }),
       })
 
@@ -1484,6 +1487,9 @@ Interviews are conversations, not just coding exercises.`
           edgeCases: getEdgeCasesForInterviewer(),
           // Pass recent topics to prevent repetitive questions
           recentNudgeTopics: recentNudgeTopics,
+          // Pass test results and console logs for interviewer awareness
+          testResults: testResults,
+          consoleLogs: consoleLogs,
         }),
       })
 
@@ -1862,6 +1868,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           edgeCases: getEdgeCasesForInterviewer(),
           // Pass recent topics to prevent repetitive questions
           recentNudgeTopics: recentNudgeTopics,
+          // Pass test results and console logs for interviewer awareness
+          testResults: testResults,
+          consoleLogs: consoleLogs,
         }),
       })
 
@@ -2805,6 +2814,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             edgeCases: isInterviewer ? getEdgeCasesForInterviewer() : undefined,
             // Pass recent topics to prevent repetitive questions
             recentNudgeTopics: isInterviewer ? recentNudgeTopics : undefined,
+            // Pass test results and console logs for interviewer awareness
+            testResults: isInterviewer ? testResults : undefined,
+            consoleLogs: isInterviewer ? consoleLogs : undefined,
           }),
         })
 
@@ -3349,6 +3361,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           edgeCases: getEdgeCasesForInterviewer(),
           // Pass recent topics to prevent repetitive questions
           recentNudgeTopics: recentNudgeTopics,
+          // Pass test results and console logs for interviewer awareness
+          testResults: testResults,
+          consoleLogs: consoleLogs,
         }),
       })
 
