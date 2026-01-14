@@ -10,6 +10,9 @@ import { faangCompanies } from "./faang"
 import { topTechCompanies } from "./top-tech"
 import { growthFinanceCompanies } from "./growth-finance"
 import { emergingTechCompanies } from "./emerging-tech"
+import { gamingEntertainmentCompanies } from "./gaming-entertainment"
+import { socialConsumerCompanies } from "./social-consumer"
+import { enterpriseDevtoolsCompanies } from "./enterprise-devtools"
 import { DSAPattern } from "@/lib/types/dsa-patterns"
 
 // Re-export individual company data for direct access
@@ -17,6 +20,9 @@ export * from "./faang"
 export * from "./top-tech"
 export * from "./growth-finance"
 export * from "./emerging-tech"
+export * from "./gaming-entertainment"
+export * from "./social-consumer"
+export * from "./enterprise-devtools"
 
 /**
  * All companies combined
@@ -26,6 +32,9 @@ export const ALL_COMPANIES: CompanyQuestionData[] = [
   ...topTechCompanies,
   ...growthFinanceCompanies,
   ...emergingTechCompanies,
+  ...gamingEntertainmentCompanies,
+  ...socialConsumerCompanies,
+  ...enterpriseDevtoolsCompanies,
 ]
 
 /**
@@ -62,6 +71,21 @@ export const COMPANY_TIERS = {
     name: "Emerging Tech & Delivery",
     description: "Fast-growing tech, fintech, and delivery companies",
     companies: emergingTechCompanies.map((c) => c.id),
+  },
+  gamingEntertainment: {
+    name: "Gaming & Entertainment",
+    description: "Gaming, streaming, and entertainment companies - popular with interns",
+    companies: gamingEntertainmentCompanies.map((c) => c.id),
+  },
+  socialConsumer: {
+    name: "Social & Consumer",
+    description: "Social media and consumer-focused tech companies",
+    companies: socialConsumerCompanies.map((c) => c.id),
+  },
+  enterpriseDevtools: {
+    name: "Enterprise & Developer Tools",
+    description: "Enterprise software, developer tools, and hardware companies",
+    companies: enterpriseDevtoolsCompanies.map((c) => c.id),
   },
 } as const
 
