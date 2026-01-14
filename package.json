@@ -85,7 +85,9 @@
     "input-otp": "1.4.1",
     "js-tiktoken": "^1.0.21",
     "jspdf": "^3.0.4",
+    "lottie-react": "^2.4.1",
     "lucide-react": "^0.454.0",
+    "nanoid": "^5.1.6",
     "next": "^16.1.0",
     "next-themes": "0.4.6",
     "react": "^19",
@@ -107,9 +109,9 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
-    "@next/bundle-analyzer": "^15.1.0",
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.17.0",
+    "@next/bundle-analyzer": "^15.1.0",
     "@tailwindcss/postcss": "^4.1.9",
     "@types/node": "^22",
     "@types/react": "^19",

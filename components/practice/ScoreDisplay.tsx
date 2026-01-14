@@ -111,20 +111,60 @@ export function ScoreDisplay({
 
   const normalizeScore = (score: number) => (score <= 10 ? score * 10 : score)
 
-  // Use stored score breakdown if available, otherwise fall back to parsed sections
-  const scores = {
-    understanding: normalizeScore(
-      scoreBreakdown?.understandingScore ?? sections.scores.understanding ?? 0
-    ),
-    problemSolving: normalizeScore(
-      scoreBreakdown?.problemSolvingScore ?? sections.scores.problemSolving ?? 0
-    ),
-    codeQuality: normalizeScore(
-      scoreBreakdown?.codeQualityScore ?? sections.scores.codeQuality ?? 0
-    ),
-    communication: normalizeScore(
-      scoreBreakdown?.communicationScore ?? sections.scores.communication ?? 0
-    ),
+  // Priority for category scores:
+  // 1. scoreBreakdown from backend (most authoritative)
+  // 2. Parsed scores from feedback text
+  // 3. Fallback to performanceScore for all categories
+  const hasBackendScores =
+    scoreBreakdown &&
+    (scoreBreakdown.understandingScore !== undefined ||
+      scoreBreakdown.problemSolvingScore !== undefined ||
+      scoreBreakdown.codeQualityScore !== undefined ||
+      scoreBreakdown.communicationScore !== undefined)
+
+  const hasParsedScores =
+    sections.scores.understanding > 0 ||
+    sections.scores.problemSolving > 0 ||
+    sections.scores.codeQuality > 0 ||
+    sections.scores.communication > 0
+
+  let scores: {
+    understanding: number
+    problemSolving: number
+    codeQuality: number
+    communication: number
+  }
+
+  if (hasBackendScores) {
+    scores = {
+      understanding: normalizeScore(scoreBreakdown!.understandingScore ?? 0),
+      problemSolving: normalizeScore(scoreBreakdown!.problemSolvingScore ?? 0),
+      codeQuality: normalizeScore(scoreBreakdown!.codeQualityScore ?? 0),
+      communication: normalizeScore(scoreBreakdown!.communicationScore ?? 0),
+    }
+  } else if (hasParsedScores) {
+    scores = {
+      understanding: normalizeScore(sections.scores.understanding || 0),
+      problemSolving: normalizeScore(sections.scores.problemSolving || 0),
+      codeQuality: normalizeScore(sections.scores.codeQuality || 0),
+      communication: normalizeScore(sections.scores.communication || 0),
+    }
+  } else if (performanceScore > 0) {
+    // Fallback: use performanceScore for all categories
+    const baseScore = normalizeScore(performanceScore)
+    scores = {
+      understanding: baseScore,
+      problemSolving: baseScore,
+      codeQuality: baseScore,
+      communication: baseScore,
+    }
+  } else {
+    scores = {
+      understanding: 0,
+      problemSolving: 0,
+      codeQuality: 0,
+      communication: 0,
+    }
   }
 
   // Use stored technical score if available, otherwise calculate from breakdown

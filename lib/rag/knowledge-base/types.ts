@@ -243,3 +243,121 @@ export interface SystemDesignKnowledge {
     formula?: string
   }[]
 }
+
+/**
+ * Problem Complexity Knowledge - Multiple approaches with trade-offs
+ * Data sourced from LeetCode editorials and verified algorithm knowledge
+ */
+export interface ProblemComplexityKnowledge {
+  /** Internal scenario ID (e.g., "dsa-two-sum") */
+  problemId: string
+  /** LeetCode problem number */
+  leetcodeNumber: number
+  /** LeetCode URL slug */
+  slug: string
+  /** Problem title */
+  problemTitle: string
+  /** Source URL for verification */
+  sourceUrl: string
+  /** LeetCode difficulty */
+  difficulty: "Easy" | "Medium" | "Hard"
+  /** LeetCode topic tags */
+  tags: string[]
+
+  /**
+   * Multiple valid approaches with trade-offs
+   * From LeetCode editorial or verified algorithm knowledge
+   */
+  approaches: ProblemApproach[]
+
+  /**
+   * Common mistakes when analyzing complexity
+   * Helps interviewer identify and correct misconceptions
+   */
+  commonMistakes: string[]
+
+  /**
+   * Key operations and their complexities
+   * Helps user understand why the overall complexity is what it is
+   */
+  keyOperations: {
+    operation: string
+    complexity: string
+    note?: string
+  }[]
+
+  /** Verification metadata */
+  verified: boolean
+  verifiedAt?: string
+  verificationSource: "leetcode-editorial" | "neetcode" | "algorithm-textbook" | "manual"
+}
+
+/**
+ * A single approach to solving a problem
+ */
+export interface ProblemApproach {
+  /** Approach name (e.g., "Hash Map", "Two Pointers", "Brute Force") */
+  name: string
+  /** Time complexity (e.g., "O(n)", "O(n^2)") */
+  timeComplexity: string
+  /** Space complexity (e.g., "O(1)", "O(n)") */
+  spaceComplexity: string
+  /** Trade-off explanation */
+  tradeOff: string
+  /** When to use this approach */
+  whenToUse: string
+  /** Brief code pattern description */
+  codePattern?: string
+  /** Is this the optimal time complexity? */
+  isOptimalTime: boolean
+  /** Is this the optimal space complexity? */
+  isOptimalSpace: boolean
+  /** Source of this data */
+  source: "leetcode-editorial" | "neetcode" | "algorithm-textbook" | "manual"
+}
+
+/**
+ * Pattern-level complexity rules based on CS fundamentals
+ * These are general rules that apply to algorithm patterns
+ */
+export interface PatternComplexityRules {
+  pattern: DSAPattern
+  typicalTimeComplexity: string
+  typicalSpaceComplexity: string
+  keyInsight: string
+  /** Textbook or fundamental reference */
+  source: string
+  /** Common variations and their complexities */
+  variations?: {
+    name: string
+    time: string
+    space: string
+    note: string
+  }[]
+}
+
+/**
+ * Complexity analysis for a user's session
+ * Stores both what user claimed and what code analysis detected
+ */
+export interface SessionComplexityAnalysis {
+  /** What the code analysis heuristics detected */
+  codeAnalyzed: {
+    timeComplexity: string
+    spaceComplexity: string
+    confidence: "low" | "medium" | "high"
+    detectedPatterns: string[]
+  }
+  /** What the user stated during the interview */
+  userStated: {
+    timeComplexity: string | null
+    spaceComplexity: string | null
+    timestamp: number
+  } | null
+  /** Which approach from knowledge base they likely used */
+  approachUsed: string | null
+  /** Was their stated complexity accurate? */
+  isAccurate: boolean | null
+  /** Feedback for the user */
+  feedback?: string
+}

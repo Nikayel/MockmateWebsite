@@ -660,7 +660,8 @@ CRITICAL INSTRUCTIONS:
     const aiResponse = await generateFeedbackResponse(
       enhancedSystemInstruction,
       prompt,
-      [] // No history needed for feedback
+      [], // No history needed for feedback
+      { userId, sessionId, scenarioId } // Pass for usage tracking
     )
 
     const feedback = aiResponse.text

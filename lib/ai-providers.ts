@@ -728,11 +728,20 @@ export async function generateInterviewResponse(
 export async function generateFeedbackResponse(
   systemPrompt: string,
   userMessage: string,
-  history: Array<{ role: "user" | "model"; content: string }> = []
+  history: Array<{ role: "user" | "model"; content: string }> = [],
+  options?: {
+    userId?: string
+    sessionId?: string
+    scenarioId?: string
+  }
 ): Promise<AIResponse> {
   return generateAIResponse(systemPrompt, userMessage, history, {
     complexity: "complex",
     temperature: 0.3, // Lower temperature for consistent, data-driven feedback
+    userId: options?.userId,
+    sessionId: options?.sessionId,
+    scenarioId: options?.scenarioId,
+    eventType: "feedback_generation",
   })
 }
 

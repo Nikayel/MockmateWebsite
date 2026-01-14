@@ -9,7 +9,11 @@ import {
 import { trackAIChatServer } from "@/lib/analytics-server"
 import { getCompanyStyle, getPatternMetadata, type DSAPattern } from "@/lib/types/dsa-patterns"
 import { logger } from "@/lib/logger"
-import { buildHintContext, buildFeedbackContext } from "@/lib/rag/context-builder"
+import {
+  buildHintContext,
+  buildFeedbackContext,
+  buildComplexityContext,
+} from "@/lib/rag/context-builder"
 import { getPatternKnowledge } from "@/lib/rag/knowledge-base/dsa-knowledge"
 import { getCompanyInterviewKnowledge } from "@/lib/rag/knowledge-base/company-knowledge"
 import type { CompanyId } from "@/lib/data/company-questions/types"
@@ -112,6 +116,7 @@ async function buildRAGContext(options: {
   scenarioPattern?: string
   scenarioCompany?: string
   scenarioType?: string
+  scenarioId?: string
   problemText?: string
   userCode?: string
   userId?: string
@@ -181,7 +186,19 @@ ${companyKnowledge.cultureTips
       }
     }
 
-    // 3. Build hint context from RAG if we have problem text
+    // 3. Build complexity knowledge context for interviewer
+    // This gives the interviewer knowledge of multiple approaches, trade-offs, and how to question about complexity
+    if (options.scenarioId || options.scenarioPattern) {
+      const complexityContext = buildComplexityContext(
+        options.scenarioId || "",
+        options.scenarioPattern as DSAPattern
+      )
+      if (complexityContext) {
+        ragContextParts.push(complexityContext)
+      }
+    }
+
+    // 4. Build hint context from RAG if we have problem text
     if (options.problemText && options.problemText.length > 20) {
       const hintContext = await buildHintContext({
         problemText: options.problemText,
@@ -264,6 +281,9 @@ export async function POST(request: NextRequest) {
       isWrapUp,
       // NEW: Edge cases for interviewer to ask about
       edgeCases,
+      // NEW: Console context for interviewer awareness
+      testResults,
+      consoleLogs,
     } = await request.json()
 
     // For proactive messages (interviewer jumping in), message might be empty
@@ -421,6 +441,65 @@ DO NOT skip edge cases - real interviewers always ask about them. If they haven'
 `
         : ""
 
+    // Build console/test results context for interviewer awareness
+    interface TestResultItem {
+      description?: string
+      passed?: boolean
+      input?: unknown
+      expected?: unknown
+      actual?: unknown
+      error?: string | null
+    }
+    interface ConsoleLogItem {
+      type?: string
+      message?: string
+    }
+    const testResultsArray = testResults as TestResultItem[] | undefined
+    const consoleLogsArray = consoleLogs as ConsoleLogItem[] | undefined
+
+    let consoleContext = ""
+    if (testResultsArray && Array.isArray(testResultsArray) && testResultsArray.length > 0) {
+      const passed = testResultsArray.filter((t) => t.passed).length
+      const total = testResultsArray.length
+      const allPassed = passed === total
+
+      consoleContext = `
+CONSOLE & TEST RESULTS (IMPORTANT - BE AWARE OF THIS):
+Tests have been run: ${passed}/${total} passed ${allPassed ? "✓ ALL PASSING" : "✗ SOME FAILING"}
+
+${testResultsArray
+  .slice(0, 5)
+  .map(
+    (t, i) =>
+      `Test ${i + 1}: ${t.description || "Test case"} - ${t.passed ? "PASSED ✓" : "FAILED ✗"}${
+        !t.passed && t.error ? ` (Error: ${t.error})` : ""
+      }${!t.passed && t.expected !== undefined ? ` (Expected: ${JSON.stringify(t.expected)}, Got: ${JSON.stringify(t.actual)})` : ""}`
+  )
+  .join("\n")}
+
+${
+  allPassed
+    ? `INTERVIEWER BEHAVIOR WHEN ALL TESTS PASS:
+- DO NOT say "let's run the tests" - they already did and passed!
+- Move to follow-up questions: complexity analysis, optimizations, edge cases
+- Example: "Nice, tests are passing. What's the time complexity?" or "Good - now let's talk about how you'd optimize this"`
+    : `INTERVIEWER BEHAVIOR WHEN TESTS FAIL:
+- Acknowledge the failing tests
+- Ask them to debug: "Looks like test ${testResultsArray.findIndex((t) => !t.passed) + 1} is failing - what do you think is happening there?"
+- Help them trace through the failing case`
+}
+`
+    }
+
+    // Add console logs context if available
+    if (consoleLogsArray && Array.isArray(consoleLogsArray) && consoleLogsArray.length > 0) {
+      const recentLogs = consoleLogsArray.slice(-5)
+      consoleContext += `
+RECENT CONSOLE OUTPUT:
+${recentLogs.map((log) => `[${log.type || "log"}] ${log.message || ""}`).join("\n")}
+`
+    }
+
     // Build system design specific context with phase-based guidance
     const isSystemDesign = scenarioType === "system-design"
     const elapsedMinutes = elapsedTime ? Math.floor(elapsedTime / 60) : 0
@@ -576,6 +655,7 @@ ${companyContext}
 ${userContextString}${problemContext}
 ${isSystemDesign ? systemDesignContext : isBugFix ? bugFixContext : patternContext}
 ${edgeCaseContext}
+${consoleContext}
 
 INTERVIEW STYLE - ACT LIKE A REAL INTERVIEWER:
 You are having a natural conversation with the candidate. They may:
@@ -796,12 +876,21 @@ Keep responses brief, actionable, and helpful. You're a tool they can use, but t
 
     let systemPrompt = systemPrompts[role as keyof typeof systemPrompts] || systemPrompts.partner
 
+    // Derive scenarioId from title for complexity lookup (e.g., "Two Sum" -> "dsa-two-sum")
+    const scenarioId = scenarioTitle
+      ? `dsa-${scenarioTitle
+          .toLowerCase()
+          .replace(/\s+/g, "-")
+          .replace(/[^a-z0-9-]/g, "")}`
+      : undefined
+
     // Enhance both interviewer and partner roles with RAG context
     const ragContext = await buildRAGContext({
       scenarioTitle,
       scenarioPattern,
       scenarioCompany,
       scenarioType,
+      scenarioId,
       problemText: scenarioTitle, // Use title as problem text
       userCode: currentCode,
       userId,
@@ -1049,8 +1138,12 @@ Keep it conversational and real - like you're actually debriefing someone after 
     const complexity: TaskComplexity = role == "interviewer" ? "dialogue" : "code"
 
     // Use AI provider abstraction with fallback
+    // Pass userId/sessionId for proper cost tracking
     const aiResponse = await generateAIResponse(systemPrompt, fullUserMessage, history, {
       complexity,
+      userId,
+      sessionId,
+      eventType: "chat_message",
     })
 
     // Validate response relevance

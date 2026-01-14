@@ -531,6 +531,23 @@ export async function updateInterviewSession(
       communication?: number
       communicationScore?: number
     }
+    // Complexity analysis - stores both user-stated and code-analyzed
+    complexityAnalysis?: {
+      codeAnalyzed: {
+        timeComplexity: string
+        spaceComplexity: string
+        confidence: "low" | "medium" | "high"
+        detectedPatterns?: string[]
+      }
+      userStated?: {
+        timeComplexity: string | null
+        spaceComplexity: string | null
+        timestamp: number
+      }
+      approachUsed?: string
+      isAccurate?: boolean
+      feedback?: string
+    }
   }
 ): Promise<void> {
   const sessionRef = doc(db, "interview_sessions", sessionId)
@@ -556,23 +573,57 @@ export async function updateInterviewSession(
     if (additionalData.efficiencyScore) updateData.efficiency_score = additionalData.efficiencyScore
     // Save score breakdown for technical score calculations (required for pattern ranking)
     if (additionalData.scoreBreakdown) {
+      const understandingScore =
+        additionalData.scoreBreakdown.understanding ||
+        additionalData.scoreBreakdown.understandingScore ||
+        0
+      const problemSolvingScore =
+        additionalData.scoreBreakdown.problemSolving ||
+        additionalData.scoreBreakdown.problemSolvingScore ||
+        0
+      const codeQualityScore =
+        additionalData.scoreBreakdown.codeQuality ||
+        additionalData.scoreBreakdown.codeQualityScore ||
+        0
+      const communicationScore =
+        additionalData.scoreBreakdown.communication ||
+        additionalData.scoreBreakdown.communicationScore ||
+        0
+
       updateData.score_breakdown = {
-        understandingScore:
-          additionalData.scoreBreakdown.understanding ||
-          additionalData.scoreBreakdown.understandingScore ||
-          0,
-        problemSolvingScore:
-          additionalData.scoreBreakdown.problemSolving ||
-          additionalData.scoreBreakdown.problemSolvingScore ||
-          0,
-        codeQualityScore:
-          additionalData.scoreBreakdown.codeQuality ||
-          additionalData.scoreBreakdown.codeQualityScore ||
-          0,
-        communicationScore:
-          additionalData.scoreBreakdown.communication ||
-          additionalData.scoreBreakdown.communicationScore ||
-          0,
+        understandingScore,
+        problemSolvingScore,
+        codeQualityScore,
+        communicationScore,
+      }
+
+      // Calculate and save technical_score (excludes communication, focuses on code mastery)
+      // Uses same weights as ScoreDisplay.tsx for consistency
+      updateData.technical_score = Math.round(
+        codeQualityScore * 0.6 + problemSolvingScore * 0.25 + understandingScore * 0.15
+      )
+      // Also save as mastery_score for backwards compatibility
+      updateData.mastery_score = updateData.technical_score
+    }
+    // Save complexity analysis (user-stated vs code-analyzed)
+    if (additionalData.complexityAnalysis) {
+      updateData.complexity_analysis = {
+        code_analyzed: {
+          time_complexity: additionalData.complexityAnalysis.codeAnalyzed.timeComplexity,
+          space_complexity: additionalData.complexityAnalysis.codeAnalyzed.spaceComplexity,
+          confidence: additionalData.complexityAnalysis.codeAnalyzed.confidence,
+          detected_patterns: additionalData.complexityAnalysis.codeAnalyzed.detectedPatterns || [],
+        },
+        user_stated: additionalData.complexityAnalysis.userStated
+          ? {
+              time_complexity: additionalData.complexityAnalysis.userStated.timeComplexity,
+              space_complexity: additionalData.complexityAnalysis.userStated.spaceComplexity,
+              timestamp: additionalData.complexityAnalysis.userStated.timestamp,
+            }
+          : null,
+        approach_used: additionalData.complexityAnalysis.approachUsed || null,
+        is_accurate: additionalData.complexityAnalysis.isAccurate ?? null,
+        feedback: additionalData.complexityAnalysis.feedback || null,
       }
     }
   }
@@ -594,6 +645,8 @@ export async function markSessionEvaluating(
     chatMessages?: Array<{ type: string; message: string }>
     interviewerMessages?: Array<{ type: string; message: string }>
     testResults?: Array<any>
+    testSummary?: { total: number; passed: number; failed: number; passRate: number }
+    isPostInterviewDiscussion?: boolean
   }
 ): Promise<void> {
   try {
@@ -615,6 +668,8 @@ export async function markSessionEvaluating(
           test_results: state.testResults
             ? sanitizeTestResultsForFirestore(state.testResults.slice(-20))
             : undefined,
+          test_summary: state.testSummary,
+          is_post_interview_discussion: state.isPostInterviewDiscussion ?? true, // Default to true when marking evaluating
           saved_at: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),
@@ -641,6 +696,8 @@ export async function saveSessionState(
     chatMessages?: Array<{ type: string; message: string }>
     interviewerMessages?: Array<{ type: string; message: string }>
     testResults?: Array<any>
+    testSummary?: { total: number; passed: number; failed: number; passRate: number }
+    isPostInterviewDiscussion?: boolean
   }
 ): Promise<void> {
   try {
@@ -657,6 +714,8 @@ export async function saveSessionState(
           test_results: state.testResults
             ? sanitizeTestResultsForFirestore(state.testResults.slice(-20))
             : undefined,
+          test_summary: state.testSummary,
+          is_post_interview_discussion: state.isPostInterviewDiscussion ?? false,
           saved_at: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),
@@ -678,6 +737,8 @@ export async function getSessionState(sessionId: string): Promise<{
   chatMessages?: Array<{ type: string; message: string }>
   interviewerMessages?: Array<{ type: string; message: string }>
   testResults?: Array<any>
+  testSummary?: { total: number; passed: number; failed: number; passRate: number }
+  isPostInterviewDiscussion?: boolean
   savedAt?: string
   completedAt?: string
   feedbackStatus?: FeedbackStatus
@@ -700,6 +761,8 @@ export async function getSessionState(sessionId: string): Promise<{
       chatMessages?: Array<{ type: string; message: string }>
       interviewerMessages?: Array<{ type: string; message: string }>
       testResults?: Array<any>
+      testSummary?: { total: number; passed: number; failed: number; passRate: number }
+      isPostInterviewDiscussion?: boolean
       savedAt?: string
       completedAt?: string
       feedbackStatus?: FeedbackStatus
@@ -720,6 +783,8 @@ export async function getSessionState(sessionId: string): Promise<{
       result.chatMessages = data.session_state.chat_messages
       result.interviewerMessages = data.session_state.interviewer_messages
       result.testResults = data.session_state.test_results
+      result.testSummary = data.session_state.test_summary
+      result.isPostInterviewDiscussion = data.session_state.is_post_interview_discussion ?? false
       result.savedAt = data.session_state.saved_at
     }
 

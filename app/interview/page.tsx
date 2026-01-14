@@ -1102,7 +1102,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           selectedLanguage,
           elapsedTime,
           testResults,
+          testSummary,
           workspaceContext,
+          isPostInterviewDiscussion: showPostInterviewDiscussion,
           timestamp: Date.now(),
         }
 
@@ -1120,6 +1122,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               chatMessages,
               interviewerMessages,
               testResults,
+              testSummary,
+              isPostInterviewDiscussion: showPostInterviewDiscussion,
             })
           }
         } else if (isGuestMode && guestId) {
@@ -1142,6 +1146,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   chatMessages: chatMessages.slice(-20), // Limit messages
                   interviewerMessages: interviewerMessages.slice(-20),
                   testResults: testResults.slice(-10),
+                  testSummary,
+                  isPostInterviewDiscussion: showPostInterviewDiscussion,
                 },
               }),
             })
@@ -1168,8 +1174,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     selectedLanguage,
     elapsedTime,
     testResults,
+    testSummary,
     workspaceContext,
     currentSessionId,
+    showPostInterviewDiscussion,
   ])
 
   // Track when code value changes
@@ -1272,6 +1280,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     language: data.session.session_state.language,
                     elapsedTime: data.session.session_state.elapsed_time,
                     testResults: data.session.session_state.test_results,
+                    testSummary: data.session.session_state.test_summary,
+                    isPostInterviewDiscussion:
+                      data.session.session_state.is_post_interview_discussion,
                     savedAt: data.session.session_state.saved_at,
                   }
                   remoteTimestamp = new Date(data.session.session_state.saved_at).getTime()
@@ -1296,9 +1307,23 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           if (remoteData.elapsedTime) {
             setElapsedTime(remoteData.elapsedTime)
           }
-          toast.info("Session restored from cloud backup", {
-            description: "Your progress was saved. Continue where you left off!",
-          })
+          // Restore test summary if available
+          if (remoteData.testSummary) {
+            setTestSummary(remoteData.testSummary)
+          }
+          // Restore post-interview discussion state
+          if (remoteData.isPostInterviewDiscussion) {
+            setShowPostInterviewDiscussion(true)
+            setIsInterviewStarted(true)
+            setShowScenarioBrowser(false)
+            toast.info("Post-interview discussion restored", {
+              description: "Continue your discussion with the interviewer.",
+            })
+          } else {
+            toast.info("Session restored from cloud backup", {
+              description: "Your progress was saved. Continue where you left off!",
+            })
+          }
         } else if (localData) {
           setCode(localData.code || "")
           setChatMessages(localData.chatMessages || [])
@@ -1309,9 +1334,23 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           if (localData.elapsedTime) {
             setElapsedTime(localData.elapsedTime)
           }
-          toast.info("Session restored from auto-save", {
-            description: "Your local progress was recovered.",
-          })
+          // Restore test summary if available
+          if (localData.testSummary) {
+            setTestSummary(localData.testSummary)
+          }
+          // Restore post-interview discussion state
+          if (localData.isPostInterviewDiscussion) {
+            setShowPostInterviewDiscussion(true)
+            setIsInterviewStarted(true)
+            setShowScenarioBrowser(false)
+            toast.info("Post-interview discussion restored", {
+              description: "Continue your discussion with the interviewer.",
+            })
+          } else {
+            toast.info("Session restored from auto-save", {
+              description: "Your local progress was recovered.",
+            })
+          }
         }
       } catch (error) {
         console.error("Failed to restore auto-saved session:", error)
@@ -1359,6 +1398,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           edgeCases: getEdgeCasesForInterviewer(),
           // Pass recent topics to prevent repetitive questions
           recentNudgeTopics: recentNudgeTopics,
+          // Pass test results and console logs for interviewer awareness
+          testResults: testResults,
+          consoleLogs: consoleLogs,
         }),
       })
 
@@ -1484,6 +1526,9 @@ Interviews are conversations, not just coding exercises.`
           edgeCases: getEdgeCasesForInterviewer(),
           // Pass recent topics to prevent repetitive questions
           recentNudgeTopics: recentNudgeTopics,
+          // Pass test results and console logs for interviewer awareness
+          testResults: testResults,
+          consoleLogs: consoleLogs,
         }),
       })
 
@@ -1668,155 +1713,13 @@ Ask ONE focused question based on these observations.`)
         return
       }
 
-      const partnerMessagesSent = chatMessages.filter((msg) => msg.type === "user").length
-      const partnerMessagesReceived = chatMessages.filter((msg) => msg.type === "ai").length
-      const interviewerUserMessages = interviewerMessages.filter((msg) => msg.type === "user")
-      const interviewerQuestionsAnswered = interviewerUserMessages.length
-      const interviewerClarificationsRequested = interviewerUserMessages.filter((msg) =>
-        msg.message.includes("?")
-      ).length
-      const interviewerFeedbackAcknowledged = interviewerUserMessages.filter((msg) =>
-        /thanks|got it|understand|cool|okay|ok/i.test(msg.message)
-      ).length
-      const proactiveInteractions =
-        interviewerQuestionsAnswered > 0 || partnerMessagesSent > 0 ? 1 : 0
-
-      const aiCollaborationMetrics = {
-        partnerMessagesSent,
-        partnerMessagesReceived,
-        partnerHintsRequested: revealedHints,
-      }
-
-      const interactionMetrics = {
-        interviewerQuestionsAnswered,
-        interviewerClarificationsRequested,
-        interviewerFeedbackAcknowledged,
-        proactiveInteractions,
-        problemDifficulty: selectedScenario?.difficulty,
-        problemType: selectedScenario?.type,
-        skillsDemonstrated: selectedScenario?.tags || [],
-      }
-
-      // Note: We no longer apply harsh penalties based on message counts alone
-      // The AI feedback system now evaluates actual conversation content quality
-      // This prevents unfair penalties when users communicate well but message counts are low
-
-      // Generate comprehensive feedback first
-      let comprehensiveFeedback = `Completed ${selectedScenario?.title} with ${summary.passed}/${summary.total} tests passing`
-      // Convert pass rate (0-100) to 0-100 score scale
-      let calculatedPerformanceScore = summary.passRate
-      // Store score breakdown for technical score calculations
-      let scoreBreakdownData: {
-        understanding?: number
-        problemSolving?: number
-        codeQuality?: number
-        communication?: number
-      } | null = null
-
-      // Calculate efficiency metrics for feedback
-      const efficiencyData = analyzeCodeEfficiency(code)
-
-      // Set generating state to show loading UI
-      setIsGeneratingFeedback(true)
-
-      if (currentSessionId && user && code.trim()) {
-        try {
-          // Mark session as evaluating BEFORE feedback generation starts
-          // This prevents the session from being reopened if user refreshes
-          try {
-            await markSessionEvaluating(currentSessionId, {
-              code,
-              language: selectedLanguage,
-              elapsedTime,
-              chatMessages,
-              interviewerMessages,
-              testResults,
-            })
-          } catch (markError) {
-            console.error("Failed to mark session as evaluating:", markError)
-            // Continue anyway - this is non-critical
-          }
-
-          // Prepare conversation transcript for content-based evaluation
-          // This allows the AI to evaluate WHAT was said, not just message counts
-          const conversationTranscript = [
-            ...interviewerMessages.map((m) => ({
-              role: m.type === "user" ? "candidate" : "interviewer",
-              content: m.message,
-              timestamp: m.timestamp,
-            })),
-            ...chatMessages.map((m) => ({
-              role: m.type === "user" ? "candidate" : "ai_partner",
-              content: m.message,
-              timestamp: m.timestamp,
-            })),
-          ].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
-
-          const feedbackResponse = await fetch("/api/generate-feedback", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              code,
-              scenarioTitle: selectedScenario?.title,
-              scenarioType: selectedScenario?.type,
-              scenarioId: selectedScenario?.id,
-              scenarioDifficulty: selectedScenario?.difficulty,
-              scenarioPattern: (selectedScenario as any)?.pattern,
-              scenarioCompany: targetCompany, // Target company for company-specific feedback
-              testResults: testResults,
-              language: selectedLanguage,
-              timeSpent: elapsedTime,
-              aiCollaborationMetrics,
-              interactionMetrics,
-              // Pass efficiency metrics for accurate feedback
-              efficiencyMetrics: efficiencyData,
-              // NEW: Pass actual conversation content for quality-based evaluation
-              conversationTranscript,
-              sessionId: currentSessionId,
-              userId: user.id,
-            }),
-          })
-
-          if (feedbackResponse.ok) {
-            const feedbackData = await feedbackResponse.json()
-            comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
-            calculatedPerformanceScore = feedbackData.performanceScore || calculatedPerformanceScore
-            // Store technical score (mastery-based) for Overall/Technical toggle
-            if (feedbackData.technicalScore !== undefined) {
-              setTechnicalScore(feedbackData.technicalScore)
-            }
-            // Store score breakdown for metrics (pattern ranking) and display
-            if (feedbackData.scores) {
-              scoreBreakdownData = feedbackData.scores
-              // Also set state for PracticeFeedback component
-              setScoreBreakdown({
-                understandingScore: feedbackData.scores.understanding,
-                problemSolvingScore: feedbackData.scores.problemSolving,
-                codeQualityScore: feedbackData.scores.codeQuality,
-                communicationScore: feedbackData.scores.communication,
-              })
-            }
-            // Store Constitutional AI critique if present
-            if (feedbackData.constitutionalAICritique) {
-              setConstitutionalAICritique(feedbackData.constitutionalAICritique)
-            }
-          }
-        } catch (feedbackError) {
-          console.error("Error generating feedback:", feedbackError)
-          toast.warning("Feedback generation delayed", {
-            description: "Using basic feedback. Full analysis may be available shortly.",
-          })
-        }
-      }
-
-      // Feedback is ready - update states
-      setComprehensiveFeedback(comprehensiveFeedback)
-      setPerformanceScore(calculatedPerformanceScore)
-      setIsGeneratingFeedback(false) // Feedback generation complete
-
-      // Now trigger interviewer to discuss the solution
-      const userProfile = user ? await getUserProfile(user.id) : null
+      // Calculate efficiency metrics for the discussion prompt
       const metrics = analyzeCodeEfficiency(code)
+
+      // Trigger interviewer to discuss the solution
+      // NOTE: Feedback generation is now DEFERRED until user clicks "View Detailed Feedback"
+      // This allows post-interview discussion to be included in the final scoring
+      const userProfile = user ? await getUserProfile(user.id) : null
 
       const discussionPrompt = `[POST-INTERVIEW DISCUSSION - CONTINUE CONVERSATION] This is a continuation of our interview conversation. The candidate has just completed their coding solution.
 
@@ -1832,12 +1735,13 @@ EFFICIENCY METRICS:
 IMPORTANT: This is a POST-INTERVIEW DISCUSSION phase. You should:
 1. Continue the conversation naturally - reference previous discussion points if relevant
 2. Discuss the results and solution quality
-3. Ask if they have questions about the solution, complexity, or optimizations
-4. Be conversational - this is a debrief, not a restart
+3. Ask about edge cases, optimizations, or alternative approaches
+4. Probe their understanding of time/space complexity
+5. Be conversational - this is a debrief, not a restart
 
 Do NOT reintroduce yourself. Continue as if we're in the middle of a discussion about their completed solution.
 
-Be conversational and thorough - like a real interviewer debriefing after a coding interview.`
+Be conversational and thorough - like a real interviewer debriefing after a coding interview. The candidate's responses during this discussion will be factored into their final score.`
 
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -1857,11 +1761,13 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           currentCode: code,
           scenarioTitle: selectedScenario?.title,
           scenarioType: selectedScenario?.type,
-          scenarioCompany: targetCompany, // Target company for RAG context
+          scenarioCompany: targetCompany,
           isProactive: false,
           edgeCases: getEdgeCasesForInterviewer(),
-          // Pass recent topics to prevent repetitive questions
           recentNudgeTopics: recentNudgeTopics,
+          // Pass test results and console logs for interviewer awareness
+          testResults: testResults,
+          consoleLogs: consoleLogs,
         }),
       })
 
@@ -1869,162 +1775,6 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
       if (data.reply) {
         setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
-      }
-
-      // Update session with completion data
-      if (currentSessionId && user) {
-        try {
-          // performanceScore is now 0-100, save directly
-          const scoreToSave = calculatedPerformanceScore
-          // Mark as 'complete' since we have the final feedback
-          await updateInterviewSession(currentSessionId, scoreToSave, comprehensiveFeedback, {
-            code,
-            language: selectedLanguage,
-            testResults,
-            timeComplexity: efficiencyData?.estimatedTimeComplexity,
-            spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
-            efficiencyScore: efficiencyData?.efficiencyScore,
-            feedbackStatus: "complete", // Feedback generation is done
-            scoreBreakdown: scoreBreakdownData || undefined,
-          })
-
-          // Track session completion for user stats (async, non-blocking)
-          trackSessionCompletion({
-            sessionId: currentSessionId,
-            finalCode: code,
-            language: selectedLanguage,
-            testsPassed: summary.passed,
-            testsTotal: summary.total,
-            efficiencyScore: efficiencyData?.efficiencyScore || 50,
-          }).catch((err) => console.error("Session metrics tracking failed:", err))
-
-          // Update spaced repetition state (due dates and streak)
-          if (selectedScenario) {
-            const hintsUsedCount = revealedHintIndices.size + revealedAIHintIndices.size
-            updateSpacedRepetition({
-              problemId: selectedScenario.id,
-              performanceScore: calculatedPerformanceScore,
-              masteryScore: scoreBreakdownData
-                ? Math.round(
-                    (scoreBreakdownData.understanding || 0) * 0.3 +
-                      (scoreBreakdownData.problemSolving || 0) * 0.4 +
-                      (scoreBreakdownData.codeQuality || 0) * 0.3
-                  )
-                : undefined,
-              timeSpentMinutes: Math.round(elapsedTime / 60),
-              hintsUsed: hintsUsedCount,
-              testCasesPassed: summary.passed,
-              testCasesTotal: summary.total,
-            }).catch((err) => console.error("Spaced repetition update failed:", err))
-          }
-
-          // Mark question complete in roadmap if user came from roadmap
-          if (isFromRoadmap && selectedScenario && activeRoadmap) {
-            markQuestionCompleted(selectedScenario.id, calculatedPerformanceScore)
-            // Add elapsed time (convert seconds to minutes)
-            const minutesSpent = Math.round(elapsedTime / 60)
-            if (minutesSpent > 0) {
-              addActualTime(minutesSpent)
-            }
-            // Signal to roadmap page that a question was just completed (for day completion modal)
-            sessionStorage.setItem(
-              "roadmap-question-just-completed",
-              JSON.stringify({
-                scenarioId: selectedScenario.id,
-                roadmapId: activeRoadmap.id,
-                timestamp: Date.now(),
-              })
-            )
-            toast.success("Progress saved to your roadmap!")
-          }
-
-          // Store solution for RAG (async, non-blocking)
-          // For system design, store design notes even if empty (chat-only submission)
-          const isSystemDesign = selectedScenario?.type === "system-design"
-          const shouldStore = selectedScenario?.id && (code.trim() || isSystemDesign)
-
-          if (shouldStore) {
-            fetch("/api/rag", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                action: "store-solution",
-                userId: user.id,
-                problemId: selectedScenario.id,
-                problemTitle: selectedScenario.title,
-                solutionCode:
-                  code || (isSystemDesign ? "// Design discussion completed via chat" : ""),
-                language: selectedLanguage,
-                passed: isSystemDesign ? true : summary.passed === summary.total, // System design has no tests
-                score: calculatedPerformanceScore,
-                problemType: selectedScenario.type, // Pass problem type for proper tagging
-              }),
-            }).catch((err) => {
-              console.error("Solution storage error (non-blocking):", err)
-            })
-          }
-
-          // Vectorize session for RAG features (async, non-blocking)
-          fetch("/api/vectorize-session", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              userId: user.id,
-              sessionId: currentSessionId,
-              scenarioId: selectedScenario?.id,
-              scenarioTitle: selectedScenario?.title,
-              language: selectedLanguage,
-              code,
-              testResults,
-              timeSpent: elapsedTime,
-              aiCollaborationMetrics,
-              interactionMetrics,
-              efficiencyMetrics: efficiencyData,
-              scores: {
-                correctness:
-                  (testResults.filter((t: TestResult) => t.passed).length / testResults.length) *
-                  100,
-                efficiency: efficiencyData.efficiencyScore,
-                codeQuality: 70, // Default, would need more analysis
-                reasoningExplanation: aiCollaborationMetrics.partnerMessagesSent > 0 ? 50 : 0,
-                aiCollaboration: aiCollaborationMetrics.partnerMessagesSent > 0 ? 50 : 0,
-                overall: calculatedPerformanceScore,
-              },
-            }),
-          }).catch((err) => {
-            console.error("Vectorization error (non-blocking):", err)
-          })
-        } catch (error) {
-          console.error("Error updating session on completion:", error)
-          // Non-critical error - session state saved to cloud but local UI continues
-          toast.warning("Session progress may not be fully saved", {
-            description:
-              "Your feedback is still available, but progress tracking may be incomplete.",
-          })
-        }
-      } else if (currentSessionId && isGuestMode && guestId) {
-        // Guest user - save completion data via API
-        try {
-          await fetch("/api/guest-session", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sessionId: currentSessionId,
-              guestId,
-              performanceScore: calculatedPerformanceScore,
-              feedback: comprehensiveFeedback,
-              finalCode: code,
-              language: selectedLanguage,
-              testResults,
-              timeComplexity: efficiencyData?.estimatedTimeComplexity,
-              spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
-              efficiencyScore: efficiencyData?.efficiencyScore,
-            }),
-          })
-        } catch (error) {
-          console.error("Error saving guest session completion:", error)
-          // Non-critical - user can still see feedback
-        }
       }
     } catch (error) {
       console.error("Error in post-interview discussion:", error)
@@ -2529,30 +2279,336 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
   const proceedToFinalFeedback = async () => {
     setShowPostInterviewDiscussion(false)
+    setIsGeneratingFeedback(true)
     setShowFeedback(true)
 
-    // Show signup prompt for guest users after feedback
-    if (isGuestMode && guestId) {
-      // Small delay to let user see their feedback first
-      setTimeout(() => {
-        setShowSignupPrompt(true)
-      }, 2000)
-
-      // Mark free trial as used and save feedback to localStorage
-      markFreeTrialUsed()
-      if (currentSessionId && selectedScenario) {
-        saveGuestSessionData({
-          sessionId: currentSessionId,
-          scenarioId: selectedScenario.id,
-          scenarioTitle: selectedScenario.title,
-          startedAt: new Date().toISOString(),
-          feedback: {
-            score: performanceScore || 0,
-            summary: comprehensiveFeedback,
-            feedbackData: null,
-          },
-        })
+    // Now generate feedback - includes ALL conversation including post-interview discussion
+    try {
+      if (!selectedScenario) {
+        setIsGeneratingFeedback(false)
+        return
       }
+
+      const partnerMessagesSent = chatMessages.filter((msg) => msg.type === "user").length
+      const partnerMessagesReceived = chatMessages.filter((msg) => msg.type === "ai").length
+      const interviewerUserMessages = interviewerMessages.filter((msg) => msg.type === "user")
+      const interviewerQuestionsAnswered = interviewerUserMessages.length
+      const interviewerClarificationsRequested = interviewerUserMessages.filter((msg) =>
+        msg.message.includes("?")
+      ).length
+      const interviewerFeedbackAcknowledged = interviewerUserMessages.filter((msg) =>
+        /thanks|got it|understand|cool|okay|ok/i.test(msg.message)
+      ).length
+      const proactiveInteractions =
+        interviewerQuestionsAnswered > 0 || partnerMessagesSent > 0 ? 1 : 0
+
+      const aiCollaborationMetrics = {
+        partnerMessagesSent,
+        partnerMessagesReceived,
+        partnerHintsRequested: revealedHints,
+      }
+
+      const interactionMetrics = {
+        interviewerQuestionsAnswered,
+        interviewerClarificationsRequested,
+        interviewerFeedbackAcknowledged,
+        proactiveInteractions,
+        problemDifficulty: selectedScenario?.difficulty,
+        problemType: selectedScenario?.type,
+        skillsDemonstrated: selectedScenario?.tags || [],
+      }
+
+      let feedbackText = `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
+      let calculatedPerformanceScore = testSummary.passRate
+      let scoreBreakdownData: {
+        understanding?: number
+        problemSolving?: number
+        codeQuality?: number
+        communication?: number
+      } | null = null
+      let aiFeedbackSucceeded = false
+
+      const efficiencyData = analyzeCodeEfficiency(code)
+
+      if (currentSessionId && user && code.trim()) {
+        try {
+          // Prepare conversation transcript - NOW includes ALL messages including post-interview discussion
+          const conversationTranscript = [
+            ...interviewerMessages.map((m) => ({
+              role: m.type === "user" ? "candidate" : "interviewer",
+              content: m.message,
+              timestamp: m.timestamp,
+            })),
+            ...chatMessages.map((m) => ({
+              role: m.type === "user" ? "candidate" : "ai_partner",
+              content: m.message,
+              timestamp: m.timestamp,
+            })),
+          ].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+
+          const feedbackResponse = await fetch("/api/generate-feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              code,
+              scenarioTitle: selectedScenario?.title,
+              scenarioType: selectedScenario?.type,
+              scenarioId: selectedScenario?.id,
+              scenarioDifficulty: selectedScenario?.difficulty,
+              scenarioPattern: (selectedScenario as any)?.pattern,
+              scenarioCompany: targetCompany,
+              testResults: testResults,
+              language: selectedLanguage,
+              timeSpent: elapsedTime,
+              aiCollaborationMetrics,
+              interactionMetrics,
+              efficiencyMetrics: efficiencyData,
+              conversationTranscript,
+              sessionId: currentSessionId,
+              userId: user.id,
+            }),
+          })
+
+          if (feedbackResponse.ok) {
+            const feedbackData = await feedbackResponse.json()
+            feedbackText = feedbackData.feedback || feedbackText
+            calculatedPerformanceScore = feedbackData.performanceScore || calculatedPerformanceScore
+            if (feedbackData.technicalScore !== undefined) {
+              setTechnicalScore(feedbackData.technicalScore)
+            }
+            if (feedbackData.scores) {
+              scoreBreakdownData = feedbackData.scores
+              setScoreBreakdown({
+                understandingScore: feedbackData.scores.understanding,
+                problemSolvingScore: feedbackData.scores.problemSolving,
+                codeQualityScore: feedbackData.scores.codeQuality,
+                communicationScore: feedbackData.scores.communication,
+              })
+            }
+            if (feedbackData.constitutionalAICritique) {
+              setConstitutionalAICritique(feedbackData.constitutionalAICritique)
+            }
+            aiFeedbackSucceeded = true
+          } else {
+            const passRate = testSummary.passRate
+            const fallbackScores = {
+              understanding: Math.min(100, Math.round(passRate * 0.9 + 10)),
+              problemSolving: Math.round(passRate),
+              codeQuality: Math.min(100, Math.round(passRate * 0.95 + 5)),
+              communication: 50,
+            }
+            scoreBreakdownData = fallbackScores
+            calculatedPerformanceScore = Math.round(
+              fallbackScores.understanding * 0.25 +
+                fallbackScores.problemSolving * 0.25 +
+                fallbackScores.codeQuality * 0.3 +
+                fallbackScores.communication * 0.2
+            )
+            setScoreBreakdown({
+              understandingScore: fallbackScores.understanding,
+              problemSolvingScore: fallbackScores.problemSolving,
+              codeQualityScore: fallbackScores.codeQuality,
+              communicationScore: fallbackScores.communication,
+            })
+            toast.warning("Using estimated scores", {
+              description: "AI feedback unavailable. Scores based on test results.",
+            })
+          }
+        } catch (feedbackError) {
+          console.error("Error generating feedback:", feedbackError)
+          const passRate = testSummary.passRate
+          const fallbackScores = {
+            understanding: Math.min(100, Math.round(passRate * 0.9 + 10)),
+            problemSolving: Math.round(passRate),
+            codeQuality: Math.min(100, Math.round(passRate * 0.95 + 5)),
+            communication: 50,
+          }
+          scoreBreakdownData = fallbackScores
+          calculatedPerformanceScore = Math.round(
+            fallbackScores.understanding * 0.25 +
+              fallbackScores.problemSolving * 0.25 +
+              fallbackScores.codeQuality * 0.3 +
+              fallbackScores.communication * 0.2
+          )
+          setScoreBreakdown({
+            understandingScore: fallbackScores.understanding,
+            problemSolvingScore: fallbackScores.problemSolving,
+            codeQualityScore: fallbackScores.codeQuality,
+            communicationScore: fallbackScores.communication,
+          })
+          toast.warning("Feedback generation delayed", {
+            description: "Using basic feedback. Full analysis may be available shortly.",
+          })
+        }
+      }
+
+      setComprehensiveFeedback(feedbackText)
+      setPerformanceScore(calculatedPerformanceScore)
+
+      // Save session completion data
+      if (currentSessionId && user) {
+        try {
+          await updateInterviewSession(currentSessionId, calculatedPerformanceScore, feedbackText, {
+            code,
+            language: selectedLanguage,
+            testResults,
+            timeComplexity: efficiencyData?.estimatedTimeComplexity,
+            spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
+            efficiencyScore: efficiencyData?.efficiencyScore,
+            feedbackStatus: aiFeedbackSucceeded ? "complete" : "complete",
+            scoreBreakdown: scoreBreakdownData || undefined,
+          })
+
+          trackSessionCompletion({
+            sessionId: currentSessionId,
+            finalCode: code,
+            language: selectedLanguage,
+            testsPassed: testSummary.passed,
+            testsTotal: testSummary.total,
+            efficiencyScore: efficiencyData?.efficiencyScore || 50,
+          }).catch((err) => console.error("Session metrics tracking failed:", err))
+
+          if (selectedScenario) {
+            const hintsUsedCount = revealedHintIndices.size + revealedAIHintIndices.size
+            updateSpacedRepetition({
+              problemId: selectedScenario.id,
+              performanceScore: calculatedPerformanceScore,
+              masteryScore: scoreBreakdownData
+                ? Math.round(
+                    (scoreBreakdownData.understanding || 0) * 0.3 +
+                      (scoreBreakdownData.problemSolving || 0) * 0.4 +
+                      (scoreBreakdownData.codeQuality || 0) * 0.3
+                  )
+                : undefined,
+              timeSpentMinutes: Math.round(elapsedTime / 60),
+              hintsUsed: hintsUsedCount,
+              testCasesPassed: testSummary.passed,
+              testCasesTotal: testSummary.total,
+            }).catch((err) => console.error("Spaced repetition update failed:", err))
+          }
+
+          if (isFromRoadmap && selectedScenario && activeRoadmap) {
+            markQuestionCompleted(selectedScenario.id, calculatedPerformanceScore)
+            const minutesSpent = Math.round(elapsedTime / 60)
+            if (minutesSpent > 0) {
+              addActualTime(minutesSpent)
+            }
+            sessionStorage.setItem(
+              "roadmap-question-just-completed",
+              JSON.stringify({
+                scenarioId: selectedScenario.id,
+                roadmapId: activeRoadmap.id,
+                timestamp: Date.now(),
+              })
+            )
+            toast.success("Progress saved to your roadmap!")
+          }
+
+          const isSystemDesign = selectedScenario?.type === "system-design"
+          const shouldStore = selectedScenario?.id && (code.trim() || isSystemDesign)
+
+          if (shouldStore) {
+            fetch("/api/rag", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "store-solution",
+                userId: user.id,
+                problemId: selectedScenario.id,
+                problemTitle: selectedScenario.title,
+                solutionCode:
+                  code || (isSystemDesign ? "// Design discussion completed via chat" : ""),
+                language: selectedLanguage,
+                passed: isSystemDesign ? true : testSummary.passed === testSummary.total,
+                score: calculatedPerformanceScore,
+                problemType: selectedScenario.type,
+              }),
+            }).catch((err) => console.error("Solution storage error:", err))
+          }
+
+          fetch("/api/vectorize-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: user.id,
+              sessionId: currentSessionId,
+              scenarioId: selectedScenario?.id,
+              scenarioTitle: selectedScenario?.title,
+              language: selectedLanguage,
+              code,
+              testResults,
+              timeSpent: elapsedTime,
+              aiCollaborationMetrics,
+              interactionMetrics,
+              efficiencyMetrics: efficiencyData,
+              scores: {
+                correctness:
+                  testResults.length > 0
+                    ? (testResults.filter((t: TestResult) => t.passed).length /
+                        testResults.length) *
+                      100
+                    : 0,
+                efficiency: efficiencyData.efficiencyScore,
+                codeQuality: 70,
+                reasoningExplanation: aiCollaborationMetrics.partnerMessagesSent > 0 ? 50 : 0,
+                aiCollaboration: aiCollaborationMetrics.partnerMessagesSent > 0 ? 50 : 0,
+                overall: calculatedPerformanceScore,
+              },
+            }),
+          }).catch((err) => console.error("Vectorization error:", err))
+        } catch (error) {
+          console.error("Error updating session on completion:", error)
+          toast.warning("Session progress may not be fully saved", {
+            description:
+              "Your feedback is still available, but progress tracking may be incomplete.",
+          })
+        }
+      } else if (currentSessionId && isGuestMode && guestId) {
+        try {
+          await fetch("/api/guest-session", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionId: currentSessionId,
+              guestId,
+              performanceScore: calculatedPerformanceScore,
+              feedback: feedbackText,
+              finalCode: code,
+              language: selectedLanguage,
+              testResults,
+              timeComplexity: efficiencyData?.estimatedTimeComplexity,
+              spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
+              efficiencyScore: efficiencyData?.efficiencyScore,
+            }),
+          })
+        } catch (error) {
+          console.error("Error saving guest session completion:", error)
+        }
+      }
+
+      // Show signup prompt for guest users
+      if (isGuestMode && guestId) {
+        setTimeout(() => setShowSignupPrompt(true), 2000)
+        markFreeTrialUsed()
+        if (currentSessionId && selectedScenario) {
+          saveGuestSessionData({
+            sessionId: currentSessionId,
+            scenarioId: selectedScenario.id,
+            scenarioTitle: selectedScenario.title,
+            startedAt: new Date().toISOString(),
+            feedback: {
+              score: calculatedPerformanceScore || 0,
+              summary: feedbackText,
+              feedbackData: null,
+            },
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Error generating final feedback:", error)
+      toast.error("Failed to generate feedback")
+    } finally {
+      setIsGeneratingFeedback(false)
     }
   }
 
@@ -2805,6 +2861,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             edgeCases: isInterviewer ? getEdgeCasesForInterviewer() : undefined,
             // Pass recent topics to prevent repetitive questions
             recentNudgeTopics: isInterviewer ? recentNudgeTopics : undefined,
+            // Pass test results and console logs for interviewer awareness
+            testResults: isInterviewer ? testResults : undefined,
+            consoleLogs: isInterviewer ? consoleLogs : undefined,
           }),
         })
 
@@ -3112,6 +3171,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       // Create a mock summary for system design (no tests, but we need the structure)
       const mockSummary = {
         passed: 0,
+        failed: 0,
         total: 0,
         passRate: 0, // Will be calculated by feedback system based on conversation
       }
@@ -3131,6 +3191,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             chatMessages,
             interviewerMessages,
             testResults: [],
+            testSummary: mockSummary,
+            isPostInterviewDiscussion: true,
           })
         } catch (markError) {
           console.error("Failed to mark session as evaluating:", markError)
@@ -3349,6 +3411,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           edgeCases: getEdgeCasesForInterviewer(),
           // Pass recent topics to prevent repetitive questions
           recentNudgeTopics: recentNudgeTopics,
+          // Pass test results and console logs for interviewer awareness
+          testResults: testResults,
+          consoleLogs: consoleLogs,
         }),
       })
 
@@ -3698,6 +3763,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 actual:
                   typeof r.actual === "object" ? JSON.stringify(r.actual) : String(r.actual ?? ""),
               })),
+              testSummary: data.summary,
+              isPostInterviewDiscussion: true,
             })
           } catch (markError) {
             console.error("Failed to mark session as evaluating:", markError)

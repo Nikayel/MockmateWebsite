@@ -52,6 +52,23 @@ export default function SessionDetailPage() {
           return null
         }
 
+        // If score_breakdown is missing, try to fetch from session_summaries subcollection
+        if (!sessionData.score_breakdown && sessionData.user_id) {
+          try {
+            const summaryRef = doc(db, "users", sessionData.user_id, "session_summaries", sessionId)
+            const summarySnap = await getDoc(summaryRef)
+            if (summarySnap.exists()) {
+              const summaryData = summarySnap.data()
+              // Merge scoreBreakdown from session_summaries
+              if (summaryData.scoreBreakdown) {
+                sessionData.score_breakdown = summaryData.scoreBreakdown
+              }
+            }
+          } catch {
+            // Ignore errors - score_breakdown is optional
+          }
+        }
+
         return sessionData
       } else {
         router.push("/sessions")
@@ -227,7 +244,9 @@ export default function SessionDetailPage() {
           {/* Feedback Section */}
           {/* Handle completed sessions - show feedback if available */}
           {/* Note: Legacy sessions may not have feedback_status, treat completed_at + feedback as complete */}
-          {session.feedback && session.completed_at && (session.feedback_status === "complete" || !session.feedback_status) ? (
+          {session.feedback &&
+          session.completed_at &&
+          (session.feedback_status === "complete" || !session.feedback_status) ? (
             <PracticeFeedback
               feedback={session.feedback}
               performanceScore={session.performance_score || 0}

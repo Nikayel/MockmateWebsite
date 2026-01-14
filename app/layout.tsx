@@ -8,6 +8,7 @@ import { AnnouncementProvider } from "@/components/announcements"
 import { CookieConsent } from "@/components/CookieConsent"
 import { ConsentAnalytics } from "@/components/ConsentAnalytics"
 import { PerformancePolyfill } from "@/components/performance-polyfill"
+import { ReferralCapture } from "@/components/ReferralCapture"
 import {
   OrganizationJsonLd,
   SoftwareApplicationJsonLd,
@@ -209,6 +210,7 @@ html {
           Skip to main content
         </a>
         <PerformancePolyfill />
+        <ReferralCapture />
         <ErrorBoundaryProvider>
           <AuthProvider>
             <AnnouncementProvider>

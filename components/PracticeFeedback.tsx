@@ -3,6 +3,16 @@
 import { parseFeedback } from "@/lib/feedback/parsers"
 import { ScoreDisplay, FeedbackSections, FeedbackActions } from "@/components/practice"
 import type { ChatMessage } from "@/lib/types"
+import type { SessionComplexityAnalysis } from "@/lib/rag/knowledge-base/types"
+
+interface AlternativeApproach {
+  name: string
+  timeComplexity: string
+  spaceComplexity: string
+  tradeOff: string
+  isOptimalTime: boolean
+  isOptimalSpace: boolean
+}
 
 interface PracticeFeedbackProps {
   feedback: string
@@ -33,6 +43,9 @@ interface PracticeFeedbackProps {
   onNewProblem?: () => void
   onExport?: () => void
   onEndInterview?: () => void
+  // Complexity analysis
+  complexityAnalysis?: SessionComplexityAnalysis | null
+  alternativeApproaches?: AlternativeApproach[]
 }
 
 export default function PracticeFeedback({
@@ -59,61 +72,73 @@ export default function PracticeFeedback({
   onNewProblem,
   onExport,
   onEndInterview,
+  complexityAnalysis,
+  alternativeApproaches,
 }: PracticeFeedbackProps) {
   const sections = parseFeedback(feedback)
-  const feedbackLower = feedback.toLowerCase()
 
-  // Calculate scores with fallback logic
+  const normalizeScore = (score: number) => (score <= 10 ? score * 10 : score)
+
+  // Priority for scores:
+  // 1. scoreBreakdown from backend (most authoritative)
+  // 2. Parsed scores from feedback text
+  // 3. Fallback estimation based on performanceScore (last resort)
+  const hasBackendScores =
+    scoreBreakdown &&
+    (scoreBreakdown.understandingScore !== undefined ||
+      scoreBreakdown.problemSolvingScore !== undefined ||
+      scoreBreakdown.codeQualityScore !== undefined ||
+      scoreBreakdown.communicationScore !== undefined)
+
   const hasParsedScores =
     sections.scores.understanding > 0 ||
     sections.scores.problemSolving > 0 ||
     sections.scores.codeQuality > 0 ||
     sections.scores.communication > 0
 
-  if (!hasParsedScores && performanceScore > 0) {
-    const baseScore = performanceScore <= 10 ? performanceScore * 10 : performanceScore
-    const testPassRateVal = testsTotal > 0 ? testsPassed / testsTotal : 1
-    const hasCommunicationIssues =
-      feedbackLower.includes("explain") || feedbackLower.includes("thought process")
-
-    sections.scores.understanding = Math.round(baseScore * testPassRateVal * 0.9)
-    sections.scores.problemSolving = Math.round(baseScore * (testPassRateVal > 0.8 ? 1 : 0.8))
-    sections.scores.codeQuality = Math.round(baseScore * testPassRateVal)
-    sections.scores.communication = Math.round(baseScore * (hasCommunicationIssues ? 0.5 : 0.7))
-
-    sections.scores.overall = Math.round(
-      sections.scores.understanding * 0.25 +
-        sections.scores.problemSolving * 0.25 +
-        sections.scores.codeQuality * 0.3 +
-        sections.scores.communication * 0.2
-    )
+  // Calculate scores with clear priority chain
+  let scores: {
+    understanding: number
+    problemSolving: number
+    codeQuality: number
+    communication: number
   }
 
-  const normalizeScore = (score: number) => (score <= 10 ? score * 10 : score)
-
-  const scores = {
-    understanding: normalizeScore(sections.scores.understanding || 0),
-    problemSolving: normalizeScore(sections.scores.problemSolving || 0),
-    codeQuality: normalizeScore(sections.scores.codeQuality || 0),
-    communication: normalizeScore(sections.scores.communication || 0),
+  if (hasBackendScores) {
+    // Use backend scores (most authoritative)
+    scores = {
+      understanding: normalizeScore(scoreBreakdown!.understandingScore ?? 0),
+      problemSolving: normalizeScore(scoreBreakdown!.problemSolvingScore ?? 0),
+      codeQuality: normalizeScore(scoreBreakdown!.codeQualityScore ?? 0),
+      communication: normalizeScore(scoreBreakdown!.communicationScore ?? 0),
+    }
+  } else if (hasParsedScores) {
+    // Use parsed scores from feedback text
+    scores = {
+      understanding: normalizeScore(sections.scores.understanding || 0),
+      problemSolving: normalizeScore(sections.scores.problemSolving || 0),
+      codeQuality: normalizeScore(sections.scores.codeQuality || 0),
+      communication: normalizeScore(sections.scores.communication || 0),
+    }
+  } else if (performanceScore > 0) {
+    // Fallback: estimate category scores from overall performance score
+    // This ensures category scores align with the overall score
+    const baseScore = normalizeScore(performanceScore)
+    scores = {
+      understanding: baseScore,
+      problemSolving: baseScore,
+      codeQuality: baseScore,
+      communication: baseScore,
+    }
+  } else {
+    // No scores available
+    scores = {
+      understanding: 0,
+      problemSolving: 0,
+      codeQuality: 0,
+      communication: 0,
+    }
   }
-
-  // Calculate weighted average from category scores using canonical weights
-  // SCORE_WEIGHTS.performance: U=25%, PS=25%, CQ=30%, Comm=20%
-  const hasValidCategoryScores =
-    scores.understanding > 0 ||
-    scores.problemSolving > 0 ||
-    scores.codeQuality > 0 ||
-    scores.communication > 0
-
-  const weightedAverage = hasValidCategoryScores
-    ? Math.round(
-        scores.understanding * 0.25 +
-          scores.problemSolving * 0.25 +
-          scores.codeQuality * 0.3 +
-          scores.communication * 0.2
-      )
-    : 0
 
   // Use performanceScore from the backend as the authoritative overall score
   // The backend calculates this using validated algorithms, score floors, and Constitutional AI critique
@@ -121,11 +146,9 @@ export default function PracticeFeedback({
   const overallScore =
     performanceScore > 0
       ? normalizeScore(performanceScore)
-      : weightedAverage > 0
-        ? weightedAverage
-        : sections.scores.overall > 0
-          ? normalizeScore(sections.scores.overall)
-          : 0
+      : sections.scores.overall > 0
+        ? normalizeScore(sections.scores.overall)
+        : 0
 
   const getLetterGrade = (score: number) => {
     if (score >= 95) return { grade: "A+", color: "text-emerald-400" }
@@ -188,6 +211,8 @@ export default function PracticeFeedback({
         onNewProblem={onNewProblem}
         chatMessages={chatMessages}
         interviewerMessages={interviewerMessages}
+        complexityAnalysis={complexityAnalysis}
+        alternativeApproaches={alternativeApproaches}
       />
     </div>
   )

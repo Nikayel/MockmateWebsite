@@ -503,134 +503,141 @@ export default function DashboardPage() {
 
           {/* Main Content - Responsive 2-column */}
           <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-5">
-            {/* Recent Activity - 3 cols on lg */}
-            <div
-              className="rounded-xl border border-zinc-800/50 bg-zinc-900/50 lg:col-span-3"
-              data-tour="recent-activity"
-            >
-              <div className="flex items-center justify-between border-b border-zinc-800/50 p-4">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-zinc-500" />
-                  <span className="text-sm font-medium text-zinc-300">Recent Activity</span>
-                </div>
-                <Link href="/sessions">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs text-zinc-500 hover:text-white"
-                  >
-                    View All
-                    <ChevronRight className="ml-1 h-3 w-3" />
-                  </Button>
-                </Link>
-              </div>
-
-              {sessions.length === 0 ? (
-                <div className="p-8 text-center sm:p-12">
-                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-800">
-                    <Calendar className="h-6 w-6 text-zinc-600" />
+            {/* Left column - Recent Activity + Referral Widget */}
+            <div className="space-y-4 lg:col-span-3">
+              {/* Recent Activity */}
+              <div
+                className="rounded-xl border border-zinc-800/50 bg-zinc-900/50"
+                data-tour="recent-activity"
+              >
+                <div className="flex items-center justify-between border-b border-zinc-800/50 p-4">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-zinc-500" />
+                    <span className="text-sm font-medium text-zinc-300">Recent Activity</span>
                   </div>
-                  <p className="mb-1 text-sm text-zinc-400">No sessions yet</p>
-                  <p className="mb-4 text-xs text-zinc-600">
-                    Start practicing to track your progress
-                  </p>
-                  <Link href="/interview">
-                    <Button size="sm" className="bg-white text-zinc-900 hover:bg-zinc-200">
-                      <Zap className="mr-1.5 h-3.5 w-3.5" />
-                      Start First Session
+                  <Link href="/sessions">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-zinc-500 hover:text-white"
+                    >
+                      View All
+                      <ChevronRight className="ml-1 h-3 w-3" />
                     </Button>
                   </Link>
                 </div>
-              ) : (
-                <div className="divide-y divide-zinc-800/50">
-                  {sessions.map((session) => {
-                    // Determine session state: completed, evaluating, or in-progress
-                    // Note: Legacy sessions may not have feedback_status, treat completed_at as complete
-                    const isEvaluating = session.feedback_status === "pending"
-                    const isCompleted = session.completed_at && (session.feedback_status === "complete" || !session.feedback_status)
-                    const isInProgress = !session.completed_at && !isEvaluating
 
-                    // Link to session detail if completed or evaluating, otherwise reopen interview
-                    const href =
-                      isCompleted || isEvaluating
-                        ? `/sessions/${session.id}`
-                        : `/interview?session=${session.id}&scenario=${session.scenario_id}`
+                {sessions.length === 0 ? (
+                  <div className="p-8 text-center sm:p-12">
+                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-800">
+                      <Calendar className="h-6 w-6 text-zinc-600" />
+                    </div>
+                    <p className="mb-1 text-sm text-zinc-400">No sessions yet</p>
+                    <p className="mb-4 text-xs text-zinc-600">
+                      Start practicing to track your progress
+                    </p>
+                    <Link href="/interview">
+                      <Button size="sm" className="bg-white text-zinc-900 hover:bg-zinc-200">
+                        <Zap className="mr-1.5 h-3.5 w-3.5" />
+                        Start First Session
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-zinc-800/50">
+                    {sessions.map((session) => {
+                      // Determine session state: completed, evaluating, or in-progress
+                      // Note: Legacy sessions may not have feedback_status, treat completed_at as complete
+                      const isEvaluating = session.feedback_status === "pending"
+                      const isCompleted =
+                        session.completed_at &&
+                        (session.feedback_status === "complete" || !session.feedback_status)
+                      const isInProgress = !session.completed_at && !isEvaluating
 
-                    return (
-                      <Link
-                        key={session.id}
-                        href={href}
-                        className="flex items-center gap-3 p-3 transition-colors hover:bg-zinc-800/30 sm:p-4"
-                      >
-                        {/* Score indicator */}
-                        <div
-                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-mono text-sm sm:h-11 sm:w-11 ${
-                            session.performance_score
-                              ? session.performance_score >= 80
-                                ? "bg-emerald-500/10 text-emerald-400"
-                                : session.performance_score >= 60
-                                  ? "bg-amber-500/10 text-amber-400"
-                                  : "bg-red-500/10 text-red-400"
-                              : isEvaluating
-                                ? "bg-blue-500/10 text-blue-400"
-                                : isInProgress
-                                  ? "bg-amber-500/10 text-amber-400"
-                                  : "bg-zinc-800 text-zinc-500"
-                          }`}
+                      // Link to session detail if completed or evaluating, otherwise reopen interview
+                      const href =
+                        isCompleted || isEvaluating
+                          ? `/sessions/${session.id}`
+                          : `/interview?session=${session.id}&scenario=${session.scenario_id}`
+
+                      return (
+                        <Link
+                          key={session.id}
+                          href={href}
+                          className="flex items-center gap-3 p-3 transition-colors hover:bg-zinc-800/30 sm:p-4"
                         >
-                          {session.performance_score
-                            ? Math.round(session.performance_score)
-                            : isEvaluating
-                              ? "⏳"
-                              : isInProgress
-                                ? "..."
-                                : "—"}
-                        </div>
-
-                        {/* Content */}
-                        <div className="min-w-0 flex-1">
-                          <div className="mb-0.5 flex items-center gap-2">
-                            <span className="truncate text-sm font-medium text-white">
-                              {session.topic}
-                            </span>
-                            <span
-                              className={`text-[10px] tracking-wider uppercase ${getDifficultyStyle(session.difficulty)}`}
-                            >
-                              {session.difficulty}
-                            </span>
+                          {/* Score indicator */}
+                          <div
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-mono text-sm sm:h-11 sm:w-11 ${
+                              session.performance_score
+                                ? session.performance_score >= 80
+                                  ? "bg-emerald-500/10 text-emerald-400"
+                                  : session.performance_score >= 60
+                                    ? "bg-amber-500/10 text-amber-400"
+                                    : "bg-red-500/10 text-red-400"
+                                : isEvaluating
+                                  ? "bg-blue-500/10 text-blue-400"
+                                  : isInProgress
+                                    ? "bg-amber-500/10 text-amber-400"
+                                    : "bg-zinc-800 text-zinc-500"
+                            }`}
+                          >
+                            {session.performance_score
+                              ? Math.round(session.performance_score)
+                              : isEvaluating
+                                ? "⏳"
+                                : isInProgress
+                                  ? "..."
+                                  : "—"}
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-zinc-500">
-                            <span>
-                              {new Date(session.started_at).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                              })}
-                            </span>
-                            {isEvaluating && (
-                              <Badge className="border-0 bg-blue-500/10 px-1.5 py-0 text-[10px] text-blue-400">
-                                Evaluating
-                              </Badge>
-                            )}
-                            {isInProgress && (
-                              <Badge className="border-0 bg-amber-500/10 px-1.5 py-0 text-[10px] text-amber-400">
-                                In Progress
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
 
-                        <ChevronRight className="h-4 w-4 shrink-0 text-zinc-600" />
-                      </Link>
-                    )
-                  })}
-                </div>
-              )}
+                          {/* Content */}
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-0.5 flex items-center gap-2">
+                              <span className="truncate text-sm font-medium text-white">
+                                {session.topic}
+                              </span>
+                              <span
+                                className={`text-[10px] tracking-wider uppercase ${getDifficultyStyle(session.difficulty)}`}
+                              >
+                                {session.difficulty}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-zinc-500">
+                              <span>
+                                {new Date(session.started_at).toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                })}
+                              </span>
+                              {isEvaluating && (
+                                <Badge className="border-0 bg-blue-500/10 px-1.5 py-0 text-[10px] text-blue-400">
+                                  Evaluating
+                                </Badge>
+                              )}
+                              {isInProgress && (
+                                <Badge className="border-0 bg-amber-500/10 px-1.5 py-0 text-[10px] text-amber-400">
+                                  In Progress
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+
+                          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-600" />
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Referral Widget - below Recent Activity */}
+              <ReferralWidget />
             </div>
 
             {/* Metrics Overview - 2 cols on lg */}
-            <div className="lg:col-span-2 space-y-4" data-tour="quick-start">
+            <div className="space-y-4 lg:col-span-2" data-tour="quick-start">
               <MetricsOverview />
-              <ReferralWidget />
             </div>
           </div>
 
