@@ -55,14 +55,18 @@ export const robloxData: CompanyQuestionData = {
       lastReported: "2024 Q4",
     },
     {
-      scenarioId: "design-object-pool",
-      title: "Object Pool Design",
+      scenarioId: "dsa-serialize-deserialize-tree",
+      title: "Serialize/Deserialize Data Structures",
       frequency: "common",
-      variants: ["Bullet Pool", "NPC Pool"],
     },
     {
-      scenarioId: "dsa-serialize-deserialize",
-      title: "Serialize/Deserialize Data",
+      scenarioId: "dsa-generate-parentheses",
+      title: "Generate Parentheses (Recursion)",
+      frequency: "common",
+    },
+    {
+      scenarioId: "dsa-number-of-islands",
+      title: "Number of Islands (Game Grid)",
       frequency: "common",
     },
   ],
@@ -193,24 +197,34 @@ export const spotifyData: CompanyQuestionData = {
 
   mustKnowQuestions: [
     {
-      scenarioId: "dsa-median-data-stream",
-      title: "Find Median from Data Stream",
+      scenarioId: "dsa-find-median-data-stream",
+      title: "Find Median from Data Stream (LC295)",
       frequency: "very_common",
       lastReported: "2025 Q1",
     },
     {
-      scenarioId: "dsa-sliding-window-median",
-      title: "Sliding Window Median",
+      scenarioId: "dsa-sliding-window-maximum",
+      title: "Sliding Window Maximum",
       frequency: "common",
     },
     {
-      scenarioId: "design-music-recommendation",
-      title: "Design Music Recommendation System",
+      scenarioId: "dsa-valid-anagram",
+      title: "Valid Anagram (isAnagram)",
       frequency: "common",
     },
     {
-      scenarioId: "dsa-moving-average-stream",
-      title: "Moving Average from Data Stream",
+      scenarioId: "dsa-valid-palindrome",
+      title: "Valid Palindrome",
+      frequency: "common",
+    },
+    {
+      scenarioId: "dsa-two-sum",
+      title: "Two Sum (sumTo100 variant)",
+      frequency: "common",
+    },
+    {
+      scenarioId: "dsa-kth-largest-element",
+      title: "Kth Largest Element",
       frequency: "common",
     },
   ],
@@ -344,18 +358,23 @@ export const twitchData: CompanyQuestionData = {
       frequency: "very_common",
     },
     {
-      scenarioId: "design-live-streaming",
-      title: "Design Live Streaming System",
-      frequency: "common",
-    },
-    {
-      scenarioId: "design-chat-system",
-      title: "Design Real-time Chat System",
-      frequency: "common",
-    },
-    {
       scenarioId: "dsa-number-of-islands",
       title: "Number of Islands",
+      frequency: "common",
+    },
+    {
+      scenarioId: "dsa-rotting-oranges",
+      title: "Rotting Oranges (BFS)",
+      frequency: "common",
+    },
+    {
+      scenarioId: "dsa-binary-tree-level-order",
+      title: "Binary Tree Level Order Traversal",
+      frequency: "common",
+    },
+    {
+      scenarioId: "dsa-coin-change",
+      title: "Coin Change (DP)",
       frequency: "common",
     },
   ],

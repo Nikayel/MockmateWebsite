@@ -43,19 +43,23 @@ export const nvidiaData: CompanyQuestionData = {
       lastReported: "2024 Q4",
     },
     {
-      scenarioId: "dsa-max-depth-binary-tree",
+      scenarioId: "dsa-maximum-depth-binary-tree",
       title: "Maximum Depth of Binary Tree",
       frequency: "common",
     },
     {
-      scenarioId: "dsa-regex-power-of-two",
-      title: "Power of Two (Binary Regex)",
+      scenarioId: "dsa-subtree-of-another-tree",
+      title: "Subtree of Another Tree",
       frequency: "common",
     },
-    { scenarioId: "dsa-trie-implementation", title: "Implement Trie", frequency: "common" },
     {
-      scenarioId: "concurrency-semaphore",
-      title: "Thread Synchronization with Semaphores",
+      scenarioId: "dsa-number-of-islands",
+      title: "Number of Islands (Grid)",
+      frequency: "common",
+    },
+    {
+      scenarioId: "dsa-subarray-sum-equals-k",
+      title: "Subarray Sum Equals K",
       frequency: "common",
     },
   ],
@@ -186,23 +190,23 @@ export const salesforceData: CompanyQuestionData = {
       lastReported: "2025 Q1",
     },
     {
-      scenarioId: "dsa-lcs",
+      scenarioId: "dsa-longest-common-subsequence",
       title: "Longest Common Subsequence",
       frequency: "common",
     },
     {
-      scenarioId: "dsa-word-count-dictionary",
-      title: "Valid Words from Dictionary",
+      scenarioId: "dsa-snakes-and-ladders",
+      title: "Snakes and Ladders (BFS)",
       frequency: "common",
     },
     {
-      scenarioId: "dsa-snake-ladder",
-      title: "Snake and Ladder (Min Dice Throws)",
+      scenarioId: "dsa-group-anagrams",
+      title: "Group Anagrams",
       frequency: "common",
     },
     {
-      scenarioId: "dsa-aggressive-cows",
-      title: "Aggressive Cows (Binary Search)",
+      scenarioId: "dsa-binary-tree-level-order",
+      title: "Binary Tree Level Order Traversal",
       frequency: "common",
     },
   ],
@@ -333,24 +337,35 @@ export const atlassianData: CompanyQuestionData = {
 
   mustKnowQuestions: [
     {
-      scenarioId: "dsa-meeting-overlap",
-      title: "Meeting Time Overlap",
+      scenarioId: "dsa-merge-intervals",
+      title: "Merge Intervals (Meeting Scheduling)",
       frequency: "very_common",
       lastReported: "2025 Q1",
     },
     {
-      scenarioId: "dsa-lcs",
+      scenarioId: "dsa-lru-cache",
+      title: "LRU Cache (Rate Limiter variant)",
+      frequency: "very_common",
+      lastReported: "2024 Q4",
+    },
+    {
+      scenarioId: "dsa-longest-common-subsequence",
       title: "Longest Common Subsequence",
       frequency: "common",
     },
     {
-      scenarioId: "dsa-data-structure-count",
-      title: "Custom Data Structure with Count",
+      scenarioId: "dsa-non-overlapping-intervals",
+      title: "Non-overlapping Intervals",
       frequency: "common",
     },
     {
-      scenarioId: "dsa-array-string-manipulation",
-      title: "Array and String Manipulation",
+      scenarioId: "dsa-group-anagrams",
+      title: "Group Anagrams",
+      frequency: "common",
+    },
+    {
+      scenarioId: "dsa-top-k-frequent-elements",
+      title: "Top K Frequent Elements",
       frequency: "common",
     },
   ],
@@ -467,8 +482,8 @@ export const oracleData: CompanyQuestionData = {
 
   mustKnowQuestions: [
     {
-      scenarioId: "dsa-missing-number",
-      title: "Missing Number in Array",
+      scenarioId: "dsa-first-missing-positive",
+      title: "First Missing Positive",
       frequency: "very_common",
     },
     {
@@ -477,12 +492,12 @@ export const oracleData: CompanyQuestionData = {
       frequency: "very_common",
     },
     {
-      scenarioId: "dsa-first-duplicate",
-      title: "First Duplicate (O(n) time, O(1) space)",
+      scenarioId: "dsa-find-all-duplicates",
+      title: "Find All Duplicates in Array",
       frequency: "common",
     },
     {
-      scenarioId: "dsa-add-two-numbers-linked-list",
+      scenarioId: "dsa-add-two-numbers",
       title: "Add Two Numbers (Linked List)",
       frequency: "common",
     },
@@ -492,8 +507,8 @@ export const oracleData: CompanyQuestionData = {
       frequency: "common",
     },
     {
-      scenarioId: "sql-nth-highest-salary",
-      title: "Nth Highest Salary (SQL)",
+      scenarioId: "dsa-reverse-linked-list",
+      title: "Reverse Linked List",
       frequency: "common",
     },
   ],
