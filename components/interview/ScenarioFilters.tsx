@@ -1,7 +1,18 @@
 "use client"
 
 import { memo, useState } from "react"
-import { Cpu, Bug, Wrench, Zap, Shield, Check, X, ChevronDown, Building2, Layers } from "lucide-react"
+import {
+  Cpu,
+  Bug,
+  Wrench,
+  Zap,
+  Shield,
+  Check,
+  X,
+  ChevronDown,
+  Building2,
+  Layers,
+} from "lucide-react"
 import { scenarios, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
 import { ScenarioSearchBar } from "./ScenarioSearchBar"
 
@@ -33,82 +44,114 @@ interface ScenarioFiltersProps {
 // Exercise type quick filters with descriptions
 const EXERCISE_TYPES = [
   {
-    id: 'dsa',
-    label: 'DSA',
-    description: 'Algorithms & data structures',
+    id: "dsa",
+    label: "DSA",
+    description: "Algorithms & data structures",
     icon: Cpu,
-    color: 'bg-sky-500',
-    textColor: 'text-white',
-    borderColor: 'border-sky-500',
-    lightBg: 'bg-sky-500/10',
-    lightText: 'text-sky-400'
+    color: "bg-sky-500",
+    textColor: "text-white",
+    borderColor: "border-sky-500",
+    lightBg: "bg-sky-500/10",
+    lightText: "text-sky-400",
   },
   {
-    id: 'bugfix',
-    label: 'Bug Fix',
-    description: 'Debug existing code',
+    id: "bugfix",
+    label: "Bug Fix",
+    description: "Debug existing code",
     icon: Bug,
-    color: 'bg-emerald-500',
-    textColor: 'text-white',
-    borderColor: 'border-emerald-500',
-    lightBg: 'bg-emerald-500/10',
-    lightText: 'text-emerald-400'
+    color: "bg-emerald-500",
+    textColor: "text-white",
+    borderColor: "border-emerald-500",
+    lightBg: "bg-emerald-500/10",
+    lightText: "text-emerald-400",
   },
   {
-    id: 'add-functionality',
-    label: 'Add Feature',
-    description: 'Extend codebases',
+    id: "add-functionality",
+    label: "Add Feature",
+    description: "Extend codebases",
     icon: Wrench,
-    color: 'bg-amber-500',
-    textColor: 'text-black',
-    borderColor: 'border-amber-500',
-    lightBg: 'bg-amber-500/10',
-    lightText: 'text-amber-400'
+    color: "bg-amber-500",
+    textColor: "text-black",
+    borderColor: "border-amber-500",
+    lightBg: "bg-amber-500/10",
+    lightText: "text-amber-400",
   },
   {
-    id: 'optimization',
-    label: 'Optimize',
-    description: 'Improve performance',
+    id: "optimization",
+    label: "Optimize",
+    description: "Improve performance",
     icon: Zap,
-    color: 'bg-violet-500',
-    textColor: 'text-white',
-    borderColor: 'border-violet-500',
-    lightBg: 'bg-violet-500/10',
-    lightText: 'text-violet-400'
+    color: "bg-violet-500",
+    textColor: "text-white",
+    borderColor: "border-violet-500",
+    lightBg: "bg-violet-500/10",
+    lightText: "text-violet-400",
   },
   {
-    id: 'security',
-    label: 'Security',
-    description: 'Fix vulnerabilities',
+    id: "security",
+    label: "Security",
+    description: "Fix vulnerabilities",
     icon: Shield,
-    color: 'bg-red-500',
-    textColor: 'text-white',
-    borderColor: 'border-red-500',
-    lightBg: 'bg-red-500/10',
-    lightText: 'text-red-400'
+    color: "bg-red-500",
+    textColor: "text-white",
+    borderColor: "border-red-500",
+    lightBg: "bg-red-500/10",
+    lightText: "text-red-400",
   },
   {
-    id: 'system-design',
-    label: 'System Design',
-    description: 'Architecture & scalability',
+    id: "system-design",
+    label: "System Design",
+    description: "Architecture & scalability",
     icon: Layers,
-    color: 'bg-indigo-500',
-    textColor: 'text-white',
-    borderColor: 'border-indigo-500',
-    lightBg: 'bg-indigo-500/10',
-    lightText: 'text-indigo-400'
+    color: "bg-indigo-500",
+    textColor: "text-white",
+    borderColor: "border-indigo-500",
+    lightBg: "bg-indigo-500/10",
+    lightText: "text-indigo-400",
   },
 ] as const
 
 const DIFFICULTIES = [
-  { id: 'easy', label: 'Easy', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
-  { id: 'medium', label: 'Medium', color: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
-  { id: 'hard', label: 'Hard', color: 'bg-red-500/10 text-red-400 border-red-500/30' },
+  { id: "easy", label: "Easy", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
+  { id: "medium", label: "Medium", color: "bg-amber-500/10 text-amber-400 border-amber-500/30" },
+  { id: "hard", label: "Hard", color: "bg-red-500/10 text-red-400 border-red-500/30" },
 ] as const
 
+// Dynamically get all unique companies from scenarios
+const ALL_COMPANIES = Array.from(new Set(scenarios.flatMap((s) => s.companies))).sort() as Company[]
+
+// Priority companies to show first in the dropdown
+const PRIORITY_COMPANIES = [
+  "Google",
+  "Meta",
+  "Amazon",
+  "Microsoft",
+  "Apple",
+  "Netflix",
+  // Popular intern/new-grad companies
+  "Roblox",
+  "TikTok",
+  "Snap",
+  "Pinterest",
+  "Reddit",
+  "Spotify",
+  "NVIDIA",
+  "Atlassian",
+  "Oracle",
+  "Twitch",
+  // Other top companies
+  "Airbnb",
+  "Shopify",
+  "Uber",
+  "Lyft",
+  "DoorDash",
+]
+
+// Sort companies with priority ones first
 const COMPANIES = [
-  'Google', 'Meta', 'Amazon', 'Microsoft', 'Apple', 'Netflix', 'Airbnb', 'Shopify', 'Walmart'
-] as const
+  ...PRIORITY_COMPANIES.filter((c) => ALL_COMPANIES.includes(c as Company)),
+  ...ALL_COMPANIES.filter((c) => !PRIORITY_COMPANIES.includes(c)),
+] as Company[]
 
 export const ScenarioFilters = memo(function ScenarioFilters({
   searchQuery,
@@ -145,22 +188,20 @@ export const ScenarioFilters = memo(function ScenarioFilters({
         {EXERCISE_TYPES.map((type) => {
           const Icon = type.icon
           const isActive = filterType.includes(type.id as ScenarioType)
-          const count = scenarios.filter(s => s.type === type.id).length
+          const count = scenarios.filter((s) => s.type === type.id).length
           return (
             <button
               key={type.id}
               onClick={() => onToggleType(type.id as ScenarioType)}
-              className={`
-                flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all
-                ${isActive
+              className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
+                isActive
                   ? `${type.color} ${type.textColor}`
                   : `${type.lightBg} ${type.lightText} hover:opacity-80`
-                }
-              `}
+              } `}
             >
               <Icon className="h-3.5 w-3.5" />
               {type.label}
-              <span className={`text-xs ${isActive ? 'opacity-70' : 'opacity-60'}`}>{count}</span>
+              <span className={`text-xs ${isActive ? "opacity-70" : "opacity-60"}`}>{count}</span>
               {isActive && <Check className="h-3 w-3" />}
             </button>
           )
@@ -171,7 +212,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
       <div className="flex flex-wrap gap-3">
         {/* Difficulty Pills */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-500 uppercase tracking-wider">Difficulty</span>
+          <span className="text-xs tracking-wider text-zinc-500 uppercase">Difficulty</span>
           <div className="flex gap-1">
             {DIFFICULTIES.map((diff) => {
               const isActive = filterDifficulty.includes(diff.id as DifficultyLevel)
@@ -179,13 +220,11 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                 <button
                   key={diff.id}
                   onClick={() => onToggleDifficulty(diff.id as DifficultyLevel)}
-                  className={`
-                    px-3 py-1 rounded-md text-xs font-medium transition-all border
-                    ${isActive
-                      ? diff.color + ' border-current'
-                      : 'text-zinc-400 border-zinc-700 hover:border-zinc-600 hover:text-zinc-300'
-                    }
-                  `}
+                  className={`rounded-md border px-3 py-1 text-xs font-medium transition-all ${
+                    isActive
+                      ? diff.color + " border-current"
+                      : "border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+                  } `}
                 >
                   {diff.label}
                 </button>
@@ -198,45 +237,42 @@ export const ScenarioFilters = memo(function ScenarioFilters({
         <div className="relative">
           <button
             onClick={() => setShowCompanyDropdown(!showCompanyDropdown)}
-            className={`
-              flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all border
-              ${filterCompanies.length > 0
-                ? 'bg-zinc-800 border-zinc-700 text-white'
-                : 'border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300'
-              }
-            `}
+            className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-all ${
+              filterCompanies.length > 0
+                ? "border-zinc-700 bg-zinc-800 text-white"
+                : "border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
+            } `}
           >
             <Building2 className="h-3.5 w-3.5" />
-            {filterCompanies.length > 0 ? `${filterCompanies.length} companies` : 'Companies'}
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showCompanyDropdown ? 'rotate-180' : ''}`} />
+            {filterCompanies.length > 0 ? `${filterCompanies.length} companies` : "Companies"}
+            <ChevronDown
+              className={`h-3.5 w-3.5 transition-transform ${showCompanyDropdown ? "rotate-180" : ""}`}
+            />
           </button>
 
           {showCompanyDropdown && (
             <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setShowCompanyDropdown(false)}
-              />
-              <div className="absolute top-full left-0 mt-2 w-48 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-20 py-2">
+              <div className="fixed inset-0 z-10" onClick={() => setShowCompanyDropdown(false)} />
+              <div className="absolute top-full left-0 z-20 mt-2 w-48 rounded-lg border border-zinc-800 bg-zinc-900 py-2 shadow-xl">
                 {COMPANIES.map((company) => {
                   const isActive = filterCompanies.includes(company as Company)
                   return (
                     <button
                       key={company}
                       onClick={() => onToggleCompany(company as Company)}
-                      className="w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-zinc-800 transition-colors"
+                      className="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-800"
                     >
-                      <span className={isActive ? 'text-white' : 'text-zinc-400'}>{company}</span>
+                      <span className={isActive ? "text-white" : "text-zinc-400"}>{company}</span>
                       {isActive && <Check className="h-3.5 w-3.5 text-emerald-500" />}
                     </button>
                   )
                 })}
                 {filterCompanies.length > 0 && (
                   <>
-                    <div className="border-t border-zinc-800 my-1" />
+                    <div className="my-1 border-t border-zinc-800" />
                     <button
                       onClick={onClearCompanies}
-                      className="w-full px-3 py-2 text-sm text-left text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                      className="w-full px-3 py-2 text-left text-sm text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
                     >
                       Clear selection
                     </button>
@@ -250,16 +286,16 @@ export const ScenarioFilters = memo(function ScenarioFilters({
 
       {/* Active Filters Summary */}
       {hasActiveFilters && (
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-800/50">
+        <div className="flex flex-wrap items-center gap-2 border-t border-zinc-800/50 pt-2">
           <span className="text-xs text-zinc-600">Active:</span>
-          {filterType.map(t => {
-            const type = EXERCISE_TYPES.find(et => et.id === t)
+          {filterType.map((t) => {
+            const type = EXERCISE_TYPES.find((et) => et.id === t)
             if (!type) return null
             const Icon = type.icon
             return (
               <span
                 key={t}
-                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs ${type.lightBg} ${type.lightText}`}
+                className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs ${type.lightBg} ${type.lightText}`}
               >
                 <Icon className="h-3 w-3" />
                 {type.label}
@@ -269,13 +305,15 @@ export const ScenarioFilters = memo(function ScenarioFilters({
               </span>
             )
           })}
-          {filterDifficulty.map(d => (
+          {filterDifficulty.map((d) => (
             <span
               key={d}
-              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs ${
-                d === 'easy' ? 'bg-emerald-500/10 text-emerald-400' :
-                d === 'medium' ? 'bg-amber-500/10 text-amber-400' :
-                'bg-red-500/10 text-red-400'
+              className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs ${
+                d === "easy"
+                  ? "bg-emerald-500/10 text-emerald-400"
+                  : d === "medium"
+                    ? "bg-amber-500/10 text-amber-400"
+                    : "bg-red-500/10 text-red-400"
               }`}
             >
               {d}
@@ -284,10 +322,10 @@ export const ScenarioFilters = memo(function ScenarioFilters({
               </button>
             </span>
           ))}
-          {filterCompanies.map(c => (
+          {filterCompanies.map((c) => (
             <span
               key={c}
-              className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-zinc-800 text-zinc-300"
+              className="inline-flex items-center gap-1.5 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-300"
             >
               {c}
               <button onClick={() => onRemoveCompany(c)} className="hover:opacity-70">
@@ -296,9 +334,9 @@ export const ScenarioFilters = memo(function ScenarioFilters({
             </span>
           ))}
           {searchQuery && (
-            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-zinc-800 text-zinc-300">
+            <span className="inline-flex items-center gap-1.5 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-300">
               "{searchQuery}"
-              <button onClick={() => onSearchChange('')} className="hover:opacity-70">
+              <button onClick={() => onSearchChange("")} className="hover:opacity-70">
                 <X className="h-3 w-3" />
               </button>
             </span>
