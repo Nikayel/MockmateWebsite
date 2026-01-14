@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, Suspense } from "react"
+import { useState, useEffect, useRef, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import nextDynamic from "next/dynamic"
 import { Header } from "@/components/header"
@@ -1043,6 +1043,36 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       }
     }
   }, [code, isInterviewStarted, showFeedback, showPostInterviewDiscussion, proactiveTimer])
+
+  // Fetch RAG hints for the current problem
+  const fetchRAGHints = useCallback(async () => {
+    if (!selectedScenario) return
+
+    setIsLoadingHints(true)
+    try {
+      const response = await fetch("/api/rag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "get-hints",
+          problemText: selectedScenario.problemStatement,
+          problemTitle: selectedScenario.title,
+          userCode: code,
+          difficulty: selectedScenario.difficulty,
+          problemType: selectedScenario.type,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setRagHints(data.contextualHints || [])
+      }
+    } catch (error) {
+      console.error("Error fetching hints:", error)
+    } finally {
+      setIsLoadingHints(false)
+    }
+  }, [selectedScenario, code, setIsLoadingHints, setRagHints])
 
   // Fetch RAG hints only when user has written meaningful code
   // This prevents showing hints before user even starts coding
@@ -2703,36 +2733,6 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       toast.error("Failed to generate feedback")
     } finally {
       setIsGeneratingFeedback(false)
-    }
-  }
-
-  // Fetch RAG hints for the current problem
-  const fetchRAGHints = async () => {
-    if (!selectedScenario) return
-
-    setIsLoadingHints(true)
-    try {
-      const response = await fetch("/api/rag", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "get-hints",
-          problemText: selectedScenario.problemStatement,
-          problemTitle: selectedScenario.title,
-          userCode: code,
-          difficulty: selectedScenario.difficulty,
-          problemType: selectedScenario.type,
-        }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setRagHints(data.contextualHints || [])
-      }
-    } catch (error) {
-      console.error("Error fetching hints:", error)
-    } finally {
-      setIsLoadingHints(false)
     }
   }
 
