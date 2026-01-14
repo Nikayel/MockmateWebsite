@@ -27,6 +27,9 @@ import { backtrackingScenarios } from "./scenarios/dsa/backtracking"
 import { intervalsScenarios } from "./scenarios/dsa/intervals"
 import { mathGeometryScenarios } from "./scenarios/dsa/math-geometry"
 import { binarySearchTreeScenarios } from "./scenarios/dsa/binary-search-tree"
+import { triesScenarios } from "./scenarios/dsa/tries"
+import { bitManipulationScenarios } from "./scenarios/dsa/bit-manipulation"
+import { greedyScenarios } from "./scenarios/dsa/greedy"
 
 // Import modular bugfix and system-design scenarios
 import { bugFixScenarios } from "./scenarios/bugfix"
@@ -202,6 +205,9 @@ export const scenarios: Scenario[] = [
   ...intervalsScenarios,
   ...mathGeometryScenarios,
   ...binarySearchTreeScenarios,
+  ...triesScenarios,
+  ...bitManipulationScenarios,
+  ...greedyScenarios,
 
   // Bug Fix Scenarios
   ...bugFixScenarios,

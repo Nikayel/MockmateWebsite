@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Gift, Copy, Check, Share2, Users, DollarSign } from "lucide-react"
+import { Gift, Copy, Check, Share2, Users, DollarSign, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 
 interface ReferralStats {
@@ -227,7 +227,7 @@ export function ReferralWidget() {
         {/* Terms Link */}
         <a
           href="/referral-terms"
-          className="mt-2 flex items-center justify-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-400 transition-colors"
+          className="mt-2 flex items-center justify-center gap-1 text-[10px] text-zinc-500 transition-colors hover:text-zinc-400"
         >
           Program terms apply
           <ChevronRight className="h-3 w-3" />
