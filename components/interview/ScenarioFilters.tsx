@@ -253,7 +253,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
           {showCompanyDropdown && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowCompanyDropdown(false)} />
-              <div className="absolute top-full left-0 z-20 mt-2 w-48 rounded-lg border border-zinc-800 bg-zinc-900 py-2 shadow-xl">
+              <div className="absolute top-full left-0 z-20 mt-2 max-h-80 w-56 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900 py-2 shadow-xl">
                 {COMPANIES.map((company) => {
                   const isActive = filterCompanies.includes(company as Company)
                   return (
