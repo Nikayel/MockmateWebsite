@@ -21,7 +21,19 @@ export const binarySearchTreeScenarios: DSAScenario[] = [
 A valid BST is defined as follows:
 - The left subtree of a node contains only nodes with keys less than the node's key.
 - The right subtree of a node contains only nodes with keys greater than the node's key.
-- Both the left and right subtrees must also be binary search trees.`,
+- Both the left and right subtrees must also be binary search trees.
+
+Example visualization:
+
+    Valid BST:              Invalid BST:
+         5                       5
+        / \\                     / \\
+       3   7                   3   4  ← 4 < 5 (wrong!)
+      / \\   \\                 / \\
+     1   4   8               1   6  ← 6 > 5 (wrong!)
+
+    Check: all left < node < all right
+    Use min/max bounds while traversing`,
     examples: [
       {
         input: "root = [2,1,3]",
@@ -99,7 +111,22 @@ A valid BST is defined as follows:
     estimatedTime: 20,
     problemStatement: `Given a binary search tree (BST), find the lowest common ancestor (LCA) node of two given nodes in the BST.
 
-According to the definition of LCA: "The lowest common ancestor is defined between two nodes p and q as the lowest node in T that has both p and q as descendants (where we allow a node to be a descendant of itself)."`,
+According to the definition of LCA: "The lowest common ancestor is defined between two nodes p and q as the lowest node in T that has both p and q as descendants (where we allow a node to be a descendant of itself)."
+
+Example visualization:
+
+            6        ← LCA(2,8) = 6 (split point)
+           / \\
+         [2]  [8]    p=2, q=8
+         / \\  / \\
+        0   4 7   9
+           / \\
+          3   5
+
+    BST property helps:
+    - Both p,q < node → go left
+    - Both p,q > node → go right
+    - Otherwise → current node is LCA`,
     examples: [
       {
         input: "root = [6,2,8,0,4,7,9,null,null,3,5], p = 2, q = 8",
@@ -181,7 +208,24 @@ According to the definition of LCA: "The lowest common ancestor is defined betwe
     description: "Find the kth smallest element in a BST.",
     tags: ["tree", "dfs", "bst"],
     estimatedTime: 20,
-    problemStatement: `Given the root of a binary search tree, and an integer k, return the kth smallest value (1-indexed) of all the values of the nodes in the tree.`,
+    problemStatement: `Given the root of a binary search tree, and an integer k, return the kth smallest value (1-indexed) of all the values of the nodes in the tree.
+
+Example visualization:
+
+          5
+         / \\
+        3   6
+       / \\
+      2   4
+     /
+    1
+
+    Inorder traversal (sorted): [1, 2, 3, 4, 5, 6]
+                                 ↑  ↑  ↑
+                                k=1 k=2 k=3
+
+    k=1 → return 1
+    k=3 → return 3`,
     examples: [
       {
         input: "root = [3,1,4,null,2], k = 1",
@@ -256,7 +300,21 @@ According to the definition of LCA: "The lowest common ancestor is defined betwe
 
 Basically, the deletion can be divided into two stages:
 1. Search for a node to remove.
-2. If the node is found, delete the node.`,
+2. If the node is found, delete the node.
+
+Example visualization (delete 3):
+
+    Before:              After:
+        5                   5
+       / \\                 / \\
+     [3]  6      →        4   6
+     / \\                 /
+    2   4               2
+
+    Three cases:
+    1. Leaf node → just remove
+    2. One child → replace with child
+    3. Two children → replace with inorder successor`,
     examples: [
       {
         input: "root = [5,3,6,2,4,null,7], key = 3",
@@ -328,7 +386,23 @@ Basically, the deletion can be divided into two stages:
     estimatedTime: 20,
     problemStatement: `Given an integer array nums where the elements are sorted in ascending order, convert it to a height-balanced binary search tree.
 
-A height-balanced binary tree is a binary tree in which the depth of the two subtrees of every node never differs by more than one.`,
+A height-balanced binary tree is a binary tree in which the depth of the two subtrees of every node never differs by more than one.
+
+Example visualization:
+
+    nums = [-10, -3, 0, 5, 9]
+                    ↑
+                  middle
+
+    Choose middle as root, recursively build:
+
+              0          ← middle of [-10,-3,0,5,9]
+             / \\
+           -3   9        ← middles of halves
+           /   /
+        -10   5
+
+    Result: Balanced BST with height ≈ log(n)`,
     examples: [
       {
         input: "nums = [-10,-3,0,5,9]",
@@ -588,7 +662,22 @@ You may assume that next() calls will always be valid.`,
     description: "Calculate sum of values within a range in BST",
     tags: ["tree", "bst", "dfs"],
     estimatedTime: 15,
-    problemStatement: `Given the root node of a binary search tree and two integers low and high, return the sum of values of all nodes with a value in the inclusive range [low, high].`,
+    problemStatement: `Given the root node of a binary search tree and two integers low and high, return the sum of values of all nodes with a value in the inclusive range [low, high].
+
+Example visualization:
+
+           10          range = [7, 15]
+          /  \\
+         5   15
+        / \\    \\
+       3   7    18
+
+    Nodes in range [7, 15]: 7, 10, 15
+    Sum = 7 + 10 + 15 = 32
+
+    BST optimization:
+    - If node < low → skip left subtree
+    - If node > high → skip right subtree`,
     examples: [
       {
         input: "root = [10,5,15,3,7,null,18], low = 7, high = 15",

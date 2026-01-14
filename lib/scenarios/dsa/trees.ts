@@ -19,7 +19,16 @@ export const treesScenarios: DSAScenario[] = [
     estimatedTime: 10,
     problemStatement: `Given the root of a binary tree, invert the tree, and return its root.
 
-Inverting a binary tree means swapping the left and right children of all nodes in the tree.`,
+Inverting a binary tree means swapping the left and right children of all nodes in the tree.
+
+Example visualization:
+
+    Input:           Output:
+        4                4
+       / \\              / \\
+      2   7    →      7   2
+     / \\ / \\          / \\ / \\
+    1  3 6  9        9  6 3  1`,
     examples: [
       {
         input: "root = [4,2,7,1,3,6,9]",
@@ -96,7 +105,19 @@ Inverting a binary tree means swapping the left and right children of all nodes 
     estimatedTime: 10,
     problemStatement: `Given the roots of two binary trees p and q, write a function to check if they are the same or not.
 
-Two binary trees are considered the same if they are structurally identical, and the nodes have the same value.`,
+Two binary trees are considered the same if they are structurally identical, and the nodes have the same value.
+
+Example visualization:
+
+    Tree p:     Tree q:      Result:
+       1           1
+      / \\         / \\        TRUE ✓
+     2   3       2   3       (identical)
+
+    Tree p:     Tree q:      Result:
+       1           1
+      /             \\        FALSE ✗
+     2               2       (different structure)`,
     examples: [
       {
         input: "p = [1,2,3], q = [1,2,3]",
@@ -172,7 +193,17 @@ Two binary trees are considered the same if they are structurally identical, and
     estimatedTime: 10,
     problemStatement: `Given the root of a binary tree, return its maximum depth.
 
-A binary tree's maximum depth is the number of nodes along the longest path from the root node down to the farthest leaf node.`,
+A binary tree's maximum depth is the number of nodes along the longest path from the root node down to the farthest leaf node.
+
+Example visualization:
+
+        3         ← Level 1 (depth 1)
+       / \\
+      9  20       ← Level 2 (depth 2)
+         / \\
+        15  7     ← Level 3 (depth 3)
+
+    Maximum depth = 3`,
     examples: [
       {
         input: "root = [3,9,20,null,null,15,7]",
@@ -242,7 +273,18 @@ A binary tree's maximum depth is the number of nodes along the longest path from
     description: "Check if a binary tree is a mirror of itself.",
     tags: ["tree", "dfs", "bfs", "recursion"],
     estimatedTime: 15,
-    problemStatement: `Given the root of a binary tree, check whether it is a mirror of itself (i.e., symmetric around its center).`,
+    problemStatement: `Given the root of a binary tree, check whether it is a mirror of itself (i.e., symmetric around its center).
+
+Example visualization:
+
+    Symmetric (TRUE):       Not Symmetric (FALSE):
+          1                       1
+         / \\                     / \\
+        2   2                   2   2
+       / \\ / \\                   \\   \\
+      3  4 4  3                  3    3
+          |
+       (mirror)`,
     examples: [
       {
         input: "root = [1,2,2,3,4,4,3]",
@@ -314,7 +356,18 @@ A binary tree's maximum depth is the number of nodes along the longest path from
     estimatedTime: 20,
     problemStatement: `Given the roots of two binary trees root and subRoot, return true if there is a subtree of root with the same structure and node values of subRoot and false otherwise.
 
-A subtree of a binary tree tree is a tree that consists of a node in tree and all of this node's descendants.`,
+A subtree of a binary tree tree is a tree that consists of a node in tree and all of this node's descendants.
+
+Example visualization:
+
+    root:           subRoot:
+        3              4
+       / \\            / \\
+     [4]  5          4   ← matches!
+     / \\            / \\
+    1   2          1   2
+
+    The boxed subtree [4,1,2] matches subRoot → TRUE`,
     examples: [
       {
         input: "root = [3,4,5,1,2], subRoot = [4,1,2]",
@@ -383,7 +436,18 @@ A subtree of a binary tree tree is a tree that consists of a node in tree and al
     estimatedTime: 15,
     problemStatement: `Given a binary tree, determine if it is height-balanced.
 
-A height-balanced binary tree is a binary tree in which the depth of the two subtrees of every node never differs by more than one.`,
+A height-balanced binary tree is a binary tree in which the depth of the two subtrees of every node never differs by more than one.
+
+Example visualization:
+
+    Balanced (TRUE):        Not Balanced (FALSE):
+          3                       1
+         / \\                     / \\
+        9  20                   2   2
+           / \\                 / \\
+          15  7               3   3     ← height diff = 1
+                             / \\
+                            4   4       ← height diff = 2 at node 1`,
     examples: [
       {
         input: "root = [3,9,20,null,null,15,7]",
@@ -458,7 +522,17 @@ A height-balanced binary tree is a binary tree in which the depth of the two sub
     description: "Return the values of nodes visible from the right side.",
     tags: ["tree", "bfs", "dfs"],
     estimatedTime: 20,
-    problemStatement: `Given the root of a binary tree, imagine yourself standing on the right side of it, return the values of the nodes you can see ordered from top to bottom.`,
+    problemStatement: `Given the root of a binary tree, imagine yourself standing on the right side of it, return the values of the nodes you can see ordered from top to bottom.
+
+Example visualization:
+
+        1       ← visible (rightmost at level 0)
+       / \\
+      2   3     ← 3 visible (rightmost at level 1)
+       \\   \\
+        5   4   ← 4 visible (rightmost at level 2)
+
+    Standing on right side → see: [1, 3, 4]`,
     examples: [
       {
         input: "root = [1,2,3,null,5,null,4]",
@@ -611,7 +685,22 @@ Return the number of good nodes in the binary tree.`,
     description: "Build a binary tree from preorder and inorder traversals.",
     tags: ["tree", "recursion", "divide-and-conquer", "hash-table"],
     estimatedTime: 30,
-    problemStatement: `Given two integer arrays preorder and inorder where preorder is the preorder traversal of a binary tree and inorder is the inorder traversal of the same tree, construct and return the binary tree.`,
+    problemStatement: `Given two integer arrays preorder and inorder where preorder is the preorder traversal of a binary tree and inorder is the inorder traversal of the same tree, construct and return the binary tree.
+
+Example visualization:
+
+    preorder = [3, 9, 20, 15, 7]   (Root, Left, Right)
+    inorder  = [9, 3, 15, 20, 7]   (Left, Root, Right)
+
+    Step 1: 3 is root (first in preorder)
+    Step 2: In inorder, left of 3 is [9], right is [15,20,7]
+
+    Reconstructed tree:
+          3
+         / \\
+        9  20
+           / \\
+          15  7`,
     examples: [
       {
         input: "preorder = [3,9,20,15,7], inorder = [9,3,15,20,7]",
@@ -923,7 +1012,20 @@ Design an algorithm to serialize and deserialize a binary tree. There is no rest
     estimatedTime: 25,
     problemStatement: `Given a binary tree, find the lowest common ancestor (LCA) of two given nodes in the tree.
 
-According to the definition of LCA on Wikipedia: "The lowest common ancestor is defined between two nodes p and q as the lowest node in T that has both p and q as descendants (where we allow a node to be a descendant of itself)."`,
+According to the definition of LCA on Wikipedia: "The lowest common ancestor is defined between two nodes p and q as the lowest node in T that has both p and q as descendants (where we allow a node to be a descendant of itself)."
+
+Example visualization:
+
+            3       ← LCA of (5,1) = 3
+           / \\
+         [5]  [1]   ← p=5, q=1
+         / \\  / \\
+        6   2 0   8
+           / \\
+          7   4
+
+    LCA of (5, 4) = 5  (5 is ancestor of itself)
+    LCA of (5, 1) = 3  (3 is first common ancestor)`,
     examples: [
       {
         input: "root = [3,5,1,6,2,0,8,null,null,7,4], p = 5, q = 1",
@@ -999,7 +1101,17 @@ According to the definition of LCA on Wikipedia: "The lowest common ancestor is 
     description: "Return the level order traversal of a binary tree",
     tags: ["tree", "bfs", "queue"],
     estimatedTime: 20,
-    problemStatement: `Given the root of a binary tree, return the level order traversal of its nodes' values. (i.e., from left to right, level by level).`,
+    problemStatement: `Given the root of a binary tree, return the level order traversal of its nodes' values. (i.e., from left to right, level by level).
+
+Example visualization:
+
+        3           Level 0: [3]
+       / \\
+      9  20         Level 1: [9, 20]
+         / \\
+        15  7       Level 2: [15, 7]
+
+    Output: [[3], [9, 20], [15, 7]]`,
     examples: [
       {
         input: "root = [3,9,20,null,null,15,7]",
@@ -1077,7 +1189,18 @@ According to the definition of LCA on Wikipedia: "The lowest common ancestor is 
 
 The diameter of a binary tree is the length of the longest path between any two nodes in a tree. This path may or may not pass through the root.
 
-The length of a path between two nodes is represented by the number of edges between them.`,
+The length of a path between two nodes is represented by the number of edges between them.
+
+Example visualization:
+
+          1
+         / \\
+        2   3
+       / \\
+      4   5
+
+    Longest path: 4 → 2 → 1 → 3  OR  5 → 2 → 1 → 3
+    Diameter = 3 edges`,
     examples: [
       {
         input: "root = [1,2,3,4,5]",
@@ -1431,7 +1554,17 @@ A valid BST is defined as follows:
     description: "Level order traversal alternating left-to-right and right-to-left",
     tags: ["binary-tree", "bfs", "deque"],
     estimatedTime: 25,
-    problemStatement: `Given the root of a binary tree, return the zigzag level order traversal of its nodes' values. (i.e., from left to right, then right to left for the next level and alternate between).`,
+    problemStatement: `Given the root of a binary tree, return the zigzag level order traversal of its nodes' values. (i.e., from left to right, then right to left for the next level and alternate between).
+
+Example visualization:
+
+          3        Level 0: [3]     → left to right
+         / \\
+        9  20      Level 1: [20,9]  ← right to left
+           / \\
+          15  7    Level 2: [15,7]  → left to right
+
+    Output: [[3], [20, 9], [15, 7]]`,
     examples: [
       { input: "root = [3,9,20,null,null,15,7]", output: "[[3],[20,9],[15,7]]" },
       { input: "root = [1]", output: "[[1]]" },

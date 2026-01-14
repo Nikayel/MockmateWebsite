@@ -18,7 +18,21 @@ export const graphsScenarios: DSAScenario[] = [
     estimatedTime: 25,
     problemStatement: `Given an m x n 2D binary grid grid which represents a map of '1's (land) and '0's (water), return the number of islands.
 
-An island is surrounded by water and is formed by connecting adjacent lands horizontally or vertically. You may assume all four edges of the grid are all surrounded by water.`,
+An island is surrounded by water and is formed by connecting adjacent lands horizontally or vertically. You may assume all four edges of the grid are all surrounded by water.
+
+Example visualization:
+
+    ┌───┬───┬───┬───┬───┐
+    │ 1 │ 1 │ 0 │ 0 │ 0 │   Island 1: top-left
+    ├───┼───┼───┼───┼───┤          (connected 1s)
+    │ 1 │ 1 │ 0 │ 0 │ 0 │
+    ├───┼───┼───┼───┼───┤
+    │ 0 │ 0 │ 1 │ 0 │ 0 │   Island 2: center
+    ├───┼───┼───┼───┼───┤
+    │ 0 │ 0 │ 0 │ 1 │ 1 │   Island 3: bottom-right
+    └───┴───┴───┴───┴───┘
+
+    Answer: 3 islands`,
     examples: [
       {
         input:
@@ -129,7 +143,23 @@ An island is surrounded by water and is formed by connecting adjacent lands hori
 
 For example, the pair [0, 1], indicates that to take course 0 you have to first take course 1.
 
-Return true if you can finish all courses. Otherwise, return false.`,
+Return true if you can finish all courses. Otherwise, return false.
+
+Example visualization:
+
+    prerequisites = [[1,0], [2,1], [3,2]]
+
+    Dependency Graph:
+    0 → 1 → 2 → 3     ✓ Can finish (no cycle)
+
+    prerequisites = [[1,0], [0,1]]
+
+    Cycle detected:
+    0 → 1
+    ↑   ↓
+    └───┘             ✗ Cannot finish (cycle!)
+
+    Use: Topological Sort or DFS cycle detection`,
     examples: [
       {
         input: "numCourses = 2, prerequisites = [[1,0]]",
@@ -263,7 +293,20 @@ class Node {
     public List<Node> neighbors;
 }
 
-Test case format: For simplicity, each node's value is the same as the node's index (1-indexed). The input is given as an adjacency list where adjList[i] is a list of neighbors for node i+1.`,
+Test case format: For simplicity, each node's value is the same as the node's index (1-indexed). The input is given as an adjacency list where adjList[i] is a list of neighbors for node i+1.
+
+Example visualization:
+
+    Original Graph:          Cloned Graph:
+        1 ─── 2                 1' ─── 2'
+        │     │       →         │      │
+        │     │                 │      │
+        4 ─── 3                 4' ─── 3'
+
+    adjList = [[2,4],[1,3],[2,4],[1,3]]
+
+    Use HashMap: oldNode → newNode
+    DFS/BFS to traverse and clone`,
     examples: [
       {
         input: "adjList = [[2,4],[1,3],[2,4],[1,3]]",
@@ -503,7 +546,21 @@ Given two words, beginWord and endWord, and a dictionary wordList, return the nu
     description: "Find minimum minutes for all oranges to rot using BFS",
     tags: ["array", "bfs", "matrix"],
     estimatedTime: 25,
-    problemStatement: `You are given an m x n grid where 0 is an empty cell, 1 is a fresh orange, and 2 is a rotten orange. Every minute, any fresh orange adjacent (4-directionally) to a rotten orange becomes rotten. Return the minimum number of minutes that must elapse until no cell has a fresh orange. If impossible, return -1.`,
+    problemStatement: `You are given an m x n grid where 0 is an empty cell, 1 is a fresh orange, and 2 is a rotten orange. Every minute, any fresh orange adjacent (4-directionally) to a rotten orange becomes rotten. Return the minimum number of minutes that must elapse until no cell has a fresh orange. If impossible, return -1.
+
+Example visualization:
+
+    t=0          t=1          t=2          t=3          t=4
+   ┌───┬───┬───┐ ┌───┬───┬───┐ ┌───┬───┬───┐ ┌───┬───┬───┐ ┌───┬───┬───┐
+   │ 2 │ 1 │ 1 │ │ 2 │ 2 │ 1 │ │ 2 │ 2 │ 2 │ │ 2 │ 2 │ 2 │ │ 2 │ 2 │ 2 │
+   ├───┼───┼───┤ ├───┼───┼───┤ ├───┼───┼───┤ ├───┼───┼───┤ ├───┼───┼───┤
+   │ 1 │ 1 │ 0 │ │ 2 │ 1 │ 0 │ │ 2 │ 2 │ 0 │ │ 2 │ 2 │ 0 │ │ 2 │ 2 │ 0 │
+   ├───┼───┼───┤ ├───┼───┼───┤ ├───┼───┼───┤ ├───┼───┼───┤ ├───┼───┼───┤
+   │ 0 │ 1 │ 1 │ │ 0 │ 1 │ 1 │ │ 0 │ 2 │ 1 │ │ 0 │ 2 │ 2 │ │ 0 │ 2 │ 2 │
+   └───┴───┴───┘ └───┴───┴───┘ └───┴───┴───┘ └───┴───┴───┘ └───┴───┴───┘
+
+    0=empty, 1=fresh 🍊, 2=rotten 🟤
+    Answer: 4 minutes`,
     examples: [
       { input: "grid = [[2,1,1],[1,1,0],[0,1,1]]", output: "4" },
       {
@@ -870,7 +927,22 @@ The graph is given as follows: graph[i] is a list of all nodes you can visit fro
     estimatedTime: 25,
     problemStatement: `Given an m x n matrix board containing 'X' and 'O', capture all regions that are 4-directionally surrounded by 'X'.
 
-A region is captured by flipping all 'O's into 'X's in that surrounded region.`,
+A region is captured by flipping all 'O's into 'X's in that surrounded region.
+
+Example visualization:
+
+    Input:                    Output:
+    ┌───┬───┬───┬───┐         ┌───┬───┬───┬───┐
+    │ X │ X │ X │ X │         │ X │ X │ X │ X │
+    ├───┼───┼───┼───┤         ├───┼───┼───┼───┤
+    │ X │ O │ O │ X │   →     │ X │ X │ X │ X │  (captured!)
+    ├───┼───┼───┼───┤         ├───┼───┼───┼───┤
+    │ X │ X │ O │ X │         │ X │ X │ X │ X │  (captured!)
+    ├───┼───┼───┼───┤         ├───┼───┼───┼───┤
+    │ X │ O │ X │ X │         │ X │ O │ X │ X │  (on border - safe)
+    └───┴───┴───┴───┘         └───┴───┴───┴───┘
+
+    Strategy: Mark border-connected O's as safe, flip the rest`,
     examples: [
       {
         input: 'board = [["X","X","X","X"],["X","O","O","X"],["X","X","O","X"],["X","O","X","X"]]',
@@ -1287,7 +1359,22 @@ Return the number of connected components in the graph.`,
 - 0: A gate
 - INF (2147483647): An empty room
 
-Fill each empty room with the distance to its nearest gate. If impossible, leave as INF.`,
+Fill each empty room with the distance to its nearest gate. If impossible, leave as INF.
+
+Example visualization:
+
+    Input:                    Output:
+    ┌────┬────┬────┬────┐     ┌────┬────┬────┬────┐
+    │ INF│ -1 │  0 │ INF│     │  3 │ -1 │  0 │  1 │
+    ├────┼────┼────┼────┤     ├────┼────┼────┼────┤
+    │ INF│ INF│ INF│ -1 │  →  │  2 │  2 │  1 │ -1 │
+    ├────┼────┼────┼────┤     ├────┼────┼────┼────┤
+    │ INF│ -1 │ INF│ -1 │     │  1 │ -1 │  2 │ -1 │
+    ├────┼────┼────┼────┤     ├────┼────┼────┼────┤
+    │  0 │ -1 │ INF│ INF│     │  0 │ -1 │  3 │  4 │
+    └────┴────┴────┴────┘     └────┴────┴────┴────┘
+
+    Use multi-source BFS from all gates simultaneously`,
     examples: [
       {
         input:
@@ -1345,7 +1432,20 @@ Fill each empty room with the distance to its nearest gate. If impossible, leave
     description: "Find shortest path from top-left to bottom-right in binary grid",
     tags: ["bfs", "matrix", "shortest-path"],
     estimatedTime: 20,
-    problemStatement: `Given an n x n binary matrix grid, return the length of the shortest clear path from top-left to bottom-right. A clear path connects 0s and can move in 8 directions. Return -1 if no such path exists.`,
+    problemStatement: `Given an n x n binary matrix grid, return the length of the shortest clear path from top-left to bottom-right. A clear path connects 0s and can move in 8 directions. Return -1 if no such path exists.
+
+Example visualization:
+
+    ┌───┬───┬───┐     8 directions:
+    │ 0 │ 0 │ 0 │       ↖ ↑ ↗
+    ├───┼───┼───┤       ← ● →
+    │ 1 │ 1 │ 0 │       ↙ ↓ ↘
+    ├───┼───┼───┤
+    │ 1 │ 1 │ 0 │
+    └───┴───┴───┘
+
+    Path: (0,0) → (0,1) → (0,2) → (1,2) → (2,2)
+    Length: 4 cells`,
     examples: [
       { input: "grid = [[0,1],[1,0]]", output: "2" },
       { input: "grid = [[0,0,0],[1,1,0],[1,1,0]]", output: "4" },

@@ -16,7 +16,20 @@ export const linkedListScenarios: DSAScenario[] = [
     description: "Reverse a singly linked list",
     tags: ["linked-list", "recursion"],
     estimatedTime: 15,
-    problemStatement: `Given the head of a singly linked list, reverse the list, and return the reversed list.`,
+    problemStatement: `Given the head of a singly linked list, reverse the list, and return the reversed list.
+
+Example visualization:
+
+    Input:   1 → 2 → 3 → 4 → 5 → null
+
+    Output:  5 → 4 → 3 → 2 → 1 → null
+
+    Process (using 3 pointers):
+    prev   curr  next
+    null ← [1] → 2 → 3 → 4 → 5
+           prev  curr next
+    null ← 1 ← [2] → 3 → 4 → 5
+                    ...and so on`,
     examples: [
       {
         input: "head = [1,2,3,4,5]",
@@ -99,7 +112,20 @@ export const linkedListScenarios: DSAScenario[] = [
 
 There is a cycle in a linked list if there is some node in the list that can be reached again by continuously following the next pointer.
 
-Return true if there is a cycle in the linked list. Otherwise, return false.`,
+Return true if there is a cycle in the linked list. Otherwise, return false.
+
+Example visualization:
+
+    With cycle (pos=1):
+    3 → 2 → 0 → -4
+        ↑       ↓
+        └───────┘
+
+    No cycle:
+    1 → 2 → 3 → 4 → null
+
+    Floyd's Algorithm: slow (1 step), fast (2 steps)
+    If they meet → cycle exists`,
     examples: [
       {
         input: "head = [3,2,0,-4], pos = 1",
@@ -198,7 +224,21 @@ Implement the LRUCache class:
 - int get(int key) Return the value of the key if the key exists, otherwise return -1.
 - void put(int key, int value) Update the value of the key if the key exists. Otherwise, add the key-value pair to the cache. If the number of keys exceeds the capacity from this operation, evict the least recently used key.
 
-The functions get and put must each run in O(1) average time complexity.`,
+The functions get and put must each run in O(1) average time complexity.
+
+Example visualization (capacity=2):
+
+    ┌─────────────────────────────────────┐
+    │  HashMap: O(1) lookup               │
+    │  {1→NodeA, 2→NodeB}                 │
+    └─────────────────────────────────────┘
+              ↓           ↓
+    ┌──────────────────────────────────────────┐
+    │  Doubly Linked List (order of use):      │
+    │  HEAD ↔ [1,1] ↔ [2,2] ↔ TAIL             │
+    │         LRU     MRU                      │
+    │  (evict ←)      (← new items go here)    │
+    └──────────────────────────────────────────┘`,
     examples: [
       {
         input: "LRUCache(2); put(1,1); put(2,2); get(1); put(3,3); get(2)",
@@ -398,7 +438,20 @@ impl LRUCache {
     description: "Merge two sorted linked lists into one sorted list.",
     tags: ["linked-list", "recursion", "two-pointers"],
     estimatedTime: 20,
-    problemStatement: `You are given the heads of two sorted linked lists list1 and list2. Merge the two lists into one sorted list. The list should be made by splicing together the nodes of the first two lists. Return the head of the merged linked list.`,
+    problemStatement: `You are given the heads of two sorted linked lists list1 and list2. Merge the two lists into one sorted list. The list should be made by splicing together the nodes of the first two lists. Return the head of the merged linked list.
+
+Example visualization:
+
+    list1:  1 → 2 → 4
+    list2:  1 → 3 → 4
+
+    Merge process:
+    dummy → 1 → 1 → 2 → 3 → 4 → 4
+            ↑       ↑       ↑
+          from    from    from
+          list2   list1   both
+
+    Result: 1 → 1 → 2 → 3 → 4 → 4`,
     examples: [
       {
         input: "list1 = [1,2,4], list2 = [1,3,4]",
@@ -582,7 +635,22 @@ Construct a deep copy of the list. The deep copy should consist of exactly n bra
     description: "Reorder list to L0→Ln→L1→Ln-1→L2→Ln-2→...",
     tags: ["linked-list", "two-pointers", "stack"],
     estimatedTime: 25,
-    problemStatement: `You are given the head of a singly linked-list. Reorder it to: L0 → Ln → L1 → Ln-1 → L2 → Ln-2 → ... You may not modify values in the list's nodes. Only nodes themselves may be changed.`,
+    problemStatement: `You are given the head of a singly linked-list. Reorder it to: L0 → Ln → L1 → Ln-1 → L2 → Ln-2 → ... You may not modify values in the list's nodes. Only nodes themselves may be changed.
+
+Example visualization:
+
+    Input:   1 → 2 → 3 → 4 → 5
+
+    Step 1: Find middle → split into two halves
+            1 → 2 → 3    and    4 → 5
+
+    Step 2: Reverse second half
+            1 → 2 → 3    and    5 → 4
+
+    Step 3: Merge alternately
+            1 → 5 → 2 → 4 → 3
+
+    Output:  1 → 5 → 2 → 4 → 3`,
     examples: [
       { input: "head = [1,2,3,4]", output: "[1,4,2,3]" },
       { input: "head = [1,2,3,4,5]", output: "[1,5,2,4,3]" },
@@ -614,7 +682,24 @@ Construct a deep copy of the list. The deep copy should consist of exactly n bra
     description: "Remove the nth node from the end of the list",
     tags: ["linked-list", "two-pointers"],
     estimatedTime: 20,
-    problemStatement: `Given the head of a linked list, remove the nth node from the end of the list and return its head.`,
+    problemStatement: `Given the head of a linked list, remove the nth node from the end of the list and return its head.
+
+Example visualization (n=2):
+
+    Input:   1 → 2 → 3 → [4] → 5
+                         ↑
+                    remove (2nd from end)
+
+    Two-pointer approach:
+    dummy → 1 → 2 → 3 → 4 → 5 → null
+    slow         fast
+    (fast moves n steps ahead first)
+
+    Then move both until fast hits null:
+    dummy → 1 → 2 → 3 → 4 → 5 → null
+                slow        fast
+
+    Remove slow.next → Output: 1 → 2 → 3 → 5`,
     examples: [
       { input: "head = [1,2,3,4,5], n = 2", output: "[1,2,3,5]" },
       { input: "head = [1], n = 1", output: "[]" },
@@ -663,7 +748,19 @@ Construct a deep copy of the list. The deep copy should consist of exactly n bra
     description: "Add two numbers represented as reversed linked lists",
     tags: ["linked-list", "math", "recursion"],
     estimatedTime: 25,
-    problemStatement: `You are given two non-empty linked lists representing two non-negative integers. The digits are stored in reverse order, and each node contains a single digit. Add the two numbers and return the sum as a linked list.`,
+    problemStatement: `You are given two non-empty linked lists representing two non-negative integers. The digits are stored in reverse order, and each node contains a single digit. Add the two numbers and return the sum as a linked list.
+
+Example visualization:
+
+    l1: 2 → 4 → 3  (represents 342)
+    l2: 5 → 6 → 4  (represents 465)
+                   ─────────────────
+    Sum: 342 + 465 = 807
+
+    Process (right to left with carry):
+    2+5=7 → 4+6=10(carry 1) → 3+4+1=8
+
+    Output: 7 → 0 → 8  (represents 807)`,
     examples: [
       { input: "l1 = [2,4,3], l2 = [5,6,4]", output: "[7,0,8]", explanation: "342 + 465 = 807" },
       { input: "l1 = [0], l2 = [0]", output: "[0]" },
@@ -913,7 +1010,22 @@ Note that the linked lists may intersect at different positions, and the interse
     description: "Check if a linked list is a palindrome",
     tags: ["linked-list", "two-pointers", "stack"],
     estimatedTime: 20,
-    problemStatement: `Given the head of a singly linked list, return true if it is a palindrome or false otherwise.`,
+    problemStatement: `Given the head of a singly linked list, return true if it is a palindrome or false otherwise.
+
+Example visualization:
+
+    Input: 1 → 2 → 2 → 1
+
+    Step 1: Find middle (slow/fast pointers)
+            1 → 2 | 2 → 1
+
+    Step 2: Reverse second half
+            1 → 2   1 → 2
+
+    Step 3: Compare both halves
+            1 = 1 ✓   2 = 2 ✓
+
+    Output: true (is palindrome)`,
     examples: [
       { input: "head = [1,2,2,1]", output: "true" },
       { input: "head = [1,2]", output: "false" },
@@ -953,7 +1065,20 @@ Note that the linked lists may intersect at different positions, and the interse
     estimatedTime: 10,
     problemStatement: `Given the head of a singly linked list, return the middle node of the linked list.
 
-If there are two middle nodes, return the second middle node.`,
+If there are two middle nodes, return the second middle node.
+
+Example visualization:
+
+    Odd length:    1 → 2 → [3] → 4 → 5
+                           ↑
+                         middle
+
+    Even length:   1 → 2 → 3 → [4] → 5 → 6
+                               ↑
+                         second middle
+
+    Technique: slow (1 step) + fast (2 steps)
+    When fast reaches end, slow is at middle`,
     examples: [
       { input: "head = [1,2,3,4,5]", output: "[3,4,5]", explanation: "The middle node is 3." },
       {
