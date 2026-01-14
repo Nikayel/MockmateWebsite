@@ -17,6 +17,8 @@ import { getUserPerformanceRAG } from "@/lib/rag/user-performance-rag"
 import { advancedRetrieve } from "@/lib/rag/retrieval/advanced-retrieval"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import { generateLLMHint } from "./hints/llm-generator"
+// NEW: Import RAG-enhanced misconception detection for smarter debugging hints
+import { analyzeCodeWithRAG, type EnhancedCodeAnalysisResult } from "@/lib/rag/misconception-detection"
 
 /**
  * Hint difficulty levels
@@ -500,6 +502,81 @@ export async function generateHints(
     request.testResults
   )
   hints.push(...codeHints)
+
+  // 2.5 NEW: RAG-enhanced misconception detection for debugging hints
+  // Only triggered on test failures or stuck scenarios for cost efficiency
+  if (
+    request.problemPattern &&
+    (request.trigger === "test_failed" || request.trigger === "stuck") &&
+    request.testResults &&
+    request.testResults.passed < request.testResults.total
+  ) {
+    try {
+      const misconceptionAnalysis = await analyzeCodeWithRAG(
+        request.userCode,
+        request.problemPattern,
+        request.testResults
+      )
+
+      // Add RAG-enhanced debugging hints
+      if (misconceptionAnalysis.ragHints.length > 0) {
+        ragContextUsed = true
+        for (const ragHint of misconceptionAnalysis.ragHints.slice(0, 2)) {
+          hints.push({
+            id: generateHintId(),
+            level: 3,
+            category: "debugging",
+            title: "🔍 Smart Debug Hint",
+            content: ragHint.hint + (ragHint.successfulFix ? `\n\nExample fix: ${ragHint.successfulFix}` : ""),
+            isBlurred: true,
+            source: "rag",
+            relevanceScore: ragHint.relevance,
+            metadata: {
+              pattern: ragHint.relatedPattern,
+              relatedConcepts: [ragHint.source],
+            },
+          })
+        }
+      }
+
+      // Add community insights as lower-level hints
+      if (misconceptionAnalysis.communityInsights.length > 0) {
+        hints.push({
+          id: generateHintId(),
+          level: 2,
+          category: "debugging",
+          title: "💡 Community Insight",
+          content: misconceptionAnalysis.communityInsights.join("\n"),
+          isBlurred: true,
+          source: "rag",
+          relevanceScore: 0.75,
+          metadata: {
+            pattern: request.problemPattern,
+          },
+        })
+      }
+
+      // Add detected misconceptions as hints
+      for (const misconception of misconceptionAnalysis.misconceptions.slice(0, 1)) {
+        hints.push({
+          id: generateHintId(),
+          level: 2,
+          category: "debugging",
+          title: `⚠️ Common Issue: ${misconception.misconceptionType.replace(/-/g, " ")}`,
+          content: `${misconception.description}\n\n💡 Fix: ${misconception.suggestedFix}`,
+          isBlurred: true,
+          source: "rag",
+          relevanceScore: 0.85,
+          metadata: {
+            pattern: request.problemPattern,
+            relatedConcepts: [misconception.concept],
+          },
+        })
+      }
+    } catch (error) {
+      console.error("[HintAgent] Misconception RAG error:", error)
+    }
+  }
 
   // 3. Try to get RAG-enhanced hints
   try {
