@@ -2385,11 +2385,26 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             }
             if (feedbackData.scores) {
               scoreBreakdownData = feedbackData.scores
+              // Ensure all scores are defined numbers before setting state
+              // This prevents undefined values from causing display issues
+              const scores = feedbackData.scores
               setScoreBreakdown({
-                understandingScore: feedbackData.scores.understanding,
-                problemSolvingScore: feedbackData.scores.problemSolving,
-                codeQualityScore: feedbackData.scores.codeQuality,
-                communicationScore: feedbackData.scores.communication,
+                understandingScore:
+                  scores.understanding !== undefined && scores.understanding !== null
+                    ? scores.understanding
+                    : undefined,
+                problemSolvingScore:
+                  scores.problemSolving !== undefined && scores.problemSolving !== null
+                    ? scores.problemSolving
+                    : undefined,
+                codeQualityScore:
+                  scores.codeQuality !== undefined && scores.codeQuality !== null
+                    ? scores.codeQuality
+                    : undefined,
+                communicationScore:
+                  scores.communication !== undefined && scores.communication !== null
+                    ? scores.communication
+                    : undefined,
               })
             }
             if (feedbackData.constitutionalAICritique) {
@@ -2411,11 +2426,24 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 fallbackScores.codeQuality * 0.3 +
                 fallbackScores.communication * 0.2
             )
+            // Ensure all fallback scores are valid numbers
             setScoreBreakdown({
-              understandingScore: fallbackScores.understanding,
-              problemSolvingScore: fallbackScores.problemSolving,
-              codeQualityScore: fallbackScores.codeQuality,
-              communicationScore: fallbackScores.communication,
+              understandingScore:
+                typeof fallbackScores.understanding === "number"
+                  ? fallbackScores.understanding
+                  : undefined,
+              problemSolvingScore:
+                typeof fallbackScores.problemSolving === "number"
+                  ? fallbackScores.problemSolving
+                  : undefined,
+              codeQualityScore:
+                typeof fallbackScores.codeQuality === "number"
+                  ? fallbackScores.codeQuality
+                  : undefined,
+              communicationScore:
+                typeof fallbackScores.communication === "number"
+                  ? fallbackScores.communication
+                  : undefined,
             })
             toast.warning("Using estimated scores", {
               description: "AI feedback unavailable. Scores based on test results.",
@@ -2455,6 +2483,32 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       // Save session completion data
       if (currentSessionId && user) {
         try {
+          // Ensure scoreBreakdown only contains defined values
+          const cleanScoreBreakdown = scoreBreakdownData
+            ? {
+                understanding:
+                  scoreBreakdownData.understanding !== undefined &&
+                  scoreBreakdownData.understanding !== null
+                    ? scoreBreakdownData.understanding
+                    : undefined,
+                problemSolving:
+                  scoreBreakdownData.problemSolving !== undefined &&
+                  scoreBreakdownData.problemSolving !== null
+                    ? scoreBreakdownData.problemSolving
+                    : undefined,
+                codeQuality:
+                  scoreBreakdownData.codeQuality !== undefined &&
+                  scoreBreakdownData.codeQuality !== null
+                    ? scoreBreakdownData.codeQuality
+                    : undefined,
+                communication:
+                  scoreBreakdownData.communication !== undefined &&
+                  scoreBreakdownData.communication !== null
+                    ? scoreBreakdownData.communication
+                    : undefined,
+              }
+            : undefined
+
           await updateInterviewSession(currentSessionId, calculatedPerformanceScore, feedbackText, {
             code,
             language: selectedLanguage,
@@ -2463,7 +2517,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
             efficiencyScore: efficiencyData?.efficiencyScore,
             feedbackStatus: aiFeedbackSucceeded ? "complete" : "complete",
-            scoreBreakdown: scoreBreakdownData || undefined,
+            scoreBreakdown: cleanScoreBreakdown,
           })
 
           trackSessionCompletion({
@@ -3265,12 +3319,28 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         if (feedbackData.scores) {
           systemDesignScoreBreakdown = feedbackData.scores
           // Also set state for PracticeFeedback component
-          setScoreBreakdown({
-            understandingScore: feedbackData.scores.understanding,
-            problemSolvingScore: feedbackData.scores.problemSolving,
-            codeQualityScore: feedbackData.scores.codeQuality,
-            communicationScore: feedbackData.scores.communication,
-          })
+          // Ensure all scores are defined numbers before setting state
+          if (feedbackData.scores) {
+            const scores = feedbackData.scores
+            setScoreBreakdown({
+              understandingScore:
+                scores.understanding !== undefined && scores.understanding !== null
+                  ? scores.understanding
+                  : undefined,
+              problemSolvingScore:
+                scores.problemSolving !== undefined && scores.problemSolving !== null
+                  ? scores.problemSolving
+                  : undefined,
+              codeQualityScore:
+                scores.codeQuality !== undefined && scores.codeQuality !== null
+                  ? scores.codeQuality
+                  : undefined,
+              communicationScore:
+                scores.communication !== undefined && scores.communication !== null
+                  ? scores.communication
+                  : undefined,
+            })
+          }
         }
       }
 

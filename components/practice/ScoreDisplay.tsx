@@ -109,7 +109,12 @@ export function ScoreDisplay({
     feedbackLower.includes("reason") ||
     feedbackLower.includes("why")
 
-  const normalizeScore = (score: number) => (score <= 10 ? score * 10 : score)
+  const normalizeScore = (score: number | undefined): number => {
+    if (score === undefined || score === null || isNaN(score)) return 0
+    // Normalize: if score is <= 10, assume it's on a 0-10 scale and multiply by 10
+    // Otherwise, assume it's already on a 0-100 scale
+    return score <= 10 ? score * 10 : score
+  }
 
   // Priority for category scores:
   // 1. scoreBreakdown from backend (most authoritative)
@@ -136,13 +141,17 @@ export function ScoreDisplay({
   }
 
   if (hasBackendScores) {
+    // Use backend scores (most authoritative)
+    // These should already be in 0-100 format from the API
     scores = {
-      understanding: normalizeScore(scoreBreakdown!.understandingScore ?? 0),
-      problemSolving: normalizeScore(scoreBreakdown!.problemSolvingScore ?? 0),
-      codeQuality: normalizeScore(scoreBreakdown!.codeQualityScore ?? 0),
-      communication: normalizeScore(scoreBreakdown!.communicationScore ?? 0),
+      understanding: normalizeScore(scoreBreakdown!.understandingScore),
+      problemSolving: normalizeScore(scoreBreakdown!.problemSolvingScore),
+      codeQuality: normalizeScore(scoreBreakdown!.codeQualityScore),
+      communication: normalizeScore(scoreBreakdown!.communicationScore),
     }
   } else if (hasParsedScores) {
+    // Use parsed scores from feedback text
+    // These might be in different formats, so normalize them
     scores = {
       understanding: normalizeScore(sections.scores.understanding || 0),
       problemSolving: normalizeScore(sections.scores.problemSolving || 0),

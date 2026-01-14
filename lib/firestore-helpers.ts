@@ -573,37 +573,68 @@ export async function updateInterviewSession(
     if (additionalData.efficiencyScore) updateData.efficiency_score = additionalData.efficiencyScore
     // Save score breakdown for technical score calculations (required for pattern ranking)
     if (additionalData.scoreBreakdown) {
+      // Extract scores, handling both naming conventions (understanding/understandingScore, etc.)
+      // Only include defined values to prevent Firebase errors
       const understandingScore =
-        additionalData.scoreBreakdown.understanding ||
-        additionalData.scoreBreakdown.understandingScore ||
-        0
+        additionalData.scoreBreakdown.understanding !== undefined
+          ? additionalData.scoreBreakdown.understanding
+          : additionalData.scoreBreakdown.understandingScore !== undefined
+            ? additionalData.scoreBreakdown.understandingScore
+            : undefined
       const problemSolvingScore =
-        additionalData.scoreBreakdown.problemSolving ||
-        additionalData.scoreBreakdown.problemSolvingScore ||
-        0
+        additionalData.scoreBreakdown.problemSolving !== undefined
+          ? additionalData.scoreBreakdown.problemSolving
+          : additionalData.scoreBreakdown.problemSolvingScore !== undefined
+            ? additionalData.scoreBreakdown.problemSolvingScore
+            : undefined
       const codeQualityScore =
-        additionalData.scoreBreakdown.codeQuality ||
-        additionalData.scoreBreakdown.codeQualityScore ||
-        0
+        additionalData.scoreBreakdown.codeQuality !== undefined
+          ? additionalData.scoreBreakdown.codeQuality
+          : additionalData.scoreBreakdown.codeQualityScore !== undefined
+            ? additionalData.scoreBreakdown.codeQualityScore
+            : undefined
       const communicationScore =
-        additionalData.scoreBreakdown.communication ||
-        additionalData.scoreBreakdown.communicationScore ||
-        0
+        additionalData.scoreBreakdown.communication !== undefined
+          ? additionalData.scoreBreakdown.communication
+          : additionalData.scoreBreakdown.communicationScore !== undefined
+            ? additionalData.scoreBreakdown.communicationScore
+            : undefined
 
-      updateData.score_breakdown = {
-        understandingScore,
-        problemSolvingScore,
-        codeQualityScore,
-        communicationScore,
+      // Build score_breakdown object, only including defined values
+      // This prevents Firebase errors from undefined field values
+      const scoreBreakdownObj: Record<string, number> = {}
+      if (understandingScore !== undefined) {
+        scoreBreakdownObj.understandingScore = understandingScore
+      }
+      if (problemSolvingScore !== undefined) {
+        scoreBreakdownObj.problemSolvingScore = problemSolvingScore
+      }
+      if (codeQualityScore !== undefined) {
+        scoreBreakdownObj.codeQualityScore = codeQualityScore
+      }
+      if (communicationScore !== undefined) {
+        scoreBreakdownObj.communicationScore = communicationScore
       }
 
-      // Calculate and save technical_score (excludes communication, focuses on code mastery)
-      // Uses same weights as ScoreDisplay.tsx for consistency
-      updateData.technical_score = Math.round(
-        codeQualityScore * 0.6 + problemSolvingScore * 0.25 + understandingScore * 0.15
-      )
-      // Also save as mastery_score for backwards compatibility
-      updateData.mastery_score = updateData.technical_score
+      // Only save score_breakdown if we have at least one defined score
+      if (Object.keys(scoreBreakdownObj).length > 0) {
+        updateData.score_breakdown = scoreBreakdownObj
+
+        // Calculate and save technical_score (excludes communication, focuses on code mastery)
+        // Uses same weights as ScoreDisplay.tsx for consistency
+        // Only calculate if we have the required scores
+        if (
+          codeQualityScore !== undefined &&
+          problemSolvingScore !== undefined &&
+          understandingScore !== undefined
+        ) {
+          updateData.technical_score = Math.round(
+            codeQualityScore * 0.6 + problemSolvingScore * 0.25 + understandingScore * 0.15
+          )
+          // Also save as mastery_score for backwards compatibility
+          updateData.mastery_score = updateData.technical_score
+        }
+      }
     }
     // Save complexity analysis (user-stated vs code-analyzed)
     if (additionalData.complexityAnalysis) {

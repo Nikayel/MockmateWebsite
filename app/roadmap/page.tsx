@@ -55,7 +55,7 @@ import { useRoadmapStore, useActiveRoadmap } from "@/lib/stores/roadmap-store"
 import { getCompanyById } from "@/lib/data/company-questions"
 import { getStudyRecommendations } from "@/lib/roadmap/prioritization-algorithm"
 import { generatePersonalizedGuide } from "@/lib/roadmap/personalized-guide-generator"
-import { cn, getUTCDateComponents, getLocalDateComponents, isStoredDateToday } from "@/lib/utils"
+import { cn, getUTCDateComponents, getLocalDateComponents } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 
 /**
@@ -103,6 +103,7 @@ export default function RoadmapPage() {
   // This ensures "Day 2" on Jan 9 UTC matches Jan 9 local time, regardless of timezone.
   const today = new Date()
   const localToday = getLocalDateComponents(today)
+  const localTodayTimestamp = Date.UTC(localToday.year, localToday.month, localToday.day)
 
   const todayIndex =
     roadmap?.dailyPlans.findIndex((plan) => {
@@ -115,6 +116,32 @@ export default function RoadmapPage() {
         planDateComponents.day === localToday.day
       )
     }) ?? -1 // Use -1 to indicate no match, then handle below
+
+  // If today's date doesn't exactly match any plan day, find the best day to show:
+  // - The most recent day that is today or before today (current progress)
+  // - Or the first day if we're before the roadmap starts
+  const getBestDayIndex = (): number => {
+    if (!roadmap?.dailyPlans?.length) return 0
+    if (todayIndex >= 0) return todayIndex
+
+    // Find the last day that is on or before today
+    let bestIndex = 0
+    for (let i = 0; i < roadmap.dailyPlans.length; i++) {
+      const planDate = new Date(roadmap.dailyPlans[i].date)
+      const planComponents = getUTCDateComponents(planDate)
+      const planTimestamp = Date.UTC(planComponents.year, planComponents.month, planComponents.day)
+
+      if (planTimestamp <= localTodayTimestamp) {
+        bestIndex = i
+      } else {
+        // Plan date is in the future, stop searching
+        break
+      }
+    }
+    return bestIndex
+  }
+
+  const bestDayIndex = getBestDayIndex()
 
   // Load roadmaps from Firebase on mount
   // IMPORTANT: Clear stale roadmap first to prevent cross-user data leaks
@@ -178,7 +205,14 @@ export default function RoadmapPage() {
             // This prevents the flash of wrong day on initial navigation
             const now = new Date()
             const localTodayForInit = getLocalDateComponents(now)
-            const correctDayIndex =
+            const localTodayTimestampForInit = Date.UTC(
+              localTodayForInit.year,
+              localTodayForInit.month,
+              localTodayForInit.day
+            )
+
+            // First try to find an exact match for today
+            let correctDayIndex =
               roadmap.dailyPlans?.findIndex((plan: any) => {
                 const planDate = new Date(plan.date)
                 const planDateComponents = getUTCDateComponents(planDate)
@@ -188,6 +222,25 @@ export default function RoadmapPage() {
                   planDateComponents.day === localTodayForInit.day
                 )
               }) ?? -1
+
+            // If no exact match, find the best day (most recent day on or before today)
+            if (correctDayIndex === -1 && roadmap.dailyPlans?.length > 0) {
+              correctDayIndex = 0
+              for (let i = 0; i < roadmap.dailyPlans.length; i++) {
+                const planDate = new Date(roadmap.dailyPlans[i].date)
+                const planComponents = getUTCDateComponents(planDate)
+                const planTimestamp = Date.UTC(
+                  planComponents.year,
+                  planComponents.month,
+                  planComponents.day
+                )
+                if (planTimestamp <= localTodayTimestampForInit) {
+                  correctDayIndex = i
+                } else {
+                  break
+                }
+              }
+            }
 
             if (correctDayIndex >= 0) {
               selectDay(correctDayIndex)
@@ -213,17 +266,17 @@ export default function RoadmapPage() {
     loadRoadmaps()
   }, [user?.id, firebaseUser, initialized, setActiveRoadmap])
 
-  // Set selected day to today on initial mount only
-  // NOTE: We use todayIndex as a dependency to handle the case where todayIndex
-  // is calculated before roadmap is loaded. This ensures we select the correct day
+  // Set selected day to best day on initial mount only
+  // NOTE: We use bestDayIndex as a dependency to handle the case where it's
+  // calculated before roadmap is loaded. This ensures we select the correct day
   // as soon as both are available.
   useEffect(() => {
-    if (roadmap && todayIndex >= 0 && selectedDayIndex !== todayIndex) {
-      // Only auto-select today on first load or when date changes
-      selectDay(todayIndex)
+    if (roadmap && selectedDayIndex !== bestDayIndex) {
+      // Only auto-select on first load or when date changes
+      selectDay(bestDayIndex)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roadmap?.id, todayIndex]) // Re-run when todayIndex changes to ensure correct day selection
+  }, [roadmap?.id, bestDayIndex]) // Re-run when bestDayIndex changes to ensure correct day selection
 
   const handleStartQuestion = (scenarioId: string) => {
     // Navigate to interview with this scenario
@@ -425,7 +478,14 @@ export default function RoadmapPage() {
           // Calculate and set the correct day index immediately
           const now = new Date()
           const localTodayForReactivate = getLocalDateComponents(now)
-          const correctDayIndex =
+          const localTodayTimestampForReactivate = Date.UTC(
+            localTodayForReactivate.year,
+            localTodayForReactivate.month,
+            localTodayForReactivate.day
+          )
+
+          // First try to find an exact match for today
+          let correctDayIndex =
             roadmap.dailyPlans?.findIndex((plan: any) => {
               const planDate = new Date(plan.date)
               const planDateComponents = getUTCDateComponents(planDate)
@@ -435,6 +495,25 @@ export default function RoadmapPage() {
                 planDateComponents.day === localTodayForReactivate.day
               )
             }) ?? -1
+
+          // If no exact match, find the best day (most recent day on or before today)
+          if (correctDayIndex === -1 && roadmap.dailyPlans?.length > 0) {
+            correctDayIndex = 0
+            for (let i = 0; i < roadmap.dailyPlans.length; i++) {
+              const planDate = new Date(roadmap.dailyPlans[i].date)
+              const planComponents = getUTCDateComponents(planDate)
+              const planTimestamp = Date.UTC(
+                planComponents.year,
+                planComponents.month,
+                planComponents.day
+              )
+              if (planTimestamp <= localTodayTimestampForReactivate) {
+                correctDayIndex = i
+              } else {
+                break
+              }
+            }
+          }
 
           if (correctDayIndex >= 0) {
             selectDay(correctDayIndex)
@@ -590,7 +669,9 @@ export default function RoadmapPage() {
 
   const companyData = getCompanyById(roadmap.targetCompany)
   const selectedPlan = roadmap.dailyPlans[selectedDayIndex]
-  const todayPlan = roadmap.dailyPlans[todayIndex >= 0 ? todayIndex : 0]
+  // Use bestDayIndex which finds the most appropriate day to show
+  // (exact match for today, or the most recent day if today isn't in the plan)
+  const todayPlan = roadmap.dailyPlans[bestDayIndex]
   const recommendations = getStudyRecommendations(roadmap)
   const topPatterns = companyData?.topPatterns.map((p) => p.pattern) || []
 
