@@ -12,7 +12,7 @@ export const graphsScenarios: DSAScenario[] = [
     type: "dsa",
     pattern: "graphs",
     difficulty: "medium",
-    companies: ["Amazon", "Meta", "Google", "Microsoft"],
+    companies: ["Amazon", "Meta", "Google", "Microsoft", "Salesforce", "Twitch"],
     description: "Count the number of islands in a 2D grid",
     tags: ["array", "depth-first-search", "breadth-first-search", "union-find", "matrix"],
     estimatedTime: 25,
@@ -878,7 +878,12 @@ A region is captured by flipping all 'O's into 'X's in that surrounded region.`,
         explanation: "The bottom 'O' is on the border, so it is not captured.",
       },
     ],
-    constraints: ["m == board.length", "n == board[i].length", "1 <= m, n <= 200", "board[i][j] is 'X' or 'O'."],
+    constraints: [
+      "m == board.length",
+      "n == board[i].length",
+      "1 <= m, n <= 200",
+      "board[i][j] is 'X' or 'O'.",
+    ],
     hints: [
       "Start from border 'O's - they cannot be captured",
       "Use DFS/BFS to mark all 'O's connected to borders",
@@ -891,8 +896,36 @@ A region is captured by flipping all 'O's into 'X's in that surrounded region.`,
     },
     optimalComplexity: { time: "O(m * n)", space: "O(m * n)" },
     testCases: [
-      { input: { board: [["X", "X", "X", "X"], ["X", "O", "O", "X"], ["X", "X", "O", "X"], ["X", "O", "X", "X"]] }, expected: [["X", "X", "X", "X"], ["X", "X", "X", "X"], ["X", "X", "X", "X"], ["X", "O", "X", "X"]], description: "Standard case" },
-      { input: { board: [["O", "O"], ["O", "O"]] }, expected: [["O", "O"], ["O", "O"]], description: "All border - none captured" },
+      {
+        input: {
+          board: [
+            ["X", "X", "X", "X"],
+            ["X", "O", "O", "X"],
+            ["X", "X", "O", "X"],
+            ["X", "O", "X", "X"],
+          ],
+        },
+        expected: [
+          ["X", "X", "X", "X"],
+          ["X", "X", "X", "X"],
+          ["X", "X", "X", "X"],
+          ["X", "O", "X", "X"],
+        ],
+        description: "Standard case",
+      },
+      {
+        input: {
+          board: [
+            ["O", "O"],
+            ["O", "O"],
+          ],
+        },
+        expected: [
+          ["O", "O"],
+          ["O", "O"],
+        ],
+        description: "All border - none captured",
+      },
     ],
   },
   {
@@ -909,11 +942,18 @@ A region is captured by flipping all 'O's into 'X's in that surrounded region.`,
 
 Return the number of connected components in the graph.`,
     examples: [
-      { input: "n = 5, edges = [[0,1],[1,2],[3,4]]", output: "2", explanation: "Component 1: {0,1,2}, Component 2: {3,4}" },
+      {
+        input: "n = 5, edges = [[0,1],[1,2],[3,4]]",
+        output: "2",
+        explanation: "Component 1: {0,1,2}, Component 2: {3,4}",
+      },
       { input: "n = 5, edges = [[0,1],[1,2],[2,3],[3,4]]", output: "1" },
     ],
     constraints: ["1 <= n <= 2000", "1 <= edges.length <= 5000", "0 <= ai, bi < n"],
-    hints: ["Union-Find: Initially n components, decrement when unioning", "DFS/BFS: Count traversal starts"],
+    hints: [
+      "Union-Find: Initially n components, decrement when unioning",
+      "DFS/BFS: Count traversal starts",
+    ],
     starterCode: {
       javascript: `function countComponents(n, edges) {\n  // Write your solution here\n\n}`,
       typescript: `function countComponents(n: number, edges: number[][]): number {\n  // Write your solution here\n\n}`,
@@ -921,8 +961,31 @@ Return the number of connected components in the graph.`,
     },
     optimalComplexity: { time: "O(E * α(n))", space: "O(n)" },
     testCases: [
-      { input: { n: 5, edges: [[0, 1], [1, 2], [3, 4]] }, expected: 2, description: "Two components" },
-      { input: { n: 5, edges: [[0, 1], [1, 2], [2, 3], [3, 4]] }, expected: 1, description: "One component" },
+      {
+        input: {
+          n: 5,
+          edges: [
+            [0, 1],
+            [1, 2],
+            [3, 4],
+          ],
+        },
+        expected: 2,
+        description: "Two components",
+      },
+      {
+        input: {
+          n: 5,
+          edges: [
+            [0, 1],
+            [1, 2],
+            [2, 3],
+            [3, 4],
+          ],
+        },
+        expected: 1,
+        description: "One component",
+      },
       { input: { n: 5, edges: [] }, expected: 5, description: "No edges" },
     ],
   },
@@ -942,7 +1005,10 @@ Return the number of connected components in the graph.`,
       { input: "edges = [[1,2],[2,3],[3,4],[1,4],[1,5]]", output: "[1,4]" },
     ],
     constraints: ["n == edges.length", "3 <= n <= 1000", "1 <= ai < bi <= n"],
-    hints: ["Use Union-Find to detect when adding edge creates cycle", "Return last edge where both nodes have same root"],
+    hints: [
+      "Use Union-Find to detect when adding edge creates cycle",
+      "Return last edge where both nodes have same root",
+    ],
     starterCode: {
       javascript: `function findRedundantConnection(edges) {\n  // Write your solution here\n\n}`,
       typescript: `function findRedundantConnection(edges: number[][]): number[] {\n  // Write your solution here\n\n}`,
@@ -950,8 +1016,30 @@ Return the number of connected components in the graph.`,
     },
     optimalComplexity: { time: "O(n * α(n))", space: "O(n)" },
     testCases: [
-      { input: { edges: [[1, 2], [1, 3], [2, 3]] }, expected: [2, 3], description: "Triangle" },
-      { input: { edges: [[1, 2], [2, 3], [3, 4], [1, 4], [1, 5]] }, expected: [1, 4], description: "Square with tail" },
+      {
+        input: {
+          edges: [
+            [1, 2],
+            [1, 3],
+            [2, 3],
+          ],
+        },
+        expected: [2, 3],
+        description: "Triangle",
+      },
+      {
+        input: {
+          edges: [
+            [1, 2],
+            [2, 3],
+            [3, 4],
+            [1, 4],
+            [1, 5],
+          ],
+        },
+        expected: [1, 4],
+        description: "Square with tail",
+      },
     ],
   },
   {
@@ -978,7 +1066,19 @@ Return the number of connected components in the graph.`,
     },
     optimalComplexity: { time: "O(E log V)", space: "O(V + E)" },
     testCases: [
-      { input: { times: [[2, 1, 1], [2, 3, 1], [3, 4, 1]], n: 4, k: 2 }, expected: 2, description: "All reachable" },
+      {
+        input: {
+          times: [
+            [2, 1, 1],
+            [2, 3, 1],
+            [3, 4, 1],
+          ],
+          n: 4,
+          k: 2,
+        },
+        expected: 2,
+        description: "All reachable",
+      },
       { input: { times: [[1, 2, 1]], n: 2, k: 2 }, expected: -1, description: "Unreachable" },
     ],
   },
@@ -994,8 +1094,15 @@ Return the number of connected components in the graph.`,
     estimatedTime: 30,
     problemStatement: `Find the cheapest price from src to dst with at most k stops. Return -1 if no such route exists.`,
     examples: [
-      { input: "n = 4, flights = [[0,1,100],[1,2,100],[2,0,100],[1,3,600],[2,3,200]], src = 0, dst = 3, k = 1", output: "700" },
-      { input: "n = 3, flights = [[0,1,100],[1,2,100],[0,2,500]], src = 0, dst = 2, k = 0", output: "500" },
+      {
+        input:
+          "n = 4, flights = [[0,1,100],[1,2,100],[2,0,100],[1,3,600],[2,3,200]], src = 0, dst = 3, k = 1",
+        output: "700",
+      },
+      {
+        input: "n = 3, flights = [[0,1,100],[1,2,100],[0,2,500]], src = 0, dst = 2, k = 0",
+        output: "500",
+      },
     ],
     constraints: ["1 <= n <= 100", "0 <= flights.length <= n*(n-1)/2"],
     hints: ["BFS with (node, cost, stops)", "Bellman-Ford with k+1 iterations"],
@@ -1006,8 +1113,38 @@ Return the number of connected components in the graph.`,
     },
     optimalComplexity: { time: "O(E * K)", space: "O(V)" },
     testCases: [
-      { input: { n: 4, flights: [[0, 1, 100], [1, 2, 100], [2, 0, 100], [1, 3, 600], [2, 3, 200]], src: 0, dst: 3, k: 1 }, expected: 700, description: "Limited stops" },
-      { input: { n: 3, flights: [[0, 1, 100], [1, 2, 100], [0, 2, 500]], src: 0, dst: 2, k: 0 }, expected: 500, description: "Direct only" },
+      {
+        input: {
+          n: 4,
+          flights: [
+            [0, 1, 100],
+            [1, 2, 100],
+            [2, 0, 100],
+            [1, 3, 600],
+            [2, 3, 200],
+          ],
+          src: 0,
+          dst: 3,
+          k: 1,
+        },
+        expected: 700,
+        description: "Limited stops",
+      },
+      {
+        input: {
+          n: 3,
+          flights: [
+            [0, 1, 100],
+            [1, 2, 100],
+            [0, 2, 500],
+          ],
+          src: 0,
+          dst: 2,
+          k: 0,
+        },
+        expected: 500,
+        description: "Direct only",
+      },
     ],
   },
   {
@@ -1021,9 +1158,7 @@ Return the number of connected components in the graph.`,
     tags: ["graph", "union-find", "minimum-spanning-tree"],
     estimatedTime: 30,
     problemStatement: `Return the minimum cost to make all points connected using Manhattan distance.`,
-    examples: [
-      { input: "points = [[0,0],[2,2],[3,10],[5,2],[7,0]]", output: "20" },
-    ],
+    examples: [{ input: "points = [[0,0],[2,2],[3,10],[5,2],[7,0]]", output: "20" }],
     constraints: ["1 <= points.length <= 1000", "-10^6 <= xi, yi <= 10^6"],
     hints: ["MST problem - use Prim's or Kruskal's algorithm"],
     starterCode: {
@@ -1033,8 +1168,29 @@ Return the number of connected components in the graph.`,
     },
     optimalComplexity: { time: "O(n^2 log n)", space: "O(n^2)" },
     testCases: [
-      { input: { points: [[0, 0], [2, 2], [3, 10], [5, 2], [7, 0]] }, expected: 20, description: "Five points" },
-      { input: { points: [[0, 0], [1, 1]] }, expected: 2, description: "Two points" },
+      {
+        input: {
+          points: [
+            [0, 0],
+            [2, 2],
+            [3, 10],
+            [5, 2],
+            [7, 0],
+          ],
+        },
+        expected: 20,
+        description: "Five points",
+      },
+      {
+        input: {
+          points: [
+            [0, 0],
+            [1, 1],
+          ],
+        },
+        expected: 2,
+        description: "Two points",
+      },
     ],
   },
   {
@@ -1049,7 +1205,11 @@ Return the number of connected components in the graph.`,
     estimatedTime: 30,
     problemStatement: `Given accounts where accounts[i][0] is name and rest are emails, merge accounts belonging to same person (sharing emails). Return merged accounts with sorted emails.`,
     examples: [
-      { input: 'accounts = [["John","a@mail.com","b@mail.com"],["John","a@mail.com","c@mail.com"],["Mary","m@mail.com"]]', output: '[["John","a@mail.com","b@mail.com","c@mail.com"],["Mary","m@mail.com"]]' },
+      {
+        input:
+          'accounts = [["John","a@mail.com","b@mail.com"],["John","a@mail.com","c@mail.com"],["Mary","m@mail.com"]]',
+        output: '[["John","a@mail.com","b@mail.com","c@mail.com"],["Mary","m@mail.com"]]',
+      },
     ],
     constraints: ["1 <= accounts.length <= 1000", "2 <= accounts[i].length <= 10"],
     hints: ["Union-Find to group emails", "Map email to index, union within accounts"],
@@ -1060,7 +1220,20 @@ Return the number of connected components in the graph.`,
     },
     optimalComplexity: { time: "O(n*k*α(n*k))", space: "O(n*k)" },
     testCases: [
-      { input: { accounts: [["John", "a@mail.com", "b@mail.com"], ["John", "a@mail.com", "c@mail.com"], ["Mary", "m@mail.com"]] }, expected: [["John", "a@mail.com", "b@mail.com", "c@mail.com"], ["Mary", "m@mail.com"]], description: "Merge Johns" },
+      {
+        input: {
+          accounts: [
+            ["John", "a@mail.com", "b@mail.com"],
+            ["John", "a@mail.com", "c@mail.com"],
+            ["Mary", "m@mail.com"],
+          ],
+        },
+        expected: [
+          ["John", "a@mail.com", "b@mail.com", "c@mail.com"],
+          ["Mary", "m@mail.com"],
+        ],
+        description: "Merge Johns",
+      },
     ],
   },
   {
@@ -1074,9 +1247,7 @@ Return the number of connected components in the graph.`,
     tags: ["graph", "binary-search", "heap", "union-find"],
     estimatedTime: 35,
     problemStatement: `At time t, water depth everywhere is t. You can swim between adjacent cells if both elevations <= t. Return minimum time to reach (n-1, n-1) from (0, 0).`,
-    examples: [
-      { input: "grid = [[0,2],[1,3]]", output: "3" },
-    ],
+    examples: [{ input: "grid = [[0,2],[1,3]]", output: "3" }],
     constraints: ["n == grid.length", "1 <= n <= 50", "0 <= grid[i][j] < n^2"],
     hints: ["Binary search + DFS/BFS", "Dijkstra with max elevation", "Union-Find by elevation"],
     starterCode: {
@@ -1086,7 +1257,16 @@ Return the number of connected components in the graph.`,
     },
     optimalComplexity: { time: "O(n^2 log n)", space: "O(n^2)" },
     testCases: [
-      { input: { grid: [[0, 2], [1, 3]] }, expected: 3, description: "2x2 grid" },
+      {
+        input: {
+          grid: [
+            [0, 2],
+            [1, 3],
+          ],
+        },
+        expected: 3,
+        description: "2x2 grid",
+      },
       { input: { grid: [[0]] }, expected: 0, description: "Single cell" },
     ],
   },
@@ -1109,10 +1289,19 @@ Return the number of connected components in the graph.`,
 
 Fill each empty room with the distance to its nearest gate. If impossible, leave as INF.`,
     examples: [
-      { input: "rooms = [[2147483647,-1,0,2147483647],[2147483647,2147483647,2147483647,-1],[2147483647,-1,2147483647,-1],[0,-1,2147483647,2147483647]]", output: "[[3,-1,0,1],[2,2,1,-1],[1,-1,2,-1],[0,-1,3,4]]" },
+      {
+        input:
+          "rooms = [[2147483647,-1,0,2147483647],[2147483647,2147483647,2147483647,-1],[2147483647,-1,2147483647,-1],[0,-1,2147483647,2147483647]]",
+        output: "[[3,-1,0,1],[2,2,1,-1],[1,-1,2,-1],[0,-1,3,4]]",
+      },
       { input: "rooms = [[-1]]", output: "[[-1]]" },
     ],
-    constraints: ["m == rooms.length", "n == rooms[i].length", "1 <= m, n <= 250", "rooms[i][j] is -1, 0, or 2147483647"],
+    constraints: [
+      "m == rooms.length",
+      "n == rooms[i].length",
+      "1 <= m, n <= 250",
+      "rooms[i][j] is -1, 0, or 2147483647",
+    ],
     hints: [
       "Start BFS from all gates simultaneously (multi-source BFS)",
       "Add all gates to initial queue",
@@ -1127,7 +1316,23 @@ Fill each empty room with the distance to its nearest gate. If impossible, leave
     },
     optimalComplexity: { time: "O(m * n)", space: "O(m * n)" },
     testCases: [
-      { input: { rooms: [[2147483647, -1, 0, 2147483647], [2147483647, 2147483647, 2147483647, -1], [2147483647, -1, 2147483647, -1], [0, -1, 2147483647, 2147483647]] }, expected: [[3, -1, 0, 1], [2, 2, 1, -1], [1, -1, 2, -1], [0, -1, 3, 4]], description: "Standard grid" },
+      {
+        input: {
+          rooms: [
+            [2147483647, -1, 0, 2147483647],
+            [2147483647, 2147483647, 2147483647, -1],
+            [2147483647, -1, 2147483647, -1],
+            [0, -1, 2147483647, 2147483647],
+          ],
+        },
+        expected: [
+          [3, -1, 0, 1],
+          [2, 2, 1, -1],
+          [1, -1, 2, -1],
+          [0, -1, 3, 4],
+        ],
+        description: "Standard grid",
+      },
     ],
   },
   {
@@ -1144,9 +1349,18 @@ Fill each empty room with the distance to its nearest gate. If impossible, leave
     examples: [
       { input: "grid = [[0,1],[1,0]]", output: "2" },
       { input: "grid = [[0,0,0],[1,1,0],[1,1,0]]", output: "4" },
-      { input: "grid = [[1,0,0],[1,1,0],[1,1,0]]", output: "-1", explanation: "Starting cell is blocked" },
+      {
+        input: "grid = [[1,0,0],[1,1,0],[1,1,0]]",
+        output: "-1",
+        explanation: "Starting cell is blocked",
+      },
     ],
-    constraints: ["n == grid.length", "n == grid[i].length", "1 <= n <= 100", "grid[i][j] is 0 or 1"],
+    constraints: [
+      "n == grid.length",
+      "n == grid[i].length",
+      "1 <= n <= 100",
+      "grid[i][j] is 0 or 1",
+    ],
     hints: [
       "BFS from (0,0) - guarantees shortest path",
       "8 directions: horizontal, vertical, diagonal",
@@ -1161,9 +1375,38 @@ Fill each empty room with the distance to its nearest gate. If impossible, leave
     },
     optimalComplexity: { time: "O(n^2)", space: "O(n^2)" },
     testCases: [
-      { input: { grid: [[0, 1], [1, 0]] }, expected: 2, description: "2x2 diagonal" },
-      { input: { grid: [[0, 0, 0], [1, 1, 0], [1, 1, 0]] }, expected: 4, description: "Longer path" },
-      { input: { grid: [[1, 0, 0], [1, 1, 0], [1, 1, 0]] }, expected: -1, description: "Blocked start" },
+      {
+        input: {
+          grid: [
+            [0, 1],
+            [1, 0],
+          ],
+        },
+        expected: 2,
+        description: "2x2 diagonal",
+      },
+      {
+        input: {
+          grid: [
+            [0, 0, 0],
+            [1, 1, 0],
+            [1, 1, 0],
+          ],
+        },
+        expected: 4,
+        description: "Longer path",
+      },
+      {
+        input: {
+          grid: [
+            [1, 0, 0],
+            [1, 1, 0],
+            [1, 1, 0],
+          ],
+        },
+        expected: -1,
+        description: "Blocked start",
+      },
     ],
   },
   {
@@ -1180,9 +1423,18 @@ Fill each empty room with the distance to its nearest gate. If impossible, leave
     examples: [
       { input: 'deadends = ["0201","0101","0102","1212","2002"], target = "0202"', output: "6" },
       { input: 'deadends = ["8888"], target = "0009"', output: "1" },
-      { input: 'deadends = ["0000"], target = "8888"', output: "-1", explanation: "Cannot move from starting position" },
+      {
+        input: 'deadends = ["0000"], target = "8888"',
+        output: "-1",
+        explanation: "Cannot move from starting position",
+      },
     ],
-    constraints: ["1 <= deadends.length <= 500", 'deadends[i].length == 4', 'target.length == 4', "target will not be in deadends"],
+    constraints: [
+      "1 <= deadends.length <= 500",
+      "deadends[i].length == 4",
+      "target.length == 4",
+      "target will not be in deadends",
+    ],
     hints: [
       "BFS from '0000' to target",
       "Each state has 8 neighbors (4 wheels x 2 directions)",
@@ -1197,7 +1449,11 @@ Fill each empty room with the distance to its nearest gate. If impossible, leave
     },
     optimalComplexity: { time: "O(10^4 * 4)", space: "O(10^4)" },
     testCases: [
-      { input: { deadends: ["0201", "0101", "0102", "1212", "2002"], target: "0202" }, expected: 6, description: "Avoid deadends" },
+      {
+        input: { deadends: ["0201", "0101", "0102", "1212", "2002"], target: "0202" },
+        expected: 6,
+        description: "Avoid deadends",
+      },
       { input: { deadends: ["8888"], target: "0009" }, expected: 1, description: "One turn" },
       { input: { deadends: ["0000"], target: "8888" }, expected: -1, description: "Start is dead" },
     ],
@@ -1214,10 +1470,21 @@ Fill each empty room with the distance to its nearest gate. If impossible, leave
     estimatedTime: 30,
     problemStatement: `Given equations like a/b = k and queries [c, d], return the result of c/d if calculable, or -1.0 if not.`,
     examples: [
-      { input: 'equations = [["a","b"],["b","c"]], values = [2.0,3.0], queries = [["a","c"],["b","a"],["a","e"],["a","a"],["x","x"]]', output: "[6.00000,0.50000,-1.00000,1.00000,-1.00000]" },
-      { input: 'equations = [["a","b"]], values = [0.5], queries = [["a","b"],["b","a"]]', output: "[0.50000,2.00000]" },
+      {
+        input:
+          'equations = [["a","b"],["b","c"]], values = [2.0,3.0], queries = [["a","c"],["b","a"],["a","e"],["a","a"],["x","x"]]',
+        output: "[6.00000,0.50000,-1.00000,1.00000,-1.00000]",
+      },
+      {
+        input: 'equations = [["a","b"]], values = [0.5], queries = [["a","b"],["b","a"]]',
+        output: "[0.50000,2.00000]",
+      },
     ],
-    constraints: ["1 <= equations.length <= 20", "1 <= queries.length <= 20", "Variables are lowercase strings"],
+    constraints: [
+      "1 <= equations.length <= 20",
+      "1 <= queries.length <= 20",
+      "Variables are lowercase strings",
+    ],
     hints: [
       "Build weighted graph: a->b with weight k, b->a with weight 1/k",
       "For query [c, d]: find path from c to d, multiply weights",
@@ -1232,7 +1499,22 @@ Fill each empty room with the distance to its nearest gate. If impossible, leave
     },
     optimalComplexity: { time: "O(Q * (V + E))", space: "O(V + E)" },
     testCases: [
-      { input: { equations: [["a", "b"], ["b", "c"]], values: [2.0, 3.0], queries: [["a", "c"], ["b", "a"], ["a", "e"]] }, expected: [6.0, 0.5, -1.0], description: "Chain division" },
+      {
+        input: {
+          equations: [
+            ["a", "b"],
+            ["b", "c"],
+          ],
+          values: [2.0, 3.0],
+          queries: [
+            ["a", "c"],
+            ["b", "a"],
+            ["a", "e"],
+          ],
+        },
+        expected: [6.0, 0.5, -1.0],
+        description: "Chain division",
+      },
     ],
   },
   {
@@ -1247,10 +1529,23 @@ Fill each empty room with the distance to its nearest gate. If impossible, leave
     estimatedTime: 20,
     problemStatement: `Given an undirected graph, return true if it is bipartite. A graph is bipartite if nodes can be divided into two independent sets such that every edge connects a node in set A to one in set B.`,
     examples: [
-      { input: "graph = [[1,2,3],[0,2],[0,1,3],[0,2]]", output: "false", explanation: "No way to partition nodes into two sets." },
-      { input: "graph = [[1,3],[0,2],[1,3],[0,2]]", output: "true", explanation: "Sets {0,2} and {1,3}." },
+      {
+        input: "graph = [[1,2,3],[0,2],[0,1,3],[0,2]]",
+        output: "false",
+        explanation: "No way to partition nodes into two sets.",
+      },
+      {
+        input: "graph = [[1,3],[0,2],[1,3],[0,2]]",
+        output: "true",
+        explanation: "Sets {0,2} and {1,3}.",
+      },
     ],
-    constraints: ["graph.length == n", "1 <= n <= 100", "0 <= graph[u].length < n", "Graph is undirected (if j in graph[i], then i in graph[j])"],
+    constraints: [
+      "graph.length == n",
+      "1 <= n <= 100",
+      "0 <= graph[u].length < n",
+      "Graph is undirected (if j in graph[i], then i in graph[j])",
+    ],
     hints: [
       "Try to 2-color the graph",
       "BFS/DFS: alternate colors for neighbors",
@@ -1265,8 +1560,30 @@ Fill each empty room with the distance to its nearest gate. If impossible, leave
     },
     optimalComplexity: { time: "O(V + E)", space: "O(V)" },
     testCases: [
-      { input: { graph: [[1, 2, 3], [0, 2], [0, 1, 3], [0, 2]] }, expected: false, description: "Not bipartite" },
-      { input: { graph: [[1, 3], [0, 2], [1, 3], [0, 2]] }, expected: true, description: "Bipartite square" },
+      {
+        input: {
+          graph: [
+            [1, 2, 3],
+            [0, 2],
+            [0, 1, 3],
+            [0, 2],
+          ],
+        },
+        expected: false,
+        description: "Not bipartite",
+      },
+      {
+        input: {
+          graph: [
+            [1, 3],
+            [0, 2],
+            [1, 3],
+            [0, 2],
+          ],
+        },
+        expected: true,
+        description: "Bipartite square",
+      },
     ],
   },
   {
@@ -1281,10 +1598,22 @@ Fill each empty room with the distance to its nearest gate. If impossible, leave
     estimatedTime: 15,
     problemStatement: `Given a bi-directional graph with n vertices and edges, determine if there is a valid path from source to destination.`,
     examples: [
-      { input: "n = 3, edges = [[0,1],[1,2],[2,0]], source = 0, destination = 2", output: "true", explanation: "Path 0 -> 1 -> 2 or 0 -> 2" },
-      { input: "n = 6, edges = [[0,1],[0,2],[3,5],[5,4],[4,3]], source = 0, destination = 5", output: "false", explanation: "No path from 0 to 5" },
+      {
+        input: "n = 3, edges = [[0,1],[1,2],[2,0]], source = 0, destination = 2",
+        output: "true",
+        explanation: "Path 0 -> 1 -> 2 or 0 -> 2",
+      },
+      {
+        input: "n = 6, edges = [[0,1],[0,2],[3,5],[5,4],[4,3]], source = 0, destination = 5",
+        output: "false",
+        explanation: "No path from 0 to 5",
+      },
     ],
-    constraints: ["1 <= n <= 2 * 10^5", "0 <= edges.length <= 2 * 10^5", "0 <= source, destination <= n - 1"],
+    constraints: [
+      "1 <= n <= 2 * 10^5",
+      "0 <= edges.length <= 2 * 10^5",
+      "0 <= source, destination <= n - 1",
+    ],
     hints: [
       "Build adjacency list",
       "BFS or DFS from source",
@@ -1299,8 +1628,36 @@ Fill each empty room with the distance to its nearest gate. If impossible, leave
     },
     optimalComplexity: { time: "O(V + E)", space: "O(V + E)" },
     testCases: [
-      { input: { n: 3, edges: [[0, 1], [1, 2], [2, 0]], source: 0, destination: 2 }, expected: true, description: "Connected" },
-      { input: { n: 6, edges: [[0, 1], [0, 2], [3, 5], [5, 4], [4, 3]], source: 0, destination: 5 }, expected: false, description: "Disconnected" },
+      {
+        input: {
+          n: 3,
+          edges: [
+            [0, 1],
+            [1, 2],
+            [2, 0],
+          ],
+          source: 0,
+          destination: 2,
+        },
+        expected: true,
+        description: "Connected",
+      },
+      {
+        input: {
+          n: 6,
+          edges: [
+            [0, 1],
+            [0, 2],
+            [3, 5],
+            [5, 4],
+            [4, 3],
+          ],
+          source: 0,
+          destination: 5,
+        },
+        expected: false,
+        description: "Disconnected",
+      },
     ],
   },
   {
@@ -1318,9 +1675,18 @@ Fill each empty room with the distance to its nearest gate. If impossible, leave
 Given rooms where rooms[i] is the set of keys in room i, return true if you can visit all rooms.`,
     examples: [
       { input: "rooms = [[1],[2],[3],[]]", output: "true", explanation: "Visit 0 -> 1 -> 2 -> 3" },
-      { input: "rooms = [[1,3],[3,0,1],[2],[0]]", output: "false", explanation: "Can't enter room 2" },
+      {
+        input: "rooms = [[1,3],[3,0,1],[2],[0]]",
+        output: "false",
+        explanation: "Can't enter room 2",
+      },
     ],
-    constraints: ["n == rooms.length", "2 <= n <= 1000", "0 <= rooms[i].length <= 1000", "1 <= sum(rooms[i].length) <= 3000"],
+    constraints: [
+      "n == rooms.length",
+      "2 <= n <= 1000",
+      "0 <= rooms[i].length <= 1000",
+      "1 <= sum(rooms[i].length) <= 3000",
+    ],
     hints: [
       "DFS/BFS from room 0",
       "Keys are edges to other rooms",
@@ -1336,7 +1702,11 @@ Given rooms where rooms[i] is the set of keys in room i, return true if you can 
     optimalComplexity: { time: "O(n + k)", space: "O(n)" },
     testCases: [
       { input: { rooms: [[1], [2], [3], []] }, expected: true, description: "Linear key chain" },
-      { input: { rooms: [[1, 3], [3, 0, 1], [2], [0]] }, expected: false, description: "Room 2 unreachable" },
+      {
+        input: { rooms: [[1, 3], [3, 0, 1], [2], [0]] },
+        expected: false,
+        description: "Room 2 unreachable",
+      },
     ],
   },
   {
@@ -1353,10 +1723,19 @@ Given rooms where rooms[i] is the set of keys in room i, return true if you can 
 
 Return minimum number of moves to reach square n^2 starting from 1, or -1 if impossible.`,
     examples: [
-      { input: "board = [[-1,-1,-1,-1,-1,-1],[-1,-1,-1,-1,-1,-1],[-1,-1,-1,-1,-1,-1],[-1,35,-1,-1,13,-1],[-1,-1,-1,-1,-1,-1],[-1,15,-1,-1,-1,-1]]", output: "4", explanation: "1 -> 2 -> 15 -> 35 -> 36" },
+      {
+        input:
+          "board = [[-1,-1,-1,-1,-1,-1],[-1,-1,-1,-1,-1,-1],[-1,-1,-1,-1,-1,-1],[-1,35,-1,-1,13,-1],[-1,-1,-1,-1,-1,-1],[-1,15,-1,-1,-1,-1]]",
+        output: "4",
+        explanation: "1 -> 2 -> 15 -> 35 -> 36",
+      },
       { input: "board = [[-1,-1],[-1,3]]", output: "1" },
     ],
-    constraints: ["n == board.length == board[i].length", "2 <= n <= 20", "board[i][j] is -1 or in [1, n^2]"],
+    constraints: [
+      "n == board.length == board[i].length",
+      "2 <= n <= 20",
+      "board[i][j] is -1 or in [1, n^2]",
+    ],
     hints: [
       "BFS from square 1",
       "Convert square number to (row, col) considering Boustrophedon",
@@ -1371,7 +1750,20 @@ Return minimum number of moves to reach square n^2 starting from 1, or -1 if imp
     },
     optimalComplexity: { time: "O(n^2)", space: "O(n^2)" },
     testCases: [
-      { input: { board: [[-1, -1, -1, -1, -1, -1], [-1, -1, -1, -1, -1, -1], [-1, -1, -1, -1, -1, -1], [-1, 35, -1, -1, 13, -1], [-1, -1, -1, -1, -1, -1], [-1, 15, -1, -1, -1, -1]] }, expected: 4, description: "With ladders" },
+      {
+        input: {
+          board: [
+            [-1, -1, -1, -1, -1, -1],
+            [-1, -1, -1, -1, -1, -1],
+            [-1, -1, -1, -1, -1, -1],
+            [-1, 35, -1, -1, 13, -1],
+            [-1, -1, -1, -1, -1, -1],
+            [-1, 15, -1, -1, -1, -1],
+          ],
+        },
+        expected: 4,
+        description: "With ladders",
+      },
     ],
   },
   {
@@ -1393,9 +1785,19 @@ Given trust where trust[i] = [a, b] means a trusts b, return the town judge's la
     examples: [
       { input: "n = 2, trust = [[1,2]]", output: "2" },
       { input: "n = 3, trust = [[1,3],[2,3]]", output: "3" },
-      { input: "n = 3, trust = [[1,3],[2,3],[3,1]]", output: "-1", explanation: "3 trusts someone" },
+      {
+        input: "n = 3, trust = [[1,3],[2,3],[3,1]]",
+        output: "-1",
+        explanation: "3 trusts someone",
+      },
     ],
-    constraints: ["1 <= n <= 1000", "0 <= trust.length <= 10^4", "trust[i].length == 2", "All pairs are unique", "a != b"],
+    constraints: [
+      "1 <= n <= 1000",
+      "0 <= trust.length <= 10^4",
+      "trust[i].length == 2",
+      "All pairs are unique",
+      "a != b",
+    ],
     hints: [
       "Count in-degree and out-degree for each person",
       "Judge has in-degree n-1 and out-degree 0",
@@ -1411,8 +1813,29 @@ Given trust where trust[i] = [a, b] means a trusts b, return the town judge's la
     optimalComplexity: { time: "O(n + t)", space: "O(n)" },
     testCases: [
       { input: { n: 2, trust: [[1, 2]] }, expected: 2, description: "Two people" },
-      { input: { n: 3, trust: [[1, 3], [2, 3]] }, expected: 3, description: "Three people" },
-      { input: { n: 3, trust: [[1, 3], [2, 3], [3, 1]] }, expected: -1, description: "No judge" },
+      {
+        input: {
+          n: 3,
+          trust: [
+            [1, 3],
+            [2, 3],
+          ],
+        },
+        expected: 3,
+        description: "Three people",
+      },
+      {
+        input: {
+          n: 3,
+          trust: [
+            [1, 3],
+            [2, 3],
+            [3, 1],
+          ],
+        },
+        expected: -1,
+        description: "No judge",
+      },
     ],
   },
 ]

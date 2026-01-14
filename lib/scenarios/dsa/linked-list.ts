@@ -12,7 +12,7 @@ export const linkedListScenarios: DSAScenario[] = [
     type: "dsa",
     pattern: "linked-list",
     difficulty: "easy",
-    companies: ["Amazon", "Microsoft", "Meta", "Apple", "Google"],
+    companies: ["Amazon", "Microsoft", "Meta", "Apple", "Google", "Snap"],
     description: "Reverse a singly linked list",
     tags: ["linked-list", "recursion"],
     estimatedTime: 15,
@@ -91,7 +91,7 @@ export const linkedListScenarios: DSAScenario[] = [
     type: "dsa",
     pattern: "linked-list",
     difficulty: "easy",
-    companies: ["Amazon", "Microsoft", "Meta", "Google"],
+    companies: ["Amazon", "Microsoft", "Meta", "Google", "Oracle"],
     description: "Detect if a linked list has a cycle",
     tags: ["linked-list", "two-pointers", "hash-table"],
     estimatedTime: 15,
@@ -177,7 +177,17 @@ Return true if there is a cycle in the linked list. Otherwise, return false.`,
     type: "dsa",
     pattern: "linked-list",
     difficulty: "medium",
-    companies: ["Google", "Amazon", "Meta", "Microsoft"],
+    companies: [
+      "Google",
+      "Amazon",
+      "Meta",
+      "Microsoft",
+      "Roblox",
+      "TikTok",
+      "Snap",
+      "Reddit",
+      "Twitch",
+    ],
     description: "Design a data structure that follows Least Recently Used (LRU) cache constraints",
     tags: ["hash-table", "linked-list", "design"],
     estimatedTime: 30,
@@ -908,7 +918,10 @@ Note that the linked lists may intersect at different positions, and the interse
       { input: "head = [1,2,2,1]", output: "true" },
       { input: "head = [1,2]", output: "false" },
     ],
-    constraints: ["The number of nodes in the list is in the range [1, 10^5].", "0 <= Node.val <= 9"],
+    constraints: [
+      "The number of nodes in the list is in the range [1, 10^5].",
+      "0 <= Node.val <= 9",
+    ],
     hints: [
       "Find middle using slow/fast pointers",
       "Reverse second half of list",
@@ -943,9 +956,16 @@ Note that the linked lists may intersect at different positions, and the interse
 If there are two middle nodes, return the second middle node.`,
     examples: [
       { input: "head = [1,2,3,4,5]", output: "[3,4,5]", explanation: "The middle node is 3." },
-      { input: "head = [1,2,3,4,5,6]", output: "[4,5,6]", explanation: "Two middle nodes 3 and 4, return 4." },
+      {
+        input: "head = [1,2,3,4,5,6]",
+        output: "[4,5,6]",
+        explanation: "Two middle nodes 3 and 4, return 4.",
+      },
     ],
-    constraints: ["The number of nodes in the list is in the range [1, 100].", "1 <= Node.val <= 100"],
+    constraints: [
+      "The number of nodes in the list is in the range [1, 100].",
+      "1 <= Node.val <= 100",
+    ],
     hints: [
       "Use slow and fast pointers",
       "Slow moves 1 step, fast moves 2 steps",
@@ -959,7 +979,11 @@ If there are two middle nodes, return the second middle node.`,
     optimalComplexity: { time: "O(n)", space: "O(1)" },
     testCases: [
       { input: { values: [1, 2, 3, 4, 5] }, expected: [3, 4, 5], description: "Odd length" },
-      { input: { values: [1, 2, 3, 4, 5, 6] }, expected: [4, 5, 6], description: "Even length - second middle" },
+      {
+        input: { values: [1, 2, 3, 4, 5, 6] },
+        expected: [4, 5, 6],
+        description: "Even length - second middle",
+      },
       { input: { values: [1] }, expected: [1], description: "Single node" },
     ],
   },
@@ -982,7 +1006,11 @@ You may not alter the values in the list's nodes, only nodes themselves may be c
       { input: "head = [1,2,3,4,5], k = 2", output: "[2,1,4,3,5]" },
       { input: "head = [1,2,3,4,5], k = 3", output: "[3,2,1,4,5]" },
     ],
-    constraints: ["The number of nodes in the list is n.", "1 <= k <= n <= 5000", "0 <= Node.val <= 1000"],
+    constraints: [
+      "The number of nodes in the list is n.",
+      "1 <= k <= n <= 5000",
+      "0 <= Node.val <= 1000",
+    ],
     hints: [
       "Count k nodes first to check if group exists",
       "Reverse k nodes at a time",
@@ -997,7 +1025,11 @@ You may not alter the values in the list's nodes, only nodes themselves may be c
     optimalComplexity: { time: "O(n)", space: "O(1)" },
     testCases: [
       { input: { values: [1, 2, 3, 4, 5], k: 2 }, expected: [2, 1, 4, 3, 5], description: "k=2" },
-      { input: { values: [1, 2, 3, 4, 5], k: 3 }, expected: [3, 2, 1, 4, 5], description: "k=3, remaining 2" },
+      {
+        input: { values: [1, 2, 3, 4, 5], k: 3 },
+        expected: [3, 2, 1, 4, 5],
+        description: "k=3, remaining 2",
+      },
       { input: { values: [1, 2, 3], k: 1 }, expected: [1, 2, 3], description: "k=1, no change" },
     ],
   },
@@ -1017,7 +1049,10 @@ You may not alter the values in the list's nodes, only nodes themselves may be c
       { input: "head = [-1,5,3,4,0]", output: "[-1,0,3,4,5]" },
       { input: "head = []", output: "[]" },
     ],
-    constraints: ["The number of nodes in the list is in the range [0, 5 * 10^4].", "-10^5 <= Node.val <= 10^5"],
+    constraints: [
+      "The number of nodes in the list is in the range [0, 5 * 10^4].",
+      "-10^5 <= Node.val <= 10^5",
+    ],
     hints: [
       "Use merge sort for O(n log n) time",
       "Find middle using slow/fast pointers",
@@ -1032,7 +1067,11 @@ You may not alter the values in the list's nodes, only nodes themselves may be c
     optimalComplexity: { time: "O(n log n)", space: "O(log n) for recursion" },
     testCases: [
       { input: { values: [4, 2, 1, 3] }, expected: [1, 2, 3, 4], description: "Standard sort" },
-      { input: { values: [-1, 5, 3, 4, 0] }, expected: [-1, 0, 3, 4, 5], description: "With negatives" },
+      {
+        input: { values: [-1, 5, 3, 4, 0] },
+        expected: [-1, 0, 3, 4, 5],
+        description: "With negatives",
+      },
       { input: { values: [] }, expected: [], description: "Empty list" },
       { input: { values: [1] }, expected: [1], description: "Single node" },
     ],
@@ -1053,7 +1092,10 @@ You may not alter the values in the list's nodes, only nodes themselves may be c
       { input: "head = []", output: "[]" },
       { input: "head = [1]", output: "[1]" },
     ],
-    constraints: ["The number of nodes in the list is in the range [0, 100].", "0 <= Node.val <= 100"],
+    constraints: [
+      "The number of nodes in the list is in the range [0, 100].",
+      "0 <= Node.val <= 100",
+    ],
     hints: [
       "Use dummy node to handle head swap",
       "Track prev, curr, next pointers",

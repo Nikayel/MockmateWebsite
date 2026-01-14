@@ -563,7 +563,7 @@ public:
     type: "dsa",
     pattern: "dp-knapsack",
     difficulty: "medium",
-    companies: ["Amazon", "Meta", "Google", "Apple"],
+    companies: ["Amazon", "Meta", "Google", "Apple", "Oracle"],
     description: "Find minimum number of coins needed to make amount",
     tags: ["dynamic-programming", "breadth-first-search"],
     estimatedTime: 25,
@@ -644,7 +644,7 @@ You may assume that you have an infinite number of each kind of coin.`,
     type: "dsa",
     pattern: "dp-lcs",
     difficulty: "medium",
-    companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple"],
+    companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple", "Salesforce", "Atlassian"],
     description: "Find the length of the longest common subsequence of two strings",
     tags: ["dynamic-programming", "string"],
     estimatedTime: 25,
@@ -914,7 +914,8 @@ Given an integer array nums representing the amount of money of each house, retu
       {
         input: "nums = [2,3,2]",
         output: "3",
-        explanation: "You cannot rob house 1 (money = 2) and then rob house 3 (money = 2), because they are adjacent houses.",
+        explanation:
+          "You cannot rob house 1 (money = 2) and then rob house 3 (money = 2), because they are adjacent houses.",
       },
       {
         input: "nums = [1,2,3,1]",
@@ -991,7 +992,10 @@ Given a string s containing only digits, return the number of ways to decode it.
         explanation: '"06" cannot be mapped because leading zeros are invalid.',
       },
     ],
-    constraints: ["1 <= s.length <= 100", "s contains only digits and may contain leading zero(s)."],
+    constraints: [
+      "1 <= s.length <= 100",
+      "s contains only digits and may contain leading zero(s).",
+    ],
     hints: [
       "dp[i] = number of ways to decode s[0:i]",
       "Single digit: if s[i-1] != '0', dp[i] += dp[i-1]",
@@ -1046,7 +1050,11 @@ The test cases are generated so that the answer will fit in a 32-bit integer.`,
         explanation: "The result cannot be 2, because [-2,-1] is not a subarray.",
       },
     ],
-    constraints: ["1 <= nums.length <= 2 * 10^4", "-10 <= nums[i] <= 10", "The product of any prefix or suffix of nums is guaranteed to fit in a 32-bit integer."],
+    constraints: [
+      "1 <= nums.length <= 2 * 10^4",
+      "-10 <= nums[i] <= 10",
+      "The product of any prefix or suffix of nums is guaranteed to fit in a 32-bit integer.",
+    ],
     hints: [
       "Track both max and min product ending at each position",
       "Negative * negative can become positive max",
@@ -1102,7 +1110,12 @@ Return the number of different expressions that you can build, which evaluates t
         output: "1",
       },
     ],
-    constraints: ["1 <= nums.length <= 20", "0 <= nums[i] <= 1000", "0 <= sum(nums[i]) <= 1000", "-1000 <= target <= 1000"],
+    constraints: [
+      "1 <= nums.length <= 20",
+      "0 <= nums[i] <= 1000",
+      "0 <= sum(nums[i]) <= 1000",
+      "-1000 <= target <= 1000",
+    ],
     hints: [
       "Let P = sum of positive numbers, N = sum of negative numbers",
       "P - N = target and P + N = sum",
@@ -1124,7 +1137,11 @@ Return the number of different expressions that you can build, which evaluates t
     },
     optimalComplexity: { time: "O(n * sum)", space: "O(sum)" },
     testCases: [
-      { input: { nums: [1, 1, 1, 1, 1], target: 3 }, expected: 5, description: "Five ones to make 3" },
+      {
+        input: { nums: [1, 1, 1, 1, 1], target: 3 },
+        expected: 5,
+        description: "Five ones to make 3",
+      },
       { input: { nums: [1], target: 1 }, expected: 1, description: "Single element" },
       { input: { nums: [1, 0], target: 1 }, expected: 2, description: "Zero can be +0 or -0" },
       { input: { nums: [1, 2, 1], target: 0 }, expected: 2, description: "+1-2+1 or -1+2-1" },
@@ -1154,7 +1171,12 @@ Note: You can only move either down or right at any point in time.`,
         output: "12",
       },
     ],
-    constraints: ["m == grid.length", "n == grid[i].length", "1 <= m, n <= 200", "0 <= grid[i][j] <= 200"],
+    constraints: [
+      "m == grid.length",
+      "n == grid[i].length",
+      "1 <= m, n <= 200",
+      "0 <= grid[i][j] <= 200",
+    ],
     hints: [
       "dp[i][j] = minimum sum to reach cell (i,j)",
       "dp[i][j] = grid[i][j] + min(dp[i-1][j], dp[i][j-1])",
@@ -1176,10 +1198,38 @@ Note: You can only move either down or right at any point in time.`,
     },
     optimalComplexity: { time: "O(m * n)", space: "O(n)" },
     testCases: [
-      { input: { grid: [[1, 3, 1], [1, 5, 1], [4, 2, 1]] }, expected: 7, description: "3x3 grid" },
-      { input: { grid: [[1, 2, 3], [4, 5, 6]] }, expected: 12, description: "2x3 grid" },
+      {
+        input: {
+          grid: [
+            [1, 3, 1],
+            [1, 5, 1],
+            [4, 2, 1],
+          ],
+        },
+        expected: 7,
+        description: "3x3 grid",
+      },
+      {
+        input: {
+          grid: [
+            [1, 2, 3],
+            [4, 5, 6],
+          ],
+        },
+        expected: 12,
+        description: "2x3 grid",
+      },
       { input: { grid: [[1]] }, expected: 1, description: "Single cell" },
-      { input: { grid: [[1, 2], [1, 1]] }, expected: 3, description: "2x2 grid" },
+      {
+        input: {
+          grid: [
+            [1, 2],
+            [1, 1],
+          ],
+        },
+        expected: 3,
+        description: "2x2 grid",
+      },
     ],
   },
   {
@@ -1310,7 +1360,8 @@ Find and return the maximum profit you can achieve.`,
       {
         input: "prices = [7,1,5,3,6,4]",
         output: "7",
-        explanation: "Buy on day 2 (price = 1) and sell on day 3 (price = 5), profit = 4. Then buy on day 4 (price = 3) and sell on day 5 (price = 6), profit = 3. Total = 7.",
+        explanation:
+          "Buy on day 2 (price = 1) and sell on day 3 (price = 5), profit = 4. Then buy on day 4 (price = 3) and sell on day 5 (price = 6), profit = 3. Total = 7.",
       },
       {
         input: "prices = [1,2,3,4,5]",
@@ -1428,7 +1479,12 @@ For each step, you may move to an adjacent number of the row below. More formall
         output: "-10",
       },
     ],
-    constraints: ["1 <= triangle.length <= 200", "triangle[0].length == 1", "triangle[i].length == triangle[i - 1].length + 1", "-10^4 <= triangle[i][j] <= 10^4"],
+    constraints: [
+      "1 <= triangle.length <= 200",
+      "triangle[0].length == 1",
+      "triangle[i].length == triangle[i - 1].length + 1",
+      "-10^4 <= triangle[i][j] <= 10^4",
+    ],
     hints: [
       "Work bottom-up: start from second-to-last row",
       "dp[i] = min path sum from row to bottom",
@@ -1450,7 +1506,11 @@ For each step, you may move to an adjacent number of the row below. More formall
     },
     optimalComplexity: { time: "O(n^2)", space: "O(n)" },
     testCases: [
-      { input: { triangle: [[2], [3, 4], [6, 5, 7], [4, 1, 8, 3]] }, expected: 11, description: "Standard triangle" },
+      {
+        input: { triangle: [[2], [3, 4], [6, 5, 7], [4, 1, 8, 3]] },
+        expected: 11,
+        description: "Standard triangle",
+      },
       { input: { triangle: [[-10]] }, expected: -10, description: "Single element" },
       { input: { triangle: [[2], [3, 4]] }, expected: 5, description: "Two rows" },
     ],
@@ -1468,7 +1528,8 @@ For each step, you may move to an adjacent number of the row below. More formall
     problemStatement: `Given an m x n binary matrix filled with 0's and 1's, find the largest square containing only 1's and return its area.`,
     examples: [
       {
-        input: 'matrix = [["1","0","1","0","0"],["1","0","1","1","1"],["1","1","1","1","1"],["1","0","0","1","0"]]',
+        input:
+          'matrix = [["1","0","1","0","0"],["1","0","1","1","1"],["1","1","1","1","1"],["1","0","0","1","0"]]',
         output: "4",
         explanation: "The largest square has side length 2.",
       },
@@ -1481,7 +1542,12 @@ For each step, you may move to an adjacent number of the row below. More formall
         output: "0",
       },
     ],
-    constraints: ["m == matrix.length", "n == matrix[i].length", "1 <= m, n <= 300", "matrix[i][j] is '0' or '1'."],
+    constraints: [
+      "m == matrix.length",
+      "n == matrix[i].length",
+      "1 <= m, n <= 300",
+      "matrix[i][j] is '0' or '1'.",
+    ],
     hints: [
       "dp[i][j] = side length of largest square with bottom-right corner at (i,j)",
       "If matrix[i][j] == '1': dp[i][j] = min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]) + 1",
@@ -1503,8 +1569,28 @@ For each step, you may move to an adjacent number of the row below. More formall
     },
     optimalComplexity: { time: "O(m * n)", space: "O(n)" },
     testCases: [
-      { input: { matrix: [["1", "0", "1", "0", "0"], ["1", "0", "1", "1", "1"], ["1", "1", "1", "1", "1"], ["1", "0", "0", "1", "0"]] }, expected: 4, description: "2x2 square" },
-      { input: { matrix: [["0", "1"], ["1", "0"]] }, expected: 1, description: "1x1 squares only" },
+      {
+        input: {
+          matrix: [
+            ["1", "0", "1", "0", "0"],
+            ["1", "0", "1", "1", "1"],
+            ["1", "1", "1", "1", "1"],
+            ["1", "0", "0", "1", "0"],
+          ],
+        },
+        expected: 4,
+        description: "2x2 square",
+      },
+      {
+        input: {
+          matrix: [
+            ["0", "1"],
+            ["1", "0"],
+          ],
+        },
+        expected: 1,
+        description: "1x1 squares only",
+      },
       { input: { matrix: [["0"]] }, expected: 0, description: "No 1's" },
       { input: { matrix: [["1"]] }, expected: 1, description: "Single 1" },
     ],
@@ -1559,7 +1645,11 @@ Return the minimum cost to reach the top of the floor.`,
     optimalComplexity: { time: "O(n)", space: "O(1)" },
     testCases: [
       { input: { cost: [10, 15, 20] }, expected: 15, description: "Start at index 1" },
-      { input: { cost: [1, 100, 1, 1, 1, 100, 1, 1, 100, 1] }, expected: 6, description: "Skip expensive steps" },
+      {
+        input: { cost: [1, 100, 1, 1, 1, 100, 1, 1, 100, 1] },
+        expected: 6,
+        description: "Skip expensive steps",
+      },
       { input: { cost: [0, 0, 0, 1] }, expected: 0, description: "Can reach top for free" },
     ],
   },

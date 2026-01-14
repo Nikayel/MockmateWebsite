@@ -205,7 +205,7 @@ public:
     type: "dsa",
     pattern: "heap-priority-queue",
     difficulty: "hard",
-    companies: ["Amazon", "Google", "Meta"],
+    companies: ["Amazon", "Google", "Meta", "Spotify"],
     description: "Design a data structure that supports finding median in O(1).",
     tags: ["heap", "design", "two-heaps"],
     estimatedTime: 35,
@@ -373,7 +373,7 @@ The median is the middle value in an ordered integer list. If the size of the li
     type: "dsa",
     pattern: "heap-priority-queue",
     difficulty: "medium",
-    companies: ["Amazon", "Meta", "Google", "Apple"],
+    companies: ["Amazon", "Meta", "Google", "Apple", "Snap"],
     description: "Find k closest points to the origin using a heap",
     tags: ["array", "heap", "quickselect", "sorting"],
     estimatedTime: 20,
@@ -543,11 +543,19 @@ The median is the middle value in an ordered integer list. If the size of the li
 
 At the end, there is at most one stone left. Return its weight, or 0 if no stones left.`,
     examples: [
-      { input: "stones = [2,7,4,1,8,1]", output: "1", explanation: "Smash 7,8->1, then 2,4->2, then 1,2->1, then 1,1->0, left with 1" },
+      {
+        input: "stones = [2,7,4,1,8,1]",
+        output: "1",
+        explanation: "Smash 7,8->1, then 2,4->2, then 1,2->1, then 1,1->0, left with 1",
+      },
       { input: "stones = [1]", output: "1" },
     ],
     constraints: ["1 <= stones.length <= 30", "1 <= stones[i] <= 1000"],
-    hints: ["Use max heap", "Pop two largest, push difference if non-zero", "Repeat until 0 or 1 stones left"],
+    hints: [
+      "Use max heap",
+      "Pop two largest, push difference if non-zero",
+      "Repeat until 0 or 1 stones left",
+    ],
     starterCode: {
       javascript: `function lastStoneWeight(stones) {\n  // Write your solution here\n\n}`,
       typescript: `function lastStoneWeight(stones: number[]): number {\n  // Write your solution here\n\n}`,
@@ -572,11 +580,26 @@ At the end, there is at most one stone left. Return its weight, or 0 if no stone
     estimatedTime: 25,
     problemStatement: `Given an array of strings words and an integer k, return the k most frequent strings. Return the answer sorted by frequency from highest to lowest. If two words have same frequency, sort them by lexicographical order.`,
     examples: [
-      { input: 'words = ["i","love","leetcode","i","love","coding"], k = 2', output: '["i","love"]' },
-      { input: 'words = ["the","day","is","sunny","the","the","the","sunny","is","is"], k = 4', output: '["the","is","sunny","day"]' },
+      {
+        input: 'words = ["i","love","leetcode","i","love","coding"], k = 2',
+        output: '["i","love"]',
+      },
+      {
+        input: 'words = ["the","day","is","sunny","the","the","the","sunny","is","is"], k = 4',
+        output: '["the","is","sunny","day"]',
+      },
     ],
-    constraints: ["1 <= words.length <= 500", "1 <= words[i].length <= 10", "words[i] consists of lowercase English letters.", "k is in the range [1, number of unique words]"],
-    hints: ["Count frequencies with hash map", "Use min heap of size k with custom comparator", "Or sort all unique words by (frequency desc, word asc)"],
+    constraints: [
+      "1 <= words.length <= 500",
+      "1 <= words[i].length <= 10",
+      "words[i] consists of lowercase English letters.",
+      "k is in the range [1, number of unique words]",
+    ],
+    hints: [
+      "Count frequencies with hash map",
+      "Use min heap of size k with custom comparator",
+      "Or sort all unique words by (frequency desc, word asc)",
+    ],
     starterCode: {
       javascript: `function topKFrequent(words, k) {\n  // Write your solution here\n\n}`,
       typescript: `function topKFrequent(words: string[], k: number): string[] {\n  // Write your solution here\n\n}`,
@@ -584,8 +607,19 @@ At the end, there is at most one stone left. Return its weight, or 0 if no stone
     },
     optimalComplexity: { time: "O(n log k)", space: "O(n)" },
     testCases: [
-      { input: { words: ["i", "love", "leetcode", "i", "love", "coding"], k: 2 }, expected: ["i", "love"], description: "Basic case" },
-      { input: { words: ["the", "day", "is", "sunny", "the", "the", "the", "sunny", "is", "is"], k: 4 }, expected: ["the", "is", "sunny", "day"], description: "Tie-breaking" },
+      {
+        input: { words: ["i", "love", "leetcode", "i", "love", "coding"], k: 2 },
+        expected: ["i", "love"],
+        description: "Basic case",
+      },
+      {
+        input: {
+          words: ["the", "day", "is", "sunny", "the", "the", "the", "sunny", "is", "is"],
+          k: 4,
+        },
+        expected: ["the", "is", "sunny", "day"],
+        description: "Tie-breaking",
+      },
     ],
   },
 ]
