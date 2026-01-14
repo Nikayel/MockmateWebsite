@@ -1152,12 +1152,24 @@ The length of a path between two nodes is represented by the number of edges bet
 
 A leaf is a node with no children.`,
     examples: [
-      { input: "root = [5,4,8,11,null,13,4,7,2,null,null,null,1], targetSum = 22", output: "true", explanation: "Path 5 → 4 → 11 → 2 = 22" },
+      {
+        input: "root = [5,4,8,11,null,13,4,7,2,null,null,null,1], targetSum = 22",
+        output: "true",
+        explanation: "Path 5 → 4 → 11 → 2 = 22",
+      },
       { input: "root = [1,2,3], targetSum = 5", output: "false" },
       { input: "root = [], targetSum = 0", output: "false" },
     ],
-    constraints: ["The number of nodes in the tree is in the range [0, 5000].", "-1000 <= Node.val <= 1000", "-1000 <= targetSum <= 1000"],
-    hints: ["Use DFS, subtracting node value from targetSum", "At leaf, check if remaining sum equals node value", "Handle empty tree case"],
+    constraints: [
+      "The number of nodes in the tree is in the range [0, 5000].",
+      "-1000 <= Node.val <= 1000",
+      "-1000 <= targetSum <= 1000",
+    ],
+    hints: [
+      "Use DFS, subtracting node value from targetSum",
+      "At leaf, check if remaining sum equals node value",
+      "Handle empty tree case",
+    ],
     starterCode: {
       javascript: `function hasPathSum(root, targetSum) {\n  // Write your solution here\n\n}`,
       typescript: `function hasPathSum(root: TreeNode | null, targetSum: number): boolean {\n  // Write your solution here\n\n}`,
@@ -1165,7 +1177,11 @@ A leaf is a node with no children.`,
     },
     optimalComplexity: { time: "O(n)", space: "O(h)" },
     testCases: [
-      { input: { root: [5, 4, 8, 11, null, 13, 4, 7, 2, null, null, null, 1], targetSum: 22 }, expected: true, description: "Valid path exists" },
+      {
+        input: { root: [5, 4, 8, 11, null, 13, 4, 7, 2, null, null, null, 1], targetSum: 22 },
+        expected: true,
+        description: "Valid path exists",
+      },
       { input: { root: [1, 2, 3], targetSum: 5 }, expected: false, description: "No valid path" },
       { input: { root: [], targetSum: 0 }, expected: false, description: "Empty tree" },
     ],
@@ -1182,11 +1198,23 @@ A leaf is a node with no children.`,
     estimatedTime: 25,
     problemStatement: `Given the root of a binary tree and an integer targetSum, return all root-to-leaf paths where the sum of the node values in the path equals targetSum. Each path should be returned as a list of the node values, not node references.`,
     examples: [
-      { input: "root = [5,4,8,11,null,13,4,7,2,null,null,5,1], targetSum = 22", output: "[[5,4,11,2],[5,8,4,5]]" },
+      {
+        input: "root = [5,4,8,11,null,13,4,7,2,null,null,5,1], targetSum = 22",
+        output: "[[5,4,11,2],[5,8,4,5]]",
+      },
       { input: "root = [1,2,3], targetSum = 5", output: "[]" },
     ],
-    constraints: ["The number of nodes in the tree is in the range [0, 5000].", "-1000 <= Node.val <= 1000", "-1000 <= targetSum <= 1000"],
-    hints: ["Use DFS with backtracking", "Track current path and remaining sum", "Add path to result when at leaf with sum = 0", "Remove last node when backtracking"],
+    constraints: [
+      "The number of nodes in the tree is in the range [0, 5000].",
+      "-1000 <= Node.val <= 1000",
+      "-1000 <= targetSum <= 1000",
+    ],
+    hints: [
+      "Use DFS with backtracking",
+      "Track current path and remaining sum",
+      "Add path to result when at leaf with sum = 0",
+      "Remove last node when backtracking",
+    ],
     starterCode: {
       javascript: `function pathSum(root, targetSum) {\n  // Write your solution here\n\n}`,
       typescript: `function pathSum(root: TreeNode | null, targetSum: number): number[][] {\n  // Write your solution here\n\n}`,
@@ -1194,7 +1222,14 @@ A leaf is a node with no children.`,
     },
     optimalComplexity: { time: "O(n^2)", space: "O(n)" },
     testCases: [
-      { input: { root: [5, 4, 8, 11, null, 13, 4, 7, 2, null, null, 5, 1], targetSum: 22 }, expected: [[5, 4, 11, 2], [5, 8, 4, 5]], description: "Multiple paths" },
+      {
+        input: { root: [5, 4, 8, 11, null, 13, 4, 7, 2, null, null, 5, 1], targetSum: 22 },
+        expected: [
+          [5, 4, 11, 2],
+          [5, 8, 4, 5],
+        ],
+        description: "Multiple paths",
+      },
       { input: { root: [1, 2, 3], targetSum: 5 }, expected: [], description: "No valid paths" },
     ],
   },
@@ -1217,7 +1252,10 @@ A leaf is a node with no children.`,
       { input: "root = []", output: "[]" },
       { input: "root = [0]", output: "[0]" },
     ],
-    constraints: ["The number of nodes in the tree is in the range [0, 2000].", "-100 <= Node.val <= 100"],
+    constraints: [
+      "The number of nodes in the tree is in the range [0, 2000].",
+      "-100 <= Node.val <= 100",
+    ],
     hints: [
       "Morris traversal for O(1) space",
       "Or reverse postorder (right, left, root) and link",
@@ -1231,7 +1269,11 @@ A leaf is a node with no children.`,
     },
     optimalComplexity: { time: "O(n)", space: "O(1) with Morris" },
     testCases: [
-      { input: { root: [1, 2, 5, 3, 4, null, 6] }, expected: [1, null, 2, null, 3, null, 4, null, 5, null, 6], description: "Standard tree" },
+      {
+        input: { root: [1, 2, 5, 3, 4, null, 6] },
+        expected: [1, null, 2, null, 3, null, 4, null, 5, null, 6],
+        description: "Standard tree",
+      },
       { input: { root: [] }, expected: [], description: "Empty tree" },
       { input: { root: [0] }, expected: [0], description: "Single node" },
     ],
@@ -1253,8 +1295,16 @@ Return the total sum of all root-to-leaf numbers.`,
       { input: "root = [1,2,3]", output: "25", explanation: "12 + 13 = 25" },
       { input: "root = [4,9,0,5,1]", output: "1026", explanation: "495 + 491 + 40 = 1026" },
     ],
-    constraints: ["The number of nodes in the tree is in the range [1, 1000].", "0 <= Node.val <= 9", "The depth of the tree will not exceed 10."],
-    hints: ["DFS passing current number formed so far", "At each node: num = num * 10 + node.val", "At leaf, add num to total"],
+    constraints: [
+      "The number of nodes in the tree is in the range [1, 1000].",
+      "0 <= Node.val <= 9",
+      "The depth of the tree will not exceed 10.",
+    ],
+    hints: [
+      "DFS passing current number formed so far",
+      "At each node: num = num * 10 + node.val",
+      "At leaf, add num to total",
+    ],
     starterCode: {
       javascript: `function sumNumbers(root) {\n  // Write your solution here\n\n}`,
       typescript: `function sumNumbers(root: TreeNode | null): number {\n  // Write your solution here\n\n}`,
@@ -1282,10 +1332,17 @@ Populate each next pointer to point to its next right node. If there is no next 
 
 Initially, all next pointers are set to NULL.`,
     examples: [
-      { input: "root = [1,2,3,4,5,6,7]", output: "[1,#,2,3,#,4,5,6,7,#]", explanation: "# denotes null next pointers" },
+      {
+        input: "root = [1,2,3,4,5,6,7]",
+        output: "[1,#,2,3,#,4,5,6,7,#]",
+        explanation: "# denotes null next pointers",
+      },
       { input: "root = []", output: "[]" },
     ],
-    constraints: ["The number of nodes in the tree is in the range [0, 2^12 - 1].", "-1000 <= Node.val <= 1000"],
+    constraints: [
+      "The number of nodes in the tree is in the range [0, 2^12 - 1].",
+      "-1000 <= Node.val <= 1000",
+    ],
     hints: [
       "BFS level by level, connect nodes in same level",
       "For O(1) space: use next pointers from previous level",
@@ -1299,7 +1356,11 @@ Initially, all next pointers are set to NULL.`,
     },
     optimalComplexity: { time: "O(n)", space: "O(1)" },
     testCases: [
-      { input: { root: [1, 2, 3, 4, 5, 6, 7] }, expected: [1, "#", 2, 3, "#", 4, 5, 6, 7, "#"], description: "Perfect binary tree" },
+      {
+        input: { root: [1, 2, 3, 4, 5, 6, 7] },
+        expected: [1, "#", 2, 3, "#", 4, 5, 6, 7, "#"],
+        description: "Perfect binary tree",
+      },
       { input: { root: [] }, expected: [], description: "Empty tree" },
     ],
   },
@@ -1323,9 +1384,16 @@ A valid BST is defined as follows:
 - Both the left and right subtrees must also be binary search trees.`,
     examples: [
       { input: "root = [2,1,3]", output: "true" },
-      { input: "root = [5,1,4,null,null,3,6]", output: "false", explanation: "The root node's value is 5 but its right child's value is 4." },
+      {
+        input: "root = [5,1,4,null,null,3,6]",
+        output: "false",
+        explanation: "The root node's value is 5 but its right child's value is 4.",
+      },
     ],
-    constraints: ["The number of nodes in the tree is in the range [1, 10^4].", "-2^31 <= Node.val <= 2^31 - 1"],
+    constraints: [
+      "The number of nodes in the tree is in the range [1, 10^4].",
+      "-2^31 <= Node.val <= 2^31 - 1",
+    ],
     hints: [
       "Pass min/max bounds down the tree",
       "Left child must be < current, right child must be > current",
@@ -1341,42 +1409,16 @@ A valid BST is defined as follows:
     optimalComplexity: { time: "O(n)", space: "O(h)" },
     testCases: [
       { input: { root: [2, 1, 3] }, expected: true, description: "Valid BST" },
-      { input: { root: [5, 1, 4, null, null, 3, 6] }, expected: false, description: "Invalid - right subtree violation" },
-      { input: { root: [5, 4, 6, null, null, 3, 7] }, expected: false, description: "Invalid - 3 < 5 but in right subtree" },
-    ],
-  },
-  {
-    id: "dsa-kth-smallest-bst",
-    title: "Kth Smallest Element in a BST",
-    type: "dsa",
-    pattern: "trees",
-    difficulty: "medium",
-    companies: ["Amazon", "Meta", "Google", "Microsoft", "Uber", "LinkedIn"],
-    description: "Find the kth smallest element in a BST",
-    tags: ["binary-search-tree", "dfs", "inorder"],
-    estimatedTime: 20,
-    problemStatement: `Given the root of a binary search tree, and an integer k, return the kth smallest value (1-indexed) of all the values of the nodes in the tree.`,
-    examples: [
-      { input: "root = [3,1,4,null,2], k = 1", output: "1" },
-      { input: "root = [5,3,6,2,4,null,null,1], k = 3", output: "3" },
-    ],
-    constraints: ["The number of nodes in the tree is n.", "1 <= k <= n <= 10^4", "0 <= Node.val <= 10^4"],
-    hints: [
-      "Inorder traversal of BST gives sorted order",
-      "Stop early once you've found kth element",
-      "Can also use iterative approach with stack",
-      "Follow-up: augment tree with subtree sizes for O(h) queries",
-    ],
-    starterCode: {
-      javascript: `function kthSmallest(root, k) {\n  // Use inorder traversal\n}`,
-      typescript: `function kthSmallest(root: TreeNode | null, k: number): number {\n  // Use inorder traversal\n}`,
-      python: `def kthSmallest(root: Optional[TreeNode], k: int) -> int:\n    # Use inorder traversal\n    pass`,
-      java: `class Solution {\n    public int kthSmallest(TreeNode root, int k) {\n        // Use inorder traversal\n        return 0;\n    }\n}`,
-    },
-    optimalComplexity: { time: "O(H + k)", space: "O(H)" },
-    testCases: [
-      { input: { root: [3, 1, 4, null, 2], k: 1 }, expected: 1, description: "Smallest element" },
-      { input: { root: [5, 3, 6, 2, 4, null, null, 1], k: 3 }, expected: 3, description: "Third smallest" },
+      {
+        input: { root: [5, 1, 4, null, null, 3, 6] },
+        expected: false,
+        description: "Invalid - right subtree violation",
+      },
+      {
+        input: { root: [5, 4, 6, null, null, 3, 7] },
+        expected: false,
+        description: "Invalid - 3 < 5 but in right subtree",
+      },
     ],
   },
   {
@@ -1395,7 +1437,10 @@ A valid BST is defined as follows:
       { input: "root = [1]", output: "[[1]]" },
       { input: "root = []", output: "[]" },
     ],
-    constraints: ["The number of nodes in the tree is in the range [0, 2000].", "-100 <= Node.val <= 100"],
+    constraints: [
+      "The number of nodes in the tree is in the range [0, 2000].",
+      "-100 <= Node.val <= 100",
+    ],
     hints: [
       "Use BFS with level tracking",
       "Alternate direction each level",
@@ -1410,7 +1455,11 @@ A valid BST is defined as follows:
     },
     optimalComplexity: { time: "O(n)", space: "O(n)" },
     testCases: [
-      { input: { root: [3, 9, 20, null, null, 15, 7] }, expected: [[3], [20, 9], [15, 7]], description: "Standard zigzag" },
+      {
+        input: { root: [3, 9, 20, null, null, 15, 7] },
+        expected: [[3], [20, 9], [15, 7]],
+        description: "Standard zigzag",
+      },
       { input: { root: [1] }, expected: [[1]], description: "Single node" },
       { input: { root: [] }, expected: [], description: "Empty tree" },
     ],
@@ -1429,10 +1478,20 @@ A valid BST is defined as follows:
 
 You can return the answer in any order.`,
     examples: [
-      { input: "root = [3,5,1,6,2,0,8,null,null,7,4], target = 5, k = 2", output: "[7,4,1]", explanation: "Nodes at distance 2 from node 5 are 7, 4, and 1." },
+      {
+        input: "root = [3,5,1,6,2,0,8,null,null,7,4], target = 5, k = 2",
+        output: "[7,4,1]",
+        explanation: "Nodes at distance 2 from node 5 are 7, 4, and 1.",
+      },
       { input: "root = [1], target = 1, k = 3", output: "[]" },
     ],
-    constraints: ["The number of nodes in the tree is in the range [1, 500].", "0 <= Node.val <= 500", "All Node.val are unique.", "target is a value of a node in the tree.", "0 <= k <= 1000"],
+    constraints: [
+      "The number of nodes in the tree is in the range [1, 500].",
+      "0 <= Node.val <= 500",
+      "All Node.val are unique.",
+      "target is a value of a node in the tree.",
+      "0 <= k <= 1000",
+    ],
     hints: [
       "Convert tree to undirected graph (add parent pointers)",
       "Then BFS from target node for k levels",
@@ -1447,83 +1506,16 @@ You can return the answer in any order.`,
     },
     optimalComplexity: { time: "O(n)", space: "O(n)" },
     testCases: [
-      { input: { root: [3, 5, 1, 6, 2, 0, 8, null, null, 7, 4], target: 5, k: 2 }, expected: [7, 4, 1], description: "Multiple nodes at distance K" },
-      { input: { root: [1], target: 1, k: 3 }, expected: [], description: "No nodes at distance K" },
-    ],
-  },
-  {
-    id: "dsa-convert-sorted-array-bst",
-    title: "Convert Sorted Array to Binary Search Tree",
-    type: "dsa",
-    pattern: "trees",
-    difficulty: "easy",
-    companies: ["Amazon", "Meta", "Google", "Microsoft", "Apple"],
-    description: "Convert sorted array to height-balanced BST",
-    tags: ["binary-search-tree", "divide-conquer", "recursion"],
-    estimatedTime: 15,
-    problemStatement: `Given an integer array nums where the elements are sorted in ascending order, convert it to a height-balanced binary search tree.
-
-A height-balanced binary tree is a binary tree in which the depth of the two subtrees of every node never differs by more than one.`,
-    examples: [
-      { input: "nums = [-10,-3,0,5,9]", output: "[0,-3,9,-10,null,5]", explanation: "Any valid height-balanced BST is accepted." },
-      { input: "nums = [1,3]", output: "[3,1]", explanation: "[1,null,3] and [3,1] are both valid." },
-    ],
-    constraints: ["1 <= nums.length <= 10^4", "-10^4 <= nums[i] <= 10^4", "nums is sorted in strictly increasing order."],
-    hints: [
-      "Middle element becomes root for balance",
-      "Recursively build left subtree from left half",
-      "Recursively build right subtree from right half",
-      "Similar to binary search partitioning",
-    ],
-    starterCode: {
-      javascript: `function sortedArrayToBST(nums) {\n  // Build balanced BST\n}`,
-      typescript: `function sortedArrayToBST(nums: number[]): TreeNode | null {\n  // Build balanced BST\n}`,
-      python: `def sortedArrayToBST(nums: list[int]) -> Optional[TreeNode]:\n    # Build balanced BST\n    pass`,
-      java: `class Solution {\n    public TreeNode sortedArrayToBST(int[] nums) {\n        // Build balanced BST\n        return null;\n    }\n}`,
-    },
-    optimalComplexity: { time: "O(n)", space: "O(log n)" },
-    testCases: [
-      { input: { nums: [-10, -3, 0, 5, 9] }, expected: [0, -3, 9, -10, null, 5], description: "5 elements" },
-      { input: { nums: [1, 3] }, expected: [3, 1], description: "2 elements" },
-      { input: { nums: [1] }, expected: [1], description: "Single element" },
-    ],
-  },
-  {
-    id: "dsa-bst-iterator",
-    title: "Binary Search Tree Iterator",
-    type: "dsa",
-    pattern: "trees",
-    difficulty: "medium",
-    companies: ["Amazon", "Meta", "Google", "Microsoft", "LinkedIn", "Salesforce"],
-    description: "Implement an iterator over a BST with next() and hasNext()",
-    tags: ["binary-search-tree", "stack", "design", "iterator"],
-    estimatedTime: 25,
-    problemStatement: `Implement the BSTIterator class that represents an iterator over the in-order traversal of a binary search tree (BST):
-
-- BSTIterator(TreeNode root) Initializes the iterator with the root node of a BST.
-- boolean hasNext() Returns true if there exists a number in the traversal to the right of the pointer.
-- int next() Moves the pointer to the right, then returns the number at the pointer.
-
-Calls to hasNext and next should run in average O(1) time and use O(h) memory, where h is the height of the tree.`,
-    examples: [
-      { input: '["BSTIterator", "next", "next", "hasNext", "next", "hasNext", "next", "hasNext", "next", "hasNext"]\n[[[7, 3, 15, null, null, 9, 20]], [], [], [], [], [], [], [], [], []]', output: "[null, 3, 7, true, 9, true, 15, true, 20, false]" },
-    ],
-    constraints: ["The number of nodes in the tree is in the range [1, 10^5].", "0 <= Node.val <= 10^6", "At most 10^5 calls will be made to hasNext and next."],
-    hints: [
-      "Use a stack to simulate inorder traversal",
-      "Push all left children initially",
-      "On next(), pop top, push all left children of right child",
-      "This gives amortized O(1) and O(h) space",
-    ],
-    starterCode: {
-      javascript: `class BSTIterator {\n  constructor(root) {\n    // Initialize iterator\n  }\n\n  next() {\n    // Return next smallest\n  }\n\n  hasNext() {\n    // Check if more elements exist\n  }\n}`,
-      typescript: `class BSTIterator {\n  constructor(root: TreeNode | null) {\n    // Initialize iterator\n  }\n\n  next(): number {\n    // Return next smallest\n  }\n\n  hasNext(): boolean {\n    // Check if more elements exist\n  }\n}`,
-      python: `class BSTIterator:\n    def __init__(self, root: Optional[TreeNode]):\n        # Initialize iterator\n        pass\n\n    def next(self) -> int:\n        # Return next smallest\n        pass\n\n    def hasNext(self) -> bool:\n        # Check if more elements exist\n        pass`,
-      java: `class BSTIterator {\n    public BSTIterator(TreeNode root) {\n        // Initialize iterator\n    }\n\n    public int next() {\n        // Return next smallest\n        return 0;\n    }\n\n    public boolean hasNext() {\n        // Check if more elements exist\n        return false;\n    }\n}`,
-    },
-    optimalComplexity: { time: "O(1) avg per call", space: "O(h)" },
-    testCases: [
-      { input: { ops: ["BSTIterator", "next", "next", "hasNext", "next", "hasNext"], args: [[[7, 3, 15, null, null, 9, 20]], [], [], [], [], []] }, expected: [null, 3, 7, true, 9, true], description: "Iterator operations" },
+      {
+        input: { root: [3, 5, 1, 6, 2, 0, 8, null, null, 7, 4], target: 5, k: 2 },
+        expected: [7, 4, 1],
+        description: "Multiple nodes at distance K",
+      },
+      {
+        input: { root: [1], target: 1, k: 3 },
+        expected: [],
+        description: "No nodes at distance K",
+      },
     ],
   },
   {
@@ -1545,7 +1537,10 @@ The vertical order traversal of a binary tree is a list of top-to-bottom orderin
       { input: "root = [3,9,20,null,null,15,7]", output: "[[9],[3,15],[20],[7]]" },
       { input: "root = [1,2,3,4,5,6,7]", output: "[[4],[2],[1,5,6],[3],[7]]" },
     ],
-    constraints: ["The number of nodes in the tree is in the range [1, 1000].", "0 <= Node.val <= 1000"],
+    constraints: [
+      "The number of nodes in the tree is in the range [1, 1000].",
+      "0 <= Node.val <= 1000",
+    ],
     hints: [
       "Track (col, row, val) for each node",
       "Use BFS or DFS to traverse",
@@ -1560,8 +1555,16 @@ The vertical order traversal of a binary tree is a list of top-to-bottom orderin
     },
     optimalComplexity: { time: "O(n log n)", space: "O(n)" },
     testCases: [
-      { input: { root: [3, 9, 20, null, null, 15, 7] }, expected: [[9], [3, 15], [20], [7]], description: "Standard vertical traversal" },
-      { input: { root: [1, 2, 3, 4, 5, 6, 7] }, expected: [[4], [2], [1, 5, 6], [3], [7]], description: "Same position nodes sorted by value" },
+      {
+        input: { root: [3, 9, 20, null, null, 15, 7] },
+        expected: [[9], [3, 15], [20], [7]],
+        description: "Standard vertical traversal",
+      },
+      {
+        input: { root: [1, 2, 3, 4, 5, 6, 7] },
+        expected: [[4], [2], [1, 5, 6], [3], [7]],
+        description: "Same position nodes sorted by value",
+      },
     ],
   },
   {
@@ -1576,10 +1579,21 @@ The vertical order traversal of a binary tree is a list of top-to-bottom orderin
     estimatedTime: 30,
     problemStatement: `You are given the root of a binary search tree (BST), where the values of exactly two nodes of the tree were swapped by mistake. Recover the tree without changing its structure.`,
     examples: [
-      { input: "root = [1,3,null,null,2]", output: "[3,1,null,null,2]", explanation: "3 and 1 are swapped" },
-      { input: "root = [3,1,4,null,null,2]", output: "[2,1,4,null,null,3]", explanation: "2 and 3 are swapped" },
+      {
+        input: "root = [1,3,null,null,2]",
+        output: "[3,1,null,null,2]",
+        explanation: "3 and 1 are swapped",
+      },
+      {
+        input: "root = [3,1,4,null,null,2]",
+        output: "[2,1,4,null,null,3]",
+        explanation: "2 and 3 are swapped",
+      },
     ],
-    constraints: ["The number of nodes in the tree is in the range [2, 1000].", "-2^31 <= Node.val <= 2^31 - 1"],
+    constraints: [
+      "The number of nodes in the tree is in the range [2, 1000].",
+      "-2^31 <= Node.val <= 2^31 - 1",
+    ],
     hints: [
       "Inorder traversal should be sorted",
       "Find two nodes out of place",
@@ -1595,8 +1609,16 @@ The vertical order traversal of a binary tree is a list of top-to-bottom orderin
     },
     optimalComplexity: { time: "O(n)", space: "O(1) with Morris" },
     testCases: [
-      { input: { root: [1, 3, null, null, 2] }, expected: [3, 1, null, null, 2], description: "Adjacent swap" },
-      { input: { root: [3, 1, 4, null, null, 2] }, expected: [2, 1, 4, null, null, 3], description: "Non-adjacent swap" },
+      {
+        input: { root: [1, 3, null, null, 2] },
+        expected: [3, 1, null, null, 2],
+        description: "Adjacent swap",
+      },
+      {
+        input: { root: [3, 1, 4, null, null, 2] },
+        expected: [2, 1, 4, null, null, 3],
+        description: "Non-adjacent swap",
+      },
     ],
   },
 ]
