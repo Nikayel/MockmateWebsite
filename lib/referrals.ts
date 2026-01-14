@@ -6,9 +6,21 @@
  * - Track who referred who
  * - Calculate viral coefficient
  *
- * REWARDS (for referrer):
- * - 1 free month when someone signs up with your code
- * - $10 cash + 1 extra free month when your referral upgrades to Pro
+ * REWARDS:
+ * - $10 cash when someone signs up with your code (manual payout)
+ * - 1 free month when your referral upgrades to Pro (Stripe credit)
+ *
+ * ELIGIBILITY REQUIREMENTS:
+ * - Referred user must complete at least 1 session before $10 is payable
+ * - Account must be 7 days old before payout is processed
+ * - Max 10 referrals per user per month
+ * - Rewards expire after 90 days if not claimed
+ * - Rewards voided if referred user refunds within 14 days
+ *
+ * TERMS:
+ * - This is a beta program, we reserve the right to modify or terminate
+ * - We may void rewards if fraud or abuse is detected
+ * - Rewards are non-transferable
  */
 
 import { adminDb } from "./firebase-admin"
@@ -23,6 +35,13 @@ const generateCode = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 8)
 const SIGNUP_REWARD_MONTHS = 1 // 1 free month per signup
 const CONVERSION_REWARD_CASH = 10 // $10 when referral upgrades to Pro
 const CONVERSION_REWARD_MONTHS = 1 // 1 extra free month when referral upgrades
+
+// Eligibility & Limits
+const MIN_SESSIONS_FOR_REWARD = 1 // Referred user must complete 1 session
+const MIN_ACCOUNT_AGE_DAYS = 7 // Account must be 7 days old for payout
+const MAX_REFERRALS_PER_MONTH = 10 // Cap referrals per user per month
+const REWARD_EXPIRY_DAYS = 90 // Pending rewards expire after 90 days
+const REFUND_CLAWBACK_DAYS = 14 // Void rewards if refund within 14 days
 
 export interface ReferralRecord {
   referrerId: string
@@ -49,11 +68,15 @@ export interface ReferralReward {
   referredUserId: string
   type: "signup_credit" | "conversion_cash" | "conversion_credit"
   amount: number // $ for cash, months for credit
-  status: "pending" | "paid" | "credited" | "expired"
+  status: 'pending' | 'paid' | 'credited' | 'expired' | 'voided'
   createdAt: Date
   processedAt?: Date
   processedBy?: string // Admin who processed it
   notes?: string
+  // Eligibility tracking
+  eligibleAt?: Date // When reward becomes eligible for payout
+  expiresAt?: Date // When reward expires if not claimed
+  voidedReason?: string
 }
 
 export interface ReferralStats {
@@ -158,8 +181,29 @@ export async function getUserByReferralCode(code: string): Promise<string | null
 }
 
 /**
+ * Check if referrer has hit monthly referral cap
+ */
+async function checkMonthlyReferralCap(referrerId: string): Promise<boolean> {
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  const monthlyReferrals = await adminDb
+    .collection('referrals')
+    .where('referrerId', '==', referrerId)
+    .where('signupDate', '>=', startOfMonth)
+    .get()
+
+  return monthlyReferrals.size < MAX_REFERRALS_PER_MONTH
+}
+
+/**
  * Record a referral when a new user signs up with a referral code
  * Creates a $10 cash reward for the referrer (pending manual payout)
+ *
+ * Eligibility requirements:
+ * - Referrer must not have hit monthly cap (10/month)
+ * - Reward becomes eligible after 7 days
+ * - Reward expires after 90 days
  */
 export async function recordReferral(
   referredUserId: string,
@@ -192,6 +236,18 @@ export async function recordReferral(
       return false
     }
 
+    // Check monthly referral cap
+    const withinCap = await checkMonthlyReferralCap(referrerId)
+    if (!withinCap) {
+      logger.warn('Referrer has hit monthly cap', { referrerId, cap: MAX_REFERRALS_PER_MONTH })
+      return false
+    }
+
+    // Calculate eligibility and expiry dates
+    const now = new Date()
+    const eligibleAt = new Date(now.getTime() + MIN_ACCOUNT_AGE_DAYS * 24 * 60 * 60 * 1000)
+    const expiresAt = new Date(now.getTime() + REWARD_EXPIRY_DAYS * 24 * 60 * 60 * 1000)
+
     // Record the referral with reward tracking
     const referralRef = await adminDb.collection("referrals").add({
       referrerId,
@@ -209,8 +265,8 @@ export async function recordReferral(
       conversionRewardCredited: false,
     })
 
-    // Create the 1 free month signup reward (pending)
-    await adminDb.collection("referral_rewards").add({
+    // Create the $10 signup reward (pending with eligibility dates)
+    await adminDb.collection('referral_rewards').add({
       referrerId,
       referredUserId,
       referralId: referralRef.id,
@@ -218,31 +274,25 @@ export async function recordReferral(
       amount: SIGNUP_REWARD_MONTHS,
       status: "pending",
       createdAt: FieldValue.serverTimestamp(),
+      eligibleAt: eligibleAt,
+      expiresAt: expiresAt,
     })
 
     // Update referred user's profile
-    await adminDb.collection("users").doc(referredUserId).set(
-      {
-        referredBy: referrerId,
-        referredByCode: referralCode.toUpperCase(),
-        referredAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    )
+    await adminDb.collection('users').doc(referredUserId).update({
+      referredBy: referrerId,
+      referredByCode: referralCode.toUpperCase(),
+      referredAt: FieldValue.serverTimestamp(),
+    })
 
-    // Increment referrer's count and pending free months
-    await adminDb
-      .collection("users")
-      .doc(referrerId)
-      .set(
-        {
-          referralCount: FieldValue.increment(1),
-          pendingFreeMonths: FieldValue.increment(SIGNUP_REWARD_MONTHS),
-        },
-        { merge: true }
-      )
+    // Increment referrer's count and pending rewards
+    await adminDb.collection('users').doc(referrerId).update({
+      referralCount: FieldValue.increment(1),
+      referralCountThisMonth: FieldValue.increment(1),
+      pendingCashRewards: FieldValue.increment(SIGNUP_REWARD_CASH),
+    })
 
-    logger.info("Referral recorded with 1 free month reward", {
+    logger.info('Referral recorded with $10 reward', {
       referrerId,
       referredUserId,
       referralCode,
@@ -281,8 +331,13 @@ export async function markReferralConverted(referredUserId: string): Promise<voi
       convertedDate: FieldValue.serverTimestamp(),
     })
 
-    // Create the $10 cash reward (pending manual payout)
-    await adminDb.collection("referral_rewards").add({
+    // Calculate expiry date for credit reward
+    const now = new Date()
+    const expiresAt = new Date(now.getTime() + REWARD_EXPIRY_DAYS * 24 * 60 * 60 * 1000)
+
+    // Create the free month credit reward (pending)
+    // This will be applied when admin processes it, or auto-applied via Stripe
+    await adminDb.collection('referral_rewards').add({
       referrerId,
       referredUserId,
       referralId: doc.id,
@@ -290,6 +345,8 @@ export async function markReferralConverted(referredUserId: string): Promise<voi
       amount: CONVERSION_REWARD_CASH,
       status: "pending",
       createdAt: FieldValue.serverTimestamp(),
+      eligibleAt: now, // Conversion credits are immediately eligible
+      expiresAt: expiresAt,
     })
 
     // Create the 1 extra free month credit reward (pending)
@@ -325,6 +382,163 @@ export async function markReferralConverted(referredUserId: string): Promise<voi
   } catch (error) {
     logger.error("Failed to mark referral converted", { error, referredUserId })
   }
+}
+
+/**
+ * Void all rewards for a referred user (called on refund)
+ * This is used for refund clawback within the clawback window
+ */
+export async function voidReferralRewards(
+  referredUserId: string,
+  reason: string
+): Promise<void> {
+  try {
+    // Find all rewards for this referred user
+    const rewardsSnapshot = await adminDb
+      .collection('referral_rewards')
+      .where('referredUserId', '==', referredUserId)
+      .where('status', '==', 'pending')
+      .get()
+
+    if (rewardsSnapshot.empty) {
+      logger.info('No pending rewards to void', { referredUserId })
+      return
+    }
+
+    // Void each reward
+    for (const doc of rewardsSnapshot.docs) {
+      const data = doc.data()
+
+      await doc.ref.update({
+        status: 'voided',
+        voidedReason: reason,
+        processedAt: FieldValue.serverTimestamp(),
+      })
+
+      // Decrement referrer's pending amounts
+      if (data.type === 'signup_cash') {
+        await adminDb.collection('users').doc(data.referrerId).update({
+          pendingCashRewards: FieldValue.increment(-data.amount),
+        })
+      } else if (data.type === 'conversion_credit') {
+        await adminDb.collection('users').doc(data.referrerId).update({
+          pendingFreeMonths: FieldValue.increment(-data.amount),
+        })
+      }
+
+      logger.info('Referral reward voided', {
+        rewardId: doc.id,
+        type: data.type,
+        amount: data.amount,
+        referrerId: data.referrerId,
+        referredUserId,
+        reason,
+      })
+    }
+  } catch (error) {
+    logger.error('Failed to void referral rewards', { error, referredUserId })
+  }
+}
+
+/**
+ * Check if a reward is eligible for payout
+ * Requirements:
+ * - Account must be MIN_ACCOUNT_AGE_DAYS old
+ * - Referred user must have completed MIN_SESSIONS_FOR_REWARD sessions
+ * - Reward must not be expired
+ */
+export async function checkRewardEligibility(rewardId: string): Promise<{
+  eligible: boolean
+  reason?: string
+}> {
+  try {
+    const rewardDoc = await adminDb.collection('referral_rewards').doc(rewardId).get()
+    if (!rewardDoc.exists) {
+      return { eligible: false, reason: 'Reward not found' }
+    }
+
+    const data = rewardDoc.data()!
+    const now = new Date()
+
+    // Check if expired
+    if (data.expiresAt && data.expiresAt.toDate() < now) {
+      return { eligible: false, reason: 'Reward has expired' }
+    }
+
+    // Check if eligible date has passed
+    if (data.eligibleAt && data.eligibleAt.toDate() > now) {
+      const daysRemaining = Math.ceil((data.eligibleAt.toDate().getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
+      return { eligible: false, reason: `${daysRemaining} days until eligible` }
+    }
+
+    // For signup cash rewards, check if referred user completed a session
+    if (data.type === 'signup_cash') {
+      const sessionsSnapshot = await adminDb
+        .collection('sessions')
+        .where('userId', '==', data.referredUserId)
+        .where('status', '==', 'completed')
+        .limit(MIN_SESSIONS_FOR_REWARD)
+        .get()
+
+      if (sessionsSnapshot.size < MIN_SESSIONS_FOR_REWARD) {
+        return {
+          eligible: false,
+          reason: `Referred user needs ${MIN_SESSIONS_FOR_REWARD - sessionsSnapshot.size} more session(s)`,
+        }
+      }
+    }
+
+    return { eligible: true }
+  } catch (error) {
+    logger.error('Failed to check reward eligibility', { error, rewardId })
+    return { eligible: false, reason: 'Error checking eligibility' }
+  }
+}
+
+/**
+ * Expire old pending rewards (run periodically)
+ */
+export async function expireOldRewards(): Promise<number> {
+  let expiredCount = 0
+
+  try {
+    const now = new Date()
+    const expiredSnapshot = await adminDb
+      .collection('referral_rewards')
+      .where('status', '==', 'pending')
+      .where('expiresAt', '<', now)
+      .get()
+
+    for (const doc of expiredSnapshot.docs) {
+      const data = doc.data()
+
+      await doc.ref.update({
+        status: 'expired',
+        processedAt: FieldValue.serverTimestamp(),
+      })
+
+      // Decrement referrer's pending amounts
+      if (data.type === 'signup_cash') {
+        await adminDb.collection('users').doc(data.referrerId).update({
+          pendingCashRewards: FieldValue.increment(-data.amount),
+        })
+      } else if (data.type === 'conversion_credit') {
+        await adminDb.collection('users').doc(data.referrerId).update({
+          pendingFreeMonths: FieldValue.increment(-data.amount),
+        })
+      }
+
+      expiredCount++
+    }
+
+    if (expiredCount > 0) {
+      logger.info('Expired old referral rewards', { count: expiredCount })
+    }
+  } catch (error) {
+    logger.error('Failed to expire old rewards', { error })
+  }
+
+  return expiredCount
 }
 
 /**

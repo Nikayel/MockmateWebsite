@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MetricCard } from "@/components/admin/charts"
+import { PageHeader } from "@/components/admin/shared"
 import { Progress } from "@/components/ui/progress"
 import {
   ThumbsUp,
@@ -13,7 +14,6 @@ import {
   Users,
   Share2,
   TrendingUp,
-  RefreshCw,
   Loader2,
   AlertCircle,
   Meh,
@@ -24,6 +24,13 @@ import {
   Gift,
   Check,
 } from "lucide-react"
+import {
+  typography,
+  spacing,
+  cardStyles,
+  tableStyles,
+  badgeVariants,
+} from "@/lib/admin/design-system"
 
 interface NPSData {
   stats: {
@@ -208,7 +215,7 @@ export default function GrowthPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-12 w-12 animate-spin text-[#00d9ff]" />
+        <Loader2 className="h-10 w-10 animate-spin text-[#00d9ff]" />
       </div>
     )
   }
@@ -216,11 +223,14 @@ export default function GrowthPage() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <AlertCircle className="h-12 w-12 text-red-400" />
-        <p className="text-red-400">{error}</p>
-        <Button onClick={() => loadData()} variant="outline">
-          Retry
-        </Button>
+        <AlertCircle className="h-10 w-10 text-red-400" />
+        <p className="text-red-400 text-sm">{error}</p>
+        <button
+          onClick={() => loadData()}
+          className="text-sm text-gray-400 hover:text-white underline"
+        >
+          Try again
+        </button>
       </div>
     )
   }
@@ -231,33 +241,18 @@ export default function GrowthPage() {
   const detractorPercent = totalResponses > 0 ? (npsData?.stats.detractors || 0) / totalResponses * 100 : 0
 
   return (
-    <div className="space-y-8">
+    <div className={spacing.pageGap}>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-heading font-bold text-white">Growth Metrics</h1>
-          <p className="text-gray-400 mt-1">NPS scores and referral tracking</p>
-        </div>
-
-        <Button
-          onClick={loadData}
-          variant="outline"
-          size="sm"
-          disabled={refreshing}
-          className="border-gray-700 text-gray-400 hover:text-white"
-        >
-          {refreshing ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4 mr-2" />
-          )}
-          Refresh
-        </Button>
-      </div>
+      <PageHeader
+        title="Growth Metrics"
+        subtitle="NPS scores and referral tracking"
+        onRefresh={loadData}
+        refreshing={refreshing}
+      />
 
       {/* NPS Section */}
-      <div className="space-y-6">
-        <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+      <div className={spacing.sectionGap}>
+        <h2 className={typography.sectionTitle}>
           <MessageSquare className="h-5 w-5 text-[#00d9ff]" />
           Net Promoter Score (NPS)
         </h2>
@@ -293,10 +288,10 @@ export default function GrowthPage() {
         </div>
 
         {/* NPS Distribution */}
-        <Card className="bg-gray-900/50 border-gray-800">
-          <CardHeader>
-            <CardTitle className="text-white">Response Distribution</CardTitle>
-            <CardDescription>Promoters (9-10), Passives (7-8), Detractors (0-6)</CardDescription>
+        <Card className={cardStyles.default}>
+          <CardHeader className="pb-4">
+            <CardTitle className={typography.cardTitle}>Response Distribution</CardTitle>
+            <CardDescription className={typography.cardDescription}>Promoters (9-10), Passives (7-8), Detractors (0-6)</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-4">
@@ -353,9 +348,9 @@ export default function GrowthPage() {
         </Card>
 
         {/* Recent NPS Responses */}
-        <Card className="bg-gray-900/50 border-gray-800">
-          <CardHeader>
-            <CardTitle className="text-white">Recent Responses</CardTitle>
+        <Card className={cardStyles.default}>
+          <CardHeader className="pb-4">
+            <CardTitle className={typography.cardTitle}>Recent Responses</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -385,8 +380,8 @@ export default function GrowthPage() {
       </div>
 
       {/* Referral Section */}
-      <div className="space-y-6">
-        <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+      <div className={spacing.sectionGap}>
+        <h2 className={typography.sectionTitle}>
           <Share2 className="h-5 w-5 text-purple-400" />
           Referral Program
         </h2>
@@ -422,31 +417,31 @@ export default function GrowthPage() {
         </div>
 
         {/* Top Referrers */}
-        <Card className="bg-gray-900/50 border-gray-800">
-          <CardHeader>
-            <CardTitle className="text-white">Top Referrers</CardTitle>
-            <CardDescription>Users who have referred the most people</CardDescription>
+        <Card className={cardStyles.default}>
+          <CardHeader className="pb-4">
+            <CardTitle className={typography.cardTitle}>Top Referrers</CardTitle>
+            <CardDescription className={typography.cardDescription}>Users who have referred the most people</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className={tableStyles.container}>
+              <table className={tableStyles.table}>
                 <thead>
-                  <tr className="border-b border-gray-800 text-gray-400">
-                    <th className="text-left py-2 px-3">#</th>
-                    <th className="text-left py-2 px-3">Email</th>
-                    <th className="text-right py-2 px-3">Referrals</th>
-                    <th className="text-right py-2 px-3">Conversions</th>
-                    <th className="text-right py-2 px-3">Conv. Rate</th>
+                  <tr className={tableStyles.headerRow}>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>#</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Email</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Referrals</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Conversions</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Conv. Rate</th>
                   </tr>
                 </thead>
                 <tbody>
                   {referralData?.topReferrers.slice(0, 10).map((referrer, idx) => (
-                    <tr key={referrer.userId} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                      <td className="py-2 px-3 text-gray-500">{idx + 1}</td>
-                      <td className="py-2 px-3 text-gray-300">{referrer.email}</td>
-                      <td className="py-2 px-3 text-right text-white font-medium">{referrer.referralCount}</td>
-                      <td className="py-2 px-3 text-right text-green-400">{referrer.conversions}</td>
-                      <td className="py-2 px-3 text-right text-gray-400">
+                    <tr key={referrer.userId} className={tableStyles.row}>
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>{idx + 1}</td>
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCell}`}>{referrer.email}</td>
+                      <td className={`${spacing.tableCellPadding} text-right text-white font-medium tabular-nums`}>{referrer.referralCount}</td>
+                      <td className={`${spacing.tableCellPadding} text-right text-green-400 tabular-nums`}>{referrer.conversions}</td>
+                      <td className={`${spacing.tableCellPadding} text-right ${typography.tableCellMuted} tabular-nums`}>
                         {referrer.referralCount > 0
                           ? `${(referrer.conversions / referrer.referralCount * 100).toFixed(0)}%`
                           : '-'
@@ -457,60 +452,60 @@ export default function GrowthPage() {
                 </tbody>
               </table>
               {(!referralData?.topReferrers || referralData.topReferrers.length === 0) && (
-                <p className="text-center text-gray-500 py-8">No referrals yet</p>
+                <p className={tableStyles.emptyState}>No referrals yet</p>
               )}
             </div>
           </CardContent>
         </Card>
 
         {/* All Referrals - Detailed View */}
-        <Card className="bg-gray-900/50 border-gray-800">
-          <CardHeader>
-            <CardTitle className="text-white">All Referrals</CardTitle>
-            <CardDescription>Who referred who, signup status, and reward tracking</CardDescription>
+        <Card className={cardStyles.default}>
+          <CardHeader className="pb-4">
+            <CardTitle className={typography.cardTitle}>All Referrals</CardTitle>
+            <CardDescription className={typography.cardDescription}>Who referred who, signup status, and reward tracking</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className={tableStyles.container}>
+              <table className={tableStyles.table}>
                 <thead>
-                  <tr className="border-b border-gray-800 text-gray-400">
-                    <th className="text-left py-2 px-3">Referrer</th>
-                    <th className="text-left py-2 px-3">Referred</th>
-                    <th className="text-left py-2 px-3">Code</th>
-                    <th className="text-left py-2 px-3">Signed Up</th>
-                    <th className="text-center py-2 px-3">Pro?</th>
-                    <th className="text-center py-2 px-3">$10 Owed</th>
-                    <th className="text-center py-2 px-3">Free Month</th>
+                  <tr className={tableStyles.headerRow}>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Referrer</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Referred</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Code</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Signed Up</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-center`}>Pro?</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-center`}>$10 Owed</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-center`}>Free Month</th>
                   </tr>
                 </thead>
                 <tbody>
                   {referralData?.detailedReferrals?.map((ref) => (
-                    <tr key={ref.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                      <td className="py-2 px-3 text-white">{ref.referrerEmail}</td>
-                      <td className="py-2 px-3 text-gray-300">{ref.referredEmail}</td>
-                      <td className="py-2 px-3 font-mono text-xs text-gray-500">{ref.referralCode}</td>
-                      <td className="py-2 px-3 text-gray-400">
+                    <tr key={ref.id} className={tableStyles.row}>
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCell}`}>{ref.referrerEmail}</td>
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>{ref.referredEmail}</td>
+                      <td className={`${spacing.tableCellPadding} font-mono text-xs ${typography.tableCellMuted}`}>{ref.referralCode}</td>
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
                         {new Date(ref.signupDate).toLocaleDateString()}
                       </td>
-                      <td className="py-2 px-3 text-center">
+                      <td className={`${spacing.tableCellPadding} text-center`}>
                         {ref.convertedToPro ? (
-                          <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Pro</Badge>
+                          <Badge className={badgeVariants.success}>Pro</Badge>
                         ) : (
-                          <Badge variant="outline" className="text-gray-500 border-gray-700">Free</Badge>
+                          <Badge variant="outline" className={badgeVariants.muted}>Free</Badge>
                         )}
                       </td>
-                      <td className="py-2 px-3 text-center">
+                      <td className={`${spacing.tableCellPadding} text-center`}>
                         {ref.signupRewardStatus === 'paid' ? (
-                          <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Paid</Badge>
+                          <Badge className={badgeVariants.success}>Paid</Badge>
                         ) : (
-                          <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Owe $10</Badge>
+                          <Badge className={badgeVariants.warning}>Owe $10</Badge>
                         )}
                       </td>
-                      <td className="py-2 px-3 text-center">
+                      <td className={`${spacing.tableCellPadding} text-center`}>
                         {ref.conversionRewardStatus === 'credited' ? (
-                          <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">Credited</Badge>
+                          <Badge className={badgeVariants.purple}>Credited</Badge>
                         ) : ref.conversionRewardStatus === 'pending' ? (
-                          <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Pending</Badge>
+                          <Badge className={badgeVariants.warning}>Pending</Badge>
                         ) : (
                           <span className="text-gray-600">—</span>
                         )}
@@ -520,7 +515,7 @@ export default function GrowthPage() {
                 </tbody>
               </table>
               {(!referralData?.detailedReferrals || referralData.detailedReferrals.length === 0) && (
-                <p className="text-center text-gray-500 py-8">No referrals yet</p>
+                <p className={tableStyles.emptyState}>No referrals yet</p>
               )}
             </div>
           </CardContent>
@@ -528,9 +523,9 @@ export default function GrowthPage() {
 
         {/* Weekly Trend */}
         {referralData?.weeklyTrend && referralData.weeklyTrend.length > 0 && (
-          <Card className="bg-gray-900/50 border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-white">Weekly Referral Trend</CardTitle>
+          <Card className={cardStyles.default}>
+            <CardHeader className="pb-4">
+              <CardTitle className={typography.cardTitle}>Weekly Referral Trend</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -548,8 +543,8 @@ export default function GrowthPage() {
       </div>
 
       {/* Rewards Management Section */}
-      <div className="space-y-6">
-        <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+      <div className={spacing.sectionGap}>
+        <h2 className={typography.sectionTitle}>
           <Gift className="h-5 w-5 text-yellow-400" />
           Rewards Management
         </h2>
@@ -573,36 +568,36 @@ export default function GrowthPage() {
         </div>
 
         {/* Cash Rewards Table */}
-        <Card className="bg-gray-900/50 border-gray-800">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
+        <Card className={cardStyles.default}>
+          <CardHeader className="pb-4">
+            <CardTitle className={typography.cardTitle}>
               <DollarSign className="h-5 w-5 text-green-400" />
               Pending Cash Rewards ($10 per signup)
             </CardTitle>
-            <CardDescription>Manual PayPal payouts to referrers</CardDescription>
+            <CardDescription className={typography.cardDescription}>Manual PayPal payouts to referrers</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className={tableStyles.container}>
+              <table className={tableStyles.table}>
                 <thead>
-                  <tr className="border-b border-gray-800 text-gray-400">
-                    <th className="text-left py-2 px-3">Referrer</th>
-                    <th className="text-left py-2 px-3">Referred User</th>
-                    <th className="text-right py-2 px-3">Amount</th>
-                    <th className="text-left py-2 px-3">Date</th>
-                    <th className="text-right py-2 px-3">Action</th>
+                  <tr className={tableStyles.headerRow}>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Referrer</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Referred User</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Amount</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Date</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rewardsData?.cashRewards.map((reward) => (
-                    <tr key={reward.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                      <td className="py-3 px-3 text-white">{reward.referrerEmail}</td>
-                      <td className="py-3 px-3 text-gray-400">{reward.referredEmail}</td>
-                      <td className="py-3 px-3 text-right text-green-400 font-medium">${reward.amount}</td>
-                      <td className="py-3 px-3 text-gray-500">
+                    <tr key={reward.id} className={tableStyles.row}>
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCell}`}>{reward.referrerEmail}</td>
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>{reward.referredEmail}</td>
+                      <td className={`${spacing.tableCellPadding} text-right text-green-400 font-medium tabular-nums`}>${reward.amount}</td>
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
                         {new Date(reward.createdAt).toLocaleDateString()}
                       </td>
-                      <td className="py-3 px-3 text-right">
+                      <td className={`${spacing.tableCellPadding} text-right`}>
                         <Button
                           size="sm"
                           variant="outline"
@@ -625,45 +620,45 @@ export default function GrowthPage() {
                 </tbody>
               </table>
               {(!rewardsData?.cashRewards || rewardsData.cashRewards.length === 0) && (
-                <p className="text-center text-gray-500 py-8">No pending cash rewards</p>
+                <p className={tableStyles.emptyState}>No pending cash rewards</p>
               )}
             </div>
           </CardContent>
         </Card>
 
         {/* Credit Rewards Table */}
-        <Card className="bg-gray-900/50 border-gray-800">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
+        <Card className={cardStyles.default}>
+          <CardHeader className="pb-4">
+            <CardTitle className={typography.cardTitle}>
               <Gift className="h-5 w-5 text-purple-400" />
               Pending Free Month Credits
             </CardTitle>
-            <CardDescription>1 free month when referred user upgrades to Pro</CardDescription>
+            <CardDescription className={typography.cardDescription}>1 free month when referred user upgrades to Pro</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className={tableStyles.container}>
+              <table className={tableStyles.table}>
                 <thead>
-                  <tr className="border-b border-gray-800 text-gray-400">
-                    <th className="text-left py-2 px-3">Referrer</th>
-                    <th className="text-left py-2 px-3">Converted User</th>
-                    <th className="text-right py-2 px-3">Credit</th>
-                    <th className="text-left py-2 px-3">Date</th>
-                    <th className="text-right py-2 px-3">Action</th>
+                  <tr className={tableStyles.headerRow}>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Referrer</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Converted User</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Credit</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Date</th>
+                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rewardsData?.creditRewards.map((reward) => (
-                    <tr key={reward.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                      <td className="py-3 px-3 text-white">{reward.referrerEmail}</td>
-                      <td className="py-3 px-3 text-gray-400">{reward.referredEmail}</td>
-                      <td className="py-3 px-3 text-right text-purple-400 font-medium">
+                    <tr key={reward.id} className={tableStyles.row}>
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCell}`}>{reward.referrerEmail}</td>
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>{reward.referredEmail}</td>
+                      <td className={`${spacing.tableCellPadding} text-right text-purple-400 font-medium tabular-nums`}>
                         {reward.amount} month{reward.amount > 1 ? 's' : ''}
                       </td>
-                      <td className="py-3 px-3 text-gray-500">
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
                         {new Date(reward.createdAt).toLocaleDateString()}
                       </td>
-                      <td className="py-3 px-3 text-right">
+                      <td className={`${spacing.tableCellPadding} text-right`}>
                         <Button
                           size="sm"
                           variant="outline"
@@ -686,7 +681,7 @@ export default function GrowthPage() {
                 </tbody>
               </table>
               {(!rewardsData?.creditRewards || rewardsData.creditRewards.length === 0) && (
-                <p className="text-center text-gray-500 py-8">No pending free month credits</p>
+                <p className={tableStyles.emptyState}>No pending free month credits</p>
               )}
             </div>
           </CardContent>

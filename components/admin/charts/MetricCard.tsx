@@ -8,6 +8,12 @@ import {
   Line,
   ResponsiveContainer,
 } from "recharts"
+import {
+  typography,
+  spacing,
+  cardStyles,
+  iconSizes,
+} from "@/lib/admin/design-system"
 
 interface MetricCardProps {
   title: string
@@ -21,6 +27,7 @@ interface MetricCardProps {
   sparklineData?: number[]
   sparklineColor?: string
   loading?: boolean
+  className?: string
 }
 
 export function MetricCard({
@@ -35,15 +42,16 @@ export function MetricCard({
   sparklineData,
   sparklineColor = "#00d9ff",
   loading = false,
+  className,
 }: MetricCardProps) {
   const getTrendIcon = () => {
     if (change === undefined || change === 0) {
-      return <Minus className="h-3 w-3 text-gray-500" />
+      return <Minus className={`${iconSizes.xs} text-gray-500`} />
     }
     return change > 0 ? (
-      <TrendingUp className="h-3 w-3 text-green-400" />
+      <TrendingUp className={`${iconSizes.xs} text-green-400`} />
     ) : (
-      <TrendingDown className="h-3 w-3 text-red-400" />
+      <TrendingDown className={`${iconSizes.xs} text-red-400`} />
     )
   }
 
@@ -57,11 +65,11 @@ export function MetricCard({
 
   if (loading) {
     return (
-      <Card className="bg-gray-900/50 border-gray-800">
-        <CardContent className="p-6">
+      <Card className={cn(cardStyles.default, className)}>
+        <CardContent className={spacing.cardPadding}>
           <div className="animate-pulse">
             <div className="h-4 w-24 bg-gray-700 rounded mb-3" />
-            <div className="h-8 w-32 bg-gray-700 rounded mb-2" />
+            <div className="h-9 w-32 bg-gray-700 rounded mb-2" />
             <div className="h-3 w-20 bg-gray-700 rounded" />
           </div>
         </CardContent>
@@ -70,38 +78,40 @@ export function MetricCard({
   }
 
   return (
-    <Card className="bg-gray-900/50 border-gray-800 hover:border-gray-700 transition-colors">
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              {Icon && <Icon className={cn("h-4 w-4", iconColor)} />}
-              <span className="text-sm font-medium text-gray-400">{title}</span>
+    <Card className={cn(cardStyles.interactive, className)}>
+      <CardContent className={spacing.cardPadding}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            {/* Header with icon and title */}
+            <div className="flex items-center gap-2 mb-2">
+              {Icon && <Icon className={cn(iconSizes.sm, iconColor)} />}
+              <span className={typography.metricLabel}>{title}</span>
             </div>
 
-            <div className={cn("text-3xl font-bold mb-1", valueColor)}>
+            {/* Value */}
+            <div className={cn(typography.metricValue, valueColor, "mb-1")}>
               {typeof value === "number" ? value.toLocaleString() : value}
             </div>
 
-            <div className="flex items-center gap-2">
-              {change !== undefined && (
+            {/* Subtitle or Change indicator */}
+            <div className="flex items-center gap-2 min-h-[1.25rem]">
+              {change !== undefined ? (
                 <div className={cn("flex items-center gap-1 text-sm", getTrendColor())}>
                   {getTrendIcon()}
-                  <span>{Math.abs(change).toFixed(1)}%</span>
+                  <span className="font-medium">{Math.abs(change).toFixed(1)}%</span>
                   {changeLabel && (
-                    <span className="text-gray-500">{changeLabel}</span>
+                    <span className={typography.metricSubtext}>{changeLabel}</span>
                   )}
                 </div>
-              )}
-              {subtitle && !change && (
-                <span className="text-sm text-gray-500">{subtitle}</span>
-              )}
+              ) : subtitle ? (
+                <span className={typography.metricSubtext}>{subtitle}</span>
+              ) : null}
             </div>
           </div>
 
           {/* Sparkline */}
           {sparklineData && sparklineData.length > 1 && (
-            <div className="w-20 h-12">
+            <div className="w-20 h-12 flex-shrink-0">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData}>
                   <Line
