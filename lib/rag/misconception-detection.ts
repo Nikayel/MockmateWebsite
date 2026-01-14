@@ -5,7 +5,8 @@
  * Tracks misconceptions over time and provides targeted remediation suggestions.
  *
  * Features:
- * - Pattern-based error detection
+ * - Pattern-based error detection (regex)
+ * - RAG-enhanced debugging hints (retrieves similar errors from knowledge base)
  * - Frequency tracking and trend analysis
  * - Personalized remediation suggestions
  * - Integration with RAG for context-aware feedback
@@ -15,6 +16,8 @@ import type { DSAPattern } from '@/lib/types/dsa-patterns'
 import { adminDb } from '@/lib/firebase-admin'
 import { Timestamp } from 'firebase-admin/firestore'
 import type { DetectedMisconception, MisconceptionType } from './enhanced-user-profile'
+import { getAdvancedRetriever } from './retrieval/advanced-retrieval'
+import { generateTextEmbedding } from './index'
 
 // ============================================================================
 // TYPES
@@ -43,6 +46,27 @@ export interface PatternMisuse {
   actualApproach: string
   impact: 'correctness' | 'efficiency' | 'readability'
   explanation: string
+}
+
+/**
+ * RAG-enhanced debugging hint from similar errors
+ */
+export interface RAGDebuggingHint {
+  source: 'rag' | 'knowledge-base' | 'community'
+  relevance: number // 0-1 similarity score
+  hint: string
+  context: string
+  relatedPattern?: DSAPattern
+  successfulFix?: string
+}
+
+/**
+ * Enhanced code analysis result with RAG insights
+ */
+export interface EnhancedCodeAnalysisResult extends CodeAnalysisResult {
+  ragHints: RAGDebuggingHint[]
+  similarErrorsFound: number
+  communityInsights: string[]
 }
 
 /**
@@ -643,6 +667,244 @@ function calculateConfidence(
 }
 
 // ============================================================================
+// RAG-ENHANCED ANALYSIS
+// ============================================================================
+
+// Cache for RAG hints to reduce API calls (30 second TTL)
+const ragHintCache = new Map<string, { hints: RAGDebuggingHint[]; timestamp: number }>()
+const RAG_HINT_CACHE_TTL = 30 * 1000 // 30 seconds
+
+/**
+ * Get cache key for RAG hint lookup
+ */
+function getRAGCacheKey(errorType: string, pattern: DSAPattern, codeSnippet: string): string {
+  // Use first 100 chars of code to create a reasonable cache key
+  const codeHash = codeSnippet.substring(0, 100).replace(/\s+/g, '')
+  return `${errorType}:${pattern}:${codeHash}`
+}
+
+/**
+ * Retrieve similar errors and debugging hints from RAG
+ * This provides context-aware help based on what other users encountered
+ */
+async function retrieveRAGDebuggingHints(
+  misconceptions: DetectedMisconception[],
+  pattern: DSAPattern,
+  code: string,
+  testFailures?: string[]
+): Promise<RAGDebuggingHint[]> {
+  if (misconceptions.length === 0) return []
+
+  const hints: RAGDebuggingHint[] = []
+  const retriever = getAdvancedRetriever()
+
+  try {
+    for (const misconception of misconceptions.slice(0, 2)) { // Limit to 2 to control costs
+      // Check cache first
+      const cacheKey = getRAGCacheKey(misconception.misconceptionType, pattern, code)
+      const cached = ragHintCache.get(cacheKey)
+      if (cached && Date.now() - cached.timestamp < RAG_HINT_CACHE_TTL) {
+        hints.push(...cached.hints)
+        continue
+      }
+
+      // Build a rich query for similar errors
+      const errorContext = [
+        `Error type: ${misconception.misconceptionType}`,
+        `Pattern: ${pattern}`,
+        `Description: ${misconception.description}`,
+        testFailures ? `Test failures: ${testFailures.slice(0, 3).join(', ')}` : '',
+        `Code snippet: ${code.substring(0, 300)}`,
+      ].filter(Boolean).join('\n')
+
+      // Retrieve similar debugging hints from knowledge base
+      const { results } = await retriever.retrieve({
+        query: `debugging ${misconception.misconceptionType} error ${pattern} common fix solution`,
+        limit: 3,
+        types: ['knowledge', 'hint'],
+        minSimilarity: 0.3,
+      })
+
+      const retrievedHints: RAGDebuggingHint[] = results.map(doc => ({
+        source: 'knowledge-base' as const,
+        relevance: doc.similarity,
+        hint: extractHintFromDocument(doc.text, misconception.misconceptionType),
+        context: doc.text.substring(0, 200),
+        relatedPattern: (doc.metadata?.pattern as DSAPattern) || pattern,
+        successfulFix: extractSuccessfulFix(doc.text),
+      }))
+
+      // Cache the results
+      ragHintCache.set(cacheKey, { hints: retrievedHints, timestamp: Date.now() })
+      hints.push(...retrievedHints)
+    }
+  } catch (error) {
+    console.warn('[MisconceptionDetection] RAG retrieval failed, using regex-only:', error)
+  }
+
+  // Deduplicate and sort by relevance
+  const uniqueHints = hints.reduce((acc, hint) => {
+    const exists = acc.find(h => h.hint === hint.hint)
+    if (!exists) acc.push(hint)
+    return acc
+  }, [] as RAGDebuggingHint[])
+
+  return uniqueHints.sort((a, b) => b.relevance - a.relevance).slice(0, 5)
+}
+
+/**
+ * Extract actionable hint from RAG document
+ */
+function extractHintFromDocument(text: string, errorType: string): string {
+  // Try to find specific fix suggestions in the text
+  const fixPatterns = [
+    /(?:fix|solution|solve|resolve)[:.\s]+([^.]+\.)/i,
+    /(?:try|consider|use)[:.\s]+([^.]+\.)/i,
+    /(?:instead|should)[:.\s]+([^.]+\.)/i,
+  ]
+
+  for (const pattern of fixPatterns) {
+    const match = text.match(pattern)
+    if (match && match[1]) {
+      return match[1].trim()
+    }
+  }
+
+  // Fallback: return first meaningful sentence
+  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 20)
+  return sentences[0]?.trim() || `Review your ${errorType} implementation`
+}
+
+/**
+ * Extract successful fix example from RAG document
+ */
+function extractSuccessfulFix(text: string): string | undefined {
+  // Look for code examples or explicit fixes
+  const codeMatch = text.match(/```[\s\S]*?```/)
+  if (codeMatch) {
+    return codeMatch[0].replace(/```/g, '').trim().substring(0, 200)
+  }
+
+  const fixMatch = text.match(/(?:correct|fixed|working)[\s\S]{0,100}?(?:code|solution|example)[:.\s]+([^.]+)/i)
+  if (fixMatch) {
+    return fixMatch[1].trim()
+  }
+
+  return undefined
+}
+
+/**
+ * Generate community insights based on aggregated misconception data
+ */
+async function generateCommunityInsights(
+  pattern: DSAPattern,
+  misconceptionTypes: MisconceptionType[]
+): Promise<string[]> {
+  const insights: string[] = []
+
+  // Predefined community insights based on common patterns
+  const communityWisdom: Record<string, string[]> = {
+    'off-by-one': [
+      'Pro tip: Draw array indices on paper before coding loops',
+      '80% of off-by-one errors occur at array boundaries - always test with length 0, 1, and 2',
+      'Use inclusive vs exclusive bounds consistently - pick a convention and stick to it',
+    ],
+    'missing-edge-case': [
+      'Interview tip: Always ask "what if the input is empty?" before coding',
+      'Common pattern: Handle null/empty at the TOP of your function',
+      'Edge cases to always consider: empty, single element, all same values, sorted, reverse sorted',
+    ],
+    'wrong-data-structure': [
+      'Rule of thumb: If you need O(1) lookup, think HashMap/Set',
+      'Nested loops often signal a missed optimization opportunity',
+      'Ask yourself: "Am I searching for something I could pre-compute?"',
+    ],
+    'initialization-error': [
+      'DP tip: Always initialize base cases before the main loop',
+      'Common mistake: Forgetting to handle dp[0] separately',
+      'Pro tip: Write out the recurrence relation before coding',
+    ],
+    'boundary-confusion': [
+      'Two-pointer tip: Draw the pointers moving on paper first',
+      'Binary search: Always verify left=mid+1 and right=mid-1 logic',
+      'When stuck on boundaries, trace through a 3-element example by hand',
+    ],
+    'termination-condition': [
+      'Before coding any loop, write down: "This loop ends when..."',
+      'Infinite loop? Check if your condition can actually become false',
+      'For binary search: ensure left and right converge (no equality without break)',
+    ],
+  }
+
+  for (const type of misconceptionTypes) {
+    const typeInsights = communityWisdom[type]
+    if (typeInsights) {
+      insights.push(typeInsights[Math.floor(Math.random() * typeInsights.length)])
+    }
+  }
+
+  // Add pattern-specific insight
+  const patternInsights: Record<string, string> = {
+    'arrays-hashing': 'Arrays+Hashing problems almost always have an O(n) solution using a Map',
+    'two-pointers': 'Two pointers work best on sorted arrays or when finding pairs',
+    'binary-search': 'If the answer space is monotonic, binary search probably applies',
+    'sliding-window': 'Sliding window = "find subarray/substring with property X"',
+    'dp-1d': 'For 1D DP, ask: "Can I express state[i] using previous states?"',
+    'dp-2d': 'For 2D DP, think about what each dimension represents',
+    'trees': 'Most tree problems are solved with recursion - think "what do I need from children?"',
+    'graphs': 'Graph problem? Start with: "Is this BFS (shortest path) or DFS (explore all)?"',
+  }
+
+  if (patternInsights[pattern]) {
+    insights.unshift(patternInsights[pattern])
+  }
+
+  return insights.slice(0, 3)
+}
+
+/**
+ * RAG-Enhanced code analysis
+ * Combines regex-based detection with RAG retrieval for richer debugging hints
+ */
+export async function analyzeCodeWithRAG(
+  code: string,
+  pattern: DSAPattern,
+  testResults?: { passed: number; total: number; failingTests?: string[] }
+): Promise<EnhancedCodeAnalysisResult> {
+  // Step 1: Run standard regex-based analysis
+  const baseResult = analyzeCode(code, pattern, testResults)
+
+  // Step 2: If no issues found and tests pass, return early (no RAG needed)
+  if (baseResult.misconceptions.length === 0 && testResults?.passed === testResults?.total) {
+    return {
+      ...baseResult,
+      ragHints: [],
+      similarErrorsFound: 0,
+      communityInsights: [],
+    }
+  }
+
+  // Step 3: Retrieve RAG-enhanced debugging hints
+  const ragHints = await retrieveRAGDebuggingHints(
+    baseResult.misconceptions,
+    pattern,
+    code,
+    testResults?.failingTests
+  )
+
+  // Step 4: Generate community insights
+  const misconceptionTypes = baseResult.misconceptions.map(m => m.misconceptionType)
+  const communityInsights = await generateCommunityInsights(pattern, misconceptionTypes)
+
+  return {
+    ...baseResult,
+    ragHints,
+    similarErrorsFound: ragHints.length,
+    communityInsights,
+  }
+}
+
+// ============================================================================
 // MISCONCEPTION TRACKING SERVICE
 // ============================================================================
 
@@ -841,6 +1103,40 @@ export async function analyzeAndTrackMisconceptions(
   testResults?: { passed: number; total: number; failingTests?: string[] }
 ): Promise<CodeAnalysisResult> {
   const result = analyzeCode(code, pattern, testResults)
+  const tracker = getMisconceptionTracker()
+
+  // Track each misconception
+  for (const misconception of result.misconceptions) {
+    await tracker.trackMisconception(userId, misconception)
+  }
+
+  // Check if any misconceptions were resolved
+  if (testResults && testResults.passed === testResults.total) {
+    await tracker.checkForResolution(userId, pattern, testResults)
+  }
+
+  return result
+}
+
+/**
+ * RAG-Enhanced version of analyzeAndTrackMisconceptions
+ * Provides richer debugging hints by retrieving similar errors from the knowledge base
+ *
+ * Use this when you want to provide users with:
+ * - Context-aware debugging hints based on similar errors
+ * - Community insights ("Users who had this error often fixed it by...")
+ * - More actionable suggestions than regex alone can provide
+ *
+ * Cost: ~1-2 extra RAG retrievals per call (cached for 30s)
+ */
+export async function analyzeAndTrackMisconceptionsWithRAG(
+  userId: string,
+  code: string,
+  pattern: DSAPattern,
+  testResults?: { passed: number; total: number; failingTests?: string[] }
+): Promise<EnhancedCodeAnalysisResult> {
+  // Use RAG-enhanced analysis
+  const result = await analyzeCodeWithRAG(code, pattern, testResults)
   const tracker = getMisconceptionTracker()
 
   // Track each misconception

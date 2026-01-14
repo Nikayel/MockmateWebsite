@@ -36,6 +36,12 @@ import { getCompanyInterviewKnowledge } from "./knowledge-base/company-knowledge
 import type { DSAScenario } from "@/lib/scenarios"
 import { adminDb } from "@/lib/firebase-admin"
 import { Timestamp } from "firebase-admin/firestore"
+import {
+  getCompanyFrequentQuestions,
+  getPrioritizedQuestionsForCompany,
+  type FrequentQuestion,
+  type CompanyQuestionProfile,
+} from "./question-frequency-rag"
 
 /**
  * RAG-enhanced roadmap options
@@ -59,6 +65,9 @@ export interface RAGEnhancedRoadmap extends PersonalizedRoadmap {
     personalizedAdvice: string[]
     adaptiveAdjustments: AdaptiveAdjustment[]
     studyStrategies: StudyStrategy[]
+    // NEW: Company-specific question frequency data
+    mustKnowQuestions: FrequentQuestion[]
+    companyQuestionProfile?: CompanyQuestionProfile
   }
 }
 
@@ -125,6 +134,8 @@ export class RAGRoadmapGenerator {
           personalizedAdvice: [],
           adaptiveAdjustments: [],
           studyStrategies: [],
+          mustKnowQuestions: [],
+          companyQuestionProfile: undefined,
         },
       }
     }
@@ -161,14 +172,25 @@ export class RAGRoadmapGenerator {
     // Step 7: Generate study strategies
     const studyStrategies = this.generateStudyStrategies(assessment, patternInsights)
 
-    // Step 8: Enhance daily plans with RAG insights
+    // Step 8: NEW - Get company-specific question frequency data
+    const companyQuestionProfile = await getCompanyFrequentQuestions({
+      companyId: assessment.targetCompany,
+      experienceLevel: assessment.experienceLevel,
+      limit: 15,
+    })
+
+    // Extract must-know questions
+    const mustKnowQuestions = companyQuestionProfile.topQuestions.filter(q => q.isMustkKnow)
+
+    // Step 9: Enhance daily plans with RAG insights AND question frequency
     const enhancedDailyPlans = this.enhanceDailyPlans(
       baseRoadmap.dailyPlans,
       patternInsights,
-      assessment
+      assessment,
+      mustKnowQuestions // NEW: Pass must-know questions for prioritization
     )
 
-    // Step 9: Enhance milestones
+    // Step 10: Enhance milestones
     const enhancedMilestones = this.enhanceMilestones(
       baseRoadmap.milestones,
       patternInsights,
@@ -187,6 +209,8 @@ export class RAGRoadmapGenerator {
         personalizedAdvice,
         adaptiveAdjustments,
         studyStrategies,
+        mustKnowQuestions, // NEW
+        companyQuestionProfile, // NEW
       },
     }
 
@@ -551,12 +575,13 @@ export class RAGRoadmapGenerator {
   }
 
   /**
-   * Enhance daily plans with RAG insights
+   * Enhance daily plans with RAG insights and question frequency data
    */
   private enhanceDailyPlans(
     dailyPlans: DailyPlan[],
     patternInsights: PatternInsight[],
-    assessment: UserRoadmapAssessment
+    assessment: UserRoadmapAssessment,
+    mustKnowQuestions: FrequentQuestion[] = []
   ): DailyPlan[] {
     return dailyPlans.map((plan, index) => {
       const enhancedPlan = { ...plan }
@@ -572,6 +597,33 @@ export class RAGRoadmapGenerator {
           enhancedPlan.notes = enhancedPlan.notes
             ? `${enhancedPlan.notes}\n\nTips: ${patternTips.join(". ")}`
             : `Tips: ${patternTips.join(". ")}`
+        }
+      }
+
+      // NEW: Highlight must-know questions in this day's plan
+      if (mustKnowQuestions.length > 0 && plan.questions) {
+        const mustKnowTitles = new Set(mustKnowQuestions.map(q => q.title.toLowerCase()))
+        const mustKnowInPlan = plan.questions.filter(q =>
+          mustKnowTitles.has(q.title?.toLowerCase() || '') ||
+          mustKnowQuestions.some(mkq => q.id?.includes(mkq.scenarioId))
+        )
+
+        if (mustKnowInPlan.length > 0) {
+          const highlight = `⭐ Must-Know: ${mustKnowInPlan.map(q => q.title || q.id).slice(0, 2).join(", ")}`
+          enhancedPlan.notes = enhancedPlan.notes
+            ? `${highlight}\n\n${enhancedPlan.notes}`
+            : highlight
+
+          // Add company-specific tips for must-know questions
+          for (const q of mustKnowInPlan.slice(0, 1)) {
+            const mkq = mustKnowQuestions.find(
+              mkq => q.title?.toLowerCase() === mkq.title.toLowerCase() ||
+                     q.id?.includes(mkq.scenarioId)
+            )
+            if (mkq?.companySpecificTips.length) {
+              enhancedPlan.notes += `\n💡 Tip for ${mkq.title}: ${mkq.companySpecificTips[0]}`
+            }
+          }
         }
       }
 

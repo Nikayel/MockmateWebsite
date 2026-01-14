@@ -21,6 +21,11 @@ import {
   type InterviewLevel,
 } from "@/lib/rag/knowledge-base/interview-behavior-knowledge"
 import type { CompanyId } from "@/lib/data/company-questions/types"
+import {
+  getDynamicChatContext,
+  formatDynamicContextForPrompt,
+  shouldRetrieveDynamicContext,
+} from "@/lib/rag/dynamic-chat-context"
 
 interface UserContext {
   email?: string
@@ -114,6 +119,7 @@ function manageWorkspaceContext(
 /**
  * Build RAG-enhanced context for the AI partner role
  * Retrieves relevant patterns, hints, and knowledge from the RAG system
+ * Now includes DYNAMIC context based on what the user is currently discussing
  */
 async function buildRAGContext(options: {
   scenarioTitle?: string
@@ -124,10 +130,30 @@ async function buildRAGContext(options: {
   problemText?: string
   userCode?: string
   userId?: string
+  userMessage?: string // NEW: Current user message for dynamic context
+  testResults?: { passed: number; total: number; failingTests?: string[] } // NEW: Test results for debugging context
 }): Promise<string> {
   const ragContextParts: string[] = []
 
   try {
+    // NEW: Dynamic context based on user's current message
+    if (options.userMessage && shouldRetrieveDynamicContext(options.userMessage)) {
+      const dynamicContext = await getDynamicChatContext({
+        userMessage: options.userMessage,
+        currentCode: options.userCode,
+        pattern: options.scenarioPattern as DSAPattern,
+        problemTitle: options.scenarioTitle,
+        testResults: options.testResults,
+      })
+
+      // Only add if we got meaningful context
+      if (dynamicContext.retrievedContext || dynamicContext.debuggingHints) {
+        ragContextParts.push(`
+## Dynamic Context (based on user's current question)
+${formatDynamicContextForPrompt(dynamicContext)}
+`)
+      }
+    }
     // 1. Get pattern-specific knowledge if pattern is known
     if (options.scenarioPattern) {
       const patternKnowledge = getPatternKnowledge(options.scenarioPattern as DSAPattern)
@@ -895,6 +921,7 @@ Keep responses brief, actionable, and helpful. You're a tool they can use, but t
       : undefined
 
     // Enhance both interviewer and partner roles with RAG context
+    // Now includes DYNAMIC context based on the user's current message
     const ragContext = await buildRAGContext({
       scenarioTitle,
       scenarioPattern,
@@ -904,6 +931,8 @@ Keep responses brief, actionable, and helpful. You're a tool they can use, but t
       problemText: scenarioTitle, // Use title as problem text
       userCode: currentCode,
       userId,
+      userMessage: message, // NEW: Pass user message for dynamic context
+      testResults, // NEW: Pass test results for debugging context
     })
 
     if (ragContext) {
