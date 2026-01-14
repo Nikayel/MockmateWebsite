@@ -332,13 +332,17 @@ export async function completeSessionWithMastery(
 
     // 1. MASSED PRACTICE: < 12 hours since last review
     // Cramming doesn't improve long-term retention
+    // BUT: If problem was due/overdue, always run full SR algorithm to update schedule
     const isMassedPractice = hoursSinceLastReview < 12
-    if (isMassedPractice) {
-      logger.info("Massed practice detected - updating score only, not interval", {
+    const wasDueOrOverdue = daysUntilDue <= 0 || daysOverdue > 0
+
+    if (isMassedPractice && !wasDueOrOverdue) {
+      logger.info("Massed practice detected (early) - updating score only, not interval", {
         userId,
         problemId: sessionData.scenarioId,
         hoursSinceLastReview: hoursSinceLastReview.toFixed(2),
         lastReviewAt: lastReviewAt.toISOString(),
+        daysUntilDue,
       })
 
       // IMPORTANT: Always use performanceScore for user-facing displays (last_score)
@@ -356,6 +360,17 @@ export async function completeSessionWithMastery(
         masteryLevel: existingMastery.mastery_level,
         streakDays,
       }
+    }
+
+    // If massed practice but problem was due, log it and continue to full SR algorithm
+    if (isMassedPractice && wasDueOrOverdue) {
+      logger.info("Massed practice detected but problem was due - proceeding with full SR update", {
+        userId,
+        problemId: sessionData.scenarioId,
+        hoursSinceLastReview: hoursSinceLastReview.toFixed(2),
+        daysUntilDue,
+        daysOverdue,
+      })
     }
 
     // 2. EARLY PRACTICE: More than 3 days before due date

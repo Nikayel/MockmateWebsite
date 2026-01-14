@@ -165,10 +165,7 @@ export function ReviewSections({
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h3 className="text-lg font-medium text-white">Due for Review</h3>
-          {totalDue > 0 && <span className="text-sm text-gray-500">{totalDue} due now</span>}
-          {totalUpcoming > 0 && (
-            <span className="text-sm text-gray-600">· {totalUpcoming} scheduled</span>
-          )}
+          {totalDue > 0 && <span className="text-sm text-gray-500">{totalDue} due today</span>}
           {/* Algorithm transparency indicator */}
           {userAlgorithm && (
             <span
@@ -287,61 +284,57 @@ export function ReviewSections({
         ))}
       </CollapsibleSection>
 
-      {/* Due Soon (Within 7 days) - Always visible */}
-      <CollapsibleSection
-        title="Coming Up"
-        count={dueSoon.length}
-        icon={Calendar}
-        iconColor="text-blue-400"
-        defaultExpanded={isUpcomingExpanded}
-        subtitle="Due within the next 7 days"
-        badge={
-          dueSoon.length > 0 && (
-            <span className="ml-1 text-[10px] font-normal text-gray-500 normal-case">
-              Next 7 days
-            </span>
-          )
-        }
-      >
-        {dueSoon.map((item) => (
-          <ReviewCard key={item.problem_id} item={item} showUpcomingDate isUpcoming />
-        ))}
-      </CollapsibleSection>
+      {/* Coming Up Section - Separate from Due for Review */}
+      {(dueSoon.length > 0 || dueLater.length > 0) && (
+        <div className="mt-6 border-t border-white/10 pt-6">
+          <div className="mb-4 flex items-center gap-3">
+            <h3 className="text-lg font-medium text-white">Coming Up</h3>
+            <span className="text-sm text-gray-500">{totalUpcoming} scheduled</span>
+          </div>
 
-      {/* All Scheduled (Everything including 1 year out) */}
-      {dueLater.length > 0 && (
-        <div className="mt-2 border-t border-white/5 pt-4">
-          <button
-            onClick={() => setShowAllScheduled(!showAllScheduled)}
-            className="mb-2 flex w-full items-center gap-2 text-xs font-medium tracking-wider uppercase transition-colors hover:text-gray-300"
+          {/* Due Soon (Within 7 days) */}
+          <CollapsibleSection
+            title="Next 7 Days"
+            count={dueSoon.length}
+            icon={Calendar}
+            iconColor="text-blue-400"
+            defaultExpanded={isUpcomingExpanded}
           >
-            {showAllScheduled ? (
-              <ChevronDown className="h-3 w-3 text-gray-500" />
-            ) : (
-              <ChevronRight className="h-3 w-3 text-gray-500" />
-            )}
-            <Archive className="h-3 w-3 text-gray-500" />
-            <span className="text-gray-400">All Scheduled</span>
-            <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
-              {dueLater.length}
-            </span>
-            <span className="ml-1 text-[10px] font-normal text-gray-600 normal-case">
-              Mastered problems with longer intervals
-            </span>
-            <span className="flex-1" />
-          </button>
+            {dueSoon.map((item) => (
+              <ReviewCard key={item.problem_id} item={item} showUpcomingDate isUpcoming />
+            ))}
+          </CollapsibleSection>
 
-          {!showAllScheduled && (
-            <p className="-mt-1 mb-2 ml-5 text-xs text-gray-600">
-              {dueLater.length} problem{dueLater.length !== 1 ? "s" : ""} scheduled beyond 7 days
-            </p>
-          )}
+          {/* All Scheduled (Everything including 1 year out) */}
+          {dueLater.length > 0 && (
+            <div className="mt-2">
+              <button
+                onClick={() => setShowAllScheduled(!showAllScheduled)}
+                className="mb-2 flex w-full items-center gap-2 text-xs font-medium tracking-wider uppercase transition-colors hover:text-gray-300"
+              >
+                {showAllScheduled ? (
+                  <ChevronDown className="h-3 w-3 text-gray-500" />
+                ) : (
+                  <ChevronRight className="h-3 w-3 text-gray-500" />
+                )}
+                <Archive className="h-3 w-3 text-gray-500" />
+                <span className="text-gray-400">Later</span>
+                <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                  {dueLater.length}
+                </span>
+                <span className="ml-1 text-[10px] font-normal text-gray-600 normal-case">
+                  Beyond 7 days
+                </span>
+                <span className="flex-1" />
+              </button>
 
-          {showAllScheduled && (
-            <div className="divide-y divide-white/5">
-              {dueLater.map((item) => (
-                <ReviewCard key={item.problem_id} item={item} showUpcomingDate isUpcoming />
-              ))}
+              {showAllScheduled && (
+                <div className="divide-y divide-white/5">
+                  {dueLater.map((item) => (
+                    <ReviewCard key={item.problem_id} item={item} showUpcomingDate isUpcoming />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

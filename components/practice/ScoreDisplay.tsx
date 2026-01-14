@@ -309,7 +309,12 @@ export function ScoreDisplay({
                         : "border-red-500/30 bg-red-500/10"
                 )}
               >
-                <span className={cn("text-xl font-bold", color)}>{grade}</span>
+                <div className="flex flex-col items-center">
+                  <span className={cn("text-xl leading-none font-bold", color)}>{grade}</span>
+                  <span className={cn("text-[10px] font-medium", color)}>
+                    {Math.round(displayScore)}%
+                  </span>
+                </div>
               </div>
               {/* Score type toggle */}
               <button

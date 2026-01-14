@@ -169,6 +169,15 @@ function getNextReviewDisplay(item: DueItem): {
   }
 
   if (daysUntil === 0) {
+    // Check if it's actually tomorrow (less than 24h but next calendar day)
+    const now = new Date()
+    const tomorrow = new Date(now)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setHours(0, 0, 0, 0)
+
+    if (reviewDate >= tomorrow) {
+      return { timing: "Tomorrow", context: "Based on your performance", exactDate }
+    }
     return { timing: "Due today", context: "Review to maintain streak", exactDate: "Today" }
   }
 
@@ -277,8 +286,23 @@ export function ReviewCard({
     }
   }
 
+  // Check if item is actually scheduled for tomorrow or later (not due today)
+  const isScheduledForFuture = (() => {
+    if (item.days_until_review > 0) return true
+    if (item.days_until_review === 0) {
+      // Edge case: less than 24h away but actually tomorrow (next calendar day)
+      const now = new Date()
+      const tomorrow = new Date(now)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      tomorrow.setHours(0, 0, 0, 0)
+      const reviewDate = new Date(item.next_review_at)
+      return reviewDate >= tomorrow
+    }
+    return false
+  })()
+
   const handleStartClick = () => {
-    if (isUpcoming && item.days_until_review > 1) {
+    if (isUpcoming && isScheduledForFuture && item.days_until_review > 1) {
       // Show warning for items more than 1 day away
       setShowEarlyWarning(true)
     } else {
@@ -302,10 +326,14 @@ export function ReviewCard({
                   {item.days_overdue}d overdue
                 </span>
               )}
-              {showUpcomingDate && item.days_until_review > 0 && (
+              {showUpcomingDate && (
                 <span
                   className="flex cursor-help items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs text-blue-400"
-                  title={`Scheduled for review in ${item.days_until_review} day${item.days_until_review === 1 ? "" : "s"} based on your last score of ${item.last_score}%`}
+                  title={
+                    item.days_until_review > 0
+                      ? `Scheduled for review in ${item.days_until_review} day${item.days_until_review === 1 ? "" : "s"} based on your last score of ${item.last_score}%`
+                      : `Scheduled for review based on your last score of ${item.last_score}%`
+                  }
                 >
                   <Clock className="h-3 w-3" />
                   {nextReview.timing}
@@ -358,7 +386,7 @@ export function ReviewCard({
               Done
             </Button>
           )}
-          {isUpcoming ? (
+          {isUpcoming && isScheduledForFuture ? (
             <Button
               size="sm"
               className="h-8 bg-gray-700 text-gray-300 hover:bg-gray-600"

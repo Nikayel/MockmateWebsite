@@ -1044,46 +1044,61 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     }
   }, [code, isInterviewStarted, showFeedback, showPostInterviewDiscussion, proactiveTimer])
 
-  // Fetch RAG hints for the current problem
+  // Fetch AI-powered hints for the current problem
   const fetchRAGHints = useCallback(async () => {
-    if (!selectedScenario) return
+    if (!selectedScenario || !user?.id) return
 
     setIsLoadingHints(true)
     try {
-      const response = await fetch("/api/rag", {
+      const response = await fetch("/api/agents/hints", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "get-hints",
-          problemText: selectedScenario.problemStatement,
+          action: "generate",
+          userId: user.id,
+          problemId: selectedScenario.id,
           problemTitle: selectedScenario.title,
-          userCode: code,
+          problemText: selectedScenario.problemStatement,
+          problemPattern: (selectedScenario as any).pattern,
           difficulty: selectedScenario.difficulty,
-          problemType: selectedScenario.type,
+          userCode: code,
+          language: selectedLanguage,
+          trigger: "initial",
         }),
       })
 
       if (response.ok) {
         const data = await response.json()
-        setRagHints(data.contextualHints || [])
+        // Transform hints from AI agent format to display format
+        const transformedHints = (data.hints || []).map(
+          (h: { level: number; content: string; id?: string }) => ({
+            level: h.level,
+            hint: h.content,
+            id: h.id,
+          })
+        )
+        setRagHints(transformedHints)
       }
     } catch (error) {
       console.error("Error fetching hints:", error)
     } finally {
       setIsLoadingHints(false)
     }
-  }, [selectedScenario, code, setIsLoadingHints, setRagHints])
+  }, [selectedScenario, code, selectedLanguage, user?.id, setIsLoadingHints, setRagHints])
 
-  // Fetch RAG hints only when user has written meaningful code
+  // Fetch AI hints only when user has written meaningful code BEYOND starter code
   // This prevents showing hints before user even starts coding
   useEffect(() => {
     if (!isInterviewStarted || !selectedScenario || showFeedback || showPostInterviewDiscussion) {
       return
     }
 
-    // Only fetch hints if user has written meaningful code (at least 20 chars beyond starter code)
-    const meaningfulCodeLength = code.trim().length
-    const hasWrittenCode = meaningfulCodeLength >= 20
+    // Calculate how much code the user has written beyond the starter code
+    const currentCodeLength = code.trim().length
+    const starterCodeLength = starterCode.trim().length
+    const userWrittenLength = currentCodeLength - starterCodeLength
+    // User must write at least 30 meaningful characters beyond starter code
+    const hasWrittenCode = userWrittenLength >= 30
 
     // Reset hint fetching flag when interview resets
     if (!hasWrittenCode) {
@@ -1098,6 +1113,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     }
   }, [
     code,
+    starterCode,
     isInterviewStarted,
     selectedScenario,
     showFeedback,
@@ -4275,9 +4291,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                           </div>
 
                           {/* AI Insights - Shown independently, right after description */}
-                          {/* Only show hints when user has written meaningful code (at least 20 chars) */}
+                          {/* Only show hints when user has written meaningful code beyond starter code */}
                           {isInterviewStarted &&
-                            code.trim().length >= 20 &&
+                            code.trim().length - starterCode.trim().length >= 30 &&
                             (ragHints.length > 0 || isLoadingHints) && (
                               <div className="space-y-2">
                                 <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-purple-400 uppercase">
