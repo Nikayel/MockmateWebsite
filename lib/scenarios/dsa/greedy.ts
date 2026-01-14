@@ -262,7 +262,7 @@ Given two integer arrays gas and cost, return the starting gas station's index i
     ],
   },
   {
-    id: "dsa-task-scheduler",
+    id: "dsa-task-scheduler-greedy",
     title: "Task Scheduler",
     type: "dsa",
     pattern: "greedy",
@@ -348,7 +348,7 @@ Return the least number of units of times that the CPU will take to finish all t
     ],
   },
   {
-    id: "dsa-partition-labels",
+    id: "dsa-partition-labels-greedy",
     title: "Partition Labels",
     type: "dsa",
     pattern: "greedy",
