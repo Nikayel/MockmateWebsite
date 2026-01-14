@@ -13,7 +13,7 @@ export const dpScenarios: DSAScenario[] = [
     type: "dsa",
     pattern: "dp-1d",
     difficulty: "medium",
-    companies: ["Amazon", "Microsoft", "Meta", "Apple"],
+    companies: ["Amazon", "Microsoft", "Meta", "Apple", "Roblox"],
     description: "Find the contiguous subarray with the largest sum",
     tags: ["array", "dynamic-programming", "divide-and-conquer"],
     estimatedTime: 20,

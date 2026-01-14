@@ -825,4 +825,115 @@ Return true if it is possible to obtain the target triplet [x, y, z] as an eleme
       },
     ],
   },
+  {
+    id: "dsa-maximum-units-on-truck",
+    title: "Maximum Units on a Truck",
+    type: "dsa",
+    pattern: "greedy",
+    difficulty: "easy",
+    companies: ["Amazon", "Roblox", "Google", "Microsoft"],
+    description: "Find maximum number of units that can be put on a truck with limited capacity",
+    tags: ["greedy", "array", "sorting"],
+    estimatedTime: 15,
+    problemStatement: `You are assigned to put some amount of boxes onto one truck. You are given a 2D array boxTypes, where boxTypes[i] = [numberOfBoxesi, numberOfUnitsPerBoxi]:
+- numberOfBoxesi is the number of boxes of type i.
+- numberOfUnitsPerBoxi is the number of units in each box of type i.
+
+You are also given an integer truckSize, which is the maximum number of boxes that can be put on the truck. You can choose any boxes to put on the truck as long as the number of boxes does not exceed truckSize.
+
+Return the maximum total number of units that can be put on the truck.`,
+    examples: [
+      {
+        input: "boxTypes = [[1,3],[2,2],[3,1]], truckSize = 4",
+        output: "8",
+        explanation:
+          "Take 1 box of type 0 (3 units) + 2 boxes of type 1 (2*2=4 units) + 1 box of type 2 (1 unit) = 8 units total",
+      },
+      {
+        input: "boxTypes = [[5,10],[2,5],[4,7],[3,9]], truckSize = 10",
+        output: "91",
+        explanation: "Sort by units per box descending, then greedily take boxes",
+      },
+    ],
+    constraints: [
+      "1 <= boxTypes.length <= 1000",
+      "1 <= numberOfBoxesi, numberOfUnitsPerBoxi <= 1000",
+      "1 <= truckSize <= 10^6",
+    ],
+    hints: [
+      "Sort boxes by units per box in descending order (greedy)",
+      "Take boxes with most units first until truck is full",
+      "Track remaining capacity as you add boxes",
+    ],
+    starterCode: {
+      javascript: `function maximumUnits(boxTypes, truckSize) {
+  // Sort by units per box descending, then greedily fill truck
+
+}`,
+      typescript: `function maximumUnits(boxTypes: number[][], truckSize: number): number {
+  // Sort by units per box descending, then greedily fill truck
+
+}`,
+      python: `def maximumUnits(boxTypes, truckSize):
+    # Sort by units per box descending, then greedily fill truck
+    pass`,
+      java: `class Solution {
+    public int maximumUnits(int[][] boxTypes, int truckSize) {
+        // Sort by units per box descending, then greedily fill truck
+        return 0;
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: "O(n log n)",
+      space: "O(1)",
+    },
+    testCases: [
+      {
+        input: {
+          boxTypes: [
+            [1, 3],
+            [2, 2],
+            [3, 1],
+          ],
+          truckSize: 4,
+        },
+        expected: 8,
+        description: "Basic greedy selection",
+      },
+      {
+        input: {
+          boxTypes: [
+            [5, 10],
+            [2, 5],
+            [4, 7],
+            [3, 9],
+          ],
+          truckSize: 10,
+        },
+        expected: 91,
+        description: "Multiple box types",
+      },
+      {
+        input: {
+          boxTypes: [[2, 1]],
+          truckSize: 5,
+        },
+        expected: 2,
+        description: "Single box type, more capacity than boxes",
+      },
+      {
+        input: {
+          boxTypes: [
+            [1, 1],
+            [1, 1],
+            [1, 1],
+          ],
+          truckSize: 2,
+        },
+        expected: 2,
+        description: "All same units per box",
+      },
+    ],
+  },
 ]

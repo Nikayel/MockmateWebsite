@@ -21,6 +21,7 @@ export const robloxData: CompanyQuestionData = {
   topPatterns: [
     { pattern: "arrays-hashing", frequency: 90, priority: 10, typicalDifficulty: "medium" },
     { pattern: "string", frequency: 85, priority: 9, typicalDifficulty: "medium" },
+    { pattern: "greedy", frequency: 80, priority: 9, typicalDifficulty: "easy" },
     { pattern: "dp-1d", frequency: 75, priority: 8, typicalDifficulty: "medium" },
     { pattern: "graphs", frequency: 70, priority: 8, typicalDifficulty: "medium" },
     { pattern: "sorting", frequency: 65, priority: 7, typicalDifficulty: "medium" },
@@ -43,26 +44,37 @@ export const robloxData: CompanyQuestionData = {
       lastReported: "2024 Q4",
     },
     {
+      scenarioId: "dsa-maximum-units-on-truck",
+      title: "Maximum Units on a Truck (Greedy)",
+      frequency: "very_common",
+      lastReported: "2024 Q4",
+    },
+    {
+      scenarioId: "dsa-roman-to-integer",
+      title: "Roman to Integer (String Parsing)",
+      frequency: "common",
+      lastReported: "2024 Q4",
+    },
+    {
+      scenarioId: "dsa-maximum-subarray",
+      title: "Maximum Subarray (Kadane's)",
+      frequency: "common",
+      variants: ["Maximum Units/Sum variations"],
+    },
+    {
       scenarioId: "dsa-merge-intervals",
       title: "Merge Intervals",
       frequency: "common",
       variants: ["Player Skill Pairing", "Event Queue Merging"],
     },
     {
-      scenarioId: "dsa-lru-cache",
-      title: "LRU Cache",
+      scenarioId: "dsa-generate-parentheses",
+      title: "Generate Parentheses (Recursion)",
       frequency: "common",
-      lastReported: "2024 Q4",
     },
     {
-      scenarioId: "design-object-pool",
-      title: "Object Pool Design",
-      frequency: "common",
-      variants: ["Bullet Pool", "NPC Pool"],
-    },
-    {
-      scenarioId: "dsa-serialize-deserialize",
-      title: "Serialize/Deserialize Data",
+      scenarioId: "dsa-number-of-islands",
+      title: "Number of Islands (Game Grid)",
       frequency: "common",
     },
   ],
@@ -193,24 +205,34 @@ export const spotifyData: CompanyQuestionData = {
 
   mustKnowQuestions: [
     {
-      scenarioId: "dsa-median-data-stream",
-      title: "Find Median from Data Stream",
+      scenarioId: "dsa-find-median-data-stream",
+      title: "Find Median from Data Stream (LC295)",
       frequency: "very_common",
       lastReported: "2025 Q1",
     },
     {
-      scenarioId: "dsa-sliding-window-median",
-      title: "Sliding Window Median",
+      scenarioId: "dsa-sliding-window-maximum",
+      title: "Sliding Window Maximum",
       frequency: "common",
     },
     {
-      scenarioId: "design-music-recommendation",
-      title: "Design Music Recommendation System",
+      scenarioId: "dsa-valid-anagram",
+      title: "Valid Anagram (isAnagram)",
       frequency: "common",
     },
     {
-      scenarioId: "dsa-moving-average-stream",
-      title: "Moving Average from Data Stream",
+      scenarioId: "dsa-valid-palindrome",
+      title: "Valid Palindrome",
+      frequency: "common",
+    },
+    {
+      scenarioId: "dsa-two-sum",
+      title: "Two Sum (sumTo100 variant)",
+      frequency: "common",
+    },
+    {
+      scenarioId: "dsa-kth-largest-element",
+      title: "Kth Largest Element",
       frequency: "common",
     },
   ],
@@ -344,18 +366,23 @@ export const twitchData: CompanyQuestionData = {
       frequency: "very_common",
     },
     {
-      scenarioId: "design-live-streaming",
-      title: "Design Live Streaming System",
-      frequency: "common",
-    },
-    {
-      scenarioId: "design-chat-system",
-      title: "Design Real-time Chat System",
-      frequency: "common",
-    },
-    {
       scenarioId: "dsa-number-of-islands",
       title: "Number of Islands",
+      frequency: "common",
+    },
+    {
+      scenarioId: "dsa-rotting-oranges",
+      title: "Rotting Oranges (BFS)",
+      frequency: "common",
+    },
+    {
+      scenarioId: "dsa-binary-tree-level-order",
+      title: "Binary Tree Level Order Traversal",
+      frequency: "common",
+    },
+    {
+      scenarioId: "dsa-coin-change",
+      title: "Coin Change (DP)",
       frequency: "common",
     },
   ],
