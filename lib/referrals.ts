@@ -32,6 +32,7 @@ import { customAlphabet } from "nanoid"
 const generateCode = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 8)
 
 // Reward amounts
+const SIGNUP_REWARD_CASH = 10 // $10 cash when someone signs up with your code
 const SIGNUP_REWARD_MONTHS = 1 // 1 free month per signup
 const CONVERSION_REWARD_CASH = 10 // $10 when referral upgrades to Pro
 const CONVERSION_REWARD_MONTHS = 1 // 1 extra free month when referral upgrades
@@ -68,7 +69,7 @@ export interface ReferralReward {
   referredUserId: string
   type: "signup_credit" | "conversion_cash" | "conversion_credit"
   amount: number // $ for cash, months for credit
-  status: 'pending' | 'paid' | 'credited' | 'expired' | 'voided'
+  status: "pending" | "paid" | "credited" | "expired" | "voided"
   createdAt: Date
   processedAt?: Date
   processedBy?: string // Admin who processed it
@@ -188,9 +189,9 @@ async function checkMonthlyReferralCap(referrerId: string): Promise<boolean> {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
   const monthlyReferrals = await adminDb
-    .collection('referrals')
-    .where('referrerId', '==', referrerId)
-    .where('signupDate', '>=', startOfMonth)
+    .collection("referrals")
+    .where("referrerId", "==", referrerId)
+    .where("signupDate", ">=", startOfMonth)
     .get()
 
   return monthlyReferrals.size < MAX_REFERRALS_PER_MONTH
@@ -239,7 +240,7 @@ export async function recordReferral(
     // Check monthly referral cap
     const withinCap = await checkMonthlyReferralCap(referrerId)
     if (!withinCap) {
-      logger.warn('Referrer has hit monthly cap', { referrerId, cap: MAX_REFERRALS_PER_MONTH })
+      logger.warn("Referrer has hit monthly cap", { referrerId, cap: MAX_REFERRALS_PER_MONTH })
       return false
     }
 
@@ -266,7 +267,7 @@ export async function recordReferral(
     })
 
     // Create the $10 signup reward (pending with eligibility dates)
-    await adminDb.collection('referral_rewards').add({
+    await adminDb.collection("referral_rewards").add({
       referrerId,
       referredUserId,
       referralId: referralRef.id,
@@ -279,20 +280,23 @@ export async function recordReferral(
     })
 
     // Update referred user's profile
-    await adminDb.collection('users').doc(referredUserId).update({
+    await adminDb.collection("users").doc(referredUserId).update({
       referredBy: referrerId,
       referredByCode: referralCode.toUpperCase(),
       referredAt: FieldValue.serverTimestamp(),
     })
 
     // Increment referrer's count and pending rewards
-    await adminDb.collection('users').doc(referrerId).update({
-      referralCount: FieldValue.increment(1),
-      referralCountThisMonth: FieldValue.increment(1),
-      pendingCashRewards: FieldValue.increment(SIGNUP_REWARD_CASH),
-    })
+    await adminDb
+      .collection("users")
+      .doc(referrerId)
+      .update({
+        referralCount: FieldValue.increment(1),
+        referralCountThisMonth: FieldValue.increment(1),
+        pendingCashRewards: FieldValue.increment(SIGNUP_REWARD_CASH),
+      })
 
-    logger.info('Referral recorded with $10 reward', {
+    logger.info("Referral recorded with $10 reward", {
       referrerId,
       referredUserId,
       referralCode,
@@ -337,7 +341,7 @@ export async function markReferralConverted(referredUserId: string): Promise<voi
 
     // Create the free month credit reward (pending)
     // This will be applied when admin processes it, or auto-applied via Stripe
-    await adminDb.collection('referral_rewards').add({
+    await adminDb.collection("referral_rewards").add({
       referrerId,
       referredUserId,
       referralId: doc.id,
@@ -388,20 +392,17 @@ export async function markReferralConverted(referredUserId: string): Promise<voi
  * Void all rewards for a referred user (called on refund)
  * This is used for refund clawback within the clawback window
  */
-export async function voidReferralRewards(
-  referredUserId: string,
-  reason: string
-): Promise<void> {
+export async function voidReferralRewards(referredUserId: string, reason: string): Promise<void> {
   try {
     // Find all rewards for this referred user
     const rewardsSnapshot = await adminDb
-      .collection('referral_rewards')
-      .where('referredUserId', '==', referredUserId)
-      .where('status', '==', 'pending')
+      .collection("referral_rewards")
+      .where("referredUserId", "==", referredUserId)
+      .where("status", "==", "pending")
       .get()
 
     if (rewardsSnapshot.empty) {
-      logger.info('No pending rewards to void', { referredUserId })
+      logger.info("No pending rewards to void", { referredUserId })
       return
     }
 
@@ -410,23 +411,29 @@ export async function voidReferralRewards(
       const data = doc.data()
 
       await doc.ref.update({
-        status: 'voided',
+        status: "voided",
         voidedReason: reason,
         processedAt: FieldValue.serverTimestamp(),
       })
 
       // Decrement referrer's pending amounts
-      if (data.type === 'signup_cash') {
-        await adminDb.collection('users').doc(data.referrerId).update({
-          pendingCashRewards: FieldValue.increment(-data.amount),
-        })
-      } else if (data.type === 'conversion_credit') {
-        await adminDb.collection('users').doc(data.referrerId).update({
-          pendingFreeMonths: FieldValue.increment(-data.amount),
-        })
+      if (data.type === "signup_cash") {
+        await adminDb
+          .collection("users")
+          .doc(data.referrerId)
+          .update({
+            pendingCashRewards: FieldValue.increment(-data.amount),
+          })
+      } else if (data.type === "conversion_credit") {
+        await adminDb
+          .collection("users")
+          .doc(data.referrerId)
+          .update({
+            pendingFreeMonths: FieldValue.increment(-data.amount),
+          })
       }
 
-      logger.info('Referral reward voided', {
+      logger.info("Referral reward voided", {
         rewardId: doc.id,
         type: data.type,
         amount: data.amount,
@@ -436,7 +443,7 @@ export async function voidReferralRewards(
       })
     }
   } catch (error) {
-    logger.error('Failed to void referral rewards', { error, referredUserId })
+    logger.error("Failed to void referral rewards", { error, referredUserId })
   }
 }
 
@@ -452,9 +459,9 @@ export async function checkRewardEligibility(rewardId: string): Promise<{
   reason?: string
 }> {
   try {
-    const rewardDoc = await adminDb.collection('referral_rewards').doc(rewardId).get()
+    const rewardDoc = await adminDb.collection("referral_rewards").doc(rewardId).get()
     if (!rewardDoc.exists) {
-      return { eligible: false, reason: 'Reward not found' }
+      return { eligible: false, reason: "Reward not found" }
     }
 
     const data = rewardDoc.data()!
@@ -462,21 +469,23 @@ export async function checkRewardEligibility(rewardId: string): Promise<{
 
     // Check if expired
     if (data.expiresAt && data.expiresAt.toDate() < now) {
-      return { eligible: false, reason: 'Reward has expired' }
+      return { eligible: false, reason: "Reward has expired" }
     }
 
     // Check if eligible date has passed
     if (data.eligibleAt && data.eligibleAt.toDate() > now) {
-      const daysRemaining = Math.ceil((data.eligibleAt.toDate().getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
+      const daysRemaining = Math.ceil(
+        (data.eligibleAt.toDate().getTime() - now.getTime()) / (24 * 60 * 60 * 1000)
+      )
       return { eligible: false, reason: `${daysRemaining} days until eligible` }
     }
 
     // For signup cash rewards, check if referred user completed a session
-    if (data.type === 'signup_cash') {
+    if (data.type === "signup_cash") {
       const sessionsSnapshot = await adminDb
-        .collection('sessions')
-        .where('userId', '==', data.referredUserId)
-        .where('status', '==', 'completed')
+        .collection("sessions")
+        .where("userId", "==", data.referredUserId)
+        .where("status", "==", "completed")
         .limit(MIN_SESSIONS_FOR_REWARD)
         .get()
 
@@ -490,8 +499,8 @@ export async function checkRewardEligibility(rewardId: string): Promise<{
 
     return { eligible: true }
   } catch (error) {
-    logger.error('Failed to check reward eligibility', { error, rewardId })
-    return { eligible: false, reason: 'Error checking eligibility' }
+    logger.error("Failed to check reward eligibility", { error, rewardId })
+    return { eligible: false, reason: "Error checking eligibility" }
   }
 }
 
@@ -504,38 +513,44 @@ export async function expireOldRewards(): Promise<number> {
   try {
     const now = new Date()
     const expiredSnapshot = await adminDb
-      .collection('referral_rewards')
-      .where('status', '==', 'pending')
-      .where('expiresAt', '<', now)
+      .collection("referral_rewards")
+      .where("status", "==", "pending")
+      .where("expiresAt", "<", now)
       .get()
 
     for (const doc of expiredSnapshot.docs) {
       const data = doc.data()
 
       await doc.ref.update({
-        status: 'expired',
+        status: "expired",
         processedAt: FieldValue.serverTimestamp(),
       })
 
       // Decrement referrer's pending amounts
-      if (data.type === 'signup_cash') {
-        await adminDb.collection('users').doc(data.referrerId).update({
-          pendingCashRewards: FieldValue.increment(-data.amount),
-        })
-      } else if (data.type === 'conversion_credit') {
-        await adminDb.collection('users').doc(data.referrerId).update({
-          pendingFreeMonths: FieldValue.increment(-data.amount),
-        })
+      if (data.type === "signup_cash") {
+        await adminDb
+          .collection("users")
+          .doc(data.referrerId)
+          .update({
+            pendingCashRewards: FieldValue.increment(-data.amount),
+          })
+      } else if (data.type === "conversion_credit") {
+        await adminDb
+          .collection("users")
+          .doc(data.referrerId)
+          .update({
+            pendingFreeMonths: FieldValue.increment(-data.amount),
+          })
       }
 
       expiredCount++
     }
 
     if (expiredCount > 0) {
-      logger.info('Expired old referral rewards', { count: expiredCount })
+      logger.info("Expired old referral rewards", { count: expiredCount })
     }
   } catch (error) {
-    logger.error('Failed to expire old rewards', { error })
+    logger.error("Failed to expire old rewards", { error })
   }
 
   return expiredCount
