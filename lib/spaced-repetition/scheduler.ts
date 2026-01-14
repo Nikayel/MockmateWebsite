@@ -161,11 +161,14 @@ export async function getDueProblems(
 
   const now = new Date()
   const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000)
+
+  // Use UTC to ensure consistent behavior across all environments (localhost vs production)
   const todayEnd = new Date(now)
-  todayEnd.setHours(23, 59, 59, 999)
+  todayEnd.setUTCHours(23, 59, 59, 999)
 
   const upcomingEnd = new Date(now)
-  upcomingEnd.setDate(upcomingEnd.getDate() + upcomingDays)
+  upcomingEnd.setUTCDate(upcomingEnd.getUTCDate() + upcomingDays)
+  upcomingEnd.setUTCHours(23, 59, 59, 999)
 
   // Get user's algorithm for transparency
   const userAlgorithm = await getUserAlgorithm(userId)

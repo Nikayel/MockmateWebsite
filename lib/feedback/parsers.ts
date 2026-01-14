@@ -351,45 +351,70 @@ export function parseFeedback(feedback: string): FeedbackSection {
 
 /**
  * Parse structured sections from feedback (legacy)
- * @deprecated Use parseFeedback instead
+ * Now uses the improved parseBulletList function for better bullet extraction
  */
 export function parseFeedbackSections(feedback: string): Partial<FeedbackSection> {
   const sections: Partial<FeedbackSection> = {}
 
-  // Extract TL;DR
-  const tldrMatch = feedback.match(/\*\*TL;DR\*\*[:\s]*([^\n*]+)/i)
-  if (tldrMatch) {
-    sections.tldr = tldrMatch[1].trim()
+  // Extract TL;DR - handle multiple formats
+  const tldrPatterns = [
+    /\*\*TL;DR\*\*[:\s–-]*([^\n*]+)/i,
+    /##\s*TL;DR[:\s–-]*([^\n#]+)/i,
+    /TL;DR[:\s–-]*([^\n*#]+)/i,
+  ]
+  for (const pattern of tldrPatterns) {
+    const match = feedback.match(pattern)
+    if (match && match[1].trim()) {
+      sections.tldr = match[1].trim()
+      break
+    }
   }
 
-  // Extract What Worked (bullet points)
-  const whatWorkedMatch = feedback.match(/\*\*What Worked\*\*[\s\S]*?((?:-[^\n]+\n?)+)/i)
-  if (whatWorkedMatch) {
-    sections.whatWorked = whatWorkedMatch[1]
-      .split("\n")
-      .filter((line) => line.trim().startsWith("-"))
-      .map((line) => line.replace(/^-\s*/, "").trim())
-      .filter((line) => line.length > 0)
+  // Extract What Worked - use multiple patterns and parseBulletList
+  const whatWorkedPatterns = [
+    /\*\*What Worked\*\*[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /##\s*What Worked[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /###\s*What Worked[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /What Worked[:\s]*\n([\s\S]+?)(?=\n\*\*|\n##|\n###|Fix Next|To Improve|Action Plan|$)/i,
+  ]
+  for (const pattern of whatWorkedPatterns) {
+    const match = feedback.match(pattern)
+    if (match && match[1].trim()) {
+      sections.whatWorked = parseBulletList(match[1])
+      if (sections.whatWorked.length > 0) break
+    }
   }
 
-  // Extract Fix Next
-  const fixNextMatch = feedback.match(/\*\*Fix Next\*\*[\s\S]*?((?:-[^\n]+\n?)+)/i)
-  if (fixNextMatch) {
-    sections.fixNext = fixNextMatch[1]
-      .split("\n")
-      .filter((line) => line.trim().startsWith("-"))
-      .map((line) => line.replace(/^-\s*/, "").trim())
-      .filter((line) => line.length > 0)
+  // Extract Fix Next / To Improve - use multiple patterns and parseBulletList
+  const fixNextPatterns = [
+    /\*\*Fix Next\*\*[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /\*\*To Improve\*\*[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /##\s*Fix Next[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /##\s*To Improve[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /###\s*Fix Next[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /###\s*To Improve[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /(?:Fix Next|To Improve)[:\s]*\n([\s\S]+?)(?=\n\*\*|\n##|\n###|Action Plan|What Worked|$)/i,
+  ]
+  for (const pattern of fixNextPatterns) {
+    const match = feedback.match(pattern)
+    if (match && match[1].trim()) {
+      sections.fixNext = parseBulletList(match[1])
+      if (sections.fixNext.length > 0) break
+    }
   }
 
-  // Extract Action Plan
-  const actionMatch = feedback.match(/\*\*Action Plan\*\*[\s\S]*?((?:\d+\.[^\n]+\n?)+)/i)
-  if (actionMatch) {
-    sections.actionPlan = actionMatch[1]
-      .split("\n")
-      .filter((line) => /^\d+\./.test(line.trim()))
-      .map((line) => line.replace(/^\d+\.\s*/, "").trim())
-      .filter((line) => line.length > 0)
+  // Extract Action Plan - use parseBulletList with numbered preference
+  const actionPatterns = [
+    /\*\*Action Plan\*\*[:\s]*([\s\S]+?)(?=\n\*\*|\n##|$)/i,
+    /##\s*Action Plan[:\s]*([\s\S]+?)(?=\n\*\*|\n##|$)/i,
+    /###\s*Action Plan[:\s]*([\s\S]+?)(?=\n\*\*|\n##|$)/i,
+  ]
+  for (const pattern of actionPatterns) {
+    const match = feedback.match(pattern)
+    if (match && match[1].trim()) {
+      sections.actionPlan = parseBulletList(match[1], true)
+      if (sections.actionPlan.length > 0) break
+    }
   }
 
   // Extract AI Watchlist

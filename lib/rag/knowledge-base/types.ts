@@ -24,6 +24,7 @@ export type KnowledgeType =
   | "pattern-review" // Pattern-specific review strategies
   | "debugging" // Debugging strategies and bug types
   | "system-design" // System design concepts and patterns
+  | "interview-behavior" // Interview communication best practices by level
 
 /**
  * Base knowledge document

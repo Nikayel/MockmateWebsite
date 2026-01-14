@@ -16,6 +16,10 @@ import {
 } from "@/lib/rag/context-builder"
 import { getPatternKnowledge } from "@/lib/rag/knowledge-base/dsa-knowledge"
 import { getCompanyInterviewKnowledge } from "@/lib/rag/knowledge-base/company-knowledge"
+import {
+  buildInterviewerLevelContext,
+  type InterviewLevel,
+} from "@/lib/rag/knowledge-base/interview-behavior-knowledge"
 import type { CompanyId } from "@/lib/data/company-questions/types"
 
 interface UserContext {
@@ -345,6 +349,11 @@ IMPORTANT: When referencing the candidate, use their first name or last name onl
 `
       : ""
 
+    // Build level-specific interviewer context
+    // This adapts questions and expectations based on candidate's experience level
+    const candidateLevel = (userInfo?.skill_level || "intermediate").toLowerCase() as InterviewLevel
+    const levelContext = buildInterviewerLevelContext(candidateLevel)
+
     // Manage workspace context with sliding window
     const managedWorkspace = manageWorkspaceContext(workspaceContext)
     let workspaceContextStr = ""
@@ -653,6 +662,7 @@ THINGS SABLE NEVER SAYS:
 
 ${companyContext}
 ${userContextString}${problemContext}
+${levelContext}
 ${isSystemDesign ? systemDesignContext : isBugFix ? bugFixContext : patternContext}
 ${edgeCaseContext}
 ${consoleContext}

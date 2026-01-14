@@ -402,6 +402,10 @@ function InterviewPageContent() {
   // Focus mode - reduces cognitive load by hiding non-essential panels
   // Research: Selective attention (Broadbent, 1958) - reducing distractors improves performance
   const [focusMode, setFocusMode] = useState(false)
+
+  // Experience level from roadmap (for level-appropriate interviewer questions)
+  // Falls back to "intermediate" if no roadmap (direct practice mode)
+  const experienceLevel = activeRoadmap?.assessment?.experienceLevel || "intermediate"
   // Calm mode - muted colors for anxiety reduction (research-backed)
   // Source: Color Psychology in UI Design 2025, UXmatters Calm Design Principles
   const [calmMode, setCalmMode] = useState(false)
@@ -1386,8 +1390,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 email: user?.email,
                 subscription_tier: userProfile.subscription_tier,
                 sessions_used: usageLimit?.used || 0,
+                skill_level: experienceLevel, // From roadmap or default
               }
-            : undefined,
+            : { skill_level: experienceLevel },
           workspaceContext: workspaceContext,
           currentCode: code,
           scenarioTitle: selectedScenario?.title,
@@ -1514,8 +1519,9 @@ Interviews are conversations, not just coding exercises.`
                 email: user?.email,
                 subscription_tier: userProfile.subscription_tier,
                 sessions_used: usageLimit?.used || 0,
+                skill_level: experienceLevel,
               }
-            : undefined,
+            : { skill_level: experienceLevel },
           workspaceContext: workspaceContext,
           currentCode: code,
           scenarioTitle: selectedScenario?.title,
@@ -1755,8 +1761,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                 email: user?.email,
                 subscription_tier: userProfile.subscription_tier,
                 sessions_used: usageLimit?.used || 0,
+                skill_level: experienceLevel,
               }
-            : undefined,
+            : { skill_level: experienceLevel },
           workspaceContext: workspaceContext,
           currentCode: code,
           scenarioTitle: selectedScenario?.title,
@@ -2848,8 +2855,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   full_name: userName,
                   subscription_tier: userProfile.subscription_tier,
                   sessions_used: usageLimit?.used || 0,
+                  skill_level: experienceLevel,
                 }
-              : undefined,
+              : { skill_level: experienceLevel },
             workspaceContext: workspaceContext,
             currentCode: code,
             scenarioTitle: selectedScenario?.title,
@@ -3399,8 +3407,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             ? {
                 email: user.email,
                 full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "",
+                skill_level: experienceLevel,
               }
-            : undefined,
+            : { skill_level: experienceLevel },
           currentCode: code,
           scenarioTitle: selectedScenario?.title,
           scenarioType: selectedScenario?.type,

@@ -337,6 +337,45 @@ Return ONLY the JSON object, nothing else.`
         }
       }
 
+      // ADDITIONAL SAFETY NET: If user has substantial engagement AND explained approach
+      // AND discussed complexity, the communication score should reflect good communication
+      // This catches cases where AI returns "basic" (50) for legitimately good sessions
+      if (
+        approachExplained &&
+        Boolean(parsed.complexityDiscussed) &&
+        hasSubstantialEngagement &&
+        communicationScore < 65
+      ) {
+        // Calculate expected minimum based on quality
+        const qualityMinimumMap: Record<string, number> = {
+          excellent: 80,
+          good: 70,
+          basic: 60,
+          poor: 45,
+          none: 30,
+        }
+        const qualityMinimum = qualityMinimumMap[approachQuality] || 50
+
+        if (communicationScore < qualityMinimum) {
+          logger.warn(
+            "[AI Validation] Boosting communication score - approach explained + complexity discussed deserves higher score",
+            {
+              originalScore: communicationScore,
+              newScore: qualityMinimum,
+              approachQuality,
+              complexityDiscussed: parsed.complexityDiscussed,
+              edgeCasesConsidered,
+            }
+          )
+          communicationScore = qualityMinimum
+        }
+      }
+
+      // Bonus for edge case discussion - this shows proactive thinking
+      if (edgeCasesConsidered && communicationScore < 75) {
+        communicationScore = Math.min(80, communicationScore + 5)
+      }
+
       // Log validation results for debugging
       logger.info("[AI Validation] Result", {
         edgeCasesConsidered,
