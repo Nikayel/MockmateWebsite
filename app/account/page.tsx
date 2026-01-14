@@ -78,6 +78,7 @@ export default function AccountPage() {
     inactivity_reminders: true,
     spaced_repetition_reminders: true,
     milestone_celebrations: true,
+    roadmap_reminders: true,
     marketing_emails: false,
   })
   const [isSavingPrefs, setIsSavingPrefs] = useState(false)

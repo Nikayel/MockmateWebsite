@@ -55,6 +55,7 @@ export interface NotificationPreferences {
   inactivity_reminders: boolean
   spaced_repetition_reminders: boolean
   milestone_celebrations: boolean
+  roadmap_reminders: boolean
   marketing_emails: boolean
   timezone?: string
   preferred_hours?: number[]
