@@ -31,6 +31,18 @@ export type CompanyId =
   | "robinhood"
   | "square"
   | "figma"
+  // Popular tech companies for interns and new grads
+  | "roblox"
+  | "tiktok"
+  | "nvidia"
+  | "salesforce"
+  | "snap"
+  | "pinterest"
+  | "reddit"
+  | "atlassian"
+  | "oracle"
+  | "spotify"
+  | "twitch"
 
 export type QuestionFrequency = "very_common" | "common" | "occasional" | "rare"
 

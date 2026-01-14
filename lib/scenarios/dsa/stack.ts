@@ -12,7 +12,7 @@ export const stackScenarios: DSAScenario[] = [
     type: "dsa",
     pattern: "stack",
     difficulty: "easy",
-    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    companies: ["Amazon", "Google", "Meta", "Microsoft", "Roblox", "TikTok"],
     description: "Determine if a string containing parentheses is valid",
     tags: ["stack", "string"],
     estimatedTime: 15,
@@ -421,7 +421,7 @@ impl MinStack {
     type: "dsa",
     pattern: "stack",
     difficulty: "medium",
-    companies: ["Amazon", "Google", "Meta", "Microsoft"],
+    companies: ["Amazon", "Google", "Meta", "Microsoft", "TikTok"],
     description: "Find days until warmer temperature using monotonic stack",
     tags: ["stack", "monotonic-stack", "array"],
     estimatedTime: 25,
@@ -1096,11 +1096,22 @@ A car can never pass another car ahead of it, but it can catch up to it and driv
 
 Return the number of car fleets that will arrive at the destination.`,
     examples: [
-      { input: "target = 12, position = [10,8,0,5,3], speed = [2,4,1,1,3]", output: "3", explanation: "Car at 10 forms fleet 1. Cars at 8,5,3 catch up to car at 10 forming fleet 2. Car at 0 is fleet 3." },
+      {
+        input: "target = 12, position = [10,8,0,5,3], speed = [2,4,1,1,3]",
+        output: "3",
+        explanation:
+          "Car at 10 forms fleet 1. Cars at 8,5,3 catch up to car at 10 forming fleet 2. Car at 0 is fleet 3.",
+      },
       { input: "target = 10, position = [3], speed = [3]", output: "1" },
       { input: "target = 100, position = [0,2,4], speed = [4,2,1]", output: "1" },
     ],
-    constraints: ["n == position.length == speed.length", "1 <= n <= 10^5", "0 < target <= 10^6", "0 <= position[i] < target", "0 < speed[i] <= 10^6"],
+    constraints: [
+      "n == position.length == speed.length",
+      "1 <= n <= 10^5",
+      "0 < target <= 10^6",
+      "0 <= position[i] < target",
+      "0 < speed[i] <= 10^6",
+    ],
     hints: [
       "Sort cars by position in decreasing order (closest to target first)",
       "Calculate time to reach target for each car",
@@ -1114,9 +1125,17 @@ Return the number of car fleets that will arrive at the destination.`,
     },
     optimalComplexity: { time: "O(n log n)", space: "O(n)" },
     testCases: [
-      { input: { target: 12, position: [10, 8, 0, 5, 3], speed: [2, 4, 1, 1, 3] }, expected: 3, description: "Multiple fleets" },
+      {
+        input: { target: 12, position: [10, 8, 0, 5, 3], speed: [2, 4, 1, 1, 3] },
+        expected: 3,
+        description: "Multiple fleets",
+      },
       { input: { target: 10, position: [3], speed: [3] }, expected: 1, description: "Single car" },
-      { input: { target: 100, position: [0, 2, 4], speed: [4, 2, 1] }, expected: 1, description: "All merge" },
+      {
+        input: { target: 100, position: [0, 2, 4], speed: [4, 2, 1] },
+        expected: 1,
+        description: "All merge",
+      },
     ],
   },
   {
@@ -1131,7 +1150,11 @@ Return the number of car fleets that will arrive at the destination.`,
     estimatedTime: 30,
     problemStatement: `Given n non-negative integers representing an elevation map where the width of each bar is 1, compute how much water it can trap after raining.`,
     examples: [
-      { input: "height = [0,1,0,2,1,0,1,3,2,1,2,1]", output: "6", explanation: "The elevation map traps 6 units of rain water." },
+      {
+        input: "height = [0,1,0,2,1,0,1,3,2,1,2,1]",
+        output: "6",
+        explanation: "The elevation map traps 6 units of rain water.",
+      },
       { input: "height = [4,2,0,3,2,5]", output: "9" },
     ],
     constraints: ["n == height.length", "1 <= n <= 2 * 10^4", "0 <= height[i] <= 10^5"],
@@ -1149,7 +1172,11 @@ Return the number of car fleets that will arrive at the destination.`,
     },
     optimalComplexity: { time: "O(n)", space: "O(1) with two pointers" },
     testCases: [
-      { input: { height: [0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1] }, expected: 6, description: "Standard case" },
+      {
+        input: { height: [0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1] },
+        expected: 6,
+        description: "Standard case",
+      },
       { input: { height: [4, 2, 0, 3, 2, 5] }, expected: 9, description: "Valley in middle" },
       { input: { height: [1, 2, 3, 4, 5] }, expected: 0, description: "Ascending - no water" },
     ],
@@ -1172,10 +1199,18 @@ For each 0 <= i < nums1.length, find the index j such that nums1[i] == nums2[j] 
 
 Return an array ans of length nums1.length such that ans[i] is the next greater element as described above.`,
     examples: [
-      { input: "nums1 = [4,1,2], nums2 = [1,3,4,2]", output: "[-1,3,-1]", explanation: "For 4: no greater to right. For 1: 3 is next greater. For 2: no greater." },
+      {
+        input: "nums1 = [4,1,2], nums2 = [1,3,4,2]",
+        output: "[-1,3,-1]",
+        explanation: "For 4: no greater to right. For 1: 3 is next greater. For 2: no greater.",
+      },
       { input: "nums1 = [2,4], nums2 = [1,2,3,4]", output: "[3,-1]" },
     ],
-    constraints: ["1 <= nums1.length <= nums2.length <= 1000", "0 <= nums1[i], nums2[i] <= 10^4", "All integers in nums1 and nums2 are unique."],
+    constraints: [
+      "1 <= nums1.length <= nums2.length <= 1000",
+      "0 <= nums1[i], nums2[i] <= 10^4",
+      "All integers in nums1 and nums2 are unique.",
+    ],
     hints: [
       "Use monotonic decreasing stack on nums2",
       "Build a map from element to its next greater",
@@ -1189,8 +1224,16 @@ Return an array ans of length nums1.length such that ans[i] is the next greater 
     },
     optimalComplexity: { time: "O(n + m)", space: "O(n)" },
     testCases: [
-      { input: { nums1: [4, 1, 2], nums2: [1, 3, 4, 2] }, expected: [-1, 3, -1], description: "Mixed results" },
-      { input: { nums1: [2, 4], nums2: [1, 2, 3, 4] }, expected: [3, -1], description: "Ascending array" },
+      {
+        input: { nums1: [4, 1, 2], nums2: [1, 3, 4, 2] },
+        expected: [-1, 3, -1],
+        description: "Mixed results",
+      },
+      {
+        input: { nums1: [2, 4], nums2: [1, 2, 3, 4] },
+        expected: [3, -1],
+        description: "Ascending array",
+      },
     ],
   },
   {
@@ -1207,7 +1250,12 @@ Return an array ans of length nums1.length such that ans[i] is the next greater 
 
 The next greater number of a number x is the first greater number to its traversing-order next in the array, which means you could search circularly to find its next greater number. If it doesn't exist, return -1 for this number.`,
     examples: [
-      { input: "nums = [1,2,1]", output: "[2,-1,2]", explanation: "First 1's next greater is 2; 2 has none; Second 1's next greater is 2 (circular)." },
+      {
+        input: "nums = [1,2,1]",
+        output: "[2,-1,2]",
+        explanation:
+          "First 1's next greater is 2; 2 has none; Second 1's next greater is 2 (circular).",
+      },
       { input: "nums = [1,2,3,4,3]", output: "[2,3,4,-1,4]" },
     ],
     constraints: ["1 <= nums.length <= 10^4", "-10^9 <= nums[i] <= 10^9"],
@@ -1225,7 +1273,11 @@ The next greater number of a number x is the first greater number to its travers
     optimalComplexity: { time: "O(n)", space: "O(n)" },
     testCases: [
       { input: { nums: [1, 2, 1] }, expected: [2, -1, 2], description: "Circular wrap" },
-      { input: { nums: [1, 2, 3, 4, 3] }, expected: [2, 3, 4, -1, 4], description: "Peak in middle" },
+      {
+        input: { nums: [1, 2, 3, 4, 3] },
+        expected: [2, 3, 4, -1, 4],
+        description: "Peak in middle",
+      },
     ],
   },
   {
@@ -1248,7 +1300,11 @@ Implement the StockSpanner class:
 - StockSpanner() Initializes the object.
 - int next(int price) Returns the span of the stock's price given that today's price is price.`,
     examples: [
-      { input: '["StockSpanner", "next", "next", "next", "next", "next", "next", "next"]\n[[], [100], [80], [60], [70], [60], [75], [85]]', output: "[null, 1, 1, 1, 2, 1, 4, 6]" },
+      {
+        input:
+          '["StockSpanner", "next", "next", "next", "next", "next", "next", "next"]\n[[], [100], [80], [60], [70], [60], [75], [85]]',
+        output: "[null, 1, 1, 1, 2, 1, 4, 6]",
+      },
     ],
     constraints: ["1 <= price <= 10^5", "At most 10^4 calls will be made to next."],
     hints: [
@@ -1264,7 +1320,14 @@ Implement the StockSpanner class:
     },
     optimalComplexity: { time: "O(1) amortized per call", space: "O(n)" },
     testCases: [
-      { input: { ops: ["StockSpanner", "next", "next", "next", "next"], args: [[], [100], [80], [60], [70]] }, expected: [null, 1, 1, 1, 2], description: "Basic operations" },
+      {
+        input: {
+          ops: ["StockSpanner", "next", "next", "next", "next"],
+          args: [[], [100], [80], [60], [70]],
+        },
+        expected: [null, 1, 1, 1, 2],
+        description: "Basic operations",
+      },
     ],
   },
   {
@@ -1282,8 +1345,16 @@ Implement the StockSpanner class:
 Return true if there is a 132 pattern in nums, otherwise, return false.`,
     examples: [
       { input: "nums = [1,2,3,4]", output: "false", explanation: "No 132 pattern exists." },
-      { input: "nums = [3,1,4,2]", output: "true", explanation: "There is a 132 pattern: [1, 4, 2]." },
-      { input: "nums = [-1,3,2,0]", output: "true", explanation: "There are three 132 patterns: [-1, 3, 2], [-1, 3, 0] and [-1, 2, 0]." },
+      {
+        input: "nums = [3,1,4,2]",
+        output: "true",
+        explanation: "There is a 132 pattern: [1, 4, 2].",
+      },
+      {
+        input: "nums = [-1,3,2,0]",
+        output: "true",
+        explanation: "There are three 132 patterns: [-1, 3, 2], [-1, 3, 0] and [-1, 2, 0].",
+      },
     ],
     constraints: ["n == nums.length", "1 <= n <= 2 * 10^5", "-10^9 <= nums[i] <= 10^9"],
     hints: [
@@ -1322,7 +1393,13 @@ Implement the FreqStack class:
 - void push(int val) pushes an integer val onto the top of the stack.
 - int pop() removes and returns the most frequent element in the stack. If there is a tie, the element closest to the top is removed and returned.`,
     examples: [
-      { input: '["FreqStack", "push", "push", "push", "push", "push", "push", "pop", "pop", "pop", "pop"]\n[[], [5], [7], [5], [7], [4], [5], [], [], [], []]', output: "[null, null, null, null, null, null, null, 5, 7, 5, 4]", explanation: "After pushes, frequencies are 5:3, 7:2, 4:1. Pop returns 5 (most frequent), then 7, 5, 4." },
+      {
+        input:
+          '["FreqStack", "push", "push", "push", "push", "push", "push", "pop", "pop", "pop", "pop"]\n[[], [5], [7], [5], [7], [4], [5], [], [], [], []]',
+        output: "[null, null, null, null, null, null, null, 5, 7, 5, 4]",
+        explanation:
+          "After pushes, frequencies are 5:3, 7:2, 4:1. Pop returns 5 (most frequent), then 7, 5, 4.",
+      },
     ],
     constraints: ["0 <= val <= 10^9", "At most 2 * 10^4 calls will be made to push and pop."],
     hints: [
@@ -1339,7 +1416,11 @@ Implement the FreqStack class:
     },
     optimalComplexity: { time: "O(1) per operation", space: "O(n)" },
     testCases: [
-      { input: { ops: ["FreqStack", "push", "push", "push", "pop"], args: [[], [5], [7], [5], []] }, expected: [null, null, null, null, 5], description: "Pop most frequent" },
+      {
+        input: { ops: ["FreqStack", "push", "push", "push", "pop"], args: [[], [5], [7], [5], []] },
+        expected: [null, null, null, null, 5],
+        description: "Pop most frequent",
+      },
     ],
   },
 ]

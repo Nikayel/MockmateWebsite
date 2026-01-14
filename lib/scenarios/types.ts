@@ -55,6 +55,17 @@ export type Company =
   | "Palantir"
   | "Veeva"
   | "Salesforce"
+  // Popular tech companies for interns and new grads
+  | "Roblox"
+  | "TikTok"
+  | "NVIDIA"
+  | "Snap"
+  | "Pinterest"
+  | "Reddit"
+  | "Atlassian"
+  | "Oracle"
+  | "Spotify"
+  | "Twitch"
 
 export interface BaseScenario {
   id: string
