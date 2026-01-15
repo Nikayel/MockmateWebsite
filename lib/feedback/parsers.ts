@@ -368,46 +368,61 @@ export function injectScoresIntoFeedback(
   let result = feedback
 
   // Replace scores in Score Snapshot section with correct values
-  // Handle different label formats based on scenario type
+  // Handle different label formats: "- Label:", "• Label:", "Label:", etc.
+  // The pattern matches optional bullet (-, •, *) followed by label and score
+  const bulletPrefix = "[-•*]?\\s*"
+
   if (scenarioType === "system-design") {
     result = result.replace(
-      /(-\s*Requirements:?\s*)\d+(\s*\/\s*100)/gi,
+      new RegExp(`(${bulletPrefix}Requirements:?\\s*)\\d+(\\s*/\\s*100)`, "gi"),
       `$1${scores.understanding}$2`
     )
     result = result.replace(
-      /(-\s*Architecture:?\s*)\d+(\s*\/\s*100)/gi,
+      new RegExp(`(${bulletPrefix}Architecture:?\\s*)\\d+(\\s*/\\s*100)`, "gi"),
       `$1${scores.problemSolving}$2`
     )
-    result = result.replace(/(-\s*Scalability:?\s*)\d+(\s*\/\s*100)/gi, `$1${scores.codeQuality}$2`)
-  } else if (scenarioType === "bugfix") {
-    result = result.replace(/(-\s*Bug Found:?\s*)\d+(\s*\/\s*100)/gi, `$1${scores.understanding}$2`)
     result = result.replace(
-      /(-\s*Root Cause:?\s*)\d+(\s*\/\s*100)/gi,
+      new RegExp(`(${bulletPrefix}Scalability:?\\s*)\\d+(\\s*/\\s*100)`, "gi"),
+      `$1${scores.codeQuality}$2`
+    )
+  } else if (scenarioType === "bugfix") {
+    result = result.replace(
+      new RegExp(`(${bulletPrefix}Bug Found:?\\s*)\\d+(\\s*/\\s*100)`, "gi"),
+      `$1${scores.understanding}$2`
+    )
+    result = result.replace(
+      new RegExp(`(${bulletPrefix}Root Cause:?\\s*)\\d+(\\s*/\\s*100)`, "gi"),
       `$1${scores.problemSolving}$2`
     )
-    result = result.replace(/(-\s*Fix Quality:?\s*)\d+(\s*\/\s*100)/gi, `$1${scores.codeQuality}$2`)
+    result = result.replace(
+      new RegExp(`(${bulletPrefix}Fix Quality:?\\s*)\\d+(\\s*/\\s*100)`, "gi"),
+      `$1${scores.codeQuality}$2`
+    )
   } else {
     // Default DSA format
     result = result.replace(
-      /(-\s*Understanding:?\s*)\d+(\s*\/\s*100)/gi,
+      new RegExp(`(${bulletPrefix}Understanding:?\\s*)\\d+(\\s*/\\s*100)`, "gi"),
       `$1${scores.understanding}$2`
     )
     result = result.replace(
-      /(-\s*Problem[-\s]?Solving:?\s*)\d+(\s*\/\s*100)/gi,
+      new RegExp(`(${bulletPrefix}Problem[-\\s]?Solving:?\\s*)\\d+(\\s*/\\s*100)`, "gi"),
       `$1${scores.problemSolving}$2`
     )
     result = result.replace(
-      /(-\s*Code\s*Quality:?\s*)\d+(\s*\/\s*100)/gi,
+      new RegExp(`(${bulletPrefix}Code\\s*Quality:?\\s*)\\d+(\\s*/\\s*100)`, "gi"),
       `$1${scores.codeQuality}$2`
     )
   }
 
   // Communication and Overall are common across all types
   result = result.replace(
-    /(-\s*Communication:?\s*)\d+(\s*\/\s*100)/gi,
+    new RegExp(`(${bulletPrefix}Communication:?\\s*)\\d+(\\s*/\\s*100)`, "gi"),
     `$1${scores.communication}$2`
   )
-  result = result.replace(/(-\s*Overall:?\s*)\d+(\s*\/\s*100)/gi, `$1${scores.overall}$2`)
+  result = result.replace(
+    new RegExp(`(${bulletPrefix}Overall:?\\s*)\\d+(\\s*/\\s*100)`, "gi"),
+    `$1${scores.overall}$2`
+  )
 
   return result
 }

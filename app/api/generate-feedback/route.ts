@@ -156,9 +156,10 @@ CRITICAL FORMATTING RULES:
 - specific improvement for system design interviews
 
 **Action Plan**
-1. If score < 25: "IMMEDIATE: Understand that system design interviews require active discussion."
-2. Short-term: concepts to study
-3. Long-term: projects to build
+CRITICAL: Don't suggest generic improvements the user already demonstrated. If they communicated well, don't tell them to communicate more.
+1. If score < 25: "IMMEDIATE: Understand that system design interviews require active discussion." If score >= 70, suggest a specific deeper dive (e.g., "Design the caching layer in detail")
+2. Short-term: Name a specific system to study that builds on what they discussed (e.g., "Study how Netflix handles CDN caching")
+3. Long-term: Suggest a hands-on project related to the design (e.g., "Build a simple distributed cache to understand trade-offs firsthand")
 
 SYSTEM DESIGN FOCUS:
 - Evaluate requirements gathering, not code
@@ -197,9 +198,10 @@ CRITICAL FORMATTING RULES:
 - specific improvement for debugging skills
 
 **Action Plan**
-1. Immediate debugging technique to practice
-2. Short-term: debugging patterns to learn
-3. Long-term: codebase understanding to build
+CRITICAL: Don't suggest improvements the user already demonstrated. If they found the bug quickly, focus on next-level skills.
+1. IMMEDIATE: If they struggled, suggest a specific debugging technique. If they succeeded, suggest a harder bug type to practice (e.g., "Try race condition bugs next")
+2. Short-term: Name a specific debugging tool or pattern to learn (e.g., "Practice using binary search debugging on large codebases")
+3. Long-term: Connect to real-world debugging scenarios (e.g., "Contribute to an open-source project to practice debugging unfamiliar code")
 
 BUG FIX FOCUS:
 - Evaluate the debugging process, not just the fix
@@ -265,9 +267,16 @@ CRITICAL FORMATTING RULES:
 - Third improvement if applicable
 
 **Action Plan**
-1. IMMEDIATE: First concrete action
-2. Short-term: Second action
-3. Long-term: Third action
+CRITICAL RULES FOR ACTION PLAN:
+- NEVER suggest improving something the user already demonstrated well (e.g., don't say "explain before coding" if they did explain)
+- If communication score >= 80, don't suggest communication improvements - focus on technical growth
+- If all scores >= 80, focus on NEXT LEVEL challenges (harder problems, new patterns, speed optimization)
+- Action items must be SPECIFIC and reference the actual problem/pattern attempted
+- Reference related problems by name when suggesting practice (e.g., "Try Contains Duplicate II" not "try similar problems")
+
+1. IMMEDIATE: If score >= 80, suggest implementing an alternative approach discussed OR a direct follow-up problem. If score < 80, address the biggest gap.
+2. Short-term: Suggest a specific harder variation or related pattern to practice (name the problem)
+3. Long-term: Connect to their target company prep or broader skill development
 
 DSA FOCUS:
 - Reference actual data (tests passed, complexity, time).

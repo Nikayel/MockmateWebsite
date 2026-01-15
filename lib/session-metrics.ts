@@ -693,24 +693,26 @@ async function syncScoreToInterviewSession(
   isReconstructedSession: boolean = false
 ): Promise<void> {
   try {
-    // If this is a reconstructed session (fallback data), check if authoritative score already exists
-    if (isReconstructedSession) {
-      const sessionDoc = await adminDb.collection("interview_sessions").doc(sessionId).get()
-      const existingData = sessionDoc.data()
+    // ALWAYS check if authoritative score already exists from generate-feedback API
+    // The feedback API calculates scores with full AI validation - those are the source of truth
+    // Our locally-calculated scores from interaction metrics are less accurate
+    const sessionDoc = await adminDb.collection("interview_sessions").doc(sessionId).get()
+    const existingData = sessionDoc.data()
 
-      // If feedback_status is 'complete' and we have a performance_score, the generate-feedback API
-      // already set the authoritative score - don't overwrite it with our incomplete data
-      if (
-        existingData?.feedback_status === "complete" &&
-        typeof existingData?.performance_score === "number"
-      ) {
-        console.log(
-          `[Session Metrics] Skipping score sync for ${sessionId} - authoritative score exists from generate-feedback (${existingData.performance_score})`
-        )
-        return
-      }
+    // If feedback_status is 'complete' and we have a score_breakdown, the generate-feedback API
+    // already set the authoritative scores - don't overwrite them with our estimated scores
+    if (
+      existingData?.feedback_status === "complete" &&
+      existingData?.score_breakdown &&
+      typeof existingData.score_breakdown.understandingScore === "number"
+    ) {
+      console.log(
+        `[Session Metrics] Skipping score sync for ${sessionId} - authoritative score_breakdown exists from generate-feedback`
+      )
+      return
     }
 
+    // Only sync scores if no authoritative scores exist (fallback case)
     await adminDb
       .collection("interview_sessions")
       .doc(sessionId)

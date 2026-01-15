@@ -802,22 +802,18 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       else if (scenarioId && !sessionId && (fromRoadmap || fromPractice)) {
         const scenario = getScenarioById(scenarioId)
         if (scenario) {
-          // Check if there's already a submitted or evaluating session for this scenario
+          // Check if there's already an evaluating session for this scenario
+          // Only redirect if evaluating - otherwise let user start a new session
           if (user?.id && !fromPractice) {
             const existingSession = await findLatestSubmittedSession(user.id, scenarioId)
-            if (existingSession) {
-              if (existingSession.isEvaluating) {
-                toast.info("Session is being evaluated", {
-                  description: "Redirecting to your results...",
-                })
-              } else {
-                toast.info("Session already submitted", {
-                  description: "Redirecting to your results...",
-                })
-              }
+            if (existingSession?.isEvaluating) {
+              toast.info("Session is being evaluated", {
+                description: "Redirecting to your results...",
+              })
               router.push(`/sessions/${existingSession.sessionId}`)
               return
             }
+            // If session was completed but not evaluating, allow user to start fresh
           }
 
           // Just select the scenario - don't auto-start, let user click Start Interview
@@ -2256,6 +2252,15 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           spaceComplexity: efficiencyMetrics?.estimatedSpaceComplexity,
           efficiencyScore: efficiencyMetrics?.efficiencyScore,
           feedbackStatus: "complete", // Feedback generation is done
+          // CRITICAL: Include scoreBreakdown to prevent overwriting scores
+          scoreBreakdown: scoreBreakdown
+            ? {
+                understanding: scoreBreakdown.understandingScore,
+                problemSolving: scoreBreakdown.problemSolvingScore,
+                codeQuality: scoreBreakdown.codeQualityScore,
+                communication: scoreBreakdown.communicationScore,
+              }
+            : undefined,
         })
 
         // Store system design notes if not already stored
