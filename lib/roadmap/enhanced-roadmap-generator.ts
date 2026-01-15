@@ -428,15 +428,15 @@ export function buildEnhancedDailySchedule(
     .sort((a, b) => b.avgPriority - a.avgPriority)
 
   let remainingQuestions = [...prioritizedQuestions]
-  // Use noon local time to avoid timezone issues when dates are stored as UTC
-  // and later converted back - noon ensures the date stays the same day in most timezones
+  // Store dates as UTC midnight to ensure consistent comparison across timezones.
+  // The comparison logic in utils.ts uses getStoredDateComponents which extracts year/month/day
+  // from the UTC representation for UTC midnight dates, so we store dates at UTC midnight.
   const today = new Date()
-  today.setHours(12, 0, 0, 0)
+  const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()))
 
   for (let day = 0; day < availableDays && remainingQuestions.length > 0; day++) {
-    const dayDate = new Date(today)
-    dayDate.setDate(dayDate.getDate() + day)
-    dayDate.setHours(12, 0, 0, 0) // Ensure noon time for each day
+    const dayDate = new Date(todayUTC)
+    dayDate.setUTCDate(dayDate.getUTCDate() + day)
 
     // Determine focus cluster for today (rotate)
     const focusClusterIndex = day % clusterOrder.length
@@ -535,9 +535,8 @@ export function buildEnhancedDailySchedule(
 
   // Add review days
   for (let i = 0; i < config.reviewBufferDays; i++) {
-    const dayDate = new Date(today)
-    dayDate.setDate(dayDate.getDate() + availableDays + i)
-    dayDate.setHours(12, 0, 0, 0) // Ensure noon time for timezone safety
+    const dayDate = new Date(todayUTC)
+    dayDate.setUTCDate(dayDate.getUTCDate() + availableDays + i)
 
     const reviewThemes = [
       "Review Day - Weak Areas",

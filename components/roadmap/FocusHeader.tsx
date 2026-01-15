@@ -7,7 +7,7 @@ import {
   isStoredDateToday,
   isStoredDatePast,
   isStoredDateFuture,
-  getUTCDateComponents,
+  getStoredDateComponents,
 } from "@/lib/utils"
 import { DailyPlan, PersonalizedRoadmap } from "@/lib/data/company-questions/types"
 
@@ -41,15 +41,14 @@ export function FocusHeader({
   ragEnhancements,
 }: FocusHeaderProps) {
   // Determine if this is today, past, or future
-  // Use timezone-safe comparison: plan dates are stored as UTC midnight,
-  // so we compare the UTC date with local today to handle timezone differences correctly.
+  // Use timezone-safe comparison that handles both UTC midnight and local noon formats
   const planDate = new Date(plan.date)
   const isToday = isStoredDateToday(planDate)
   const isPast = isStoredDatePast(planDate)
   const isFuture = isStoredDateFuture(planDate)
 
-  // Format date for display using UTC components to show the "intended" date
-  const planDateComponents = getUTCDateComponents(planDate)
+  // Format date for display using stored date components (handles both formats)
+  const planDateComponents = getStoredDateComponents(planDate)
   const displayDate = new Date(
     planDateComponents.year,
     planDateComponents.month,

@@ -17,8 +17,49 @@ export function cn(...inputs: ClassValue[]) {
  */
 
 /**
- * Extracts date components from a date that was stored as UTC midnight.
- * This returns the "intended" date regardless of the user's timezone.
+ * Extracts the "intended" date components from a stored date.
+ *
+ * Roadmap dates represent calendar days (e.g., "Jan 14") and should be compared
+ * as calendar days regardless of timezone. New roadmaps store dates at UTC midnight,
+ * but legacy roadmaps may have stored dates at local noon.
+ *
+ * This function detects the storage format and extracts the intended date:
+ * - UTC midnight (00:00:00 UTC) -> use UTC components (new format)
+ * - Other times -> use local components (legacy format, stored at local noon)
+ */
+export function getStoredDateComponents(date: Date): {
+  year: number
+  month: number
+  day: number
+} {
+  // Check if this is UTC midnight (new format)
+  const isUTCMidnight =
+    date.getUTCHours() === 0 &&
+    date.getUTCMinutes() === 0 &&
+    date.getUTCSeconds() === 0 &&
+    date.getUTCMilliseconds() === 0
+
+  if (isUTCMidnight) {
+    // New format: date was stored as UTC midnight, use UTC components
+    return {
+      year: date.getUTCFullYear(),
+      month: date.getUTCMonth(),
+      day: date.getUTCDate(),
+    }
+  } else {
+    // Legacy format: date was stored at local noon, use local components
+    // This preserves the original intended date for existing roadmaps
+    return {
+      year: date.getFullYear(),
+      month: date.getMonth(),
+      day: date.getDate(),
+    }
+  }
+}
+
+/**
+ * @deprecated Use getStoredDateComponents instead for roadmap dates.
+ * This function assumes UTC midnight storage which may not be true for legacy data.
  */
 export function getUTCDateComponents(date: Date): {
   year: number
@@ -48,30 +89,30 @@ export function getLocalDateComponents(date: Date = new Date()): {
 }
 
 /**
- * Compares a stored UTC date with today's local date.
+ * Compares a stored date with today's local date.
  * Returns true if the stored date represents the same calendar day as today.
  *
- * @param storedDate - Date object created from a UTC midnight timestamp
+ * @param storedDate - Date object from roadmap (may be UTC midnight or local noon)
  * @param localDate - Optional local date to compare against (defaults to now)
  */
 export function isStoredDateToday(storedDate: Date, localDate: Date = new Date()): boolean {
-  const stored = getUTCDateComponents(storedDate)
+  const stored = getStoredDateComponents(storedDate)
   const local = getLocalDateComponents(localDate)
   return stored.year === local.year && stored.month === local.month && stored.day === local.day
 }
 
 /**
- * Compares a stored UTC date with a local date.
+ * Compares a stored date with a local date.
  * Returns:
  *  - negative if stored date is before local date
  *  - 0 if same day
  *  - positive if stored date is after local date
  *
- * @param storedDate - Date object created from a UTC midnight timestamp
+ * @param storedDate - Date object from roadmap (may be UTC midnight or local noon)
  * @param localDate - Optional local date to compare against (defaults to now)
  */
 export function compareStoredDateWithLocal(storedDate: Date, localDate: Date = new Date()): number {
-  const stored = getUTCDateComponents(storedDate)
+  const stored = getStoredDateComponents(storedDate)
   const local = getLocalDateComponents(localDate)
 
   // Create comparable timestamps (using UTC to avoid timezone shifts)

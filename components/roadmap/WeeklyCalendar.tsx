@@ -7,7 +7,7 @@ import { DailyPlan } from "@/lib/data/company-questions/types"
 import {
   cn,
   getLocalDateComponents,
-  getUTCDateComponents,
+  getStoredDateComponents,
   isStoredDateToday,
   isStoredDatePast,
 } from "@/lib/utils"
@@ -24,11 +24,11 @@ export function WeeklyCalendar({ dailyPlans, selectedDayIndex, onSelectDay }: We
   const localToday = getLocalDateComponents(today)
 
   // Find today's index using timezone-safe comparison:
-  // Plan dates are stored as UTC midnight, so we use UTC methods to get the "intended" date
-  // and compare with local today.
+  // Plan dates may be stored as UTC midnight (new) or local noon (legacy).
+  // getStoredDateComponents handles both formats to get the intended date.
   const todayIndex = dailyPlans.findIndex((plan) => {
     const planDate = new Date(plan.date)
-    const planComponents = getUTCDateComponents(planDate)
+    const planComponents = getStoredDateComponents(planDate)
     return (
       planComponents.year === localToday.year &&
       planComponents.month === localToday.month &&
@@ -203,9 +203,9 @@ function DayCell({
   onHover: () => void
   onLeave: () => void
 }) {
-  // Use UTC components to display the "intended" date from the stored UTC midnight timestamp
+  // Get the intended date components (handles both UTC midnight and local noon formats)
   const planDate = new Date(plan.date)
-  const planComponents = getUTCDateComponents(planDate)
+  const planComponents = getStoredDateComponents(planDate)
   const displayDate = new Date(planComponents.year, planComponents.month, planComponents.day)
   const dayName = displayDate.toLocaleDateString("en-US", { weekday: "short" })
   const dayNum = planComponents.day

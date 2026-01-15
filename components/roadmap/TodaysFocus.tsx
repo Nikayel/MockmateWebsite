@@ -7,7 +7,7 @@ import { FocusHeader } from "./FocusHeader"
 import { FocusQuestionsList } from "./FocusQuestionsList"
 import { FocusCompletionBanner } from "./FocusCompletionBanner"
 import { RAGExplanationModal } from "./RAGExplanationModal"
-import { isStoredDateToday, getUTCDateComponents } from "@/lib/utils"
+import { isStoredDateToday, getStoredDateComponents } from "@/lib/utils"
 
 type RAGEnhancements = NonNullable<PersonalizedRoadmap["ragEnhancements"]>
 
@@ -46,13 +46,12 @@ export function TodaysFocus({
   const completedMinutes = completedQuestions.reduce((sum, q) => sum + q.estimatedMinutes, 0)
 
   // Determine if this is today
-  // Use timezone-safe comparison: plan dates are stored as UTC midnight,
-  // so we compare the UTC date with local today to handle timezone differences correctly.
+  // Use timezone-safe comparison that handles both UTC midnight and local noon formats
   const planDate = new Date(plan.date)
   const isToday = isStoredDateToday(planDate)
 
-  // Format date for display using UTC components to show the "intended" date
-  const planDateComponents = getUTCDateComponents(planDate)
+  // Format date for display using stored date components (handles both formats)
+  const planDateComponents = getStoredDateComponents(planDate)
   const displayDate = new Date(
     planDateComponents.year,
     planDateComponents.month,

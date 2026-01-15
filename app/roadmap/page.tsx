@@ -55,7 +55,7 @@ import { useRoadmapStore, useActiveRoadmap } from "@/lib/stores/roadmap-store"
 import { getCompanyById } from "@/lib/data/company-questions"
 import { getStudyRecommendations } from "@/lib/roadmap/prioritization-algorithm"
 import { generatePersonalizedGuide } from "@/lib/roadmap/personalized-guide-generator"
-import { cn, getUTCDateComponents, getLocalDateComponents } from "@/lib/utils"
+import { cn, getStoredDateComponents, getLocalDateComponents } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 
 /**
@@ -109,7 +109,7 @@ export default function RoadmapPage() {
     roadmap?.dailyPlans.findIndex((plan) => {
       const planDate = new Date(plan.date)
       // Use UTC methods to get the intended date from the stored UTC midnight timestamp
-      const planDateComponents = getUTCDateComponents(planDate)
+      const planDateComponents = getStoredDateComponents(planDate)
       return (
         planDateComponents.year === localToday.year &&
         planDateComponents.month === localToday.month &&
@@ -128,7 +128,7 @@ export default function RoadmapPage() {
     let bestIndex = 0
     for (let i = 0; i < roadmap.dailyPlans.length; i++) {
       const planDate = new Date(roadmap.dailyPlans[i].date)
-      const planComponents = getUTCDateComponents(planDate)
+      const planComponents = getStoredDateComponents(planDate)
       const planTimestamp = Date.UTC(planComponents.year, planComponents.month, planComponents.day)
 
       if (planTimestamp <= localTodayTimestamp) {
@@ -215,7 +215,7 @@ export default function RoadmapPage() {
             let correctDayIndex =
               roadmap.dailyPlans?.findIndex((plan: any) => {
                 const planDate = new Date(plan.date)
-                const planDateComponents = getUTCDateComponents(planDate)
+                const planDateComponents = getStoredDateComponents(planDate)
                 return (
                   planDateComponents.year === localTodayForInit.year &&
                   planDateComponents.month === localTodayForInit.month &&
@@ -228,7 +228,7 @@ export default function RoadmapPage() {
               correctDayIndex = 0
               for (let i = 0; i < roadmap.dailyPlans.length; i++) {
                 const planDate = new Date(roadmap.dailyPlans[i].date)
-                const planComponents = getUTCDateComponents(planDate)
+                const planComponents = getStoredDateComponents(planDate)
                 const planTimestamp = Date.UTC(
                   planComponents.year,
                   planComponents.month,
@@ -488,7 +488,7 @@ export default function RoadmapPage() {
           let correctDayIndex =
             roadmap.dailyPlans?.findIndex((plan: any) => {
               const planDate = new Date(plan.date)
-              const planDateComponents = getUTCDateComponents(planDate)
+              const planDateComponents = getStoredDateComponents(planDate)
               return (
                 planDateComponents.year === localTodayForReactivate.year &&
                 planDateComponents.month === localTodayForReactivate.month &&
@@ -501,7 +501,7 @@ export default function RoadmapPage() {
             correctDayIndex = 0
             for (let i = 0; i < roadmap.dailyPlans.length; i++) {
               const planDate = new Date(roadmap.dailyPlans[i].date)
-              const planComponents = getUTCDateComponents(planDate)
+              const planComponents = getStoredDateComponents(planDate)
               const planTimestamp = Date.UTC(
                 planComponents.year,
                 planComponents.month,

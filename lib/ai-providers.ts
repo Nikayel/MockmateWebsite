@@ -51,28 +51,30 @@ interface ProviderConfig {
   maxTokens: number
   temperature: number
   costPer1kTokens: number // For cost tracking
+  thinkingLevel?: "minimal" | "low" | "medium" | "high" // For Gemini 3.0 thinking mode
 }
 
-// Provider configurations - Updated Dec 2025 pricing
-// Strategy: Gemini Flash Lite for simple/chat (cheapest), Flash for standard, DeepSeek for critique
+// Provider configurations - Updated Jan 2025 pricing
+// Strategy: Gemini 3.0 Flash for dialogue/complex, 2.5 Flash-Lite for simple, DeepSeek for critique
 const PROVIDERS: Record<AIProvider, ProviderConfig> = {
   gemini: {
     name: "gemini",
     enabled: true,
     apiKey: process.env.GEMINI_API_KEY,
-    model: "gemini-2.5-flash", // Best value: $0.075/1M input, $0.30/1M output
+    model: "gemini-3-flash-preview", // Upgraded: $0.50/1M input, $3/1M output - better reasoning
     maxTokens: 1024,
     temperature: 0.7,
-    costPer1kTokens: 0.000188, // Averaged (input + output) / 2
+    costPer1kTokens: 0.00175, // Averaged (input + output) / 2
+    thinkingLevel: "low", // minimal/low/medium/high - low for balanced speed/quality
   },
   "gemini-lite": {
     name: "gemini-lite",
     enabled: true,
-    apiKey: process.env.GEMINI_API_KEY, // Same API key as gemini
-    model: "gemini-2.5-flash", // Use 2.5 Flash - free tier up to 1M tokens!
+    apiKey: process.env.GEMINI_API_KEY,
+    model: "gemini-2.5-flash-lite", // Actually use Flash-Lite now: $0.10/1M input, $0.40/1M output
     maxTokens: 1024,
     temperature: 0.7,
-    costPer1kTokens: 0, // Free tier - no cost until 1M tokens
+    costPer1kTokens: 0.00025, // Averaged - very cheap
   },
   deepseek: {
     name: "deepseek",
@@ -112,7 +114,7 @@ const FALLBACK_ORDER: Record<TaskComplexity, AIProvider[]> = {
   simple: ["gemini-lite", "gemini", "deepseek-chat", "claude"], // Chat, hints - cheapest path (Flash Lite -> deepseek-chat)
   standard: ["gemini", "gemini-lite", "deepseek-chat", "claude"], // Interview interactions - balanced
   complex: ["gemini", "claude", "deepseek"], // Feedback generation - quality matters (uses reasoner)
-  dialogue: ["claude", "gemini-lite", "deepseek-chat"], // for the conversation in the chat
+  dialogue: ["claude", "gemini", "deepseek-chat"], // for the conversation in the chat
   code: ["deepseek-chat", "gemini", "claude"],
   critique: ["deepseek", "claude", "gemini"],
 }
@@ -164,9 +166,24 @@ async function callGemini(
 ): Promise<string> {
   try {
     const genAI = new GoogleGenerativeAI(config.apiKey || "")
+
+    // Build generation config - add thinkingLevel for Gemini 3.0 models
+    const generationConfig: Record<string, unknown> = {
+      maxOutputTokens: config.maxTokens,
+      temperature: config.temperature,
+    }
+
+    // Add thinking config for Gemini 3.0 Flash
+    if (config.thinkingLevel && config.model.includes("gemini-3")) {
+      generationConfig.thinkingConfig = {
+        thinkingLevel: config.thinkingLevel.toUpperCase(), // API expects MINIMAL, LOW, MEDIUM, HIGH
+      }
+    }
+
     const model = genAI.getGenerativeModel({
       model: config.model,
       systemInstruction: systemPrompt,
+      generationConfig,
     })
 
     const geminiHistory = history.map((msg) => ({
@@ -176,10 +193,6 @@ async function callGemini(
 
     const chat = model.startChat({
       history: geminiHistory,
-      generationConfig: {
-        maxOutputTokens: config.maxTokens,
-        temperature: config.temperature,
-      },
     })
 
     const result = await chat.sendMessage(userMessage)

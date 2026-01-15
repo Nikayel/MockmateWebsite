@@ -1308,6 +1308,16 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               return
             }
 
+            // If session is being evaluated (submitted but feedback pending), redirect to session page
+            // This prevents users from being put back into interview mode during evaluation
+            if (firestoreState?.feedbackStatus === "pending") {
+              toast.info("Session is being evaluated", {
+                description: "Redirecting to your results page...",
+              })
+              router.push(`/sessions/${sessionIdFromUrl}`)
+              return
+            }
+
             if (firestoreState?.savedAt) {
               remoteData = firestoreState
               remoteTimestamp = new Date(firestoreState.savedAt).getTime()
@@ -1345,6 +1355,15 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 if (data.session?.completed_at) {
                   toast.info("Session already submitted", {
                     description: "Redirecting to your results...",
+                  })
+                  router.push(`/sessions/${sessionIdFromUrl}`)
+                  return
+                }
+
+                // If session is being evaluated, redirect to session page
+                if (data.session?.feedback_status === "pending") {
+                  toast.info("Session is being evaluated", {
+                    description: "Redirecting to your results page...",
                   })
                   router.push(`/sessions/${sessionIdFromUrl}`)
                   return
