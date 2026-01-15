@@ -1,16 +1,24 @@
 /**
  * Email Notifications Cron Job
  *
- * Runs hourly to check for:
- * 1. Inactive users (24h+) - send inactivity reminders
- * 2. Topics due for review - send spaced repetition reminders
+ * Consolidated cron job that handles:
+ * 1. Welcome emails for new users
+ * 2. Inactivity reminders (24h+)
+ * 3. Spaced repetition reminders (topics due for review)
+ * 4. Roadmap-based reminders (interview countdown, behind schedule, daily)
+ * 5. Streak at-risk alerts (in-app)
+ * 6. Subscription expiry checks
  *
- * Designed for Vercel Cron Jobs:
- * Add to vercel.json:
+ * IMPORTANT: This cron respects each user's timezone!
+ * Emails are only sent during 9 AM - 9 PM in the USER'S local time.
+ *
+ * Runs every 3 hours to cover all timezones across 24 hours.
+ *
+ * Designed for Vercel Cron Jobs (Hobby plan - 1 cron only):
  * {
  *   "crons": [{
  *     "path": "/api/cron/email-notifications",
- *     "schedule": "0 * * * *"
+ *     "schedule": "0 */3 * * *"
  *   }]
  * }
  */
@@ -26,6 +34,8 @@ import {
   sendWelcomeEmail,
   canSendEmail,
   calculateRetention,
+  isReasonableHourForUser,
+  isInQuietHours,
 } from "@/lib/email"
 import type { Profile, UserLearningState, ProblemMasteryRecord } from "@/lib/types"
 import { checkStreakAtRisk, sendDailyReminderIfNeeded } from "@/lib/services/session-notifications"
@@ -34,6 +44,38 @@ const db = adminDb
 
 // Verify cron secret to prevent unauthorized access
 const CRON_SECRET = process.env.CRON_SECRET
+
+/**
+ * Check if we can send an email to a user based on their timezone
+ * Returns false if it's outside 9 AM - 9 PM in their local time
+ */
+function canSendToUserTimezone(profile: Profile): { canSend: boolean; reason?: string; localHour?: number } {
+  // Get user's timezone from notification preferences or profile
+  const timezone = profile.notification_preferences?.timezone || "America/Los_Angeles"
+
+  // Check if it's a reasonable hour in user's timezone
+  const { isReasonable, localHour } = isReasonableHourForUser(timezone)
+
+  if (!isReasonable) {
+    return {
+      canSend: false,
+      reason: `outside_reasonable_hours (${localHour}:00 in ${timezone})`,
+      localHour,
+    }
+  }
+
+  // Check quiet hours if configured
+  const quietHours = profile.notification_preferences?.quietHours
+  if (quietHours?.enabled && isInQuietHours(timezone, quietHours)) {
+    return {
+      canSend: false,
+      reason: `quiet_hours (${localHour}:00 in ${timezone})`,
+      localHour,
+    }
+  }
+
+  return { canSend: true, localHour }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,29 +90,20 @@ export async function GET(request: NextRequest) {
     }
 
     const results = {
-      welcomeEmails: { sent: 0, skipped: 0, failed: 0 },
-      inactivityEmails: { sent: 0, skipped: 0, failed: 0 },
-      spacedRepetitionEmails: { sent: 0, skipped: 0, failed: 0 },
-      roadmapEmails: { sent: 0, skipped: 0, failed: 0 },
+      welcomeEmails: { sent: 0, skipped: 0, failed: 0, skippedTimezone: 0 },
+      inactivityEmails: { sent: 0, skipped: 0, failed: 0, skippedTimezone: 0 },
+      spacedRepetitionEmails: { sent: 0, skipped: 0, failed: 0, skippedTimezone: 0 },
+      roadmapEmails: { sent: 0, skipped: 0, failed: 0, skippedTimezone: 0 },
+      subscriptionExpiry: { reminders7d: 0, reminders1d: 0, downgrades: 0 },
       streakAlerts: { sent: 0, skipped: 0 },
       errors: [] as string[],
     }
 
     // Get current time
     const now = new Date()
-    const currentHour = now.getUTCHours()
 
-    // Only send emails during reasonable hours (9 AM - 9 PM UTC)
-    // In production, this should use user timezone
-    const isReasonableHour = currentHour >= 9 && currentHour <= 21
-
-    if (!isReasonableHour) {
-      return NextResponse.json({
-        success: true,
-        message: "Skipping - outside reasonable hours",
-        hour: currentHour,
-      })
-    }
+    // NOTE: We no longer skip based on UTC time!
+    // Each user's timezone is checked individually before sending.
 
     // ============================================
     // 1. WELCOME EMAILS (for users who signed up but didn't receive email)
@@ -93,11 +126,15 @@ export async function GET(request: NextRequest) {
     await processRoadmapReminders(now, results)
 
     // ============================================
-    // 5. STREAK AT RISK ALERTS (in-app only, evening hours)
+    // 5. SUBSCRIPTION EXPIRY (consolidated from separate cron)
     // ============================================
-    if (currentHour >= 19 && currentHour <= 22) {
-      await processStreakAlerts(results)
-    }
+    await processSubscriptionExpiry(now, results)
+
+    // ============================================
+    // 6. STREAK AT RISK ALERTS (in-app only)
+    // Check based on user timezone - evening hours in their local time
+    // ============================================
+    await processStreakAlerts(results)
 
     return NextResponse.json({
       success: true,
@@ -146,6 +183,13 @@ async function processWelcomeEmails(now: Date, results: any): Promise<void> {
       // Skip if no email
       if (!profile.email) {
         results.welcomeEmails.skipped++
+        continue
+      }
+
+      // CHECK USER'S TIMEZONE - Only send during reasonable hours in their local time
+      const timezoneCheck = canSendToUserTimezone(profile)
+      if (!timezoneCheck.canSend) {
+        results.welcomeEmails.skippedTimezone++
         continue
       }
 
@@ -273,6 +317,13 @@ async function processInactivityReminders(now: Date, results: any): Promise<void
         continue
       }
 
+      // CHECK USER'S TIMEZONE - Only send during reasonable hours in their local time
+      const timezoneCheck = canSendToUserTimezone(profile)
+      if (!timezoneCheck.canSend) {
+        results.inactivityEmails.skippedTimezone++
+        continue
+      }
+
       // Check rate limits
       const rateCheck = canSendEmail(profile.last_email_sent_at, profile.emails_sent_today)
       if (!rateCheck.allowed) {
@@ -394,6 +445,13 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
         continue
       }
 
+      // CHECK USER'S TIMEZONE - Only send during reasonable hours in their local time
+      const timezoneCheck = canSendToUserTimezone(profile)
+      if (!timezoneCheck.canSend) {
+        results.spacedRepetitionEmails.skippedTimezone++
+        continue
+      }
+
       // Check rate limits
       const rateCheck = canSendEmail(profile.last_email_sent_at, profile.emails_sent_today)
       if (!rateCheck.allowed) {
@@ -506,6 +564,13 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
         continue
       }
 
+      // CHECK USER'S TIMEZONE - Only send during reasonable hours in their local time
+      const timezoneCheck = canSendToUserTimezone(profile)
+      if (!timezoneCheck.canSend) {
+        results.spacedRepetitionEmails.skippedTimezone++
+        continue
+      }
+
       // Check rate limits
       const rateCheck = canSendEmail(profile.last_email_sent_at, profile.emails_sent_today)
       if (!rateCheck.allowed) {
@@ -594,6 +659,13 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
 
       if (!(profile.notification_preferences?.email_notifications_enabled ?? true)) {
         results.roadmapEmails.skipped++
+        continue
+      }
+
+      // CHECK USER'S TIMEZONE - Only send during reasonable hours in their local time
+      const timezoneCheck = canSendToUserTimezone(profile)
+      if (!timezoneCheck.canSend) {
+        results.roadmapEmails.skippedTimezone++
         continue
       }
 
@@ -849,6 +921,150 @@ async function processStreakAlerts(results: {
     }
   } catch (error) {
     console.error("[Cron] Error processing streak alerts:", error)
+  }
+}
+
+/**
+ * Process subscription expiry (consolidated from /api/cron/subscription-expiry)
+ * Handles: expired subscriptions, 7-day reminders, 1-day reminders
+ */
+async function processSubscriptionExpiry(now: Date, results: any): Promise<void> {
+  const { sendSubscriptionCancellationEmail, sendTrialEndingEmail } = await import("@/lib/email")
+
+  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+  const oneDayFromNow = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000)
+
+  try {
+    // 1. Downgrade expired yearly subscriptions
+    const expiredQuery = await db
+      .collection("profiles")
+      .where("subscription_type", "==", "yearly")
+      .where("subscription_tier", "==", "pro")
+      .where("subscription_current_period_end", "<=", now.toISOString())
+      .limit(100)
+      .get()
+
+    for (const doc of expiredQuery.docs) {
+      const userId = doc.id
+      const profile = doc.data() as Profile
+
+      try {
+        await db.collection("profiles").doc(userId).update({
+          subscription_tier: "free",
+          subscription_status: "expired",
+          subscription_expired_at: now.toISOString(),
+          updated_at: now.toISOString(),
+        })
+
+        results.subscriptionExpiry.downgrades++
+        console.log(`[Cron] Downgraded user ${userId} - yearly plan expired`)
+
+        // Send expiration email (check timezone)
+        if (profile.email) {
+          const timezoneCheck = canSendToUserTimezone(profile)
+          if (timezoneCheck.canSend) {
+            try {
+              await sendSubscriptionCancellationEmail(profile.email, {
+                userName: profile.full_name || "",
+                userEmail: profile.email,
+                isImmediate: true,
+                accessUntil: now.toISOString(),
+              })
+            } catch (emailError) {
+              console.error(`[Cron] Failed to send expiry email to ${userId}:`, emailError)
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`[Cron] Failed to downgrade user ${userId}:`, error)
+      }
+    }
+
+    // 2. Send 7-day expiry reminders
+    const sevenDayQuery = await db
+      .collection("profiles")
+      .where("subscription_type", "==", "yearly")
+      .where("subscription_tier", "==", "pro")
+      .where("subscription_current_period_end", "<=", sevenDaysFromNow.toISOString())
+      .where("subscription_current_period_end", ">", now.toISOString())
+      .limit(100)
+      .get()
+
+    for (const doc of sevenDayQuery.docs) {
+      const userId = doc.id
+      const profile = doc.data() as Profile
+
+      if (profile.yearly_expiry_reminder_7day_sent) continue
+
+      const expiryDate = new Date(profile.subscription_current_period_end as string)
+      const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
+      if (daysUntilExpiry <= 7 && daysUntilExpiry > 1 && profile.email) {
+        // Check timezone before sending
+        const timezoneCheck = canSendToUserTimezone(profile)
+        if (!timezoneCheck.canSend) continue
+
+        try {
+          await sendTrialEndingEmail(profile.email, {
+            userName: profile.full_name || "",
+            userEmail: profile.email,
+            trialEndDate: profile.subscription_current_period_end as string,
+          })
+
+          await db.collection("profiles").doc(userId).update({
+            yearly_expiry_reminder_7day_sent: true,
+            updated_at: now.toISOString(),
+          })
+
+          results.subscriptionExpiry.reminders7d++
+        } catch (error) {
+          console.error(`[Cron] Failed to send 7-day reminder to ${userId}:`, error)
+        }
+      }
+    }
+
+    // 3. Send 1-day expiry reminders
+    const oneDayQuery = await db
+      .collection("profiles")
+      .where("subscription_type", "==", "yearly")
+      .where("subscription_tier", "==", "pro")
+      .where("subscription_current_period_end", "<=", oneDayFromNow.toISOString())
+      .where("subscription_current_period_end", ">", now.toISOString())
+      .limit(100)
+      .get()
+
+    for (const doc of oneDayQuery.docs) {
+      const userId = doc.id
+      const profile = doc.data() as Profile
+
+      if (profile.yearly_expiry_reminder_1day_sent) continue
+
+      if (profile.email) {
+        // Check timezone before sending
+        const timezoneCheck = canSendToUserTimezone(profile)
+        if (!timezoneCheck.canSend) continue
+
+        try {
+          await sendTrialEndingEmail(profile.email, {
+            userName: profile.full_name || "",
+            userEmail: profile.email,
+            trialEndDate: profile.subscription_current_period_end as string,
+          })
+
+          await db.collection("profiles").doc(userId).update({
+            yearly_expiry_reminder_1day_sent: true,
+            updated_at: now.toISOString(),
+          })
+
+          results.subscriptionExpiry.reminders1d++
+        } catch (error) {
+          console.error(`[Cron] Failed to send 1-day reminder to ${userId}:`, error)
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[Cron] Error in subscription expiry processing:", error)
+    results.errors.push(`Subscription expiry error: ${error}`)
   }
 }
 
