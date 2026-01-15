@@ -180,7 +180,7 @@ export class RAGRoadmapGenerator {
     })
 
     // Extract must-know questions
-    const mustKnowQuestions = companyQuestionProfile.topQuestions.filter(q => q.isMustkKnow)
+    const mustKnowQuestions = companyQuestionProfile.topQuestions.filter((q) => q.isMustkKnow)
 
     // Step 9: Enhance daily plans with RAG insights AND question frequency
     const enhancedDailyPlans = this.enhanceDailyPlans(
@@ -602,14 +602,18 @@ export class RAGRoadmapGenerator {
 
       // NEW: Highlight must-know questions in this day's plan
       if (mustKnowQuestions.length > 0 && plan.questions) {
-        const mustKnowTitles = new Set(mustKnowQuestions.map(q => q.title.toLowerCase()))
-        const mustKnowInPlan = plan.questions.filter(q =>
-          mustKnowTitles.has(q.title?.toLowerCase() || '') ||
-          mustKnowQuestions.some(mkq => q.id?.includes(mkq.scenarioId))
+        const mustKnowTitles = new Set(mustKnowQuestions.map((q) => q.title.toLowerCase()))
+        const mustKnowInPlan = plan.questions.filter(
+          (q) =>
+            mustKnowTitles.has(q.title?.toLowerCase() || "") ||
+            mustKnowQuestions.some((mkq) => q.scenarioId?.includes(mkq.scenarioId))
         )
 
         if (mustKnowInPlan.length > 0) {
-          const highlight = `⭐ Must-Know: ${mustKnowInPlan.map(q => q.title || q.id).slice(0, 2).join(", ")}`
+          const highlight = `⭐ Must-Know: ${mustKnowInPlan
+            .map((q) => q.title || q.scenarioId)
+            .slice(0, 2)
+            .join(", ")}`
           enhancedPlan.notes = enhancedPlan.notes
             ? `${highlight}\n\n${enhancedPlan.notes}`
             : highlight
@@ -617,8 +621,9 @@ export class RAGRoadmapGenerator {
           // Add company-specific tips for must-know questions
           for (const q of mustKnowInPlan.slice(0, 1)) {
             const mkq = mustKnowQuestions.find(
-              mkq => q.title?.toLowerCase() === mkq.title.toLowerCase() ||
-                     q.id?.includes(mkq.scenarioId)
+              (mkq) =>
+                q.title?.toLowerCase() === mkq.title.toLowerCase() ||
+                q.scenarioId?.includes(mkq.scenarioId)
             )
             if (mkq?.companySpecificTips.length) {
               enhancedPlan.notes += `\n💡 Tip for ${mkq.title}: ${mkq.companySpecificTips[0]}`
