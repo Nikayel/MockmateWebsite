@@ -350,6 +350,69 @@ export function parseFeedback(feedback: string): FeedbackSection {
 }
 
 /**
+ * Inject/replace scores in feedback text to ensure consistency with authoritative scores.
+ * This is critical because AI-generated feedback or Constitutional AI revisions
+ * may contain different scores than the algorithmically calculated ones.
+ */
+export function injectScoresIntoFeedback(
+  feedback: string,
+  scores: {
+    understanding: number
+    problemSolving: number
+    codeQuality: number
+    communication: number
+    overall: number
+  },
+  scenarioType?: string
+): string {
+  let result = feedback
+
+  // Replace scores in Score Snapshot section with correct values
+  // Handle different label formats based on scenario type
+  if (scenarioType === "system-design") {
+    result = result.replace(
+      /(-\s*Requirements:?\s*)\d+(\s*\/\s*100)/gi,
+      `$1${scores.understanding}$2`
+    )
+    result = result.replace(
+      /(-\s*Architecture:?\s*)\d+(\s*\/\s*100)/gi,
+      `$1${scores.problemSolving}$2`
+    )
+    result = result.replace(/(-\s*Scalability:?\s*)\d+(\s*\/\s*100)/gi, `$1${scores.codeQuality}$2`)
+  } else if (scenarioType === "bugfix") {
+    result = result.replace(/(-\s*Bug Found:?\s*)\d+(\s*\/\s*100)/gi, `$1${scores.understanding}$2`)
+    result = result.replace(
+      /(-\s*Root Cause:?\s*)\d+(\s*\/\s*100)/gi,
+      `$1${scores.problemSolving}$2`
+    )
+    result = result.replace(/(-\s*Fix Quality:?\s*)\d+(\s*\/\s*100)/gi, `$1${scores.codeQuality}$2`)
+  } else {
+    // Default DSA format
+    result = result.replace(
+      /(-\s*Understanding:?\s*)\d+(\s*\/\s*100)/gi,
+      `$1${scores.understanding}$2`
+    )
+    result = result.replace(
+      /(-\s*Problem[-\s]?Solving:?\s*)\d+(\s*\/\s*100)/gi,
+      `$1${scores.problemSolving}$2`
+    )
+    result = result.replace(
+      /(-\s*Code\s*Quality:?\s*)\d+(\s*\/\s*100)/gi,
+      `$1${scores.codeQuality}$2`
+    )
+  }
+
+  // Communication and Overall are common across all types
+  result = result.replace(
+    /(-\s*Communication:?\s*)\d+(\s*\/\s*100)/gi,
+    `$1${scores.communication}$2`
+  )
+  result = result.replace(/(-\s*Overall:?\s*)\d+(\s*\/\s*100)/gi, `$1${scores.overall}$2`)
+
+  return result
+}
+
+/**
  * Parse structured sections from feedback (legacy)
  * Now uses the improved parseBulletList function for better bullet extraction
  */

@@ -20,8 +20,8 @@ export type {
   IncompleteSolutionAnalysis,
   PreScreenResult,
   ScoreResult,
-  ExtendedScoreResult
-} from './types'
+  ExtendedScoreResult,
+} from "./types"
 
 // ============================================================================
 // VALIDATION EXPORTS
@@ -33,25 +33,20 @@ export {
   calculateCodeSimilarity,
   analyzeAICodeOverlap,
   validateConversationWithAI,
-  getDefaultValidation
-} from './validation'
+  getDefaultValidation,
+} from "./validation"
 
 // ============================================================================
 // COMPLETENESS ANALYSIS EXPORTS
 // ============================================================================
 
-export {
-  analyzeCodeCompleteness,
-  isBlankDesignTemplate
-} from './completeness-analysis'
+export { analyzeCodeCompleteness, isBlankDesignTemplate } from "./completeness-analysis"
 
 // ============================================================================
 // PRE-SCREENING EXPORTS
 // ============================================================================
 
-export {
-  preScreenConversation
-} from './pre-screening'
+export { preScreenConversation } from "./pre-screening"
 
 // ============================================================================
 // SCORING EXPORTS
@@ -61,30 +56,23 @@ export {
   calculateSystemDesignScores,
   calculateBugFixScores,
   calculateValidatedScores,
-  applyScoreFloors
-} from './scoring-algorithms'
+  applyScoreFloors,
+} from "./scoring-algorithms"
 
 // ============================================================================
 // CONSTITUTIONAL AI EXPORTS
 // ============================================================================
 
-export {
-  critiqueScores,
-  critiqueFeedbackText
-} from './constitutional-ai'
+export { critiqueScores, critiqueFeedbackText } from "./constitutional-ai"
 
 // ============================================================================
 // CONTEXT BUILDER EXPORTS
 // ============================================================================
 
-export {
-  buildRAGFeedbackContext
-} from './context-builder'
+export { buildRAGFeedbackContext } from "./context-builder"
 
 // ============================================================================
 // PARSER EXPORTS
 // ============================================================================
 
-export {
-  parseFeedbackSections
-} from './parsers'
+export { parseFeedbackSections, injectScoresIntoFeedback } from "./parsers"

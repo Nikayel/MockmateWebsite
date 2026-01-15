@@ -156,6 +156,13 @@ export async function generateTrackedEmbeddings(
  * Store a text embedding in the vector database
  * Uses Pinecone when available, with Firestore as backup for metadata
  */
+/**
+ * Remove undefined values from an object (Firestore doesn't accept undefined)
+ */
+function removeUndefinedValues<T extends Record<string, unknown>>(obj: T): T {
+  return Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined)) as T
+}
+
 export async function storeTextEmbedding(embedding: TextEmbedding): Promise<string> {
   try {
     const timestamp = embedding.metadata.timestamp
@@ -169,16 +176,19 @@ export async function storeTextEmbedding(embedding: TextEmbedding): Promise<stri
       embedding.id ||
       `${embedding.type}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
 
+    // Clean metadata to remove undefined values (Firestore doesn't accept undefined)
+    const cleanedMetadata = removeUndefinedValues({
+      ...embedding.metadata,
+      type: embedding.type,
+      timestamp: timestampStr,
+    })
+
     // Store in the vector database (Pinecone or Firestore depending on config)
     const vectorDoc: VectorDocument = {
       id: docId,
       vector: embedding.vector,
       text: embedding.text,
-      metadata: {
-        ...embedding.metadata,
-        type: embedding.type,
-        timestamp: timestampStr,
-      },
+      metadata: cleanedMetadata,
     }
 
     await vectorDB.upsert([vectorDoc])
@@ -194,10 +204,10 @@ export async function storeTextEmbedding(embedding: TextEmbedding): Promise<stri
             type: embedding.type,
             // Don't store vector in Firestore when using Pinecone (save space)
             vectorStoredIn: "pinecone",
-            metadata: {
+            metadata: removeUndefinedValues({
               ...embedding.metadata,
               timestamp: timestampStr,
-            },
+            }),
             createdAt: Timestamp.now(),
           })
       } catch (firestoreError) {

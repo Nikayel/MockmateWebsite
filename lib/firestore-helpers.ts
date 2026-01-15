@@ -686,6 +686,7 @@ export async function markSessionEvaluating(
       sessionRef,
       {
         feedback_status: "pending",
+        completed_at: new Date().toISOString(), // Mark as completed when evaluation starts
         final_code: state.code,
         language: state.language,
         elapsed_time: state.elapsedTime,

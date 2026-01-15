@@ -309,7 +309,20 @@ Return ONLY the JSON object, nothing else.`
       const candidateMessages = transcript.filter((m) => m.role === "candidate")
       const totalCandidateChars = candidateMessages.reduce((sum, m) => sum + m.content.length, 0)
       const avgMessageLength = totalCandidateChars / Math.max(1, candidateMessages.length)
-      const hasSubstantialEngagement = candidateMessages.length >= 5 && avgMessageLength >= 80
+
+      // Voice transcription creates many short messages, so use TOTAL content as additional signal
+      // 400 chars total = ~80 words = reasonable explanation
+      const hasTotalContentEngagement = totalCandidateChars >= 400 && candidateMessages.length >= 3
+      const hasSubstantialEngagement =
+        (candidateMessages.length >= 5 && avgMessageLength >= 80) || hasTotalContentEngagement
+
+      // Check if interviewer praised communication (strong signal that AI validation is wrong)
+      const interviewerMessages = transcript.filter((m) => m.role === "interviewer")
+      const interviewerPraisedCommunication = interviewerMessages.some((m) =>
+        /communicated?.*(clearly|well|good)|good\s+work|solid\s+performance|explained?.*(clearly|well)|clear\s+explanation/i.test(
+          m.content
+        )
+      )
 
       // SAFETY NET: If AI says approachExplained=false but there's strong engagement,
       // check if they discussed complexity (which implies they explained their thinking)
@@ -335,6 +348,24 @@ Return ONLY the JSON object, nothing else.`
         if (communicationScore < 55) {
           communicationScore = Math.max(communicationScore, 60)
         }
+      }
+
+      // CRITICAL: If interviewer praised communication, AI validation is definitely wrong
+      // This is the strongest signal - the interviewer in the session said they communicated well
+      if (interviewerPraisedCommunication && communicationScore < 70) {
+        logger.warn(
+          "[AI Validation] Overriding low score - interviewer praised communication in transcript",
+          {
+            originalScore: communicationScore,
+            newScore: 75,
+            originalApproachExplained: parsed.approachExplained,
+          }
+        )
+        approachExplained = true
+        if (approachQuality === "none" || approachQuality === "poor") {
+          approachQuality = "good"
+        }
+        communicationScore = Math.max(communicationScore, 75)
       }
 
       // ADDITIONAL SAFETY NET: If user has substantial engagement AND explained approach

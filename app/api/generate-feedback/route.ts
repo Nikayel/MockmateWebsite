@@ -27,6 +27,7 @@ import {
   critiqueFeedbackText,
   buildRAGFeedbackContext,
   parseFeedbackSections,
+  injectScoresIntoFeedback,
 } from "@/lib/feedback"
 
 export async function POST(request: NextRequest) {
@@ -674,10 +675,16 @@ CRITICAL INSTRUCTIONS:
     })
 
     // Use revised feedback if critique made changes
-    const finalFeedback =
+    const rawFinalFeedback =
       feedbackCritique.madeChanges && feedbackCritique.revisedFeedback
         ? feedbackCritique.revisedFeedback
         : feedback
+
+    // CRITICAL: Inject authoritative scores into feedback text
+    // This ensures the Score Snapshot section in the feedback text always matches
+    // the algorithmically calculated scores, preventing discrepancies between
+    // post-interview modal (uses API scores) and session details (may parse feedback text)
+    const finalFeedback = injectScoresIntoFeedback(rawFinalFeedback, finalScores, scenarioType)
 
     // USE FINAL SCORES as primary (after Constitutional AI review)
     // AI-generated narrative is just for user-facing feedback text
