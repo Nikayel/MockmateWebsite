@@ -24,11 +24,11 @@ import {
   Info,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { PersonalizedCompanyGuide } from "@/lib/roadmap/personalized-guide-generator"
+import type { PersonalizedCompanyGuide as PersonalizedGuideData } from "@/lib/roadmap/personalized-guide-generator"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 
 interface PersonalizedCompanyGuideProps {
-  guide: PersonalizedCompanyGuide
+  guide: PersonalizedGuideData
   defaultExpanded?: boolean
 }
 
@@ -140,7 +140,7 @@ function TimeStrategyBanner({
   strategy,
   companyName,
 }: {
-  strategy: PersonalizedCompanyGuide["timeStrategy"]
+  strategy: PersonalizedGuideData["timeStrategy"]
   companyName: string
 }) {
   const urgencyColors = {
@@ -229,7 +229,7 @@ function AdaptiveRecommendationsCard({
   expanded,
   onToggle,
 }: {
-  recommendations: PersonalizedCompanyGuide["adaptiveRecommendations"]
+  recommendations: PersonalizedGuideData["adaptiveRecommendations"]
   expanded: boolean
   onToggle: () => void
 }) {
@@ -299,7 +299,7 @@ function WhyTheseQuestionsCard({
   expanded,
   onToggle,
 }: {
-  rationale: PersonalizedCompanyGuide["questionSelectionRationale"]
+  rationale: PersonalizedGuideData["questionSelectionRationale"]
   companyName: string
   expanded: boolean
   onToggle: () => void
@@ -389,7 +389,7 @@ function PrioritizedPatternsCard({
   expanded,
   onToggle,
 }: {
-  patterns: PersonalizedCompanyGuide["prioritizedPatterns"]
+  patterns: PersonalizedGuideData["prioritizedPatterns"]
   companyName: string
   expanded: boolean
   onToggle: () => void
@@ -428,7 +428,7 @@ function PatternRow({
   pattern,
   rank,
 }: {
-  pattern: PersonalizedCompanyGuide["prioritizedPatterns"][0]
+  pattern: PersonalizedGuideData["prioritizedPatterns"][0]
   rank: number
 }) {
   const [showTips, setShowTips] = useState(false)
@@ -534,7 +534,7 @@ function PersonalizedTipsCard({
   expanded,
   onToggle,
 }: {
-  tips: PersonalizedCompanyGuide["personalizedTips"]
+  tips: PersonalizedGuideData["personalizedTips"]
   companyName: string
   expanded: boolean
   onToggle: () => void
@@ -593,7 +593,7 @@ function CompanyInsightsCard({
   expanded,
   onToggle,
 }: {
-  insights: PersonalizedCompanyGuide["companyInsights"]
+  insights: PersonalizedGuideData["companyInsights"]
   companyName: string
   expanded: boolean
   onToggle: () => void

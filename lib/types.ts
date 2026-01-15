@@ -43,6 +43,11 @@ export interface Profile {
   last_email_sent_at?: string
   emails_sent_today?: number
   welcome_email_sent?: boolean
+  welcome_notification_sent?: boolean
+  // Subscription expiry reminder tracking
+  yearly_expiry_reminder_7day_sent?: boolean
+  yearly_expiry_reminder_1day_sent?: boolean
+  subscription_expired_at?: string
   // Spaced Repetition Algorithm A/B Testing
   spaced_repetition_algorithm?: "sm2" | "fsrs" // Assigned algorithm for A/B testing
   algorithm_assigned_at?: string // ISO date when algorithm was assigned
@@ -59,6 +64,11 @@ export interface NotificationPreferences {
   marketing_emails: boolean
   timezone?: string
   preferred_hours?: number[]
+  quietHours?: {
+    enabled: boolean
+    start: number
+    end: number
+  }
 }
 
 export interface ProfileQuota {

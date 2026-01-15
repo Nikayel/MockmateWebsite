@@ -7,10 +7,16 @@
  * - DELETE: Revoke admin role from a user
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { requirePermission } from '@/lib/admin/middleware'
-import { PERMISSIONS, listAdmins, grantAdminRole, revokeAdminRole, AdminRole } from '@/lib/admin/rbac'
-import { adminDb } from '@/lib/firebase-admin'
+import { NextRequest, NextResponse } from "next/server"
+import { requirePermission } from "@/lib/admin/middleware"
+import {
+  PERMISSIONS,
+  listAdmins,
+  grantAdminRole,
+  revokeAdminRole,
+  AdminRole,
+} from "@/lib/admin/rbac"
+import { adminDb } from "@/lib/firebase-admin"
 
 // GET: List all admins
 export async function GET(request: NextRequest) {
@@ -18,7 +24,7 @@ export async function GET(request: NextRequest) {
 
   if (!authResult.authorized) {
     return NextResponse.json(
-      { success: false, error: authResult.error || 'Unauthorized' },
+      { success: false, error: authResult.error || "Unauthorized" },
       { status: authResult.status || 403 }
     )
   }
@@ -30,9 +36,9 @@ export async function GET(request: NextRequest) {
     const enrichedAdmins = await Promise.all(
       admins.map(async (admin) => {
         // Try to get email from profiles if not set
-        if (admin.email === 'Environment Admin' && adminDb) {
+        if (admin.email === "Environment Admin" && adminDb) {
           try {
-            const profileDoc = await adminDb.collection('profiles').doc(admin.userId).get()
+            const profileDoc = await adminDb.collection("profiles").doc(admin.userId).get()
             if (profileDoc.exists) {
               const profile = profileDoc.data()
               return {
@@ -59,11 +65,8 @@ export async function GET(request: NextRequest) {
       admins: enrichedAdmins,
     })
   } catch (error) {
-    console.error('[Admin API] Error listing admins:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to list admins' },
-      { status: 500 }
-    )
+    console.error("[Admin API] Error listing admins:", error)
+    return NextResponse.json({ success: false, error: "Failed to list admins" }, { status: 500 })
   }
 }
 
@@ -73,7 +76,7 @@ export async function POST(request: NextRequest) {
 
   if (!authResult.authorized) {
     return NextResponse.json(
-      { success: false, error: authResult.error || 'Unauthorized' },
+      { success: false, error: authResult.error || "Unauthorized" },
       { status: authResult.status || 403 }
     )
   }
@@ -84,27 +87,24 @@ export async function POST(request: NextRequest) {
 
     if (!userId || !email || !role) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: userId, email, role' },
+        { success: false, error: "Missing required fields: userId, email, role" },
         { status: 400 }
       )
     }
 
     // Validate role
-    const validRoles: AdminRole[] = ['admin', 'analyst', 'support']
+    const validRoles: AdminRole[] = ["admin", "analyst", "support"]
     if (!validRoles.includes(role)) {
       return NextResponse.json(
-        { success: false, error: `Invalid role. Must be one of: ${validRoles.join(', ')}` },
+        { success: false, error: `Invalid role. Must be one of: ${validRoles.join(", ")}` },
         { status: 400 }
       )
     }
 
-    const result = await grantAdminRole(authResult.userId!, userId, email, role)
+    const result = await grantAdminRole(authResult.context!.userId, userId, email, role)
 
     if (!result.success) {
-      return NextResponse.json(
-        { success: false, error: result.error },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, error: result.error }, { status: 400 })
     }
 
     return NextResponse.json({
@@ -112,9 +112,9 @@ export async function POST(request: NextRequest) {
       message: `Admin role '${role}' granted to ${email}`,
     })
   } catch (error) {
-    console.error('[Admin API] Error granting admin role:', error)
+    console.error("[Admin API] Error granting admin role:", error)
     return NextResponse.json(
-      { success: false, error: 'Failed to grant admin role' },
+      { success: false, error: "Failed to grant admin role" },
       { status: 500 }
     )
   }
@@ -126,39 +126,36 @@ export async function DELETE(request: NextRequest) {
 
   if (!authResult.authorized) {
     return NextResponse.json(
-      { success: false, error: authResult.error || 'Unauthorized' },
+      { success: false, error: authResult.error || "Unauthorized" },
       { status: authResult.status || 403 }
     )
   }
 
   try {
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
+    const userId = searchParams.get("userId")
 
     if (!userId) {
       return NextResponse.json(
-        { success: false, error: 'Missing userId parameter' },
+        { success: false, error: "Missing userId parameter" },
         { status: 400 }
       )
     }
 
-    const result = await revokeAdminRole(authResult.userId!, userId)
+    const result = await revokeAdminRole(authResult.context!.userId, userId)
 
     if (!result.success) {
-      return NextResponse.json(
-        { success: false, error: result.error },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, error: result.error }, { status: 400 })
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Admin role revoked',
+      message: "Admin role revoked",
     })
   } catch (error) {
-    console.error('[Admin API] Error revoking admin role:', error)
+    console.error("[Admin API] Error revoking admin role:", error)
     return NextResponse.json(
-      { success: false, error: 'Failed to revoke admin role' },
+      { success: false, error: "Failed to revoke admin role" },
       { status: 500 }
     )
   }

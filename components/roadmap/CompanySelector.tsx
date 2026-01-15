@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import { motion } from "framer-motion"
 import { Search, Building2, ChevronRight, Clock, Users } from "lucide-react"
 import { ALL_COMPANIES, COMPANY_TIERS } from "@/lib/data/company-questions"
@@ -160,10 +161,11 @@ function CompanyCard({
           {logoError ? (
             <Building2 className="text-muted-foreground h-6 w-6" />
           ) : (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
+            <Image
               src={company.logo}
               alt={`${company.name} logo`}
+              width={32}
+              height={32}
               className="h-full w-full object-contain"
               onError={() => setLogoError(true)}
             />

@@ -15,12 +15,8 @@
  * Runs every 3 hours to cover all timezones across 24 hours.
  *
  * Designed for Vercel Cron Jobs (Hobby plan - 1 cron only):
- * {
- *   "crons": [{
- *     "path": "/api/cron/email-notifications",
- *     "schedule": "0 */3 * * *"
- *   }]
- * }
+ * Schedule: "0 0/3 * * *" (every 3 hours)
+ * Path: /api/cron/email-notifications
  */
 
 import { NextRequest, NextResponse } from "next/server"
@@ -49,7 +45,11 @@ const CRON_SECRET = process.env.CRON_SECRET
  * Check if we can send an email to a user based on their timezone
  * Returns false if it's outside 9 AM - 9 PM in their local time
  */
-function canSendToUserTimezone(profile: Profile): { canSend: boolean; reason?: string; localHour?: number } {
+function canSendToUserTimezone(profile: Profile): {
+  canSend: boolean
+  reason?: string
+  localHour?: number
+} {
   // Get user's timezone from notification preferences or profile
   const timezone = profile.notification_preferences?.timezone || "America/Los_Angeles"
 
@@ -997,7 +997,9 @@ async function processSubscriptionExpiry(now: Date, results: any): Promise<void>
       if (profile.yearly_expiry_reminder_7day_sent) continue
 
       const expiryDate = new Date(profile.subscription_current_period_end as string)
-      const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      const daysUntilExpiry = Math.ceil(
+        (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      )
 
       if (daysUntilExpiry <= 7 && daysUntilExpiry > 1 && profile.email) {
         // Check timezone before sending
