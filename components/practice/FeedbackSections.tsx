@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, memo } from "react"
 import {
   CheckCircle,
   TrendingUp,
@@ -62,7 +62,7 @@ interface FeedbackSectionsProps {
   alternativeApproaches?: AlternativeApproach[]
 }
 
-export function FeedbackSections({
+export const FeedbackSections = memo(function FeedbackSections({
   sections,
   code,
   language = "javascript",
@@ -554,4 +554,4 @@ export function FeedbackSections({
       </p>
     </div>
   )
-}
+})
