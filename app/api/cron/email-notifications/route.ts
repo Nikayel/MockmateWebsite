@@ -14,9 +14,8 @@
  *
  * Runs every 3 hours to cover all timezones across 24 hours.
  *
- * Designed for Vercel Cron Jobs (Hobby plan - 1 cron only):
- * Schedule: "0 0/3 * * *" (every 3 hours)
- * Path: /api/cron/email-notifications
+ * Triggered externally via cron-job.org (Vercel Hobby plan only allows daily crons).
+ * Configure at cron-job.org: POST to /api/cron/email-notifications with Bearer token.
  */
 
 import { NextRequest, NextResponse } from "next/server"
