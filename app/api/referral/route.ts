@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuth } from '@/lib/auth-helpers'
 import { getUserReferralCode, getUserReferralStats, recordReferral } from '@/lib/referrals'
+import { promoCodeRateLimit } from '@/lib/rate-limit'
 
 /**
  * GET /api/referral
@@ -54,6 +55,12 @@ export async function GET(request: NextRequest) {
  * - referralCode: string
  */
 export async function POST(request: NextRequest) {
+  // Apply rate limiting to prevent brute-force attacks on referral codes
+  const rateLimitResponse = await promoCodeRateLimit(request)
+  if (rateLimitResponse) {
+    return rateLimitResponse
+  }
+
   const authResult = await verifyAuth(request)
   if (!authResult.authenticated || !authResult.userId) {
     return NextResponse.json(

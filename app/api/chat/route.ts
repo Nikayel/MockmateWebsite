@@ -1220,19 +1220,10 @@ Keep it conversational and real - like you're actually debriefing someone after 
       status: error?.status,
       endpoint: "/api/chat",
     })
+    // Return generic error message to avoid leaking internal details
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : error?.message || "Failed to process chat message",
-        details:
-          process.env.NODE_ENV === "development"
-            ? {
-                status: error?.status,
-                originalError: error?.originalError?.message || error?.originalError,
-              }
-            : undefined,
+        error: "Failed to process chat message. Please try again.",
       },
       { status: 500 }
     )

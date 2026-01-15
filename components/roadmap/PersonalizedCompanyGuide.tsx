@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, memo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   ChevronDown,
@@ -58,7 +58,7 @@ const PATTERN_NAMES: Record<string, string> = {
   sorting: "Sorting",
 }
 
-export function PersonalizedCompanyGuide({
+export const PersonalizedCompanyGuide = memo(function PersonalizedCompanyGuide({
   guide,
   defaultExpanded = true,
 }: PersonalizedCompanyGuideProps) {
@@ -131,7 +131,7 @@ export function PersonalizedCompanyGuide({
       />
     </div>
   )
-}
+})
 
 /**
  * Time Strategy Banner
