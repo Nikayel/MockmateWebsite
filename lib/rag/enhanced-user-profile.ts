@@ -20,6 +20,12 @@ import {
   type UserPerformanceProfile,
   type SessionAnalysis,
 } from "./user-performance-rag"
+// NEW: Import production-grade behavioral analysis
+import {
+  generateAccurateBehavioralProfile,
+  assessDataQuality,
+  type AccurateBehavioralProfile,
+} from "./behavioral-analysis"
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -1192,3 +1198,25 @@ export async function getInterviewReadiness(
 ): Promise<EnhancedUserProfile["interviewReadiness"]> {
   return getEnhancedProfileService().getInterviewReadiness(userId)
 }
+
+// ============================================================================
+// PRODUCTION-GRADE BEHAVIORAL ANALYSIS EXPORTS
+// ============================================================================
+
+/**
+ * Get accurate behavioral profile using production-grade analysis
+ * This uses ACTUAL session data, not naive heuristics
+ */
+export async function getAccurateBehavioralProfile(userId: string): Promise<AccurateBehavioralProfile> {
+  return generateAccurateBehavioralProfile(userId)
+}
+
+/**
+ * Assess data quality for a user's behavioral analysis
+ */
+export async function getUserDataQuality(userId: string) {
+  return assessDataQuality(userId)
+}
+
+// Re-export types for convenience
+export type { AccurateBehavioralProfile } from "./behavioral-analysis"
