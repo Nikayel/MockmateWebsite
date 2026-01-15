@@ -29,7 +29,7 @@ export async function syncSubscription(firebaseUser: FirebaseUser): Promise<Sync
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${idToken}`
+        Authorization: `Bearer ${idToken}`,
       },
       body: JSON.stringify({ userId: firebaseUser.uid }),
     })
@@ -38,7 +38,7 @@ export async function syncSubscription(firebaseUser: FirebaseUser): Promise<Sync
       return {
         success: false,
         profile: null,
-        error: `Sync failed with status ${response.status}`
+        error: `Sync failed with status ${response.status}`,
       }
     }
 
@@ -49,20 +49,20 @@ export async function syncSubscription(firebaseUser: FirebaseUser): Promise<Sync
       const updatedProfile = await getUserProfile(firebaseUser.uid)
       return {
         success: true,
-        profile: updatedProfile
+        profile: updatedProfile,
       }
     }
 
     return {
       success: false,
       profile: null,
-      error: data.error || "Sync completed but no profile returned"
+      error: data.error || "Sync completed but no profile returned",
     }
   } catch {
     return {
       success: false,
       profile: null,
-      error: "Network error during sync"
+      error: "Network error during sync",
     }
   }
 }
@@ -94,10 +94,10 @@ export async function syncSubscriptionWithRetry(
   maxAttempts: number = 5,
   delayMs: number = 1500
 ): Promise<SyncResult> {
-  let lastResult: SyncResult = {
+  const lastResult: SyncResult = {
     success: false,
     profile: null,
-    error: "No attempts made"
+    error: "No attempts made",
   }
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -108,7 +108,7 @@ export async function syncSubscriptionWithRetry(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`
+          Authorization: `Bearer ${idToken}`,
         },
         body: JSON.stringify({ userId: firebaseUser.uid }),
       })
@@ -121,19 +121,19 @@ export async function syncSubscriptionWithRetry(
           const updatedProfile = await getUserProfile(firebaseUser.uid)
           return {
             success: true,
-            profile: updatedProfile
+            profile: updatedProfile,
           }
         }
       }
 
       // Not yet synced, wait and retry
       if (attempt < maxAttempts - 1) {
-        await new Promise(resolve => setTimeout(resolve, delayMs))
+        await new Promise((resolve) => setTimeout(resolve, delayMs))
       }
     } catch {
       // Continue to next attempt
       if (attempt < maxAttempts - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise((resolve) => setTimeout(resolve, 1000))
       }
     }
   }

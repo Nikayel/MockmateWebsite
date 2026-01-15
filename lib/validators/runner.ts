@@ -9,7 +9,7 @@ import {
   Normalizers,
   PropertyBuilders,
   OutputNormalization,
-} from './types'
+} from "./types"
 
 export interface ValidationResult {
   passed: boolean
@@ -32,22 +32,22 @@ function applyNormalization(value: any, steps: OutputNormalization[]): any {
 
   for (const step of steps) {
     switch (step) {
-      case 'sort-array':
+      case "sort-array":
         result = Normalizers.sortArray(result)
         break
-      case 'sort-nested':
+      case "sort-nested":
         result = Normalizers.sortNested(result)
         break
-      case 'set':
+      case "set":
         result = Array.from(Normalizers.toSet(result))
         break
-      case 'multiset':
+      case "multiset":
         result = Normalizers.sortArray(result)
         break
-      case 'normalize-whitespace':
+      case "normalize-whitespace":
         result = Normalizers.normalizeWhitespace(result)
         break
-      case 'none':
+      case "none":
       default:
         break
     }
@@ -65,7 +65,7 @@ function deepEquals(a: any, b: any, tolerance = 0.0001): boolean {
   if (b === null || b === undefined) return false
 
   // Handle numbers with tolerance
-  if (typeof a === 'number' && typeof b === 'number') {
+  if (typeof a === "number" && typeof b === "number") {
     if (Number.isNaN(a) && Number.isNaN(b)) return true
     const diff = Math.abs(a - b)
     const relativeTolerance = Math.max(tolerance, Math.abs(a) * tolerance)
@@ -73,12 +73,12 @@ function deepEquals(a: any, b: any, tolerance = 0.0001): boolean {
   }
 
   // Handle booleans
-  if (typeof a === 'boolean' && typeof b === 'boolean') {
+  if (typeof a === "boolean" && typeof b === "boolean") {
     return a === b
   }
 
   // Handle strings
-  if (typeof a === 'string' && typeof b === 'string') {
+  if (typeof a === "string" && typeof b === "string") {
     return a === b
   }
 
@@ -89,12 +89,12 @@ function deepEquals(a: any, b: any, tolerance = 0.0001): boolean {
   }
 
   // Handle objects
-  if (typeof a === 'object' && typeof b === 'object') {
+  if (typeof a === "object" && typeof b === "object") {
     const keysA = Object.keys(a).sort()
     const keysB = Object.keys(b).sort()
     if (keysA.length !== keysB.length) return false
-    if (keysA.join(',') !== keysB.join(',')) return false
-    return keysA.every(key => deepEquals(a[key], b[key], tolerance))
+    if (keysA.join(",") !== keysB.join(",")) return false
+    return keysA.every((key) => deepEquals(a[key], b[key], tolerance))
   }
 
   // Fallback to strict equality
@@ -107,7 +107,7 @@ function deepEquals(a: any, b: any, tolerance = 0.0001): boolean {
 export async function validateOutput(
   testCase: ValidatedTestCase,
   actualOutput: any,
-  context: Omit<ValidatorContext, 'input' | 'output' | 'expected'>
+  context: Omit<ValidatorContext, "input" | "output" | "expected">
 ): Promise<ValidationResult> {
   const config = testCase.validation
   const parsedOutput = Normalizers.parseOutput(actualOutput)
@@ -116,7 +116,7 @@ export async function validateOutput(
     input: testCase.input,
     output: parsedOutput,
     expected: config.expected ?? testCase.expected,
-    ...context
+    ...context,
   }
 
   // Apply custom validator first if provided
@@ -125,29 +125,29 @@ export async function validateOutput(
       const result = await config.customValidator(ctx)
       return {
         passed: result,
-        reason: result ? undefined : 'Custom validator returned false'
+        reason: result ? undefined : "Custom validator returned false",
       }
     } catch (error) {
       return {
         passed: false,
-        reason: `Custom validator error: ${error instanceof Error ? error.message : 'Unknown error'}`
+        reason: `Custom validator error: ${error instanceof Error ? error.message : "Unknown error"}`,
       }
     }
   }
 
   switch (config.mode) {
-    case 'property':
+    case "property":
       return validateProperties(ctx, config)
 
-    case 'reference':
+    case "reference":
       // Reference validation would require executing reference solution
       // For now, fall through to exact mode
       return validateExact(ctx, config)
 
-    case 'any-valid':
+    case "any-valid":
       return validateAnyValid(ctx, config)
 
-    case 'exact':
+    case "exact":
     default:
       return validateExact(ctx, config)
   }
@@ -156,16 +156,13 @@ export async function validateOutput(
 /**
  * Property-based validation
  */
-function validateProperties(
-  ctx: ValidatorContext,
-  config: ValidatorConfig
-): ValidationResult {
+function validateProperties(ctx: ValidatorContext, config: ValidatorConfig): ValidationResult {
   const properties = config.properties || []
 
   if (properties.length === 0) {
     return {
       passed: false,
-      reason: 'No properties defined for property-based validation'
+      reason: "No properties defined for property-based validation",
     }
   }
 
@@ -182,18 +179,18 @@ function validateProperties(
           details: {
             propertyName: prop.name,
             propertyDescription: prop.description,
-            actual: ctx.output
-          }
+            actual: ctx.output,
+          },
         }
       }
     } catch (error) {
       return {
         passed: false,
-        reason: `Property "${prop.name}" threw error: ${error instanceof Error ? error.message : 'Unknown'}`,
+        reason: `Property "${prop.name}" threw error: ${error instanceof Error ? error.message : "Unknown"}`,
         details: {
           propertyName: prop.name,
-          propertyDescription: prop.description
-        }
+          propertyDescription: prop.description,
+        },
       }
     }
   }
@@ -204,48 +201,42 @@ function validateProperties(
 /**
  * Exact value validation with normalization
  */
-function validateExact(
-  ctx: ValidatorContext,
-  config: ValidatorConfig
-): ValidationResult {
+function validateExact(ctx: ValidatorContext, config: ValidatorConfig): ValidationResult {
   const expected = config.expected ?? ctx.expected
   const normalizeSteps = config.normalize || []
 
-  let normalizedActual = applyNormalization(ctx.output, normalizeSteps)
-  let normalizedExpected = applyNormalization(expected, normalizeSteps)
+  const normalizedActual = applyNormalization(ctx.output, normalizeSteps)
+  const normalizedExpected = applyNormalization(expected, normalizeSteps)
 
   const tolerance = config.tolerance ?? 0.0001
   const passed = deepEquals(normalizedActual, normalizedExpected, tolerance)
 
   return {
     passed,
-    reason: passed ? undefined : 'Output does not match expected value',
+    reason: passed ? undefined : "Output does not match expected value",
     details: {
       expected,
       actual: ctx.output,
       normalizedExpected,
-      normalizedActual
-    }
+      normalizedActual,
+    },
   }
 }
 
 /**
  * Any valid output validation - checks against multiple valid outputs
  */
-function validateAnyValid(
-  ctx: ValidatorContext,
-  config: ValidatorConfig
-): ValidationResult {
+function validateAnyValid(ctx: ValidatorContext, config: ValidatorConfig): ValidationResult {
   const validOutputs = config.multipleValidOutputs || []
 
   if (validOutputs.length === 0) {
     // Fall back to expected if no multiple outputs defined
     if (config.expected !== undefined) {
-      return validateExact(ctx, { ...config, mode: 'exact' })
+      return validateExact(ctx, { ...config, mode: "exact" })
     }
     return {
       passed: false,
-      reason: 'No valid outputs defined for any-valid mode'
+      reason: "No valid outputs defined for any-valid mode",
     }
   }
 
@@ -262,11 +253,11 @@ function validateAnyValid(
 
   return {
     passed: false,
-    reason: 'Output does not match any valid output',
+    reason: "Output does not match any valid output",
     details: {
       actual: ctx.output,
-      normalizedActual
-    }
+      normalizedActual,
+    },
   }
 }
 
@@ -287,7 +278,7 @@ export function convertLegacyTestCase(
   const normalize: OutputNormalization[] = []
 
   if (testCase.compareAsSet || testCase.orderMatters === false) {
-    normalize.push('sort-nested')
+    normalize.push("sort-nested")
   }
 
   // Auto-detect problem type from scenarioId for property-based validation
@@ -298,7 +289,7 @@ export function convertLegacyTestCase(
       input: testCase.input,
       description: testCase.description,
       validation: {
-        mode: 'property',
+        mode: "property",
         properties: propertyValidators,
         expected: testCase.expected, // Keep for debugging
       },
@@ -310,7 +301,7 @@ export function convertLegacyTestCase(
     input: testCase.input,
     description: testCase.description,
     validation: {
-      mode: 'exact',
+      mode: "exact",
       expected: testCase.expected,
       normalize,
     },
@@ -324,33 +315,38 @@ export function convertLegacyTestCase(
 function detectPropertyValidators(
   scenarioId: string,
   testCase: { input: any; expected: any }
-): Array<ReturnType<typeof PropertyBuilders[keyof typeof PropertyBuilders]>> {
-  const validators: Array<ReturnType<typeof PropertyBuilders[keyof typeof PropertyBuilders]>> = []
+): Array<ReturnType<(typeof PropertyBuilders)[keyof typeof PropertyBuilders]>> {
+  const validators: Array<ReturnType<(typeof PropertyBuilders)[keyof typeof PropertyBuilders]>> = []
   const { input, expected } = testCase
 
   // Two-sum pattern detection
   if (
-    scenarioId.includes('two-sum') ||
+    scenarioId.includes("two-sum") ||
     (input.nums && input.target !== undefined && Array.isArray(expected) && expected.length === 2)
   ) {
-    validators.push(PropertyBuilders.twoSumValid('nums', 'target'))
+    validators.push(PropertyBuilders.twoSumValid("nums", "target"))
     return validators
   }
 
   // Group anagrams pattern
-  if (scenarioId.includes('anagram') && input.strs && Array.isArray(expected) && Array.isArray(expected[0])) {
+  if (
+    scenarioId.includes("anagram") &&
+    input.strs &&
+    Array.isArray(expected) &&
+    Array.isArray(expected[0])
+  ) {
     validators.push(PropertyBuilders.validAnagramGroups())
     return validators
   }
 
   // Palindrome check
-  if (scenarioId.includes('palindrome') && typeof expected === 'boolean') {
+  if (scenarioId.includes("palindrome") && typeof expected === "boolean") {
     validators.push(PropertyBuilders.isPalindrome())
     return validators
   }
 
   // Cycle detection
-  if (scenarioId.includes('cycle') && typeof expected === 'boolean') {
+  if (scenarioId.includes("cycle") && typeof expected === "boolean") {
     validators.push(PropertyBuilders.hasCycle())
     return validators
   }
@@ -381,12 +377,12 @@ export function validateResultEnhanced(
     output: Normalizers.parseOutput(actual),
     expected: testCase.expected,
     language,
-    scenarioId
+    scenarioId,
   }
 
   const config = validatedTestCase.validation
 
-  if (config.mode === 'property' && config.properties) {
+  if (config.mode === "property" && config.properties) {
     return validateProperties(ctx, config)
   }
 

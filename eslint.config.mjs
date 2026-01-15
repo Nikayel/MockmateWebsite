@@ -50,6 +50,7 @@ const eslintConfig = [
       "*.config.js",
       "*.config.mjs",
       "extension/**",
+      "scripts/**",
     ],
   },
 ];

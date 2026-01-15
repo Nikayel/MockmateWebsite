@@ -62,7 +62,20 @@
       "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:$PATH\" npm cache clean:*)",
       "Bash(grep:*)",
       "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:$PATH\" git commit -m \"$\\(cat <<''EOF''\nfix: session evaluating state and feedback parsing\n\n- Add proper handling for evaluating sessions in /sessions page\n  - Shows \"View Status\" button linking to session detail page\n  - Previously showed no action, letting users click into interview\n- Fix feedback bullet list parsing in parsers.ts\n  - Use matchAll with multiline regex to properly extract bullets\n  - Handles cases where bullets don''t have leading newlines\n  - Fixes empty \"What Worked\" and \"To Improve\" sections\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:$PATH\" /Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin/node ./node_modules/typescript/bin/tsc:*)"
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:$PATH\" /Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin/node ./node_modules/typescript/bin/tsc:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:$PATH\" git commit -m \"$\\(cat <<''EOF''\nfix: CI/CD and Vercel cron configuration\n\n- Update CI workflow: pnpm v9, Node 20, pnpm/action-setup@v4\n- Remove Vercel crons \\(using cron-job.org for external triggering\\)\n- Update email-notifications comment to reflect external cron setup\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:$PATH\" pnpm exec eslint:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH\" pnpm run lint:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH\" gh run list:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" gh run list:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" gh run view:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" pnpm next:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" pnpm next lint:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" pnpm lint:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" pnpm eslint:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" pnpm lint:fix:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" pnpm typecheck:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" git add:*)"
     ]
   }
 }

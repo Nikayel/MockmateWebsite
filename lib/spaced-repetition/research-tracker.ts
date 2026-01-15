@@ -5,8 +5,8 @@
  * Stores granular data for statistical analysis and comparison.
  */
 
-import { adminDb } from '../firebase-admin'
-import { FieldValue } from 'firebase-admin/firestore'
+import { adminDb } from "../firebase-admin"
+import { FieldValue } from "firebase-admin/firestore"
 import type {
   SpacedRepetitionAlgorithm,
   SpacedRepetitionMasteryLevel,
@@ -16,15 +16,15 @@ import type {
   AlgorithmResearchEvent,
   AlgorithmComparisonAggregate,
   AlgorithmCohortStats,
-} from '../types'
-import { getUserAlgorithm } from './algorithm-router'
+} from "../types"
+import { getUserAlgorithm } from "./algorithm-router"
 
 // ============================================
 // Helper Functions
 // ============================================
 
 function getDateString(date: Date = new Date()): string {
-  return date.toISOString().split('T')[0] // YYYY-MM-DD
+  return date.toISOString().split("T")[0] // YYYY-MM-DD
 }
 
 function getWeekStart(date: Date = new Date()): string {
@@ -53,8 +53,8 @@ export async function recordReviewEvent(params: {
   scenarioId: string
   pattern: string
   difficulty: SpacedRepetitionDifficulty
-  score: number                    // Interview score (includes communication)
-  masteryScore: number             // Code-focused score (for SR algorithm)
+  score: number // Interview score (includes communication)
+  masteryScore: number // Code-focused score (for SR algorithm)
   qualityRating: number
   timeSpentMinutes: number
   hintsUsed: number
@@ -87,8 +87,7 @@ export async function recordReviewEvent(params: {
   // Use masteryScore for retention calculation - this measures CODE CORRECTNESS
   // Interview score includes communication, which doesn't indicate pattern mastery
   const actualRetention = params.masteryScore >= 56
-  const retentionAsPredicted =
-    (params.preReviewState.predictedRetention >= 50) === actualRetention
+  const retentionAsPredicted = params.preReviewState.predictedRetention >= 50 === actualRetention
 
   const event: AlgorithmResearchEvent = {
     id: eventId,
@@ -127,7 +126,7 @@ export async function recordReviewEvent(params: {
   }
 
   // Store the event
-  await adminDb.collection('algorithm_research_events').doc(eventId).set(event)
+  await adminDb.collection("algorithm_research_events").doc(eventId).set(event)
 
   // Update daily metrics
   await updateDailyMetrics(params.userId, algorithm, dateStr, {
@@ -139,10 +138,11 @@ export async function recordReviewEvent(params: {
     intervalScheduled: params.postReviewState.newIntervalDays,
     retained: actualRetention,
     lapsed: params.score < 40,
-    masteredToday: masteryChanged && params.postReviewState.masteryLevel === 'mastered',
-    regressedToday: masteryChanged &&
-      ['learning', 'new'].includes(params.postReviewState.masteryLevel) &&
-      ['reviewing', 'mastered'].includes(params.preReviewState.masteryLevel),
+    masteredToday: masteryChanged && params.postReviewState.masteryLevel === "mastered",
+    regressedToday:
+      masteryChanged &&
+      ["learning", "new"].includes(params.postReviewState.masteryLevel) &&
+      ["reviewing", "mastered"].includes(params.preReviewState.masteryLevel),
     isNewProblem: params.isFirstReview,
   })
 
@@ -154,7 +154,7 @@ export async function recordReviewEvent(params: {
     lapsed: params.score < 40,
     intervalScheduled: params.postReviewState.newIntervalDays,
     retentionAsPredicted,
-    newProblemMastered: masteryChanged && params.postReviewState.masteryLevel === 'mastered',
+    newProblemMastered: masteryChanged && params.postReviewState.masteryLevel === "mastered",
     easeFactor: params.postReviewState.newEaseFactor,
     stability: params.postReviewState.newStability,
   })
@@ -182,9 +182,9 @@ async function updateDailyMetrics(
   }
 ): Promise<void> {
   const metricsRef = adminDb
-    .collection('algorithm_research_metrics')
+    .collection("algorithm_research_metrics")
     .doc(userId)
-    .collection('daily')
+    .collection("daily")
     .doc(dateStr)
 
   const doc = await metricsRef.get()
@@ -248,7 +248,7 @@ async function updateDailyMetrics(
 
       const newScores = [...existing.scores, data.score]
       const newIntervals = [...existing.intervals_scheduled, data.intervalScheduled]
-      const retained = newScores.filter(s => s >= 56).length
+      const retained = newScores.filter((s) => s >= 56).length
       const newQualityDist = { ...existing.quality_distribution }
       newQualityDist[data.qualityRating] = (newQualityDist[data.qualityRating] || 0) + 1
 
@@ -256,7 +256,8 @@ async function updateDailyMetrics(
       const diffStats = { ...existing.problems_by_difficulty }
       const currentDiff = diffStats[data.difficulty]
       const newAttempted = currentDiff.attempted + 1
-      const newAvgScore = ((currentDiff.avg_score * currentDiff.attempted) + data.score) / newAttempted
+      const newAvgScore =
+        (currentDiff.avg_score * currentDiff.attempted + data.score) / newAttempted
       diffStats[data.difficulty] = {
         attempted: newAttempted,
         avg_score: Math.round(newAvgScore),
@@ -287,7 +288,9 @@ async function updateDailyMetrics(
           ? existing.problems_regressed_today + 1
           : existing.problems_regressed_today,
         intervals_scheduled: newIntervals,
-        average_interval_days: Math.round(newIntervals.reduce((a, b) => a + b, 0) / newIntervals.length),
+        average_interval_days: Math.round(
+          newIntervals.reduce((a, b) => a + b, 0) / newIntervals.length
+        ),
         max_interval_days: Math.max(existing.max_interval_days, data.intervalScheduled),
         hints_used: existing.hints_used + data.hintsUsed,
         problems_by_difficulty: diffStats,
@@ -318,10 +321,10 @@ async function updateResearchSummary(
   }
 ): Promise<void> {
   const summaryRef = adminDb
-    .collection('algorithm_research_metrics')
+    .collection("algorithm_research_metrics")
     .doc(userId)
-    .collection('summary')
-    .doc('current')
+    .collection("summary")
+    .doc("current")
 
   const doc = await summaryRef.get()
 
@@ -350,21 +353,23 @@ async function updateResearchSummary(
       current_streak: 1,
       average_daily_reviews: 1,
       average_session_length_minutes: data.timeSpentMinutes,
-      weekly_averages: [{
-        week_start: weekStart,
-        average_score: data.score,
-        retention_rate: data.retained ? 100 : 0,
-        reviews_completed: 1,
-        problems_mastered: data.newProblemMastered ? 1 : 0,
-      }],
+      weekly_averages: [
+        {
+          week_start: weekStart,
+          average_score: data.score,
+          retention_rate: data.retained ? 100 : 0,
+          reviews_completed: 1,
+          problems_mastered: data.newProblemMastered ? 1 : 0,
+        },
+      ],
       average_interval_accuracy: data.retentionAsPredicted ? 100 : 0,
       interval_distribution: {
-        '1-3_days': data.intervalScheduled <= 3 ? 1 : 0,
-        '4-7_days': data.intervalScheduled >= 4 && data.intervalScheduled <= 7 ? 1 : 0,
-        '8-14_days': data.intervalScheduled >= 8 && data.intervalScheduled <= 14 ? 1 : 0,
-        '15-30_days': data.intervalScheduled >= 15 && data.intervalScheduled <= 30 ? 1 : 0,
-        '31-60_days': data.intervalScheduled >= 31 && data.intervalScheduled <= 60 ? 1 : 0,
-        '60+_days': data.intervalScheduled > 60 ? 1 : 0,
+        "1-3_days": data.intervalScheduled <= 3 ? 1 : 0,
+        "4-7_days": data.intervalScheduled >= 4 && data.intervalScheduled <= 7 ? 1 : 0,
+        "8-14_days": data.intervalScheduled >= 8 && data.intervalScheduled <= 14 ? 1 : 0,
+        "15-30_days": data.intervalScheduled >= 15 && data.intervalScheduled <= 30 ? 1 : 0,
+        "31-60_days": data.intervalScheduled >= 31 && data.intervalScheduled <= 60 ? 1 : 0,
+        "60+_days": data.intervalScheduled > 60 ? 1 : 0,
       },
       first_review_at: now,
       last_review_at: now,
@@ -373,12 +378,12 @@ async function updateResearchSummary(
     }
 
     // Add algorithm-specific data
-    if (algorithm === 'sm2' && data.easeFactor) {
+    if (algorithm === "sm2" && data.easeFactor) {
       newSummary.sm2_specific = {
         average_ease_factor: data.easeFactor,
         ease_factor_distribution: { [data.easeFactor.toFixed(1)]: 1 },
       }
-    } else if (algorithm === 'fsrs' && data.stability) {
+    } else if (algorithm === "fsrs" && data.stability) {
       newSummary.fsrs_specific = {
         average_stability: data.stability,
         average_difficulty: 5,
@@ -391,20 +396,27 @@ async function updateResearchSummary(
     // Update existing summary
     const existing = doc.data() as AlgorithmResearchSummary
     const newTotalReviews = existing.total_reviews + 1
-    const newRetained = (existing.lifetime_retention_rate * existing.total_reviews / 100) +
-      (data.retained ? 1 : 0)
-    const newLapsed = (existing.lifetime_lapse_rate * existing.total_reviews / 100) +
-      (data.lapsed ? 1 : 0)
-    const newAccurate = (existing.average_interval_accuracy * existing.total_reviews / 100) +
+    const newRetained =
+      (existing.lifetime_retention_rate * existing.total_reviews) / 100 + (data.retained ? 1 : 0)
+    const newLapsed =
+      (existing.lifetime_lapse_rate * existing.total_reviews) / 100 + (data.lapsed ? 1 : 0)
+    const newAccurate =
+      (existing.average_interval_accuracy * existing.total_reviews) / 100 +
       (data.retentionAsPredicted ? 1 : 0)
 
     // Determine interval bucket
     const intervalBucket =
-      data.intervalScheduled <= 3 ? '1-3_days' :
-      data.intervalScheduled <= 7 ? '4-7_days' :
-      data.intervalScheduled <= 14 ? '8-14_days' :
-      data.intervalScheduled <= 30 ? '15-30_days' :
-      data.intervalScheduled <= 60 ? '31-60_days' : '60+_days'
+      data.intervalScheduled <= 3
+        ? "1-3_days"
+        : data.intervalScheduled <= 7
+          ? "4-7_days"
+          : data.intervalScheduled <= 14
+            ? "8-14_days"
+            : data.intervalScheduled <= 30
+              ? "15-30_days"
+              : data.intervalScheduled <= 60
+                ? "31-60_days"
+                : "60+_days"
 
     const newIntervalDist = { ...existing.interval_distribution }
     newIntervalDist[intervalBucket] = (newIntervalDist[intervalBucket] || 0) + 1
@@ -413,7 +425,7 @@ async function updateResearchSummary(
       total_reviews: FieldValue.increment(1),
       total_time_spent_minutes: FieldValue.increment(data.timeSpentMinutes),
       lifetime_average_score: Math.round(
-        ((existing.lifetime_average_score * existing.total_reviews) + data.score) / newTotalReviews
+        (existing.lifetime_average_score * existing.total_reviews + data.score) / newTotalReviews
       ),
       lifetime_retention_rate: Math.round((newRetained / newTotalReviews) * 100),
       lifetime_lapse_rate: Math.round((newLapsed / newTotalReviews) * 100),
@@ -439,9 +451,9 @@ export async function recordSkippedReview(userId: string): Promise<void> {
   const dateStr = getDateString()
 
   const metricsRef = adminDb
-    .collection('algorithm_research_metrics')
+    .collection("algorithm_research_metrics")
     .doc(userId)
-    .collection('daily')
+    .collection("daily")
     .doc(dateStr)
 
   const doc = await metricsRef.get()
@@ -465,7 +477,7 @@ async function getDistributionFromProfiles(): Promise<{
   sm2: { total: number; active_7d: number }
   fsrs: { total: number; active_7d: number }
 }> {
-  const profiles = await adminDb.collection('profiles').get()
+  const profiles = await adminDb.collection("profiles").get()
   const stats = {
     sm2: { total: 0, active_7d: 0 },
     fsrs: { total: 0, active_7d: 0 },
@@ -476,7 +488,7 @@ async function getDistributionFromProfiles(): Promise<{
 
   profiles.docs.forEach((doc) => {
     const data = doc.data()
-    const algorithm = (data.spaced_repetition_algorithm as SpacedRepetitionAlgorithm) || 'sm2'
+    const algorithm = (data.spaced_repetition_algorithm as SpacedRepetitionAlgorithm) || "sm2"
     const lastActive = data.updated_at ? new Date(data.updated_at) : null
 
     // Only count non-overridden users for research
@@ -505,15 +517,15 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
 
   // Query each algorithm separately to match available index:
   // (algorithm ASC, total_reviews DESC)
-  let sm2Users: AlgorithmResearchSummary[] = []
-  let fsrsUsers: AlgorithmResearchSummary[] = []
+  const sm2Users: AlgorithmResearchSummary[] = []
+  const fsrsUsers: AlgorithmResearchSummary[] = []
 
   try {
     // Query SM-2 users with review data
     const sm2Snap = await adminDb
-      .collectionGroup('summary')
-      .where('algorithm', '==', 'sm2')
-      .where('total_reviews', '>', 0)
+      .collectionGroup("summary")
+      .where("algorithm", "==", "sm2")
+      .where("total_reviews", ">", 0)
       .get()
 
     sm2Snap.docs.forEach((doc) => {
@@ -523,15 +535,15 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
       }
     })
   } catch (error) {
-    console.warn('[ResearchTracker] Failed to query SM-2 summaries:', error)
+    console.warn("[ResearchTracker] Failed to query SM-2 summaries:", error)
   }
 
   try {
     // Query FSRS users with review data
     const fsrsSnap = await adminDb
-      .collectionGroup('summary')
-      .where('algorithm', '==', 'fsrs')
-      .where('total_reviews', '>', 0)
+      .collectionGroup("summary")
+      .where("algorithm", "==", "fsrs")
+      .where("total_reviews", ">", 0)
       .get()
 
     fsrsSnap.docs.forEach((doc) => {
@@ -541,12 +553,12 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
       }
     })
   } catch (error) {
-    console.warn('[ResearchTracker] Failed to query FSRS summaries:', error)
+    console.warn("[ResearchTracker] Failed to query FSRS summaries:", error)
   }
 
   // Calculate cohort stats - use distribution totals for user counts
-  const sm2Stats = calculateCohortStats('sm2', sm2Users, thirtyDaysAgo, distribution.sm2.total)
-  const fsrsStats = calculateCohortStats('fsrs', fsrsUsers, thirtyDaysAgo, distribution.fsrs.total)
+  const sm2Stats = calculateCohortStats("sm2", sm2Users, thirtyDaysAgo, distribution.sm2.total)
+  const fsrsStats = calculateCohortStats("fsrs", fsrsUsers, thirtyDaysAgo, distribution.fsrs.total)
 
   // Calculate comparison
   const comparison: {
@@ -576,14 +588,14 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
 
   // Count wins for each algorithm across metrics
   const metricComparisons = [
-    { name: 'retention', fsrsBetter: comparison.retention_rate_difference > 0 },
-    { name: 'score', fsrsBetter: comparison.average_score_difference > 0 },
-    { name: 'time_to_mastery', fsrsBetter: comparison.time_to_mastery_difference_days > 0 },
-    { name: 'engagement', fsrsBetter: comparison.engagement_difference > 0 },
-    { name: 'interval_efficiency', fsrsBetter: comparison.interval_efficiency_difference > 0 },
+    { name: "retention", fsrsBetter: comparison.retention_rate_difference > 0 },
+    { name: "score", fsrsBetter: comparison.average_score_difference > 0 },
+    { name: "time_to_mastery", fsrsBetter: comparison.time_to_mastery_difference_days > 0 },
+    { name: "engagement", fsrsBetter: comparison.engagement_difference > 0 },
+    { name: "interval_efficiency", fsrsBetter: comparison.interval_efficiency_difference > 0 },
   ]
 
-  const fsrsWins = metricComparisons.filter(m => m.fsrsBetter).length
+  const fsrsWins = metricComparisons.filter((m) => m.fsrsBetter).length
   const sm2Wins = 5 - fsrsWins
 
   comparison.fsrs_wins_count = fsrsWins
@@ -592,10 +604,10 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
   // Determine winner if sample size is sufficient
   if (comparison.sufficient_sample_size) {
     if (fsrsWins >= 4) {
-      comparison.overall_winner = 'fsrs'
+      comparison.overall_winner = "fsrs"
       comparison.confidence_level = Math.min(95, 60 + fsrsWins * 7)
     } else if (fsrsWins <= 1) {
-      comparison.overall_winner = 'sm2'
+      comparison.overall_winner = "sm2"
       comparison.confidence_level = Math.min(95, 60 + sm2Wins * 7)
     }
     // If 2-3 wins each, no clear winner - leave as null
@@ -613,10 +625,7 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
   }
 
   // Store the aggregate
-  await adminDb
-    .collection('algorithm_research_aggregate')
-    .doc('comparison')
-    .set(aggregate)
+  await adminDb.collection("algorithm_research_aggregate").doc("comparison").set(aggregate)
 
   return aggregate
 }
@@ -625,7 +634,7 @@ function calculateCohortStats(
   algorithm: SpacedRepetitionAlgorithm,
   users: AlgorithmResearchSummary[],
   thirtyDaysAgo: Date,
-  totalAssignedUsers?: number  // Total from profiles (assigned), not just with review data
+  totalAssignedUsers?: number // Total from profiles (assigned), not just with review data
 ): AlgorithmCohortStats {
   // Use the total assigned users from profiles, fallback to users with review data
   const totalUsers = totalAssignedUsers ?? users.length
@@ -640,19 +649,15 @@ function calculateCohortStats(
   const sevenDaysAgo = new Date()
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
-  const activeUsers7d = users.filter(u =>
-    new Date(u.last_review_at) >= sevenDaysAgo
-  )
-  const activeUsers30d = users.filter(u =>
-    new Date(u.last_review_at) >= thirtyDaysAgo
-  )
+  const activeUsers7d = users.filter((u) => new Date(u.last_review_at) >= sevenDaysAgo)
+  const activeUsers30d = users.filter((u) => new Date(u.last_review_at) >= thirtyDaysAgo)
 
-  const retentionRates = users.map(u => u.lifetime_retention_rate)
-  const scores = users.map(u => u.lifetime_average_score)
+  const retentionRates = users.map((u) => u.lifetime_retention_rate)
+  const scores = users.map((u) => u.lifetime_average_score)
 
   return {
     algorithm,
-    total_users: totalUsers,  // Use assigned user count from profiles
+    total_users: totalUsers, // Use assigned user count from profiles
     active_users_7d: activeUsers7d.length,
     active_users_30d: activeUsers30d.length,
     users_with_overrides: 0, // All overridden users were filtered out
@@ -661,9 +666,7 @@ function calculateCohortStats(
       retentionRates.reduce((a, b) => a + b, 0) / retentionRates.length
     ),
     median_retention_rate: median(retentionRates),
-    average_score: Math.round(
-      scores.reduce((a, b) => a + b, 0) / scores.length
-    ),
+    average_score: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
     median_score: median(scores),
 
     total_problems_mastered: users.reduce((sum, u) => sum + u.problems_mastered, 0),
@@ -677,9 +680,9 @@ function calculateCohortStats(
     average_streak_days: Math.round(
       users.reduce((sum, u) => sum + u.current_streak, 0) / users.length
     ),
-    average_daily_reviews: Math.round(
-      users.reduce((sum, u) => sum + u.average_daily_reviews, 0) / users.length * 10
-    ) / 10,
+    average_daily_reviews:
+      Math.round((users.reduce((sum, u) => sum + u.average_daily_reviews, 0) / users.length) * 10) /
+      10,
     average_session_length_minutes: Math.round(
       users.reduce((sum, u) => sum + u.average_session_length_minutes, 0) / users.length
     ),
@@ -691,7 +694,7 @@ function calculateCohortStats(
     average_lapse_rate: Math.round(
       users.reduce((sum, u) => sum + u.lifetime_lapse_rate, 0) / users.length
     ),
-    users_with_zero_lapses: users.filter(u => u.lifetime_lapse_rate === 0).length,
+    users_with_zero_lapses: users.filter((u) => u.lifetime_lapse_rate === 0).length,
 
     average_interval_days: calculateAverageInterval(users),
     interval_accuracy: Math.round(
@@ -722,11 +725,11 @@ function createEmptyCohortStats(algorithm: SpacedRepetitionAlgorithm): Algorithm
     churn_rate_7d: 0,
     churn_rate_30d: 0,
     score_distribution: {
-      '0-20': 0,
-      '21-40': 0,
-      '41-60': 0,
-      '61-80': 0,
-      '81-100': 0,
+      "0-20": 0,
+      "21-40": 0,
+      "41-60": 0,
+      "61-80": 0,
+      "81-100": 0,
     },
     average_lapse_rate: 0,
     users_with_zero_lapses: 0,
@@ -736,16 +739,18 @@ function createEmptyCohortStats(algorithm: SpacedRepetitionAlgorithm): Algorithm
   }
 }
 
-function calculateScoreDistribution(users: AlgorithmResearchSummary[]): AlgorithmCohortStats['score_distribution'] {
-  const dist = { '0-20': 0, '21-40': 0, '41-60': 0, '61-80': 0, '81-100': 0 }
+function calculateScoreDistribution(
+  users: AlgorithmResearchSummary[]
+): AlgorithmCohortStats["score_distribution"] {
+  const dist = { "0-20": 0, "21-40": 0, "41-60": 0, "61-80": 0, "81-100": 0 }
 
   users.forEach((u) => {
     const score = u.lifetime_average_score
-    if (score <= 20) dist['0-20']++
-    else if (score <= 40) dist['21-40']++
-    else if (score <= 60) dist['41-60']++
-    else if (score <= 80) dist['61-80']++
-    else dist['81-100']++
+    if (score <= 20) dist["0-20"]++
+    else if (score <= 40) dist["21-40"]++
+    else if (score <= 60) dist["41-60"]++
+    else if (score <= 80) dist["61-80"]++
+    else dist["81-100"]++
   })
 
   return dist
@@ -758,12 +763,12 @@ function calculateAverageInterval(users: AlgorithmResearchSummary[]): number {
   users.forEach((u) => {
     const dist = u.interval_distribution
     const weights = {
-      '1-3_days': 2,
-      '4-7_days': 5.5,
-      '8-14_days': 11,
-      '15-30_days': 22.5,
-      '31-60_days': 45.5,
-      '60+_days': 90,
+      "1-3_days": 2,
+      "4-7_days": 5.5,
+      "8-14_days": 11,
+      "15-30_days": 22.5,
+      "31-60_days": 45.5,
+      "60+_days": 90,
     }
 
     Object.entries(dist).forEach(([key, count]) => {
@@ -784,10 +789,7 @@ function calculateAverageInterval(users: AlgorithmResearchSummary[]): number {
  * Get the latest aggregate comparison
  */
 export async function getAggregateComparison(): Promise<AlgorithmComparisonAggregate | null> {
-  const doc = await adminDb
-    .collection('algorithm_research_aggregate')
-    .doc('comparison')
-    .get()
+  const doc = await adminDb.collection("algorithm_research_aggregate").doc("comparison").get()
 
   return doc.exists ? (doc.data() as AlgorithmComparisonAggregate) : null
 }
@@ -799,10 +801,10 @@ export async function getUserResearchSummary(
   userId: string
 ): Promise<AlgorithmResearchSummary | null> {
   const doc = await adminDb
-    .collection('algorithm_research_metrics')
+    .collection("algorithm_research_metrics")
     .doc(userId)
-    .collection('summary')
-    .doc('current')
+    .collection("summary")
+    .doc("current")
     .get()
 
   return doc.exists ? (doc.data() as AlgorithmResearchSummary) : null
@@ -817,12 +819,12 @@ export async function getUserDailyMetrics(
   endDate: string
 ): Promise<AlgorithmDailyMetrics[]> {
   const snapshot = await adminDb
-    .collection('algorithm_research_metrics')
+    .collection("algorithm_research_metrics")
     .doc(userId)
-    .collection('daily')
-    .where('date', '>=', startDate)
-    .where('date', '<=', endDate)
-    .orderBy('date', 'desc')
+    .collection("daily")
+    .where("date", ">=", startDate)
+    .where("date", "<=", endDate)
+    .orderBy("date", "desc")
     .get()
 
   return snapshot.docs.map((doc) => doc.data() as AlgorithmDailyMetrics)
@@ -836,15 +838,15 @@ export async function getRecentEvents(
   algorithm?: SpacedRepetitionAlgorithm
 ): Promise<AlgorithmResearchEvent[]> {
   let query = adminDb
-    .collection('algorithm_research_events')
-    .orderBy('timestamp', 'desc')
+    .collection("algorithm_research_events")
+    .orderBy("timestamp", "desc")
     .limit(limit)
 
   if (algorithm) {
     query = adminDb
-      .collection('algorithm_research_events')
-      .where('algorithm', '==', algorithm)
-      .orderBy('timestamp', 'desc')
+      .collection("algorithm_research_events")
+      .where("algorithm", "==", algorithm)
+      .orderBy("timestamp", "desc")
       .limit(limit)
   }
 

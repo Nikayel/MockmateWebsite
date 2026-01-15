@@ -26,9 +26,9 @@ if (!process.env.STRIPE_SECRET_KEY) {
 // IMPORTANT: In production, ONLY use STRIPE_WEBHOOK_SECRET
 // STRIPE_WEBHOOK_SECRET_LOCAL should ONLY be set in development (from `stripe listen`)
 // If both are set, prefer production secret unless explicitly in development
-const isDevelopment = process.env.NODE_ENV === 'development'
+const isDevelopment = process.env.NODE_ENV === "development"
 const webhookSecret = isDevelopment
-  ? (process.env.STRIPE_WEBHOOK_SECRET_LOCAL || process.env.STRIPE_WEBHOOK_SECRET)
+  ? process.env.STRIPE_WEBHOOK_SECRET_LOCAL || process.env.STRIPE_WEBHOOK_SECRET
   : process.env.STRIPE_WEBHOOK_SECRET
 
 if (!webhookSecret) {
@@ -55,17 +55,19 @@ async function updateQuotaForSubscriptionTierAdmin(
   const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
 
-  const sessionsLimit = subscriptionTier === "pro"
-    ? PRICING_CONFIG.pro.sessionsPerMonth
-    : PRICING_CONFIG.free.sessionsPerMonth
+  const sessionsLimit =
+    subscriptionTier === "pro"
+      ? PRICING_CONFIG.pro.sessionsPerMonth
+      : PRICING_CONFIG.free.sessionsPerMonth
 
   // Query for existing quota
-  const quotaSnapshot = await adminDb.collection("profile_quota")
+  const quotaSnapshot = await adminDb
+    .collection("profile_quota")
     .where("user_id", "==", userId)
     .get()
 
   // Find current period quota
-  const currentQuotaDoc = quotaSnapshot.docs.find(doc => {
+  const currentQuotaDoc = quotaSnapshot.docs.find((doc) => {
     const data = doc.data()
     const quotaStart = new Date(data.period_start)
     return quotaStart >= periodStart && quotaStart <= periodEnd
@@ -87,7 +89,11 @@ async function updateQuotaForSubscriptionTierAdmin(
       // If user has used more than new limit (e.g., downgrade from pro to free), cap it
       // This ensures display shows correct "X/Y" where X <= Y
       updateData.sessions_used = sessionsLimit
-      paymentLogger.info("Capping sessions_used due to downgrade", { userId, sessionsLimit, previousUsed: currentData.sessions_used })
+      paymentLogger.info("Capping sessions_used due to downgrade", {
+        userId,
+        sessionsLimit,
+        previousUsed: currentData.sessions_used,
+      })
     }
 
     await currentQuotaDoc.ref.update(updateData)
@@ -166,7 +172,7 @@ export async function POST(request: NextRequest) {
       secretPrefix: webhookSecret ? webhookSecret.substring(0, 10) + "..." : "NOT_SET",
       bodyLength: body.length,
       isDevelopment,
-      hint: "Check that STRIPE_WEBHOOK_SECRET matches the webhook endpoint in Stripe Dashboard"
+      hint: "Check that STRIPE_WEBHOOK_SECRET matches the webhook endpoint in Stripe Dashboard",
     })
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
   }
@@ -182,7 +188,7 @@ export async function POST(request: NextRequest) {
       eventType: event.type,
       eventCreated: event.created,
       eventAgeSeconds: Math.round(eventAge),
-      maxAgeSeconds: MAX_EVENT_AGE_SECONDS
+      maxAgeSeconds: MAX_EVENT_AGE_SECONDS,
     })
     return NextResponse.json({ error: "Event too old" }, { status: 400 })
   }
@@ -197,7 +203,10 @@ export async function POST(request: NextRequest) {
     const processedEventSnap = await processedEventRef.get()
 
     if (processedEventSnap.exists) {
-      paymentLogger.info("Event already processed, skipping", { eventId: event.id, eventType: event.type })
+      paymentLogger.info("Event already processed, skipping", {
+        eventId: event.id,
+        eventType: event.type,
+      })
       return NextResponse.json({ received: true, skipped: true })
     }
 
@@ -212,7 +221,10 @@ export async function POST(request: NextRequest) {
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     })
   } catch (idempotencyError) {
-    paymentLogger.error("Error checking event idempotency", { eventId: event.id, error: idempotencyError })
+    paymentLogger.error("Error checking event idempotency", {
+      eventId: event.id,
+      error: idempotencyError,
+    })
     // Continue processing - idempotency check is not critical
   }
 
@@ -233,7 +245,8 @@ export async function POST(request: NextRequest) {
 
     // Process if payment was successful OR no payment required (100% discount coupon)
     // When a 100% discount coupon is applied, payment_status is "no_payment_required" not "paid"
-    const paymentSuccessful = session.payment_status === "paid" || session.payment_status === "no_payment_required"
+    const paymentSuccessful =
+      session.payment_status === "paid" || session.payment_status === "no_payment_required"
 
     // Handle subscription mode (monthly plans)
     if (paymentSuccessful && session.mode === "subscription") {
@@ -258,9 +271,7 @@ export async function POST(request: NextRequest) {
                 ? new Date(subscription.created * 1000).toISOString()
                 : undefined
               const periodEnd = subscription.items?.data?.[0]?.current_period_end
-              currentPeriodEnd = periodEnd
-                ? new Date(periodEnd * 1000).toISOString()
-                : undefined
+              currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000).toISOString() : undefined
               paymentLogger.info("Retrieved subscription details", {
                 subscriptionId: subscription.id,
                 status: subscription.status,
@@ -296,7 +307,9 @@ export async function POST(request: NextRequest) {
             if (profileSnap.exists) {
               // Document exists - update to preserve other fields
               transaction.update(profileRef, updateData as Record<string, any>)
-              paymentLogger.info("Updated existing profile for subscription (transactional)", { userId })
+              paymentLogger.info("Updated existing profile for subscription (transactional)", {
+                userId,
+              })
               return profileSnap.data() as Record<string, unknown> | undefined
             } else {
               // Document doesn't exist - create with subscription data
@@ -307,10 +320,13 @@ export async function POST(request: NextRequest) {
                 created_at: new Date().toISOString(),
               }
               transaction.set(profileRef, newProfileData)
-              paymentLogger.warn("Profile did not exist - created with subscription data (transactional)", {
-                userId,
-                email: session.customer_email || "MISSING",
-              })
+              paymentLogger.warn(
+                "Profile did not exist - created with subscription data (transactional)",
+                {
+                  userId,
+                  email: session.customer_email || "MISSING",
+                }
+              )
               return newProfileData as Record<string, unknown>
             }
           })
@@ -341,7 +357,10 @@ export async function POST(request: NextRequest) {
           try {
             await markReferralConverted(userId)
           } catch (referralError) {
-            paymentLogger.error("Failed to process referral conversion", { userId, error: referralError })
+            paymentLogger.error("Failed to process referral conversion", {
+              userId,
+              error: referralError,
+            })
             // Don't fail the webhook - referral processing is non-critical
           }
 
@@ -370,7 +389,10 @@ export async function POST(request: NextRequest) {
                 nextBillingDate: currentPeriodEnd,
               })
             } catch (emailError) {
-              paymentLogger.error("Failed to send subscription confirmation email", { userId, error: emailError })
+              paymentLogger.error("Failed to send subscription confirmation email", {
+                userId,
+                error: emailError,
+              })
             }
           }
 
@@ -411,14 +433,14 @@ export async function POST(request: NextRequest) {
           const profileSnap = await profileRef.get()
 
           // Get existing profile data or prepare to create new
-          let profile = profileSnap.exists ? profileSnap.data() : null
+          const profile = profileSnap.exists ? profileSnap.data() : null
 
           if (!profileSnap.exists) {
             // Profile doesn't exist - create it with subscription data
             // This handles edge cases where profile creation failed but payment succeeded
             paymentLogger.warn("Profile does not exist for yearly plan - will create", {
               userId,
-              email: session.customer_email
+              email: session.customer_email,
             })
           }
 
@@ -437,7 +459,9 @@ export async function POST(request: NextRequest) {
               await stripe.customers.retrieve(customerId)
               paymentLogger.info("Using existing valid customer from profile", { customerId })
             } catch {
-              paymentLogger.warn("Existing customer ID invalid, will find/create new", { invalidId: customerId })
+              paymentLogger.warn("Existing customer ID invalid, will find/create new", {
+                invalidId: customerId,
+              })
               customerId = undefined
             }
           }
@@ -453,13 +477,17 @@ export async function POST(request: NextRequest) {
           // If no customer in session, try to get it from payment intent
           if (!customerId && session.payment_intent) {
             try {
-              const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent as string)
+              const paymentIntent = await stripe.paymentIntents.retrieve(
+                session.payment_intent as string
+              )
               customerId = paymentIntent.customer as string | undefined
               if (customerId) {
                 paymentLogger.info("Retrieved customer ID from payment intent", { customerId })
               }
             } catch (piError) {
-              paymentLogger.warn("Failed to retrieve customer from payment intent", { error: piError })
+              paymentLogger.warn("Failed to retrieve customer from payment intent", {
+                error: piError,
+              })
             }
           }
 
@@ -475,12 +503,15 @@ export async function POST(request: NextRequest) {
 
               // Find a customer that matches this userId in metadata
               const matchingCustomer = existingCustomers.data.find(
-                c => c.metadata?.userId === userId
+                (c) => c.metadata?.userId === userId
               )
 
               if (matchingCustomer) {
                 customerId = matchingCustomer.id
-                paymentLogger.info("Found existing customer by email with matching userId", { customerId, email: userEmail })
+                paymentLogger.info("Found existing customer by email with matching userId", {
+                  customerId,
+                  email: userEmail,
+                })
               } else if (existingCustomers.data.length === 0) {
                 // No customers with this email - safe to create new one
                 const newCustomer = await stripe.customers.create({
@@ -489,30 +520,42 @@ export async function POST(request: NextRequest) {
                     userId: userId,
                     plan: "yearly",
                     source: "checkout_recovery",
-                  }
+                  },
                 })
                 customerId = newCustomer.id
-                paymentLogger.info("Created new customer for yearly plan", { customerId, email: userEmail })
+                paymentLogger.info("Created new customer for yearly plan", {
+                  customerId,
+                  email: userEmail,
+                })
               } else {
                 // Customers exist but none match this userId - create new to avoid conflict
-                paymentLogger.warn("Found customers with email but none match userId - creating new", {
-                  email: userEmail,
-                  userId,
-                  existingCustomerCount: existingCustomers.data.length
-                })
+                paymentLogger.warn(
+                  "Found customers with email but none match userId - creating new",
+                  {
+                    email: userEmail,
+                    userId,
+                    existingCustomerCount: existingCustomers.data.length,
+                  }
+                )
                 const newCustomer = await stripe.customers.create({
                   email: userEmail,
                   metadata: {
                     userId: userId,
                     plan: "yearly",
                     source: "checkout_new_user",
-                  }
+                  },
                 })
                 customerId = newCustomer.id
-                paymentLogger.info("Created separate customer to avoid email conflict", { customerId, email: userEmail })
+                paymentLogger.info("Created separate customer to avoid email conflict", {
+                  customerId,
+                  email: userEmail,
+                })
               }
             } catch (customerError) {
-              paymentLogger.error("Failed to find/create customer by email", { error: customerError, email: userEmail })
+              paymentLogger.error("Failed to find/create customer by email", {
+                error: customerError,
+                email: userEmail,
+              })
             }
           }
 
@@ -531,12 +574,15 @@ export async function POST(request: NextRequest) {
           if (customerId) {
             updateData.stripe_customer_id = customerId
           } else {
-            paymentLogger.error("Yearly plan: CRITICAL - No customer ID found after all recovery attempts", {
-              userId,
-              sessionId: session.id,
-              hasPaymentIntent: !!session.payment_intent,
-              email: profile?.email || session.customer_email
-            })
+            paymentLogger.error(
+              "Yearly plan: CRITICAL - No customer ID found after all recovery attempts",
+              {
+                userId,
+                sessionId: session.id,
+                hasPaymentIntent: !!session.payment_intent,
+                email: profile?.email || session.customer_email,
+              }
+            )
           }
 
           // Use set with merge to handle both update and create cases
@@ -548,10 +594,15 @@ export async function POST(request: NextRequest) {
             updateData.created_at = new Date().toISOString()
           }
           await profileRef.set(updateData, { merge: true })
-          paymentLogger.info(profileSnap.exists ? "Updated profile for yearly plan" : "Created profile for yearly plan", {
-            userId,
-            expiresAt: oneYearFromNow.toISOString(),
-          })
+          paymentLogger.info(
+            profileSnap.exists
+              ? "Updated profile for yearly plan"
+              : "Created profile for yearly plan",
+            {
+              userId,
+              expiresAt: oneYearFromNow.toISOString(),
+            }
+          )
 
           // Update quota to Pro limit - reset usage for new subscription
           await updateQuotaForSubscriptionTierAdmin(userId, "pro", true)
@@ -577,7 +628,10 @@ export async function POST(request: NextRequest) {
           try {
             await markReferralConverted(userId)
           } catch (referralError) {
-            paymentLogger.error("Failed to process referral conversion", { userId, error: referralError })
+            paymentLogger.error("Failed to process referral conversion", {
+              userId,
+              error: referralError,
+            })
             // Don't fail the webhook - referral processing is non-critical
           }
 
@@ -605,7 +659,10 @@ export async function POST(request: NextRequest) {
                 nextBillingDate: oneYearFromNow.toISOString(),
               })
             } catch (emailError) {
-              paymentLogger.error("Failed to send subscription confirmation email", { userId, error: emailError })
+              paymentLogger.error("Failed to send subscription confirmation email", {
+                userId,
+                error: emailError,
+              })
             }
           }
         } catch (error) {
@@ -634,7 +691,8 @@ export async function POST(request: NextRequest) {
     try {
       const customerId = invoice.customer as string
       if (customerId) {
-        const profilesQuery = await adminDb.collection("profiles")
+        const profilesQuery = await adminDb
+          .collection("profiles")
           .where("stripe_customer_id", "==", customerId)
           .get()
 
@@ -644,12 +702,16 @@ export async function POST(request: NextRequest) {
           const profileRef = adminDb.collection("profiles").doc(userId)
 
           // Update subscription status to indicate payment issue
-          await profileRef.set({
-            subscription_status: "past_due",
-            payment_failed_at: new Date().toISOString(),
-            payment_failure_reason: invoice.last_finalization_error?.message || "Payment declined",
-            updated_at: new Date().toISOString(),
-          }, { merge: true })
+          await profileRef.set(
+            {
+              subscription_status: "past_due",
+              payment_failed_at: new Date().toISOString(),
+              payment_failure_reason:
+                invoice.last_finalization_error?.message || "Payment declined",
+              updated_at: new Date().toISOString(),
+            },
+            { merge: true }
+          )
 
           paymentLogger.warn("Subscription marked as past_due", { userId })
 
@@ -664,7 +726,10 @@ export async function POST(request: NextRequest) {
               })
               paymentLogger.info("Payment failure email sent", { userId, email: profile.email })
             } catch (emailError) {
-              paymentLogger.error("Failed to send payment failure email", { userId, error: emailError })
+              paymentLogger.error("Failed to send payment failure email", {
+                userId,
+                error: emailError,
+              })
             }
           }
         }
@@ -687,7 +752,8 @@ export async function POST(request: NextRequest) {
     try {
       const customerId = invoice.customer as string
       if (customerId) {
-        const profilesQuery = await adminDb.collection("profiles")
+        const profilesQuery = await adminDb
+          .collection("profiles")
           .where("stripe_customer_id", "==", customerId)
           .get()
 
@@ -697,11 +763,14 @@ export async function POST(request: NextRequest) {
           const profile = profileDoc.data()
 
           // Update subscription status to indicate action required
-          await adminDb.collection("profiles").doc(userId).set({
-            subscription_status: "requires_action",
-            payment_action_url: invoice.hosted_invoice_url,
-            updated_at: new Date().toISOString(),
-          }, { merge: true })
+          await adminDb.collection("profiles").doc(userId).set(
+            {
+              subscription_status: "requires_action",
+              payment_action_url: invoice.hosted_invoice_url,
+              updated_at: new Date().toISOString(),
+            },
+            { merge: true }
+          )
 
           paymentLogger.info("User requires payment action", { userId })
         }
@@ -724,7 +793,8 @@ export async function POST(request: NextRequest) {
     try {
       const customerId = charge.customer as string
       if (customerId) {
-        const profilesQuery = await adminDb.collection("profiles")
+        const profilesQuery = await adminDb
+          .collection("profiles")
           .where("stripe_customer_id", "==", customerId)
           .get()
 
@@ -733,17 +803,23 @@ export async function POST(request: NextRequest) {
           const userId = profileDoc.id
           const profileRef = adminDb.collection("profiles").doc(userId)
 
-          await profileRef.set({
-            last_charge_failure: {
-              charge_id: charge.id,
-              failure_code: charge.failure_code,
-              failure_message: charge.failure_message,
-              occurred_at: new Date().toISOString(),
+          await profileRef.set(
+            {
+              last_charge_failure: {
+                charge_id: charge.id,
+                failure_code: charge.failure_code,
+                failure_message: charge.failure_message,
+                occurred_at: new Date().toISOString(),
+              },
+              updated_at: new Date().toISOString(),
             },
-            updated_at: new Date().toISOString(),
-          }, { merge: true })
+            { merge: true }
+          )
 
-          paymentLogger.warn("Recorded charge failure", { userId, failureMessage: charge.failure_message })
+          paymentLogger.warn("Recorded charge failure", {
+            userId,
+            failureMessage: charge.failure_message,
+          })
         }
       }
     } catch (error) {
@@ -764,7 +840,8 @@ export async function POST(request: NextRequest) {
     try {
       const customerId = charge.customer as string
       if (customerId) {
-        const profilesQuery = await adminDb.collection("profiles")
+        const profilesQuery = await adminDb
+          .collection("profiles")
           .where("stripe_customer_id", "==", customerId)
           .get()
 
@@ -785,7 +862,10 @@ export async function POST(request: NextRequest) {
           // REFERRAL CLAWBACK: Void any pending referral rewards for this user
           // This prevents fraud where someone signs up via referral, gets the referrer $10, then refunds
           try {
-            await voidReferralRewards(userId, `Refund processed: ${charge.refunded ? 'full' : 'partial'} refund`)
+            await voidReferralRewards(
+              userId,
+              `Refund processed: ${charge.refunded ? "full" : "partial"} refund`
+            )
             paymentLogger.info("Voided referral rewards due to refund", { userId })
           } catch (clawbackError) {
             paymentLogger.error("Failed to void referral rewards", { userId, error: clawbackError })
@@ -794,11 +874,14 @@ export async function POST(request: NextRequest) {
 
           // If fully refunded, downgrade user
           if (charge.refunded) {
-            await adminDb.collection("profiles").doc(userId).set({
-              subscription_tier: "free",
-              subscription_status: "refunded",
-              updated_at: new Date().toISOString(),
-            }, { merge: true })
+            await adminDb.collection("profiles").doc(userId).set(
+              {
+                subscription_tier: "free",
+                subscription_status: "refunded",
+                updated_at: new Date().toISOString(),
+              },
+              { merge: true }
+            )
 
             await updateQuotaForSubscriptionTierAdmin(userId, "free")
             paymentLogger.info("User downgraded due to full refund", { userId })
@@ -823,7 +906,8 @@ export async function POST(request: NextRequest) {
     try {
       const customerId = invoice.customer as string
       if (customerId) {
-        const profilesQuery = await adminDb.collection("profiles")
+        const profilesQuery = await adminDb
+          .collection("profiles")
           .where("stripe_customer_id", "==", customerId)
           .get()
 
@@ -835,9 +919,8 @@ export async function POST(request: NextRequest) {
 
           // Record payment in history
           const invoiceSubscription = invoice.parent?.subscription_details?.subscription
-          const subscriptionId = typeof invoiceSubscription === 'string'
-            ? invoiceSubscription
-            : invoiceSubscription?.id
+          const subscriptionId =
+            typeof invoiceSubscription === "string" ? invoiceSubscription : invoiceSubscription?.id
           await recordPaymentHistory(userId, {
             type: "subscription",
             amount: invoice.amount_paid || 0,
@@ -845,11 +928,12 @@ export async function POST(request: NextRequest) {
             status: "succeeded",
             stripe_invoice_id: invoice.id,
             stripe_subscription_id: subscriptionId,
-            description: invoice.billing_reason === "subscription_cycle"
-              ? "Monthly subscription renewal"
-              : invoice.billing_reason === "subscription_create"
-                ? "Initial subscription payment"
-                : `Subscription payment (${invoice.billing_reason})`,
+            description:
+              invoice.billing_reason === "subscription_cycle"
+                ? "Monthly subscription renewal"
+                : invoice.billing_reason === "subscription_create"
+                  ? "Initial subscription payment"
+                  : `Subscription payment (${invoice.billing_reason})`,
             period_start: invoice.period_start
               ? new Date(invoice.period_start * 1000).toISOString()
               : undefined,
@@ -863,13 +947,16 @@ export async function POST(request: NextRequest) {
             paymentLogger.info("New billing period - resetting usage", { userId })
 
             // Update profile with new period end date
-            await profileRef.set({
-              subscription_status: "active",
-              subscription_current_period_end: invoice.period_end
-                ? new Date(invoice.period_end * 1000).toISOString()
-                : undefined,
-              updated_at: new Date().toISOString(),
-            }, { merge: true })
+            await profileRef.set(
+              {
+                subscription_status: "active",
+                subscription_current_period_end: invoice.period_end
+                  ? new Date(invoice.period_end * 1000).toISOString()
+                  : undefined,
+                updated_at: new Date().toISOString(),
+              },
+              { merge: true }
+            )
 
             // Reset usage for new billing period
             await updateQuotaForSubscriptionTierAdmin(userId, "pro", true)
@@ -878,14 +965,17 @@ export async function POST(request: NextRequest) {
           }
           // Handle recovery from past_due
           else if (profile?.subscription_status === "past_due") {
-            await profileRef.set({
-              subscription_status: "active",
-              subscription_tier: "pro",
-              payment_failed_at: null,
-              payment_failure_reason: null,
-              payment_recovered_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            }, { merge: true })
+            await profileRef.set(
+              {
+                subscription_status: "active",
+                subscription_tier: "pro",
+                payment_failed_at: null,
+                payment_failure_reason: null,
+                payment_recovered_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              },
+              { merge: true }
+            )
 
             // Restore Pro quota (don't reset usage - they're catching up)
             await updateQuotaForSubscriptionTierAdmin(userId, "pro", false)
@@ -906,7 +996,8 @@ export async function POST(request: NextRequest) {
     logger.payment("Subscription paused", { subscriptionId: subscription.id })
 
     try {
-      const profilesQuery = await adminDb.collection("profiles")
+      const profilesQuery = await adminDb
+        .collection("profiles")
         .where("stripe_subscription_id", "==", subscription.id)
         .get()
 
@@ -914,10 +1005,13 @@ export async function POST(request: NextRequest) {
         const profileDoc = profilesQuery.docs[0]
         const userId = profileDoc.id
 
-        await adminDb.collection("profiles").doc(userId).set({
-          subscription_status: "paused",
-          updated_at: new Date().toISOString(),
-        }, { merge: true })
+        await adminDb.collection("profiles").doc(userId).set(
+          {
+            subscription_status: "paused",
+            updated_at: new Date().toISOString(),
+          },
+          { merge: true }
+        )
 
         // Keep Pro tier but note the pause
         paymentLogger.info("Subscription paused for user", { userId })
@@ -937,7 +1031,8 @@ export async function POST(request: NextRequest) {
     })
 
     try {
-      const profilesQuery = await adminDb.collection("profiles")
+      const profilesQuery = await adminDb
+        .collection("profiles")
         .where("stripe_subscription_id", "==", subscription.id)
         .get()
 
@@ -968,11 +1063,15 @@ export async function POST(request: NextRequest) {
   }
 
   // Handle subscription updates/cancellations with GRACE PERIOD support
-  if (event.type === "customer.subscription.deleted" || event.type === "customer.subscription.updated") {
+  if (
+    event.type === "customer.subscription.deleted" ||
+    event.type === "customer.subscription.updated"
+  ) {
     const subscription = event.data.object as Stripe.Subscription
 
     try {
-      const profilesQuery = await adminDb.collection("profiles")
+      const profilesQuery = await adminDb
+        .collection("profiles")
         .where("stripe_subscription_id", "==", subscription.id)
         .get()
 
@@ -983,21 +1082,22 @@ export async function POST(request: NextRequest) {
         const profileRef = adminDb.collection("profiles").doc(userId)
 
         const periodEnd = subscription.items?.data?.[0]?.current_period_end
-        const currentPeriodEnd = periodEnd
-          ? new Date(periodEnd * 1000).toISOString()
-          : undefined
+        const currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000).toISOString() : undefined
 
         // GRACE PERIOD: Check if subscription is set to cancel at period end
         // User keeps Pro access until current_period_end
         if (subscription.cancel_at_period_end && subscription.status === "active") {
           // User canceled but should keep access until period end
-          await profileRef.set({
-            subscription_tier: "pro", // Keep Pro access!
-            subscription_status: "cancel_at_period_end",
-            subscription_cancel_at: currentPeriodEnd,
-            subscription_current_period_end: currentPeriodEnd,
-            updated_at: new Date().toISOString(),
-          }, { merge: true })
+          await profileRef.set(
+            {
+              subscription_tier: "pro", // Keep Pro access!
+              subscription_status: "cancel_at_period_end",
+              subscription_cancel_at: currentPeriodEnd,
+              subscription_current_period_end: currentPeriodEnd,
+              updated_at: new Date().toISOString(),
+            },
+            { merge: true }
+          )
 
           logger.payment("Subscription scheduled for cancellation (grace period)", {
             userId,
@@ -1014,7 +1114,10 @@ export async function POST(request: NextRequest) {
                 isImmediate: false,
               })
             } catch (emailError) {
-              paymentLogger.error("Failed to send cancellation email", { userId, error: emailError })
+              paymentLogger.error("Failed to send cancellation email", {
+                userId,
+                error: emailError,
+              })
             }
           }
         }
@@ -1025,13 +1128,16 @@ export async function POST(request: NextRequest) {
           subscription.status === "unpaid"
         ) {
           // Actually downgrade to free tier
-          await profileRef.set({
-            subscription_tier: "free",
-            subscription_status: subscription.status,
-            subscription_current_period_end: currentPeriodEnd,
-            subscription_cancel_at: null,
-            updated_at: new Date().toISOString(),
-          }, { merge: true })
+          await profileRef.set(
+            {
+              subscription_tier: "free",
+              subscription_status: subscription.status,
+              subscription_current_period_end: currentPeriodEnd,
+              subscription_cancel_at: null,
+              updated_at: new Date().toISOString(),
+            },
+            { merge: true }
+          )
 
           await updateQuotaForSubscriptionTierAdmin(userId, "free")
 
@@ -1050,25 +1156,33 @@ export async function POST(request: NextRequest) {
                 isImmediate: true,
               })
             } catch (emailError) {
-              paymentLogger.error("Failed to send cancellation email", { userId, error: emailError })
+              paymentLogger.error("Failed to send cancellation email", {
+                userId,
+                error: emailError,
+              })
             }
           }
         }
         // ACTIVE: Subscription is active (not canceling)
         else if (subscription.status === "active") {
           // Update subscription details (e.g., period end date)
-          await profileRef.set({
-            subscription_tier: "pro",
-            subscription_status: subscription.status,
-            subscription_current_period_end: currentPeriodEnd,
-            subscription_cancel_at: null, // Clear any pending cancellation
-            updated_at: new Date().toISOString(),
-          }, { merge: true })
+          await profileRef.set(
+            {
+              subscription_tier: "pro",
+              subscription_status: subscription.status,
+              subscription_current_period_end: currentPeriodEnd,
+              subscription_cancel_at: null, // Clear any pending cancellation
+              updated_at: new Date().toISOString(),
+            },
+            { merge: true }
+          )
 
           paymentLogger.info("Subscription updated", { userId, status: subscription.status })
         }
       } else {
-        paymentLogger.warn("No user found with subscription ID", { subscriptionId: subscription.id })
+        paymentLogger.warn("No user found with subscription ID", {
+          subscriptionId: subscription.id,
+        })
       }
     } catch (error) {
       paymentLogger.error("Error handling subscription update/deletion", { error })
@@ -1084,7 +1198,8 @@ export async function POST(request: NextRequest) {
 
     try {
       // Find all profiles with this customer ID
-      const profilesQuery = await adminDb.collection("profiles")
+      const profilesQuery = await adminDb
+        .collection("profiles")
         .where("stripe_customer_id", "==", customer.id)
         .get()
 
@@ -1103,7 +1218,9 @@ export async function POST(request: NextRequest) {
           // If subscription ID exists, verify it's still valid
           if (profile?.stripe_subscription_id) {
             try {
-              const subscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id)
+              const subscription = await stripe.subscriptions.retrieve(
+                profile.stripe_subscription_id
+              )
               // Subscription still exists - keep it
               paymentLogger.info("Customer deleted but subscription still exists", {
                 userId,
@@ -1147,7 +1264,8 @@ export async function POST(request: NextRequest) {
     try {
       const customerId = subscription.customer as string
       if (customerId) {
-        const profilesQuery = await adminDb.collection("profiles")
+        const profilesQuery = await adminDb
+          .collection("profiles")
           .where("stripe_customer_id", "==", customerId)
           .get()
 

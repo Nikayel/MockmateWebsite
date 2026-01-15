@@ -5,8 +5,8 @@
  * Logs are stored in Firestore for compliance and security tracking.
  */
 
-import { adminDb } from '../firebase-admin'
-import { Timestamp } from 'firebase-admin/firestore'
+import { adminDb } from "../firebase-admin"
+import { Timestamp } from "firebase-admin/firestore"
 
 export interface AuditLogEntry {
   adminId: string
@@ -32,7 +32,7 @@ export async function logAdminAction(
   request?: { headers: { get: (name: string) => string | null } }
 ): Promise<void> {
   if (!adminDb) {
-    console.warn('[Audit] Database not available, skipping audit log')
+    console.warn("[Audit] Database not available, skipping audit log")
     return
   }
 
@@ -46,16 +46,15 @@ export async function logAdminAction(
 
     // Extract request metadata if available
     if (request) {
-      entry.ip = request.headers.get('x-forwarded-for') ||
-                 request.headers.get('x-real-ip') ||
-                 'unknown'
-      entry.userAgent = request.headers.get('user-agent') || undefined
+      entry.ip =
+        request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
+      entry.userAgent = request.headers.get("user-agent") || undefined
     }
 
-    await adminDb.collection('admin_audit_log').add(entry)
+    await adminDb.collection("admin_audit_log").add(entry)
   } catch (error) {
     // Log error but don't fail the operation
-    console.error('[Audit] Error logging admin action:', error)
+    console.error("[Audit] Error logging admin action:", error)
   }
 }
 
@@ -78,8 +77,9 @@ export async function getAuditLogs(options: {
   }
 
   try {
-    let query = adminDb.collection('admin_audit_log')
-      .orderBy('timestamp', 'desc')
+    const query = adminDb
+      .collection("admin_audit_log")
+      .orderBy("timestamp", "desc")
       .limit(options.limit || 100)
 
     // Note: Firestore doesn't support multiple inequality filters,
@@ -87,30 +87,30 @@ export async function getAuditLogs(options: {
 
     const snapshot = await query.get()
 
-    let entries = snapshot.docs.map(doc => doc.data() as AuditLogEntry)
+    let entries = snapshot.docs.map((doc) => doc.data() as AuditLogEntry)
 
     // Apply filters
     if (options.adminId) {
-      entries = entries.filter(e => e.adminId === options.adminId)
+      entries = entries.filter((e) => e.adminId === options.adminId)
     }
 
     if (options.action) {
-      entries = entries.filter(e => e.action === options.action)
+      entries = entries.filter((e) => e.action === options.action)
     }
 
     if (options.startDate) {
       const startTime = Timestamp.fromDate(options.startDate)
-      entries = entries.filter(e => e.timestamp >= startTime)
+      entries = entries.filter((e) => e.timestamp >= startTime)
     }
 
     if (options.endDate) {
       const endTime = Timestamp.fromDate(options.endDate)
-      entries = entries.filter(e => e.timestamp <= endTime)
+      entries = entries.filter((e) => e.timestamp <= endTime)
     }
 
     return entries
   } catch (error) {
-    console.error('[Audit] Error fetching audit logs:', error)
+    console.error("[Audit] Error fetching audit logs:", error)
     return []
   }
 }
@@ -120,22 +120,22 @@ export async function getAuditLogs(options: {
  */
 export const AUDIT_ACTIONS = {
   // User management
-  DELETE_USER: 'delete_user',
-  UPDATE_USER: 'update_user',
+  DELETE_USER: "delete_user",
+  UPDATE_USER: "update_user",
 
   // Budget management
-  SET_USER_BUDGET: 'set_user_budget',
+  SET_USER_BUDGET: "set_user_budget",
 
   // System actions
-  CLEAR_CACHE: 'clear_cache',
-  CLEANUP_ORPHANS: 'cleanup_orphans',
+  CLEAR_CACHE: "clear_cache",
+  CLEANUP_ORPHANS: "cleanup_orphans",
 
   // Admin management
-  GRANT_ROLE: 'grant_role',
-  REVOKE_ROLE: 'revoke_role',
+  GRANT_ROLE: "grant_role",
+  REVOKE_ROLE: "revoke_role",
 
   // Settings
-  UPDATE_SETTINGS: 'update_settings',
+  UPDATE_SETTINGS: "update_settings",
 } as const
 
-export type AuditAction = typeof AUDIT_ACTIONS[keyof typeof AUDIT_ACTIONS]
+export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS]

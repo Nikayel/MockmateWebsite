@@ -5,12 +5,12 @@
  * expectations for each experience level.
  */
 
-import { DSAPattern } from '@/lib/types/dsa-patterns';
+import { DSAPattern } from "@/lib/types/dsa-patterns"
 
 /**
  * Experience levels
  */
-export type ExperienceLevel = 'intern' | 'beginner' | 'intermediate' | 'advanced';
+export type ExperienceLevel = "intern" | "beginner" | "intermediate" | "advanced"
 
 /**
  * Role-based difficulty configuration
@@ -18,33 +18,33 @@ export type ExperienceLevel = 'intern' | 'beginner' | 'intermediate' | 'advanced
 export interface RoleDifficultyConfig {
   // Difficulty distribution (should sum to 100)
   distribution: {
-    easy: number;
-    medium: number;
-    hard: number;
-  };
+    easy: number
+    medium: number
+    hard: number
+  }
 
   // When can they access hard problems?
   hardProblemGates: {
-    minDaysRemaining: number;
-    minPatternsMastered: number;
-    minProblemsSolved: number;
-    minMediumSuccessRate: number;
-  };
+    minDaysRemaining: number
+    minPatternsMastered: number
+    minProblemsSolved: number
+    minMediumSuccessRate: number
+  }
 
   // Time multiplier (how much longer they need)
-  timeMultiplier: number;
+  timeMultiplier: number
 
   // Minimum problems per pattern for coverage
-  minProblemsPerPattern: number;
+  minProblemsPerPattern: number
 
   // Focus areas for interviews
   focusAreas: {
-    communication: 'low' | 'medium' | 'high';
-    optimization: 'low' | 'medium' | 'high';
-    codeQuality: 'low' | 'medium' | 'high';
-    edgeCases: 'low' | 'medium' | 'high';
-    systemDesign: 'none' | 'basic' | 'moderate' | 'advanced';
-  };
+    communication: "low" | "medium" | "high"
+    optimization: "low" | "medium" | "high"
+    codeQuality: "low" | "medium" | "high"
+    edgeCases: "low" | "medium" | "high"
+    systemDesign: "none" | "basic" | "moderate" | "advanced"
+  }
 }
 
 /**
@@ -52,30 +52,30 @@ export interface RoleDifficultyConfig {
  * These are the patterns most commonly asked in intern interviews
  */
 export const INTERN_PRIORITY_PATTERNS: DSAPattern[] = [
-  'arrays-hashing',
-  'two-pointers',
-  'sliding-window',
-  'binary-search',
-  'stack',
-  'trees',
-  'string',
-  'linked-list',
-];
+  "arrays-hashing",
+  "two-pointers",
+  "sliding-window",
+  "binary-search",
+  "stack",
+  "trees",
+  "string",
+  "linked-list",
+]
 
 /**
  * Patterns to AVOID or minimize for interns
  */
 export const INTERN_AVOID_PATTERNS: DSAPattern[] = [
-  'dp-2d',
-  'dp-tree',
-  'dp-knapsack',
-  'dp-lcs',
-  'dijkstra',
-  'topological-sort',
-  'union-find',
-  'trie',
-  'bit-manipulation',
-];
+  "dp-2d",
+  "dp-tree",
+  "dp-knapsack",
+  "dp-lcs",
+  "dijkstra",
+  "topological-sort",
+  "union-find",
+  "trie",
+  "bit-manipulation",
+]
 
 /**
  * Role configurations
@@ -96,11 +96,11 @@ export const ROLE_CONFIGS: Record<ExperienceLevel, RoleDifficultyConfig> = {
     timeMultiplier: 1.5, // 50% more time needed
     minProblemsPerPattern: 6,
     focusAreas: {
-      communication: 'high',   // Critical for interns
-      optimization: 'low',     // Correct > optimal
-      codeQuality: 'medium',
-      edgeCases: 'medium',
-      systemDesign: 'none',
+      communication: "high", // Critical for interns
+      optimization: "low", // Correct > optimal
+      codeQuality: "medium",
+      edgeCases: "medium",
+      systemDesign: "none",
     },
   },
 
@@ -119,11 +119,11 @@ export const ROLE_CONFIGS: Record<ExperienceLevel, RoleDifficultyConfig> = {
     timeMultiplier: 1.3,
     minProblemsPerPattern: 5,
     focusAreas: {
-      communication: 'high',
-      optimization: 'medium',
-      codeQuality: 'medium',
-      edgeCases: 'medium',
-      systemDesign: 'none',
+      communication: "high",
+      optimization: "medium",
+      codeQuality: "medium",
+      edgeCases: "medium",
+      systemDesign: "none",
     },
   },
 
@@ -142,11 +142,11 @@ export const ROLE_CONFIGS: Record<ExperienceLevel, RoleDifficultyConfig> = {
     timeMultiplier: 1.0,
     minProblemsPerPattern: 3,
     focusAreas: {
-      communication: 'medium',
-      optimization: 'high',
-      codeQuality: 'high',
-      edgeCases: 'high',
-      systemDesign: 'basic',
+      communication: "medium",
+      optimization: "high",
+      codeQuality: "high",
+      edgeCases: "high",
+      systemDesign: "basic",
     },
   },
 
@@ -160,205 +160,205 @@ export const ROLE_CONFIGS: Record<ExperienceLevel, RoleDifficultyConfig> = {
       minDaysRemaining: 7,
       minPatternsMastered: 2,
       minProblemsSolved: 10,
-      minMediumSuccessRate: 0.50,
+      minMediumSuccessRate: 0.5,
     },
     timeMultiplier: 0.8,
     minProblemsPerPattern: 2,
     focusAreas: {
-      communication: 'medium',
-      optimization: 'high',
-      codeQuality: 'high',
-      edgeCases: 'high',
-      systemDesign: 'advanced',
+      communication: "medium",
+      optimization: "high",
+      codeQuality: "high",
+      edgeCases: "high",
+      systemDesign: "advanced",
     },
   },
-};
+}
 
 /**
  * Company-specific intern interview data
  */
 export interface InternInterviewData {
-  companyId: string;
-  typicalPatterns: DSAPattern[];
-  difficultyExpectation: 'easy-medium' | 'medium' | 'medium-hard';
-  behavioralWeight: 'low' | 'medium' | 'high';
-  internTips: string[];
-  typicalQuestions: string[];
-  whatTheyLookFor: string[];
-  redFlags: string[];
+  companyId: string
+  typicalPatterns: DSAPattern[]
+  difficultyExpectation: "easy-medium" | "medium" | "medium-hard"
+  behavioralWeight: "low" | "medium" | "high"
+  internTips: string[]
+  typicalQuestions: string[]
+  whatTheyLookFor: string[]
+  redFlags: string[]
 }
 
 export const INTERN_COMPANY_DATA: Record<string, InternInterviewData> = {
   amazon: {
-    companyId: 'amazon',
-    typicalPatterns: ['arrays-hashing', 'trees', 'string', 'two-pointers', 'bfs'],
-    difficultyExpectation: 'easy-medium',
-    behavioralWeight: 'high', // LP questions for interns too
+    companyId: "amazon",
+    typicalPatterns: ["arrays-hashing", "trees", "string", "two-pointers", "bfs"],
+    difficultyExpectation: "easy-medium",
+    behavioralWeight: "high", // LP questions for interns too
     internTips: [
-      'Amazon asks Leadership Principle questions even for interns',
-      'Prepare 2-3 STAR stories about teamwork, problem-solving, ownership',
-      'The online assessment (OA) is often the first step - practice on HackerRank',
-      'Focus on clear communication - explain your approach before coding',
-      'Amazon intern interviews rarely include hard problems',
+      "Amazon asks Leadership Principle questions even for interns",
+      "Prepare 2-3 STAR stories about teamwork, problem-solving, ownership",
+      "The online assessment (OA) is often the first step - practice on HackerRank",
+      "Focus on clear communication - explain your approach before coding",
+      "Amazon intern interviews rarely include hard problems",
     ],
     typicalQuestions: [
-      'Two Sum',
-      'Merge Two Sorted Lists',
-      'Valid Parentheses',
-      'Number of Islands (BFS approach)',
-      'Binary Tree Level Order Traversal',
+      "Two Sum",
+      "Merge Two Sorted Lists",
+      "Valid Parentheses",
+      "Number of Islands (BFS approach)",
+      "Binary Tree Level Order Traversal",
     ],
     whatTheyLookFor: [
-      'Clear problem-solving approach',
-      'Ability to break down problems',
-      'Code that works (correctness > optimization)',
-      'Communication throughout the process',
-      'Ownership mindset (LP: Ownership)',
+      "Clear problem-solving approach",
+      "Ability to break down problems",
+      "Code that works (correctness > optimization)",
+      "Communication throughout the process",
+      "Ownership mindset (LP: Ownership)",
     ],
     redFlags: [
       "Jumping into code without clarifying requirements",
-      'Not testing with examples',
-      'Unable to explain thought process',
-      'Giving up when stuck instead of asking clarifying questions',
+      "Not testing with examples",
+      "Unable to explain thought process",
+      "Giving up when stuck instead of asking clarifying questions",
     ],
   },
 
   google: {
-    companyId: 'google',
-    typicalPatterns: ['arrays-hashing', 'binary-search', 'trees', 'string', 'two-pointers'],
-    difficultyExpectation: 'medium',
-    behavioralWeight: 'medium',
+    companyId: "google",
+    typicalPatterns: ["arrays-hashing", "binary-search", "trees", "string", "two-pointers"],
+    difficultyExpectation: "medium",
+    behavioralWeight: "medium",
     internTips: [
-      'Google intern interviews focus heavily on algorithmic thinking',
-      'Practice coding in Google Docs - no IDE features!',
-      'They value your thought process more than the final answer',
-      'Interviewers are usually friendly and will give hints',
-      'Expect questions about time/space complexity',
+      "Google intern interviews focus heavily on algorithmic thinking",
+      "Practice coding in Google Docs - no IDE features!",
+      "They value your thought process more than the final answer",
+      "Interviewers are usually friendly and will give hints",
+      "Expect questions about time/space complexity",
     ],
     typicalQuestions: [
-      'Two Sum',
-      'Valid Palindrome',
-      'Binary Search variants',
-      'Tree traversals',
-      'String manipulation',
+      "Two Sum",
+      "Valid Palindrome",
+      "Binary Search variants",
+      "Tree traversals",
+      "String manipulation",
     ],
     whatTheyLookFor: [
-      'Clean, readable code',
-      'Strong algorithmic fundamentals',
-      'Ability to think through edge cases',
-      'Communication and collaboration',
-      'Intellectual curiosity',
+      "Clean, readable code",
+      "Strong algorithmic fundamentals",
+      "Ability to think through edge cases",
+      "Communication and collaboration",
+      "Intellectual curiosity",
     ],
     redFlags: [
-      'Messy, unreadable code',
-      'Not discussing complexity',
-      'Silent coding without explanation',
-      'Not asking clarifying questions',
+      "Messy, unreadable code",
+      "Not discussing complexity",
+      "Silent coding without explanation",
+      "Not asking clarifying questions",
     ],
   },
 
   meta: {
-    companyId: 'meta',
-    typicalPatterns: ['arrays-hashing', 'trees', 'string', 'two-pointers', 'sliding-window'],
-    difficultyExpectation: 'medium',
-    behavioralWeight: 'medium',
+    companyId: "meta",
+    typicalPatterns: ["arrays-hashing", "trees", "string", "two-pointers", "sliding-window"],
+    difficultyExpectation: "medium",
+    behavioralWeight: "medium",
     internTips: [
-      'Meta expects faster problem-solving - practice timed coding',
-      'They use CoderPad with syntax highlighting (easier than Google Docs)',
-      'Focus on getting a working solution first, then optimize',
-      'Be ready to trace through your code with examples',
-      'Meta values practical problem-solving ability',
+      "Meta expects faster problem-solving - practice timed coding",
+      "They use CoderPad with syntax highlighting (easier than Google Docs)",
+      "Focus on getting a working solution first, then optimize",
+      "Be ready to trace through your code with examples",
+      "Meta values practical problem-solving ability",
     ],
     typicalQuestions: [
-      'Valid Palindrome II',
-      'Binary Tree traversals',
-      'String manipulation',
-      'Array problems',
-      'Two pointers problems',
+      "Valid Palindrome II",
+      "Binary Tree traversals",
+      "String manipulation",
+      "Array problems",
+      "Two pointers problems",
     ],
     whatTheyLookFor: [
-      'Speed and efficiency',
-      'Working code that handles edge cases',
-      'Clear communication',
-      'Practical problem-solving',
-      'Ability to work under time pressure',
+      "Speed and efficiency",
+      "Working code that handles edge cases",
+      "Clear communication",
+      "Practical problem-solving",
+      "Ability to work under time pressure",
     ],
     redFlags: [
-      'Taking too long to start coding',
-      'Not finishing the problem',
-      'Code that doesn\'t run',
-      'Unable to trace through examples',
+      "Taking too long to start coding",
+      "Not finishing the problem",
+      "Code that doesn't run",
+      "Unable to trace through examples",
     ],
   },
 
   microsoft: {
-    companyId: 'microsoft',
-    typicalPatterns: ['arrays-hashing', 'trees', 'linked-list', 'string', 'sorting'],
-    difficultyExpectation: 'easy-medium',
-    behavioralWeight: 'medium',
+    companyId: "microsoft",
+    typicalPatterns: ["arrays-hashing", "trees", "linked-list", "string", "sorting"],
+    difficultyExpectation: "easy-medium",
+    behavioralWeight: "medium",
     internTips: [
-      'Microsoft values Growth Mindset - show you love learning',
-      'They appreciate clean, well-structured code',
-      'Intern interviews are generally more relaxed than other FAANG',
-      'Be ready to discuss past projects and what you learned',
-      'They may use whiteboard, IDE, or paper',
+      "Microsoft values Growth Mindset - show you love learning",
+      "They appreciate clean, well-structured code",
+      "Intern interviews are generally more relaxed than other FAANG",
+      "Be ready to discuss past projects and what you learned",
+      "They may use whiteboard, IDE, or paper",
     ],
     typicalQuestions: [
-      'Reverse Linked List',
-      'Two Sum',
-      'Valid Parentheses',
-      'Tree traversals',
-      'String problems',
+      "Reverse Linked List",
+      "Two Sum",
+      "Valid Parentheses",
+      "Tree traversals",
+      "String problems",
     ],
     whatTheyLookFor: [
-      'Growth mindset and love of learning',
-      'Clean, readable code',
-      'Problem-solving approach',
-      'Collaboration and teamwork',
-      'Curiosity and passion for technology',
+      "Growth mindset and love of learning",
+      "Clean, readable code",
+      "Problem-solving approach",
+      "Collaboration and teamwork",
+      "Curiosity and passion for technology",
     ],
     redFlags: [
-      'Fixed mindset - not open to feedback',
-      'Arrogance or dismissiveness',
-      'Sloppy code',
-      'Not asking questions',
+      "Fixed mindset - not open to feedback",
+      "Arrogance or dismissiveness",
+      "Sloppy code",
+      "Not asking questions",
     ],
   },
 
   apple: {
-    companyId: 'apple',
-    typicalPatterns: ['arrays-hashing', 'linked-list', 'trees', 'string', 'sorting'],
-    difficultyExpectation: 'easy-medium',
-    behavioralWeight: 'medium',
+    companyId: "apple",
+    typicalPatterns: ["arrays-hashing", "linked-list", "trees", "string", "sorting"],
+    difficultyExpectation: "easy-medium",
+    behavioralWeight: "medium",
     internTips: [
-      'Apple is secretive - you may not know the team until late in process',
-      'They value attention to detail and code quality',
-      'Be prepared to discuss Apple products you use',
-      'Process is slower than other companies',
-      'Domain fit matters more than pure algorithm skills',
+      "Apple is secretive - you may not know the team until late in process",
+      "They value attention to detail and code quality",
+      "Be prepared to discuss Apple products you use",
+      "Process is slower than other companies",
+      "Domain fit matters more than pure algorithm skills",
     ],
     typicalQuestions: [
-      'Linked List problems',
-      'Tree problems',
-      'String manipulation',
-      'Basic array problems',
-      'Sorting-related problems',
+      "Linked List problems",
+      "Tree problems",
+      "String manipulation",
+      "Basic array problems",
+      "Sorting-related problems",
     ],
     whatTheyLookFor: [
-      'Attention to detail',
-      'Code quality over speed',
-      'Genuine interest in Apple products',
-      'Problem-solving approach',
-      'Communication skills',
+      "Attention to detail",
+      "Code quality over speed",
+      "Genuine interest in Apple products",
+      "Problem-solving approach",
+      "Communication skills",
     ],
     redFlags: [
-      'Sloppy code',
-      'Not asking about edge cases',
+      "Sloppy code",
+      "Not asking about edge cases",
       "No genuine interest in Apple's mission",
-      'Rushing through problems',
+      "Rushing through problems",
     ],
   },
-};
+}
 
 /**
  * Check if user can access hard problems
@@ -370,46 +370,52 @@ export function canAccessHardProblems(
   mediumSuccessRate: number,
   daysRemaining: number
 ): { allowed: boolean; reason: string; criteria: string[] } {
-  const config = ROLE_CONFIGS[experienceLevel];
-  const gates = config.hardProblemGates;
+  const config = ROLE_CONFIGS[experienceLevel]
+  const gates = config.hardProblemGates
 
-  const criteria: string[] = [];
-  const failedCriteria: string[] = [];
+  const criteria: string[] = []
+  const failedCriteria: string[] = []
 
   // Check each gate
   if (daysRemaining >= gates.minDaysRemaining) {
-    criteria.push(`${gates.minDaysRemaining}+ days remaining`);
+    criteria.push(`${gates.minDaysRemaining}+ days remaining`)
   } else {
-    failedCriteria.push(`Need ${gates.minDaysRemaining}+ days remaining (you have ${daysRemaining})`);
+    failedCriteria.push(
+      `Need ${gates.minDaysRemaining}+ days remaining (you have ${daysRemaining})`
+    )
   }
 
   if (patternsMastered >= gates.minPatternsMastered) {
-    criteria.push(`${gates.minPatternsMastered}+ patterns mastered`);
+    criteria.push(`${gates.minPatternsMastered}+ patterns mastered`)
   } else {
-    failedCriteria.push(`Master ${gates.minPatternsMastered}+ patterns (you have ${patternsMastered})`);
+    failedCriteria.push(
+      `Master ${gates.minPatternsMastered}+ patterns (you have ${patternsMastered})`
+    )
   }
 
   if (problemsSolved >= gates.minProblemsSolved) {
-    criteria.push(`${gates.minProblemsSolved}+ problems solved`);
+    criteria.push(`${gates.minProblemsSolved}+ problems solved`)
   } else {
-    failedCriteria.push(`Solve ${gates.minProblemsSolved}+ problems (you have ${problemsSolved})`);
+    failedCriteria.push(`Solve ${gates.minProblemsSolved}+ problems (you have ${problemsSolved})`)
   }
 
   if (mediumSuccessRate >= gates.minMediumSuccessRate) {
-    criteria.push(`${Math.round(gates.minMediumSuccessRate * 100)}%+ success on Medium`);
+    criteria.push(`${Math.round(gates.minMediumSuccessRate * 100)}%+ success on Medium`)
   } else {
-    failedCriteria.push(`${Math.round(gates.minMediumSuccessRate * 100)}%+ Medium success rate (you have ${Math.round(mediumSuccessRate * 100)}%)`);
+    failedCriteria.push(
+      `${Math.round(gates.minMediumSuccessRate * 100)}%+ Medium success rate (you have ${Math.round(mediumSuccessRate * 100)}%)`
+    )
   }
 
-  const allowed = failedCriteria.length === 0;
+  const allowed = failedCriteria.length === 0
 
   return {
     allowed,
     reason: allowed
-      ? 'You have unlocked hard problems!'
+      ? "You have unlocked hard problems!"
       : `Focus on fundamentals first. ${failedCriteria[0]}`,
     criteria: allowed ? criteria : failedCriteria,
-  };
+  }
 }
 
 /**
@@ -419,50 +425,50 @@ export function getPriorityPatterns(
   experienceLevel: ExperienceLevel,
   companyId?: string
 ): DSAPattern[] {
-  if (experienceLevel === 'intern') {
+  if (experienceLevel === "intern") {
     // Combine intern priority patterns with company-specific if available
     if (companyId && INTERN_COMPANY_DATA[companyId]) {
-      const companyPatterns = INTERN_COMPANY_DATA[companyId].typicalPatterns;
-      const combined = new Set([...INTERN_PRIORITY_PATTERNS, ...companyPatterns]);
-      return Array.from(combined);
+      const companyPatterns = INTERN_COMPANY_DATA[companyId].typicalPatterns
+      const combined = new Set([...INTERN_PRIORITY_PATTERNS, ...companyPatterns])
+      return Array.from(combined)
     }
-    return INTERN_PRIORITY_PATTERNS;
+    return INTERN_PRIORITY_PATTERNS
   }
 
   // For other levels, return all patterns (no restriction)
-  return [];
+  return []
 }
 
 /**
  * Get patterns to deprioritize for a role
  */
 export function getDeprioritizedPatterns(experienceLevel: ExperienceLevel): DSAPattern[] {
-  if (experienceLevel === 'intern') {
-    return INTERN_AVOID_PATTERNS;
+  if (experienceLevel === "intern") {
+    return INTERN_AVOID_PATTERNS
   }
-  if (experienceLevel === 'beginner') {
-    return ['dijkstra', 'topological-sort', 'bit-manipulation'];
+  if (experienceLevel === "beginner") {
+    return ["dijkstra", "topological-sort", "bit-manipulation"]
   }
-  return [];
+  return []
 }
 
 /**
  * Get interview tips for a role at a company
  */
 export function getInternTips(companyId: string): string[] {
-  const data = INTERN_COMPANY_DATA[companyId];
+  const data = INTERN_COMPANY_DATA[companyId]
   if (data) {
-    return data.internTips;
+    return data.internTips
   }
 
   // Generic intern tips
   return [
-    'Focus on fundamentals - arrays, strings, trees, basic recursion',
-    'Communicate your thought process clearly',
-    'Don\'t worry about optimal solutions - correct is more important',
-    'Practice explaining your code out loud',
-    'Ask clarifying questions before coding',
-  ];
+    "Focus on fundamentals - arrays, strings, trees, basic recursion",
+    "Communicate your thought process clearly",
+    "Don't worry about optimal solutions - correct is more important",
+    "Practice explaining your code out loud",
+    "Ask clarifying questions before coding",
+  ]
 }
 
 /**
@@ -472,92 +478,77 @@ export function getInterviewExpectations(
   experienceLevel: ExperienceLevel,
   companyId?: string
 ): {
-  mustHave: string[];
-  niceToHave: string[];
-  notExpected: string[];
+  mustHave: string[]
+  niceToHave: string[]
+  notExpected: string[]
 } {
-  if (experienceLevel === 'intern') {
-    const companyData = companyId ? INTERN_COMPANY_DATA[companyId] : null;
+  if (experienceLevel === "intern") {
+    const companyData = companyId ? INTERN_COMPANY_DATA[companyId] : null
 
     return {
       mustHave: [
-        'Clear problem-solving approach',
-        'Working code that handles basic cases',
-        'Communication throughout the process',
-        'Ability to trace through examples',
+        "Clear problem-solving approach",
+        "Working code that handles basic cases",
+        "Communication throughout the process",
+        "Ability to trace through examples",
         ...(companyData?.whatTheyLookFor || []),
       ],
       niceToHave: [
-        'Handle edge cases',
-        'Discuss time complexity',
-        'Clean code style',
-        'Quick debugging',
+        "Handle edge cases",
+        "Discuss time complexity",
+        "Clean code style",
+        "Quick debugging",
       ],
       notExpected: [
-        'Optimal solutions for hard problems',
-        'System design knowledge',
-        'Advanced data structures (tries, segment trees)',
-        'Complex DP problems',
+        "Optimal solutions for hard problems",
+        "System design knowledge",
+        "Advanced data structures (tries, segment trees)",
+        "Complex DP problems",
       ],
-    };
+    }
   }
 
-  if (experienceLevel === 'beginner') {
+  if (experienceLevel === "beginner") {
     return {
       mustHave: [
-        'Working solutions to medium problems',
-        'Understanding of common patterns',
-        'Time complexity analysis',
-        'Clear communication',
+        "Working solutions to medium problems",
+        "Understanding of common patterns",
+        "Time complexity analysis",
+        "Clear communication",
       ],
-      niceToHave: [
-        'Optimal solutions',
-        'Edge case handling',
-        'Clean, production-ready code',
-      ],
-      notExpected: [
-        'Advanced system design',
-        'Complex optimization',
-        'Esoteric algorithms',
-      ],
-    };
+      niceToHave: ["Optimal solutions", "Edge case handling", "Clean, production-ready code"],
+      notExpected: ["Advanced system design", "Complex optimization", "Esoteric algorithms"],
+    }
   }
 
-  if (experienceLevel === 'intermediate') {
+  if (experienceLevel === "intermediate") {
     return {
       mustHave: [
-        'Optimal solutions to medium problems',
-        'Working solutions to hard problems',
-        'System design basics',
-        'Code quality and testing mindset',
+        "Optimal solutions to medium problems",
+        "Working solutions to hard problems",
+        "System design basics",
+        "Code quality and testing mindset",
       ],
       niceToHave: [
-        'Optimal solutions to hard problems',
-        'Trade-off discussions',
-        'Scalability considerations',
+        "Optimal solutions to hard problems",
+        "Trade-off discussions",
+        "Scalability considerations",
       ],
-      notExpected: [
-        'Distributed systems expertise',
-        'ML/AI specialization',
-      ],
-    };
+      notExpected: ["Distributed systems expertise", "ML/AI specialization"],
+    }
   }
 
   // Advanced
   return {
     mustHave: [
-      'Optimal solutions to hard problems',
-      'System design expertise',
-      'Trade-off analysis',
-      'Leadership and mentoring ability',
+      "Optimal solutions to hard problems",
+      "System design expertise",
+      "Trade-off analysis",
+      "Leadership and mentoring ability",
     ],
-    niceToHave: [
-      'Domain expertise',
-      'Architectural vision',
-      'Cross-team influence',
-    ],
+    niceToHave: ["Domain expertise", "Architectural vision", "Cross-team influence"],
     notExpected: [],
-  };
+  }
 }
 
 /**
@@ -568,48 +559,46 @@ export function getDailyPracticeRecommendation(
   daysRemaining: number,
   hoursAvailable: number
 ): {
-  easyCount: number;
-  mediumCount: number;
-  hardCount: number;
-  focusAdvice: string;
+  easyCount: number
+  mediumCount: number
+  hardCount: number
+  focusAdvice: string
 } {
-  const config = ROLE_CONFIGS[experienceLevel];
-  const { distribution } = config;
+  const config = ROLE_CONFIGS[experienceLevel]
+  const { distribution } = config
 
   // Base problem count on hours available
   // Assume ~30 min per easy, ~45 min per medium, ~60 min per hard
-  const totalMinutes = hoursAvailable * 60;
+  const totalMinutes = hoursAvailable * 60
 
   // Calculate based on distribution
   const weightedAvgMinutes =
-    (distribution.easy * 25 +
-      distribution.medium * 40 +
-      distribution.hard * 60) / 100;
+    (distribution.easy * 25 + distribution.medium * 40 + distribution.hard * 60) / 100
 
-  const totalProblems = Math.floor(totalMinutes / weightedAvgMinutes);
+  const totalProblems = Math.floor(totalMinutes / weightedAvgMinutes)
 
-  let easyCount = Math.round((distribution.easy / 100) * totalProblems);
-  let mediumCount = Math.round((distribution.medium / 100) * totalProblems);
-  let hardCount = Math.round((distribution.hard / 100) * totalProblems);
+  const easyCount = Math.round((distribution.easy / 100) * totalProblems)
+  let mediumCount = Math.round((distribution.medium / 100) * totalProblems)
+  let hardCount = Math.round((distribution.hard / 100) * totalProblems)
 
   // Adjust for interns - minimize hard
-  if (experienceLevel === 'intern') {
-    hardCount = Math.min(hardCount, daysRemaining >= 30 ? 1 : 0);
-    mediumCount = totalProblems - easyCount - hardCount;
+  if (experienceLevel === "intern") {
+    hardCount = Math.min(hardCount, daysRemaining >= 30 ? 1 : 0)
+    mediumCount = totalProblems - easyCount - hardCount
   }
 
   // Focus advice based on days remaining
-  let focusAdvice: string;
+  let focusAdvice: string
   if (daysRemaining <= 3) {
-    focusAdvice = 'Review mode: Focus on problems you know, build confidence';
+    focusAdvice = "Review mode: Focus on problems you know, build confidence"
   } else if (daysRemaining <= 7) {
-    focusAdvice = 'Polish mode: Review weak areas, practice under time pressure';
+    focusAdvice = "Polish mode: Review weak areas, practice under time pressure"
   } else if (daysRemaining <= 14) {
-    focusAdvice = 'Intensify: Mix review with targeted practice on gaps';
+    focusAdvice = "Intensify: Mix review with targeted practice on gaps"
   } else if (daysRemaining <= 30) {
-    focusAdvice = 'Build mode: Focus on pattern mastery, one cluster at a time';
+    focusAdvice = "Build mode: Focus on pattern mastery, one cluster at a time"
   } else {
-    focusAdvice = 'Foundation mode: Learn new patterns, no rush';
+    focusAdvice = "Foundation mode: Learn new patterns, no rush"
   }
 
   return {
@@ -617,7 +606,7 @@ export function getDailyPracticeRecommendation(
     mediumCount: Math.max(1, mediumCount), // At least 1 medium
     hardCount: Math.max(0, hardCount),
     focusAdvice,
-  };
+  }
 }
 
 /**
@@ -625,9 +614,9 @@ export function getDailyPracticeRecommendation(
  */
 export function getAdjustedTimeEstimate(
   baseMins: number,
-  difficulty: 'easy' | 'medium' | 'hard',
+  difficulty: "easy" | "medium" | "hard",
   experienceLevel: ExperienceLevel
 ): number {
-  const config = ROLE_CONFIGS[experienceLevel];
-  return Math.round(baseMins * config.timeMultiplier);
+  const config = ROLE_CONFIGS[experienceLevel]
+  return Math.round(baseMins * config.timeMultiplier)
 }

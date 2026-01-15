@@ -13,19 +13,19 @@
  * - Quality metrics tracking
  */
 
-import type { EmbeddingProvider } from '../types'
-import { TFIDFEmbeddingProvider, generateTextEmbedding as generateTFIDFEmbedding } from './provider'
-import { OpenAIEmbeddingProvider, isOpenAIAvailable, OpenAIEmbeddingModel } from './openai-provider'
-import { GeminiEmbeddingProvider, isGeminiAvailable, GeminiEmbeddingModel } from './gemini-provider'
-import { embeddingCache } from './cache'
+import type { EmbeddingProvider } from "../types"
+import { TFIDFEmbeddingProvider, generateTextEmbedding as generateTFIDFEmbedding } from "./provider"
+import { OpenAIEmbeddingProvider, isOpenAIAvailable, OpenAIEmbeddingModel } from "./openai-provider"
+import { GeminiEmbeddingProvider, isGeminiAvailable, GeminiEmbeddingModel } from "./gemini-provider"
+import { embeddingCache } from "./cache"
 
 export type HybridMode =
-  | 'gemini-only'           // Only Gemini (768D)
-  | 'gemini-with-fallback'  // Gemini first, then TF-IDF
-  | 'openai-only'
-  | 'tfidf-only'
-  | 'openai-with-fallback'
-  | 'combined'
+  | "gemini-only" // Only Gemini (768D)
+  | "gemini-with-fallback" // Gemini first, then TF-IDF
+  | "openai-only"
+  | "tfidf-only"
+  | "openai-with-fallback"
+  | "combined"
 
 interface HybridProviderConfig {
   mode?: HybridMode
@@ -35,15 +35,15 @@ interface HybridProviderConfig {
   openaiModel?: OpenAIEmbeddingModel
   openaiDimensions?: number
   combinedWeights?: {
-    openai: number   // Weight for OpenAI embeddings (0-1)
-    tfidf: number    // Weight for TF-IDF embeddings (0-1)
+    openai: number // Weight for OpenAI embeddings (0-1)
+    tfidf: number // Weight for TF-IDF embeddings (0-1)
   }
   cacheEnabled?: boolean
-  cacheTTL?: number  // Cache TTL in milliseconds
+  cacheTTL?: number // Cache TTL in milliseconds
 }
 
 interface EmbeddingMetrics {
-  provider: 'gemini' | 'openai' | 'tfidf' | 'combined'
+  provider: "gemini" | "openai" | "tfidf" | "combined"
   dimensions: number
   latencyMs: number
   cached: boolean
@@ -71,7 +71,7 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
   private metrics: EmbeddingMetrics[] = []
 
   constructor(config: HybridProviderConfig = {}) {
-    this.mode = config.mode || 'gemini-with-fallback'
+    this.mode = config.mode || "gemini-with-fallback"
     this.cacheEnabled = config.cacheEnabled !== false
     this.combinedWeights = config.combinedWeights || { openai: 0.7, tfidf: 0.3 }
 
@@ -81,12 +81,12 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
     // Initialize Gemini provider if available (primary choice)
     if (isGeminiAvailable()) {
       this.geminiProvider = new GeminiEmbeddingProvider({
-        model: config.geminiModel || 'text-embedding-004',
+        model: config.geminiModel || "text-embedding-004",
       })
     } else {
       this.geminiProvider = null
-      if (this.mode === 'gemini-only') {
-        throw new Error('[HybridProvider] gemini-only mode requires GEMINI_API_KEY')
+      if (this.mode === "gemini-only") {
+        throw new Error("[HybridProvider] gemini-only mode requires GEMINI_API_KEY")
       }
     }
 
@@ -98,30 +98,32 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
       })
     } else {
       this.openaiProvider = null
-      if (this.mode === 'openai-only') {
-        throw new Error('[HybridProvider] openai-only mode requires OPENAI_API_KEY')
+      if (this.mode === "openai-only") {
+        throw new Error("[HybridProvider] openai-only mode requires OPENAI_API_KEY")
       }
     }
 
-    console.log(`[HybridProvider] Initialized with mode: ${this.mode}, Gemini available: ${!!this.geminiProvider}, OpenAI available: ${!!this.openaiProvider}`)
+    console.log(
+      `[HybridProvider] Initialized with mode: ${this.mode}, Gemini available: ${!!this.geminiProvider}, OpenAI available: ${!!this.openaiProvider}`
+    )
   }
 
   /**
    * Get the active provider name
    */
   getActiveProvider(): string {
-    if (this.mode === 'combined') return 'combined'
-    if (this.mode === 'tfidf-only') return 'tfidf'
-    if (this.mode === 'gemini-only' || this.mode === 'gemini-with-fallback') {
-      if (this.geminiProvider?.isConfigured()) return 'gemini'
+    if (this.mode === "combined") return "combined"
+    if (this.mode === "tfidf-only") return "tfidf"
+    if (this.mode === "gemini-only" || this.mode === "gemini-with-fallback") {
+      if (this.geminiProvider?.isConfigured()) return "gemini"
     }
-    if (this.mode === 'openai-only' || this.mode === 'openai-with-fallback') {
-      if (this.openaiProvider?.isConfigured()) return 'openai'
+    if (this.mode === "openai-only" || this.mode === "openai-with-fallback") {
+      if (this.openaiProvider?.isConfigured()) return "openai"
     }
     // Fallback chain: Gemini -> OpenAI -> TF-IDF
-    if (this.geminiProvider?.isConfigured()) return 'gemini'
-    if (this.openaiProvider?.isConfigured()) return 'openai'
-    return 'tfidf'
+    if (this.geminiProvider?.isConfigured()) return "gemini"
+    if (this.openaiProvider?.isConfigured()) return "openai"
+    return "tfidf"
   }
 
   /**
@@ -129,17 +131,17 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
    */
   getDimensions(): number {
     switch (this.mode) {
-      case 'gemini-only':
+      case "gemini-only":
         return this.geminiProvider?.getDimensions() || 768
-      case 'gemini-with-fallback':
+      case "gemini-with-fallback":
         return this.geminiProvider?.getDimensions() || 256
-      case 'openai-only':
+      case "openai-only":
         return this.openaiProvider?.getDimensions() || 1536
-      case 'tfidf-only':
+      case "tfidf-only":
         return 256
-      case 'combined':
+      case "combined":
         return (this.openaiProvider?.getDimensions() || 0) + 256
-      case 'openai-with-fallback':
+      case "openai-with-fallback":
         return this.openaiProvider?.getDimensions() || 256
       default:
         return 768 // Default to Gemini dimensions
@@ -152,98 +154,101 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
   async generateEmbedding(text: string): Promise<number[]> {
     const startTime = Date.now()
     let embedding: number[]
-    let provider: 'gemini' | 'openai' | 'tfidf' | 'combined' = 'tfidf'
-    let cached = false
+    let provider: "gemini" | "openai" | "tfidf" | "combined" = "tfidf"
+    const cached = false
 
     // Check cache first
     if (this.cacheEnabled) {
       const cacheKey = `${this.mode}:${text}`
       const cachedEmbedding = embeddingCache.get(cacheKey)
       if (cachedEmbedding) {
-        this.recordMetrics('combined', cachedEmbedding.length, Date.now() - startTime, true)
+        this.recordMetrics("combined", cachedEmbedding.length, Date.now() - startTime, true)
         return cachedEmbedding
       }
     }
 
     try {
       switch (this.mode) {
-        case 'gemini-only':
+        case "gemini-only":
           if (!this.geminiProvider) {
-            throw new Error('Gemini provider not available')
+            throw new Error("Gemini provider not available")
           }
           embedding = await this.geminiProvider.generateEmbedding(text)
-          provider = 'gemini'
+          provider = "gemini"
           break
 
-        case 'gemini-with-fallback':
+        case "gemini-with-fallback":
           if (this.geminiProvider?.isConfigured()) {
             try {
               embedding = await this.geminiProvider.generateEmbedding(text)
-              provider = 'gemini'
+              provider = "gemini"
             } catch (error) {
-              console.warn('[HybridProvider] Gemini failed, falling back to TF-IDF:', error)
+              console.warn("[HybridProvider] Gemini failed, falling back to TF-IDF:", error)
               embedding = await this.tfidfProvider.generateEmbedding(text)
-              provider = 'tfidf'
+              provider = "tfidf"
             }
           } else {
             embedding = await this.tfidfProvider.generateEmbedding(text)
-            provider = 'tfidf'
+            provider = "tfidf"
           }
           break
 
-        case 'openai-only':
+        case "openai-only":
           if (!this.openaiProvider) {
-            throw new Error('OpenAI provider not available')
+            throw new Error("OpenAI provider not available")
           }
           embedding = await this.openaiProvider.generateEmbedding(text)
-          provider = 'openai'
+          provider = "openai"
           break
 
-        case 'tfidf-only':
+        case "tfidf-only":
           embedding = await this.tfidfProvider.generateEmbedding(text)
-          provider = 'tfidf'
+          provider = "tfidf"
           break
 
-        case 'combined':
+        case "combined":
           embedding = await this.generateCombinedEmbedding(text)
-          provider = 'combined'
+          provider = "combined"
           break
 
-        case 'openai-with-fallback':
+        case "openai-with-fallback":
         default:
           // Default fallback chain: Gemini -> OpenAI -> TF-IDF
           if (this.geminiProvider?.isConfigured()) {
             try {
               embedding = await this.geminiProvider.generateEmbedding(text)
-              provider = 'gemini'
+              provider = "gemini"
             } catch (error) {
-              console.warn('[HybridProvider] Gemini failed, trying OpenAI:', error)
+              console.warn("[HybridProvider] Gemini failed, trying OpenAI:", error)
               if (this.openaiProvider?.isConfigured()) {
                 try {
                   embedding = await this.openaiProvider.generateEmbedding(text)
-                  provider = 'openai'
+                  provider = "openai"
                 } catch (openaiError) {
-                  console.warn('[HybridProvider] OpenAI also failed, falling back to TF-IDF:', openaiError)
+                  console.warn(
+                    "[HybridProvider] OpenAI also failed, falling back to TF-IDF:",
+                    openaiError
+                  )
                   embedding = await this.tfidfProvider.generateEmbedding(text)
-                  provider = 'tfidf'
+                  provider = "tfidf"
                 }
               } else {
                 embedding = await this.tfidfProvider.generateEmbedding(text)
-                provider = 'tfidf'
+                provider = "tfidf"
               }
             }
           } else if (this.openaiProvider?.isConfigured()) {
             try {
               embedding = await this.openaiProvider.generateEmbedding(text)
-              provider = 'openai'
+              provider = "openai"
             } catch (error) {
-              console.warn('[HybridProvider] OpenAI failed, falling back to TF-IDF:', error)
+              console.warn("[HybridProvider] OpenAI failed, falling back to TF-IDF:", error)
               embedding = await this.tfidfProvider.generateEmbedding(text)
-              provider = 'tfidf'
+              provider = "tfidf"
             }
           } else {
             embedding = await this.tfidfProvider.generateEmbedding(text)
-            provider = 'tfidf'
+            provider = "tfidf"
           }
           break
       }
@@ -256,9 +261,8 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
 
       this.recordMetrics(provider, embedding.length, Date.now() - startTime, cached)
       return embedding
-
     } catch (error) {
-      console.error('[HybridProvider] Embedding generation failed:', error)
+      console.error("[HybridProvider] Embedding generation failed:", error)
       throw error
     }
   }
@@ -269,31 +273,37 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
   async generateEmbeddings(texts: string[]): Promise<number[][]> {
     // For efficiency, batch process when possible
     // Try Gemini first (primary), then OpenAI (secondary)
-    if (this.mode === 'gemini-only' || this.mode === 'gemini-with-fallback') {
+    if (this.mode === "gemini-only" || this.mode === "gemini-with-fallback") {
       if (this.geminiProvider?.isConfigured()) {
         try {
           return await this.geminiProvider.generateEmbeddings(texts)
         } catch (error) {
-          if (this.mode === 'gemini-only') throw error
-          console.warn('[HybridProvider] Batch Gemini failed, trying OpenAI:', error)
+          if (this.mode === "gemini-only") throw error
+          console.warn("[HybridProvider] Batch Gemini failed, trying OpenAI:", error)
         }
       }
     }
 
-    if (this.mode === 'openai-only' || this.mode === 'openai-with-fallback' ||
-        (this.mode === 'gemini-with-fallback' && this.openaiProvider?.isConfigured())) {
+    if (
+      this.mode === "openai-only" ||
+      this.mode === "openai-with-fallback" ||
+      (this.mode === "gemini-with-fallback" && this.openaiProvider?.isConfigured())
+    ) {
       try {
         if (this.openaiProvider) {
           return await this.openaiProvider.generateEmbeddings(texts)
         }
       } catch (error) {
-        if (this.mode === 'openai-only') throw error
-        console.warn('[HybridProvider] Batch OpenAI failed, falling back to individual TF-IDF:', error)
+        if (this.mode === "openai-only") throw error
+        console.warn(
+          "[HybridProvider] Batch OpenAI failed, falling back to individual TF-IDF:",
+          error
+        )
       }
     }
 
     // Fall back to individual processing
-    return Promise.all(texts.map(text => this.generateEmbedding(text)))
+    return Promise.all(texts.map((text) => this.generateEmbedding(text)))
   }
 
   /**
@@ -301,9 +311,7 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
    */
   private async generateCombinedEmbedding(text: string): Promise<number[]> {
     const [openaiEmbedding, tfidfEmbedding] = await Promise.all([
-      this.openaiProvider?.isConfigured()
-        ? this.openaiProvider.generateEmbedding(text)
-        : null,
+      this.openaiProvider?.isConfigured() ? this.openaiProvider.generateEmbedding(text) : null,
       this.tfidfProvider.generateEmbedding(text),
     ])
 
@@ -317,8 +325,8 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
     }
 
     // Weight and combine embeddings
-    const weightedOpenAI = openaiEmbedding.map(v => v * this.combinedWeights.openai)
-    const weightedTFIDF = tfidfEmbedding.map(v => v * this.combinedWeights.tfidf)
+    const weightedOpenAI = openaiEmbedding.map((v) => v * this.combinedWeights.openai)
+    const weightedTFIDF = tfidfEmbedding.map((v) => v * this.combinedWeights.tfidf)
 
     // Concatenate: [openai..., tfidf...]
     return [...weightedOpenAI, ...weightedTFIDF]
@@ -328,7 +336,7 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
    * Record metrics for monitoring
    */
   private recordMetrics(
-    provider: 'gemini' | 'openai' | 'tfidf' | 'combined',
+    provider: "gemini" | "openai" | "tfidf" | "combined",
     dimensions: number,
     latencyMs: number,
     cached: boolean
@@ -373,11 +381,11 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
    * Switch embedding mode at runtime
    */
   setMode(mode: HybridMode): void {
-    if (mode === 'gemini-only' && !this.geminiProvider?.isConfigured()) {
-      throw new Error('Cannot switch to gemini-only mode: Gemini not configured')
+    if (mode === "gemini-only" && !this.geminiProvider?.isConfigured()) {
+      throw new Error("Cannot switch to gemini-only mode: Gemini not configured")
     }
-    if (mode === 'openai-only' && !this.openaiProvider?.isConfigured()) {
-      throw new Error('Cannot switch to openai-only mode: OpenAI not configured')
+    if (mode === "openai-only" && !this.openaiProvider?.isConfigured()) {
+      throw new Error("Cannot switch to openai-only mode: OpenAI not configured")
     }
     this.mode = mode
     console.log(`[HybridProvider] Mode switched to: ${mode}`)
@@ -398,7 +406,7 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
 
     if (this.geminiProvider?.isConfigured()) {
       try {
-        await this.geminiProvider.generateEmbedding('health check')
+        await this.geminiProvider.generateEmbedding("health check")
         geminiAvailable = true
       } catch {
         geminiAvailable = false
@@ -407,34 +415,34 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
 
     if (this.openaiProvider?.isConfigured()) {
       try {
-        await this.openaiProvider.generateEmbedding('health check')
+        await this.openaiProvider.generateEmbedding("health check")
         openaiAvailable = true
       } catch {
         openaiAvailable = false
       }
     }
 
-    const tfidfAvailable = true  // TF-IDF is always available
+    const tfidfAvailable = true // TF-IDF is always available
 
     // Determine health based on mode
     let healthy: boolean
     switch (this.mode) {
-      case 'gemini-only':
+      case "gemini-only":
         healthy = geminiAvailable
         break
-      case 'openai-only':
+      case "openai-only":
         healthy = openaiAvailable
         break
-      case 'tfidf-only':
+      case "tfidf-only":
         healthy = tfidfAvailable
         break
-      case 'gemini-with-fallback':
+      case "gemini-with-fallback":
         healthy = geminiAvailable || tfidfAvailable
         break
-      case 'openai-with-fallback':
+      case "openai-with-fallback":
         healthy = openaiAvailable || tfidfAvailable
         break
-      case 'combined':
+      case "combined":
         healthy = (geminiAvailable || openaiAvailable) && tfidfAvailable
         break
       default:
