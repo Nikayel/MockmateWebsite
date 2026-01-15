@@ -12,6 +12,10 @@ import {
   DistributionChart,
 } from "@/components/admin/charts"
 import {
+  PageHeader,
+  DashboardSkeleton,
+} from "@/components/admin/shared"
+import {
   Users,
   DollarSign,
   Terminal,
@@ -21,6 +25,7 @@ import {
   RefreshCw,
   Crown,
   Zap,
+  LayoutDashboard,
 } from "lucide-react"
 import { logger } from "@/lib/logger"
 
@@ -136,11 +141,7 @@ export default function AdminDashboard() {
   const handleRefresh = () => loadMetrics(true)
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
-      </div>
-    )
+    return <DashboardSkeleton />
   }
 
   if (error || !metrics) {
@@ -184,45 +185,14 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-heading font-bold text-white">Dashboard Overview</h1>
-          <p className="text-gray-400 mt-1">Real-time platform analytics and metrics</p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/* Time Range Selector */}
-          <div className="flex gap-1 bg-gray-900 rounded-lg p-1">
-            {["7d", "30d", "90d", "all"].map((range) => (
-              <Button
-                key={range}
-                size="sm"
-                variant={timeRange === range ? "default" : "ghost"}
-                onClick={() => setTimeRange(range)}
-                className={
-                  timeRange === range
-                    ? "bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
-                    : "text-gray-400 hover:text-white hover:bg-gray-800"
-                }
-              >
-                {range === "all" ? "All" : range.toUpperCase()}
-              </Button>
-            ))}
-          </div>
-
-          {/* Refresh Button */}
-          <Button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            variant="outline"
-            size="sm"
-            className="border-gray-700 text-gray-400 hover:text-white"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Dashboard Overview"
+        subtitle="Real-time platform analytics and metrics"
+        timeRange={timeRange}
+        onTimeRangeChange={setTimeRange}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+      />
 
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

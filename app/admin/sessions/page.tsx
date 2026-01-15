@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { MetricCard, TimeSeriesChart, DistributionChart } from "@/components/admin/charts"
+import { PageHeader, MetricsGridSkeleton, ChartSkeleton } from "@/components/admin/shared"
 import { Terminal, CheckCircle, Clock, Zap, RefreshCw, TrendingUp } from "lucide-react"
 import { logger } from "@/lib/logger"
 
@@ -43,8 +44,14 @@ export default function SessionsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
+      <div className="space-y-8">
+        <PageHeader title="Sessions" subtitle="Interview session analytics" />
+        <MetricsGridSkeleton count={4} />
+        <ChartSkeleton height={280} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ChartSkeleton height={280} />
+          <ChartSkeleton height={280} />
+        </div>
       </div>
     )
   }
@@ -71,42 +78,13 @@ export default function SessionsPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-heading font-bold text-white">Sessions</h1>
-          <p className="text-gray-400 mt-1">Interview session analytics</p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex gap-1 bg-gray-900 rounded-lg p-1">
-            {["7d", "30d", "90d", "all"].map((range) => (
-              <Button
-                key={range}
-                size="sm"
-                variant={timeRange === range ? "default" : "ghost"}
-                onClick={() => setTimeRange(range)}
-                className={
-                  timeRange === range
-                    ? "bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
-                    : "text-gray-400 hover:text-white hover:bg-gray-800"
-                }
-              >
-                {range === "all" ? "All" : range.toUpperCase()}
-              </Button>
-            ))}
-          </div>
-
-          <Button
-            onClick={loadData}
-            variant="outline"
-            size="sm"
-            className="border-gray-700 text-gray-400 hover:text-white"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Sessions"
+        subtitle="Interview session analytics"
+        timeRange={timeRange}
+        onTimeRangeChange={setTimeRange}
+        onRefresh={loadData}
+      />
 
       {/* Key Metrics */}
       {metrics && (

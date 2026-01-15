@@ -29,9 +29,11 @@ import {
   Rocket,
   Server,
   CreditCard,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { logger } from "@/lib/logger"
+import { Skeleton } from "@/components/admin/shared"
 
 interface NavItem {
   name: string
@@ -117,8 +119,32 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (authLoading || isAdmin === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0a0f]">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+      <div className="flex min-h-screen bg-[#0a0a0f]">
+        {/* Sidebar skeleton */}
+        <aside className="fixed top-0 left-0 z-40 h-screen w-64 border-r border-gray-800 bg-gray-900/95">
+          <div className="flex h-14 items-center justify-between border-b border-gray-800 px-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#00d9ff] to-[#00ff88]">
+                <Shield className="h-4 w-4 text-black" />
+              </div>
+              <div>
+                <span className="font-heading font-semibold text-white text-sm">Admin</span>
+                <span className="block text-[10px] text-gray-500 -mt-0.5">Mockmate</span>
+              </div>
+            </div>
+          </div>
+          <nav className="px-2 py-4 space-y-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className="h-9 w-full rounded-lg" />
+            ))}
+          </nav>
+        </aside>
+        {/* Main content skeleton */}
+        <main className="flex-1 ml-64 p-6 lg:p-8">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <Loader2 className="h-10 w-10 animate-spin text-[#00d9ff]" />
+          </div>
+        </main>
       </div>
     )
   }
@@ -159,15 +185,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed top-0 left-0 z-40 h-screen border-r border-gray-800 bg-gray-900/95 transition-all duration-300",
+          "fixed top-0 left-0 z-40 h-screen border-r border-gray-800/80 bg-gray-900/98 backdrop-blur-sm transition-all duration-300 ease-in-out",
           collapsed ? "w-16" : "w-64"
         )}
       >
         {/* Logo */}
-        <div className="flex h-14 items-center justify-between border-b border-gray-800 px-3">
+        <div className="flex h-14 items-center justify-between border-b border-gray-800/80 px-3">
           {!collapsed && (
-            <Link href="/admin" className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#00d9ff] to-[#00ff88]">
+            <Link href="/admin" className="flex items-center gap-2.5 group">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#00d9ff] to-[#00ff88] shadow-lg shadow-[#00d9ff]/20 group-hover:shadow-[#00d9ff]/30 transition-shadow">
                 <Shield className="h-4 w-4 text-black" />
               </div>
               <div>
@@ -176,24 +202,43 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </div>
             </Link>
           )}
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className={cn(
-              "rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white",
-              collapsed && "mx-auto"
-            )}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </button>
+          {collapsed && (
+            <Link href="/admin" className="mx-auto">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#00d9ff] to-[#00ff88] shadow-lg shadow-[#00d9ff]/20">
+                <Shield className="h-4 w-4 text-black" />
+              </div>
+            </Link>
+          )}
+          {!collapsed && (
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="rounded-lg p-1.5 text-gray-400 transition-all hover:bg-gray-800 hover:text-white hover:scale-105"
+              aria-label="Collapse sidebar"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
+        {/* Expand button when collapsed */}
+        {collapsed && (
+          <div className="px-2 py-3 border-b border-gray-800/50">
+            <button
+              onClick={() => setCollapsed(false)}
+              className="w-full rounded-lg p-2 text-gray-400 transition-all hover:bg-gray-800 hover:text-white flex items-center justify-center"
+              aria-label="Expand sidebar"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-2 py-4">
+        <nav className="flex-1 overflow-y-auto px-2 py-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
           {sections.map((section, sectionIndex) => {
             const sectionItems = navigation.filter(item => item.section === section)
             return (
-              <div key={section} className={sectionIndex > 0 ? "mt-6" : ""}>
+              <div key={section} className={sectionIndex > 0 ? "mt-5" : ""}>
                 {/* Section label - only show when not collapsed */}
                 {!collapsed && (
                   <div className="px-3 mb-2">
@@ -203,9 +248,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   </div>
                 )}
                 {collapsed && sectionIndex > 0 && (
-                  <div className="h-px bg-gray-800 mx-2 mb-2" />
+                  <div className="h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent mx-2 mb-2" />
                 )}
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   {sectionItems.map((item) => {
                     const isActive =
                       pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href))
@@ -215,18 +260,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         key={item.name}
                         href={item.href}
                         className={cn(
-                          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                          "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                           isActive
-                            ? "bg-[#00d9ff]/10 text-[#00d9ff] border-l-2 border-[#00d9ff]"
-                            : "text-gray-400 hover:bg-gray-800/50 hover:text-white"
+                            ? "bg-gradient-to-r from-[#00d9ff]/15 to-[#00d9ff]/5 text-[#00d9ff] border-l-2 border-[#00d9ff] shadow-sm"
+                            : "text-gray-400 hover:bg-gray-800/60 hover:text-white hover:translate-x-0.5",
+                          collapsed && "justify-center px-2"
                         )}
+                        title={collapsed ? item.name : undefined}
                       >
-                        <item.icon className={cn("h-[18px] w-[18px] flex-shrink-0", isActive && "text-[#00d9ff]")} />
+                        <item.icon className={cn(
+                          "h-[18px] w-[18px] flex-shrink-0 transition-transform group-hover:scale-110",
+                          isActive && "text-[#00d9ff]"
+                        )} />
                         {!collapsed && (
                           <>
                             <span className="truncate">{item.name}</span>
                             {item.badge && (
-                              <span className="ml-auto rounded-full bg-[#00d9ff]/20 text-[#00d9ff] px-1.5 py-0.5 text-[10px] font-semibold">
+                              <span className="ml-auto rounded-full bg-[#00d9ff]/20 text-[#00d9ff] px-1.5 py-0.5 text-[10px] font-semibold border border-[#00d9ff]/30">
                                 {item.badge}
                               </span>
                             )}
@@ -242,24 +292,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
 
         {/* User section */}
-        <div className="border-t border-gray-800 p-3">
+        <div className="border-t border-gray-800/80 p-3 bg-gray-900/50">
           {!collapsed && firebaseUser && (
-            <div className="mb-2 flex items-center gap-2.5 p-2 rounded-lg bg-gray-800/30">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#00d9ff] to-[#00ff88] flex-shrink-0">
-                <span className="text-xs font-bold text-black">
+            <div className="mb-3 flex items-center gap-2.5 p-2.5 rounded-lg bg-gradient-to-r from-gray-800/50 to-gray-800/30 border border-gray-700/50">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#00d9ff] to-[#00ff88] flex-shrink-0 shadow-lg shadow-[#00d9ff]/20">
+                <span className="text-sm font-bold text-black">
                   {firebaseUser.email?.[0].toUpperCase()}
                 </span>
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-medium text-white">{firebaseUser.email}</p>
-                <p className="text-[10px] text-gray-500">Super Admin</p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <div className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+                  <p className="text-[10px] text-gray-400">Super Admin</p>
+                </div>
               </div>
             </div>
           )}
           <button
             onClick={handleSignOut}
             className={cn(
-              "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs text-gray-400 transition-colors hover:bg-red-500/10 hover:text-red-400",
+              "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs font-medium text-gray-400 transition-all hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20",
               collapsed && "justify-center px-2"
             )}
           >
@@ -270,8 +323,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main content */}
-      <main className={cn("flex-1 transition-all duration-300", collapsed ? "ml-16" : "ml-64")}>
-        <div className="p-6 lg:p-8">{children}</div>
+      <main className={cn(
+        "flex-1 transition-all duration-300 ease-in-out min-h-screen",
+        collapsed ? "ml-16" : "ml-64"
+      )}>
+        <div className="p-6 lg:p-8 max-w-[1800px] mx-auto">{children}</div>
       </main>
     </div>
   )
