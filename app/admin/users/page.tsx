@@ -17,8 +17,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { MetricCard, TimeSeriesChart, DistributionChart } from "@/components/admin/charts"
+import { PageHeader, MetricsGridSkeleton, ChartSkeleton, UserListSkeleton } from "@/components/admin/shared"
 import { UserProfileDrawer } from "@/components/admin/UserProfileDrawer"
-import { Users, UserPlus, Crown, Search, RefreshCw, Trash2, X, Eye } from "lucide-react"
+import { Users, UserPlus, Crown, Search, RefreshCw, Trash2, X, Eye, Loader2 } from "lucide-react"
 import { logger } from "@/lib/logger"
 
 interface UserProfile {
@@ -157,8 +158,11 @@ export default function UsersPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
+      <div className="space-y-8">
+        <PageHeader title="Users" subtitle="User management and analytics" />
+        <MetricsGridSkeleton count={4} />
+        <ChartSkeleton height={280} />
+        <UserListSkeleton rows={8} />
       </div>
     )
   }
@@ -179,42 +183,13 @@ export default function UsersPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-heading text-3xl font-bold text-white">Users</h1>
-          <p className="mt-1 text-gray-400">User management and analytics</p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex gap-1 rounded-lg bg-gray-900 p-1">
-            {["7d", "30d", "90d", "all"].map((range) => (
-              <Button
-                key={range}
-                size="sm"
-                variant={timeRange === range ? "default" : "ghost"}
-                onClick={() => setTimeRange(range)}
-                className={
-                  timeRange === range
-                    ? "bg-[#00d9ff] text-black hover:bg-[#00d9ff]/80"
-                    : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                }
-              >
-                {range === "all" ? "All" : range.toUpperCase()}
-              </Button>
-            ))}
-          </div>
-
-          <Button
-            onClick={loadData}
-            variant="outline"
-            size="sm"
-            className="border-gray-700 text-gray-400 hover:text-white"
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Users"
+        subtitle="User management and analytics"
+        timeRange={timeRange}
+        onTimeRangeChange={setTimeRange}
+        onRefresh={loadData}
+      />
 
       {/* Key Metrics */}
       {metrics && (
