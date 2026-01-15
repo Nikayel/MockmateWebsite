@@ -17,6 +17,8 @@ import {
   getEnhancedUserProfile,
   getUserInsights,
   getInterviewReadiness,
+  getAccurateBehavioralProfile,
+  getUserDataQuality,
 } from "@/lib/rag/enhanced-user-profile"
 import { adminDb } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
@@ -46,11 +48,13 @@ export async function GET(request: NextRequest) {
     const profileData = profileDoc.data()
 
     // Fetch all enhanced profile data in parallel
-    const [enhancedProfile, insights, interviewReadiness, misconceptionData] = await Promise.all([
+    const [enhancedProfile, insights, interviewReadiness, misconceptionData, accurateBehavior, dataQuality] = await Promise.all([
       getEnhancedUserProfile(userId),
       getUserInsights(userId),
       getInterviewReadiness(userId),
       getMisconceptionsSummary(userId),
+      getAccurateBehavioralProfile(userId), // NEW: Production-grade behavioral analysis
+      getUserDataQuality(userId), // NEW: Data quality assessment
     ])
 
     // Get recent session activity
@@ -81,6 +85,21 @@ export async function GET(request: NextRequest) {
       misconceptions: misconceptionData,
       recentSessions,
       learningState,
+      // NEW: Production-grade behavioral analysis
+      accurateBehavior: {
+        dataQuality: dataQuality.quality,
+        sessionsAnalyzed: dataQuality.sessionsCount,
+        missingDataPoints: dataQuality.missingDataPoints,
+        planning: accurateBehavior.planning,
+        debugging: accurateBehavior.debugging,
+        helpSeeking: accurateBehavior.helpSeeking,
+        persistence: accurateBehavior.persistence,
+        learningVelocity: accurateBehavior.learningVelocity,
+        temporalPerformance: accurateBehavior.temporalPerformance,
+        strengths: accurateBehavior.strengths,
+        areasForImprovement: accurateBehavior.areasForImprovement,
+        recommendations: accurateBehavior.recommendations,
+      },
     })
   } catch (error: any) {
     logger.error("Error fetching user profile for admin", { error, adminId })
