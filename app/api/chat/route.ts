@@ -330,6 +330,7 @@ export async function POST(request: NextRequest) {
       interviewPhase,
       conversationTracker,
       hasSubmitted,
+      solutionComplexity,
     } = await request.json()
 
     // For proactive messages (interviewer jumping in), message might be empty
@@ -675,18 +676,39 @@ DO NOT:
       : ""
 
     // Build phase-specific context
-    const currentPhase = (hasSubmitted ? 'post_interview' : interviewPhase) as InterviewPhase || 'discussion'
+    const currentPhase =
+      ((hasSubmitted ? "post_interview" : interviewPhase) as InterviewPhase) || "discussion"
     const phasePrompt = PHASE_PROMPTS[currentPhase] || PHASE_PROMPTS.discussion
 
     // Build conversation tracking context if available
-    let trackingContext = ''
+    let trackingContext = ""
     if (conversationTracker) {
       trackingContext = buildTrackingContext(conversationTracker as ConversationTracker)
     }
 
     // Build hint guidance if hints have been given
     const hintsGiven = (conversationTracker as ConversationTracker)?.hintsGiven || 0
-    const hintGuidance = hintsGiven > 0 ? getHintGuidance(hintsGiven) : ''
+    const hintGuidance = hintsGiven > 0 ? getHintGuidance(hintsGiven) : ""
+
+    // Build complexity context - tells interviewer if solution is optimal
+    let complexityContext = ""
+    if (solutionComplexity) {
+      const { estimated, optimal, isOptimal } = solutionComplexity
+      if (isOptimal) {
+        complexityContext = `
+SOLUTION COMPLEXITY:
+- Candidate's solution appears to be ${estimated} which matches the optimal ${optimal}
+- DO NOT ask "can you optimize this?" - their solution is already optimal
+- Instead: ask about trade-offs, edge cases, or alternative approaches
+- Good questions: "Could you trade space for time?", "What edge cases might we be missing?", "What's another way to solve this?"`
+      } else {
+        complexityContext = `
+SOLUTION COMPLEXITY:
+- Candidate's solution appears to be ${estimated}
+- Optimal solution would be ${optimal}
+- You CAN ask about optimization: "Could you do better than ${estimated}?" or "Is there a way to avoid the nested loop?"`
+      }
+    }
 
     const systemPrompts = {
       interviewer: `You are Sable, a sharp and direct technical interviewer${isGenericCompany ? "" : ` at ${companyStyle.company}`}. You're known for being brutally honest but fair - you give real signal, not empty praise.
@@ -717,11 +739,12 @@ ${consoleContext}
 ${phasePrompt}
 ${trackingContext}
 ${hintGuidance}
+${complexityContext}
 ${INTERVIEWER_BEHAVIOR_RULES}
 
 WHEN CANDIDATE PROPOSES APPROACH:
-- If brute force: Accept it, ask complexity, then "Can you optimize?"
-- If optimal: "What made you choose that over [alternative]?" then let them code
+- If brute force: Accept it, ask complexity, then "Can you think of a more optimal approach?"
+- If optimal (or you know they can't do better): "What made you choose that over [alternative]?" then let them code
 - Don't over-question - once they've explained clearly, say "Go ahead and code it"
 
 WHEN CANDIDATE IS STUCK:
@@ -731,7 +754,8 @@ WHEN CANDIDATE IS STUCK:
 
 WHEN TESTS PASS:
 - Ask about complexity (make them derive it, don't confirm)
-- Ask ONE optimization follow-up
+- ONLY ask about optimization IF their solution can be improved (check SOLUTION COMPLEXITY section above)
+- If already optimal: ask about edge cases, trade-offs, or alternative approaches instead
 - Give brief debrief: one thing well, one to improve
 
 ACCEPT CORRECT LOGIC:

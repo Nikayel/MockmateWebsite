@@ -10,12 +10,12 @@
 // =============================================================================
 
 export type InterviewPhase =
-  | 'intro'           // Initial greeting and problem introduction
-  | 'discussion'      // Candidate explains approach, interviewer probes
-  | 'coding'          // Candidate writes code, interviewer observes
-  | 'testing'         // Tests run, discuss results and complexity
-  | 'post_interview'  // Wrap-up after submit, final thoughts
-  | 'complete'        // Session ended, direct to feedback
+  | "intro" // Initial greeting and problem introduction
+  | "discussion" // Candidate explains approach, interviewer probes
+  | "coding" // Candidate writes code, interviewer observes
+  | "testing" // Tests run, discuss results and complexity
+  | "post_interview" // Wrap-up after submit, final thoughts
+  | "complete" // Session ended, direct to feedback
 
 export interface PhaseContext {
   currentPhase: InterviewPhase
@@ -39,31 +39,31 @@ export function detectInterviewPhase(context: {
 }): InterviewPhase {
   // User clicked submit -> post-interview wrap-up
   if (context.hasSubmitted) {
-    return 'post_interview'
+    return "post_interview"
   }
 
   // Tests have run -> testing phase (discuss results)
   if (context.testsHaveRun) {
-    return 'testing'
+    return "testing"
   }
 
   // Has written code -> coding phase
   if (context.hasStartedCoding) {
-    return 'coding'
+    return "coding"
   }
 
   // Has explained approach -> discussion phase
   if (context.hasExplainedApproach) {
-    return 'discussion'
+    return "discussion"
   }
 
   // Just started -> intro
   if (context.messageCount <= 2) {
-    return 'intro'
+    return "intro"
   }
 
   // Default to discussion after intro
-  return 'discussion'
+  return "discussion"
 }
 
 // =============================================================================
@@ -100,8 +100,9 @@ PHASE RULES:
 
 WHEN CANDIDATE PROPOSES AN APPROACH:
 1. If brute force: Accept it, then ask "Can you think of a way to optimize?"
-2. If optimal: Ask why they chose it over alternatives
+2. If optimal (or can't be improved): Ask why they chose it, then let them code - don't keep pushing
 3. If wrong: Ask them to trace through an example
+4. In real interviews: brute force is FINE as a starting point. Accept it, let them code, THEN discuss optimization.
 
 RED FLAGS TO PROBE:
 - They jump to coding without explaining
@@ -135,14 +136,13 @@ HOW TO HINT (progressive):
 
   testing: `
 CURRENT PHASE: TESTING & REVIEW
-Your goal: Discuss test results, analyze complexity, explore optimizations.
+Your goal: Discuss test results, analyze complexity, explore improvements.
 
 PHASE RULES:
 - Acknowledge test results briefly
-- If all passed: Move to complexity and optimization questions
+- If all passed: Move to complexity questions
 - If some failed: Help them debug (don't give the answer)
 - Ask about complexity - but make THEM derive it
-- Discuss trade-offs and alternatives
 - DO NOT repeat earlier feedback
 - DO NOT give away complexity - ask "What's the complexity? Walk me through it."
 
@@ -154,8 +154,16 @@ COMPLEXITY DISCUSSION:
 
 AFTER TESTS PASS:
 - "Nice, tests are passing. What's the time complexity?"
-- "Could you optimize this further?"
-- "What edge cases might we be missing?"
+- Check the SOLUTION COMPLEXITY context - if already optimal, DO NOT ask to optimize
+- If NOT optimal: "Could you do better than [current complexity]?"
+- If ALREADY optimal: "What edge cases might we be missing?" or "What's a trade-off of this approach?"
+- In real interviews, if a solution can't be optimized, interviewers move on
+
+EXAMPLE (OPTIMAL SOLUTION):
+"Tests pass, nice. What's the complexity? [they answer O(n)] Good. Since you're hitting the optimal bound here, what edge cases might trip up your solution?"
+
+EXAMPLE (SUBOPTIMAL SOLUTION):
+"Tests pass. What's the complexity? [they answer O(n²)] Right. Is there a way to do better? Think about what data structure could help."
 `,
 
   post_interview: `
@@ -198,18 +206,18 @@ Say: "That's a wrap! Click 'View Detailed Feedback' to see your scores and perso
 export interface ConversationTracker {
   // What has the candidate covered?
   approachExplained: boolean
-  approachType: 'none' | 'brute_force' | 'optimized' | 'unclear'
+  approachType: "none" | "brute_force" | "optimized" | "unclear"
 
   // Complexity discussion
   timeComplexityMentioned: boolean
-  timeComplexityValue: string | null  // e.g., "O(n)"
+  timeComplexityValue: string | null // e.g., "O(n)"
   spaceComplexityMentioned: boolean
   spaceComplexityValue: string | null
-  complexityExplanationGiven: boolean  // Did they explain WHY?
+  complexityExplanationGiven: boolean // Did they explain WHY?
 
   // Edge cases
-  edgeCasesMentioned: string[]  // List of edge cases they mentioned
-  edgeCasesAskedByInterviewer: string[]  // Edge cases interviewer already asked about
+  edgeCasesMentioned: string[] // List of edge cases they mentioned
+  edgeCasesAskedByInterviewer: string[] // Edge cases interviewer already asked about
 
   // Progress
   hasStartedCoding: boolean
@@ -226,7 +234,7 @@ export interface ConversationTracker {
 export function createEmptyTracker(): ConversationTracker {
   return {
     approachExplained: false,
-    approachType: 'none',
+    approachType: "none",
     timeComplexityMentioned: false,
     timeComplexityValue: null,
     spaceComplexityMentioned: false,
@@ -250,19 +258,19 @@ export function createEmptyTracker(): ConversationTracker {
 export function updateTrackerFromMessage(
   tracker: ConversationTracker,
   message: string,
-  role: 'user' | 'interviewer'
+  role: "user" | "interviewer"
 ): ConversationTracker {
   const updated = { ...tracker }
   const lowerMessage = message.toLowerCase()
 
-  if (role === 'user') {
+  if (role === "user") {
     // Check for approach explanation
     if (
-      lowerMessage.includes('approach') ||
-      lowerMessage.includes('i would') ||
+      lowerMessage.includes("approach") ||
+      lowerMessage.includes("i would") ||
       lowerMessage.includes("i'll use") ||
-      lowerMessage.includes('my plan') ||
-      lowerMessage.includes('thinking')
+      lowerMessage.includes("my plan") ||
+      lowerMessage.includes("thinking")
     ) {
       updated.approachExplained = true
     }
@@ -270,12 +278,12 @@ export function updateTrackerFromMessage(
     // Check for complexity mentions
     const complexityMatch = message.match(/O\([^)]+\)/gi)
     if (complexityMatch) {
-      complexityMatch.forEach(c => {
+      complexityMatch.forEach((c) => {
         const complexity = c.toUpperCase()
-        if (lowerMessage.includes('time') || lowerMessage.includes('runtime')) {
+        if (lowerMessage.includes("time") || lowerMessage.includes("runtime")) {
           updated.timeComplexityMentioned = true
           updated.timeComplexityValue = complexity
-        } else if (lowerMessage.includes('space') || lowerMessage.includes('memory')) {
+        } else if (lowerMessage.includes("space") || lowerMessage.includes("memory")) {
           updated.spaceComplexityMentioned = true
           updated.spaceComplexityValue = complexity
         } else {
@@ -287,11 +295,11 @@ export function updateTrackerFromMessage(
 
       // Check if they explained why
       if (
-        lowerMessage.includes('because') ||
-        lowerMessage.includes('since') ||
-        lowerMessage.includes('due to') ||
-        lowerMessage.includes('loop') ||
-        lowerMessage.includes('iterate')
+        lowerMessage.includes("because") ||
+        lowerMessage.includes("since") ||
+        lowerMessage.includes("due to") ||
+        lowerMessage.includes("loop") ||
+        lowerMessage.includes("iterate")
       ) {
         updated.complexityExplanationGiven = true
       }
@@ -299,53 +307,74 @@ export function updateTrackerFromMessage(
 
     // Check for edge case mentions
     const edgeCaseKeywords = [
-      'empty', 'null', 'none', 'zero', 'negative',
-      'single', 'one element', 'duplicate', 'edge case',
-      'what if', 'corner case', 'boundary'
+      "empty",
+      "null",
+      "none",
+      "zero",
+      "negative",
+      "single",
+      "one element",
+      "duplicate",
+      "edge case",
+      "what if",
+      "corner case",
+      "boundary",
     ]
-    edgeCaseKeywords.forEach(keyword => {
+    edgeCaseKeywords.forEach((keyword) => {
       if (lowerMessage.includes(keyword) && !updated.edgeCasesMentioned.includes(keyword)) {
         updated.edgeCasesMentioned.push(keyword)
       }
     })
 
     // Check for brute force vs optimized
-    if (lowerMessage.includes('brute force') || lowerMessage.includes('nested loop') || lowerMessage.includes('n squared') || lowerMessage.includes('n^2')) {
-      updated.approachType = 'brute_force'
-    } else if (
-      lowerMessage.includes('hash') ||
-      lowerMessage.includes('map') ||
-      lowerMessage.includes('set') ||
-      lowerMessage.includes('optimize') ||
-      lowerMessage.includes('better')
+    if (
+      lowerMessage.includes("brute force") ||
+      lowerMessage.includes("nested loop") ||
+      lowerMessage.includes("n squared") ||
+      lowerMessage.includes("n^2")
     ) {
-      if (updated.approachType === 'brute_force') {
+      updated.approachType = "brute_force"
+    } else if (
+      lowerMessage.includes("hash") ||
+      lowerMessage.includes("map") ||
+      lowerMessage.includes("set") ||
+      lowerMessage.includes("optimize") ||
+      lowerMessage.includes("better")
+    ) {
+      if (updated.approachType === "brute_force") {
         updated.didOptimize = true
       }
-      updated.approachType = 'optimized'
+      updated.approachType = "optimized"
     }
   }
 
-  if (role === 'interviewer') {
+  if (role === "interviewer") {
     // Track what interviewer has asked about
-    if (lowerMessage.includes('optimize') || lowerMessage.includes('better approach') || lowerMessage.includes('improve')) {
+    if (
+      lowerMessage.includes("optimize") ||
+      lowerMessage.includes("better approach") ||
+      lowerMessage.includes("improve")
+    ) {
       updated.wasAskedToOptimize = true
     }
 
     // Track edge cases interviewer asked about
-    const edgeCaseKeywords = ['empty', 'null', 'single', 'one element', 'edge case']
-    edgeCaseKeywords.forEach(keyword => {
-      if (lowerMessage.includes(keyword) && !updated.edgeCasesAskedByInterviewer.includes(keyword)) {
+    const edgeCaseKeywords = ["empty", "null", "single", "one element", "edge case"]
+    edgeCaseKeywords.forEach((keyword) => {
+      if (
+        lowerMessage.includes(keyword) &&
+        !updated.edgeCasesAskedByInterviewer.includes(keyword)
+      ) {
         updated.edgeCasesAskedByInterviewer.push(keyword)
       }
     })
 
     // Track hints given
     if (
-      lowerMessage.includes('hint') ||
-      lowerMessage.includes('consider') ||
-      lowerMessage.includes('think about') ||
-      lowerMessage.includes('what if')
+      lowerMessage.includes("hint") ||
+      lowerMessage.includes("consider") ||
+      lowerMessage.includes("think about") ||
+      lowerMessage.includes("what if")
     ) {
       updated.hintsGiven++
     }
@@ -363,7 +392,7 @@ export function buildTrackingContext(tracker: ConversationTracker): string {
   // Approach status
   if (tracker.approachExplained) {
     sections.push(`CANDIDATE HAS EXPLAINED APPROACH: ${tracker.approachType}`)
-    if (tracker.approachType === 'brute_force' && !tracker.wasAskedToOptimize) {
+    if (tracker.approachType === "brute_force" && !tracker.wasAskedToOptimize) {
       sections.push(`-> ACTION: Ask if they can optimize`)
     }
     if (tracker.wasAskedToOptimize && tracker.didOptimize) {
@@ -375,7 +404,9 @@ export function buildTrackingContext(tracker: ConversationTracker): string {
 
   // Complexity status
   if (tracker.timeComplexityMentioned) {
-    sections.push(`TIME COMPLEXITY DISCUSSED: ${tracker.timeComplexityValue}${tracker.complexityExplanationGiven ? ' (with explanation)' : ' (no explanation given)'}`)
+    sections.push(
+      `TIME COMPLEXITY DISCUSSED: ${tracker.timeComplexityValue}${tracker.complexityExplanationGiven ? " (with explanation)" : " (no explanation given)"}`
+    )
     if (!tracker.complexityExplanationGiven) {
       sections.push(`-> ACTION: Ask them to walk through their reasoning`)
     }
@@ -386,11 +417,13 @@ export function buildTrackingContext(tracker: ConversationTracker): string {
 
   // Edge cases status
   if (tracker.edgeCasesMentioned.length > 0) {
-    sections.push(`EDGE CASES CANDIDATE MENTIONED: ${tracker.edgeCasesMentioned.join(', ')}`)
+    sections.push(`EDGE CASES CANDIDATE MENTIONED: ${tracker.edgeCasesMentioned.join(", ")}`)
     sections.push(`-> DO NOT say they didn't mention edge cases - they did!`)
   }
   if (tracker.edgeCasesAskedByInterviewer.length > 0) {
-    sections.push(`EDGE CASES YOU ALREADY ASKED ABOUT: ${tracker.edgeCasesAskedByInterviewer.join(', ')}`)
+    sections.push(
+      `EDGE CASES YOU ALREADY ASKED ABOUT: ${tracker.edgeCasesAskedByInterviewer.join(", ")}`
+    )
     sections.push(`-> DO NOT ask about these again`)
   }
 
@@ -400,8 +433,8 @@ export function buildTrackingContext(tracker: ConversationTracker): string {
   }
 
   return sections.length > 0
-    ? `\nCONVERSATION TRACKING (what has already been covered):\n${sections.join('\n')}\n`
-    : ''
+    ? `\nCONVERSATION TRACKING (what has already been covered):\n${sections.join("\n")}\n`
+    : ""
 }
 
 // =============================================================================
@@ -448,30 +481,30 @@ CRITICAL INTERVIEWER RULES (NEVER VIOLATE):
 
 export interface HintLevel {
   level: number
-  type: 'leading_question' | 'concrete_example' | 'direct_nudge' | 'explicit_help'
+  type: "leading_question" | "concrete_example" | "direct_nudge" | "explicit_help"
   description: string
 }
 
 export const HINT_PROGRESSION: HintLevel[] = [
   {
     level: 1,
-    type: 'leading_question',
-    description: 'Ask a question that points toward the issue without revealing it',
+    type: "leading_question",
+    description: "Ask a question that points toward the issue without revealing it",
   },
   {
     level: 2,
-    type: 'concrete_example',
-    description: 'Walk through a specific input that exposes the problem',
+    type: "concrete_example",
+    description: "Walk through a specific input that exposes the problem",
   },
   {
     level: 3,
-    type: 'direct_nudge',
-    description: 'Suggest the general direction (data structure, technique)',
+    type: "direct_nudge",
+    description: "Suggest the general direction (data structure, technique)",
   },
   {
     level: 4,
-    type: 'explicit_help',
-    description: 'Give specific guidance (only if running out of time)',
+    type: "explicit_help",
+    description: "Give specific guidance (only if running out of time)",
   },
 ]
 
@@ -484,9 +517,9 @@ HINT GUIDANCE (You've given ${hintsGiven} hints so far):
 Current hint level: ${currentLevel}/4 - ${hint.type}
 Strategy: ${hint.description}
 
-${currentLevel === 1 ? `EXAMPLE: "Have you thought about what happens when the input is empty?"` : ''}
-${currentLevel === 2 ? `EXAMPLE: "Let's trace through with input [2,7] and target 9 - what happens at each step?"` : ''}
-${currentLevel === 3 ? `EXAMPLE: "Think about what data structure gives you O(1) lookups"` : ''}
-${currentLevel === 4 ? `EXAMPLE: "Consider using a hash map to store values you've seen"` : ''}
+${currentLevel === 1 ? `EXAMPLE: "Have you thought about what happens when the input is empty?"` : ""}
+${currentLevel === 2 ? `EXAMPLE: "Let's trace through with input [2,7] and target 9 - what happens at each step?"` : ""}
+${currentLevel === 3 ? `EXAMPLE: "Think about what data structure gives you O(1) lookups"` : ""}
+${currentLevel === 4 ? `EXAMPLE: "Consider using a hash map to store values you've seen"` : ""}
 `
 }

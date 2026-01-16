@@ -1811,8 +1811,17 @@ Interviews are conversations, not just coding exercises.`
       interviewPhase: getCurrentInterviewPhase(),
       conversationTracker,
       hasSubmitted: showPostInterviewDiscussion,
+      // Pass efficiency metrics so interviewer knows if solution is already optimal
+      solutionComplexity: efficiencyMetrics
+        ? {
+            estimated: efficiencyMetrics.estimatedTimeComplexity,
+            optimal: efficiencyMetrics.optimalTimeComplexity,
+            isOptimal:
+              efficiencyMetrics.estimatedTimeComplexity === efficiencyMetrics.optimalTimeComplexity,
+          }
+        : null,
     }),
-    [getCurrentInterviewPhase, conversationTracker, showPostInterviewDiscussion]
+    [getCurrentInterviewPhase, conversationTracker, showPostInterviewDiscussion, efficiencyMetrics]
   )
 
   // Analyze code for context-aware proactive feedback
