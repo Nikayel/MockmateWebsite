@@ -14,6 +14,8 @@ import type {
 } from "./types"
 import { generateAIResponse } from "@/lib/ai-providers"
 import { logger } from "@/lib/logger"
+import type { ExtractedEvidence } from "./structured-extraction"
+import { buildEvidenceSummary } from "./structured-extraction"
 
 // ============================================================================
 // SCORE CRITIQUE
@@ -36,9 +38,21 @@ export async function critiqueScores(
     aiValidation: ConversationValidation
     codeCompleteness?: { isIncomplete: boolean; reason: string }
     hasBlindCopying?: boolean
+    // NEW: Structured evidence from transcript extraction
+    extractedEvidence?: ExtractedEvidence
+    problemContext?: {
+      title: string
+      optimalTimeComplexity: string
+      optimalSpaceComplexity: string
+    }
   }
 ): Promise<ScoreCritiqueAdjustment> {
   const silentSolution = "silentSolution" in scores ? scores.silentSolution : false
+
+  // Build evidence summary if available
+  const evidenceSummary = context.extractedEvidence
+    ? buildEvidenceSummary(context.extractedEvidence)
+    : null
 
   const critiquePrompt = `You are a Constitutional AI reviewer ensuring fair, helpful, and honest scoring.
 
@@ -58,6 +72,22 @@ PERFORMANCE CONTEXT:
 ${context.codeCompleteness?.isIncomplete ? `- Code incomplete: ${context.codeCompleteness.reason}` : ""}
 ${context.hasBlindCopying ? "- AI copying detected" : ""}
 ${silentSolution ? "- Silent solution (no explanation)" : ""}
+${context.problemContext ? `
+PROBLEM CONTEXT:
+- Problem: ${context.problemContext.title}
+- Optimal Time: ${context.problemContext.optimalTimeComplexity}
+- Optimal Space: ${context.problemContext.optimalSpaceComplexity}
+` : ""}
+${evidenceSummary ? `
+EXTRACTED EVIDENCE FROM TRANSCRIPT (use this to verify claims):
+${evidenceSummary}
+
+IMPORTANT: Use the extracted evidence above to verify if scores match what actually happened.
+- If evidence shows candidate mentioned edge cases, don't penalize for "not mentioning edge cases"
+- If evidence shows candidate discussed complexity, don't claim they didn't
+- If evidence shows candidate self-corrected bugs, give credit (positive signal)
+- If evidence shows candidate improved from brute force to optimal, give credit for progression
+` : ""}
 
 CONSTITUTIONAL PRINCIPLES - Critique against these 4 aspects:
 

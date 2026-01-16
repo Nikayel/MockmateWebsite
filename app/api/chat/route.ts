@@ -26,6 +26,18 @@ import {
   formatDynamicContextForPrompt,
   shouldRetrieveDynamicContext,
 } from "@/lib/rag/dynamic-chat-context"
+// NEW: Phase-aware interview system
+import {
+  type InterviewPhase,
+  type ConversationTracker,
+  PHASE_PROMPTS,
+  INTERVIEWER_BEHAVIOR_RULES,
+  buildTrackingContext,
+  getHintGuidance,
+  createEmptyTracker,
+  updateTrackerFromMessage,
+} from "@/lib/interview/interview-phases"
+import { buildCompanyInterviewerPrompt } from "@/lib/interview/company-interviewer-styles"
 
 interface UserContext {
   email?: string
@@ -314,6 +326,10 @@ export async function POST(request: NextRequest) {
       // NEW: Console context for interviewer awareness
       testResults,
       consoleLogs,
+      // NEW: Phase-aware interview system
+      interviewPhase,
+      conversationTracker,
+      hasSubmitted,
     } = await request.json()
 
     // For proactive messages (interviewer jumping in), message might be empty
@@ -692,6 +708,29 @@ ${levelContext}
 ${isSystemDesign ? systemDesignContext : isBugFix ? bugFixContext : patternContext}
 ${edgeCaseContext}
 ${consoleContext}
+
+${(() => {
+  // Build phase-specific context
+  const phase = (hasSubmitted ? 'post_interview' : interviewPhase) as InterviewPhase || 'discussion'
+  const phasePrompt = PHASE_PROMPTS[phase] || PHASE_PROMPTS.discussion
+
+  // Build conversation tracking context if available
+  let trackingContext = ''
+  if (conversationTracker) {
+    trackingContext = buildTrackingContext(conversationTracker as ConversationTracker)
+  }
+
+  // Build hint guidance if hints have been given
+  const hintsGiven = (conversationTracker as ConversationTracker)?.hintsGiven || 0
+  const hintGuidance = hintsGiven > 0 ? getHintGuidance(hintsGiven) : ''
+
+  return `
+${phasePrompt}
+${trackingContext}
+${hintGuidance}
+${INTERVIEWER_BEHAVIOR_RULES}
+`
+})()}
 
 INTERVIEW STYLE - ACT LIKE A REAL INTERVIEWER:
 You are having a natural conversation with the candidate. They may:

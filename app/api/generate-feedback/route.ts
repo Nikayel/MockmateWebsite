@@ -29,6 +29,12 @@ import {
   parseFeedbackSections,
   injectScoresIntoFeedback,
 } from "@/lib/feedback"
+// Import structured extraction for grounded feedback
+import {
+  extractConversationEvidence,
+  buildEvidenceSummary,
+  type ExtractedEvidence,
+} from "@/lib/feedback/structured-extraction"
 
 export async function POST(request: NextRequest) {
   // Apply rate limiting
@@ -406,13 +412,49 @@ CODE EFFICIENCY ANALYSIS:
       aiValidation
     )
 
+    // Step 4.5: Structured Extraction from Transcript
+    // Extract concrete evidence BEFORE generating feedback to prevent hallucination
+    let extractedEvidence: ExtractedEvidence | undefined
+    try {
+      if (conversationTranscript && Array.isArray(conversationTranscript) && conversationTranscript.length > 0) {
+        const transcriptMessages = conversationTranscript.map((msg: { type?: string; role?: string; message?: string; content?: string }) => ({
+          role: (msg.type === 'user' || msg.role === 'user') ? 'user' as const : 'interviewer' as const,
+          content: msg.message || msg.content || '',
+        }))
+
+        extractedEvidence = await extractConversationEvidence(transcriptMessages, {
+          title: scenarioTitle,
+          optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || 'O(n)',
+          optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || 'O(1)',
+          criticalEdgeCases: ['empty input', 'single element', 'null values'],
+        })
+
+        logger.info("Structured extraction completed", {
+          sessionId,
+          approachExplained: extractedEvidence.approach.explained,
+          complexityDiscussed: extractedEvidence.timeComplexity.mentioned,
+          edgeCasesMentioned: extractedEvidence.edgeCases.mentionedByCandidate.length,
+        })
+      }
+    } catch (error) {
+      logger.warn("Structured extraction failed, continuing without evidence", { error, sessionId })
+    }
+
     // Step 5: Constitutional AI Score Critique
+    // Now with extracted evidence for grounded critique
     const scoreCritique = await critiqueScores(algorithmicScores, {
       passRate,
       scenarioType: scenarioType || "dsa",
       aiValidation,
       codeCompleteness: code ? analyzeCodeCompleteness(code, language || "python") : undefined,
       hasBlindCopying,
+      // NEW: Pass extracted evidence for grounded critique
+      extractedEvidence,
+      problemContext: {
+        title: scenarioTitle,
+        optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || 'O(n)',
+        optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || 'O(1)',
+      },
     })
 
     // Use adjusted scores if critique made changes
@@ -434,6 +476,15 @@ COMMUNICATION ANALYSIS (hybrid validated):
 - Questions answered: ${aiValidation.questionsAnswered}/${aiValidation.questionsAsked}
 - Communication score: ${aiValidation.communicationScore}/100
 - Total candidate messages: ${preScreen.candidateMessageCount}
+${extractedEvidence ? `
+EXTRACTED EVIDENCE (ground your feedback in these facts):
+${buildEvidenceSummary(extractedEvidence)}
+
+CRITICAL: Your feedback must be consistent with the extracted evidence above.
+- If evidence shows they mentioned edge cases, DO NOT say "didn't mention edge cases"
+- If evidence shows they discussed complexity, DO NOT say "didn't discuss complexity"
+- Quote specific examples from the evidence when giving feedback
+` : ''}
 
 PRE-CALCULATED SCORES (use these as your scores):
 ${
