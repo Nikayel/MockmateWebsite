@@ -29,6 +29,12 @@ import {
   parseFeedbackSections,
   injectScoresIntoFeedback,
 } from "@/lib/feedback"
+// Import structured extraction for grounded feedback
+import {
+  extractConversationEvidence,
+  buildEvidenceSummary,
+  type ExtractedEvidence,
+} from "@/lib/feedback/structured-extraction"
 
 export async function POST(request: NextRequest) {
   // Apply rate limiting
@@ -372,7 +378,46 @@ CODE EFFICIENCY ANALYSIS:
     const aiCodeOverlap = analyzeAICodeOverlap(code, partnerMessages)
     const hasBlindCopying = aiCodeOverlap.hasHighOverlap && !aiCodeOverlap.modificationsMade
 
-    // Step 3: Calculate validated scores using both algorithmic + AI signals
+    // Step 2.6: Structured Extraction from Transcript (BEFORE scoring)
+    // Extract concrete evidence to ground scoring in actual quotes
+    let extractedEvidence: ExtractedEvidence | undefined
+    try {
+      if (
+        conversationTranscript &&
+        Array.isArray(conversationTranscript) &&
+        conversationTranscript.length > 0
+      ) {
+        const transcriptMessages = conversationTranscript.map(
+          (msg: { type?: string; role?: string; message?: string; content?: string }) => ({
+            role:
+              msg.type === "user" || msg.role === "user"
+                ? ("user" as const)
+                : ("interviewer" as const),
+            content: msg.message || msg.content || "",
+          })
+        )
+
+        extractedEvidence = await extractConversationEvidence(transcriptMessages, {
+          title: scenarioTitle,
+          optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || "O(n)",
+          optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
+          criticalEdgeCases: ["empty input", "single element", "null values"],
+        })
+
+        logger.info("Structured extraction completed for scoring", {
+          sessionId,
+          approachExplained: extractedEvidence.approach.explained,
+          complexityDiscussed: extractedEvidence.timeComplexity.mentioned,
+          edgeCasesMentioned: extractedEvidence.edgeCases.mentionedByCandidate.length,
+          selfCorrectedBugs: extractedEvidence.progression.selfCorrectedBugs,
+          improvedAfterPrompt: extractedEvidence.progression.improvedAfterPrompt,
+        })
+      }
+    } catch (error) {
+      logger.warn("Structured extraction failed, continuing without evidence", { error, sessionId })
+    }
+
+    // Step 3: Calculate validated scores using algorithmic + AI signals + extracted evidence
     // Different scoring models for different scenario types
     const validatedScores = calculateValidatedScores(
       passRate,
@@ -380,7 +425,8 @@ CODE EFFICIENCY ANALYSIS:
       preScreen,
       aiValidation,
       scenarioType, // Pass scenario type for specialized scoring
-      code // Pass code/design notes for system design blank template detection
+      code, // Pass code/design notes for system design blank template detection
+      extractedEvidence // NEW: Pass extracted evidence for grounded scoring
     )
 
     // Apply AI copying penalty if detected
@@ -407,12 +453,20 @@ CODE EFFICIENCY ANALYSIS:
     )
 
     // Step 5: Constitutional AI Score Critique
+    // Now with extracted evidence for grounded critique
     const scoreCritique = await critiqueScores(algorithmicScores, {
       passRate,
       scenarioType: scenarioType || "dsa",
       aiValidation,
       codeCompleteness: code ? analyzeCodeCompleteness(code, language || "python") : undefined,
       hasBlindCopying,
+      // NEW: Pass extracted evidence for grounded critique
+      extractedEvidence,
+      problemContext: {
+        title: scenarioTitle,
+        optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || "O(n)",
+        optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
+      },
     })
 
     // Use adjusted scores if critique made changes
@@ -434,6 +488,19 @@ COMMUNICATION ANALYSIS (hybrid validated):
 - Questions answered: ${aiValidation.questionsAnswered}/${aiValidation.questionsAsked}
 - Communication score: ${aiValidation.communicationScore}/100
 - Total candidate messages: ${preScreen.candidateMessageCount}
+${
+  extractedEvidence
+    ? `
+EXTRACTED EVIDENCE (ground your feedback in these facts):
+${buildEvidenceSummary(extractedEvidence)}
+
+CRITICAL: Your feedback must be consistent with the extracted evidence above.
+- If evidence shows they mentioned edge cases, DO NOT say "didn't mention edge cases"
+- If evidence shows they discussed complexity, DO NOT say "didn't discuss complexity"
+- Quote specific examples from the evidence when giving feedback
+`
+    : ""
+}
 
 PRE-CALCULATED SCORES (use these as your scores):
 ${
@@ -743,15 +810,19 @@ CRITICAL INSTRUCTIONS:
       | "easy"
       | "medium"
       | "hard"
+    // Use extracted evidence for more accurate hint count if available
+    const hintsUsedActual =
+      extractedEvidence?.hints.totalGiven ?? interactionMetrics?.hintsUsed ?? 0
     const masteryScoreForResponse = calculateMasteryScore({
       testCasesPassed: testsPassed,
       testCasesTotal: testsTotal,
       timeSpentMinutes: timeSpent ? Math.round(timeSpent / 60) : 0,
-      hintsUsed: interactionMetrics?.hintsUsed || 0,
+      hintsUsed: hintsUsedActual,
       hintsTotal: 5,
       problemDifficulty: difficulty as Difficulty,
-      approachExplained: aiValidation.approachExplained,
-      complexityDiscussed: aiValidation.complexityDiscussed,
+      approachExplained: extractedEvidence?.approach.explained ?? aiValidation.approachExplained,
+      complexityDiscussed:
+        extractedEvidence?.timeComplexity.mentioned ?? aiValidation.complexityDiscussed,
       interviewerMessagesCount: aiValidation.questionsAsked || 0,
     })
 
@@ -771,15 +842,18 @@ CRITICAL INSTRUCTIONS:
 
         // Calculate mastery score (technical proficiency only, excludes communication)
         // This is critical for spaced repetition - we need to measure code mastery, not interview skills
+        // Use extracted evidence when available for accurate hint/approach tracking
         const masteryScoreResult = calculateMasteryScore({
           testCasesPassed: testsPassed,
           testCasesTotal: testsTotal,
           timeSpentMinutes: timeSpent ? Math.round(timeSpent / 60) : 0,
-          hintsUsed: interactionMetrics?.hintsUsed || 0,
+          hintsUsed: hintsUsedActual,
           hintsTotal: 5, // Standard hint limit
           problemDifficulty: difficulty as Difficulty,
-          approachExplained: aiValidation.approachExplained,
-          complexityDiscussed: aiValidation.complexityDiscussed,
+          approachExplained:
+            extractedEvidence?.approach.explained ?? aiValidation.approachExplained,
+          complexityDiscussed:
+            extractedEvidence?.timeComplexity.mentioned ?? aiValidation.complexityDiscussed,
           interviewerMessagesCount: aiValidation.questionsAsked || 0,
         })
 

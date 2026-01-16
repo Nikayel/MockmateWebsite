@@ -11,6 +11,7 @@ import type {
   ConversationValidation,
   PreScreenResult,
 } from "./types"
+import type { ExtractedEvidence } from "./structured-extraction"
 import { analyzeCodeCompleteness, isBlankDesignTemplate } from "./completeness-analysis"
 
 // ============================================================================
@@ -274,6 +275,11 @@ export function calculateBugFixScores(
 
 /**
  * STEP 3: Calculate final scores using both algorithmic signals and AI validation
+ *
+ * Now with ExtractedEvidence for grounded scoring:
+ * - Use actual quotes to verify claims
+ * - Reward good behaviors (self-correction, optimization progression)
+ * - Don't penalize for things they actually did
  */
 export function calculateValidatedScores(
   passRate: number,
@@ -281,7 +287,8 @@ export function calculateValidatedScores(
   preScreen: PreScreenResult,
   aiValidation: ConversationValidation,
   scenarioType?: string,
-  code?: string
+  code?: string,
+  extractedEvidence?: ExtractedEvidence
 ): ScoreResult {
   // SYSTEM DESIGN SCORING - conversation-based, no test pass rate
   if (scenarioType === "system-design") {
@@ -360,7 +367,7 @@ export function calculateValidatedScores(
 
   // === PROBLEM-SOLVING SCORE (25%) ===
   // Primary: test pass rate + code efficiency
-  // Secondary: edge cases and alternatives discussed
+  // Secondary: edge cases, optimization progression, self-correction
   const effScore = efficiencyMetrics?.efficiencyScore || 50
   let problemSolving = Math.round(passRate * 0.6 + effScore * 0.4)
 
@@ -369,8 +376,54 @@ export function calculateValidatedScores(
   if (aiValidation.alternativesDiscussed && aiValidation.isCoherent && !isIncompleteSolution) {
     problemSolving = Math.min(95, problemSolving + 5)
   }
-  if (aiValidation.edgeCasesConsidered && aiValidation.isCoherent && !isIncompleteSolution) {
-    problemSolving = Math.min(95, problemSolving + 5)
+
+  // === EVIDENCE-BASED SCORING (uses extracted quotes, not LLM guesses) ===
+  // When evidence is available, use it INSTEAD of aiValidation for edge cases
+  // to avoid double-counting
+  if (extractedEvidence && !isIncompleteSolution) {
+    // EDGE CASE BONUS: Use evidence (replaces aiValidation.edgeCasesConsidered)
+    // This is more accurate than LLM's guess
+    const proactiveEdgeCases = extractedEvidence.edgeCases.mentionedByCandidate.length
+    if (proactiveEdgeCases >= 3) {
+      problemSolving = Math.min(95, problemSolving + 7) // 3+ edge cases = strong
+    } else if (proactiveEdgeCases >= 1) {
+      problemSolving = Math.min(95, problemSolving + 4) // 1-2 edge cases = good
+    }
+    // Note: No bonus if 0 edge cases (don't penalize, just no bonus)
+
+    // PROGRESSION BONUS: Started brute force, then optimized = shows good problem-solving growth
+    // Real interviewers LOVE seeing candidates iterate and improve
+    if (
+      extractedEvidence.progression.startedWithBruteForce &&
+      extractedEvidence.progression.improvedAfterPrompt
+    ) {
+      problemSolving = Math.min(95, problemSolving + 6)
+    }
+
+    // SELF-CORRECTION BONUS: Catching and fixing own bugs = strong signal
+    // Real interviewers value this more than getting it right first try
+    if (extractedEvidence.progression.selfCorrectedBugs) {
+      problemSolving = Math.min(95, problemSolving + 4)
+    }
+
+    // HINT PENALTY: Needed excessive help or copied blindly
+    if (extractedEvidence.hints.copiedBlindly) {
+      problemSolving = Math.max(20, problemSolving - 15)
+    } else if (extractedEvidence.hints.totalGiven >= 4) {
+      // 4+ hints = needed significant help (not necessarily bad, but lower score)
+      problemSolving = Math.max(30, problemSolving - 8)
+    } else if (
+      extractedEvidence.hints.totalGiven >= 2 &&
+      !extractedEvidence.hints.usedEffectively
+    ) {
+      // Got hints but didn't use them well
+      problemSolving = Math.max(35, problemSolving - 5)
+    }
+  } else if (!isIncompleteSolution) {
+    // Fallback to aiValidation when no evidence available
+    if (aiValidation.edgeCasesConsidered && aiValidation.isCoherent) {
+      problemSolving = Math.min(95, problemSolving + 5)
+    }
   }
 
   // CRITICAL: Cap problem-solving for incomplete solutions
@@ -494,6 +547,48 @@ export function calculateValidatedScores(
         none: 25,
       }[aiValidation.approachQuality] || 35
     communication = Math.max(qualityFloor, communication)
+  }
+
+  // === EVIDENCE-BASED COMMUNICATION ADJUSTMENTS ===
+  // These are ADDITIONAL signals not captured by aiValidation
+  // Cap total evidence-based bonus to prevent excessive stacking
+  if (extractedEvidence) {
+    let evidenceBonus = 0
+
+    // BONUS: Explained while coding (real interviewers love this)
+    if (extractedEvidence.communication.explainedWhileCoding) {
+      evidenceBonus += 4
+    }
+
+    // BONUS: Asked clarifying questions (shows thoroughness)
+    if (extractedEvidence.communication.askedClarifyingQuestions) {
+      evidenceBonus += 3
+    }
+
+    // BONUS: Responded well to feedback (adaptability)
+    if (extractedEvidence.communication.respondedToFeedback) {
+      evidenceBonus += 3
+    }
+
+    // ACCURACY CHECK: If they discussed complexity, use evidence to verify accuracy
+    // This REPLACES the aiValidation complexity check (more accurate)
+    if (
+      extractedEvidence.timeComplexity.mentioned &&
+      extractedEvidence.timeComplexity.isCorrect === true
+    ) {
+      evidenceBonus += 3
+    } else if (
+      extractedEvidence.timeComplexity.mentioned &&
+      extractedEvidence.timeComplexity.isCorrect === false
+    ) {
+      // Inaccurate complexity = slight penalty (but they at least tried)
+      evidenceBonus -= 3
+    }
+
+    // Cap evidence-based bonus at +10 to prevent excessive inflation
+    // (explainedWhileCoding + clarifying + feedback + complexity = max 13, capped to 10)
+    evidenceBonus = Math.min(10, Math.max(-5, evidenceBonus))
+    communication = Math.min(95, Math.max(25, communication + evidenceBonus))
   }
 
   // For incomplete solutions, communication can stay higher IF they discussed well
