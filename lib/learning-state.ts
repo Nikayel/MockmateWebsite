@@ -9,10 +9,72 @@
  */
 
 import { adminDb, FieldValue } from "./firebase-admin"
-import type { UserLearningState, TopicLearningState } from "./types"
+import type { UserLearningState, TopicLearningState, Profile } from "./types"
 import type { DSAPattern } from "./types/dsa-patterns"
 import type { Difficulty } from "./spaced-repetition/sm2-algorithm"
 import { logger } from "./logger"
+import { DEFAULT_TIMEZONE } from "./email/timezone"
+
+/**
+ * Get the start of a calendar day in a specific timezone
+ * This ensures streak calculations work correctly regardless of server timezone
+ */
+function getStartOfDayInTimezone(date: Date, timezone: string): Date {
+  try {
+    // Format the date in the user's timezone to get the local date parts
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+    const parts = formatter.formatToParts(date)
+    const year = parseInt(parts.find((p) => p.type === "year")?.value || "0", 10)
+    const month = parseInt(parts.find((p) => p.type === "month")?.value || "0", 10) - 1
+    const day = parseInt(parts.find((p) => p.type === "day")?.value || "0", 10)
+
+    // Create a date representing midnight in that timezone
+    // We use a formatter to get the offset, then adjust
+    const midnightLocal = new Date(year, month, day, 0, 0, 0, 0)
+
+    // Get the timezone offset for this specific date (handles DST)
+    const offsetFormatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      timeZoneName: "shortOffset",
+    })
+    const offsetString = offsetFormatter.format(midnightLocal)
+    const offsetMatch = offsetString.match(/GMT([+-]\d+)?/)
+    const offsetHours = offsetMatch?.[1] ? parseInt(offsetMatch[1], 10) : 0
+
+    // Return a UTC date that represents midnight in the user's timezone
+    return new Date(Date.UTC(year, month, day, -offsetHours, 0, 0, 0))
+  } catch (error) {
+    // Fallback to local time if timezone is invalid
+    logger.warn("Invalid timezone for streak calculation, falling back to local", {
+      timezone,
+      error: error instanceof Error ? error.message : "Unknown error",
+    })
+    const result = new Date(date)
+    result.setHours(0, 0, 0, 0)
+    return result
+  }
+}
+
+/**
+ * Get user's timezone from their profile
+ */
+async function getUserTimezone(userId: string): Promise<string> {
+  try {
+    const profileDoc = await adminDb.collection("profiles").doc(userId).get()
+    if (profileDoc.exists) {
+      const profile = profileDoc.data() as Profile
+      return profile.notification_preferences?.timezone || DEFAULT_TIMEZONE
+    }
+  } catch (error) {
+    logger.warn("Failed to fetch user timezone, using default", { userId })
+  }
+  return DEFAULT_TIMEZONE
+}
 
 /**
  * Calculate next review date using SM-2 spaced repetition algorithm
@@ -73,6 +135,9 @@ export async function updateLearningStateAfterSession(
   const now = new Date()
   const topicId = sessionData.scenarioId || sessionData.topic.toLowerCase().replace(/\s+/g, "-")
 
+  // Fetch user's timezone BEFORE the transaction to avoid nested reads
+  const userTimezone = await getUserTimezone(userId)
+
   await adminDb.runTransaction(async (transaction) => {
     const doc = await transaction.get(learningStateRef)
 
@@ -93,8 +158,9 @@ export async function updateLearningStateAfterSession(
       }
     }
 
-    // Calculate streak using calendar days (not elapsed hours)
+    // Calculate streak using calendar days in the USER'S TIMEZONE
     // This ensures practicing at 11 PM then 1 AM counts as consecutive days
+    // regardless of server timezone
     const lastSessionAt = learningState.last_session_at
       ? new Date(learningState.last_session_at)
       : null
@@ -102,20 +168,17 @@ export async function updateLearningStateAfterSession(
     let newStreakDays = learningState.streak_days || 0
 
     if (lastSessionAt) {
-      // Compare calendar dates (ignoring time) to properly track streaks
-      const lastSessionDate = new Date(lastSessionAt)
-      lastSessionDate.setHours(0, 0, 0, 0)
-
-      const todayDate = new Date(now)
-      todayDate.setHours(0, 0, 0, 0)
+      // Compare calendar dates in the user's timezone to properly track streaks
+      const lastSessionDayStart = getStartOfDayInTimezone(lastSessionAt, userTimezone)
+      const todayDayStart = getStartOfDayInTimezone(now, userTimezone)
 
       // Calculate difference in calendar days
       const daysSinceLastSession = Math.round(
-        (todayDate.getTime() - lastSessionDate.getTime()) / (1000 * 60 * 60 * 24)
+        (todayDayStart.getTime() - lastSessionDayStart.getTime()) / (1000 * 60 * 60 * 24)
       )
 
       if (daysSinceLastSession === 0) {
-        // Same calendar day, no change to streak
+        // Same calendar day in user's timezone, no change to streak
       } else if (daysSinceLastSession === 1) {
         // Consecutive calendar day, increment streak
         newStreakDays++

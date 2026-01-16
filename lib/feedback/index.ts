@@ -75,4 +75,8 @@ export { buildRAGFeedbackContext } from "./context-builder"
 // PARSER EXPORTS
 // ============================================================================
 
-export { parseFeedbackSections, injectScoresIntoFeedback } from "./parsers"
+export {
+  parseFeedbackSections,
+  injectScoresIntoFeedback,
+  sanitizeFeedbackForScoreConsistency,
+} from "./parsers"

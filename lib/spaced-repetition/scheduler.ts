@@ -194,6 +194,15 @@ export async function getDueProblems(
   const dueToday: DueItem[] = []
   const upcoming: DueItem[] = []
 
+  // Helper to calculate calendar days difference (for "Tomorrow" to show as 1 day, not 0)
+  const getCalendarDaysDiff = (fromDate: Date, toDate: Date): number => {
+    const fromStart = new Date(fromDate)
+    fromStart.setHours(0, 0, 0, 0)
+    const toStart = new Date(toDate)
+    toStart.setHours(0, 0, 0, 0)
+    return Math.round((toStart.getTime() - fromStart.getTime()) / (1000 * 60 * 60 * 24))
+  }
+
   snapshot.docs.forEach((doc) => {
     const data = doc.data() as ProblemMastery
     const nextReviewAt = new Date(data.next_review_at)
@@ -201,7 +210,8 @@ export async function getDueProblems(
     // Calculate time differences
     const millisDiff = nextReviewAt.getTime() - now.getTime()
     const minutesDiff = Math.floor(millisDiff / (1000 * 60))
-    const daysDiff = Math.floor(millisDiff / (1000 * 60 * 60 * 24))
+    // Use calendar days for days_until_review so "Tomorrow" shows as 1 day, not 0
+    const daysDiff = getCalendarDaysDiff(now, nextReviewAt)
 
     const daysOverdue = Math.max(0, -daysDiff)
     const priorityScore = calculateReviewPriority(

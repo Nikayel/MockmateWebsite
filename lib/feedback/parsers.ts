@@ -350,6 +350,42 @@ export function parseFeedback(feedback: string): FeedbackSection {
 }
 
 /**
+ * Sanitize feedback text to remove contradictory criticism based on actual scores.
+ * This prevents cases where AI-generated feedback criticizes communication
+ * when the communication score is actually good (>= 60).
+ */
+export function sanitizeFeedbackForScoreConsistency(
+  feedback: string,
+  scores: {
+    communication: number
+    overall: number
+  }
+): string {
+  let result = feedback
+
+  // If communication score >= 60, remove "EXPLAIN YOUR APPROACH" criticism
+  // This prevents contradictory feedback where someone communicated well but
+  // the AI incorrectly flagged them for not explaining
+  if (scores.communication >= 60) {
+    // Remove various forms of the "explain approach" criticism
+    const explainApproachPatterns = [
+      /[-•*]\s*EXPLAIN YOUR APPROACH[^.]*\.[^\n]*/gi,
+      /[-•*]\s*coding in silence[^.]*\.[^\n]*/gi,
+      /[-•*]\s*Explicitly state Time and Space complexity[^.]*\.[^\n]*/gi,
+    ]
+
+    for (const pattern of explainApproachPatterns) {
+      result = result.replace(pattern, "")
+    }
+
+    // Clean up any resulting empty lines or orphaned bullet sections
+    result = result.replace(/\n{3,}/g, "\n\n")
+  }
+
+  return result
+}
+
+/**
  * Inject/replace scores in feedback text to ensure consistency with authoritative scores.
  * This is critical because AI-generated feedback or Constitutional AI revisions
  * may contain different scores than the algorithmically calculated ones.

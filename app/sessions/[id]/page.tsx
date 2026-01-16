@@ -252,6 +252,7 @@ export default function SessionDetailPage() {
               performanceScore={session.performance_score || 0}
               technicalScore={session.technical_score ?? session.mastery_score}
               scoreBreakdown={session.score_breakdown}
+              constitutionalAICritique={session.constitutional_ai_critique}
               testsPassed={
                 session.tests_passed ??
                 (session.test_results?.filter((t: any) => t.passed).length || 0)

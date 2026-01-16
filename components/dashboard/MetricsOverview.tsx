@@ -6,6 +6,13 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { useAuth } from "@/lib/auth-context"
 import Link from "next/link"
 import {
@@ -23,8 +30,19 @@ import {
   CheckCircle,
   RefreshCw,
   BookOpen,
+  Trophy,
+  ExternalLink,
 } from "lucide-react"
 import { ScoreInfoTooltip } from "@/components/ui/score-info-tooltip"
+
+interface MasteredProblem {
+  problemId: string
+  scenarioId: string
+  title: string
+  pattern: string
+  difficulty: string
+  masteredAt: string
+}
 
 interface QuickMetrics {
   totalSessions: number
@@ -67,6 +85,28 @@ export function MetricsOverview() {
   const [metrics, setMetrics] = useState<QuickMetrics | null>(null)
   const [loading, setLoading] = useState(true)
   const [showOverallScore, setShowOverallScore] = useState(true) // Default to Interview Score (includes communication)
+  const [masteredProblems, setMasteredProblems] = useState<MasteredProblem[]>([])
+  const [loadingMastered, setLoadingMastered] = useState(false)
+  const [masteredDialogOpen, setMasteredDialogOpen] = useState(false)
+
+  const loadMasteredProblems = async () => {
+    if (!firebaseUser || loadingMastered) return
+    setLoadingMastered(true)
+    try {
+      const token = await firebaseUser.getIdToken()
+      const response = await fetch("/api/user/mastered-problems", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setMasteredProblems(data.problems || [])
+      }
+    } catch (error) {
+      console.error("Failed to load mastered problems:", error)
+    } finally {
+      setLoadingMastered(false)
+    }
+  }
 
   useEffect(() => {
     const loadMetrics = async () => {
@@ -286,18 +326,75 @@ export function MetricsOverview() {
               </span>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="rounded bg-emerald-500/10 p-2">
-                <div className="flex items-center justify-center gap-1">
-                  <CheckCircle className="h-3 w-3 text-emerald-400" />
-                  <span className="text-sm font-bold text-emerald-400">
-                    {metrics.mastery.mastered}
-                  </span>
-                </div>
-                <div className="flex items-center justify-center text-[10px] text-gray-400">
-                  Mastered
-                  <ScoreInfoTooltip type="mastered" iconClassName="h-2.5 w-2.5" />
-                </div>
-              </div>
+              <Dialog open={masteredDialogOpen} onOpenChange={setMasteredDialogOpen}>
+                <DialogTrigger asChild>
+                  <button
+                    className="rounded bg-emerald-500/10 p-2 transition-colors hover:bg-emerald-500/20"
+                    onClick={() => {
+                      setMasteredDialogOpen(true)
+                      loadMasteredProblems()
+                    }}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <CheckCircle className="h-3 w-3 text-emerald-400" />
+                      <span className="text-sm font-bold text-emerald-400">
+                        {metrics.mastery.mastered}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-center text-[10px] text-gray-400">
+                      Mastered
+                      <ScoreInfoTooltip type="mastered" iconClassName="h-2.5 w-2.5" asSpan />
+                    </div>
+                  </button>
+                </DialogTrigger>
+                <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Trophy className="h-5 w-5 text-emerald-400" />
+                      Mastered Problems ({masteredProblems.length})
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-2">
+                    {loadingMastered ? (
+                      <div className="py-8 text-center text-gray-400">Loading...</div>
+                    ) : masteredProblems.length === 0 ? (
+                      <div className="py-8 text-center text-gray-400">
+                        No mastered problems yet. Keep practicing!
+                      </div>
+                    ) : (
+                      masteredProblems.map((problem) => (
+                        <Link
+                          key={problem.problemId}
+                          href={`/interview?scenario=${problem.scenarioId}`}
+                          className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 transition-colors hover:border-emerald-500/30 hover:bg-zinc-800/50"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate font-medium text-white">{problem.title}</div>
+                            <div className="flex items-center gap-2 text-xs text-gray-400">
+                              <span className="capitalize">
+                                {problem.pattern.replace(/-/g, " ")}
+                              </span>
+                              <span>•</span>
+                              <span
+                                className={
+                                  problem.difficulty === "easy"
+                                    ? "text-emerald-400"
+                                    : problem.difficulty === "medium"
+                                      ? "text-amber-400"
+                                      : "text-red-400"
+                                }
+                              >
+                                {problem.difficulty}
+                              </span>
+                            </div>
+                          </div>
+                          <ExternalLink className="h-4 w-4 shrink-0 text-gray-500" />
+                        </Link>
+                      ))
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
               <div className="rounded bg-amber-500/10 p-2">
                 <div className="flex items-center justify-center gap-1">
                   <RefreshCw className="h-3 w-3 text-amber-400" />
@@ -383,7 +480,7 @@ export function MetricsOverview() {
           </div>
         )}
 
-        {/* Pattern Highlights - uses technical score by default */}
+        {/* Pattern Highlights - score changes based on toggle */}
         {metrics.topPattern && (
           <div className="flex items-center justify-between rounded-lg border border-green-500/20 bg-green-500/10 p-2">
             <div className="flex items-center gap-2">
@@ -393,9 +490,16 @@ export function MetricsOverview() {
                 <div className="text-sm text-white">{metrics.topPattern.name}</div>
               </div>
             </div>
-            <Badge className="border-green-500/30 bg-green-500/20 text-xs text-green-400">
-              {showOverallScore ? metrics.topPattern.score : metrics.topPattern.technicalScore}%
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge className="cursor-default border-green-500/30 bg-green-500/20 text-xs text-green-400">
+                  {showOverallScore ? metrics.topPattern.score : metrics.topPattern.technicalScore}%
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="text-xs">
+                {showOverallScore ? "Interview" : "Technical"} score for this pattern
+              </TooltipContent>
+            </Tooltip>
           </div>
         )}
 
@@ -408,12 +512,19 @@ export function MetricsOverview() {
                 <div className="text-sm text-white">{metrics.weakestPattern.name}</div>
               </div>
             </div>
-            <Badge className="border-orange-500/30 bg-orange-500/20 text-xs text-orange-400">
-              {showOverallScore
-                ? metrics.weakestPattern.score
-                : metrics.weakestPattern.technicalScore}
-              %
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge className="cursor-default border-orange-500/30 bg-orange-500/20 text-xs text-orange-400">
+                  {showOverallScore
+                    ? metrics.weakestPattern.score
+                    : metrics.weakestPattern.technicalScore}
+                  %
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="text-xs">
+                {showOverallScore ? "Interview" : "Technical"} score for this pattern
+              </TooltipContent>
+            </Tooltip>
           </div>
         )}
       </CardContent>

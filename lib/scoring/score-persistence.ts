@@ -240,6 +240,41 @@ export async function getMasteryStatistics(userId: string): Promise<{
 }
 
 /**
+ * Get list of mastered problems for a user
+ * @param userId - User ID
+ * @returns Array of mastered problem details
+ */
+export async function getMasteredProblems(userId: string): Promise<
+  Array<{
+    problemId: string
+    scenarioId: string
+    title: string
+    pattern: string
+    difficulty: string
+    masteredAt: string
+  }>
+> {
+  const snapshot = await adminDb
+    .collection("problem_mastery")
+    .doc(userId)
+    .collection("problems")
+    .where("mastery_level", "==", "mastered")
+    .get()
+
+  return snapshot.docs.map((doc) => {
+    const data = doc.data()
+    return {
+      problemId: doc.id,
+      scenarioId: data.scenario_id || doc.id,
+      title: data.title || data.scenario_title || doc.id,
+      pattern: data.pattern || "unknown",
+      difficulty: data.difficulty || "medium",
+      masteredAt: data.last_review_at || data.updated_at || new Date().toISOString(),
+    }
+  })
+}
+
+/**
  * Update mastery level for a problem
  * Called after spaced repetition calculates new level
  *

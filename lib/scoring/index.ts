@@ -43,5 +43,6 @@ export {
   getExistingSessionScores,
   getUserScoreStats,
   getMasteryStatistics,
+  getMasteredProblems,
   updateProblemMasteryLevel,
 } from "./score-persistence"

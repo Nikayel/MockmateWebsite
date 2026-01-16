@@ -95,26 +95,42 @@ interface ScoreInfoTooltipProps {
   type: ScoreInfoType
   className?: string
   iconClassName?: string
+  /** Use span instead of button - required when inside another interactive element */
+  asSpan?: boolean
 }
 
 export function ScoreInfoTooltip({
   type,
   className = "",
   iconClassName = "",
+  asSpan = false,
 }: ScoreInfoTooltipProps) {
   const info = SCORE_EXPLANATIONS[type]
+
+  const triggerClassName = `ml-1 rounded text-zinc-500 transition-colors hover:text-zinc-400 focus:ring-1 focus:ring-zinc-500 focus:outline-none ${className}`
 
   return (
     <TooltipProvider>
       <Tooltip delayDuration={300}>
         <TooltipTrigger asChild>
-          <button
-            type="button"
-            className={`ml-1 rounded text-zinc-500 transition-colors hover:text-zinc-400 focus:ring-1 focus:ring-zinc-500 focus:outline-none ${className}`}
-            aria-label={`Learn more about ${info.title}`}
-          >
-            <HelpCircle className={`h-3.5 w-3.5 ${iconClassName}`} />
-          </button>
+          {asSpan ? (
+            <span
+              role="button"
+              tabIndex={0}
+              className={triggerClassName}
+              aria-label={`Learn more about ${info.title}`}
+            >
+              <HelpCircle className={`h-3.5 w-3.5 ${iconClassName}`} />
+            </span>
+          ) : (
+            <button
+              type="button"
+              className={triggerClassName}
+              aria-label={`Learn more about ${info.title}`}
+            >
+              <HelpCircle className={`h-3.5 w-3.5 ${iconClassName}`} />
+            </button>
+          )}
         </TooltipTrigger>
         <TooltipContent className="max-w-xs border-zinc-800 bg-zinc-900" side="top" sideOffset={5}>
           <p className="text-sm font-medium text-white">{info.title}</p>

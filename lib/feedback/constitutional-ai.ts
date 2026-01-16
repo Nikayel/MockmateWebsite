@@ -72,13 +72,19 @@ PERFORMANCE CONTEXT:
 ${context.codeCompleteness?.isIncomplete ? `- Code incomplete: ${context.codeCompleteness.reason}` : ""}
 ${context.hasBlindCopying ? "- AI copying detected" : ""}
 ${silentSolution ? "- Silent solution (no explanation)" : ""}
-${context.problemContext ? `
+${
+  context.problemContext
+    ? `
 PROBLEM CONTEXT:
 - Problem: ${context.problemContext.title}
 - Optimal Time: ${context.problemContext.optimalTimeComplexity}
 - Optimal Space: ${context.problemContext.optimalSpaceComplexity}
-` : ""}
-${evidenceSummary ? `
+`
+    : ""
+}
+${
+  evidenceSummary
+    ? `
 EXTRACTED EVIDENCE FROM TRANSCRIPT (use this to verify claims):
 ${evidenceSummary}
 
@@ -87,7 +93,9 @@ IMPORTANT: Use the extracted evidence above to verify if scores match what actua
 - If evidence shows candidate discussed complexity, don't claim they didn't
 - If evidence shows candidate self-corrected bugs, give credit (positive signal)
 - If evidence shows candidate improved from brute force to optimal, give credit for progression
-` : ""}
+`
+    : ""
+}
 
 CONSTITUTIONAL PRINCIPLES - Critique against these 4 aspects:
 
@@ -271,6 +279,7 @@ CONSTITUTIONAL PRINCIPLES - Critique against these 4 aspects:
    - Does it match the actual scores?
    - Are technical claims correct?
    - Red flags: Praising "optimal complexity" when pass rate is low, claiming "explained well" when communication=30
+   - CRITICAL RED FLAG: Criticizing "EXPLAIN YOUR APPROACH" when communication score >= 60 (this means they DID explain)
 
 4. ACTIONABILITY: Does feedback give clear next steps?
    - Can the student understand what to improve?

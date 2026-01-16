@@ -178,8 +178,13 @@ function InterviewPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
-  const { markQuestionCompleted, markQuestionEvaluating, addActualTime, activeRoadmap } =
-    useRoadmapStore()
+  const {
+    markQuestionCompleted,
+    markQuestionEvaluating,
+    addActualTime,
+    activeRoadmap,
+    setActiveRoadmap,
+  } = useRoadmapStore()
   // Use store for loading states so InterviewerChat component can see them
   const {
     isLoadingChat,
@@ -264,6 +269,9 @@ function InterviewPageContent() {
   // Track topics the interviewer has already asked about to prevent repetitive questions
   const [recentNudgeTopics, setRecentNudgeTopics] = useState<string[]>([])
 
+  // Track topics the user has already answered to prevent AI from re-asking
+  const [userAnsweredTopics, setUserAnsweredTopics] = useState<string[]>([])
+
   // Extract topics from AI interviewer messages to avoid repetition
   const extractTopicsFromMessage = (message: string): string[] => {
     const topics: string[] = []
@@ -293,6 +301,74 @@ function InterviewPageContent() {
     }
     if (lowerMsg.includes("alternative") || lowerMsg.includes("other approach")) {
       topics.push("alternative approaches")
+    }
+
+    return topics
+  }
+
+  // Extract topics the USER has answered from their messages
+  // This prevents the interviewer from re-asking about things the user already explained
+  const extractUserAnsweredTopics = (message: string): string[] => {
+    const topics: string[] = []
+    const lowerMsg = message.toLowerCase()
+
+    // Complexity answers - user stating time/space complexity
+    if (
+      lowerMsg.match(/o\s*\(\s*[n\d\s\^logn*]+\s*\)/i) || // O(n), O(n^2), O(log n), O(n log n)
+      lowerMsg.includes("linear time") ||
+      lowerMsg.includes("constant time") ||
+      lowerMsg.includes("quadratic") ||
+      lowerMsg.includes("logarithmic")
+    ) {
+      if (
+        lowerMsg.includes("time") ||
+        lowerMsg.includes("runtime") ||
+        !lowerMsg.includes("space")
+      ) {
+        topics.push("time complexity: user stated it")
+      }
+      if (lowerMsg.includes("space") || lowerMsg.includes("memory")) {
+        topics.push("space complexity: user stated it")
+      }
+      // If they just say O(n) without specifying, assume they answered complexity
+      if (!lowerMsg.includes("time") && !lowerMsg.includes("space")) {
+        topics.push("complexity: user stated it")
+      }
+    }
+
+    // Edge case mentions
+    if (
+      lowerMsg.includes("empty array") ||
+      lowerMsg.includes("empty input") ||
+      lowerMsg.includes("null") ||
+      lowerMsg.includes("edge case") ||
+      lowerMsg.includes("single element") ||
+      lowerMsg.includes("negative") ||
+      lowerMsg.includes("zero")
+    ) {
+      topics.push("edge cases: user mentioned")
+    }
+
+    // Approach explanation
+    if (
+      lowerMsg.includes("my approach") ||
+      lowerMsg.includes("i'm thinking") ||
+      lowerMsg.includes("i'll use") ||
+      lowerMsg.includes("the idea is") ||
+      lowerMsg.includes("basically") ||
+      lowerMsg.includes("so what i'm doing")
+    ) {
+      topics.push("approach: user explained")
+    }
+
+    // Trade-off discussion
+    if (
+      lowerMsg.includes("trade-off") ||
+      lowerMsg.includes("tradeoff") ||
+      lowerMsg.includes("trade off") ||
+      (lowerMsg.includes("space") && lowerMsg.includes("time"))
+    ) {
+      topics.push("trade-offs: user discussed")
     }
 
     return topics
@@ -560,6 +636,57 @@ function InterviewPageContent() {
     return () => clearTimeout(timer)
   }, [initialized, authLoading])
 
+  // Load roadmap from Firebase if coming from roadmap but activeRoadmap is not loaded
+  // This handles cases where the page was refreshed or navigated directly
+  useEffect(() => {
+    const loadRoadmapIfNeeded = async () => {
+      // Only load if coming from roadmap, user is authenticated, and no activeRoadmap
+      if (!isFromRoadmap || !firebaseUser || activeRoadmap) return
+
+      try {
+        const idToken = await firebaseUser.getIdToken()
+        const response = await fetch("/api/roadmap", {
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.roadmap) {
+            // Convert date strings back to Date objects
+            const roadmap = {
+              ...data.roadmap,
+              interviewDate: new Date(data.roadmap.interviewDate),
+              createdAt: data.roadmap.createdAt ? new Date(data.roadmap.createdAt) : new Date(),
+              updatedAt: data.roadmap.updatedAt ? new Date(data.roadmap.updatedAt) : new Date(),
+              dailyPlans:
+                data.roadmap.dailyPlans?.map((plan: any) => ({
+                  ...plan,
+                  date: new Date(plan.date),
+                  questions: plan.questions?.map((q: any) => ({
+                    ...q,
+                    completedAt: q.completedAt ? new Date(q.completedAt) : undefined,
+                  })),
+                })) || [],
+              milestones:
+                data.roadmap.milestones?.map((m: any) => ({
+                  ...m,
+                  targetDate: new Date(m.targetDate),
+                })) || [],
+            }
+            setActiveRoadmap(roadmap)
+          }
+        }
+      } catch (error) {
+        console.error("Error loading roadmap for interview:", error)
+      }
+    }
+
+    loadRoadmapIfNeeded()
+  }, [isFromRoadmap, firebaseUser, activeRoadmap, setActiveRoadmap])
+
   // Load completed problems for pattern progress (based on interview_sessions)
   useEffect(() => {
     const loadCompletedProblems = async () => {
@@ -630,6 +757,7 @@ function InterviewPageContent() {
       const scenarioId = searchParams?.get("scenario")
       const fromRoadmap = searchParams?.get("roadmap") === "true"
       const fromPractice = searchParams?.get("practice") === "true"
+      const isPostInterviewResume = searchParams?.get("postInterview") === "true"
 
       // Case 1: Reopening an existing session
       if (sessionId && scenarioId) {
@@ -645,6 +773,20 @@ function InterviewPageContent() {
 
           // Check if there's saved session state to determine if this is a true resume
           const savedState = await getSessionState(sessionId)
+
+          // CRITICAL: If session is completed or evaluating, redirect to results page
+          // This prevents users from being put back into interview mode
+          if (savedState?.completedAt || savedState?.feedbackStatus === "pending") {
+            toast.info(
+              savedState?.feedbackStatus === "pending"
+                ? "Session is being evaluated"
+                : "Session already submitted",
+              { description: "Redirecting to your results..." }
+            )
+            router.push(`/sessions/${sessionId}`)
+            return
+          }
+
           const hasExistingProgress =
             savedState &&
             ((savedState.interviewerMessages && savedState.interviewerMessages.length > 1) ||
@@ -773,7 +915,18 @@ Let's continue!`
             if (savedState?.testResults && savedState.testResults.length > 0) {
               setTestResults(savedState.testResults)
             }
-            toast.success("Session resumed")
+
+            // If resuming post-interview discussion, show that view directly
+            if (isPostInterviewResume && savedState?.isPostInterviewDiscussion) {
+              setShowPostInterviewDiscussion(true)
+              // Restore test summary if available
+              if (savedState.testSummary) {
+                setTestSummary(savedState.testSummary)
+              }
+              toast.success("Resuming post-interview discussion")
+            } else {
+              toast.success("Session resumed")
+            }
           } else {
             // Fresh start - no previous progress
             const isDSAScenario = scenario.type === "dsa"
@@ -783,7 +936,6 @@ Let's continue!`
 Here's what I expect:
 - Walk me through your plan before you code; if you skip that, I'll call it out.
 - Narrate while you build so I can understand your reasoning.
-- This is a pure coding challenge—no AI assistance. Just you and the problem, like a real technical interview.
 
 Take a breath, study the prompt on the left, and tell me how you plan to attack this.`
               : `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${scenario.title}**, a ${scenario.difficulty} ${problemType} problem.
@@ -791,7 +943,6 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 Here's what I expect:
 - Walk me through your plan before you code; if you skip that, I'll call it out.
 - Narrate while you build so I can understand your reasoning.
-- Use the AI partner intentionally. If you're just copying suggestions, I'll flag it.
 
 Take a breath, study the prompt on the left, and tell me how you plan to attack this.`
 
@@ -1286,6 +1437,31 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
     const restoreSession = async () => {
       try {
+        // If coming from roadmap (starting fresh on a problem), check if there's already
+        // a completed session. If so, clear any old autosave data to start fresh.
+        if (isFromRoadmap && firebaseUser) {
+          const existingSession = await findLatestSubmittedSession(
+            firebaseUser.uid,
+            selectedScenario.id
+          )
+          if (existingSession) {
+            // There's an existing session - handle based on state
+            if (existingSession.isEvaluating) {
+              // Session is being evaluated - redirect to results
+              toast.info("Session is being evaluated", {
+                description: "Redirecting to your results...",
+              })
+              router.push(`/sessions/${existingSession.sessionId}`)
+              return
+            }
+            // Session is completed - clear old autosave and start fresh
+            const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
+            localStorage.removeItem(storageKey)
+            // Don't restore anything - let user start fresh
+            return
+          }
+        }
+
         let localData = null
         let localTimestamp = 0
         let remoteData = null
@@ -1471,7 +1647,16 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     }
 
     restoreSession()
-  }, [firebaseUser, isGuestMode, guestId, selectedScenario, searchParams, isInterviewStarted])
+  }, [
+    firebaseUser,
+    isGuestMode,
+    guestId,
+    selectedScenario,
+    searchParams,
+    isInterviewStarted,
+    isFromRoadmap,
+    router,
+  ])
 
   const triggerProactiveInterviewer = async () => {
     if (isLoadingInterviewer || showFeedback || showPostInterviewDiscussion) return
@@ -1509,6 +1694,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           edgeCases: getEdgeCasesForInterviewer(),
           // Pass recent topics to prevent repetitive questions
           recentNudgeTopics: recentNudgeTopics,
+          // Pass topics the user has already answered to prevent re-asking
+          userAnsweredTopics: userAnsweredTopics,
           // Pass test results and console logs for interviewer awareness
           testResults: testResults,
           consoleLogs: consoleLogs,
@@ -1642,6 +1829,8 @@ Interviews are conversations, not just coding exercises.`
           edgeCases: getEdgeCasesForInterviewer(),
           // Pass recent topics to prevent repetitive questions
           recentNudgeTopics: recentNudgeTopics,
+          // Pass topics the user has already answered to prevent re-asking
+          userAnsweredTopics: userAnsweredTopics,
           // Pass test results and console logs for interviewer awareness
           testResults: testResults,
           consoleLogs: consoleLogs,
@@ -2316,7 +2505,6 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 Here's what I expect:
 - Walk me through your plan before you code; if you skip that, I'll call it out.
 - Narrate while you build so I can understand your reasoning.
-- This is a pure coding challenge—no AI assistance. Just you and the problem, like a real technical interview.
 
 Take a breath, study the prompt on the left, and tell me how you plan to attack this.`
       : `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${scenario.title}**, a ${scenario.difficulty} ${problemType} problem.
@@ -2324,7 +2512,6 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 Here's what I expect:
 - Walk me through your plan before you code; if you skip that, I'll call it out.
 - Narrate while you build so I can understand your reasoning.
-- Use the AI partner intentionally. If you're just copying suggestions, I'll flag it.
 
 Take a breath, study the prompt on the left, and tell me how you plan to attack this.`
 
@@ -2494,6 +2681,26 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     setIsGeneratingFeedback(true)
     setShowFeedback(true)
 
+    // CRITICAL: Mark session as evaluating FIRST, before generating feedback
+    // This ensures if user navigates away, the session shows as "evaluating" not "in progress"
+    if (currentSessionId && user) {
+      try {
+        await markSessionEvaluating(currentSessionId, {
+          code,
+          language: selectedLanguage,
+          elapsedTime,
+          chatMessages,
+          interviewerMessages,
+          testResults,
+          testSummary,
+          isPostInterviewDiscussion: true,
+        })
+      } catch (markError) {
+        console.error("Failed to mark session as evaluating:", markError)
+        // Continue anyway - feedback generation should still proceed
+      }
+    }
+
     // Now generate feedback - includes ALL conversation including post-interview discussion
     try {
       if (!selectedScenario) {
@@ -2539,6 +2746,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         communication?: number
       } | null = null
       let aiFeedbackSucceeded = false
+      let localConstitutionalAICritique: Record<string, unknown> | null = null
 
       const efficiencyData = analyzeCodeEfficiency(code)
 
@@ -2614,6 +2822,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             }
             if (feedbackData.constitutionalAICritique) {
               setConstitutionalAICritique(feedbackData.constitutionalAICritique)
+              // Store locally for saving to session
+              localConstitutionalAICritique = feedbackData.constitutionalAICritique
             }
             aiFeedbackSucceeded = true
           } else {
@@ -2723,6 +2933,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             efficiencyScore: efficiencyData?.efficiencyScore,
             feedbackStatus: aiFeedbackSucceeded ? "complete" : "complete",
             scoreBreakdown: cleanScoreBreakdown,
+            constitutionalAICritique: localConstitutionalAICritique || undefined,
           })
 
           trackSessionCompletion({
@@ -3103,6 +3314,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             edgeCases: isInterviewer ? getEdgeCasesForInterviewer() : undefined,
             // Pass recent topics to prevent repetitive questions
             recentNudgeTopics: isInterviewer ? recentNudgeTopics : undefined,
+            // Pass topics the user has already answered to prevent re-asking
+            userAnsweredTopics: isInterviewer ? userAnsweredTopics : undefined,
             // Pass test results and console logs for interviewer awareness
             testResults: isInterviewer ? testResults : undefined,
             consoleLogs: isInterviewer ? consoleLogs : undefined,
@@ -3117,11 +3330,12 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         if (data.conversationEnded) {
           // Show end session prompt instead of continuing conversation
           toast.info(
-            data.endMessage || "Session complete! Click 'End Session' to see your feedback.",
+            data.endMessage ||
+              "Session complete! Click 'View Detailed Feedback' to see your results.",
             {
               duration: 5000,
               action: {
-                label: "End Session",
+                label: "View Detailed Feedback",
                 onClick: proceedToFinalFeedback,
               },
             }
@@ -3166,13 +3380,16 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           if (data.conversationEnded === true) {
             // Show prompt to end session after the final message
             setTimeout(() => {
-              toast.info("Click 'End Session' to see your detailed feedback and score.", {
-                duration: 8000,
-                action: {
-                  label: "End Session",
-                  onClick: proceedToFinalFeedback,
-                },
-              })
+              toast.info(
+                "Click 'View Detailed Feedback' to see your score breakdown and analysis.",
+                {
+                  duration: 8000,
+                  action: {
+                    label: "View Detailed Feedback",
+                    onClick: proceedToFinalFeedback,
+                  },
+                }
+              )
             }, 1500) // Wait for message to appear first
           }
 
@@ -4014,13 +4231,13 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           markQuestionEvaluating(selectedScenario.id)
         }
 
-        // Mark session as evaluating IMMEDIATELY after submit (before post-interview chat)
-        // This ensures if user leaves during post-interview discussion, session shows as "evaluating"
+        // Save session state for post-interview discussion (but don't mark as evaluating yet)
+        // User will click "View Detailed Feedback" to start evaluation after wrap-up conversation
         if (currentSessionId && user) {
           try {
-            await markSessionEvaluating(currentSessionId, {
+            await saveSessionState(currentSessionId, {
               code,
-              language: selectedLanguage,
+              selectedLanguage,
               elapsedTime,
               chatMessages: chatMessages.slice(-50),
               interviewerMessages: interviewerMessages.slice(-50),
@@ -4037,8 +4254,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               testSummary: data.summary,
               isPostInterviewDiscussion: true,
             })
-          } catch (markError) {
-            console.error("Failed to mark session as evaluating:", markError)
+          } catch (saveError) {
+            console.error("Failed to save session state:", saveError)
             // Continue anyway - non-critical
           }
         }

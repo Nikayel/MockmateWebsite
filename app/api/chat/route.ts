@@ -974,6 +974,19 @@ If they're still stuck on these, give a CONCRETE hint instead of asking again.
 `
           : ""
 
+      // User-answered topics tracking - DON'T re-ask what they already answered
+      const userAnsweredContext =
+        userAnsweredTopics && userAnsweredTopics.length > 0
+          ? `
+CANDIDATE HAS ALREADY ANSWERED (do NOT ask about these again):
+${userAnsweredTopics
+  .slice(-5)
+  .map((t: string) => `- ${t}`)
+  .join("\n")}
+If you want to discuss these topics, ACKNOWLEDGE their answer first, then probe DEEPER or move on.
+`
+          : ""
+
       // Keep proactive message SHORT and natural - like a real interviewer jumping in
       fullUserMessage = `[NATURAL CHECK-IN] The candidate has been working on code. Act like a real interviewer who just noticed something interesting or wants to understand their thinking.
 
@@ -981,6 +994,7 @@ ${currentCodeContext}
 ${aiPartnerContext}
 ${patternSpecificQuestion}
 ${nudgeAvoidance}
+${userAnsweredContext}
 
 Options for how to engage:
 ${proactivePrompts
@@ -1065,7 +1079,7 @@ Keep it conversational and real - like you're actually debriefing someone after 
           reply: null,
           conversationEnded: true,
           endMessage:
-            "The interview session has ended. Click 'Submit or View detailed feedback' to see your detailed feedback and score breakdown.",
+            "The interview session has ended. Click 'View Detailed Feedback' to see your score breakdown and detailed analysis.",
         })
       }
 
@@ -1074,6 +1088,18 @@ Keep it conversational and real - like you're actually debriefing someone after 
       fullUserMessage = message
       if (workspaceContextStr || currentCodeContext) {
         fullUserMessage += workspaceContextStr + currentCodeContext
+      }
+
+      // For interviewer role, add user-answered topics context to prevent re-asking
+      if (role === "interviewer" && userAnsweredTopics && userAnsweredTopics.length > 0) {
+        fullUserMessage += `
+
+[CONTEXT - CANDIDATE HAS ALREADY ANSWERED]:
+${userAnsweredTopics
+  .slice(-5)
+  .map((t: string) => `- ${t}`)
+  .join("\n")}
+Remember: Acknowledge what they said, then probe deeper or move on. Do NOT re-ask.`
       }
     }
 

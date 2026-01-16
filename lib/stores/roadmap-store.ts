@@ -218,33 +218,68 @@ export const useRoadmapStore = create<RoadmapState>()(
         // Update local state immediately (optimistic update)
         set({ activeRoadmap: updatedRoadmap })
 
-        // Sync to Firebase in the background
-        if (state.activeRoadmap.id) {
-          ;(async () => {
-            try {
-              const token = await getCurrentUserToken()
-              if (!token) {
-                console.error("Failed to sync progress: No auth token")
-                return
+        // Sync to Firebase with retry logic
+        const roadmapId = state.activeRoadmap.id
+        if (roadmapId) {
+          const syncToFirebase = async (retries = 3): Promise<boolean> => {
+            for (let attempt = 1; attempt <= retries; attempt++) {
+              try {
+                const token = await getCurrentUserToken()
+                if (!token) {
+                  console.error("Failed to sync progress: No auth token")
+                  return false
+                }
+                const response = await fetch("/api/roadmap/progress", {
+                  method: "PATCH",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    roadmapId,
+                    scenarioId,
+                    status: "completed",
+                    score,
+                    timeSpentMinutes,
+                  }),
+                })
+
+                if (response.ok) {
+                  return true
+                }
+
+                // Log error but don't throw on last attempt
+                const errorData = await response.json().catch(() => ({}))
+                console.error(`Roadmap sync attempt ${attempt} failed:`, errorData)
+
+                if (attempt < retries) {
+                  // Exponential backoff: 1s, 2s, 4s
+                  await new Promise((resolve) =>
+                    setTimeout(resolve, 1000 * Math.pow(2, attempt - 1))
+                  )
+                }
+              } catch (error) {
+                console.error(`Roadmap sync attempt ${attempt} error:`, error)
+                if (attempt < retries) {
+                  await new Promise((resolve) =>
+                    setTimeout(resolve, 1000 * Math.pow(2, attempt - 1))
+                  )
+                }
               }
-              await fetch("/api/roadmap/progress", {
-                method: "PATCH",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                  roadmapId: state.activeRoadmap!.id,
-                  scenarioId,
-                  status: "completed",
-                  score,
-                  timeSpentMinutes,
-                }),
-              })
-            } catch (error) {
-              console.error("Failed to sync progress to Firebase:", error)
             }
-          })()
+            return false
+          }
+
+          // Run sync in background - the toast is shown by the interview page
+          syncToFirebase().then((success) => {
+            if (!success) {
+              // Revert local state if all retries failed
+              // This ensures UI stays in sync with Firebase
+              console.error("All roadmap sync retries failed for scenario:", scenarioId)
+              // Note: We don't revert because the session IS completed in Firebase
+              // The roadmap will sync correctly on next page load
+            }
+          })
         }
       },
 
@@ -273,31 +308,44 @@ export const useRoadmapStore = create<RoadmapState>()(
         // Update local state immediately (optimistic update)
         set({ activeRoadmap: updatedRoadmap })
 
-        // Sync to Firebase in the background
-        if (state.activeRoadmap.id) {
-          ;(async () => {
-            try {
-              const token = await getCurrentUserToken()
-              if (!token) {
-                console.error("Failed to sync progress: No auth token")
-                return
+        // Sync to Firebase with retry logic
+        const roadmapId = state.activeRoadmap.id
+        if (roadmapId) {
+          const syncToFirebase = async (retries = 2): Promise<void> => {
+            for (let attempt = 1; attempt <= retries; attempt++) {
+              try {
+                const token = await getCurrentUserToken()
+                if (!token) {
+                  console.error("Failed to sync skipped status: No auth token")
+                  return
+                }
+                const response = await fetch("/api/roadmap/progress", {
+                  method: "PATCH",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    roadmapId,
+                    scenarioId,
+                    status: "skipped",
+                  }),
+                })
+
+                if (response.ok) return
+
+                if (attempt < retries) {
+                  await new Promise((resolve) => setTimeout(resolve, 1000 * attempt))
+                }
+              } catch (error) {
+                console.error(`Skipped sync attempt ${attempt} error:`, error)
+                if (attempt < retries) {
+                  await new Promise((resolve) => setTimeout(resolve, 1000 * attempt))
+                }
               }
-              await fetch("/api/roadmap/progress", {
-                method: "PATCH",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                  roadmapId: state.activeRoadmap!.id,
-                  scenarioId,
-                  status: "skipped",
-                }),
-              })
-            } catch (error) {
-              console.error("Failed to sync progress to Firebase:", error)
             }
-          })()
+          }
+          syncToFirebase()
         }
       },
 
@@ -343,31 +391,44 @@ export const useRoadmapStore = create<RoadmapState>()(
         // Update local state immediately (optimistic update)
         set({ activeRoadmap: updatedRoadmap })
 
-        // Sync to Firebase in the background
-        if (state.activeRoadmap.id) {
-          ;(async () => {
-            try {
-              const token = await getCurrentUserToken()
-              if (!token) {
-                console.error("Failed to sync progress: No auth token")
-                return
+        // Sync to Firebase with retry logic
+        const roadmapId = state.activeRoadmap.id
+        if (roadmapId) {
+          const syncToFirebase = async (retries = 2): Promise<void> => {
+            for (let attempt = 1; attempt <= retries; attempt++) {
+              try {
+                const token = await getCurrentUserToken()
+                if (!token) {
+                  console.error("Failed to sync evaluating status: No auth token")
+                  return
+                }
+                const response = await fetch("/api/roadmap/progress", {
+                  method: "PATCH",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    roadmapId,
+                    scenarioId,
+                    status: "evaluating",
+                  }),
+                })
+
+                if (response.ok) return
+
+                if (attempt < retries) {
+                  await new Promise((resolve) => setTimeout(resolve, 1000 * attempt))
+                }
+              } catch (error) {
+                console.error(`Evaluating sync attempt ${attempt} error:`, error)
+                if (attempt < retries) {
+                  await new Promise((resolve) => setTimeout(resolve, 1000 * attempt))
+                }
               }
-              await fetch("/api/roadmap/progress", {
-                method: "PATCH",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                  roadmapId: state.activeRoadmap!.id,
-                  scenarioId,
-                  status: "evaluating",
-                }),
-              })
-            } catch (error) {
-              console.error("Failed to sync progress to Firebase:", error)
             }
-          })()
+          }
+          syncToFirebase()
         }
       },
 

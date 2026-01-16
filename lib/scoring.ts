@@ -458,5 +458,6 @@ export {
   getExistingSessionScores,
   getUserScoreStats,
   getMasteryStatistics,
+  getMasteredProblems,
   updateProblemMasteryLevel,
 } from "./scoring/index"

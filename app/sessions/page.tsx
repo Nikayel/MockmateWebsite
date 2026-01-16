@@ -160,7 +160,17 @@ export default function SessionsPage() {
                   const scenarioExists = session.scenario_id
                     ? !!getScenarioById(session.scenario_id)
                     : false
-                  const canReopen = isInProgress && session.scenario_id && scenarioExists
+                  // Check if session is in post-interview discussion phase
+                  // (submitted code but user hasn't clicked "View Detailed Feedback" yet)
+                  const isPostInterviewDiscussion =
+                    isInProgress &&
+                    session.session_state?.is_post_interview_discussion &&
+                    session.feedback_status !== "pending"
+                  const canReopen =
+                    isInProgress &&
+                    !isPostInterviewDiscussion &&
+                    session.scenario_id &&
+                    scenarioExists
                   // Check if feedback is still being generated
                   const isFeedbackPending =
                     session.feedback_status === "pending" ||
@@ -189,9 +199,11 @@ export default function SessionsPage() {
                             ? getScoreColor(score)
                             : isFeedbackPending
                               ? "animate-pulse bg-blue-500/10 text-blue-400"
-                              : isInProgress
-                                ? "bg-amber-500/10 text-amber-400"
-                                : "bg-zinc-800 text-zinc-400"
+                              : isPostInterviewDiscussion
+                                ? "bg-purple-500/10 text-purple-400"
+                                : isInProgress
+                                  ? "bg-amber-500/10 text-amber-400"
+                                  : "bg-zinc-800 text-zinc-400"
                         }`}
                       >
                         {score ? score : isFeedbackPending ? "..." : isInProgress ? "..." : "—"}
@@ -206,7 +218,12 @@ export default function SessionsPage() {
                           >
                             {session.difficulty}
                           </span>
-                          {isInProgress && (
+                          {isPostInterviewDiscussion && (
+                            <span className="rounded bg-purple-500/10 px-1.5 py-0.5 text-[10px] text-purple-400">
+                              Post-Interview
+                            </span>
+                          )}
+                          {isInProgress && !isPostInterviewDiscussion && (
                             <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-400">
                               In Progress
                             </span>
@@ -243,7 +260,20 @@ export default function SessionsPage() {
 
                       {/* Action */}
                       <div className="shrink-0">
-                        {canReopen ? (
+                        {isPostInterviewDiscussion ? (
+                          <Button
+                            onClick={() =>
+                              router.push(
+                                `/interview?session=${session.id}&scenario=${session.scenario_id}&postInterview=true`
+                              )
+                            }
+                            size="sm"
+                            className="h-8 bg-purple-600 text-xs text-white hover:bg-purple-500"
+                          >
+                            <Play className="mr-1.5 h-3 w-3" />
+                            Continue Wrap-up
+                          </Button>
+                        ) : canReopen ? (
                           <Button
                             onClick={() =>
                               router.push(

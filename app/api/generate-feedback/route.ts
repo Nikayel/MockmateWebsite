@@ -28,6 +28,7 @@ import {
   buildRAGFeedbackContext,
   parseFeedbackSections,
   injectScoresIntoFeedback,
+  sanitizeFeedbackForScoreConsistency,
 } from "@/lib/feedback"
 // Import structured extraction for grounded feedback
 import {
@@ -760,7 +761,11 @@ CRITICAL INSTRUCTIONS:
     // This ensures the Score Snapshot section in the feedback text always matches
     // the algorithmically calculated scores, preventing discrepancies between
     // post-interview modal (uses API scores) and session details (may parse feedback text)
-    const finalFeedback = injectScoresIntoFeedback(rawFinalFeedback, finalScores, scenarioType)
+    const feedbackWithScores = injectScoresIntoFeedback(rawFinalFeedback, finalScores, scenarioType)
+
+    // Sanitize feedback to remove contradictory criticism
+    // e.g., remove "EXPLAIN YOUR APPROACH" if communication score >= 60
+    const finalFeedback = sanitizeFeedbackForScoreConsistency(feedbackWithScores, finalScores)
 
     // USE FINAL SCORES as primary (after Constitutional AI review)
     // AI-generated narrative is just for user-facing feedback text

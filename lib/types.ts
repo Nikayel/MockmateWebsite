@@ -122,6 +122,31 @@ export interface InterviewSession {
     codeQualityScore?: number
     communicationScore?: number
   }
+  // Constitutional AI critique metadata (only present if adjustments were made)
+  constitutional_ai_critique?: {
+    scoreCritique?: {
+      critiques: Array<{ aspect: string; passed: boolean; issue: string; suggestion: string }>
+      reasoning: string
+      originalScores: {
+        understanding: number
+        problemSolving: number
+        codeQuality: number
+        communication: number
+        overall: number
+      }
+      adjustedScores: {
+        understanding: number
+        problemSolving: number
+        codeQuality: number
+        communication: number
+        overall: number
+      }
+    } | null
+    feedbackCritique?: {
+      critiques: Array<{ aspect: string; passed: boolean; issue: string; suggestion: string }>
+      reasoning: string
+    } | null
+  }
   // Session state (for recovery)
   session_state?: {
     code?: string
@@ -130,6 +155,7 @@ export interface InterviewSession {
     test_results?: Array<any>
     chat_messages?: ChatMessage[]
     interviewer_messages?: ChatMessage[]
+    is_post_interview_discussion?: boolean
   }
 }
 

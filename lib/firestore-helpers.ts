@@ -548,15 +548,34 @@ export async function updateInterviewSession(
       isAccurate?: boolean
       feedback?: string
     }
+    // Constitutional AI critique metadata (for debugging/transparency)
+    constitutionalAICritique?: {
+      scoreCritique?: {
+        critiques: Array<{ aspect: string; passed: boolean; issue: string; suggestion: string }>
+        reasoning: string
+        originalScores: Record<string, number>
+        adjustedScores: Record<string, number>
+      } | null
+      feedbackCritique?: {
+        critiques: Array<{ aspect: string; passed: boolean; issue: string; suggestion: string }>
+        reasoning: string
+      } | null
+    }
   }
 ): Promise<void> {
   const sessionRef = doc(db, "interview_sessions", sessionId)
   const updateData: any = {
     completed_at: new Date().toISOString(),
-    performance_score: performanceScore,
-    feedback: feedback,
     feedback_status: additionalData?.feedbackStatus || "pending", // Default to pending
     updated_at: new Date().toISOString(),
+  }
+
+  // Only add performance_score and feedback if defined (Firestore doesn't allow undefined)
+  if (performanceScore !== undefined) {
+    updateData.performance_score = performanceScore
+  }
+  if (feedback !== undefined) {
+    updateData.feedback = feedback
   }
 
   // Save additional completion data
@@ -657,6 +676,10 @@ export async function updateInterviewSession(
         feedback: additionalData.complexityAnalysis.feedback || null,
       }
     }
+    // Save Constitutional AI critique for debugging/transparency
+    if (additionalData.constitutionalAICritique) {
+      updateData.constitutional_ai_critique = additionalData.constitutionalAICritique
+    }
   }
 
   await setDoc(sessionRef, updateData, { merge: true })
@@ -695,12 +718,12 @@ export async function markSessionEvaluating(
           code: state.code,
           language: state.language,
           elapsed_time: state.elapsedTime,
-          chat_messages: state.chatMessages?.slice(-50), // Keep last 50 messages
-          interviewer_messages: state.interviewerMessages?.slice(-50),
-          test_results: state.testResults
-            ? sanitizeTestResultsForFirestore(state.testResults.slice(-20))
-            : undefined,
-          test_summary: state.testSummary,
+          chat_messages: state.chatMessages?.slice(-50) || [], // Keep last 50 messages
+          interviewer_messages: state.interviewerMessages?.slice(-50) || [],
+          ...(state.testResults && {
+            test_results: sanitizeTestResultsForFirestore(state.testResults.slice(-20)),
+          }),
+          ...(state.testSummary && { test_summary: state.testSummary }),
           is_post_interview_discussion: state.isPostInterviewDiscussion ?? true, // Default to true when marking evaluating
           saved_at: new Date().toISOString(),
         },

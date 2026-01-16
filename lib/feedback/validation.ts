@@ -244,11 +244,16 @@ VALIDATION RULES:
   * "So if we start from the left, there's nothing, so I'd say it's one..." (tracing through logic) ✓
   * "I want to loop over and keep track of the running product" ✓
   * Walking through an example step-by-step to show their thinking ✓
+  * Discussing brute force first, then explaining optimized approach ✓
+  * "The core idea is..." or "Pretty much what's happening is..." ✓
+  * Explaining trade-offs like "fresh start or extend the window" ✓
+  * Describing algorithm in conversational terms (even if not formal vocabulary) ✓
 
   EXAMPLES OF NO APPROACH (mark as FALSE):
   * Just typing code without saying anything ✗
   * "Let me try" then immediately coding ✗
   * Only asking clarifying questions but never explaining strategy ✗
+  * ONLY submitting code with zero verbal explanation ✗
 
 - approachQuality (only if approachExplained is true):
   * "poor" - Single vague sentence like "I'll loop through" with no detail
@@ -290,6 +295,12 @@ VALIDATION RULES:
 CRITICAL: Silent coding (no explanation at all) = communication score < 40.
 But conversational explanations count! "I'm thinking..." or tracing through examples IS explaining.
 
+VOICE TRANSCRIPTION NOTE: The conversation may be from voice input with transcription artifacts:
+- Misspellings are common (e.g., "four loop" = "for loop", "cadence" = "Kadane's")
+- Sentences may run together or have odd punctuation
+- Technical terms may be phonetically spelled
+- Do NOT penalize for transcription quality - focus on the IDEAS being communicated
+
 Return ONLY the JSON object, nothing else.`
 
   try {
@@ -319,7 +330,15 @@ Return ONLY the JSON object, nothing else.`
       // Check if interviewer praised communication (strong signal that AI validation is wrong)
       const interviewerMessages = transcript.filter((m) => m.role === "interviewer")
       const interviewerPraisedCommunication = interviewerMessages.some((m) =>
-        /communicated?.*(clearly|well|good)|good\s+work|solid\s+performance|explained?.*(clearly|well)|clear\s+explanation/i.test(
+        // Patterns for positive communication feedback:
+        // - "communication was clear/direct/good"
+        // - "communicated clearly/well"
+        // - "explained clearly/well"
+        // - "clear explanation"
+        // - "good work/job", "solid performance", "nice work"
+        // - "you have a good grasp"
+        // - "I'm satisfied"
+        /communication\s+(was|is)\s+(clear|direct|good|excellent)|communicated?\s+(clearly|well|good)|explained?\s+(clearly|well)|clear\s+explanation|good\s+(work|job)|solid\s+performance|nice\s+work|have\s+a\s+good\s+grasp|I'm\s+satisfied/i.test(
           m.content
         )
       )

@@ -75,7 +75,14 @@
       "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" pnpm eslint:*)",
       "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" pnpm lint:fix:*)",
       "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" pnpm typecheck:*)",
-      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" git add:*)"
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" git add:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" git commit:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" git push)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" pnpm run build:*)",
+      "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" pnpm run typecheck:*)",
+      "Bash(npm run lint:*)",
+      "Bash(/usr/local/bin/npm run lint)",
+      "Bash(/opt/homebrew/bin/npm run lint)"
     ]
   }
 }

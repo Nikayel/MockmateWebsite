@@ -65,10 +65,17 @@ export async function triggerSessionNotifications(data: SessionCompletionData): 
     // Get previous stats for milestone detection
     const previousStats = await getPreviousStats(data.userId)
 
+    // Check if current session mastered a new pattern
+    // A pattern is considered mastered when: high mastery score (85+) and reviewed multiple times
+    const currentPatternMastered = await checkIfPatternJustMastered(data.userId, data.pattern)
+
     // Current stats after this session
     const currentStats = {
       problemsSolved: data.problemsSolvedTotal,
-      patternsCompleted: previousStats.patternsCompleted, // Will update below if pattern mastered
+      patternsCompleted:
+        currentPatternMastered && !previousStats.patternsCompleted.includes(data.pattern)
+          ? [...previousStats.patternsCompleted, data.pattern]
+          : previousStats.patternsCompleted,
       streakDays: data.streakDays,
     }
 
@@ -101,11 +108,17 @@ export async function triggerSessionNotifications(data: SessionCompletionData): 
           },
         })
       } else if (milestone.type === "pattern_mastered") {
+        // Calculate total mastered and next pattern for the notification
+        const totalMastered = currentStats.patternsCompleted.length
+        const nextPattern = getNextPattern(currentStats.patternsCompleted)
+
         notifications.push({
           type: "milestone_celebration",
           variables: {
             milestoneType: "pattern",
             pattern: milestone.value,
+            totalMastered,
+            nextPattern,
           },
         })
       }
@@ -281,11 +294,11 @@ async function getPreviousStats(userId: string): Promise<{
 
     const problemsSolved = problemsSnapshot.size
 
-    // Get patterns where user has expert level
+    // Get patterns where user has mastered level
     const masteredPatterns: string[] = []
     problemsSnapshot.forEach((doc) => {
       const data = doc.data()
-      if (data.mastery_level === "expert" && !masteredPatterns.includes(data.pattern)) {
+      if (data.mastery_level === "mastered" && !masteredPatterns.includes(data.pattern)) {
         masteredPatterns.push(data.pattern)
       }
     })
@@ -301,6 +314,69 @@ async function getPreviousStats(userId: string): Promise<{
   } catch {
     return { problemsSolved: 0, patternsCompleted: [], streakDays: 0 }
   }
+}
+
+/**
+ * Check if a pattern was just mastered by the user in this session
+ * A pattern is mastered when the user has mastered at least 3 problems in that pattern
+ * (or all problems if there are fewer than 3 available)
+ */
+async function checkIfPatternJustMastered(userId: string, pattern: string): Promise<boolean> {
+  try {
+    // Count mastered problems in this pattern
+    const masteredSnapshot = await adminDb
+      .collection("problem_mastery")
+      .doc(userId)
+      .collection("problems")
+      .where("pattern", "==", pattern)
+      .where("mastery_level", "==", "mastered")
+      .get()
+
+    const masteredCount = masteredSnapshot.size
+
+    // Require at least 3 mastered problems to consider a pattern mastered
+    // This prevents triggering pattern mastery notification for a single question
+    const MIN_PROBLEMS_FOR_PATTERN_MASTERY = 3
+
+    return masteredCount >= MIN_PROBLEMS_FOR_PATTERN_MASTERY
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Get the next pattern the user should work on based on the roadmap
+ */
+function getNextPattern(completedPatterns: string[]): string {
+  // Import the roadmap order
+  const roadmapOrder = [
+    "arrays-hashing",
+    "two-pointers",
+    "stack",
+    "binary-search",
+    "sliding-window",
+    "linked-list",
+    "trees",
+    "heap",
+    "trie",
+    "backtracking",
+    "graphs",
+    "dp-1d",
+    "dp-2d",
+    "greedy",
+    "intervals",
+    "bit-manipulation",
+    "math-geometry",
+  ]
+
+  // Find first pattern not yet completed
+  for (const pattern of roadmapOrder) {
+    if (!completedPatterns.includes(pattern)) {
+      return pattern
+    }
+  }
+
+  return "advanced patterns"
 }
 
 async function updateStatsCache(

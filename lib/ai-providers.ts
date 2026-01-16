@@ -101,7 +101,7 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     enabled: !!process.env.ANTHROPIC_API_KEY,
     apiKey: process.env.ANTHROPIC_API_KEY,
     baseUrl: "https://api.anthropic.com/v1",
-    model: "claude-3-5-haiku-latest", // $0.80/1M input, $4.00/1M output - quality fallback
+    model: "claude-haiku-4-5-20251001", // $1/1M input, $5/1M output - quality fallback
     maxTokens: 1024,
     temperature: 0.7,
     costPer1kTokens: 0.0024, // Averaged - more expensive but best quality
