@@ -11,6 +11,7 @@ import type {
   ConversationValidation,
   PreScreenResult,
 } from "./types"
+import type { ExtractedEvidence } from "./structured-extraction"
 import { analyzeCodeCompleteness, isBlankDesignTemplate } from "./completeness-analysis"
 
 // ============================================================================
@@ -274,6 +275,11 @@ export function calculateBugFixScores(
 
 /**
  * STEP 3: Calculate final scores using both algorithmic signals and AI validation
+ *
+ * Now with ExtractedEvidence for grounded scoring:
+ * - Use actual quotes to verify claims
+ * - Reward good behaviors (self-correction, optimization progression)
+ * - Don't penalize for things they actually did
  */
 export function calculateValidatedScores(
   passRate: number,
@@ -281,7 +287,8 @@ export function calculateValidatedScores(
   preScreen: PreScreenResult,
   aiValidation: ConversationValidation,
   scenarioType?: string,
-  code?: string
+  code?: string,
+  extractedEvidence?: ExtractedEvidence
 ): ScoreResult {
   // SYSTEM DESIGN SCORING - conversation-based, no test pass rate
   if (scenarioType === "system-design") {
@@ -360,7 +367,7 @@ export function calculateValidatedScores(
 
   // === PROBLEM-SOLVING SCORE (25%) ===
   // Primary: test pass rate + code efficiency
-  // Secondary: edge cases and alternatives discussed
+  // Secondary: edge cases, optimization progression, self-correction
   const effScore = efficiencyMetrics?.efficiencyScore || 50
   let problemSolving = Math.round(passRate * 0.6 + effScore * 0.4)
 
@@ -371,6 +378,47 @@ export function calculateValidatedScores(
   }
   if (aiValidation.edgeCasesConsidered && aiValidation.isCoherent && !isIncompleteSolution) {
     problemSolving = Math.min(95, problemSolving + 5)
+  }
+
+  // === EVIDENCE-BASED SCORING (uses extracted quotes, not LLM guesses) ===
+  if (extractedEvidence && !isIncompleteSolution) {
+    // PROGRESSION BONUS: Started brute force, then optimized = shows good problem-solving growth
+    // Real interviewers LOVE seeing candidates iterate and improve
+    if (
+      extractedEvidence.progression.startedWithBruteForce &&
+      extractedEvidence.progression.improvedAfterPrompt
+    ) {
+      problemSolving = Math.min(95, problemSolving + 8)
+    }
+
+    // SELF-CORRECTION BONUS: Catching and fixing own bugs = strong signal
+    // Real interviewers value this more than getting it right first try
+    if (extractedEvidence.progression.selfCorrectedBugs) {
+      problemSolving = Math.min(95, problemSolving + 5)
+    }
+
+    // PROACTIVE EDGE CASE BONUS: Mentioned edge cases WITHOUT being prompted
+    // Use actual count from evidence, not LLM's guess
+    const proactiveEdgeCases = extractedEvidence.edgeCases.mentionedByCandidate.length
+    if (proactiveEdgeCases >= 3) {
+      problemSolving = Math.min(95, problemSolving + 6)
+    } else if (proactiveEdgeCases >= 1) {
+      problemSolving = Math.min(95, problemSolving + 3)
+    }
+
+    // HINT PENALTY: Needed excessive help or copied blindly
+    if (extractedEvidence.hints.copiedBlindly) {
+      problemSolving = Math.max(20, problemSolving - 15)
+    } else if (extractedEvidence.hints.totalGiven >= 4) {
+      // 4+ hints = needed significant help (not necessarily bad, but lower score)
+      problemSolving = Math.max(30, problemSolving - 8)
+    } else if (
+      extractedEvidence.hints.totalGiven >= 2 &&
+      !extractedEvidence.hints.usedEffectively
+    ) {
+      // Got hints but didn't use them well
+      problemSolving = Math.max(35, problemSolving - 5)
+    }
   }
 
   // CRITICAL: Cap problem-solving for incomplete solutions
@@ -494,6 +542,55 @@ export function calculateValidatedScores(
         none: 25,
       }[aiValidation.approachQuality] || 35
     communication = Math.max(qualityFloor, communication)
+  }
+
+  // === EVIDENCE-BASED COMMUNICATION ADJUSTMENTS ===
+  if (extractedEvidence) {
+    // BONUS: Explained while coding (real interviewers love this)
+    if (extractedEvidence.communication.explainedWhileCoding) {
+      communication = Math.min(95, communication + 5)
+    }
+
+    // BONUS: Asked clarifying questions (shows thoroughness)
+    if (extractedEvidence.communication.askedClarifyingQuestions) {
+      communication = Math.min(95, communication + 3)
+    }
+
+    // BONUS: Responded well to feedback (adaptability)
+    if (extractedEvidence.communication.respondedToFeedback) {
+      communication = Math.min(95, communication + 3)
+    }
+
+    // ACCURACY CHECK: If they discussed complexity, use evidence to verify accuracy
+    // Don't penalize based on LLM guess - use actual extracted quote
+    if (
+      extractedEvidence.timeComplexity.mentioned &&
+      extractedEvidence.timeComplexity.isCorrect === true
+    ) {
+      // Accurate complexity discussion = communication bonus
+      communication = Math.min(95, communication + 4)
+    } else if (
+      extractedEvidence.timeComplexity.mentioned &&
+      extractedEvidence.timeComplexity.isCorrect === false
+    ) {
+      // Inaccurate complexity = slight penalty (but they at least tried)
+      communication = Math.max(30, communication - 3)
+    }
+
+    // QUESTION ANSWERING: Use actual answer quality from evidence
+    const goodAnswers = extractedEvidence.interviewerQuestions.filter(
+      (q) => q.answerQuality === "good"
+    ).length
+    const totalQuestions = extractedEvidence.interviewerQuestions.length
+    if (totalQuestions > 0) {
+      const answerRate = goodAnswers / totalQuestions
+      if (answerRate >= 0.8) {
+        communication = Math.min(95, communication + 5)
+      } else if (answerRate <= 0.3 && totalQuestions >= 3) {
+        // Poor answers to most questions
+        communication = Math.max(30, communication - 5)
+      }
+    }
   }
 
   // For incomplete solutions, communication can stay higher IF they discussed well
