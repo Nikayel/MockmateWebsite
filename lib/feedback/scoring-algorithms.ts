@@ -376,34 +376,34 @@ export function calculateValidatedScores(
   if (aiValidation.alternativesDiscussed && aiValidation.isCoherent && !isIncompleteSolution) {
     problemSolving = Math.min(95, problemSolving + 5)
   }
-  if (aiValidation.edgeCasesConsidered && aiValidation.isCoherent && !isIncompleteSolution) {
-    problemSolving = Math.min(95, problemSolving + 5)
-  }
 
   // === EVIDENCE-BASED SCORING (uses extracted quotes, not LLM guesses) ===
+  // When evidence is available, use it INSTEAD of aiValidation for edge cases
+  // to avoid double-counting
   if (extractedEvidence && !isIncompleteSolution) {
+    // EDGE CASE BONUS: Use evidence (replaces aiValidation.edgeCasesConsidered)
+    // This is more accurate than LLM's guess
+    const proactiveEdgeCases = extractedEvidence.edgeCases.mentionedByCandidate.length
+    if (proactiveEdgeCases >= 3) {
+      problemSolving = Math.min(95, problemSolving + 7) // 3+ edge cases = strong
+    } else if (proactiveEdgeCases >= 1) {
+      problemSolving = Math.min(95, problemSolving + 4) // 1-2 edge cases = good
+    }
+    // Note: No bonus if 0 edge cases (don't penalize, just no bonus)
+
     // PROGRESSION BONUS: Started brute force, then optimized = shows good problem-solving growth
     // Real interviewers LOVE seeing candidates iterate and improve
     if (
       extractedEvidence.progression.startedWithBruteForce &&
       extractedEvidence.progression.improvedAfterPrompt
     ) {
-      problemSolving = Math.min(95, problemSolving + 8)
+      problemSolving = Math.min(95, problemSolving + 6)
     }
 
     // SELF-CORRECTION BONUS: Catching and fixing own bugs = strong signal
     // Real interviewers value this more than getting it right first try
     if (extractedEvidence.progression.selfCorrectedBugs) {
-      problemSolving = Math.min(95, problemSolving + 5)
-    }
-
-    // PROACTIVE EDGE CASE BONUS: Mentioned edge cases WITHOUT being prompted
-    // Use actual count from evidence, not LLM's guess
-    const proactiveEdgeCases = extractedEvidence.edgeCases.mentionedByCandidate.length
-    if (proactiveEdgeCases >= 3) {
-      problemSolving = Math.min(95, problemSolving + 6)
-    } else if (proactiveEdgeCases >= 1) {
-      problemSolving = Math.min(95, problemSolving + 3)
+      problemSolving = Math.min(95, problemSolving + 4)
     }
 
     // HINT PENALTY: Needed excessive help or copied blindly
@@ -418,6 +418,11 @@ export function calculateValidatedScores(
     ) {
       // Got hints but didn't use them well
       problemSolving = Math.max(35, problemSolving - 5)
+    }
+  } else if (!isIncompleteSolution) {
+    // Fallback to aiValidation when no evidence available
+    if (aiValidation.edgeCasesConsidered && aiValidation.isCoherent) {
+      problemSolving = Math.min(95, problemSolving + 5)
     }
   }
 
@@ -545,52 +550,45 @@ export function calculateValidatedScores(
   }
 
   // === EVIDENCE-BASED COMMUNICATION ADJUSTMENTS ===
+  // These are ADDITIONAL signals not captured by aiValidation
+  // Cap total evidence-based bonus to prevent excessive stacking
   if (extractedEvidence) {
+    let evidenceBonus = 0
+
     // BONUS: Explained while coding (real interviewers love this)
     if (extractedEvidence.communication.explainedWhileCoding) {
-      communication = Math.min(95, communication + 5)
+      evidenceBonus += 4
     }
 
     // BONUS: Asked clarifying questions (shows thoroughness)
     if (extractedEvidence.communication.askedClarifyingQuestions) {
-      communication = Math.min(95, communication + 3)
+      evidenceBonus += 3
     }
 
     // BONUS: Responded well to feedback (adaptability)
     if (extractedEvidence.communication.respondedToFeedback) {
-      communication = Math.min(95, communication + 3)
+      evidenceBonus += 3
     }
 
     // ACCURACY CHECK: If they discussed complexity, use evidence to verify accuracy
-    // Don't penalize based on LLM guess - use actual extracted quote
+    // This REPLACES the aiValidation complexity check (more accurate)
     if (
       extractedEvidence.timeComplexity.mentioned &&
       extractedEvidence.timeComplexity.isCorrect === true
     ) {
-      // Accurate complexity discussion = communication bonus
-      communication = Math.min(95, communication + 4)
+      evidenceBonus += 3
     } else if (
       extractedEvidence.timeComplexity.mentioned &&
       extractedEvidence.timeComplexity.isCorrect === false
     ) {
       // Inaccurate complexity = slight penalty (but they at least tried)
-      communication = Math.max(30, communication - 3)
+      evidenceBonus -= 3
     }
 
-    // QUESTION ANSWERING: Use actual answer quality from evidence
-    const goodAnswers = extractedEvidence.interviewerQuestions.filter(
-      (q) => q.answerQuality === "good"
-    ).length
-    const totalQuestions = extractedEvidence.interviewerQuestions.length
-    if (totalQuestions > 0) {
-      const answerRate = goodAnswers / totalQuestions
-      if (answerRate >= 0.8) {
-        communication = Math.min(95, communication + 5)
-      } else if (answerRate <= 0.3 && totalQuestions >= 3) {
-        // Poor answers to most questions
-        communication = Math.max(30, communication - 5)
-      }
-    }
+    // Cap evidence-based bonus at +10 to prevent excessive inflation
+    // (explainedWhileCoding + clarifying + feedback + complexity = max 13, capped to 10)
+    evidenceBonus = Math.min(10, Math.max(-5, evidenceBonus))
+    communication = Math.min(95, Math.max(25, communication + evidenceBonus))
   }
 
   // For incomplete solutions, communication can stay higher IF they discussed well
