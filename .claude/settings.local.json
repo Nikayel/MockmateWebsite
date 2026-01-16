@@ -82,7 +82,10 @@
       "Bash(PATH=\"/Users/nikayeljamal/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH\" pnpm run typecheck:*)",
       "Bash(npm run lint:*)",
       "Bash(/usr/local/bin/npm run lint)",
-      "Bash(/opt/homebrew/bin/npm run lint)"
+      "Bash(/opt/homebrew/bin/npm run lint)",
+      "Bash(/usr/local/bin/node ./node_modules/.bin/tsc:*)",
+      "Bash(PATH=\"/usr/local/bin:$PATH\" /usr/local/bin/node node_modules/typescript/bin/tsc:*)",
+      "Bash(PATH=\"/usr/local/bin:$PATH\" /usr/local/bin/node:*)"
     ]
   }
 }

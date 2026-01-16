@@ -317,6 +317,8 @@ export async function POST(request: NextRequest) {
       lastPartnerExchange,
       // NEW: Nudge tracking to prevent repetitive questions
       recentNudgeTopics,
+      // NEW: User-answered topics tracking
+      userAnsweredTopics,
       // NEW: Time since last candidate message (for time-based proactive)
       timeSinceLastMessage,
       // NEW: Is this a wrap-up request?

@@ -28,31 +28,19 @@ export type {
 } from "./useCodeExecution"
 
 export { useNotifications } from "./useNotifications"
-export type {
-  UseNotificationsOptions,
-  UseNotificationsReturn,
-} from "./useNotifications"
+export type { UseNotificationsOptions, UseNotificationsReturn } from "./useNotifications"
 
 export { useSessionMetrics } from "./use-session-metrics"
 
 // New interview hooks
 export { useInterviewState } from "./useInterviewState"
-export type {
-  UseInterviewStateOptions,
-  UseInterviewStateReturn,
-} from "./useInterviewState"
+export type { UseInterviewStateOptions, UseInterviewStateReturn } from "./useInterviewState"
 
 export { useInterviewUI } from "./useInterviewUI"
-export type {
-  UseInterviewUIOptions,
-  UseInterviewUIReturn,
-} from "./useInterviewUI"
+export type { UseInterviewUIOptions, UseInterviewUIReturn } from "./useInterviewUI"
 
 export { useTestExecution } from "./useTestExecution"
-export type {
-  UseTestExecutionOptions,
-  UseTestExecutionReturn,
-} from "./useTestExecution"
+export type { UseTestExecutionOptions, UseTestExecutionReturn } from "./useTestExecution"
 
 export { useFocusTrap } from "./useFocusTrap"
 
@@ -69,13 +57,14 @@ export type {
 export { useScenarioFilters } from "./useScenarioFilters"
 
 export { useDSARoadmap, inferPattern } from "./useDSARoadmap"
-export type {
-  NodeStats,
-  UseDSARoadmapOptions,
-  UseDSARoadmapReturn,
-} from "./useDSARoadmap"
+export type { NodeStats, UseDSARoadmapOptions, UseDSARoadmapReturn } from "./useDSARoadmap"
 
-export { useSkillInsights, useSmartRecommendations, useEnhancedProfile, useCodeAnalysis } from "./useSkillInsights"
+export {
+  useSkillInsights,
+  useSmartRecommendations,
+  useEnhancedProfile,
+  useCodeAnalysis,
+} from "./useSkillInsights"
 export type {
   SkillInsightsData,
   SmartRecommendation,
@@ -83,3 +72,6 @@ export type {
   UserSummary,
   SmartRecommendationsResponse,
 } from "./useSkillInsights"
+
+export { useInterviewPhase } from "./useInterviewPhase"
+export type { UseInterviewPhaseReturn } from "./useInterviewPhase"

@@ -83,6 +83,14 @@ import {
   updateTrackerFromMessage,
   detectInterviewPhase,
 } from "@/lib/interview/interview-phases"
+// Extracted utilities
+import {
+  extractTopicsFromMessage,
+  extractUserAnsweredTopics,
+  analyzeCodeEfficiency,
+} from "@/lib/interview"
+// Local page components
+import { PostInterviewView, FeedbackLoadingState } from "./_components"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -272,107 +280,7 @@ function InterviewPageContent() {
   // Track topics the user has already answered to prevent AI from re-asking
   const [userAnsweredTopics, setUserAnsweredTopics] = useState<string[]>([])
 
-  // Extract topics from AI interviewer messages to avoid repetition
-  const extractTopicsFromMessage = (message: string): string[] => {
-    const topics: string[] = []
-    const lowerMsg = message.toLowerCase()
-
-    // Common interview question patterns
-    if (lowerMsg.includes("time complexity") || lowerMsg.includes("time and space")) {
-      topics.push("time complexity")
-    }
-    if (lowerMsg.includes("space complexity")) {
-      topics.push("space complexity")
-    }
-    if (lowerMsg.includes("edge case") || lowerMsg.includes("edge-case")) {
-      topics.push("edge cases")
-    }
-    if (lowerMsg.includes("walk me through") || lowerMsg.includes("explain your")) {
-      topics.push("approach explanation")
-    }
-    if (lowerMsg.includes("optimize") || lowerMsg.includes("more efficient")) {
-      topics.push("optimization")
-    }
-    if (
-      lowerMsg.includes("test") &&
-      (lowerMsg.includes("how would") || lowerMsg.includes("what"))
-    ) {
-      topics.push("testing")
-    }
-    if (lowerMsg.includes("alternative") || lowerMsg.includes("other approach")) {
-      topics.push("alternative approaches")
-    }
-
-    return topics
-  }
-
-  // Extract topics the USER has answered from their messages
-  // This prevents the interviewer from re-asking about things the user already explained
-  const extractUserAnsweredTopics = (message: string): string[] => {
-    const topics: string[] = []
-    const lowerMsg = message.toLowerCase()
-
-    // Complexity answers - user stating time/space complexity
-    if (
-      lowerMsg.match(/o\s*\(\s*[n\d\s\^logn*]+\s*\)/i) || // O(n), O(n^2), O(log n), O(n log n)
-      lowerMsg.includes("linear time") ||
-      lowerMsg.includes("constant time") ||
-      lowerMsg.includes("quadratic") ||
-      lowerMsg.includes("logarithmic")
-    ) {
-      if (
-        lowerMsg.includes("time") ||
-        lowerMsg.includes("runtime") ||
-        !lowerMsg.includes("space")
-      ) {
-        topics.push("time complexity: user stated it")
-      }
-      if (lowerMsg.includes("space") || lowerMsg.includes("memory")) {
-        topics.push("space complexity: user stated it")
-      }
-      // If they just say O(n) without specifying, assume they answered complexity
-      if (!lowerMsg.includes("time") && !lowerMsg.includes("space")) {
-        topics.push("complexity: user stated it")
-      }
-    }
-
-    // Edge case mentions
-    if (
-      lowerMsg.includes("empty array") ||
-      lowerMsg.includes("empty input") ||
-      lowerMsg.includes("null") ||
-      lowerMsg.includes("edge case") ||
-      lowerMsg.includes("single element") ||
-      lowerMsg.includes("negative") ||
-      lowerMsg.includes("zero")
-    ) {
-      topics.push("edge cases: user mentioned")
-    }
-
-    // Approach explanation
-    if (
-      lowerMsg.includes("my approach") ||
-      lowerMsg.includes("i'm thinking") ||
-      lowerMsg.includes("i'll use") ||
-      lowerMsg.includes("the idea is") ||
-      lowerMsg.includes("basically") ||
-      lowerMsg.includes("so what i'm doing")
-    ) {
-      topics.push("approach: user explained")
-    }
-
-    // Trade-off discussion
-    if (
-      lowerMsg.includes("trade-off") ||
-      lowerMsg.includes("tradeoff") ||
-      lowerMsg.includes("trade off") ||
-      (lowerMsg.includes("space") && lowerMsg.includes("time"))
-    ) {
-      topics.push("trade-offs: user discussed")
-    }
-
-    return topics
-  }
+  // Note: extractTopicsFromMessage and extractUserAnsweredTopics are now imported from @/lib/interview
 
   // Track pending auto-send to avoid duplicate sends
   const pendingAutoSendRef = useRef<{ interviewer: boolean; partner: boolean }>({
@@ -2087,7 +1995,7 @@ Ask ONE focused question based on these observations.`)
       }
 
       // Calculate efficiency metrics for the discussion prompt
-      const metrics = analyzeCodeEfficiency(code)
+      const metrics = analyzeCodeEfficiency(code, (selectedScenario as any)?.optimalComplexity)
 
       // Trigger interviewer to discuss the solution
       // NOTE: Feedback generation is now DEFERRED until user clicks "View Detailed Feedback"
@@ -2748,7 +2656,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       let aiFeedbackSucceeded = false
       let localConstitutionalAICritique: Record<string, unknown> | null = null
 
-      const efficiencyData = analyzeCodeEfficiency(code)
+      const efficiencyData = analyzeCodeEfficiency(
+        code,
+        (selectedScenario as any)?.optimalComplexity
+      )
 
       if (currentSessionId && user && code.trim()) {
         try {
@@ -3440,108 +3351,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     }
   }
 
-  const analyzeCodeEfficiency = (code: string) => {
-    // Calculate lines of code (excluding empty lines and comments)
-    const lines = code.split("\n")
-    const linesOfCode = lines.filter((line) => {
-      const trimmed = line.trim()
-      return (
-        trimmed.length > 0 &&
-        !trimmed.startsWith("//") &&
-        !trimmed.startsWith("/*") &&
-        !trimmed.startsWith("*")
-      )
-    }).length
-
-    // Basic complexity estimation based on control structures
-    const controlStructures = (code.match(/\b(if|else|for|while|switch|case|catch)\b/g) || [])
-      .length
-    const complexityLevel =
-      controlStructures <= 3 ? "Low" : controlStructures <= 7 ? "Medium" : "High"
-
-    // Estimate time complexity based on nested loops
-    const nestedLoopCount =
-      (code.match(/for.*{[^}]*for/g) || []).length +
-      (code.match(/while.*{[^}]*while/g) || []).length
-    let estimatedTimeComplexity = "O(n)"
-    if (nestedLoopCount >= 2) {
-      estimatedTimeComplexity = "O(n³)"
-    } else if (nestedLoopCount === 1) {
-      estimatedTimeComplexity = "O(n²)"
-    } else if (code.includes("sort")) {
-      estimatedTimeComplexity = "O(n log n)"
-    }
-
-    // Estimate space complexity based on data structures
-    // Only count CREATION of new data structures, not access/indexing
-    const hasHashMapCreation =
-      /new\s+Map\s*\(/.test(code) || // new Map()
-      /new\s+Set\s*\(/.test(code) || // new Set()
-      /=\s*\{\s*\}/.test(code) || // = {} (empty object literal)
-      /dict\s*\(\s*\)/.test(code) || // dict() in Python
-      /set\s*\(\s*\)/.test(code) || // set() in Python
-      /defaultdict\s*\(/.test(code) || // defaultdict in Python
-      /Counter\s*\(/.test(code) // Counter in Python
-
-    // Detect array CREATION, not just indexing
-    const hasArrayCreation =
-      /=\s*\[\s*\]/.test(code) || // = [] (empty array literal)
-      /=\s*\[[^\]]+\](?!\s*=)/.test(code) || // = [items] (array literal with items)
-      /new\s+Array\s*\(/.test(code) || // new Array()
-      /Array\s*\.\s*from\s*\(/.test(code) || // Array.from()
-      /list\s*\(\s*\)/.test(code) || // list() in Python
-      /\.split\s*\(/.test(code) || // .split() creates new array
-      /\.slice\s*\(/.test(code) || // .slice() creates new array
-      /\.map\s*\(/.test(code) || // .map() creates new array
-      /\.filter\s*\(/.test(code) || // .filter() creates new array
-      /\[\s*for\s+/.test(code) // [x for x in ...] list comprehension
-
-    let estimatedSpaceComplexity = "O(1)"
-    if (hasHashMapCreation || hasArrayCreation) {
-      estimatedSpaceComplexity = "O(n)"
-    }
-
-    // Get optimal complexity from scenario
-    const optimalTimeComplexity = (selectedScenario as any)?.optimalComplexity?.time || "N/A"
-    const optimalSpaceComplexity = (selectedScenario as any)?.optimalComplexity?.space || "N/A"
-
-    // Calculate efficiency score (0-100)
-    let efficiencyScore = 100
-
-    // Deduct points for suboptimal time complexity
-    if (optimalTimeComplexity !== "N/A" && estimatedTimeComplexity !== optimalTimeComplexity) {
-      efficiencyScore -= 20
-    }
-
-    // Deduct points for suboptimal space complexity
-    if (optimalSpaceComplexity !== "N/A" && estimatedSpaceComplexity !== optimalSpaceComplexity) {
-      efficiencyScore -= 10
-    }
-
-    // Deduct points for excessive complexity
-    if (complexityLevel === "High") {
-      efficiencyScore -= 15
-    } else if (complexityLevel === "Medium") {
-      efficiencyScore -= 5
-    }
-
-    // Deduct points for excessive lines of code
-    if (linesOfCode > 30) {
-      efficiencyScore -= 10
-    } else if (linesOfCode > 20) {
-      efficiencyScore -= 5
-    }
-
-    return {
-      linesOfCode,
-      complexity: complexityLevel,
-      estimatedTimeComplexity,
-      estimatedSpaceComplexity,
-      optimalTimeComplexity,
-      optimalSpaceComplexity,
-      efficiencyScore: Math.max(0, efficiencyScore),
-    }
-  }
+  // Note: analyzeCodeEfficiency is now imported from @/lib/interview
+  // Usage: analyzeCodeEfficiency(code, (selectedScenario as any)?.optimalComplexity)
 
   const submitSystemDesign = async () => {
     if (!selectedScenario || selectedScenario.type !== "system-design") return
@@ -3927,7 +3738,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     setConsoleLogs([]) // Clear previous console logs
 
     // Analyze code efficiency
-    const metrics = analyzeCodeEfficiency(code)
+    const metrics = analyzeCodeEfficiency(code, (selectedScenario as any)?.optimalComplexity)
     setEfficiencyMetrics(metrics)
 
     try {
@@ -4087,7 +3898,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
     setConsoleLogs([])
 
     // Analyze code efficiency
-    const metrics = analyzeCodeEfficiency(code)
+    const metrics = analyzeCodeEfficiency(code, (selectedScenario as any)?.optimalComplexity)
     setEfficiencyMetrics(metrics)
 
     try {
@@ -5423,282 +5234,28 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   </Card>
                 </div>
               ) : showPostInterviewDiscussion ? (
-                /* Post-Interview Discussion Phase */
-                <div className="mx-auto max-w-7xl px-4 py-8">
-                  <div className="mb-6 text-center">
-                    <CheckCircle className="text-accent mx-auto mb-3 h-12 w-12" />
-                    <h2 className="font-heading mb-2 text-2xl font-bold text-white">
-                      Solution Complete!
-                    </h2>
-                    <p className="mb-4 text-gray-300">
-                      {testSummary.passRate === 100
-                        ? "All tests passed! Let's discuss your solution with the interviewer."
-                        : `${testSummary.passed}/${testSummary.total} tests passed. Let's discuss your solution.`}
-                    </p>
-                    {/* Continue Editing button - allows users to go back and fix their code */}
-                    {testSummary.passRate < 100 && (
-                      <Button
-                        onClick={() => setShowPostInterviewDiscussion(false)}
-                        variant="outline"
-                        className="border-accent text-accent hover:bg-accent/10 mb-4"
-                      >
-                        <Code className="mr-2 h-4 w-4" />
-                        Continue Editing
-                      </Button>
-                    )}
-                    {testSummary.total > 0 && (
-                      <div className="mb-4 flex items-center justify-center gap-4">
-                        <Badge className="bg-[#00d9ff] text-black">
-                          {testSummary.passed}/{testSummary.total} Tests Passed
-                        </Badge>
-                        {efficiencyMetrics && (
-                          <>
-                            <Badge
-                              className={`${
-                                efficiencyMetrics.efficiencyScore >= 80
-                                  ? "bg-[#00d9ff]"
-                                  : efficiencyMetrics.efficiencyScore >= 60
-                                    ? "bg-[#00d9ff]/70"
-                                    : "bg-gray-600"
-                              } text-black`}
-                            >
-                              Efficiency: {efficiencyMetrics.efficiencyScore}/100
-                            </Badge>
-                            <Badge variant="outline" className="border-gray-600 text-gray-300">
-                              Time: {efficiencyMetrics.estimatedTimeComplexity}
-                            </Badge>
-                            <Badge variant="outline" className="border-gray-600 text-gray-300">
-                              Space: {efficiencyMetrics.estimatedSpaceComplexity}
-                            </Badge>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Collapsible Code Viewer */}
-                  <Card className="glass-effect mb-6 border-gray-700 bg-gray-900/50">
-                    <CardHeader
-                      className="cursor-pointer transition-colors hover:bg-gray-800/50"
-                      onClick={() => setShowCodeInDiscussion(!showCodeInDiscussion)}
-                    >
-                      <CardTitle className="flex items-center justify-between text-white">
-                        <div className="flex items-center space-x-2">
-                          <Code className="text-accent h-5 w-5" />
-                          <span>Your Solution</span>
-                          <Badge variant="outline" className="border-gray-600 text-gray-400">
-                            {selectedLanguage}
-                          </Badge>
-                        </div>
-                        {showCodeInDiscussion ? (
-                          <ChevronUp className="h-5 w-5 text-gray-400" />
-                        ) : (
-                          <ChevronDown className="h-5 w-5 text-gray-400" />
-                        )}
-                      </CardTitle>
-                    </CardHeader>
-                    {showCodeInDiscussion && (
-                      <CardContent>
-                        <div className="overflow-hidden rounded-lg border border-gray-700">
-                          <CodeEditor
-                            height="400px"
-                            language={selectedLanguage}
-                            value={code}
-                            readOnly
-                          />
-                        </div>
-                        {testResults.length > 0 && (
-                          <div className="mt-4 space-y-2">
-                            <h4 className="text-sm font-semibold text-white">Test Results:</h4>
-                            {testResults.map((result, index) => (
-                              <div
-                                key={index}
-                                className={`rounded border p-2 ${
-                                  result.passed
-                                    ? "border-green-700 bg-green-900/20"
-                                    : "border-red-700 bg-red-900/20"
-                                }`}
-                              >
-                                <div className="flex items-center justify-between text-xs">
-                                  <span
-                                    className={result.passed ? "text-green-400" : "text-red-400"}
-                                  >
-                                    {result.passed ? "✓" : "✗"} {result.description}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    )}
-                  </Card>
-
-                  {/* Interviewer Discussion Panel */}
-                  <Card className="glass-effect mb-6 border-gray-700 bg-gray-900/50">
-                    <CardHeader>
-                      <CardTitle className="flex items-center space-x-2 text-white">
-                        <div className="relative">
-                          <Brain className="text-accent animate-neural-pulse h-5 w-5" />
-                          <div className="bg-accent absolute inset-0 rounded-full opacity-30 blur-md"></div>
-                        </div>
-                        <span className="from-accent to-neural bg-gradient-to-r bg-clip-text font-bold text-transparent">
-                          Post-Interview Discussion
-                        </span>
-                        {isGeneratingDiscussion && (
-                          <span className="ml-2 text-xs text-gray-400">
-                            (Analyzing your solution...)
-                          </span>
-                        )}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="mb-4 max-h-[500px] space-y-4 overflow-y-auto pr-2">
-                        {interviewerMessages.map((msg, index) => (
-                          <div
-                            key={index}
-                            className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
-                          >
-                            <div
-                              className={`max-w-[85%] rounded-lg p-3 ${
-                                msg.type === "user"
-                                  ? "bg-blue-600 text-white"
-                                  : "bg-gray-800 text-gray-100"
-                              }`}
-                            >
-                              <div className="mb-1 flex items-center space-x-2">
-                                {msg.type === "user" ? (
-                                  <User className="h-4 w-4" />
-                                ) : (
-                                  <Brain className="text-accent animate-neural-pulse h-4 w-4" />
-                                )}
-                                <span className="text-sm font-medium">
-                                  {msg.type === "user" ? "You" : "CodeSparring AI"}
-                                </span>
-                              </div>
-                              <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                                {msg.message}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                        {/* Thinking indicator for post-interview discussion */}
-                        {(isLoadingInterviewer || isGeneratingDiscussion) && (
-                          <div className="flex justify-start">
-                            <div className="max-w-[85%] rounded-lg border border-gray-700/50 bg-gray-800/50 p-3 text-gray-400">
-                              <div className="flex items-center space-x-2">
-                                <Brain className="h-4 w-4 animate-pulse text-[#00d9ff]" />
-                                <span className="text-sm">
-                                  {isGeneratingDiscussion
-                                    ? "Analyzing your solution..."
-                                    : "CodeSparring AI is thinking"}
-                                </span>
-                                <span className="flex space-x-0.5">
-                                  <span
-                                    className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#00d9ff]"
-                                    style={{ animationDelay: "0ms" }}
-                                  />
-                                  <span
-                                    className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#00d9ff]"
-                                    style={{ animationDelay: "150ms" }}
-                                  />
-                                  <span
-                                    className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#00d9ff]"
-                                    style={{ animationDelay: "300ms" }}
-                                  />
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        <div ref={interviewerEndRef} />
-                      </div>
-
-                      {/* Chat Input with Simplified Voice Mode */}
-                      <div className="border-border flex flex-col gap-3 border-t pt-4">
-                        <VoiceModeToggle
-                          isRecording={isRecordingInterviewer}
-                          onToggleRecording={() => toggleVoiceRecording(true)}
-                          transcript={interviewerInput}
-                          disabled={isLoadingInterviewer || isGeneratingDiscussion}
-                          compact={false}
-                        />
-                        {/* Text input for typing when not recording */}
-                        {!isRecordingInterviewer && (
-                          <div className="flex space-x-2">
-                            <Input
-                              value={interviewerInput}
-                              onChange={(e) => setInterviewerInput(e.target.value)}
-                              placeholder="Type or use voice above..."
-                              className="bg-secondary border-border text-foreground placeholder-muted-foreground flex-1"
-                              onKeyPress={(e) =>
-                                e.key === "Enter" &&
-                                !isLoadingInterviewer &&
-                                handleSendMessage(true)
-                              }
-                              disabled={isLoadingInterviewer || isGeneratingDiscussion}
-                              aria-label="Chat with interviewer"
-                            />
-                            <Button
-                              onClick={() => handleSendMessage(true)}
-                              className="bg-accent hover:bg-accent/80 text-accent-foreground"
-                              loading={isLoadingInterviewer || isGeneratingDiscussion}
-                              disabled={!interviewerInput.trim()}
-                              aria-label="Send message"
-                            >
-                              {!(isLoadingInterviewer || isGeneratingDiscussion) && (
-                                <Send className="h-4 w-4" aria-hidden="true" />
-                              )}
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Action Buttons */}
-                  <div className="flex justify-center">
-                    <Button
-                      onClick={proceedToFinalFeedback}
-                      className="bg-accent hover:bg-accent/80 text-accent-foreground px-6"
-                    >
-                      View Detailed Feedback
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+                <PostInterviewView
+                  testSummary={testSummary}
+                  efficiencyMetrics={efficiencyMetrics}
+                  code={code}
+                  selectedLanguage={selectedLanguage}
+                  testResults={testResults}
+                  interviewerMessages={interviewerMessages}
+                  isLoadingInterviewer={isLoadingInterviewer}
+                  isGeneratingDiscussion={isGeneratingDiscussion}
+                  interviewerInput={interviewerInput}
+                  setInterviewerInput={setInterviewerInput}
+                  handleSendMessage={handleSendMessage}
+                  isRecordingInterviewer={isRecordingInterviewer}
+                  toggleVoiceRecording={toggleVoiceRecording}
+                  interviewerEndRef={interviewerEndRef}
+                  showCodeInDiscussion={showCodeInDiscussion}
+                  setShowCodeInDiscussion={setShowCodeInDiscussion}
+                  setShowPostInterviewDiscussion={setShowPostInterviewDiscussion}
+                  proceedToFinalFeedback={proceedToFinalFeedback}
+                />
               ) : isGeneratingFeedback ? (
-                /* Loading state while AI calculates comprehensive feedback */
-                <div className="flex flex-col items-center justify-center px-8 py-16">
-                  <div className="relative mb-6">
-                    <div className="border-accent/20 border-t-accent h-16 w-16 animate-spin rounded-full border-4" />
-                    <Sparkles className="text-accent absolute top-1/2 left-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
-                  </div>
-                  <h3 className="mb-2 text-xl font-semibold text-white">
-                    Analyzing Your Performance
-                  </h3>
-                  <p className="mb-4 max-w-md text-center text-gray-400">
-                    We are evaluating your code, communication, and problem-solving approach to
-                    generate comprehensive feedback...
-                  </p>
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <Clock className="h-4 w-4" />
-                    <span>This usually takes 30 seconds to 2 minutes</span>
-                  </div>
-                  <div className="mt-6 flex flex-col items-center gap-3">
-                    <p className="text-xs text-gray-500">
-                      Don&apos;t want to wait? Your results will be saved.
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push("/dashboard")}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      Go to Dashboard
-                    </Button>
-                  </div>
-                </div>
+                <FeedbackLoadingState onGoToDashboard={() => router.push("/dashboard")} />
               ) : (
                 <>
                   <ErrorBoundary>
