@@ -75,6 +75,14 @@ import { getScenarioById, type Scenario } from "@/lib/scenarios"
 import { extractProtectedElements, validateCodeProtection } from "@/lib/code-protection"
 import { trackUserMessage, trackAIMessage } from "@/lib/scoring/track-chat"
 import { toast } from "sonner"
+// Interview phase tracking
+import {
+  type InterviewPhase,
+  type ConversationTracker,
+  createEmptyTracker,
+  updateTrackerFromMessage,
+  detectInterviewPhase,
+} from "@/lib/interview/interview-phases"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -246,6 +254,11 @@ function InterviewPageContent() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState("")
   const [interviewerInput, setInterviewerInput] = useState("")
+
+  // Interview phase tracking - tracks what candidate has covered to prevent false feedback
+  const [conversationTracker, setConversationTracker] =
+    useState<ConversationTracker>(createEmptyTracker())
+  const [currentInterviewPhase, setCurrentInterviewPhase] = useState<InterviewPhase>("intro")
   // Note: isLoadingChat and isLoadingInterviewer are from useInterviewStore above
 
   // Track topics the interviewer has already asked about to prevent repetitive questions
@@ -1499,6 +1512,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           // Pass test results and console logs for interviewer awareness
           testResults: testResults,
           consoleLogs: consoleLogs,
+          // Phase-aware interview tracking
+          ...getInterviewerChatParams(),
         }),
       })
 
@@ -1506,6 +1521,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
       if (data.reply) {
         setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+        // Update tracker with interviewer's message
+        updateTrackerOnMessage(data.reply, "interviewer")
         // Track topics from this proactive message
         const newTopics = extractTopicsFromMessage(data.reply)
         if (newTopics.length > 0) {
@@ -1628,6 +1645,8 @@ Interviews are conversations, not just coding exercises.`
           // Pass test results and console logs for interviewer awareness
           testResults: testResults,
           consoleLogs: consoleLogs,
+          // Phase-aware interview tracking
+          ...getInterviewerChatParams(),
         }),
       })
 
@@ -1635,6 +1654,8 @@ Interviews are conversations, not just coding exercises.`
 
       if (data.reply) {
         setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+        // Update tracker with interviewer's message
+        updateTrackerOnMessage(data.reply, "interviewer")
         // Track topics from this proactive message
         const newTopics = extractTopicsFromMessage(data.reply)
         if (newTopics.length > 0) {
@@ -1738,6 +1759,61 @@ Interviews are conversations, not just coding exercises.`
         input: tc.input,
       }))
   }
+
+  // Get current interview phase based on state
+  const getCurrentInterviewPhase = useCallback((): InterviewPhase => {
+    // If in post-interview discussion, they've submitted
+    if (showPostInterviewDiscussion) return "post_interview"
+    // If showing feedback, complete
+    if (showFeedback) return "complete"
+    // If tests have run, testing phase
+    if (testResults.length > 0) return "testing"
+    // If code has been written, coding phase
+    if (code.length > 50) return "coding"
+    // If they've explained approach (based on tracker), discussion phase
+    if (conversationTracker.approachExplained) return "discussion"
+    // If few messages, still intro
+    if (interviewerMessages.length <= 2) return "intro"
+    // Default to discussion
+    return "discussion"
+  }, [
+    showPostInterviewDiscussion,
+    showFeedback,
+    testResults.length,
+    code.length,
+    conversationTracker.approachExplained,
+    interviewerMessages.length,
+  ])
+
+  // Update tracker when user sends a message
+  const updateTrackerOnMessage = useCallback((message: string, role: "user" | "interviewer") => {
+    setConversationTracker((prev) => updateTrackerFromMessage(prev, message, role))
+  }, [])
+
+  // Update tracker when code changes to detect coding phase
+  const updateTrackerOnCodeChange = useCallback(
+    (newCode: string) => {
+      if (newCode.length > 50 && !conversationTracker.hasStartedCoding) {
+        setConversationTracker((prev) => ({ ...prev, hasStartedCoding: true }))
+      }
+    },
+    [conversationTracker.hasStartedCoding]
+  )
+
+  // Update tracker when tests run
+  const updateTrackerOnTestsRun = useCallback(() => {
+    setConversationTracker((prev) => ({ ...prev, hasRunTests: true }))
+  }, [])
+
+  // Build common params for interviewer chat API calls
+  const getInterviewerChatParams = useCallback(
+    () => ({
+      interviewPhase: getCurrentInterviewPhase(),
+      conversationTracker,
+      hasSubmitted: showPostInterviewDiscussion,
+    }),
+    [getCurrentInterviewPhase, conversationTracker, showPostInterviewDiscussion]
+  )
 
   // Analyze code for context-aware proactive feedback
   // IMPORTANT: This analysis is NEUTRAL - do not praise patterns until correctness is verified
@@ -1868,6 +1944,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           // Pass test results and console logs for interviewer awareness
           testResults: testResults,
           consoleLogs: consoleLogs,
+          // Phase-aware interview tracking
+          ...getInterviewerChatParams(),
         }),
       })
 
@@ -1875,6 +1953,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
       if (data.reply) {
         setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+        // Track interviewer response for conversation context
+        updateTrackerOnMessage(data.reply, "interviewer")
       }
     } catch (error) {
       console.error("Error in post-interview discussion:", error)
@@ -2911,6 +2991,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       setInput("")
       setLoading(true)
 
+      // Track user message for conversation context (phase tracking)
+      if (isInterviewer) {
+        updateTrackerOnMessage(input, "user")
+      }
+
       // Track user message for scoring (fire-and-forget)
       if (currentSessionId && firebaseUser) {
         firebaseUser
@@ -2999,6 +3084,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             // Pass test results and console logs for interviewer awareness
             testResults: isInterviewer ? testResults : undefined,
             consoleLogs: isInterviewer ? consoleLogs : undefined,
+            // Phase-aware interview tracking (only for interviewer)
+            ...(isInterviewer ? getInterviewerChatParams() : {}),
           }),
         })
 
@@ -3034,6 +3121,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 return updated.slice(-10)
               })
             }
+            // Track interviewer response for conversation context (phase tracking)
+            updateTrackerOnMessage(data.reply, "interviewer")
           }
 
           // Track AI response for scoring (fire-and-forget)
@@ -3566,12 +3655,16 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           // Pass test results and console logs for interviewer awareness
           testResults: testResults,
           consoleLogs: consoleLogs,
+          // Phase-aware interview tracking
+          ...getInterviewerChatParams(),
         }),
       })
 
       const data = await response.json()
       if (data.reply) {
         setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+        // Track interviewer response for conversation context
+        updateTrackerOnMessage(data.reply, "interviewer")
       }
     } catch (error) {
       console.error("Error generating system design feedback:", error)
