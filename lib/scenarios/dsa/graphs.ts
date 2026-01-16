@@ -533,6 +533,7 @@ Given two words, beginWord and endWord, and a dictionary wordList, return the nu
           [4, 0],
         ],
         description: "Multiple valid cells",
+        compareAsSet: true,
       },
     ],
   },

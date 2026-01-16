@@ -365,6 +365,16 @@ The median is the middle value in an ordered integer list. If the size of the li
         expected: 6,
         description: "No cooling",
       },
+      {
+        input: { tasks: ["A"], n: 5 },
+        expected: 1,
+        description: "Single task",
+      },
+      {
+        input: { tasks: ["A", "A", "A", "A"], n: 3 },
+        expected: 13,
+        description: "High cooling with repeats",
+      },
     ],
   },
   {
@@ -423,7 +433,8 @@ The median is the middle value in an ordered integer list. If the size of the li
           [3, 3],
           [-2, 4],
         ],
-        description: "Two closest",
+        description: "Two closest (order may vary)",
+        compareAsSet: true,
       },
     ],
   },
@@ -456,7 +467,10 @@ The median is the middle value in an ordered integer list. If the size of the li
     optimalComplexity: { time: "O(n log k)", space: "O(k)" },
     testCases: [
       { input: { s: "aab" }, expected: "aba", description: "Valid rearrangement" },
-      { input: { s: "aaab" }, expected: "", description: "Impossible" },
+      { input: { s: "aaab" }, expected: "", description: "Impossible - one char dominates" },
+      { input: { s: "aabb" }, expected: "abab", description: "Two chars equal frequency", orderMatters: false },
+      { input: { s: "a" }, expected: "a", description: "Single character" },
+      { input: { s: "ab" }, expected: "ab", description: "Two different chars", orderMatters: false },
     ],
   },
   {

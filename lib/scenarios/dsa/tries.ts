@@ -227,6 +227,7 @@ Each word must be constructed from letters of sequentially adjacent cells, where
         },
         expected: ["eat", "oath"],
         description: "Standard case with multiple found words",
+        compareAsSet: true,
       },
       {
         input: {
