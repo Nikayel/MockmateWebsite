@@ -1954,7 +1954,20 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           testResults: testResults,
           consoleLogs: consoleLogs,
           // Phase-aware interview tracking
-          ...getInterviewerChatParams(),
+          // NOTE: Explicitly set hasSubmitted=true and interviewPhase='post_interview'
+          // because React state may not have updated yet when this is called
+          interviewPhase: "post_interview" as const,
+          conversationTracker,
+          hasSubmitted: true, // Explicit - don't rely on state timing
+          solutionComplexity: efficiencyMetrics
+            ? {
+                estimated: efficiencyMetrics.estimatedTimeComplexity,
+                optimal: efficiencyMetrics.optimalTimeComplexity,
+                isOptimal:
+                  efficiencyMetrics.estimatedTimeComplexity ===
+                  efficiencyMetrics.optimalTimeComplexity,
+              }
+            : null,
         }),
       })
 
@@ -3665,7 +3678,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           testResults: testResults,
           consoleLogs: consoleLogs,
           // Phase-aware interview tracking
-          ...getInterviewerChatParams(),
+          // NOTE: Explicitly set phase params because React state may not have updated yet
+          interviewPhase: "post_interview" as const,
+          conversationTracker,
+          hasSubmitted: true,
+          solutionComplexity: null, // System design doesn't have complexity metrics
         }),
       })
 
