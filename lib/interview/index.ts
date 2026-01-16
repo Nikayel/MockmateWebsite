@@ -35,3 +35,10 @@ export type {
   GenerateFeedbackOptions,
   FeedbackResult,
 } from "./feedback-generator"
+
+// Topic extraction utilities
+export { extractTopicsFromMessage, extractUserAnsweredTopics } from "./topic-extraction"
+
+// Code analysis utilities
+export { analyzeCodeEfficiency } from "./code-analysis"
+export type { CodeEfficiencyMetrics, OptimalComplexity } from "./code-analysis"
