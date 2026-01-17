@@ -70,17 +70,15 @@ export async function extractConversationState(
   }
 
   // Build conversation text for analysis
-  const conversationText = candidateMessages
-    .map((m) => `CANDIDATE: ${m.content}`)
-    .join("\n\n")
+  const conversationText = candidateMessages.map((m) => `CANDIDATE: ${m.content}`).join("\n\n")
 
   try {
     const response = await generateAIResponse(
       EXTRACTION_PROMPT,
       conversationText,
+      [], // Empty history
       {
-        taskComplexity: "simple", // Uses gemini-lite (cheapest)
-        maxTokens: 256, // Small response
+        complexity: "simple", // Uses gemini-lite (cheapest)
         temperature: 0.1, // Deterministic
         userId: "system-extraction", // For rate limiting
       }
