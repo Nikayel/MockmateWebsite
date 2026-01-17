@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
       efficiencyMetrics,
       conversationTranscript,
       partnerMessages,
+      phaseTracking,
       sessionId,
       userId,
     } = await request.json()
@@ -445,6 +446,109 @@ CODE EFFICIENCY ANALYSIS:
       })
     }
 
+    // Step 3.5: Phase-aware scoring penalties
+    // Detect skipped phases and apply penalties for incomplete interview flow
+    interface PhaseAnalysis {
+      skippedPhases: string[]
+      penalties: { phase: string; penalty: number; reason: string }[]
+      totalPenalty: number
+      submittedFromPhase: string
+      incompleteFlow: boolean
+    }
+
+    const phaseAnalysis: PhaseAnalysis = {
+      skippedPhases: [],
+      penalties: [],
+      totalPenalty: 0,
+      submittedFromPhase: phaseTracking?.submittedFromPhase || "unknown",
+      incompleteFlow: false,
+    }
+
+    if (phaseTracking && scenarioType !== "system-design") {
+      // Detect skipped phases
+      const tracker = phaseTracking.conversationTracker
+
+      // 1. No discussion phase (jumped to coding without explaining approach)
+      if (!tracker?.approachExplained && preScreen.candidateMessageCount > 0) {
+        phaseAnalysis.skippedPhases.push("discussion")
+        phaseAnalysis.penalties.push({
+          phase: "discussion",
+          penalty: 15,
+          reason: "Did not explain approach before coding",
+        })
+        // Apply to communication score
+        validatedScores.communication = Math.max(20, validatedScores.communication - 15)
+      }
+
+      // 2. No testing phase (submitted without running tests)
+      if (!phaseTracking.testsRanBeforeSubmit) {
+        phaseAnalysis.skippedPhases.push("testing")
+        phaseAnalysis.penalties.push({
+          phase: "testing",
+          penalty: 10,
+          reason: "Submitted without running tests",
+        })
+        // Apply to problem-solving score
+        validatedScores.problemSolving = Math.max(20, validatedScores.problemSolving - 10)
+      }
+
+      // 3. No complexity discussion (tests passed but never discussed complexity)
+      if (
+        passRate >= 80 &&
+        !tracker?.timeComplexityMentioned &&
+        !aiValidation.complexityDiscussed
+      ) {
+        phaseAnalysis.skippedPhases.push("complexity_discussion")
+        phaseAnalysis.penalties.push({
+          phase: "complexity_discussion",
+          penalty: 10,
+          reason: "Did not discuss time/space complexity",
+        })
+        // Apply to understanding score
+        validatedScores.understanding = Math.max(30, validatedScores.understanding - 10)
+      }
+
+      // 4. Heavy hint dependency (5+ hints)
+      if (tracker?.hintsGiven >= 5) {
+        phaseAnalysis.penalties.push({
+          phase: "hints",
+          penalty: 15,
+          reason: `Used ${tracker.hintsGiven} hints - solution may not be independently derived`,
+        })
+        // Apply to understanding and problem-solving
+        validatedScores.understanding = Math.max(30, validatedScores.understanding - 10)
+        validatedScores.problemSolving = Math.max(30, validatedScores.problemSolving - 5)
+      }
+
+      // 5. Early/panic submission (from intro or early coding phase)
+      if (
+        phaseTracking.submittedFromPhase === "intro" ||
+        (phaseTracking.submittedFromPhase === "coding" && !phaseTracking.testsRanBeforeSubmit)
+      ) {
+        phaseAnalysis.incompleteFlow = true
+        phaseAnalysis.penalties.push({
+          phase: "early_submission",
+          penalty: 20,
+          reason: "Submitted very early without completing interview flow",
+        })
+        // Apply to all scores
+        validatedScores.understanding = Math.max(20, validatedScores.understanding - 10)
+        validatedScores.problemSolving = Math.max(20, validatedScores.problemSolving - 10)
+      }
+
+      // Calculate total penalty
+      phaseAnalysis.totalPenalty = phaseAnalysis.penalties.reduce((sum, p) => sum + p.penalty, 0)
+
+      if (phaseAnalysis.penalties.length > 0) {
+        logger.info("Phase-aware penalties applied", {
+          sessionId,
+          skippedPhases: phaseAnalysis.skippedPhases,
+          penalties: phaseAnalysis.penalties,
+          totalPenalty: phaseAnalysis.totalPenalty,
+        })
+      }
+    }
+
     // Step 4: Apply score floors for correct solutions
     const algorithmicScores = applyScoreFloors(
       validatedScores,
@@ -489,6 +593,22 @@ COMMUNICATION ANALYSIS (hybrid validated):
 - Questions answered: ${aiValidation.questionsAnswered}/${aiValidation.questionsAsked}
 - Communication score: ${aiValidation.communicationScore}/100
 - Total candidate messages: ${preScreen.candidateMessageCount}
+${
+  phaseAnalysis.skippedPhases.length > 0
+    ? `
+INTERVIEW FLOW ISSUES (penalties already applied to scores):
+- Submitted from phase: ${phaseAnalysis.submittedFromPhase}
+- Skipped phases: ${phaseAnalysis.skippedPhases.join(", ")}
+${phaseAnalysis.penalties.map((p) => `- ${p.reason} (-${p.penalty} points)`).join("\n")}
+${phaseAnalysis.incompleteFlow ? "⚠️ INCOMPLETE INTERVIEW FLOW - candidate did not complete the standard interview process" : ""}
+
+CRITICAL: In "Fix Next", mention the skipped phases:
+${phaseAnalysis.skippedPhases.includes("discussion") ? '- "EXPLAIN YOUR APPROACH before coding - interviewers need to understand your thought process"' : ""}
+${phaseAnalysis.skippedPhases.includes("testing") ? '- "RUN TESTS before submitting - verify your solution works"' : ""}
+${phaseAnalysis.skippedPhases.includes("complexity_discussion") ? '- "DISCUSS COMPLEXITY after solving - explain time/space trade-offs"' : ""}
+`
+    : ""
+}
 ${
   extractedEvidence
     ? `
@@ -966,6 +1086,17 @@ CRITICAL INSTRUCTIONS:
         : false,
       aiCopyingDetected: hasBlindCopying, // True if >70% code copied from AI Partner
       aiOverlapPercentage: aiCodeOverlap.overlapPercentage, // How much code matches AI suggestions
+      // Phase-aware scoring flags
+      phaseAnalysis:
+        phaseAnalysis.skippedPhases.length > 0 || phaseAnalysis.incompleteFlow
+          ? {
+              submittedFromPhase: phaseAnalysis.submittedFromPhase,
+              skippedPhases: phaseAnalysis.skippedPhases,
+              penalties: phaseAnalysis.penalties,
+              totalPenalty: phaseAnalysis.totalPenalty,
+              incompleteFlow: phaseAnalysis.incompleteFlow,
+            }
+          : undefined,
       // Constitutional AI critique metadata (only if changes were made)
       ...(scoreCritique.madeChanges || feedbackCritique.madeChanges
         ? {
