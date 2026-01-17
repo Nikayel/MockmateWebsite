@@ -1945,6 +1945,9 @@ Interviews are conversations, not just coding exercises.`
       interviewPhase: getCurrentInterviewPhase(),
       conversationTracker,
       hasSubmitted: showPostInterviewDiscussion,
+      // Real Interview Mode (fuzzy problem statements)
+      realInterviewMode,
+      hasFuzzyStatement: !!(selectedScenario as any)?.fuzzyStatement,
       // Pass efficiency metrics so interviewer knows if solution is already optimal
       solutionComplexity: efficiencyMetrics
         ? {
@@ -1955,7 +1958,14 @@ Interviews are conversations, not just coding exercises.`
           }
         : null,
     }),
-    [getCurrentInterviewPhase, conversationTracker, showPostInterviewDiscussion, efficiencyMetrics]
+    [
+      getCurrentInterviewPhase,
+      conversationTracker,
+      showPostInterviewDiscussion,
+      efficiencyMetrics,
+      realInterviewMode,
+      selectedScenario,
+    ]
   )
 
   // Analyze code for context-aware proactive feedback
