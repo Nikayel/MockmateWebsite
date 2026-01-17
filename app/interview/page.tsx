@@ -902,9 +902,18 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             // If session was completed but not evaluating, allow user to start fresh
           }
 
-          // Just select the scenario - don't auto-start, let user click Start Interview
+          // Select the scenario and hide browser to show the problem view
           setSelectedScenario(scenario)
-          setShowScenarioBrowser(false) // Hide browser to show the problem view
+          setShowScenarioBrowser(false)
+
+          // If from roadmap, call startInterview to trigger proper initialization
+          // This will handle company selection, Real Interview Mode, etc.
+          if (fromRoadmap) {
+            // Small delay to ensure state is set before calling startInterview
+            setTimeout(() => {
+              startInterview(scenario)
+            }, 100)
+          }
         } else {
           toast.error("Scenario not found")
           setShowScenarioBrowser(true)
@@ -4431,7 +4440,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       </div>
                       <div className="max-h-[calc(60vh-60px)] overflow-y-auto p-4">
                         <p className="text-sm leading-relaxed text-gray-200">
-                          {selectedScenario.problemStatement}
+                          {realInterviewMode && (selectedScenario as any).fuzzyStatement
+                            ? (selectedScenario as any).fuzzyStatement
+                            : selectedScenario.problemStatement}
                         </p>
                         {selectedScenario.type === "dsa" &&
                           selectedScenario.examples &&
@@ -4500,9 +4511,16 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                             <h3 className="text-accent flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
                               <span className="bg-accent h-4 w-1 rounded-full"></span>
                               Description
+                              {realInterviewMode && (selectedScenario as any).fuzzyStatement && (
+                                <Badge className="border-purple-500/30 bg-purple-500/20 text-[10px] text-purple-300">
+                                  Real Interview Mode
+                                </Badge>
+                              )}
                             </h3>
                             <p className="text-[15px] leading-relaxed text-gray-200">
-                              {selectedScenario.problemStatement}
+                              {realInterviewMode && (selectedScenario as any).fuzzyStatement
+                                ? (selectedScenario as any).fuzzyStatement
+                                : selectedScenario.problemStatement}
                             </p>
                           </div>
 
@@ -5388,6 +5406,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             startInterview(selectedScenario, company)
           }}
           scenarioCompanies={selectedScenario.companies || []}
+          hasFuzzyMode={!!selectedScenario.fuzzyStatement}
         />
       )}
 
