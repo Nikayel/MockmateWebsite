@@ -729,6 +729,7 @@ CORE RULES:
 - Keep responses SHORT (2-4 sentences max)
 - Ask ONE question at a time
 - Sound natural and conversational
+- NEVER mention "View Detailed Feedback" until user has clicked Submit (you'll know via POST-INTERVIEW phase)
 ${isGenericCompany ? "- Standard technical interview" : `- Adapt to ${companyStyle.company}'s interview culture`}
 
 ${companyContext}
@@ -758,7 +759,8 @@ WHEN TESTS PASS:
 - Ask about complexity (make them derive it, don't confirm)
 - ONLY ask about optimization IF their solution can be improved (check SOLUTION COMPLEXITY section above)
 - If already optimal: ask about edge cases, trade-offs, or alternative approaches instead
-- Give brief debrief: one thing well, one to improve
+- DO NOT mention "View Detailed Feedback" - user must click Submit first
+- The interview CONTINUES after tests pass - keep asking follow-up questions
 
 ACCEPT CORRECT LOGIC:
 - If their approach is valid, acknowledge it and move on

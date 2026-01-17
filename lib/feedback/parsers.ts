@@ -192,6 +192,67 @@ export function parseFeedback(feedback: string): FeedbackSection {
     aiWatchlist: "",
   }
 
+  // Handle empty or very short feedback (likely a default/placeholder)
+  // This happens when AI feedback generation fails or returns empty
+  if (!feedback || feedback.length < 100) {
+    // Check if it's a simple "Completed X with Y/Z tests" placeholder
+    const completedMatch = feedback?.match(/Completed\s+(.+?)\s+with\s+(\d+)\/(\d+)\s+tests/i)
+    if (completedMatch) {
+      const [, problemTitle, passed, total] = completedMatch
+      const passRate = parseInt(passed) / parseInt(total)
+
+      sections.tldr = feedback
+
+      // Generate reasonable defaults based on pass rate
+      if (passRate === 1) {
+        sections.whatWorked = [
+          "All test cases passed",
+          "Solution correctly handles the problem requirements",
+        ]
+        sections.fixNext = [
+          "Consider explaining your approach before coding in future sessions",
+          "Practice discussing time and space complexity analysis",
+        ]
+      } else if (passRate >= 0.7) {
+        sections.whatWorked = [
+          "Good progress on the solution",
+          `${passed} out of ${total} tests passed`,
+        ]
+        sections.fixNext = [
+          "Review failing test cases to identify edge cases",
+          "Consider tracing through your solution with example inputs",
+        ]
+      } else {
+        sections.whatWorked = [
+          "Attempted the problem",
+          passRate > 0 ? `Made progress with ${passed} tests passing` : "Showed initiative",
+        ]
+        sections.fixNext = [
+          "Review the problem requirements carefully",
+          "Break down the problem into smaller steps",
+          "Consider practicing similar pattern problems",
+        ]
+      }
+
+      sections.actionPlan = [
+        "Review this problem pattern in your study plan",
+        "Practice explaining your approach before coding",
+        "Work on similar problems to reinforce the concepts",
+      ]
+
+      return sections
+    }
+
+    // Generic fallback for other short feedback
+    if (feedback && feedback.length > 0) {
+      sections.tldr = feedback
+      sections.whatWorked = ["Review the detailed feedback for strengths"]
+      sections.fixNext = ["Review the detailed feedback for improvement areas"]
+    }
+
+    return sections
+  }
+
   const tldrMatch = feedback.match(/\*\*TL;DR\*\*[:\s]*([\s\S]+?)(?=\n\*\*|$)/)
   if (tldrMatch) sections.tldr = tldrMatch[1].trim()
 
