@@ -3847,13 +3847,23 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         ])
 
         // Add interviewer message about the error
-        setInterviewerMessages((prev) => [
-          ...prev,
-          {
-            type: "ai",
-            message: `There was a problem running your code: ${errorMessage}. Check that your function name matches what the problem expects, and try again.`,
-          },
-        ])
+        // GUARD: Only add if we haven't added a similar error message in the last 2 messages
+        setInterviewerMessages((prev) => {
+          const recentMessages = prev.slice(-2)
+          const hasRecentErrorMsg = recentMessages.some(
+            (msg) => msg.type === "ai" && (msg.message.includes("problem running your code") || msg.message.includes("error in your code"))
+          )
+          if (hasRecentErrorMsg) {
+            return prev
+          }
+          return [
+            ...prev,
+            {
+              type: "ai",
+              message: `There was a problem running your code: ${errorMessage}. Check that your function name matches what the problem expects, and try again.`,
+            },
+          ]
+        })
 
         playSound("fail")
         setIsRunningTests(false)
@@ -3924,13 +3934,26 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           setIsRunningTests(false)
 
           // Add a helpful message from the interviewer about the error
-          setInterviewerMessages((prev) => [
-            ...prev,
-            {
-              type: "ai",
-              message: `I see there's ${isSyntaxError ? "a syntax error" : "an error"} in your code. Check the console below the editor - it shows exactly what went wrong. Let me know if you'd like help understanding the error.`,
-            },
-          ])
+          // GUARD: Only add if we haven't added a similar error message in the last 2 messages
+          const errorMsgText = `I see there's ${isSyntaxError ? "a syntax error" : "an error"} in your code. Check the console below the editor - it shows exactly what went wrong. Let me know if you'd like help understanding the error.`
+          setInterviewerMessages((prev) => {
+            // Check if recent messages already contain a similar error message
+            const recentMessages = prev.slice(-2)
+            const hasRecentErrorMsg = recentMessages.some(
+              (msg) => msg.type === "ai" && msg.message.includes("error in your code")
+            )
+            if (hasRecentErrorMsg) {
+              // Don't add duplicate error message
+              return prev
+            }
+            return [
+              ...prev,
+              {
+                type: "ai",
+                message: errorMsgText,
+              },
+            ]
+          })
 
           return // Don't proceed to post-interview discussion
         }
@@ -4006,13 +4029,23 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           },
         ])
 
-        setInterviewerMessages((prev) => [
-          ...prev,
-          {
-            type: "ai",
-            message: `There was a problem running your code: ${errorMessage}. Check that your function name matches what the problem expects, and try again.`,
-          },
-        ])
+        // GUARD: Only add if we haven't added a similar error message in the last 2 messages
+        setInterviewerMessages((prev) => {
+          const recentMessages = prev.slice(-2)
+          const hasRecentErrorMsg = recentMessages.some(
+            (msg) => msg.type === "ai" && (msg.message.includes("problem running your code") || msg.message.includes("error in your code"))
+          )
+          if (hasRecentErrorMsg) {
+            return prev
+          }
+          return [
+            ...prev,
+            {
+              type: "ai",
+              message: `There was a problem running your code: ${errorMessage}. Check that your function name matches what the problem expects, and try again.`,
+            },
+          ]
+        })
 
         playSound("fail")
         setIsRunningTests(false)

@@ -130,11 +130,25 @@ export function calculateMasteryScore(input: MasteryScoreInput): MasteryScoreRes
   const independenceScore = calculateIndependenceScore(input)
 
   // Weighted final score
-  const masteryScore = Math.round(
+  let masteryScore = Math.round(
     correctnessScore * WEIGHTS.correctness +
       timeEfficiencyScore * WEIGHTS.timeEfficiency +
       independenceScore * WEIGHTS.independence
   )
+
+  // CRITICAL FLOOR: 100% test pass rate guarantees minimum mastery
+  // You solved the problem correctly - that's the most important signal
+  const passRate = input.testCasesTotal > 0 ? input.testCasesPassed / input.testCasesTotal : 0
+  if (passRate === 1) {
+    // Perfect correctness = minimum 75 mastery (you KNOW this pattern)
+    masteryScore = Math.max(75, masteryScore)
+  } else if (passRate >= 0.8) {
+    // 80%+ correct = minimum 60 mastery
+    masteryScore = Math.max(60, masteryScore)
+  } else if (passRate >= 0.5) {
+    // 50%+ correct = minimum 40 mastery
+    masteryScore = Math.max(40, masteryScore)
+  }
 
   return {
     masteryScore: Math.max(0, Math.min(100, masteryScore)),
@@ -438,7 +452,20 @@ export function quickMasteryScore(params: {
   }
 
   // Calculate final mastery score
-  const masteryScore = baseScore - hintPenalty - timePenalty + timeBonus
+  let masteryScore = baseScore - hintPenalty - timePenalty + timeBonus
+
+  // CRITICAL FLOOR: 100% test pass rate guarantees minimum mastery
+  // (matches the full algorithm's floor logic)
+  if (testCasesPassed === testCasesTotal && testCasesTotal > 0) {
+    masteryScore = Math.max(75, masteryScore)
+  } else if (testCasesTotal > 0) {
+    const passRate = testCasesPassed / testCasesTotal
+    if (passRate >= 0.8) {
+      masteryScore = Math.max(60, masteryScore)
+    } else if (passRate >= 0.5) {
+      masteryScore = Math.max(40, masteryScore)
+    }
+  }
 
   return Math.max(0, Math.min(100, Math.round(masteryScore)))
 }

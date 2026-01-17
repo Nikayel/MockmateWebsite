@@ -628,6 +628,10 @@ export function calculateValidatedScores(
  * PHILOSOPHY: Real FAANG interviews require explaining your thought process.
  * A silent optimal solution is a C at best - you solved the problem but failed
  * to demonstrate the communication skills that interviews are designed to assess.
+ *
+ * CRITICAL FIX: Added backup floors based purely on objective metrics (test pass rate)
+ * These kick in when extraction fails to detect communication properly.
+ * A 100% pass rate indicates strong problem-solving ability and should be reflected.
  */
 export function applyScoreFloors(
   scores: ScoreResult,
@@ -649,9 +653,12 @@ export function applyScoreFloors(
 
   let overall = scores.overall
   let communication = scores.communication
+  let understanding = scores.understanding
+  let problemSolving = scores.problemSolving
+  let codeQuality = scores.codeQuality
 
-  // Score floors - silent solutions get SIGNIFICANTLY LOWER floors
-  // This matches real interview expectations where communication is critical
+  // PHASE 1: Communication-aware floors (original logic)
+  // These apply when we can reliably detect communication quality
   if (passRate >= 100 && isOptimal && hasGoodComm) {
     overall = Math.max(85, overall) // A range - optimal + explained well
     communication = Math.max(70, communication)
@@ -660,21 +667,55 @@ export function applyScoreFloors(
     communication = Math.max(55, communication)
   } else if (passRate >= 100 && isOptimal) {
     // Optimal but SILENT - penalize significantly
-    // In real interviews, this is a major red flag - they can code but can't communicate
-    overall = Math.max(55, overall) // D+ range - good code but failed interview communication
-    // DO NOT boost communication - cap it low
+    overall = Math.max(55, overall)
     communication = Math.min(35, communication)
   } else if (passRate >= 100 && explainedApproach) {
     overall = Math.max(72, overall) // B- range - correct + explained
   } else if (passRate >= 100) {
-    // Correct but SILENT - significant penalty
-    overall = Math.max(52, overall) // D range - solved it but didn't interview well
+    overall = Math.max(52, overall)
     communication = Math.min(40, communication)
   } else if (passRate >= 90) {
-    overall = Math.max(50, overall) // D range
+    overall = Math.max(50, overall)
   } else if (passRate >= 80) {
-    overall = Math.max(45, overall) // D- range
+    overall = Math.max(45, overall)
   }
 
-  return { ...scores, overall, communication, silentSolution: isSilentSolution }
+  // PHASE 2: Objective metric floors (backup)
+  // These ensure technical competence is reflected regardless of extraction accuracy
+  // The tests don't lie - 100% pass rate = you solved the problem correctly
+  if (passRate >= 100) {
+    // CRITICAL: A perfect test pass rate MUST be reflected in scores
+    // Even if extraction fails, the candidate demonstrably solved the problem
+    understanding = Math.max(60, understanding) // You understood enough to solve it
+    problemSolving = Math.max(65, problemSolving) // You solved all test cases
+    codeQuality = Math.max(70, codeQuality) // Your code works perfectly
+
+    // If efficiency metrics show optimal, boost further
+    if (isOptimal) {
+      understanding = Math.max(70, understanding)
+      problemSolving = Math.max(75, problemSolving)
+      codeQuality = Math.max(80, codeQuality)
+    }
+
+    // Recalculate overall if component scores were boosted
+    const newOverall = Math.round(
+      understanding * 0.3 + problemSolving * 0.25 + codeQuality * 0.25 + communication * 0.2
+    )
+    overall = Math.max(overall, newOverall)
+  } else if (passRate >= 80) {
+    // 80%+ pass rate still shows strong competence
+    understanding = Math.max(50, understanding)
+    problemSolving = Math.max(55, problemSolving)
+    codeQuality = Math.max(55, codeQuality)
+  }
+
+  return {
+    ...scores,
+    understanding,
+    problemSolving,
+    codeQuality,
+    communication,
+    overall,
+    silentSolution: isSilentSolution,
+  }
 }
