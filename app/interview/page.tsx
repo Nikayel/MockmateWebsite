@@ -688,13 +688,23 @@ function InterviewPageContent() {
         if (scenario) {
           setSelectedScenario(scenario)
           setCurrentSessionId(sessionId)
-          // Start the interview immediately
-          setIsInterviewStarted(true)
           setShowScenarioBrowser(false)
-          setStartTime(Date.now())
 
-          // Check if there's saved session state to determine if this is a true resume
+          // Check if there's saved session state FIRST before starting interview
           const savedState = await getSessionState(sessionId)
+
+          // Restore Real Interview Mode and strict time limit settings EARLY
+          // This needs to happen before rendering so the UI shows the correct problem statement
+          if (savedState?.realInterviewMode !== undefined) {
+            useInterviewStore.getState().setRealInterviewMode(savedState.realInterviewMode)
+          }
+          if (savedState?.strictTimeLimit !== undefined) {
+            useInterviewStore.getState().setStrictTimeLimit(savedState.strictTimeLimit)
+          }
+
+          // Now start the interview with restored state
+          setIsInterviewStarted(true)
+          setStartTime(Date.now())
 
           // CRITICAL: If session is completed or evaluating, redirect to results page
           // This prevents users from being put back into interview mode
@@ -1297,6 +1307,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               testResults,
               testSummary,
               isPostInterviewDiscussion: showPostInterviewDiscussion,
+              realInterviewMode,
+              strictTimeLimit,
             })
           }
         } else if (isGuestMode && guestId) {
@@ -1321,6 +1333,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   testResults: testResults.slice(-10),
                   testSummary,
                   isPostInterviewDiscussion: showPostInterviewDiscussion,
+                  realInterviewMode,
+                  strictTimeLimit,
                 },
               }),
             })
@@ -4113,6 +4127,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               })),
               testSummary: data.summary,
               isPostInterviewDiscussion: true,
+              realInterviewMode,
+              strictTimeLimit,
             })
           } catch (saveError) {
             console.error("Failed to save session state:", saveError)
@@ -4763,67 +4779,31 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                         </>
                       )}
 
-                      {/* Upload Codebase Section */}
-                      <div className="mt-3 border-t border-gray-700 pt-3">
-                        <h3 className="mb-2 font-semibold text-white">Workspace Files</h3>
-                        {/* Show warning for add-functionality when language has no files */}
-                        {selectedScenario &&
-                          selectedScenario.type === "add-functionality" &&
-                          workspaceContext.length === 0 && (
-                            <div className="mb-2 rounded border border-yellow-500/30 bg-yellow-500/10 p-2">
-                              <p className="text-xs text-yellow-300">
-                                ⚠️ This scenario is optimized for{" "}
-                                <strong>JavaScript/TypeScript</strong>. Switch language for codebase
-                                files.
+                      {/* Upload Codebase Section - Only show for non-DSA scenarios */}
+                      {selectedScenario && selectedScenario.type !== "dsa" && (
+                        <div className="mt-3 border-t border-gray-700 pt-3">
+                          <h3 className="mb-2 font-semibold text-white">Workspace Files</h3>
+                          {/* Show warning for add-functionality when language has no files */}
+                          {selectedScenario &&
+                            selectedScenario.type === "add-functionality" &&
+                            workspaceContext.length === 0 && (
+                              <div className="mb-2 rounded border border-yellow-500/30 bg-yellow-500/10 p-2">
+                                <p className="text-xs text-yellow-300">
+                                  ⚠️ This scenario is optimized for{" "}
+                                  <strong>JavaScript/TypeScript</strong>. Switch language for
+                                  codebase files.
+                                </p>
+                              </div>
+                            )}
+                          {selectedScenario &&
+                          (selectedScenario.type === "bugfix" ||
+                            selectedScenario.type === "add-functionality") &&
+                          workspaceContext.length > 0 ? (
+                            <div className="mb-2">
+                              <p className="mb-2 text-xs text-green-400">
+                                ✓ {workspaceContext.length} codebase file(s) loaded automatically
                               </p>
-                            </div>
-                          )}
-                        {selectedScenario &&
-                        (selectedScenario.type === "bugfix" ||
-                          selectedScenario.type === "add-functionality") &&
-                        workspaceContext.length > 0 ? (
-                          <div className="mb-2">
-                            <p className="mb-2 text-xs text-green-400">
-                              ✓ {workspaceContext.length} codebase file(s) loaded automatically
-                            </p>
-                            <div className="max-h-32 space-y-1 overflow-y-auto">
-                              {workspaceContext.map((file, idx) => (
-                                <button
-                                  key={idx}
-                                  onClick={() => {
-                                    setSelectedFile(file)
-                                    setIsCodeViewerOpen(true)
-                                  }}
-                                  className="w-full cursor-pointer rounded border border-gray-700 bg-gray-800/50 px-2 py-1 text-left text-xs text-gray-300 transition-colors hover:border-blue-500 hover:bg-gray-700/50"
-                                >
-                                  <div className="flex items-center gap-1 font-semibold text-blue-400">
-                                    <Code className="h-3 w-3" />
-                                    {file.path}
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <input
-                              ref={fileInputRef}
-                              type="file"
-                              multiple
-                              accept=".js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.h,.json,.md,.txt,text/*"
-                              onChange={handleFileUpload}
-                              className="hidden"
-                            />
-                            <Button
-                              onClick={() => fileInputRef.current?.click()}
-                              variant="outline"
-                              className="h-7 w-full border-gray-600 bg-transparent text-xs text-gray-300 hover:bg-gray-800"
-                            >
-                              <Code className="mr-1 h-3 w-3" />
-                              Upload Files
-                            </Button>
-                            {workspaceContext.length > 0 && (
-                              <div className="mt-2 space-y-1">
+                              <div className="max-h-32 space-y-1 overflow-y-auto">
                                 {workspaceContext.map((file, idx) => (
                                   <button
                                     key={idx}
@@ -4831,19 +4811,57 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                                       setSelectedFile(file)
                                       setIsCodeViewerOpen(true)
                                     }}
-                                    className="w-full cursor-pointer rounded bg-gray-800/30 px-2 py-1 text-left text-xs text-gray-400 transition-colors hover:bg-gray-700/30 hover:text-blue-400"
+                                    className="w-full cursor-pointer rounded border border-gray-700 bg-gray-800/50 px-2 py-1 text-left text-xs text-gray-300 transition-colors hover:border-blue-500 hover:bg-gray-700/50"
                                   >
-                                    <div className="flex items-center gap-1 truncate">
-                                      <Code className="h-3 w-3 flex-shrink-0" />
+                                    <div className="flex items-center gap-1 font-semibold text-blue-400">
+                                      <Code className="h-3 w-3" />
                                       {file.path}
                                     </div>
                                   </button>
                                 ))}
                               </div>
-                            )}
-                          </>
-                        )}
-                      </div>
+                            </div>
+                          ) : (
+                            <>
+                              <input
+                                ref={fileInputRef}
+                                type="file"
+                                multiple
+                                accept=".js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.h,.json,.md,.txt,text/*"
+                                onChange={handleFileUpload}
+                                className="hidden"
+                              />
+                              <Button
+                                onClick={() => fileInputRef.current?.click()}
+                                variant="outline"
+                                className="h-7 w-full border-gray-600 bg-transparent text-xs text-gray-300 hover:bg-gray-800"
+                              >
+                                <Code className="mr-1 h-3 w-3" />
+                                Upload Files
+                              </Button>
+                              {workspaceContext.length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  {workspaceContext.map((file, idx) => (
+                                    <button
+                                      key={idx}
+                                      onClick={() => {
+                                        setSelectedFile(file)
+                                        setIsCodeViewerOpen(true)
+                                      }}
+                                      className="w-full cursor-pointer rounded bg-gray-800/30 px-2 py-1 text-left text-xs text-gray-400 transition-colors hover:bg-gray-700/30 hover:text-blue-400"
+                                    >
+                                      <div className="flex items-center gap-1 truncate">
+                                        <Code className="h-3 w-3 flex-shrink-0" />
+                                        {file.path}
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 

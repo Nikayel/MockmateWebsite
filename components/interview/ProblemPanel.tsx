@@ -442,69 +442,71 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
           </div>
         )}
 
-        {/* Workspace Files Section */}
-        <div className="mt-3 border-t border-gray-700 pt-3">
-          <h3 className="mb-2 font-semibold text-white">Workspace Files</h3>
-          {scenario.type === "bugfix" && workspaceContext.length > 0 ? (
-            <div className="mb-2">
-              <p className="mb-2 text-xs text-green-400">
-                ✓ {workspaceContext.length} codebase file(s) loaded automatically
-              </p>
-              <div className="max-h-32 space-y-1 overflow-y-auto">
-                {workspaceContext.map((file, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => onFileSelect(file)}
-                    className="w-full cursor-pointer rounded border border-gray-700 bg-gray-800/50 px-2 py-1 text-left text-xs text-gray-300 transition-colors hover:border-blue-500 hover:bg-gray-700/50"
-                  >
-                    <div className="flex items-center gap-1 font-semibold text-blue-400">
-                      <Code className="h-3 w-3" />
-                      {file.path}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept=".js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.h,.json,.md,.txt,text/*"
-                onChange={handleFileUpload}
-                className="hidden"
-                aria-label="Upload workspace files"
-                id="workspace-file-upload"
-              />
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                variant="outline"
-                className="h-7 w-full border-gray-600 bg-transparent text-xs text-gray-300 hover:bg-gray-800"
-                aria-label="Upload code files to workspace"
-              >
-                <Code className="mr-1 h-3 w-3" aria-hidden="true" />
-                Upload Files
-              </Button>
-              {workspaceContext.length > 0 && (
-                <div className="mt-2 space-y-1">
+        {/* Workspace Files Section - Only show for non-DSA scenarios */}
+        {scenario.type !== "dsa" && (
+          <div className="mt-3 border-t border-gray-700 pt-3">
+            <h3 className="mb-2 font-semibold text-white">Workspace Files</h3>
+            {scenario.type === "bugfix" && workspaceContext.length > 0 ? (
+              <div className="mb-2">
+                <p className="mb-2 text-xs text-green-400">
+                  ✓ {workspaceContext.length} codebase file(s) loaded automatically
+                </p>
+                <div className="max-h-32 space-y-1 overflow-y-auto">
                   {workspaceContext.map((file, idx) => (
                     <button
                       key={idx}
                       onClick={() => onFileSelect(file)}
-                      className="w-full cursor-pointer rounded bg-gray-800/30 px-2 py-1 text-left text-xs text-gray-400 transition-colors hover:bg-gray-700/30 hover:text-blue-400"
+                      className="w-full cursor-pointer rounded border border-gray-700 bg-gray-800/50 px-2 py-1 text-left text-xs text-gray-300 transition-colors hover:border-blue-500 hover:bg-gray-700/50"
                     >
-                      <div className="flex items-center gap-1 truncate">
-                        <Code className="h-3 w-3 flex-shrink-0" />
+                      <div className="flex items-center gap-1 font-semibold text-blue-400">
+                        <Code className="h-3 w-3" />
                         {file.path}
                       </div>
                     </button>
                   ))}
                 </div>
-              )}
-            </>
-          )}
-        </div>
+              </div>
+            ) : (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept=".js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.h,.json,.md,.txt,text/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  aria-label="Upload workspace files"
+                  id="workspace-file-upload"
+                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  variant="outline"
+                  className="h-7 w-full border-gray-600 bg-transparent text-xs text-gray-300 hover:bg-gray-800"
+                  aria-label="Upload code files to workspace"
+                >
+                  <Code className="mr-1 h-3 w-3" aria-hidden="true" />
+                  Upload Files
+                </Button>
+                {workspaceContext.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {workspaceContext.map((file, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => onFileSelect(file)}
+                        className="w-full cursor-pointer rounded bg-gray-800/30 px-2 py-1 text-left text-xs text-gray-400 transition-colors hover:bg-gray-700/30 hover:text-blue-400"
+                      >
+                        <div className="flex items-center gap-1 truncate">
+                          <Code className="h-3 w-3 flex-shrink-0" />
+                          {file.path}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   )
