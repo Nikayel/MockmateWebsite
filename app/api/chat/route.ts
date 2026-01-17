@@ -326,6 +326,9 @@ export async function POST(request: NextRequest) {
       conversationTracker,
       hasSubmitted,
       solutionComplexity,
+      // NEW: Real Interview Mode (fuzzy problem statements)
+      realInterviewMode,
+      hasFuzzyStatement,
     } = await request.json()
 
     // For proactive messages (interviewer jumping in), message might be empty
@@ -734,7 +737,13 @@ DO NOT:
     // The LLM cannot ignore this because it's injected based on code logic
     let enforcedChecklist = ""
     const tracker = (enhancedTracker || conversationTracker) as ConversationTracker | undefined
-    if (currentPhase === "discussion" && tracker) {
+    // Run checklist in discussion AND coding phases (before tests run)
+    // This catches cases where starter code pushes phase to "coding" too early
+    const shouldEnforceChecklist =
+      (currentPhase === "discussion" || currentPhase === "coding") &&
+      tracker &&
+      !tracker.hasRunTests
+    if (shouldEnforceChecklist) {
       const missingItems: string[] = []
 
       // Check if complexity has been discussed
@@ -780,6 +789,37 @@ SOLUTION COMPLEXITY:
       }
     }
 
+    // Build Real Interview Mode context (fuzzy problem statements)
+    let fuzzyModeContext = ""
+    if (realInterviewMode && hasFuzzyStatement) {
+      fuzzyModeContext = `
+═══════════════════════════════════════════════════════════════
+🎯 REAL INTERVIEW MODE ACTIVE
+═══════════════════════════════════════════════════════════════
+The problem statement is intentionally VAGUE (like a real interview).
+The candidate is expected to ask clarifying questions.
+
+YOUR BEHAVIOR IN THIS MODE:
+1. EXPECT and ENCOURAGE clarifying questions - they are a POSITIVE signal!
+2. Answer clarifying questions clearly and concisely
+3. DO NOT volunteer information they didn't ask for
+4. If they ask about input format, output format, constraints - answer them
+5. If they dive into coding without clarifying - that's a yellow flag, but let them proceed
+6. DO NOT say "the problem says..." - they have a vague statement
+
+GOOD RESPONSES TO CLARIFYING QUESTIONS:
+- "Good question — yes, you return the actual values, not indices"
+- "Right, you need to handle duplicates"
+- "The array can have negative numbers"
+
+BAD RESPONSES:
+- "Hold up —" (dismissive)
+- Volunteering all constraints before they ask
+- "As stated in the problem..." (they have vague statement)
+═══════════════════════════════════════════════════════════════
+`
+    }
+
     const systemPrompts = {
       interviewer: `You are Sable, a sharp and direct technical interviewer${isGenericCompany ? "" : ` at ${companyStyle.company}`}. You're known for being brutally honest but fair - you give real signal, not empty praise.
 
@@ -812,6 +852,7 @@ ${trackingContext}
 ${hintGuidance}
 ${complexityContext}
 ${enforcedChecklist}
+${fuzzyModeContext}
 ${INTERVIEWER_BEHAVIOR_RULES}
 
 WHEN CANDIDATE PROPOSES APPROACH:
@@ -1212,10 +1253,15 @@ Remember: Acknowledge what they said, then probe deeper or move on. Do NOT re-as
         | undefined
 
       // Check 1: Premature "code it up" without complexity/edge cases
+      // Run in both discussion AND coding phases (before tests run)
       const codeItUpPhrases = ["code it up", "go ahead and code", "start coding", "go code"]
       const hasCodeItUp = codeItUpPhrases.some((phrase) => responseText.includes(phrase))
+      const isPreTestPhase =
+        (currentPhase === "discussion" || currentPhase === "coding") &&
+        activeTracker &&
+        !activeTracker.hasRunTests
 
-      if (hasCodeItUp && currentPhase === "discussion" && activeTracker) {
+      if (hasCodeItUp && isPreTestPhase && activeTracker) {
         if (!activeTracker.timeComplexityMentioned) {
           ruleViolations.push("Said 'code it up' without complexity discussion")
         }
@@ -1240,6 +1286,16 @@ Remember: Acknowledge what they said, then probe deeper or move on. Do NOT re-as
       // Check 3: Premature "View Detailed Feedback" mention
       if (responseText.includes("view detailed feedback") && !hasSubmitted) {
         ruleViolations.push("Mentioned 'View Detailed Feedback' before user submitted")
+      }
+
+      // Check 4: Dismissive phrases when user asks clarifying questions
+      // Clarifying questions are a positive signal and should be encouraged
+      const dismissivePhrases = ["hold up", "wait —", "wait -", "hold on", "stop —", "stop -"]
+      const hasDismissivePhrase = dismissivePhrases.some((phrase) => responseText.includes(phrase))
+      if (hasDismissivePhrase) {
+        ruleViolations.push(
+          "Used dismissive phrase (e.g., 'Hold up') - clarifying questions should be encouraged"
+        )
       }
 
       // Log violations for monitoring (future: regenerate response)
