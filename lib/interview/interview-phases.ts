@@ -215,9 +215,9 @@ THINGS TO AVOID:
 
   complete: `
 CURRENT PHASE: COMPLETE
-The session has ended. Direct the user to view their detailed feedback.
-
-Say: "That's a wrap! Click 'View Detailed Feedback' to see your scores and personalized improvement plan."
+NOTE: This phase is set by frontend when feedback is displayed.
+The chat is no longer active at this point - user is viewing their scores.
+This prompt is NOT sent to the AI (no chat messages in this phase).
 `,
 }
 
