@@ -42,3 +42,13 @@ export { extractTopicsFromMessage, extractUserAnsweredTopics } from "./topic-ext
 // Code analysis utilities
 export { analyzeCodeEfficiency } from "./code-analysis"
 export type { CodeEfficiencyMetrics, OptimalComplexity } from "./code-analysis"
+
+// Clarifying questions checker (Real Interview Mode)
+export {
+  checkClarifyingQuestions,
+  generateClarifyingQuestionsFeedback,
+} from "./clarifying-questions-checker"
+export type {
+  ClarifyingQuestionResult,
+  ClarifyingQuestionsCheckResult,
+} from "./clarifying-questions-checker"
