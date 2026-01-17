@@ -128,6 +128,118 @@ Example visualization:
         description: "Single cell island",
       },
     ],
+
+    // ==========================================
+    // Real Interview Mode (Fuzzy Mode) Fields
+    // ==========================================
+    fuzzyStatement:
+      "Given a 2D grid map, count the number of islands.",
+
+    clarifyingQuestions: [
+      {
+        question: "What constitutes an island?",
+        answer:
+          "An island is a group of '1's (land) connected horizontally or vertically, surrounded by '0's (water).",
+        required: true,
+      },
+      {
+        question: "Are diagonal connections considered?",
+        answer:
+          "No, only horizontal and vertical adjacency counts. Diagonal cells are not connected.",
+        required: true,
+      },
+      {
+        question: "What are the grid values?",
+        answer: "The grid contains only '1' (land) and '0' (water) as characters.",
+        required: false,
+      },
+      {
+        question: "What about the grid boundaries?",
+        answer:
+          "You can assume all four edges of the grid are surrounded by water.",
+        required: false,
+      },
+      {
+        question: "Can I modify the input grid?",
+        answer:
+          "Yes, you can modify the grid in place if it helps your solution.",
+        required: false,
+      },
+      {
+        question: "What if the grid is empty?",
+        answer: "Return 0 for an empty grid.",
+        required: false,
+      },
+    ],
+
+    // ==========================================
+    // Proactive AI Interviewer Fields
+    // ==========================================
+    commonWrongApproaches: [
+      {
+        description: "Not marking visited cells - counting same island multiple times",
+        codeSignals: [
+          "no visited set",
+          "no marking",
+          "counting same cell twice",
+          "infinite loop",
+        ],
+        intervention:
+          "How are you tracking which cells you've already visited? Without that, you might count the same island multiple times.",
+      },
+      {
+        description: "Including diagonal neighbors",
+        codeSignals: [
+          "8 directions",
+          "diagonal",
+          "[[-1,-1], [-1,1], [1,-1], [1,1]]",
+        ],
+        intervention:
+          "I see you're checking 8 neighbors. The problem usually considers only 4-directional connectivity. Want to clarify?",
+      },
+      {
+        description: "Using BFS without proper queue management",
+        codeSignals: [
+          "shift() in loop",
+          "pop instead of shift",
+          "queue issues",
+        ],
+        intervention:
+          "Watch your queue operations. In BFS, you typically dequeue from the front. What order are you processing nodes?",
+      },
+    ],
+
+    whatIfQuestions: [
+      "What if the entire grid is water (all zeros)?",
+      "What if the entire grid is one big island?",
+      "What's your time and space complexity?",
+      "Could you solve this iteratively instead of recursively (or vice versa)?",
+      "What if the grid is very large - say 300x300? Any stack overflow concerns?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "starting DFS/BFS traversal",
+        question:
+          "Walk me through what happens when you find a '1'. What cells do you visit and in what order?",
+      },
+      {
+        trigger: "marking cells as visited",
+        question:
+          "I see you're marking visited cells. Why change '1' to '0' instead of using a separate visited set?",
+      },
+      {
+        trigger: "iterating through grid",
+        question:
+          "When you find a '1' and explore its island, why do you increment the count before exploring?",
+      },
+    ],
+
+    optimizationPush: {
+      suboptimalComplexity: "O(m*n) with O(m*n) extra space",
+      nudge:
+        "Your solution uses extra space for the visited set. Can you do it with O(1) extra space by modifying the input?",
+    },
   },
   {
     id: "dsa-course-schedule",

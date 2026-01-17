@@ -94,11 +94,13 @@ export interface ScorePersistenceInput {
  */
 export const SCORE_WEIGHTS = {
   // Performance score (full interview simulation)
+  // Communication bumped to 30% to reflect real interview importance
+  // (At Google, poor communicators often get rejected even with correct solutions)
   performance: {
     understanding: 0.25,
     problemSolving: 0.25,
-    codeQuality: 0.3,
-    communication: 0.2,
+    codeQuality: 0.2,
+    communication: 0.3,
   },
   // Technical score = Mastery score (objective metrics only)
   // Calculated in lib/spaced-repetition/mastery-score.ts

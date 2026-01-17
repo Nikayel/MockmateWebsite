@@ -35,6 +35,10 @@ interface InterviewHeaderProps {
   onBack?: () => void;
   isSubmitting?: boolean;
   className?: string;
+  /** Strict time limit in seconds (e.g., 25*60 for Meta) */
+  strictTimeLimit?: number | null;
+  /** Tooltip explaining why time limit exists */
+  strictTimeReason?: string;
 }
 
 // Get icon based on scenario type
@@ -73,6 +77,8 @@ export function InterviewHeader({
   onBack,
   isSubmitting = false,
   className,
+  strictTimeLimit,
+  strictTimeReason,
 }: InterviewHeaderProps) {
   if (!scenario) return null;
 
@@ -109,14 +115,23 @@ export function InterviewHeader({
 
       {/* Center: Timer */}
       <div className="hidden md:flex items-center">
-        <InterviewTimer elapsedSeconds={elapsedSeconds} />
+        <InterviewTimer
+          elapsedSeconds={elapsedSeconds}
+          strictTimeLimit={strictTimeLimit}
+          strictTimeReason={strictTimeReason}
+        />
       </div>
 
       {/* Right: Actions */}
       <div className="flex items-center gap-2">
         {/* Mobile timer */}
         <div className="md:hidden">
-          <InterviewTimer elapsedSeconds={elapsedSeconds} showIcon={false} />
+          <InterviewTimer
+            elapsedSeconds={elapsedSeconds}
+            showIcon={false}
+            strictTimeLimit={strictTimeLimit}
+            strictTimeReason={strictTimeReason}
+          />
         </div>
 
         {onReset && (

@@ -127,6 +127,12 @@ interface InterviewState {
   // Company Picker (for freeball sessions)
   showCompanyPicker: boolean
   targetCompany: InterviewTargetCompany
+
+  // Real Interview Mode (fuzzy problem statements + clarifying questions)
+  realInterviewMode: boolean
+
+  // Strict Time Limit (in seconds) - e.g., 25*60 for Meta
+  strictTimeLimit: number | null
 }
 
 // Actions Interface
@@ -208,6 +214,10 @@ interface InterviewActions {
   // Company Picker Actions
   setShowCompanyPicker: (show: boolean) => void
   setTargetCompany: (company: InterviewTargetCompany) => void
+
+  // Real Interview Mode Actions
+  setRealInterviewMode: (enabled: boolean) => void
+  setStrictTimeLimit: (seconds: number | null) => void
 }
 
 // Initial State
@@ -278,6 +288,10 @@ const initialState: InterviewState = {
   // Company Picker (for freeball sessions)
   showCompanyPicker: false,
   targetCompany: null,
+
+  // Real Interview Mode
+  realInterviewMode: false,
+  strictTimeLimit: null,
 }
 
 // Create the store
@@ -441,6 +455,10 @@ export const useInterviewStore = create<InterviewState & InterviewActions>()(
       // Company Picker Actions
       setShowCompanyPicker: (show) => set({ showCompanyPicker: show }),
       setTargetCompany: (company) => set({ targetCompany: company }),
+
+      // Real Interview Mode Actions
+      setRealInterviewMode: (enabled) => set({ realInterviewMode: enabled }),
+      setStrictTimeLimit: (seconds) => set({ strictTimeLimit: seconds }),
     }),
     { name: "interview-store" }
   )

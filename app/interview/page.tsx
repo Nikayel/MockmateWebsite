@@ -134,6 +134,11 @@ const CompanyPicker = nextDynamic(
   { ssr: false }
 )
 
+const InterviewTimer = nextDynamic(
+  () => import("@/components/interview").then((mod) => ({ default: mod.InterviewTimer })),
+  { ssr: false }
+)
+
 // Dynamically import heavy components to reduce initial bundle size
 // CodeMirror 6 is used instead of Monaco for ~95% smaller bundle
 const CodeEditor = nextDynamic(
@@ -203,6 +208,8 @@ function InterviewPageContent() {
     setTargetCompany,
     showCompanyPicker,
     setShowCompanyPicker,
+    realInterviewMode,
+    strictTimeLimit,
   } = useInterviewStore()
   const [isLoading, setIsLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
@@ -4287,11 +4294,16 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                   {isInterviewStarted && (
                     <div className="bg-secondary/50 flex items-center overflow-hidden rounded-lg">
                       {!hideTimer && (
-                        <div className="flex items-center space-x-1.5 px-2 py-1">
-                          <Clock className="text-accent h-3 w-3" />
-                          <span className="text-foreground font-mono text-xs">
-                            {formatTime(elapsedTime)}
-                          </span>
+                        <div className="px-1 py-0.5">
+                          <InterviewTimer
+                            elapsedSeconds={elapsedTime}
+                            strictTimeLimit={strictTimeLimit}
+                            strictTimeReason={
+                              strictTimeLimit
+                                ? "Meta gives 45 minutes for 2 coding questions (~25 min each). They are strict about time."
+                                : undefined
+                            }
+                          />
                         </div>
                       )}
                       <button
@@ -5367,8 +5379,11 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         <CompanyPicker
           open={showCompanyPicker}
           onClose={() => setShowCompanyPicker(false)}
-          onSelect={(company) => {
+          onSelect={(company, realInterviewMode, strictTimeLimit) => {
             setShowCompanyPicker(false)
+            // Store real interview mode and strict time settings
+            useInterviewStore.getState().setRealInterviewMode(realInterviewMode)
+            useInterviewStore.getState().setStrictTimeLimit(strictTimeLimit)
             // Restart the interview flow with the selected company
             startInterview(selectedScenario, company)
           }}

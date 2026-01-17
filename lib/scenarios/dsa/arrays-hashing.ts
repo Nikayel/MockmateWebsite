@@ -135,6 +135,100 @@ public:
         description: "Zeros: [0,4,3,0], target 0",
       },
     ],
+
+    // ==========================================
+    // Real Interview Mode (Fuzzy Mode) Fields
+    // ==========================================
+    fuzzyStatement:
+      "Given an array of numbers, find two that add up to a target value.",
+
+    clarifyingQuestions: [
+      {
+        question: "Should I return the indices or the actual values?",
+        answer: "Return the indices of the two numbers.",
+        required: true,
+      },
+      {
+        question: "Can there be multiple valid pairs?",
+        answer:
+          "Assume exactly one solution exists. You don't need to handle multiple.",
+        required: false,
+      },
+      {
+        question: "Can I use the same element twice?",
+        answer:
+          "No, you cannot use the same element twice. Each index can only be used once.",
+        required: true,
+      },
+      {
+        question: "What if no valid pair exists?",
+        answer: "You can assume there's always exactly one valid answer.",
+        required: false,
+      },
+      {
+        question: "Is the array sorted?",
+        answer: "No, the array is not necessarily sorted.",
+        required: false,
+      },
+      {
+        question: "Can there be negative numbers?",
+        answer: "Yes, numbers can be negative.",
+        required: false,
+      },
+    ],
+
+    // ==========================================
+    // Proactive AI Interviewer Fields
+    // ==========================================
+    commonWrongApproaches: [
+      {
+        description: "Nested loops brute force O(n²)",
+        codeSignals: [
+          "two nested for loops",
+          "for i in range AND for j in range",
+          "O(n^2)",
+          "O(n²)",
+        ],
+        intervention:
+          "That's a valid O(n²) approach. Before you code it all out, can you think of a way to do this in a single pass using extra space?",
+      },
+      {
+        description: "Sorting then two pointers (loses original indices)",
+        codeSignals: ["sort(", ".sort(", "sorted(", "two pointers after sort"],
+        intervention:
+          "Careful - if you sort the array, how will you keep track of the original indices? Think about what information you might lose.",
+      },
+    ],
+
+    whatIfQuestions: [
+      "What if the array is empty or has only one element?",
+      "What if the target is negative?",
+      "What if there are duplicate values like [3,3] with target 6?",
+      "What if the array has millions of elements - does your solution scale?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "started creating hash map/dictionary",
+        question: "What are you storing as the key vs the value in your map?",
+      },
+      {
+        trigger: "checking for complement",
+        question:
+          "Why do you check for the complement before adding to the map, rather than after?",
+      },
+      {
+        trigger: "loop started",
+        question:
+          "Walk me through what happens on the first iteration with nums=[2,7,11,15] and target=9.",
+      },
+    ],
+
+    optimizationPush: {
+      suboptimalComplexity: "O(n²)",
+      nudge:
+        "That brute force works but visits each pair. Can you get O(n) time using O(n) extra space?",
+    },
   },
   {
     id: "dsa-contains-duplicate",
