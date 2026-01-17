@@ -33,6 +33,7 @@ import {
   type NotificationType,
 } from "@/lib/rag/knowledge-base/notification-knowledge"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
+import { isToday, getTodayInTimezone } from "@/lib/email/timezone"
 
 export interface SessionCompletionData {
   userId: string
@@ -164,6 +165,9 @@ export async function triggerSessionNotifications(data: SessionCompletionData): 
 /**
  * Check if user's streak is at risk and send notification.
  * Called from a cron job or dashboard load.
+ *
+ * IMPORTANT: Uses timezone-aware date comparison to correctly determine
+ * if the user has practiced "today" in their local timezone.
  */
 export async function checkStreakAtRisk(userId: string): Promise<boolean> {
   try {
@@ -173,7 +177,7 @@ export async function checkStreakAtRisk(userId: string): Promise<boolean> {
     if (!learningState) return false
 
     const streakDays = learningState.streak_days || 0
-    const lastPracticeDate = learningState.last_session_at
+    const lastSessionAt = learningState.last_session_at
 
     // No streak to protect
     if (streakDays < 3) return false
@@ -197,21 +201,9 @@ export async function checkStreakAtRisk(userId: string): Promise<boolean> {
       currentHour = now.getUTCHours()
     }
 
-    // Check if they've practiced today (in user's timezone)
-    let todayInUserTz: string
-    try {
-      const dateFormatter = new Intl.DateTimeFormat("en-CA", {
-        timeZone: userTimezone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      })
-      todayInUserTz = dateFormatter.format(now)
-    } catch {
-      todayInUserTz = now.toISOString().split("T")[0]
-    }
-
-    if (lastPracticeDate?.split("T")[0] === todayInUserTz) return false
+    // Check if they've practiced today using timezone-aware comparison
+    // FIXED: Previously compared UTC date portion to user's local date (bug!)
+    if (isToday(lastSessionAt, userTimezone)) return false
 
     // Check if it's evening (after 7 PM in user's local time)
     if (currentHour < 19) return false
@@ -234,6 +226,8 @@ export async function checkStreakAtRisk(userId: string): Promise<boolean> {
 /**
  * Send a daily practice reminder if user hasn't practiced.
  * Called from a cron job.
+ *
+ * IMPORTANT: Uses timezone-aware date comparison.
  */
 export async function sendDailyReminderIfNeeded(userId: string): Promise<boolean> {
   try {
@@ -242,11 +236,15 @@ export async function sendDailyReminderIfNeeded(userId: string): Promise<boolean
 
     if (!learningState) return false
 
-    // Check if they've practiced today
-    const today = new Date().toISOString().split("T")[0]
-    const lastPracticeDate = learningState.last_session_at
+    // Get user's timezone for accurate "today" check
+    const prefs = await getNotificationPreferencesServer(userId)
+    const userTimezone = prefs.timezone || "America/Los_Angeles"
 
-    if (lastPracticeDate?.split("T")[0] === today) return false
+    // Check if they've practiced today (in THEIR timezone)
+    const lastSessionAt = learningState.last_session_at
+
+    // FIXED: Previously used UTC date comparison
+    if (isToday(lastSessionAt, userTimezone)) return false
 
     const streakDays = learningState.streak_days || 0
 

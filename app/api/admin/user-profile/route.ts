@@ -22,6 +22,8 @@ import {
 } from "@/lib/rag/enhanced-user-profile"
 import { adminDb } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
+import { getDaysDifference, DEFAULT_TIMEZONE } from "@/lib/email/timezone"
+import type { Profile } from "@/lib/types"
 
 export async function GET(request: NextRequest) {
   const authResult = await verifyAdminAccess(request)
@@ -48,7 +50,14 @@ export async function GET(request: NextRequest) {
     const profileData = profileDoc.data()
 
     // Fetch all enhanced profile data in parallel
-    const [enhancedProfile, insights, interviewReadiness, misconceptionData, accurateBehavior, dataQuality] = await Promise.all([
+    const [
+      enhancedProfile,
+      insights,
+      interviewReadiness,
+      misconceptionData,
+      accurateBehavior,
+      dataQuality,
+    ] = await Promise.all([
       getEnhancedUserProfile(userId),
       getUserInsights(userId),
       getInterviewReadiness(userId),
@@ -263,20 +272,28 @@ async function getRecentSessionsForUser(userId: string) {
  */
 async function getLearningStateForUser(userId: string) {
   try {
-    // Fetch data from all relevant sources in parallel
-    const [learningDoc, statsDoc, masterySnap, sessionSummariesSnap] = await Promise.all([
-      adminDb.collection("user_learning_state").doc(userId).get(),
-      adminDb.collection("user_stats").doc(userId).get(),
-      adminDb.collection("user_problem_mastery").doc(userId).collection("problems").get(),
-      // Also fetch session summaries as fallback for computing stats
-      adminDb
-        .collection("users")
-        .doc(userId)
-        .collection("session_summaries")
-        .orderBy("completedAt", "desc")
-        .limit(100)
-        .get(),
-    ])
+    // Fetch data from all relevant sources in parallel (including profile for timezone)
+    const [learningDoc, statsDoc, masterySnap, sessionSummariesSnap, profileDoc] =
+      await Promise.all([
+        adminDb.collection("user_learning_state").doc(userId).get(),
+        adminDb.collection("user_stats").doc(userId).get(),
+        adminDb.collection("user_problem_mastery").doc(userId).collection("problems").get(),
+        // Also fetch session summaries as fallback for computing stats
+        adminDb
+          .collection("users")
+          .doc(userId)
+          .collection("session_summaries")
+          .orderBy("completedAt", "desc")
+          .limit(100)
+          .get(),
+        // Fetch profile for timezone-aware streak calculation
+        adminDb.collection("profiles").doc(userId).get(),
+      ])
+
+    // Get user's timezone for accurate streak calculation
+    const userTimezone = profileDoc.exists
+      ? (profileDoc.data() as Profile).notification_preferences?.timezone || DEFAULT_TIMEZONE
+      : DEFAULT_TIMEZONE
 
     const learningData = learningDoc.exists ? learningDoc.data() : null
     const statsData = statsDoc.exists ? statsDoc.data() : null
@@ -387,13 +404,12 @@ async function getLearningStateForUser(userId: string) {
     }
 
     // Calculate streak - check if it should be reset due to inactivity
+    // IMPORTANT: Uses timezone-aware calendar day comparison
     let studyStreak = learningData?.streak_days || 0
-    if (learningData?.last_session_date) {
-      const lastSessionDate = new Date(learningData.last_session_date)
-      const today = new Date()
-      const daysDiff = Math.floor(
-        (today.getTime() - lastSessionDate.getTime()) / (24 * 60 * 60 * 1000)
-      )
+    const lastSessionAt = learningData?.last_session_at
+    if (lastSessionAt) {
+      // Use timezone-aware day difference calculation
+      const daysDiff = getDaysDifference(lastSessionAt, new Date(), userTimezone)
 
       // If more than 1 day since last session, streak is effectively 0 (needs new session to restart)
       if (daysDiff > 1) {
