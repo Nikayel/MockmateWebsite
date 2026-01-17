@@ -112,6 +112,45 @@ export async function extractConversationEvidence(
 }
 
 /**
+ * Get the "rank" of a complexity for comparison
+ * Higher rank = worse/bigger complexity
+ */
+function getComplexityRank(complexity: string): number {
+  const c = complexity.toUpperCase().replace(/\s+/g, '')
+  // Polynomial complexities
+  if (c.includes('N^3') || c.includes('N³') || c.includes('NCUBED')) return 100
+  if (c.includes('N^2') || c.includes('N²') || c.includes('NSQUARED') || c.includes('QUADRATIC')) return 80
+  if (c.includes('NLOGN') || c.includes('N*LOGN') || c.includes('N LOG N')) return 60
+  if (c.includes('N)') && !c.includes('LOG')) return 40  // O(N)
+  if (c.includes('LOGN') || c.includes('LOG N')) return 30  // O(log n)
+  if (c.includes('1)')) return 10  // O(1)
+  return 50 // Unknown - assume middle ground
+}
+
+/**
+ * Find the dominant (highest rank) complexity from a list
+ * For time complexity, the dominant one is usually the correct overall complexity
+ */
+function findDominantComplexity(complexities: string[]): string {
+  if (complexities.length === 0) return 'O(N)'
+  if (complexities.length === 1) return complexities[0]
+
+  // Find the one with highest rank
+  let dominant = complexities[0]
+  let highestRank = getComplexityRank(dominant)
+
+  for (const c of complexities) {
+    const rank = getComplexityRank(c)
+    if (rank > highestRank) {
+      highestRank = rank
+      dominant = c
+    }
+  }
+
+  return dominant
+}
+
+/**
  * Algorithmic extraction - fast, no AI needed
  */
 function extractAlgorithmically(
@@ -135,35 +174,76 @@ function extractAlgorithmically(
 
   let interviewerAskedEdgeCase = false
 
+  // Track pending questions to match with answers
+  let pendingQuestions: { question: string; messageIndex: number }[] = []
+
   transcript.forEach((msg, index) => {
     const content = msg.content.toLowerCase()
     const originalContent = msg.content
 
     if (msg.role === 'user') {
-      // Check for complexity mentions
-      const complexityMatch = originalContent.match(/O\([^)]+\)/gi)
-      if (complexityMatch) {
-        const complexity = complexityMatch[0].toUpperCase()
+      // ANSWER DETECTION: If there are pending questions and user responds with substance,
+      // mark them as answered. A substantive response is > 20 chars (not just "ok" or "yes")
+      if (pendingQuestions.length > 0 && originalContent.length > 20) {
+        pendingQuestions.forEach(pq => {
+          // Find the question in our evidence and mark it answered
+          const questionEntry = evidence.interviewerQuestions!.find(
+            q => q.question === pq.question
+          )
+          if (questionEntry) {
+            questionEntry.answered = true
+            questionEntry.answerQuality = originalContent.length > 100 ? 'good' : 'partial'
+            questionEntry.quote = originalContent.substring(0, 150)
+          }
+        })
+        // Clear pending questions after processing
+        pendingQuestions = []
+      }
+
+      // Check for complexity mentions - find DOMINANT complexity, not just first
+      const complexityMatches = originalContent.match(/O\([^)]+\)/gi)
+      if (complexityMatches && complexityMatches.length > 0) {
+        // Get ALL complexity values and find the dominant one
+        const allComplexities = complexityMatches.map(c => c.toUpperCase())
+        const dominantComplexity = findDominantComplexity(allComplexities)
+
+        // Also check for non-O(...) keywords like "n squared", "quadratic", etc.
+        // These often represent the actual time complexity
+        let keywordComplexity: string | null = null
+        if (content.includes('n squared') || content.includes('n^2') || content.includes('quadratic')) {
+          keywordComplexity = 'O(N²)'
+        } else if (content.includes('n log n')) {
+          keywordComplexity = 'O(N LOG N)'
+        } else if (content.includes('linear') && !content.includes('log')) {
+          keywordComplexity = 'O(N)'
+        }
+
+        // Use keyword complexity if it's "bigger" than the O(...) matches
+        // This handles "sorting is O(n log n) but overall is n squared"
+        const finalComplexity = keywordComplexity &&
+          getComplexityRank(keywordComplexity) > getComplexityRank(dominantComplexity)
+          ? keywordComplexity
+          : dominantComplexity
 
         // Determine if time or space based on context
-        if (content.includes('time') || content.includes('runtime') || !evidence.timeComplexity!.mentioned) {
+        if (content.includes('time') || content.includes('runtime') || content.includes('overall') || !evidence.timeComplexity!.mentioned) {
           evidence.timeComplexity = {
             mentioned: true,
-            value: complexity,
+            value: finalComplexity,
             explanationGiven: content.includes('because') || content.includes('loop') || content.includes('iterate'),
             quote: originalContent.substring(0, 200),
             messageIndex: index,
-            isCorrect: complexity === problemContext.optimalTimeComplexity.toUpperCase(),
+            isCorrect: finalComplexity === problemContext.optimalTimeComplexity.toUpperCase(),
           }
         }
 
         if (content.includes('space') || content.includes('memory')) {
           evidence.spaceComplexity = {
             mentioned: true,
-            value: complexity,
+            value: dominantComplexity, // For space, use the raw match
             quote: originalContent.substring(0, 200),
             messageIndex: index,
-            isCorrect: complexity === problemContext.optimalSpaceComplexity.toUpperCase(),
+            isCorrect: dominantComplexity === problemContext.optimalSpaceComplexity.toUpperCase(),
           }
         }
       }
@@ -245,17 +325,24 @@ function extractAlgorithmically(
     }
 
     if (msg.role === 'interviewer' || msg.role === 'assistant') {
-      // Track interviewer questions
+      // Track interviewer questions and add to pending queue
       if (content.includes('?')) {
         const questionMatch = originalContent.match(/[^.!?]*\?/g)
         if (questionMatch) {
           questionMatch.forEach(q => {
+            const questionText = q.trim()
+            // Skip very short questions (likely rhetorical) or confirmations
+            if (questionText.length < 15 || questionText.toLowerCase().includes('right?')) {
+              return
+            }
             evidence.interviewerQuestions!.push({
-              question: q.trim(),
-              answered: false,  // Will be filled by semantic extraction
+              question: questionText,
+              answered: false,  // Will be updated when user responds
               answerQuality: 'unanswered',
               quote: null,
             })
+            // Add to pending questions for next user message to match
+            pendingQuestions.push({ question: questionText, messageIndex: index })
           })
         }
       }
