@@ -279,10 +279,21 @@ export function updateTrackerFromMessage(
     }
 
     // Check for complexity mentions
-    const complexityMatch = message.match(/O\([^)]+\)/gi)
-    if (complexityMatch) {
-      complexityMatch.forEach((c) => {
-        const complexity = c.toUpperCase()
+    // Support multiple formats: O(n), O n, O of n, n squared, linear, etc.
+    const complexityPatterns = [
+      /O\s*\(\s*([^)]+)\s*\)/gi, // O(n), O( n log n ), O(n^2)
+      /O\s+of\s+(\w+)/gi, // O of n, O of n squared
+      /O\s+(\d*\s*n\s*(?:\^?\d*|squared|cubed)?(?:\s*log\s*n)?)/gi, // O n, O n^2, O n log n
+      /(\w+)\s+time/gi, // linear time, quadratic time, constant time
+      /time\s+(?:complexity\s+)?(?:is\s+)?(\w+)/gi, // time is linear, time complexity is O(n)
+    ]
+
+    let complexityMentioned = false
+    for (const pattern of complexityPatterns) {
+      const match = message.match(pattern)
+      if (match) {
+        complexityMentioned = true
+        const complexity = match[0].toUpperCase()
         if (lowerMessage.includes("time") || lowerMessage.includes("runtime")) {
           updated.timeComplexityMentioned = true
           updated.timeComplexityValue = complexity
@@ -294,18 +305,40 @@ export function updateTrackerFromMessage(
           updated.timeComplexityMentioned = true
           updated.timeComplexityValue = complexity
         }
-      })
+        break
+      }
+    }
 
-      // Check if they explained why
-      if (
-        lowerMessage.includes("because") ||
+    // Also check for explicit complexity keywords
+    if (
+      !complexityMentioned &&
+      (lowerMessage.includes("linear") ||
+        lowerMessage.includes("constant") ||
+        lowerMessage.includes("quadratic") ||
+        lowerMessage.includes("logarithmic") ||
+        lowerMessage.includes("n squared") ||
+        lowerMessage.includes("n log n"))
+    ) {
+      updated.timeComplexityMentioned = true
+      if (lowerMessage.includes("linear")) updated.timeComplexityValue = "O(n)"
+      if (lowerMessage.includes("constant")) updated.timeComplexityValue = "O(1)"
+      if (lowerMessage.includes("quadratic") || lowerMessage.includes("n squared"))
+        updated.timeComplexityValue = "O(n²)"
+      if (lowerMessage.includes("logarithmic")) updated.timeComplexityValue = "O(log n)"
+      if (lowerMessage.includes("n log n")) updated.timeComplexityValue = "O(n log n)"
+    }
+
+    // Check if they explained why
+    if (
+      updated.timeComplexityMentioned &&
+      (lowerMessage.includes("because") ||
         lowerMessage.includes("since") ||
         lowerMessage.includes("due to") ||
         lowerMessage.includes("loop") ||
-        lowerMessage.includes("iterate")
-      ) {
-        updated.complexityExplanationGiven = true
-      }
+        lowerMessage.includes("iterate") ||
+        lowerMessage.includes("through"))
+    ) {
+      updated.complexityExplanationGiven = true
     }
 
     // Check for edge case mentions
