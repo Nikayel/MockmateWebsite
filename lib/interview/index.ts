@@ -44,10 +44,9 @@ export { analyzeCodeEfficiency } from "./code-analysis"
 export type { CodeEfficiencyMetrics, OptimalComplexity } from "./code-analysis"
 
 // Clarifying questions checker (Real Interview Mode)
-export {
-  checkClarifyingQuestions,
-  generateClarifyingQuestionsFeedback,
-} from "./clarifying-questions-checker"
+// NOTE: Server-only module - import directly from "./clarifying-questions-checker"
+// to avoid bundling firebase-admin into client code.
+// export { checkClarifyingQuestions, generateClarifyingQuestionsFeedback } from "./clarifying-questions-checker"
 export type {
   ClarifyingQuestionResult,
   ClarifyingQuestionsCheckResult,
@@ -60,7 +59,13 @@ export {
   getMidCodingProbe,
   detectWrongApproach,
 } from "./proactive-triggers"
-export type {
-  ProactiveContext,
-  ProactiveTriggerResult,
-} from "./proactive-triggers"
+export type { ProactiveContext, ProactiveTriggerResult } from "./proactive-triggers"
+
+// Company-specific time limits (DRY: single source of truth)
+export {
+  STRICT_TIME_COMPANIES,
+  getStrictTimeConfig,
+  hasStrictTimeLimit,
+  getStrictTimeLimitMinutes,
+} from "./company-time-limits"
+export type { StrictTimeConfig } from "./company-time-limits"
