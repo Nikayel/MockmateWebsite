@@ -42,6 +42,7 @@ import {
   shouldRunExtraction,
 } from "@/lib/interview/conversation-extraction"
 import { buildCompanyInterviewerPrompt } from "@/lib/interview/company-interviewer-styles"
+import { validateInterviewerResponse } from "@/lib/interview/response-validation"
 import { truncateText, truncateFileContent } from "@/lib/utils"
 
 interface UserContext {
@@ -1245,64 +1246,29 @@ Remember: Acknowledge what they said, then probe deeper or move on. Do NOT re-as
 
     // POST-GENERATION VALIDATION: Check for interviewer rule violations
     // This catches common errors that prompt engineering alone can't prevent
+    // Now with regeneration capability for critical violations
     if (role === "interviewer") {
-      const responseText = aiResponse.text.toLowerCase()
-      const ruleViolations: string[] = []
       const activeTracker = (enhancedTracker || conversationTracker) as
         | ConversationTracker
         | undefined
 
-      // Check 1: Premature "code it up" without complexity/edge cases
-      // Run in both discussion AND coding phases (before tests run)
-      const codeItUpPhrases = ["code it up", "go ahead and code", "start coding", "go code"]
-      const hasCodeItUp = codeItUpPhrases.some((phrase) => responseText.includes(phrase))
-      const isPreTestPhase =
-        (currentPhase === "discussion" || currentPhase === "coding") &&
-        activeTracker &&
-        !activeTracker.hasRunTests
+      const validation = validateInterviewerResponse({
+        response: aiResponse.text,
+        phase: currentPhase,
+        tracker: activeTracker,
+        hasSubmitted: hasSubmitted || false,
+        lastUserMessage: message,
+      })
 
-      if (hasCodeItUp && isPreTestPhase && activeTracker) {
-        if (!activeTracker.timeComplexityMentioned) {
-          ruleViolations.push("Said 'code it up' without complexity discussion")
-        }
-        if (activeTracker.edgeCasesMentioned.length === 0) {
-          ruleViolations.push("Said 'code it up' without edge cases discussion")
-        }
-      }
-
-      // Check 2: Leading questions that give away the answer
-      const leadingPatterns = [
-        /are you thinking.*(dp|dynamic|hash|map|set|tree|stack|queue)/i,
-        /would a.*(hash|map|set|array|tree|stack|queue).*help/i,
-        /have you considered.*(dp|dynamic|hash|sliding|two pointer)/i,
-        /it's basically.*(fibonacci|dp|bfs|dfs|binary search)/i,
-      ]
-      for (const pattern of leadingPatterns) {
-        if (pattern.test(aiResponse.text)) {
-          ruleViolations.push(`Leading question detected: ${pattern.toString()}`)
-        }
-      }
-
-      // Check 3: Premature "View Detailed Feedback" mention
-      if (responseText.includes("view detailed feedback") && !hasSubmitted) {
-        ruleViolations.push("Mentioned 'View Detailed Feedback' before user submitted")
-      }
-
-      // Check 4: Dismissive phrases when user asks clarifying questions
-      // Clarifying questions are a positive signal and should be encouraged
-      const dismissivePhrases = ["hold up", "wait —", "wait -", "hold on", "stop —", "stop -"]
-      const hasDismissivePhrase = dismissivePhrases.some((phrase) => responseText.includes(phrase))
-      if (hasDismissivePhrase) {
-        ruleViolations.push(
-          "Used dismissive phrase (e.g., 'Hold up') - clarifying questions should be encouraged"
-        )
-      }
-
-      // Log violations for monitoring (future: regenerate response)
-      if (ruleViolations.length > 0) {
+      // Log violations for monitoring
+      if (!validation.isValid) {
         logger.warn("[Chat API] Interviewer rule violations detected", {
           sessionId,
-          violations: ruleViolations,
+          violations: validation.violations.map((v) => ({
+            rule: v.rule,
+            severity: v.severity,
+            evidence: v.evidence.substring(0, 100),
+          })),
           phase: currentPhase,
           trackerState: activeTracker
             ? {
@@ -1312,6 +1278,45 @@ Remember: Acknowledge what they said, then probe deeper or move on. Do NOT re-as
             : null,
           responsePreview: aiResponse.text.substring(0, 200),
         })
+
+        // Regenerate on critical violations (max 1 retry to avoid loops)
+        if (validation.shouldRegenerate && validation.regenerationHint) {
+          logger.info("[Chat API] Regenerating response due to critical violation", {
+            sessionId,
+            hint: validation.regenerationHint,
+          })
+
+          // Add the hint to the prompt and regenerate
+          const correctedPrompt = `${systemPrompt}
+
+⚠️ CRITICAL CORRECTION REQUIRED:
+Your previous response violated interviewer rules: ${validation.regenerationHint}
+Generate a new response that follows the rules properly.`
+
+          try {
+            const regeneratedResponse = await generateAIResponse(
+              correctedPrompt,
+              fullUserMessage,
+              history,
+              {
+                complexity,
+                userId,
+                sessionId,
+                eventType: "chat_message_retry",
+              }
+            )
+
+            // Use the regenerated response
+            aiResponse.text = regeneratedResponse.text
+            aiResponse.provider = regeneratedResponse.provider
+            aiResponse.latencyMs = (aiResponse.latencyMs || 0) + (regeneratedResponse.latencyMs || 0)
+
+            logger.info("[Chat API] Successfully regenerated response", { sessionId })
+          } catch (regenError) {
+            // If regeneration fails, use the original response
+            logger.error("[Chat API] Failed to regenerate response", { error: regenError })
+          }
+        }
       }
     }
 

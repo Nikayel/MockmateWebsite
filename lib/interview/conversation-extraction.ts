@@ -3,6 +3,12 @@
  *
  * Uses a fast/cheap LLM call to extract what the candidate has discussed,
  * replacing fragile regex-based detection.
+ *
+ * Key improvements over regex:
+ * - Extracts DOMINANT complexity (overall, not just first/sort)
+ * - Detects approach explanation quality (not just presence)
+ * - Tracks clarifying questions asked (positive signal)
+ * - Understands context and intent
  */
 
 import { generateAIResponse } from "@/lib/ai-providers"
@@ -12,65 +18,109 @@ import type { ConversationTracker } from "./interview-phases"
 interface ExtractionResult {
   approachExplained: boolean
   approachType: "none" | "brute_force" | "optimized" | "unclear"
+  approachQuality: "none" | "vague" | "specific" | "detailed"
   timeComplexityMentioned: boolean
   timeComplexityValue: string | null
+  dominantComplexity: string | null // NEW: The overall/dominant complexity
   spaceComplexityMentioned: boolean
   spaceComplexityValue: string | null
   complexityExplanationGiven: boolean
+  complexityIsAccurate: boolean | null // NEW: Is their stated complexity correct?
   edgeCasesMentioned: string[]
+  clarifyingQuestionsAsked: boolean // NEW: Did they ask clarifying questions?
+  answeredInterviewerQuestions: number // NEW: How many questions did they answer?
 }
 
-const EXTRACTION_PROMPT = `You are analyzing an interview conversation to extract what the candidate has discussed.
+const EXTRACTION_PROMPT = `You are analyzing a technical interview conversation to extract what the candidate has discussed.
+Your job is to accurately detect signals from the conversation - be thorough but accurate.
 
-Given the recent messages, extract:
-1. Did the candidate explain their approach? (yes/no)
-2. What type of approach? (brute_force, optimized, none, unclear)
-3. Did they mention time complexity? If so, what value? (e.g., "O(n)", "linear", "O(n^2)")
-4. Did they mention space complexity? If so, what value?
-5. Did they explain WHY the complexity is what it is? (e.g., "because we loop once", "due to the hash map")
-6. What edge cases did they mention? (list them)
+Given the messages, extract:
 
-IMPORTANT: Be liberal in detection. If they say anything like:
-- "o n" or "O n" or "O(n)" or "linear" → time complexity mentioned
-- "n squared" or "O(n^2)" or "quadratic" → time complexity mentioned
-- "constant space" or "O(1) space" → space complexity mentioned
+1. APPROACH EXPLANATION:
+   - Did the candidate explain their approach? (yes if they described what they'll do)
+   - What type? (brute_force if O(n²) or nested loops, optimized if O(n) with hash/two-pointer, unclear if can't tell)
+   - Quality: "none" if no explanation, "vague" if just said "I'll use X", "specific" if described how, "detailed" if walked through logic
 
-Respond in JSON format only:
+2. TIME COMPLEXITY:
+   - Did they state time complexity? (yes if they said O(n), O(n²), linear, quadratic, etc.)
+   - What value did they state? (normalize to O(n) format)
+   - DOMINANT complexity: If they mentioned multiple (e.g., "sort is O(n log n), then loop is O(n²)"),
+     extract the OVERALL dominant complexity (O(n²) dominates O(n log n))
+   - Did they explain WHY? (yes if they said "because we loop", "due to nested", etc.)
+
+3. SPACE COMPLEXITY:
+   - Did they mention space? What value?
+
+4. EDGE CASES:
+   - List any edge cases they mentioned (empty array, null, negative numbers, duplicates, etc.)
+
+5. POSITIVE SIGNALS:
+   - Did they ask clarifying questions? (indicates good interview behavior)
+   - How many interviewer questions did they answer? (count responses to direct questions)
+
+IMPORTANT RULES:
+- Be LIBERAL in detection - if they said something that implies complexity, count it
+- "On2" or "o n squared" or "n squared" = O(n²)
+- "On" or "o n" or "linear" = O(n)
+- "two pointer" or "sort first then" = usually O(n²) or O(n log n) overall
+- When multiple complexities mentioned, the DOMINANT (worst) is the overall complexity
+
+Respond in JSON format ONLY (no markdown, no explanation):
 {
   "approachExplained": true/false,
   "approachType": "none" | "brute_force" | "optimized" | "unclear",
+  "approachQuality": "none" | "vague" | "specific" | "detailed",
   "timeComplexityMentioned": true/false,
-  "timeComplexityValue": "O(n)" or null,
+  "timeComplexityValue": "O(n²)" or null,
+  "dominantComplexity": "O(n²)" or null,
   "spaceComplexityMentioned": true/false,
-  "spaceComplexityValue": "O(1)" or null,
+  "spaceComplexityValue": "O(n)" or null,
   "complexityExplanationGiven": true/false,
-  "edgeCasesMentioned": ["empty input", "single element", ...]
+  "complexityIsAccurate": true/false/null,
+  "edgeCasesMentioned": ["empty array", "duplicates", ...],
+  "clarifyingQuestionsAsked": true/false,
+  "answeredInterviewerQuestions": 5
 }`
+
+// Extended tracker interface with new fields
+export interface ExtendedConversationTracker extends ConversationTracker {
+  approachQuality?: "none" | "vague" | "specific" | "detailed"
+  dominantComplexity?: string | null
+  complexityIsAccurate?: boolean | null
+  clarifyingQuestionsAsked?: boolean
+  answeredInterviewerQuestions?: number
+}
 
 /**
  * Extract conversation state using LLM
- * Uses cheap/fast provider (gemini-lite) for cost efficiency
+ * Uses cheap/fast provider for cost efficiency
+ *
+ * Includes BOTH candidate and interviewer messages for full context
+ * (needed to count answered questions and understand conversation flow)
  */
 export async function extractConversationState(
   recentMessages: Array<{ role: string; content: string }>,
   currentTracker: ConversationTracker
-): Promise<Partial<ConversationTracker>> {
+): Promise<Partial<ExtendedConversationTracker>> {
   // Skip if no messages to analyze
   if (!recentMessages || recentMessages.length === 0) {
     return {}
   }
 
-  // Only analyze candidate messages (last 5-10 for efficiency)
-  const candidateMessages = recentMessages
-    .filter((m) => m.role === "user" || m.role === "candidate")
-    .slice(-10)
+  // Include both roles for full context (limit to last 15 for efficiency)
+  const messages = recentMessages.slice(-15)
 
-  if (candidateMessages.length === 0) {
+  if (messages.length === 0) {
     return {}
   }
 
-  // Build conversation text for analysis
-  const conversationText = candidateMessages.map((m) => `CANDIDATE: ${m.content}`).join("\n\n")
+  // Build conversation text with role labels
+  const conversationText = messages
+    .map((m) => {
+      const role = m.role === "user" || m.role === "candidate" ? "CANDIDATE" : "INTERVIEWER"
+      return `${role}: ${m.content}`
+    })
+    .join("\n\n")
 
   try {
     const response = await generateAIResponse(
@@ -78,14 +128,21 @@ export async function extractConversationState(
       conversationText,
       [], // Empty history
       {
-        complexity: "simple", // Uses gemini-lite (cheapest)
+        complexity: "simple", // Uses cheap provider
         temperature: 0.1, // Deterministic
         userId: "system-extraction", // For rate limiting
       }
     )
 
-    // Parse JSON response
-    const jsonMatch = response.text.match(/\{[\s\S]*\}/)
+    // Parse JSON response - handle potential markdown wrapper
+    let jsonText = response.text
+    // Remove markdown code block if present
+    const codeBlockMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (codeBlockMatch) {
+      jsonText = codeBlockMatch[1]
+    }
+
+    const jsonMatch = jsonText.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
       logger.warn("[Extraction] Failed to parse JSON from response", {
         response: response.text.slice(0, 200),
@@ -95,47 +152,63 @@ export async function extractConversationState(
 
     const extracted: ExtractionResult = JSON.parse(jsonMatch[0])
 
-    // Merge with current tracker (don't overwrite with false if already true)
-    const updates: Partial<ConversationTracker> = {}
+    // Build updates - always prefer new extraction for accuracy
+    const updates: Partial<ExtendedConversationTracker> = {}
 
-    if (extracted.approachExplained && !currentTracker.approachExplained) {
+    // Approach explanation
+    if (extracted.approachExplained) {
       updates.approachExplained = true
       updates.approachType = extracted.approachType
+      updates.approachQuality = extracted.approachQuality
     }
 
-    if (extracted.timeComplexityMentioned && !currentTracker.timeComplexityMentioned) {
+    // Time complexity - use DOMINANT complexity as the value
+    if (extracted.timeComplexityMentioned) {
       updates.timeComplexityMentioned = true
-      updates.timeComplexityValue = extracted.timeComplexityValue
+      // Prefer dominant complexity over raw value
+      updates.timeComplexityValue = extracted.dominantComplexity || extracted.timeComplexityValue
+      updates.dominantComplexity = extracted.dominantComplexity
+      updates.complexityIsAccurate = extracted.complexityIsAccurate
     }
 
-    if (extracted.spaceComplexityMentioned && !currentTracker.spaceComplexityMentioned) {
+    // Space complexity
+    if (extracted.spaceComplexityMentioned) {
       updates.spaceComplexityMentioned = true
       updates.spaceComplexityValue = extracted.spaceComplexityValue
     }
 
-    if (extracted.complexityExplanationGiven && !currentTracker.complexityExplanationGiven) {
+    // Complexity explanation
+    if (extracted.complexityExplanationGiven) {
       updates.complexityExplanationGiven = true
     }
 
-    // Merge edge cases (don't duplicate)
+    // Edge cases - merge with existing (don't duplicate)
     if (extracted.edgeCasesMentioned && extracted.edgeCasesMentioned.length > 0) {
-      const newEdgeCases = extracted.edgeCasesMentioned.filter(
-        (ec) => !currentTracker.edgeCasesMentioned.includes(ec)
-      )
-      if (newEdgeCases.length > 0) {
-        updates.edgeCasesMentioned = [...currentTracker.edgeCasesMentioned, ...newEdgeCases]
-      }
+      const existingEdgeCases = currentTracker.edgeCasesMentioned || []
+      const allEdgeCases = new Set([...existingEdgeCases, ...extracted.edgeCasesMentioned])
+      updates.edgeCasesMentioned = Array.from(allEdgeCases)
+    }
+
+    // New positive signals
+    if (extracted.clarifyingQuestionsAsked) {
+      updates.clarifyingQuestionsAsked = true
+    }
+    if (extracted.answeredInterviewerQuestions !== undefined) {
+      updates.answeredInterviewerQuestions = extracted.answeredInterviewerQuestions
     }
 
     logger.info("[Extraction] Successfully extracted conversation state", {
-      extracted,
-      updates,
+      approachExplained: extracted.approachExplained,
+      approachQuality: extracted.approachQuality,
+      timeComplexity: extracted.dominantComplexity || extracted.timeComplexityValue,
+      edgeCases: extracted.edgeCasesMentioned?.length || 0,
+      clarifyingQuestions: extracted.clarifyingQuestionsAsked,
+      questionsAnswered: extracted.answeredInterviewerQuestions,
     })
 
     return updates
   } catch (error) {
     logger.error("[Extraction] Failed to extract conversation state", { error })
-    // Fall back to empty updates - regex will still work as backup
     return {}
   }
 }
