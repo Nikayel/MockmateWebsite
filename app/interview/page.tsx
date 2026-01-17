@@ -2182,9 +2182,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     // Determine target company:
     // 1. If override provided (from company picker), use it
     // 2. If from roadmap, use roadmap's target company
-    // 3. If freeball with multiple companies and no selection, show picker
-    // 4. If freeball with single company, use that company
-    // 5. Otherwise, use "freeball" (generic)
+    // 3. Otherwise, always show picker to let user choose company + Real Interview Mode
     let effectiveTargetCompany: InterviewTargetCompany = companyOverride ?? targetCompany
 
     if (!effectiveTargetCompany) {
@@ -2192,19 +2190,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       if (activeRoadmap?.targetCompany) {
         effectiveTargetCompany = activeRoadmap.targetCompany
       }
-      // Check if scenario has companies tagged
-      else if (scenario.companies && scenario.companies.length > 0) {
-        if (scenario.companies.length === 1) {
-          // Single company - auto-select it
-          effectiveTargetCompany = scenario.companies[0].toLowerCase() as CompanyId
-        } else {
-          // Multiple companies - show picker
-          setShowCompanyPicker(true)
-          return // Wait for user to pick
-        }
-      } else {
-        // No companies tagged - freeball
-        effectiveTargetCompany = "freeball"
+      // Always show company picker for freeball sessions
+      // This lets users choose target company AND enable Real Interview Mode (fuzzy)
+      else {
+        setShowCompanyPicker(true)
+        return // Wait for user to pick
       }
     }
 
@@ -3851,7 +3841,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         setInterviewerMessages((prev) => {
           const recentMessages = prev.slice(-2)
           const hasRecentErrorMsg = recentMessages.some(
-            (msg) => msg.type === "ai" && (msg.message.includes("problem running your code") || msg.message.includes("error in your code"))
+            (msg) =>
+              msg.type === "ai" &&
+              (msg.message.includes("problem running your code") ||
+                msg.message.includes("error in your code"))
           )
           if (hasRecentErrorMsg) {
             return prev
@@ -4033,7 +4026,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         setInterviewerMessages((prev) => {
           const recentMessages = prev.slice(-2)
           const hasRecentErrorMsg = recentMessages.some(
-            (msg) => msg.type === "ai" && (msg.message.includes("problem running your code") || msg.message.includes("error in your code"))
+            (msg) =>
+              msg.type === "ai" &&
+              (msg.message.includes("problem running your code") ||
+                msg.message.includes("error in your code"))
           )
           if (hasRecentErrorMsg) {
             return prev
@@ -4245,8 +4241,18 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       {showScenarioBrowser && (
         <ScenarioBrowser
           onStartInterview={async (scenario) => {
-            // Pass scenario directly to avoid race condition with state update
-            await startInterview(scenario)
+            // Set the selected scenario first
+            setSelectedScenario(scenario)
+
+            // Check if we should show company picker
+            // Show picker if: not from roadmap (no target company set)
+            if (!activeRoadmap?.targetCompany) {
+              // Show company picker to let user choose company + Real Interview Mode
+              setShowCompanyPicker(true)
+            } else {
+              // From roadmap - start interview directly with roadmap's target company
+              await startInterview(scenario)
+            }
           }}
           usageLimit={usageLimit}
           completedProblems={completedProblems}
