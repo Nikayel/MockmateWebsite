@@ -9,6 +9,7 @@ import { useState, useCallback, useMemo } from "react"
 import {
   type InterviewPhase,
   type ConversationTracker,
+  type PhaseDetectionContext,
   createEmptyTracker,
   updateTrackerFromMessage,
   detectInterviewPhase,
@@ -21,12 +22,19 @@ import {
   extractUserAnsweredTopics,
 } from "@/lib/interview/topic-extraction"
 
+export interface UseInterviewPhaseOptions {
+  // Starter code length for comparison (passed from page)
+  starterCodeLength?: number
+}
+
 export interface UseInterviewPhaseReturn {
   // State
   currentPhase: InterviewPhase
   conversationTracker: ConversationTracker
   recentNudgeTopics: string[]
   userAnsweredTopics: string[]
+  testsHaveRun: boolean
+  hasSubmitted: boolean
 
   // Derived values
   phasePrompt: string
@@ -38,29 +46,44 @@ export interface UseInterviewPhaseReturn {
   updateFromInterviewerMessage: (message: string) => void
   markTestsRun: (allPassed: boolean) => void
   markSubmitted: () => void
-  markCodingStarted: () => void
+  updateCodeLength: (length: number) => void
   reset: () => void
 }
 
-export function useInterviewPhase(): UseInterviewPhaseReturn {
+export function useInterviewPhase(
+  options: UseInterviewPhaseOptions = {}
+): UseInterviewPhaseReturn {
+  const { starterCodeLength = 0 } = options
+
   const [conversationTracker, setConversationTracker] =
     useState<ConversationTracker>(createEmptyTracker())
   const [recentNudgeTopics, setRecentNudgeTopics] = useState<string[]>([])
   const [userAnsweredTopics, setUserAnsweredTopics] = useState<string[]>([])
   const [hasSubmitted, setHasSubmitted] = useState(false)
+  const [testsHaveRun, setTestsHaveRun] = useState(false)
+  const [currentCodeLength, setCurrentCodeLength] = useState(starterCodeLength)
   const [messageCount, setMessageCount] = useState(0)
 
-  // Derive current phase from tracker state
+  // Derive current phase using DETERMINISTIC signals
+  // No regex - just button clicks, code length, and LLM extraction results
   const currentPhase = useMemo(() => {
-    return detectInterviewPhase({
-      messageCount,
-      hasExplainedApproach: conversationTracker.approachExplained,
-      hasStartedCoding: conversationTracker.hasStartedCoding,
-      testsHaveRun: conversationTracker.hasRunTests,
-      allTestsPassed: false, // This would need test results to determine
+    const context: PhaseDetectionContext = {
       hasSubmitted,
-    })
-  }, [conversationTracker, hasSubmitted, messageCount])
+      testsHaveRun,
+      currentCodeLength,
+      starterCodeLength,
+      approachExplained: conversationTracker.approachExplained,
+      messageCount,
+    }
+    return detectInterviewPhase(context)
+  }, [
+    hasSubmitted,
+    testsHaveRun,
+    currentCodeLength,
+    starterCodeLength,
+    conversationTracker.approachExplained,
+    messageCount,
+  ])
 
   // Get phase-specific prompt
   const phasePrompt = useMemo(() => {
@@ -104,6 +127,8 @@ export function useInterviewPhase(): UseInterviewPhaseReturn {
   }, [])
 
   const markTestsRun = useCallback((allPassed: boolean) => {
+    setTestsHaveRun(true)
+    // Also update tracker for compatibility
     setConversationTracker((prev) => ({
       ...prev,
       hasRunTests: true,
@@ -114,11 +139,8 @@ export function useInterviewPhase(): UseInterviewPhaseReturn {
     setHasSubmitted(true)
   }, [])
 
-  const markCodingStarted = useCallback(() => {
-    setConversationTracker((prev) => ({
-      ...prev,
-      hasStartedCoding: true,
-    }))
+  const updateCodeLength = useCallback((length: number) => {
+    setCurrentCodeLength(length)
   }, [])
 
   const reset = useCallback(() => {
@@ -126,14 +148,18 @@ export function useInterviewPhase(): UseInterviewPhaseReturn {
     setRecentNudgeTopics([])
     setUserAnsweredTopics([])
     setHasSubmitted(false)
+    setTestsHaveRun(false)
+    setCurrentCodeLength(starterCodeLength)
     setMessageCount(0)
-  }, [])
+  }, [starterCodeLength])
 
   return {
     currentPhase,
     conversationTracker,
     recentNudgeTopics,
     userAnsweredTopics,
+    testsHaveRun,
+    hasSubmitted,
     phasePrompt,
     trackingContext,
     hintGuidance,
@@ -141,7 +167,7 @@ export function useInterviewPhase(): UseInterviewPhaseReturn {
     updateFromInterviewerMessage,
     markTestsRun,
     markSubmitted,
-    markCodingStarted,
+    updateCodeLength,
     reset,
   }
 }

@@ -26,16 +26,18 @@ import {
   formatDynamicContextForPrompt,
   shouldRetrieveDynamicContext,
 } from "@/lib/rag/dynamic-chat-context"
-// NEW: Phase-aware interview system
+// NEW: Phase-aware interview system with deterministic phase detection
 import {
   type InterviewPhase,
   type ConversationTracker,
+  type PhaseDetectionContext,
   PHASE_PROMPTS,
   INTERVIEWER_BEHAVIOR_RULES,
   buildTrackingContext,
   getHintGuidance,
   createEmptyTracker,
   updateTrackerFromMessage,
+  detectInterviewPhase,
 } from "@/lib/interview/interview-phases"
 import {
   extractConversationState,
@@ -330,6 +332,8 @@ export async function POST(request: NextRequest) {
       // NEW: Real Interview Mode (fuzzy problem statements)
       realInterviewMode,
       hasFuzzyStatement,
+      // NEW: Starter code length for deterministic phase detection
+      starterCodeLength,
     } = await request.json()
 
     // For proactive messages (interviewer jumping in), message might be empty
@@ -714,9 +718,23 @@ DO NOT:
 `
       : ""
 
-    // Build phase-specific context
-    const currentPhase =
-      ((hasSubmitted ? "post_interview" : interviewPhase) as InterviewPhase) || "discussion"
+    // Build phase-specific context using DETERMINISTIC signals
+    // No longer relies on frontend-passed interviewPhase - we compute it here
+    const testsHaveRunNow = testResultsArray && Array.isArray(testResultsArray) && testResultsArray.length > 0
+    const messageCount = Array.isArray(context) ? context.length : 0
+    const currentCodeLen = currentCode?.length || 0
+    const starterLen = starterCodeLength || 0
+
+    const phaseContext: PhaseDetectionContext = {
+      hasSubmitted: hasSubmitted || false,
+      testsHaveRun: testsHaveRunNow || false,
+      currentCodeLength: currentCodeLen,
+      starterCodeLength: starterLen,
+      approachExplained: enhancedTracker?.approachExplained || (conversationTracker as ConversationTracker)?.approachExplained,
+      messageCount,
+    }
+
+    const currentPhase = detectInterviewPhase(phaseContext)
     const phasePrompt = PHASE_PROMPTS[currentPhase] || PHASE_PROMPTS.discussion
 
     // Build conversation tracking context if available

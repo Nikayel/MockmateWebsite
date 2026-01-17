@@ -29,7 +29,67 @@ export interface PhaseContext {
 // PHASE DETECTION
 // =============================================================================
 
-export function detectInterviewPhase(context: {
+/**
+ * Detect the current interview phase using DETERMINISTIC signals.
+ *
+ * Philosophy: Use reliable signals, not fragile regex/keyword detection.
+ * - Button clicks (submit, run tests) = 100% reliable
+ * - Code length comparison = reliable
+ * - LLM extraction for approach = already paid for, use it
+ *
+ * NO regex detection here - that belongs in extraction.
+ */
+export interface PhaseDetectionContext {
+  // DETERMINISTIC: Button clicks (100% reliable)
+  hasSubmitted: boolean
+  testsHaveRun: boolean
+
+  // DETERMINISTIC: Code comparison
+  currentCodeLength: number
+  starterCodeLength: number
+
+  // FROM LLM EXTRACTION: Approach detection (already running every ~3 messages)
+  approachExplained?: boolean
+
+  // SIMPLE COUNT: Message count for intro phase
+  messageCount: number
+}
+
+export function detectInterviewPhase(context: PhaseDetectionContext): InterviewPhase {
+  // 1. BUTTON CLICK: User clicked Submit → post-interview
+  if (context.hasSubmitted) {
+    return "post_interview"
+  }
+
+  // 2. BUTTON CLICK: User clicked Run Tests → testing phase
+  if (context.testsHaveRun) {
+    return "testing"
+  }
+
+  // 3. CODE LENGTH: Compare current code to starter template
+  // If they've written >50 chars of actual code, they're coding
+  const codeWritten = context.currentCodeLength - context.starterCodeLength
+  if (codeWritten > 50) {
+    return "coding"
+  }
+
+  // 4. LLM EXTRACTION: Approach explained (from extractConversationState)
+  if (context.approachExplained) {
+    return "discussion"
+  }
+
+  // 5. SIMPLE COUNT: Very early in conversation → intro
+  if (context.messageCount <= 2) {
+    return "intro"
+  }
+
+  // 6. DEFAULT: Still in discussion phase
+  return "discussion"
+}
+
+// Legacy function for backwards compatibility
+// TODO: Remove once all callers updated to new interface
+export function detectInterviewPhaseLegacy(context: {
   messageCount: number
   hasExplainedApproach: boolean
   hasStartedCoding: boolean
@@ -37,33 +97,14 @@ export function detectInterviewPhase(context: {
   allTestsPassed: boolean
   hasSubmitted: boolean
 }): InterviewPhase {
-  // User clicked submit -> post-interview wrap-up
-  if (context.hasSubmitted) {
-    return "post_interview"
-  }
-
-  // Tests have run -> testing phase (discuss results)
-  if (context.testsHaveRun) {
-    return "testing"
-  }
-
-  // Has written code -> coding phase
-  if (context.hasStartedCoding) {
-    return "coding"
-  }
-
-  // Has explained approach -> discussion phase
-  if (context.hasExplainedApproach) {
-    return "discussion"
-  }
-
-  // Just started -> intro
-  if (context.messageCount <= 2) {
-    return "intro"
-  }
-
-  // Default to discussion after intro
-  return "discussion"
+  return detectInterviewPhase({
+    hasSubmitted: context.hasSubmitted,
+    testsHaveRun: context.testsHaveRun,
+    currentCodeLength: context.hasStartedCoding ? 100 : 0, // Fake for legacy
+    starterCodeLength: 0,
+    approachExplained: context.hasExplainedApproach,
+    messageCount: context.messageCount,
+  })
 }
 
 // =============================================================================
