@@ -44,7 +44,10 @@ import {
   shouldRunExtraction,
 } from "@/lib/interview/conversation-extraction"
 import { buildCompanyInterviewerPrompt } from "@/lib/interview/company-interviewer-styles"
-import { validateInterviewerResponse } from "@/lib/interview/response-validation"
+import {
+  validateWithRetry,
+  type ValidationContext
+} from "@/lib/interview/response-validation"
 import { truncateText, truncateFileContent } from "@/lib/utils"
 
 interface UserContext {
@@ -1294,79 +1297,68 @@ Remember: Acknowledge what they said, then probe deeper or move on. Do NOT re-as
       // Don't fail, but log for monitoring
     }
 
-    // POST-GENERATION VALIDATION: Check for interviewer rule violations
-    // This catches common errors that prompt engineering alone can't prevent
-    // Now with regeneration capability for critical violations
+    // HARD GATES: Deterministic validation with retry loop
+    // This catches rule violations that prompt engineering alone can't prevent
+    // Gates are deterministic (not AI) - they always catch specific patterns
     if (role === "interviewer") {
       const activeTracker = (enhancedTracker || conversationTracker) as
         | ConversationTracker
         | undefined
 
-      const validation = validateInterviewerResponse({
+      const validationContext: ValidationContext = {
         response: aiResponse.text,
         phase: currentPhase,
         tracker: activeTracker,
         hasSubmitted: hasSubmitted || false,
         lastUserMessage: message,
-      })
+        isOptimalSolution: solutionComplexity?.isOptimal || false,
+      }
 
-      // Log violations for monitoring
-      if (!validation.isValid) {
-        logger.warn("[Chat API] Interviewer rule violations detected", {
+      // Regeneration function for the retry loop
+      const regenerate = async (hint: string): Promise<string> => {
+        const correctedPrompt = `${systemPrompt}
+
+⚠️ HARD GATE VIOLATION - REGENERATE:
+${hint}
+
+Generate a response that follows these rules.`
+
+        const regeneratedResponse = await generateAIResponse(
+          correctedPrompt,
+          fullUserMessage,
+          history,
+          {
+            complexity,
+            userId,
+            sessionId,
+            eventType: "chat_message_retry",
+          }
+        )
+        return regeneratedResponse.text
+      }
+
+      // Run validation with up to 2 retries for critical violations
+      const gateResult = await validateWithRetry(validationContext, regenerate, 2)
+
+      // Update response if regenerated
+      if (gateResult.retries > 0) {
+        aiResponse.text = gateResult.response
+        logger.info("[Hard Gates] Response regenerated", {
           sessionId,
-          violations: validation.violations.map((v) => ({
+          retries: gateResult.retries,
+          remainingViolations: gateResult.violations.map(v => v.rule),
+        })
+      }
+
+      // Log any remaining violations (warnings that didn't trigger regeneration)
+      if (gateResult.violations.length > 0) {
+        logger.warn("[Hard Gates] Violations in final response", {
+          sessionId,
+          violations: gateResult.violations.map(v => ({
             rule: v.rule,
             severity: v.severity,
-            evidence: v.evidence.substring(0, 100),
           })),
-          phase: currentPhase,
-          trackerState: activeTracker
-            ? {
-                complexityMentioned: activeTracker.timeComplexityMentioned,
-                edgeCasesMentioned: activeTracker.edgeCasesMentioned.length,
-              }
-            : null,
-          responsePreview: aiResponse.text.substring(0, 200),
         })
-
-        // Regenerate on critical violations (max 1 retry to avoid loops)
-        if (validation.shouldRegenerate && validation.regenerationHint) {
-          logger.info("[Chat API] Regenerating response due to critical violation", {
-            sessionId,
-            hint: validation.regenerationHint,
-          })
-
-          // Add the hint to the prompt and regenerate
-          const correctedPrompt = `${systemPrompt}
-
-⚠️ CRITICAL CORRECTION REQUIRED:
-Your previous response violated interviewer rules: ${validation.regenerationHint}
-Generate a new response that follows the rules properly.`
-
-          try {
-            const regeneratedResponse = await generateAIResponse(
-              correctedPrompt,
-              fullUserMessage,
-              history,
-              {
-                complexity,
-                userId,
-                sessionId,
-                eventType: "chat_message_retry",
-              }
-            )
-
-            // Use the regenerated response
-            aiResponse.text = regeneratedResponse.text
-            aiResponse.provider = regeneratedResponse.provider
-            aiResponse.latencyMs = (aiResponse.latencyMs || 0) + (regeneratedResponse.latencyMs || 0)
-
-            logger.info("[Chat API] Successfully regenerated response", { sessionId })
-          } catch (regenError) {
-            // If regeneration fails, use the original response
-            logger.error("[Chat API] Failed to regenerate response", { error: regenError })
-          }
-        }
       }
     }
 
