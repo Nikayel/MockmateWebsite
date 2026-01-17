@@ -392,7 +392,7 @@ CODE EFFICIENCY ANALYSIS:
         const transcriptMessages = conversationTranscript.map(
           (msg: { type?: string; role?: string; message?: string; content?: string }) => ({
             role:
-              msg.type === "user" || msg.role === "user"
+              msg.type === "user" || msg.role === "user" || msg.role === "candidate"
                 ? ("user" as const)
                 : ("interviewer" as const),
             content: msg.message || msg.content || "",
