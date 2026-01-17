@@ -12,6 +12,7 @@
  */
 
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
+import type { DSAScenario } from "@/lib/scenarios/types"
 import { getAdvancedRetriever } from "./retrieval/advanced-retrieval"
 import { getPatternKnowledge } from "./knowledge-base/dsa-knowledge"
 
@@ -44,6 +45,13 @@ export interface DynamicChatContext {
   suggestedTopics: string[]
   relevantPatternInfo?: string
   debuggingHints?: string[]
+  /** Scenario-specific proactive data for tailored interventions */
+  scenarioProactiveData?: {
+    whatIfQuestions?: string[]
+    commonWrongApproaches?: Array<{ description: string; intervention: string }>
+    midCodingProbes?: Array<{ trigger: string; question: string }>
+    optimizationPush?: { suboptimalComplexity: string; nudge: string }
+  }
 }
 
 /**
@@ -56,6 +64,8 @@ export interface DynamicContextOptions {
   problemTitle?: string
   testResults?: { passed: number; total: number; failingTests?: string[] }
   conversationHistory?: Array<{ type: string; message: string }>
+  /** Full scenario for accessing proactive data (whatIfQuestions, commonWrongApproaches, etc.) */
+  scenario?: DSAScenario
 }
 
 // ============================================================================
@@ -487,6 +497,22 @@ ${results.length > 0 ? `**From Knowledge Base:**\n${results[0].text.substring(0,
     console.warn("[DynamicChatContext] RAG retrieval failed:", error)
   }
 
+  // Extract scenario-specific proactive data if available
+  const scenarioProactiveData = options.scenario
+    ? {
+        whatIfQuestions: options.scenario.whatIfQuestions,
+        commonWrongApproaches: options.scenario.commonWrongApproaches?.map((wa) => ({
+          description: wa.description,
+          intervention: wa.intervention,
+        })),
+        midCodingProbes: options.scenario.midCodingProbes?.map((p) => ({
+          trigger: p.trigger,
+          question: p.question,
+        })),
+        optimizationPush: options.scenario.optimizationPush,
+      }
+    : undefined
+
   const result: DynamicChatContext = {
     intent,
     confidence,
@@ -494,6 +520,7 @@ ${results.length > 0 ? `**From Knowledge Base:**\n${results[0].text.substring(0,
     suggestedTopics,
     relevantPatternInfo,
     debuggingHints,
+    scenarioProactiveData,
   }
 
   // Cache the result
@@ -528,6 +555,35 @@ export function formatDynamicContextForPrompt(context: DynamicChatContext): stri
 
   if (context.suggestedTopics.length > 0) {
     parts.push(`\n[Suggested follow-up topics: ${context.suggestedTopics.join(", ")}]`)
+  }
+
+  // Include scenario-specific proactive data for tailored AI responses
+  if (context.scenarioProactiveData) {
+    const proactive = context.scenarioProactiveData
+
+    if (proactive.whatIfQuestions && proactive.whatIfQuestions.length > 0) {
+      parts.push(
+        `\n**Problem-Specific What-If Questions (use after solution works):**\n${proactive.whatIfQuestions.slice(0, 2).map((q) => `- ${q}`).join("\n")}`
+      )
+    }
+
+    if (proactive.commonWrongApproaches && proactive.commonWrongApproaches.length > 0) {
+      parts.push(
+        `\n**Watch for Wrong Approaches:**\n${proactive.commonWrongApproaches.slice(0, 2).map((wa) => `- If: ${wa.description} → Say: "${wa.intervention}"`).join("\n")}`
+      )
+    }
+
+    if (proactive.midCodingProbes && proactive.midCodingProbes.length > 0) {
+      parts.push(
+        `\n**Tailored Mid-Coding Questions:**\n${proactive.midCodingProbes.slice(0, 2).map((p) => `- When: ${p.trigger} → Ask: "${p.question}"`).join("\n")}`
+      )
+    }
+
+    if (proactive.optimizationPush) {
+      parts.push(
+        `\n**Optimization Nudge:** If solution is ${proactive.optimizationPush.suboptimalComplexity}, say: "${proactive.optimizationPush.nudge}"`
+      )
+    }
   }
 
   return parts.join("\n")
