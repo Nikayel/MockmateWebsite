@@ -35,6 +35,24 @@ function sanitizeTestResultsForFirestore(testResults: Array<any>): Array<any> {
 }
 
 /**
+ * Copy defined fields from source to target object.
+ * Firestore doesn't allow undefined values, so this helper
+ * only copies fields that are not undefined.
+ */
+function copyDefinedFields<T extends Record<string, any>>(
+  target: Record<string, any>,
+  source: T | null | undefined,
+  fields: (keyof T)[]
+): void {
+  if (!source) return
+  for (const field of fields) {
+    if (source[field] !== undefined) {
+      target[field as string] = source[field]
+    }
+  }
+}
+
+/**
  * Create or update user profile in Firestore
  */
 export async function createOrUpdateProfile(
@@ -87,49 +105,24 @@ export async function createOrUpdateProfile(
     profileDataForFirestore.avatar_url = photoURL
   }
 
-  // Preserve existing subscription data if profile exists and fields are defined
-  if (existingProfile) {
-    if (existingProfile.subscription_status !== undefined) {
-      profileDataForFirestore.subscription_status = existingProfile.subscription_status
-    }
-    if (existingProfile.stripe_customer_id !== undefined) {
-      profileDataForFirestore.stripe_customer_id = existingProfile.stripe_customer_id
-    }
-    if (existingProfile.stripe_subscription_id !== undefined) {
-      profileDataForFirestore.stripe_subscription_id = existingProfile.stripe_subscription_id
-    }
-    if (existingProfile.subscription_start_date !== undefined) {
-      profileDataForFirestore.subscription_start_date = existingProfile.subscription_start_date
-    }
-    if (existingProfile.subscription_current_period_end !== undefined) {
-      profileDataForFirestore.subscription_current_period_end =
-        existingProfile.subscription_current_period_end
-    }
-    if (existingProfile.subscription_platform !== undefined) {
-      profileDataForFirestore.subscription_platform = existingProfile.subscription_platform
-    }
-    // Preserve onboarding data if it exists
-    if (existingProfile.onboarding_completed !== undefined) {
-      profileDataForFirestore.onboarding_completed = existingProfile.onboarding_completed
-    }
-    if (existingProfile.onboarding_completed_at !== undefined) {
-      profileDataForFirestore.onboarding_completed_at = existingProfile.onboarding_completed_at
-    }
-    if (existingProfile.role !== undefined) {
-      profileDataForFirestore.role = existingProfile.role
-    }
-    if (existingProfile.goal !== undefined) {
-      profileDataForFirestore.goal = existingProfile.goal
-    }
-    // Preserve email notification data
-    if (existingProfile.welcome_email_sent !== undefined) {
-      profileDataForFirestore.welcome_email_sent = existingProfile.welcome_email_sent
-    }
-    // Preserve notification preferences
-    if (existingProfile.notification_preferences !== undefined) {
-      profileDataForFirestore.notification_preferences = existingProfile.notification_preferences
-    }
-  }
+  // Preserve existing subscription and profile data if profile exists
+  copyDefinedFields(profileDataForFirestore, existingProfile, [
+    // Subscription fields
+    "subscription_status",
+    "stripe_customer_id",
+    "stripe_subscription_id",
+    "subscription_start_date",
+    "subscription_current_period_end",
+    "subscription_platform",
+    // Onboarding fields
+    "onboarding_completed",
+    "onboarding_completed_at",
+    "role",
+    "goal",
+    // Email/notification fields
+    "welcome_email_sent",
+    "notification_preferences",
+  ])
 
   // Set default notification preferences for new profiles (required for email cron to work)
   if (isNewProfile && !profileDataForFirestore.notification_preferences) {
@@ -621,19 +614,9 @@ export async function updateInterviewSession(
 
       // Build score_breakdown object, only including defined values
       // This prevents Firebase errors from undefined field values
+      const scores = { understandingScore, problemSolvingScore, codeQualityScore, communicationScore }
       const scoreBreakdownObj: Record<string, number> = {}
-      if (understandingScore !== undefined) {
-        scoreBreakdownObj.understandingScore = understandingScore
-      }
-      if (problemSolvingScore !== undefined) {
-        scoreBreakdownObj.problemSolvingScore = problemSolvingScore
-      }
-      if (codeQualityScore !== undefined) {
-        scoreBreakdownObj.codeQualityScore = codeQualityScore
-      }
-      if (communicationScore !== undefined) {
-        scoreBreakdownObj.communicationScore = communicationScore
-      }
+      copyDefinedFields(scoreBreakdownObj, scores, Object.keys(scores) as (keyof typeof scores)[])
 
       // Only save score_breakdown if we have at least one defined score
       if (Object.keys(scoreBreakdownObj).length > 0) {

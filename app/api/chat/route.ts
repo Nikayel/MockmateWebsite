@@ -42,6 +42,7 @@ import {
   shouldRunExtraction,
 } from "@/lib/interview/conversation-extraction"
 import { buildCompanyInterviewerPrompt } from "@/lib/interview/company-interviewer-styles"
+import { truncateText, truncateFileContent } from "@/lib/utils"
 
 interface UserContext {
   email?: string
@@ -72,10 +73,7 @@ function manageContextWindow(
   if (context.length <= maxMessages) {
     return context.map((msg) => ({
       ...msg,
-      message:
-        msg.message.length > MAX_MESSAGE_LENGTH
-          ? msg.message.slice(0, MAX_MESSAGE_LENGTH) + "... [truncated]"
-          : msg.message,
+      message: truncateText(msg.message, MAX_MESSAGE_LENGTH),
     }))
   }
 
@@ -93,18 +91,12 @@ function manageContextWindow(
   return [
     {
       ...firstMessage,
-      message:
-        firstMessage.message.length > MAX_MESSAGE_LENGTH
-          ? firstMessage.message.slice(0, MAX_MESSAGE_LENGTH) + "... [truncated]"
-          : firstMessage.message,
+      message: truncateText(firstMessage.message, MAX_MESSAGE_LENGTH),
     },
     summaryMessage,
     ...recentMessages.map((msg) => ({
       ...msg,
-      message:
-        msg.message.length > MAX_MESSAGE_LENGTH
-          ? msg.message.slice(0, MAX_MESSAGE_LENGTH) + "... [truncated]"
-          : msg.message,
+      message: truncateText(msg.message, MAX_MESSAGE_LENGTH),
     })),
   ]
 }
@@ -125,10 +117,7 @@ function manageWorkspaceContext(
   // Truncate large files
   return limitedFiles.map((file) => ({
     path: file.path,
-    content:
-      file.content.length > maxFileSize
-        ? file.content.slice(0, maxFileSize) + "\n// ... [file truncated for context management]"
-        : file.content,
+    content: truncateFileContent(file.content, maxFileSize),
   }))
 }
 

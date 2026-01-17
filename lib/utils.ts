@@ -135,3 +135,32 @@ export function isStoredDatePast(storedDate: Date, localDate: Date = new Date())
 export function isStoredDateFuture(storedDate: Date, localDate: Date = new Date()): boolean {
   return compareStoredDateWithLocal(storedDate, localDate) > 0
 }
+
+/**
+ * Text truncation utilities for context management.
+ * Extracted from repeated patterns across the codebase (DRY).
+ */
+
+/**
+ * Truncates text to a maximum length with a customizable suffix.
+ * @param text - The text to truncate
+ * @param maxLength - Maximum length before truncation
+ * @param suffix - Suffix to append when truncated (default: "... [truncated]")
+ */
+export function truncateText(
+  text: string,
+  maxLength: number,
+  suffix: string = "... [truncated]"
+): string {
+  if (!text || text.length <= maxLength) return text
+  return text.slice(0, maxLength) + suffix
+}
+
+/**
+ * Truncates file content with a file-specific suffix.
+ * @param content - The file content to truncate
+ * @param maxSize - Maximum size before truncation
+ */
+export function truncateFileContent(content: string, maxSize: number): string {
+  return truncateText(content, maxSize, "\n// ... [file truncated for context management]")
+}
