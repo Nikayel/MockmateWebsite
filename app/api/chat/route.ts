@@ -734,7 +734,13 @@ DO NOT:
     // The LLM cannot ignore this because it's injected based on code logic
     let enforcedChecklist = ""
     const tracker = (enhancedTracker || conversationTracker) as ConversationTracker | undefined
-    if (currentPhase === "discussion" && tracker) {
+    // Run checklist in discussion AND coding phases (before tests run)
+    // This catches cases where starter code pushes phase to "coding" too early
+    const shouldEnforceChecklist =
+      (currentPhase === "discussion" || currentPhase === "coding") &&
+      tracker &&
+      !tracker.hasRunTests
+    if (shouldEnforceChecklist) {
       const missingItems: string[] = []
 
       // Check if complexity has been discussed
@@ -1212,10 +1218,15 @@ Remember: Acknowledge what they said, then probe deeper or move on. Do NOT re-as
         | undefined
 
       // Check 1: Premature "code it up" without complexity/edge cases
+      // Run in both discussion AND coding phases (before tests run)
       const codeItUpPhrases = ["code it up", "go ahead and code", "start coding", "go code"]
       const hasCodeItUp = codeItUpPhrases.some((phrase) => responseText.includes(phrase))
+      const isPreTestPhase =
+        (currentPhase === "discussion" || currentPhase === "coding") &&
+        activeTracker &&
+        !activeTracker.hasRunTests
 
-      if (hasCodeItUp && currentPhase === "discussion" && activeTracker) {
+      if (hasCodeItUp && isPreTestPhase && activeTracker) {
         if (!activeTracker.timeComplexityMentioned) {
           ruleViolations.push("Said 'code it up' without complexity discussion")
         }
@@ -1240,6 +1251,16 @@ Remember: Acknowledge what they said, then probe deeper or move on. Do NOT re-as
       // Check 3: Premature "View Detailed Feedback" mention
       if (responseText.includes("view detailed feedback") && !hasSubmitted) {
         ruleViolations.push("Mentioned 'View Detailed Feedback' before user submitted")
+      }
+
+      // Check 4: Dismissive phrases when user asks clarifying questions
+      // Clarifying questions are a positive signal and should be encouraged
+      const dismissivePhrases = ["hold up", "wait —", "wait -", "hold on", "stop —", "stop -"]
+      const hasDismissivePhrase = dismissivePhrases.some((phrase) => responseText.includes(phrase))
+      if (hasDismissivePhrase) {
+        ruleViolations.push(
+          "Used dismissive phrase (e.g., 'Hold up') - clarifying questions should be encouraged"
+        )
       }
 
       // Log violations for monitoring (future: regenerate response)
