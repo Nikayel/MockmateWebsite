@@ -4,9 +4,7 @@
  */
 
 import admin from "firebase-admin"
-
-// Development mode check - logs only appear in development
-const isDev = process.env.NODE_ENV === 'development'
+import { logger } from "./logger"
 
 // Initialize Firebase Admin SDK (singleton pattern)
 if (!admin.apps.length) {
@@ -16,7 +14,7 @@ if (!admin.apps.length) {
     const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
 
     if (!projectId) {
-      if (isDev) console.error("Firebase Admin SDK: NEXT_PUBLIC_FIREBASE_PROJECT_ID is not set")
+      logger.error("Firebase Admin SDK: NEXT_PUBLIC_FIREBASE_PROJECT_ID is not set")
       throw new Error("Firebase project ID is required for Admin SDK initialization")
     }
 
@@ -28,36 +26,25 @@ if (!admin.apps.length) {
           credential: admin.credential.cert(serviceAccountJson),
           projectId: projectId,
         })
-        if (isDev) console.log("Firebase Admin SDK initialized with service account")
+        logger.info("Firebase Admin SDK initialized with service account")
       } catch (parseError) {
-        if (isDev) {
-          console.error("Firebase Admin SDK: Failed to parse service account JSON")
-          console.error("Error:", parseError)
-        }
+        logger.error("Firebase Admin SDK: Failed to parse service account JSON", { error: parseError })
         throw new Error("Invalid FIREBASE_SERVICE_ACCOUNT_KEY format. Must be valid JSON.")
       }
     } else {
       // Initialize without service account (development - uses application default credentials)
       // NOTE: This requires GOOGLE_APPLICATION_CREDENTIALS env var or running on GCP
-      if (isDev) {
-        console.warn("Firebase Admin SDK: No service account key found")
-        console.warn("  Attempting to initialize with application default credentials")
-        console.warn("  This requires GOOGLE_APPLICATION_CREDENTIALS env var or running on GCP")
-      }
+      logger.warn("Firebase Admin SDK: No service account key found, using application default credentials", {
+        note: "Requires GOOGLE_APPLICATION_CREDENTIALS env var or running on GCP"
+      })
 
       admin.initializeApp({
         projectId: projectId,
       })
-      if (isDev) console.log("Firebase Admin SDK initialized with default credentials")
+      logger.info("Firebase Admin SDK initialized with default credentials")
     }
   } catch (error) {
-    if (isDev) {
-      console.error("Error initializing Firebase Admin SDK:", error)
-      if (error instanceof Error) {
-        console.error("  Error name:", error.name)
-        console.error("  Error message:", error.message)
-      }
-    }
+    logger.error("Error initializing Firebase Admin SDK", { error })
 
     // Still initialize with minimal config to prevent crashes
     // But token verification will likely fail
@@ -68,15 +55,15 @@ if (!admin.apps.length) {
           admin.initializeApp({
             projectId: projectId,
           })
-          if (isDev) console.warn("Firebase Admin SDK initialized with minimal config (token verification may fail)")
-        } catch {
-          if (isDev) {
-            console.error("Failed to initialize Firebase Admin SDK even with minimal config")
-            console.error("  This will cause authentication failures in API routes")
-          }
+          logger.warn("Firebase Admin SDK initialized with minimal config (token verification may fail)")
+        } catch (minimalError) {
+          logger.error("Failed to initialize Firebase Admin SDK even with minimal config", {
+            error: minimalError,
+            note: "This will cause authentication failures in API routes"
+          })
         }
       } else {
-        if (isDev) console.error("Cannot initialize Firebase Admin SDK: No project ID available")
+        logger.error("Cannot initialize Firebase Admin SDK: No project ID available")
       }
     }
   }
