@@ -25,6 +25,13 @@ interface PracticeFeedbackProps {
     communicationScore?: number
   }
   constitutionalAICritique?: any
+  // Pre-parsed structured feedback from API (preferred over parsing raw text)
+  structuredFeedback?: {
+    whatWorked?: string[]
+    fixNext?: string[]
+    actionPlan?: string[]
+    tldr?: string
+  }
   testsPassed: number
   testsTotal: number
   timeComplexity?: string
@@ -54,6 +61,7 @@ export default function PracticeFeedback({
   technicalScore,
   scoreBreakdown,
   constitutionalAICritique,
+  structuredFeedback,
   testsPassed,
   testsTotal,
   timeComplexity,
@@ -75,7 +83,26 @@ export default function PracticeFeedback({
   complexityAnalysis,
   alternativeApproaches,
 }: PracticeFeedbackProps) {
-  const sections = parseFeedback(feedback)
+  // Parse feedback text, then override with structured data if available from API
+  const parsedSections = parseFeedback(feedback)
+
+  // If we have pre-parsed structured feedback from API, use it (more reliable than parsing)
+  const sections = {
+    ...parsedSections,
+    whatWorked:
+      structuredFeedback?.whatWorked && structuredFeedback.whatWorked.length > 0
+        ? structuredFeedback.whatWorked
+        : parsedSections.whatWorked,
+    fixNext:
+      structuredFeedback?.fixNext && structuredFeedback.fixNext.length > 0
+        ? structuredFeedback.fixNext
+        : parsedSections.fixNext,
+    actionPlan:
+      structuredFeedback?.actionPlan && structuredFeedback.actionPlan.length > 0
+        ? structuredFeedback.actionPlan
+        : parsedSections.actionPlan,
+    tldr: structuredFeedback?.tldr || parsedSections.tldr,
+  }
 
   const normalizeScore = (score: number | undefined): number => {
     if (score === undefined || score === null || isNaN(score)) return 0

@@ -281,6 +281,35 @@ export async function POST(request: NextRequest) {
         const executionResult = await executeWithPiston(fullCode, language, testCase.input)
 
         if (!executionResult.success || executionResult.error) {
+          // Check if this is an infrastructure error (service busy, timeout, etc.)
+          // vs a code execution error (syntax error, runtime error, etc.)
+          const errorMessage = executionResult.error || "Execution failed"
+          const isServiceError =
+            errorMessage.includes("service is busy") ||
+            errorMessage.includes("Unable to connect") ||
+            errorMessage.includes("network") ||
+            errorMessage.includes("timeout") ||
+            errorMessage.includes("ECONNREFUSED") ||
+            errorMessage.includes("503") ||
+            errorMessage.includes("502")
+
+          // For service errors, mark as "service_error" not "failed"
+          // These should not count against the user's score
+          if (isServiceError) {
+            results.push({
+              description: testCase.description,
+              input: testCase.input,
+              expected: testCase.expected,
+              actual: null,
+              passed: false,
+              error: errorMessage,
+              serviceError: true, // Flag to indicate this was an infrastructure issue
+            })
+            // Don't set allPassed = false for service errors
+            // The test couldn't run, it didn't fail
+            continue
+          }
+
           allPassed = false
           results.push({
             description: testCase.description,
@@ -288,7 +317,7 @@ export async function POST(request: NextRequest) {
             expected: testCase.expected,
             actual: null,
             passed: false,
-            error: executionResult.error || "Execution failed",
+            error: errorMessage,
           })
           continue
         }
@@ -331,9 +360,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate summary
+    // Exclude service errors from the count - they're infrastructure issues, not code failures
+    const serviceErrorCount = results.filter((r: any) => r.serviceError).length
     const passedCount = results.filter((r) => r.passed).length
+    const effectiveTotal = testCases.length - serviceErrorCount // Tests that actually ran
     const totalCount = testCases.length
-    const passRate = totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0
+    const passRate = effectiveTotal > 0 ? Math.round((passedCount / effectiveTotal) * 100) : 0
     const executionTimeMs = Date.now() - startTime
 
     // Log execution results for debugging
@@ -360,14 +392,17 @@ export async function POST(request: NextRequest) {
     }).catch((err) => logger.error("Analytics tracking error", { error: err }))
 
     return NextResponse.json({
-      success: allPassed,
+      success: allPassed && serviceErrorCount === 0, // Only fully successful if no service errors
       results,
       consoleLogs: allConsoleLogs, // Include captured console.log outputs
       summary: {
         total: totalCount,
         passed: passedCount,
-        failed: totalCount - passedCount,
+        failed: effectiveTotal - passedCount, // Only count actual failures, not service errors
         passRate,
+        // Include service error info so frontend can display appropriate message
+        serviceErrors: serviceErrorCount,
+        effectiveTotal, // Tests that actually ran (excluding service errors)
       },
       error: null,
     })

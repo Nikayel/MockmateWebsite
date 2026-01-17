@@ -224,6 +224,13 @@ function InterviewPageContent() {
     string,
     unknown
   > | null>(null)
+  // Structured feedback sections from API (pre-parsed)
+  const [structuredFeedback, setStructuredFeedback] = useState<{
+    whatWorked?: string[]
+    fixNext?: string[]
+    actionPlan?: string[]
+    tldr?: string
+  } | null>(null)
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false) // Track AI feedback generation
   const [isGeneratingDiscussion, setIsGeneratingDiscussion] = useState(false)
   const [showCodeInDiscussion, setShowCodeInDiscussion] = useState(false)
@@ -2735,6 +2742,15 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               setConstitutionalAICritique(feedbackData.constitutionalAICritique)
               // Store locally for saving to session
               localConstitutionalAICritique = feedbackData.constitutionalAICritique
+            }
+            // Extract and store structured feedback sections (pre-parsed by API)
+            if (feedbackData.structured) {
+              setStructuredFeedback({
+                whatWorked: feedbackData.structured.whatWorked || [],
+                fixNext: feedbackData.structured.fixNext || [],
+                actionPlan: feedbackData.structured.actionPlan || [],
+                tldr: feedbackData.structured.tldr || "",
+              })
             }
             aiFeedbackSucceeded = true
           } else {
@@ -5265,6 +5281,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       technicalScore={technicalScore ?? undefined}
                       scoreBreakdown={scoreBreakdown || undefined}
                       constitutionalAICritique={constitutionalAICritique}
+                      structuredFeedback={structuredFeedback || undefined}
                       testsPassed={testSummary.passed}
                       testsTotal={testSummary.total}
                       timeComplexity={efficiencyMetrics?.estimatedTimeComplexity}

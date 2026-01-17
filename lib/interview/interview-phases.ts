@@ -145,6 +145,8 @@ PHASE RULES:
 - Ask about complexity - but make THEM derive it
 - DO NOT repeat earlier feedback
 - DO NOT give away complexity - ask "What's the complexity? Walk me through it."
+- DO NOT mention "View Detailed Feedback" - user hasn't submitted yet
+- The interview CONTINUES after tests pass - there's more to discuss!
 
 COMPLEXITY DISCUSSION:
 - If they state complexity: "Walk me through your reasoning"
@@ -158,6 +160,11 @@ AFTER TESTS PASS:
 - If NOT optimal: "Could you do better than [current complexity]?"
 - If ALREADY optimal: "What edge cases might we be missing?" or "What's a trade-off of this approach?"
 - In real interviews, if a solution can't be optimized, interviewers move on
+
+WHEN INTERVIEW NATURALLY WINDS DOWN (complexity discussed, edge cases covered):
+- Say: "Solid work. When you're ready, click Submit to wrap up and get your feedback."
+- Or: "That covers everything. Hit Submit whenever you're ready to wrap up."
+- NEVER say "View Detailed Feedback" - that button only appears AFTER they submit
 
 EXAMPLE (OPTIMAL SOLUTION):
 "Tests pass, nice. What's the complexity? [they answer O(n)] Good. Since you're hitting the optimal bound here, what edge cases might trip up your solution?"
@@ -276,10 +283,21 @@ export function updateTrackerFromMessage(
     }
 
     // Check for complexity mentions
-    const complexityMatch = message.match(/O\([^)]+\)/gi)
-    if (complexityMatch) {
-      complexityMatch.forEach((c) => {
-        const complexity = c.toUpperCase()
+    // Support multiple formats: O(n), O n, O of n, n squared, linear, etc.
+    const complexityPatterns = [
+      /O\s*\(\s*([^)]+)\s*\)/gi, // O(n), O( n log n ), O(n^2)
+      /O\s+of\s+(\w+)/gi, // O of n, O of n squared
+      /O\s+(\d*\s*n\s*(?:\^?\d*|squared|cubed)?(?:\s*log\s*n)?)/gi, // O n, O n^2, O n log n
+      /(\w+)\s+time/gi, // linear time, quadratic time, constant time
+      /time\s+(?:complexity\s+)?(?:is\s+)?(\w+)/gi, // time is linear, time complexity is O(n)
+    ]
+
+    let complexityMentioned = false
+    for (const pattern of complexityPatterns) {
+      const match = message.match(pattern)
+      if (match) {
+        complexityMentioned = true
+        const complexity = match[0].toUpperCase()
         if (lowerMessage.includes("time") || lowerMessage.includes("runtime")) {
           updated.timeComplexityMentioned = true
           updated.timeComplexityValue = complexity
@@ -291,18 +309,40 @@ export function updateTrackerFromMessage(
           updated.timeComplexityMentioned = true
           updated.timeComplexityValue = complexity
         }
-      })
+        break
+      }
+    }
 
-      // Check if they explained why
-      if (
-        lowerMessage.includes("because") ||
+    // Also check for explicit complexity keywords
+    if (
+      !complexityMentioned &&
+      (lowerMessage.includes("linear") ||
+        lowerMessage.includes("constant") ||
+        lowerMessage.includes("quadratic") ||
+        lowerMessage.includes("logarithmic") ||
+        lowerMessage.includes("n squared") ||
+        lowerMessage.includes("n log n"))
+    ) {
+      updated.timeComplexityMentioned = true
+      if (lowerMessage.includes("linear")) updated.timeComplexityValue = "O(n)"
+      if (lowerMessage.includes("constant")) updated.timeComplexityValue = "O(1)"
+      if (lowerMessage.includes("quadratic") || lowerMessage.includes("n squared"))
+        updated.timeComplexityValue = "O(n²)"
+      if (lowerMessage.includes("logarithmic")) updated.timeComplexityValue = "O(log n)"
+      if (lowerMessage.includes("n log n")) updated.timeComplexityValue = "O(n log n)"
+    }
+
+    // Check if they explained why
+    if (
+      updated.timeComplexityMentioned &&
+      (lowerMessage.includes("because") ||
         lowerMessage.includes("since") ||
         lowerMessage.includes("due to") ||
         lowerMessage.includes("loop") ||
-        lowerMessage.includes("iterate")
-      ) {
-        updated.complexityExplanationGiven = true
-      }
+        lowerMessage.includes("iterate") ||
+        lowerMessage.includes("through"))
+    ) {
+      updated.complexityExplanationGiven = true
     }
 
     // Check for edge case mentions
@@ -473,6 +513,14 @@ CRITICAL INTERVIEWER RULES (NEVER VIOLATE):
    - In coding: Let them code, don't over-interrupt
    - In post-interview: Wrap up, don't start new discussions
    - After submit: Direct to "View Detailed Feedback", not "Submit"
+
+7. NEVER MENTION "VIEW DETAILED FEEDBACK" BEFORE USER SUBMITS:
+   - CRITICAL: Only mention "View Detailed Feedback" when you're in POST-INTERVIEW phase
+   - The POST-INTERVIEW phase ONLY happens AFTER the user clicks the Submit button
+   - If they haven't submitted yet, continue the interview naturally - ask follow-up questions
+   - Even if all tests pass, the interview continues until they click Submit
+   - If tests pass but user hasn't submitted: ask about complexity, edge cases, optimizations
+   - DO NOT prematurely end the interview or direct them to feedback
 `
 
 // =============================================================================
