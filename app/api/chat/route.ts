@@ -736,8 +736,40 @@ DO NOT:
     }
 
     // Build hint guidance if hints have been given
-    const hintsGiven = (enhancedTracker || conversationTracker as ConversationTracker)?.hintsGiven || 0
+    const hintsGiven =
+      (enhancedTracker || (conversationTracker as ConversationTracker))?.hintsGiven || 0
     const hintGuidance = hintsGiven > 0 ? getHintGuidance(hintsGiven) : ""
+
+    // CODE-ENFORCED CHECKLIST INJECTION
+    // This dynamically injects requirements based on tracker state
+    // The LLM cannot ignore this because it's injected based on code logic
+    let enforcedChecklist = ""
+    const tracker = (enhancedTracker || conversationTracker) as ConversationTracker | undefined
+    if (currentPhase === "discussion" && tracker) {
+      const missingItems: string[] = []
+
+      // Check if complexity has been discussed
+      if (!tracker.timeComplexityMentioned) {
+        missingItems.push(
+          '⚠️ ASK ABOUT COMPLEXITY: "What time and space complexity are you targeting?"'
+        )
+      }
+
+      // Check if edge cases have been discussed
+      if (tracker.edgeCasesMentioned.length === 0) {
+        missingItems.push('⚠️ ASK ABOUT EDGE CASES: "Any edge cases you\'re thinking about?"')
+      }
+
+      if (missingItems.length > 0) {
+        enforcedChecklist = `
+═══════════════════════════════════════════════════════════════
+🚫 DO NOT SAY "GO CODE" OR "CODE IT UP" IN THIS RESPONSE 🚫
+You MUST ask about these first:
+${missingItems.join("\n")}
+═══════════════════════════════════════════════════════════════
+`
+      }
+    }
 
     // Build complexity context - tells interviewer if solution is optimal
     let complexityContext = ""
@@ -790,12 +822,13 @@ ${phasePrompt}
 ${trackingContext}
 ${hintGuidance}
 ${complexityContext}
+${enforcedChecklist}
 ${INTERVIEWER_BEHAVIOR_RULES}
 
 WHEN CANDIDATE PROPOSES APPROACH:
-- If brute force: Accept it, ask complexity, then "Can you think of a more optimal approach?"
-- If optimal (or you know they can't do better): "What made you choose that over [alternative]?" then let them code
-- Don't over-question - once they've explained clearly, say "Go ahead and code it"
+- If brute force: Accept it, then ask about complexity and edge cases before coding
+- If optimal: Acknowledge, then ask about complexity and edge cases before coding
+- DO NOT say "go code" until complexity AND edge cases are discussed (see phase prompt)
 
 WHEN CANDIDATE IS STUCK:
 - Use progressive hints (leading question → concrete example → direct nudge)
@@ -1178,6 +1211,63 @@ Remember: Acknowledge what they said, then probe deeper or move on. Do NOT re-as
     if (!validation.valid) {
       logger.warn("[Chat API] Response may have relevance issues", { issues: validation.issues })
       // Don't fail, but log for monitoring
+    }
+
+    // POST-GENERATION VALIDATION: Check for interviewer rule violations
+    // This catches common errors that prompt engineering alone can't prevent
+    if (role === "interviewer") {
+      const responseText = aiResponse.text.toLowerCase()
+      const ruleViolations: string[] = []
+      const activeTracker = (enhancedTracker || conversationTracker) as
+        | ConversationTracker
+        | undefined
+
+      // Check 1: Premature "code it up" without complexity/edge cases
+      const codeItUpPhrases = ["code it up", "go ahead and code", "start coding", "go code"]
+      const hasCodeItUp = codeItUpPhrases.some((phrase) => responseText.includes(phrase))
+
+      if (hasCodeItUp && currentPhase === "discussion" && activeTracker) {
+        if (!activeTracker.timeComplexityMentioned) {
+          ruleViolations.push("Said 'code it up' without complexity discussion")
+        }
+        if (activeTracker.edgeCasesMentioned.length === 0) {
+          ruleViolations.push("Said 'code it up' without edge cases discussion")
+        }
+      }
+
+      // Check 2: Leading questions that give away the answer
+      const leadingPatterns = [
+        /are you thinking.*(dp|dynamic|hash|map|set|tree|stack|queue)/i,
+        /would a.*(hash|map|set|array|tree|stack|queue).*help/i,
+        /have you considered.*(dp|dynamic|hash|sliding|two pointer)/i,
+        /it's basically.*(fibonacci|dp|bfs|dfs|binary search)/i,
+      ]
+      for (const pattern of leadingPatterns) {
+        if (pattern.test(aiResponse.text)) {
+          ruleViolations.push(`Leading question detected: ${pattern.toString()}`)
+        }
+      }
+
+      // Check 3: Premature "View Detailed Feedback" mention
+      if (responseText.includes("view detailed feedback") && !hasSubmitted) {
+        ruleViolations.push("Mentioned 'View Detailed Feedback' before user submitted")
+      }
+
+      // Log violations for monitoring (future: regenerate response)
+      if (ruleViolations.length > 0) {
+        logger.warn("[Chat API] Interviewer rule violations detected", {
+          sessionId,
+          violations: ruleViolations,
+          phase: currentPhase,
+          trackerState: activeTracker
+            ? {
+                complexityMentioned: activeTracker.timeComplexityMentioned,
+                edgeCasesMentioned: activeTracker.edgeCasesMentioned.length,
+              }
+            : null,
+          responsePreview: aiResponse.text.substring(0, 200),
+        })
+      }
     }
 
     const responseTimeMs = Date.now() - startTime
