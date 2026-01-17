@@ -2684,6 +2684,22 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             })),
           ].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
 
+          // Build phase tracking info for scoring
+          const phaseTracking = {
+            submittedFromPhase: getCurrentInterviewPhase(),
+            testsRanBeforeSubmit: testResults.length > 0,
+            hadDiscussionPhase: conversationTracker.approachExplained,
+            conversationTracker: {
+              approachExplained: conversationTracker.approachExplained,
+              approachType: conversationTracker.approachType,
+              timeComplexityMentioned: conversationTracker.timeComplexityMentioned,
+              spaceComplexityMentioned: conversationTracker.spaceComplexityMentioned,
+              complexityExplanationGiven: conversationTracker.complexityExplanationGiven,
+              edgeCasesMentioned: conversationTracker.edgeCasesMentioned,
+              hintsGiven: conversationTracker.hintsGiven,
+            },
+          }
+
           const feedbackResponse = await fetch("/api/generate-feedback", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -2702,6 +2718,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               interactionMetrics,
               efficiencyMetrics: efficiencyData,
               conversationTranscript,
+              phaseTracking,
               sessionId: currentSessionId,
               userId: user.id,
             }),
