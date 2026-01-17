@@ -756,6 +756,7 @@ DO NOT:
     // The LLM cannot ignore this because it's injected based on code logic
     let enforcedChecklist = ""
     const tracker = (enhancedTracker || conversationTracker) as ConversationTracker | undefined
+
     // Run checklist in discussion AND coding phases (before tests run)
     // This catches cases where starter code pushes phase to "coding" too early
     const shouldEnforceChecklist =
@@ -783,6 +784,35 @@ DO NOT:
 🚫 DO NOT SAY "GO CODE" OR "CODE IT UP" IN THIS RESPONSE 🚫
 You MUST ask about these first:
 ${missingItems.join("\n")}
+═══════════════════════════════════════════════════════════════
+`
+      }
+    }
+
+    // TESTING PHASE: Dynamic override to prevent re-asking already covered topics
+    // The static testing phase prompt says "ask about complexity" but we need to
+    // skip that if complexity was already discussed during the approach phase
+    let testingPhaseOverride = ""
+    if (currentPhase === "testing" && tracker) {
+      const alreadyCovered: string[] = []
+
+      if (tracker.timeComplexityMentioned && tracker.timeComplexityValue) {
+        alreadyCovered.push(`✅ COMPLEXITY ALREADY DISCUSSED: ${tracker.timeComplexityValue} - DO NOT ask again`)
+      }
+      if (tracker.edgeCasesMentioned.length > 0) {
+        alreadyCovered.push(`✅ EDGE CASES ALREADY DISCUSSED: ${tracker.edgeCasesMentioned.join(", ")} - DO NOT ask again`)
+      }
+
+      if (alreadyCovered.length > 0) {
+        testingPhaseOverride = `
+═══════════════════════════════════════════════════════════════
+ALREADY COVERED (DO NOT RE-ASK):
+${alreadyCovered.join("\n")}
+
+INSTEAD, focus on:
+- Ask about trade-offs or alternative approaches
+- Discuss what edge cases might still be missing
+- Ask about optimization potential (only if not already optimal)
 ═══════════════════════════════════════════════════════════════
 `
       }
@@ -871,6 +901,7 @@ ${trackingContext}
 ${hintGuidance}
 ${complexityContext}
 ${enforcedChecklist}
+${testingPhaseOverride}
 ${fuzzyModeContext}
 ${INTERVIEWER_BEHAVIOR_RULES}
 
@@ -885,7 +916,8 @@ WHEN CANDIDATE IS STUCK:
 - After 2 failed attempts at same concept, give a concrete nudge
 
 WHEN TESTS PASS:
-- Ask about complexity (make them derive it, don't confirm)
+- Check ALREADY COVERED section above - DO NOT re-ask topics already discussed
+- If complexity NOT discussed yet: ask about it (make them derive it, don't confirm)
 - ONLY ask about optimization IF their solution can be improved (check SOLUTION COMPLEXITY section above)
 - If already optimal: ask about edge cases, trade-offs, or alternative approaches instead
 - The interview CONTINUES after tests pass - keep asking follow-up questions

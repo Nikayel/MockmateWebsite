@@ -938,7 +938,7 @@ CRITICAL INSTRUCTIONS:
     // Use extracted evidence for more accurate hint count if available
     const hintsUsedActual =
       extractedEvidence?.hints.totalGiven ?? interactionMetrics?.hintsUsed ?? 0
-    const masteryScoreForResponse = calculateMasteryScore({
+    let masteryScoreForResponse = calculateMasteryScore({
       testCasesPassed: testsPassed,
       testCasesTotal: testsTotal,
       timeSpentMinutes: timeSpent ? Math.round(timeSpent / 60) : 0,
@@ -950,6 +950,24 @@ CRITICAL INSTRUCTIONS:
         extractedEvidence?.timeComplexity.mentioned ?? aiValidation.complexityDiscussed,
       interviewerMessagesCount: aiValidation.questionsAsked || 0,
     })
+
+    // CRITICAL: When tests all pass, mastery should be >= overall
+    // Philosophy: If you solved the problem correctly, your "code knowledge" (mastery)
+    // should not be lower than your "interview performance" (overall)
+    // This prevents confusing situations where you get 100% tests but mastery < overall
+    if (testsTotal > 0 && testsPassed === testsTotal) {
+      if (masteryScoreForResponse.masteryScore < scores.overall) {
+        // Boost mastery to match overall when all tests pass
+        masteryScoreForResponse = {
+          ...masteryScoreForResponse,
+          masteryScore: scores.overall,
+        }
+        logger.info("Mastery score boosted to match overall (100% pass rate)", {
+          originalMastery: masteryScoreForResponse.masteryScore,
+          boostedTo: scores.overall,
+        })
+      }
+    }
 
     // Update learning state for spaced repetition email reminders
     // Also update problem-level mastery for enhanced SM-2 spaced repetition
