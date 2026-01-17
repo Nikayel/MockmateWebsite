@@ -141,6 +141,104 @@ public:
         description: "Edge: Single opening bracket",
       },
     ],
+
+    // ==========================================
+    // Real Interview Mode (Fuzzy Mode) Fields
+    // ==========================================
+    fuzzyStatement:
+      "Given a string of brackets, determine if it's valid.",
+
+    clarifyingQuestions: [
+      {
+        question: "What types of brackets are we dealing with?",
+        answer:
+          "Only parentheses (), square brackets [], and curly braces {}.",
+        required: true,
+      },
+      {
+        question: "What makes a string 'valid'?",
+        answer:
+          "Every opening bracket must have a matching closing bracket of the same type, and they must be properly nested.",
+        required: true,
+      },
+      {
+        question: "Can the string contain other characters?",
+        answer: "No, the string only contains bracket characters.",
+        required: false,
+      },
+      {
+        question: "What about an empty string?",
+        answer: "An empty string is considered valid.",
+        required: false,
+      },
+      {
+        question: "Is there a maximum length?",
+        answer: "The string can have up to 10,000 characters.",
+        required: false,
+      },
+    ],
+
+    // ==========================================
+    // Proactive AI Interviewer Fields
+    // ==========================================
+    commonWrongApproaches: [
+      {
+        description: "Just counting brackets without tracking type/order",
+        codeSignals: [
+          "count open and close",
+          "counter++",
+          "counter--",
+          "only counting",
+        ],
+        intervention:
+          "Counting might not be enough. What about '([)]'? The counts match but is it valid?",
+      },
+      {
+        description: "Using string replacement in a loop",
+        codeSignals: [
+          "replace('()', '')",
+          "replace('[]', '')",
+          "while loop replace",
+        ],
+        intervention:
+          "That could work but what's the time complexity? Each replace might scan the whole string. Can you do it in one pass?",
+      },
+      {
+        description: "Checking only adjacent pairs",
+        codeSignals: ["s[i] and s[i+1]", "adjacent characters", "pairs only"],
+        intervention:
+          "What about nested brackets like '{[]}'? Adjacent checking might miss valid patterns.",
+      },
+    ],
+
+    whatIfQuestions: [
+      "What if the string starts with a closing bracket like ']'?",
+      "What happens if we have unmatched opening brackets at the end, like '((('?",
+      "What's the space complexity of your solution?",
+      "Could you solve this without a stack?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "creating a stack",
+        question: "What are you pushing onto the stack - the bracket itself or something else?",
+      },
+      {
+        trigger: "using a map/dictionary for bracket matching",
+        question:
+          "Nice - what's your mapping strategy? Keys are opening or closing brackets?",
+      },
+      {
+        trigger: "checking if stack is empty at end",
+        question: "Why do you need to check if the stack is empty at the end?",
+      },
+    ],
+
+    optimizationPush: {
+      suboptimalComplexity: "O(n²)",
+      nudge:
+        "Your solution works but might be doing repeated work. Can you solve it with a single pass through the string?",
+    },
   },
   {
     id: "dsa-min-stack",

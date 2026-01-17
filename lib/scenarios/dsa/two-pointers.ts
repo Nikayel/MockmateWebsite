@@ -91,6 +91,111 @@ Notice that the solution set must not contain duplicate triplets.`,
         description: "No triplets sum to zero",
       },
     ],
+
+    // ==========================================
+    // Real Interview Mode (Fuzzy Mode) Fields
+    // ==========================================
+    fuzzyStatement:
+      "Given an array of numbers, find all unique triplets that sum to zero.",
+
+    clarifyingQuestions: [
+      {
+        question: "Should I return the values or the indices?",
+        answer: "Return the actual values, not the indices.",
+        required: true,
+      },
+      {
+        question: "What if there are duplicate triplets?",
+        answer:
+          "The solution set must not contain duplicate triplets. Each unique combination should appear only once.",
+        required: true,
+      },
+      {
+        question: "Can I use the same element multiple times?",
+        answer:
+          "No, you cannot use the same array index twice in a triplet, but different indices with the same value are allowed.",
+        required: true,
+      },
+      {
+        question: "What if no triplets exist?",
+        answer: "Return an empty array.",
+        required: false,
+      },
+      {
+        question: "Is the array sorted?",
+        answer: "No, but you can sort it if that helps your approach.",
+        required: false,
+      },
+      {
+        question: "Does the order of triplets in the result matter?",
+        answer: "No, triplets can be in any order.",
+        required: false,
+      },
+    ],
+
+    // ==========================================
+    // Proactive AI Interviewer Fields
+    // ==========================================
+    commonWrongApproaches: [
+      {
+        description: "Three nested loops brute force O(n³)",
+        codeSignals: [
+          "three nested loops",
+          "O(n^3)",
+          "O(n³)",
+          "for i for j for k",
+        ],
+        intervention:
+          "That's O(n³). Can you reduce it? Think about how sorting might help and whether you can apply a technique you've used for two-sum.",
+      },
+      {
+        description: "Not handling duplicates - returning duplicate triplets",
+        codeSignals: [
+          "no duplicate check",
+          "missing skip duplicates",
+          "result has duplicates",
+        ],
+        intervention:
+          "Your approach looks right, but think about this: if nums has [-1,-1,2], how do you ensure you don't return [[-1,-1,2],[-1,-1,2]]?",
+      },
+      {
+        description: "Using a Set for deduplication inefficiently",
+        codeSignals: ["Set of tuples", "stringify triplet", "JSON.stringify"],
+        intervention:
+          "Using a Set works but adds overhead. Can you skip duplicates during iteration instead of filtering after?",
+      },
+    ],
+
+    whatIfQuestions: [
+      "What if the array has fewer than 3 elements?",
+      "What if all elements are the same, like [0,0,0,0]?",
+      "What if there are many duplicates - how does your solution handle [-1,-1,-1,2,2,2]?",
+      "What's the time complexity? Can you do better than O(n³)?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "started sorting the array",
+        question:
+          "Good start with sorting. How does sorting help you avoid duplicates?",
+      },
+      {
+        trigger: "using two pointers",
+        question:
+          "When do you move the left pointer vs the right pointer? Walk me through.",
+      },
+      {
+        trigger: "skipping duplicates",
+        question:
+          "I see you're skipping duplicates. Why do you need to skip both for the outer loop AND for the inner pointers?",
+      },
+    ],
+
+    optimizationPush: {
+      suboptimalComplexity: "O(n³)",
+      nudge:
+        "Can you get this down to O(n²)? Hint: sort first, then for each element, can you use a technique from Two Sum II?",
+    },
   },
   {
     id: "dsa-trapping-rain-water-two-pointers",

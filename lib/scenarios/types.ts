@@ -78,6 +78,40 @@ export interface BaseScenario {
   estimatedTime: number // in minutes
 }
 
+/**
+ * Clarifying question that candidates should ask in "Real Interview Mode"
+ */
+export interface ClarifyingQuestion {
+  /** The question topic/intent (used for semantic matching) */
+  question: string
+  /** The answer the interviewer would give */
+  answer: string
+  /** Is this critical to ask? Affects scoring */
+  required: boolean
+}
+
+/**
+ * Common wrong approach detection for proactive AI intervention
+ */
+export interface WrongApproach {
+  /** Description of the suboptimal approach */
+  description: string
+  /** Keywords/patterns to detect in code (for hint matching, not regex) */
+  codeSignals: string[]
+  /** What the AI should say to nudge them */
+  intervention: string
+}
+
+/**
+ * Mid-coding probe for proactive AI engagement
+ */
+export interface MidCodingProbe {
+  /** When to trigger this probe (semantic description) */
+  trigger: string
+  /** The question to ask */
+  question: string
+}
+
 export interface DSAScenario extends BaseScenario {
   type: "dsa"
   pattern: DSAPattern
@@ -109,6 +143,37 @@ export interface DSAScenario extends BaseScenario {
   // Optional reference solution for dynamic validation
   // Allows running canonical solution and comparing outputs
   referenceSolution?: ReferenceSolution
+
+  // ==========================================
+  // Real Interview Mode (Fuzzy Mode) Fields
+  // ==========================================
+
+  /** Vague problem statement for "Real Interview Mode" - requires candidate to ask clarifying Qs */
+  fuzzyStatement?: string
+
+  /** Expected clarifying questions - checked via batch LLM at phase transition */
+  clarifyingQuestions?: ClarifyingQuestion[]
+
+  // ==========================================
+  // Proactive AI Interviewer Fields
+  // ==========================================
+
+  /** Common wrong approaches to detect and intervene on */
+  commonWrongApproaches?: WrongApproach[]
+
+  /** Problem-specific "what if" questions (e.g., "What if array is empty?") */
+  whatIfQuestions?: string[]
+
+  /** Context-aware probes to ask during coding */
+  midCodingProbes?: MidCodingProbe[]
+
+  /** When to push for optimization */
+  optimizationPush?: {
+    /** The suboptimal complexity that triggers the nudge */
+    suboptimalComplexity: string
+    /** The nudge message */
+    nudge: string
+  }
 }
 
 export interface BugFixScenario extends BaseScenario {

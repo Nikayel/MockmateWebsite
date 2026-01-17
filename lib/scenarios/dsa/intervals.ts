@@ -109,6 +109,116 @@ export const intervalsScenarios: DSAScenario[] = [
         description: "Single interval",
       },
     ],
+
+    // ==========================================
+    // Real Interview Mode (Fuzzy Mode) Fields
+    // ==========================================
+    fuzzyStatement:
+      "Given a list of intervals, merge all the overlapping ones.",
+
+    clarifyingQuestions: [
+      {
+        question: "What does 'overlapping' mean exactly?",
+        answer:
+          "Two intervals overlap if they share any point. For example, [1,4] and [4,5] overlap at point 4.",
+        required: true,
+      },
+      {
+        question: "Are the intervals sorted?",
+        answer:
+          "No, the intervals are not necessarily sorted. You may need to sort them.",
+        required: true,
+      },
+      {
+        question: "What format is each interval?",
+        answer:
+          "Each interval is [start, end] where start <= end. Both are integers.",
+        required: false,
+      },
+      {
+        question: "Should the result be sorted?",
+        answer: "Yes, return merged intervals sorted by start time.",
+        required: false,
+      },
+      {
+        question: "Can intervals be nested? Like [1,10] and [2,3]?",
+        answer:
+          "Yes, one interval can fully contain another. They should merge into the larger one.",
+        required: false,
+      },
+      {
+        question: "What if there's only one interval?",
+        answer: "Return it as-is.",
+        required: false,
+      },
+    ],
+
+    // ==========================================
+    // Proactive AI Interviewer Fields
+    // ==========================================
+    commonWrongApproaches: [
+      {
+        description: "Not sorting first - comparing non-adjacent intervals incorrectly",
+        codeSignals: [
+          "no sort",
+          "comparing without sorting",
+          "nested loops without sort",
+        ],
+        intervention:
+          "How are you handling intervals that aren't adjacent in the array but should merge? For example, [[3,4],[1,2],[2,3]]?",
+      },
+      {
+        description: "Checking overlap incorrectly - missing edge cases",
+        codeSignals: [
+          "start < end",
+          "wrong overlap condition",
+          "missing equality check",
+        ],
+        intervention:
+          "Let's trace through [1,4] and [4,5]. Do they overlap? Make sure your condition handles the boundary case.",
+      },
+      {
+        description: "Modifying array while iterating",
+        codeSignals: [
+          "splice inside loop",
+          "removing while iterating",
+          "index issues",
+        ],
+        intervention:
+          "I see you're modifying the array while iterating. That can cause issues. Consider building a new result array instead.",
+      },
+    ],
+
+    whatIfQuestions: [
+      "What if all intervals overlap into one? Like [[1,4],[2,5],[3,6]]?",
+      "What if no intervals overlap at all?",
+      "What's the time complexity? Why do we need to sort?",
+      "What if intervals are given in reverse order like [[5,6],[3,4],[1,2]]?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "sorting intervals",
+        question:
+          "Good, you're sorting. What are you sorting by - start time, end time, or both?",
+      },
+      {
+        trigger: "comparing current with last merged",
+        question:
+          "When you find an overlap, how do you decide the end time of the merged interval?",
+      },
+      {
+        trigger: "building result array",
+        question:
+          "Walk me through what happens when you process [[1,3],[2,6],[8,10]]. What's in your result after each step?",
+      },
+    ],
+
+    optimizationPush: {
+      suboptimalComplexity: "O(n²)",
+      nudge:
+        "Your solution compares each interval with every other. Can you do it in O(n log n) by sorting first and then a single pass?",
+    },
   },
 
   {
