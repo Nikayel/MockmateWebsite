@@ -9,8 +9,8 @@ export const DEFAULT_TIMEZONE = "America/Los_Angeles"
 
 // Reasonable hours for sending emails (9 AM - 9 PM local time)
 export const REASONABLE_HOURS = {
-  start: 9,  // 9 AM
-  end: 21,   // 9 PM
+  start: 9, // 9 AM
+  end: 21, // 9 PM
 }
 
 /**
@@ -103,5 +103,122 @@ export function isValidTimezone(timezone: string): boolean {
     return true
   } catch {
     return false
+  }
+}
+
+/**
+ * Get today's date string (YYYY-MM-DD) in a specific timezone
+ *
+ * This is critical for streak calculations - ensures we compare calendar dates
+ * in the user's timezone, not UTC.
+ *
+ * Example: A user in PST practicing at 11 PM local time:
+ * - UTC would show next day's date
+ * - This function correctly returns the local date
+ */
+export function getTodayInTimezone(timezone: string | undefined | null): string {
+  const userTimezone = timezone || DEFAULT_TIMEZONE
+  try {
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: userTimezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+    return formatter.format(new Date())
+  } catch {
+    // Fallback to UTC if timezone is invalid
+    return new Date().toISOString().split("T")[0]
+  }
+}
+
+/**
+ * Convert an ISO timestamp to a date string (YYYY-MM-DD) in a specific timezone
+ *
+ * Use this to convert stored timestamps (which are in UTC/ISO format) to the
+ * user's local calendar date for comparison.
+ */
+export function getDateInTimezone(
+  isoTimestamp: string,
+  timezone: string | undefined | null
+): string {
+  const userTimezone = timezone || DEFAULT_TIMEZONE
+  try {
+    const date = new Date(isoTimestamp)
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: userTimezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+    return formatter.format(date)
+  } catch {
+    // Fallback to UTC date portion
+    return isoTimestamp.split("T")[0]
+  }
+}
+
+/**
+ * Check if a given ISO timestamp is "today" in the user's timezone
+ *
+ * This properly handles the case where it's still "today" in the user's
+ * timezone even if UTC has moved to the next day.
+ */
+export function isToday(
+  isoTimestamp: string | undefined | null,
+  timezone: string | undefined | null
+): boolean {
+  if (!isoTimestamp) return false
+
+  const today = getTodayInTimezone(timezone)
+  const timestampDate = getDateInTimezone(isoTimestamp, timezone)
+
+  return today === timestampDate
+}
+
+/**
+ * Calculate the difference in calendar days between two dates in a specific timezone
+ *
+ * Returns:
+ * - 0 if same calendar day
+ * - 1 if consecutive days (yesterday to today)
+ * - >1 if more than 1 day apart
+ *
+ * This is the correct way to calculate streak continuity.
+ */
+export function getDaysDifference(
+  earlierTimestamp: string,
+  laterTimestamp: string | Date,
+  timezone: string | undefined | null
+): number {
+  const userTimezone = timezone || DEFAULT_TIMEZONE
+
+  const earlier =
+    typeof earlierTimestamp === "string" ? new Date(earlierTimestamp) : earlierTimestamp
+  const later = typeof laterTimestamp === "string" ? new Date(laterTimestamp) : laterTimestamp
+
+  try {
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: userTimezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+
+    const earlierDate = formatter.format(earlier)
+    const laterDate = formatter.format(later)
+
+    // Parse the YYYY-MM-DD strings and calculate difference
+    const earlierMs = new Date(earlierDate + "T00:00:00Z").getTime()
+    const laterMs = new Date(laterDate + "T00:00:00Z").getTime()
+
+    return Math.round((laterMs - earlierMs) / (1000 * 60 * 60 * 24))
+  } catch {
+    // Fallback to UTC-based calculation
+    const earlierDateUtc = new Date(earlier.toISOString().split("T")[0] + "T00:00:00Z").getTime()
+    const laterDateUtc = new Date(
+      (later instanceof Date ? later.toISOString() : later).split("T")[0] + "T00:00:00Z"
+    ).getTime()
+    return Math.round((laterDateUtc - earlierDateUtc) / (1000 * 60 * 60 * 24))
   }
 }

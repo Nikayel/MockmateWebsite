@@ -20,6 +20,13 @@ import {
   type MasteryScoreResult,
 } from "./spaced-repetition/mastery-score"
 import { analyzeMessage } from "./scoring/keyword-detection"
+import {
+  getTodayInTimezone,
+  getDateInTimezone,
+  getDaysDifference,
+  DEFAULT_TIMEZONE,
+} from "./email/timezone"
+import type { Profile } from "./types"
 
 // =============================================================================
 // TYPES
@@ -846,15 +853,32 @@ async function updateUserAggregateStats(summary: SessionSummary): Promise<void> 
 /**
  * Update user's learning state (streak, topics, last active)
  * This powers the Learning Progress display in admin dashboard
+ *
+ * IMPORTANT: Uses timezone-aware date calculation to properly track streaks.
+ * A user practicing at 11 PM in their timezone should count as practicing
+ * "today" even if it's already tomorrow in UTC.
  */
 async function updateUserLearningState(summary: SessionSummary): Promise<void> {
   try {
     const learningStateRef = adminDb.collection("user_learning_state").doc(summary.userId)
 
+    // Fetch user's timezone BEFORE the transaction to avoid nested reads
+    let userTimezone = DEFAULT_TIMEZONE
+    try {
+      const profileDoc = await adminDb.collection("profiles").doc(summary.userId).get()
+      if (profileDoc.exists) {
+        const profile = profileDoc.data() as Profile
+        userTimezone = profile.notification_preferences?.timezone || DEFAULT_TIMEZONE
+      }
+    } catch {
+      // Use default timezone if profile fetch fails
+    }
+
     await adminDb.runTransaction(async (transaction) => {
       const doc = await transaction.get(learningStateRef)
       const now = new Date(summary.completedAt)
-      const today = now.toISOString().split("T")[0]
+      // Use timezone-aware "today" calculation
+      const today = getTodayInTimezone(userTimezone)
 
       if (!doc.exists) {
         // Create new learning state document
@@ -878,22 +902,30 @@ async function updateUserLearningState(summary: SessionSummary): Promise<void> {
         })
       } else {
         const data = doc.data()!
-        const lastSessionDate = data.last_session_date || ""
+        const lastSessionAt = data.last_session_at
         let streakDays = data.streak_days || 0
 
-        // Calculate streak
-        if (lastSessionDate !== today) {
-          const lastDate = new Date(lastSessionDate)
-          const daysDiff = Math.floor((now.getTime() - lastDate.getTime()) / (24 * 60 * 60 * 1000))
+        // Calculate streak using timezone-aware calendar day comparison
+        // This ensures practicing at 11 PM then 1 AM counts correctly
+        if (lastSessionAt) {
+          const lastSessionDate = getDateInTimezone(lastSessionAt, userTimezone)
 
-          if (daysDiff === 1) {
-            // Consecutive day - increment streak
-            streakDays++
-          } else if (daysDiff > 1) {
-            // Streak broken - reset to 1
-            streakDays = 1
+          if (lastSessionDate !== today) {
+            // Use timezone-aware day difference calculation
+            const daysDiff = getDaysDifference(lastSessionAt, now, userTimezone)
+
+            if (daysDiff === 1) {
+              // Consecutive day - increment streak
+              streakDays++
+            } else if (daysDiff > 1) {
+              // Streak broken - reset to 1
+              streakDays = 1
+            }
+            // If daysDiff === 0, same day - don't change streak
           }
-          // If daysDiff === 0, same day - don't change streak
+        } else {
+          // First session ever
+          streakDays = 1
         }
 
         // Update topics

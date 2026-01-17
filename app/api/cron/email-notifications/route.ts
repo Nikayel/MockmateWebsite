@@ -31,6 +31,8 @@ import {
   calculateRetention,
   isReasonableHourForUser,
   isInQuietHours,
+  isToday,
+  DEFAULT_TIMEZONE,
 } from "@/lib/email"
 import type { Profile, UserLearningState, ProblemMasteryRecord } from "@/lib/types"
 import { checkStreakAtRisk, sendDailyReminderIfNeeded } from "@/lib/services/session-notifications"
@@ -881,6 +883,9 @@ async function logEmailNotification(userId: string, emailType: string, now: Date
 /**
  * Process streak at risk alerts (in-app notifications)
  * Finds users with 3+ day streaks who haven't practiced today and sends them an alert
+ *
+ * IMPORTANT: Uses timezone-aware "today" check. A user's session at 11 PM local time
+ * should count as "today" even if it's already tomorrow in UTC.
  */
 async function processStreakAlerts(results: {
   streakAlerts: { sent: number; skipped: number }
@@ -893,15 +898,26 @@ async function processStreakAlerts(results: {
       .limit(100)
       .get()
 
-    const today = new Date().toISOString().split("T")[0]
-
     for (const doc of learningStatesSnap.docs) {
       const userId = doc.id
       const learningState = doc.data()
 
-      // Skip if they already practiced today
-      const lastPractice = learningState.last_practice_date
-      if (lastPractice?.split("T")[0] === today) {
+      // Get user's timezone from their profile for accurate "today" check
+      let userTimezone = DEFAULT_TIMEZONE
+      try {
+        const profileDoc = await db.collection("profiles").doc(userId).get()
+        if (profileDoc.exists) {
+          const profile = profileDoc.data() as Profile
+          userTimezone = profile.notification_preferences?.timezone || DEFAULT_TIMEZONE
+        }
+      } catch {
+        // Use default timezone if profile fetch fails
+      }
+
+      // Skip if they already practiced today (in THEIR timezone)
+      // Use last_session_at (correct field name) with timezone-aware check
+      const lastSessionAt = learningState.last_session_at
+      if (isToday(lastSessionAt, userTimezone)) {
         results.streakAlerts.skipped++
         continue
       }
