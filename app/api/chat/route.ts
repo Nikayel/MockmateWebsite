@@ -37,6 +37,10 @@ import {
   createEmptyTracker,
   updateTrackerFromMessage,
 } from "@/lib/interview/interview-phases"
+import {
+  extractConversationState,
+  shouldRunExtraction,
+} from "@/lib/interview/conversation-extraction"
 import { buildCompanyInterviewerPrompt } from "@/lib/interview/company-interviewer-styles"
 
 interface UserContext {
@@ -364,6 +368,46 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // LLM-based conversation extraction for more accurate tracking
+    // Only run for interviewer mode and when key signals detected
+    let enhancedTracker = conversationTracker as ConversationTracker | undefined
+    if (role === "interviewer" && conversationTracker && context && message) {
+      const messageCount = Array.isArray(context) ? context.length : 0
+      const lastExtraction = (conversationTracker as any)?.lastExtractionAt || 0
+
+      if (shouldRunExtraction(messageCount, lastExtraction, message)) {
+        try {
+          // Convert context to extraction format
+          const recentMessages = (context as Array<{ type: string; message: string }>)
+            .slice(-10)
+            .map((m) => ({
+              role: m.type === "user" ? "candidate" : "interviewer",
+              content: m.message,
+            }))
+
+          // Run async extraction (non-blocking for response, enhances future requests)
+          const extractionUpdates = await extractConversationState(
+            recentMessages,
+            conversationTracker as ConversationTracker
+          )
+
+          // Merge extraction results with existing tracker
+          if (Object.keys(extractionUpdates).length > 0) {
+            enhancedTracker = {
+              ...(conversationTracker as ConversationTracker),
+              ...extractionUpdates,
+            }
+            logger.info("[Chat API] Enhanced tracker with LLM extraction", { extractionUpdates })
+          }
+        } catch (extractionError) {
+          // Extraction failed, continue with original tracker
+          logger.warn("[Chat API] LLM extraction failed, using regex-based tracker", {
+            error: extractionError,
+          })
+        }
+      }
+    }
+
     // Build user context string for personalized responses
     const userInfo = userContext as UserContext
     // Extract first name or last name from full_name or email
@@ -683,13 +727,16 @@ DO NOT:
     const phasePrompt = PHASE_PROMPTS[currentPhase] || PHASE_PROMPTS.discussion
 
     // Build conversation tracking context if available
+    // Use enhanced tracker (with LLM extraction) if available
     let trackingContext = ""
-    if (conversationTracker) {
-      trackingContext = buildTrackingContext(conversationTracker as ConversationTracker)
+    if (enhancedTracker || conversationTracker) {
+      trackingContext = buildTrackingContext(
+        (enhancedTracker || conversationTracker) as ConversationTracker
+      )
     }
 
     // Build hint guidance if hints have been given
-    const hintsGiven = (conversationTracker as ConversationTracker)?.hintsGiven || 0
+    const hintsGiven = (enhancedTracker || conversationTracker as ConversationTracker)?.hintsGiven || 0
     const hintGuidance = hintsGiven > 0 ? getHintGuidance(hintsGiven) : ""
 
     // Build complexity context - tells interviewer if solution is optimal
