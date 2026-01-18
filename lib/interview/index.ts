@@ -52,15 +52,6 @@ export type {
   ClarifyingQuestionsCheckResult,
 } from "./clarifying-questions-checker"
 
-// Context-aware proactive triggers (replaces fixed timer)
-export {
-  checkProactiveTrigger,
-  getWhatIfQuestion,
-  getMidCodingProbe,
-  detectWrongApproach,
-} from "./proactive-triggers"
-export type { ProactiveContext, ProactiveTriggerResult } from "./proactive-triggers"
-
 // Company-specific time limits (DRY: single source of truth)
 export {
   STRICT_TIME_COMPANIES,

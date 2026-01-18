@@ -765,6 +765,8 @@ export function buildInterviewContext(options: ContextBuilderOptions): {
   codeContext: string // Current solution code
   aiPartnerContext: string // AI Partner usage tracking
   userAnsweredContext: string // Topics already answered
+  workspaceContext: string // Other files in user's codebase (injected later)
+  ragContext: string // RAG-enhanced dynamic context (injected later)
 } {
   const { context: userContext, userName } = buildUserContext(options.userInfo)
 
@@ -803,5 +805,8 @@ export function buildInterviewContext(options: ContextBuilderOptions): {
       userAnsweredTopics: options.userAnsweredTopics,
       recentNudgeTopics: options.recentNudgeTopics,
     }),
+    // These are injected later in the route handler (async operations)
+    workspaceContext: "",
+    ragContext: "",
   }
 }

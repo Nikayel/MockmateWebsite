@@ -131,6 +131,10 @@ export class InterviewerAgent implements Agent<InterviewerInput, InterviewerOutp
       if (pc.aiPartnerContext) prompt += `\n\n${pc.aiPartnerContext}`
       // Add user answered topics - prevents re-asking about already covered topics
       if (pc.userAnsweredContext) prompt += `\n\n${pc.userAnsweredContext}`
+      // Add workspace context - other files in user's codebase
+      if (pc.workspaceContext) prompt += `\n\n${pc.workspaceContext}`
+      // Add RAG-enhanced context - dynamic knowledge retrieval
+      if (pc.ragContext) prompt += `\n\n${pc.ragContext}`
     }
 
     // Add phase-specific guidance

@@ -35,6 +35,244 @@ import {
   buildProactiveContext,
   buildCodeContext,
 } from "@/lib/interview/context-builders"
+import { type DSAPattern } from "@/lib/types/dsa-patterns"
+import { getPatternKnowledge } from "@/lib/rag/knowledge-base/dsa-knowledge"
+import { getCompanyInterviewKnowledge, type CompanyId } from "@/lib/rag/knowledge-base/company-knowledge"
+import { getDynamicChatContext, formatDynamicContextForPrompt, shouldRetrieveDynamicContext } from "@/lib/rag/dynamic-chat-context"
+import { buildHintContext, buildComplexityContext } from "@/lib/rag/context-builder"
+import { truncateText, truncateFileContent } from "@/lib/utils"
+
+// =============================================================================
+// CONTEXT MANAGEMENT CONSTANTS
+// =============================================================================
+
+const MAX_HISTORY_MESSAGES = 20 // Keep last 20 messages
+const MAX_MESSAGE_LENGTH = 4000 // Truncate individual messages
+const MAX_WORKSPACE_FILES = 5 // Limit workspace files
+const MAX_FILE_SIZE = 10000 // 10KB per file max
+
+// =============================================================================
+// CONTEXT WINDOW MANAGEMENT
+// =============================================================================
+
+/**
+ * Sliding window for conversation history
+ * Keeps most recent messages, summarizes old ones if needed
+ */
+function manageContextWindow(
+  context: Array<{ type: string; message: string }>,
+  maxMessages: number = MAX_HISTORY_MESSAGES
+): Array<{ type: string; message: string }> {
+  if (!context || !Array.isArray(context)) return []
+
+  // If within limits, return as-is
+  if (context.length <= maxMessages) {
+    return context.map((msg) => ({
+      ...msg,
+      message: truncateText(msg.message, MAX_MESSAGE_LENGTH),
+    }))
+  }
+
+  // Keep first message (usually greeting) and last N-1 messages
+  const firstMessage = context[0]
+  const recentMessages = context.slice(-(maxMessages - 1))
+
+  // Create summary of dropped messages
+  const droppedCount = context.length - maxMessages
+  const summaryMessage = {
+    type: "model",
+    message: `[Previous ${droppedCount} messages summarized for context management]`,
+  }
+
+  return [
+    {
+      ...firstMessage,
+      message: truncateText(firstMessage.message, MAX_MESSAGE_LENGTH),
+    },
+    summaryMessage,
+    ...recentMessages.map((msg) => ({
+      ...msg,
+      message: truncateText(msg.message, MAX_MESSAGE_LENGTH),
+    })),
+  ]
+}
+
+/**
+ * Manage workspace context size
+ */
+function manageWorkspaceContext(
+  workspaceContext: Array<{ path: string; content: string }>,
+  maxFiles: number = MAX_WORKSPACE_FILES,
+  maxFileSize: number = MAX_FILE_SIZE
+): Array<{ path: string; content: string }> {
+  if (!workspaceContext || !Array.isArray(workspaceContext)) return []
+
+  // Take only the most relevant files (first N)
+  const limitedFiles = workspaceContext.slice(0, maxFiles)
+
+  // Truncate large files
+  return limitedFiles.map((file) => ({
+    path: file.path,
+    content: truncateFileContent(file.content, maxFileSize),
+  }))
+}
+
+/**
+ * Build workspace context string for prompt injection
+ */
+function buildWorkspaceContextString(
+  workspaceContext: Array<{ path: string; content: string }>
+): string {
+  const managedWorkspace = manageWorkspaceContext(workspaceContext)
+  if (managedWorkspace.length === 0) return ""
+
+  let workspaceStr = "\n\n=== USER'S CODEBASE CONTEXT ===\n"
+  managedWorkspace.forEach((file) => {
+    workspaceStr += `\n--- File: ${file.path} ---\n${file.content}\n`
+  })
+  workspaceStr += "=== END CODEBASE CONTEXT ===\n"
+
+  return workspaceStr
+}
+
+// =============================================================================
+// RAG CONTEXT BUILDER
+// =============================================================================
+
+/**
+ * Build RAG-enhanced context for the interviewer
+ * Retrieves relevant patterns, hints, and knowledge from the RAG system
+ * Includes DYNAMIC context based on what the user is currently discussing
+ */
+async function buildRAGContext(options: {
+  scenarioTitle?: string
+  scenarioPattern?: string
+  scenarioCompany?: string
+  scenarioType?: string
+  scenarioId?: string
+  problemText?: string
+  userCode?: string
+  userId?: string
+  userMessage?: string
+  testResults?: { passed: number; total: number; failingTests?: string[] }
+}): Promise<string> {
+  const ragContextParts: string[] = []
+
+  try {
+    // 1. Dynamic context based on user's current message
+    if (options.userMessage && shouldRetrieveDynamicContext(options.userMessage)) {
+      const dynamicContext = await getDynamicChatContext({
+        userMessage: options.userMessage,
+        currentCode: options.userCode,
+        pattern: options.scenarioPattern as DSAPattern,
+        problemTitle: options.scenarioTitle,
+        testResults: options.testResults,
+      })
+
+      // Only add if we got meaningful context
+      if (dynamicContext.retrievedContext || dynamicContext.debuggingHints) {
+        ragContextParts.push(`
+## Dynamic Context (based on user's current question)
+${formatDynamicContextForPrompt(dynamicContext)}
+`)
+      }
+    }
+
+    // 2. Get pattern-specific knowledge if pattern is known
+    if (options.scenarioPattern) {
+      const patternKnowledge = getPatternKnowledge(options.scenarioPattern as DSAPattern)
+      if (patternKnowledge) {
+        ragContextParts.push(`
+## Pattern Knowledge: ${patternKnowledge.displayName}
+
+### When to Use
+${patternKnowledge.whenToUse.slice(0, 3).map((w) => `- ${w}`).join("\n")}
+
+### Key Insights
+${patternKnowledge.keyInsights.slice(0, 3).map((i) => `- ${i}`).join("\n")}
+
+### Common Mistakes to Avoid
+${patternKnowledge.commonMistakes.slice(0, 2).map((m) => `- ${m}`).join("\n")}
+
+### Expected Complexity
+- Time: ${patternKnowledge.timeComplexity.typical}
+- Space: ${patternKnowledge.spaceComplexity.typical}
+`)
+      }
+    }
+
+    // 3. Get company-specific interview knowledge
+    if (options.scenarioCompany && options.scenarioCompany !== "Generic") {
+      const companyKnowledge = getCompanyInterviewKnowledge(options.scenarioCompany as CompanyId)
+      if (companyKnowledge) {
+        ragContextParts.push(`
+## ${companyKnowledge.companyName} Interview Tips
+
+### Interview Style
+${companyKnowledge.interviewStyle.description}
+Pace: ${companyKnowledge.interviewStyle.pace}
+Expectations: ${companyKnowledge.interviewStyle.expectations.slice(0, 3).map((e) => `- ${e}`).join("\n")}
+
+### Focus Areas
+${companyKnowledge.topPatterns.slice(0, 4).map((p) => `- ${p.pattern}`).join("\n")}
+
+### What They Value
+${companyKnowledge.cultureTips.slice(0, 2).map((t) => `- ${t}`).join("\n")}
+`)
+      }
+    }
+
+    // 4. Build complexity knowledge context
+    if (options.scenarioId || options.scenarioPattern) {
+      const complexityContext = buildComplexityContext(
+        options.scenarioId || "",
+        options.scenarioPattern as DSAPattern
+      )
+      if (complexityContext) {
+        ragContextParts.push(complexityContext)
+      }
+    }
+
+    // 5. Build hint context from RAG if we have problem text
+    if (options.problemText && options.problemText.length > 20) {
+      const hintContext = await buildHintContext({
+        problemText: options.problemText,
+        problemPattern: options.scenarioPattern as DSAPattern,
+        userCode: options.userCode,
+        userId: options.userId,
+      })
+
+      if (hintContext.retrievedDocs.length > 0) {
+        ragContextParts.push(`
+## Relevant Knowledge from RAG (${hintContext.retrievedDocs.length} documents)
+
+${hintContext.retrievedDocs
+  .slice(0, 2)
+  .map(
+    (doc, i) => `
+### Reference ${i + 1}
+${doc.text.substring(0, 400)}${doc.text.length > 400 ? "..." : ""}
+`
+  )
+  .join("\n")}
+`)
+      }
+    }
+  } catch (error) {
+    // RAG errors should not break the chat - log and continue
+    logger.error("[Chat-v2] RAG context build error", { error })
+  }
+
+  if (ragContextParts.length === 0) {
+    return ""
+  }
+
+  return `
+=== RAG-ENHANCED CONTEXT ===
+${ragContextParts.join("\n")}
+=== END RAG CONTEXT ===
+`
+}
 
 // =============================================================================
 // REQUEST/RESPONSE TYPES (same as v1 for compatibility)
@@ -51,6 +289,8 @@ interface ChatRequest {
   scenarioType?: string
   scenarioPattern?: string
   scenarioCompany?: string
+  scenarioId?: string
+  problemText?: string
   currentCode?: string
   starterCodeLength?: number
   // State
@@ -70,6 +310,8 @@ interface ChatRequest {
   }
   // Edge cases
   edgeCases?: Array<{ description: string; input: unknown }>
+  // Workspace context (other files in codebase)
+  workspaceContext?: Array<{ path: string; content: string }>
   // Special modes
   realInterviewMode?: boolean
   hasFuzzyStatement?: boolean
@@ -200,7 +442,10 @@ function buildInterviewContextFromRequest(body: ChatRequest): InterviewContext {
 function buildMessages(context: ChatRequest["context"]): ChatMessage[] {
   if (!context || !Array.isArray(context)) return []
 
-  return context.map(msg => ({
+  // Apply context window management
+  const managedContext = manageContextWindow(context)
+
+  return managedContext.map(msg => ({
     role: msg.type === "user" ? "user" as const : "assistant" as const,
     content: msg.message,
   }))
@@ -417,8 +662,42 @@ export async function POST(request: NextRequest) {
       body.message = wrapUpMessage
     }
 
+    // Build workspace context
+    const workspaceContextStr = body.workspaceContext
+      ? buildWorkspaceContextString(body.workspaceContext)
+      : ""
+
+    // Build RAG context (async - dynamic knowledge retrieval)
+    const testResults = body.testResults || []
+    const testsPassed = testResults.filter(t => t.passed).length
+    const ragContext = await buildRAGContext({
+      scenarioTitle: body.scenarioTitle,
+      scenarioPattern: body.scenarioPattern,
+      scenarioCompany: body.scenarioCompany,
+      scenarioType: body.scenarioType,
+      scenarioId: body.scenarioId,
+      problemText: body.problemText,
+      userCode: body.currentCode,
+      userId: body.userId,
+      userMessage: body.message,
+      testResults: testResults.length > 0 ? {
+        passed: testsPassed,
+        total: testResults.length,
+        failingTests: testResults
+          .filter(t => !t.passed)
+          .map(t => t.description || t.name || "Test failed"),
+      } : undefined,
+    })
+
     // Build context for orchestrator (uses context-builders for rich context)
     const interviewContext = buildInterviewContextFromRequest(body)
+
+    // Inject workspace and RAG context into promptContext
+    if (interviewContext.promptContext) {
+      interviewContext.promptContext.workspaceContext = workspaceContextStr
+      interviewContext.promptContext.ragContext = ragContext
+    }
+
     const messages = buildMessages(body.context)
     const lastMessage = body.isProactive
       ? buildProactiveContext({

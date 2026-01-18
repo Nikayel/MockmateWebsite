@@ -78,6 +78,8 @@ export interface InterviewContext {
     codeContext: string // Current solution code
     aiPartnerContext: string // AI Partner usage tracking
     userAnsweredContext: string // Topics already answered
+    workspaceContext: string // Other files in user's codebase
+    ragContext: string // RAG-enhanced dynamic context
   }
 }
 
