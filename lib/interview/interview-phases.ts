@@ -96,26 +96,6 @@ export function detectInterviewPhase(context: PhaseDetectionContext): InterviewP
   return "discussion"
 }
 
-// Legacy function for backwards compatibility
-// TODO: Remove once all callers updated to new interface
-export function detectInterviewPhaseLegacy(context: {
-  messageCount: number
-  hasExplainedApproach: boolean
-  hasStartedCoding: boolean
-  testsHaveRun: boolean
-  allTestsPassed: boolean
-  hasSubmitted: boolean
-}): InterviewPhase {
-  return detectInterviewPhase({
-    hasSubmitted: context.hasSubmitted,
-    testsHaveRun: context.testsHaveRun,
-    currentCodeLength: context.hasStartedCoding ? 100 : 0, // Fake for legacy
-    starterCodeLength: 0,
-    approachExplained: context.hasExplainedApproach,
-    messageCount: context.messageCount,
-  })
-}
-
 // =============================================================================
 // PHASE-SPECIFIC PROMPTS (DEPRECATED - use interviewer-prompts.ts)
 // =============================================================================

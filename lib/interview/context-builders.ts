@@ -13,7 +13,12 @@ import { getCompanyStyle, getPatternMetadata, type DSAPattern } from "@/lib/type
 import type { CompanyId } from "@/lib/data/company-questions/types"
 import { getPatternKnowledge } from "@/lib/rag/knowledge-base/dsa-knowledge"
 import { getCompanyInterviewKnowledge } from "@/lib/rag/knowledge-base/company-knowledge"
-import { buildInterviewerLevelContext, type InterviewLevel } from "@/lib/rag/knowledge-base/interview-behavior-knowledge"
+import {
+  buildInterviewerLevelContext,
+  type InterviewLevel,
+} from "@/lib/rag/knowledge-base/interview-behavior-knowledge"
+import { getAllDebuggingKnowledge } from "@/lib/rag/knowledge-base/debugging-knowledge"
+import { getSystemDesignKnowledgeByCategory } from "@/lib/rag/knowledge-base/system-design-knowledge"
 import type { ConversationTracker, InterviewPhase } from "./interview-phases"
 
 // =============================================================================
@@ -232,7 +237,10 @@ DO NOT skip edge cases - real interviewers always ask about them. If they haven'
 /**
  * Build console/test results context for interviewer awareness
  */
-export function buildTestResultsContext(testResults?: TestResultItem[], consoleLogs?: Array<{ type?: string; message?: string }>): string {
+export function buildTestResultsContext(
+  testResults?: TestResultItem[],
+  consoleLogs?: Array<{ type?: string; message?: string }>
+): string {
   if (!testResults || !Array.isArray(testResults) || testResults.length === 0) {
     return ""
   }
@@ -426,7 +434,10 @@ DO NOT:
 /**
  * Build real interview mode context (fuzzy problem statements)
  */
-export function buildFuzzyModeContext(realInterviewMode?: boolean, hasFuzzyStatement?: boolean): string {
+export function buildFuzzyModeContext(
+  realInterviewMode?: boolean,
+  hasFuzzyStatement?: boolean
+): string {
   if (!realInterviewMode || !hasFuzzyStatement) return ""
 
   return `
@@ -527,14 +538,19 @@ ${partnerMessagesCount >= 3 ? `- When they explain code, verify they understand 
 
   // Pattern-specific question
   if (scenarioPattern) {
-    parts.push(`Based on the ${scenarioPattern} pattern, ask a relevant question about their approach or potential issues.`)
+    parts.push(
+      `Based on the ${scenarioPattern} pattern, ask a relevant question about their approach or potential issues.`
+    )
   }
 
   // Nudge avoidance
   if (recentNudgeTopics && recentNudgeTopics.length > 0) {
     parts.push(`
 AVOID REPEATING THESE TOPICS (already asked about):
-${recentNudgeTopics.slice(-3).map((t) => `- ${t}`).join("\n")}
+${recentNudgeTopics
+  .slice(-3)
+  .map((t) => `- ${t}`)
+  .join("\n")}
 If they're still stuck on these, give a CONCRETE hint instead of asking again.
 `)
   }
@@ -543,7 +559,10 @@ If they're still stuck on these, give a CONCRETE hint instead of asking again.
   if (userAnsweredTopics && userAnsweredTopics.length > 0) {
     parts.push(`
 CANDIDATE HAS ALREADY ANSWERED (do NOT ask about these again):
-${userAnsweredTopics.slice(-5).map((t) => `- ${t}`).join("\n")}
+${userAnsweredTopics
+  .slice(-5)
+  .map((t) => `- ${t}`)
+  .join("\n")}
 If you want to discuss these topics, ACKNOWLEDGE their answer first, then probe DEEPER or move on.
 `)
   }
@@ -563,7 +582,10 @@ If you want to discuss these topics, ACKNOWLEDGE their answer first, then probe 
 ${parts.join("\n")}
 
 Options for how to engage:
-${proactivePrompts.slice(0, 3).map((p) => `- "${p}"`).join("\n")}
+${proactivePrompts
+  .slice(0, 3)
+  .map((p) => `- "${p}"`)
+  .join("\n")}
 
 Pick ONE natural response (or create your own). Keep it under 20 words. Sound like a real person in the room, not a robot.`,
   }
@@ -598,13 +620,22 @@ export function buildPatternKnowledgeContext(scenarioPattern?: string): string {
 ## Pattern Knowledge: ${patternKnowledge.displayName}
 
 ### When to Use
-${patternKnowledge.whenToUse.slice(0, 3).map((w) => `- ${w}`).join("\n")}
+${patternKnowledge.whenToUse
+  .slice(0, 3)
+  .map((w) => `- ${w}`)
+  .join("\n")}
 
 ### Key Insights
-${patternKnowledge.keyInsights.slice(0, 3).map((i) => `- ${i}`).join("\n")}
+${patternKnowledge.keyInsights
+  .slice(0, 3)
+  .map((i) => `- ${i}`)
+  .join("\n")}
 
 ### Common Mistakes to Avoid
-${patternKnowledge.commonMistakes.slice(0, 2).map((m) => `- ${m}`).join("\n")}
+${patternKnowledge.commonMistakes
+  .slice(0, 2)
+  .map((m) => `- ${m}`)
+  .join("\n")}
 
 ### Expected Complexity
 - Time: ${patternKnowledge.timeComplexity.typical}
@@ -627,13 +658,111 @@ export function buildCompanyKnowledgeContext(scenarioCompany?: string): string {
 ### Interview Style
 ${companyKnowledge.interviewStyle.description}
 Pace: ${companyKnowledge.interviewStyle.pace}
-Expectations: ${companyKnowledge.interviewStyle.expectations.slice(0, 3).map((e) => `- ${e}`).join("\n")}
+Expectations: ${companyKnowledge.interviewStyle.expectations
+    .slice(0, 3)
+    .map((e) => `- ${e}`)
+    .join("\n")}
 
 ### Focus Areas
-${companyKnowledge.topPatterns.slice(0, 4).map((p) => `- ${p.pattern}`).join("\n")}
+${companyKnowledge.topPatterns
+  .slice(0, 4)
+  .map((p) => `- ${p.pattern}`)
+  .join("\n")}
 
 ### What They Value
-${companyKnowledge.cultureTips.slice(0, 2).map((t) => `- ${t}`).join("\n")}
+${companyKnowledge.cultureTips
+  .slice(0, 2)
+  .map((t) => `- ${t}`)
+  .join("\n")}
+`
+}
+
+// =============================================================================
+// DEBUGGING KNOWLEDGE CONTEXT (for bugfix scenarios)
+// =============================================================================
+
+/**
+ * Build debugging knowledge context for bugfix interviews
+ * Gives interviewer specific knowledge about common bugs and debugging strategies
+ */
+export function buildDebuggingKnowledgeContext(scenarioType?: string): string {
+  if (scenarioType !== "bugfix") return ""
+
+  // Get all debugging knowledge sorted by frequency
+  const allBugs = getAllDebuggingKnowledge()
+  const commonBugs = allBugs.sort((a, b) => b.frequency - a.frequency).slice(0, 5)
+
+  if (commonBugs.length === 0) return ""
+
+  let context = `
+## Debugging Knowledge for Interviewer
+
+### Common Bug Categories to Watch For
+`
+
+  for (const bug of commonBugs) {
+    context += `
+**${bug.displayName}** (Frequency: ${bug.frequency}/10)
+- Common causes: ${bug.commonCauses.slice(0, 2).join(", ")}
+- Symptoms: ${bug.symptoms.slice(0, 2).join(", ")}
+- Debugging approach: ${bug.debuggingApproach[0]}
+`
+  }
+
+  context += `
+### How to Guide Debugging
+1. Ask them to explain what the bug is first
+2. Ask: "What have you tried so far?"
+3. If stuck: Guide them to check ${commonBugs[0]?.redFlags[0] || "common issues"}
+4. Don't give away the answer - ask leading questions
+5. After fix: "How would you prevent this in the future?"
+`
+
+  return context
+}
+
+// =============================================================================
+// SYSTEM DESIGN KNOWLEDGE CONTEXT (for system-design scenarios)
+// =============================================================================
+
+/**
+ * Build system design knowledge context for SD interviews
+ * Gives interviewer specific knowledge about design concepts and trade-offs
+ */
+export function buildSystemDesignKnowledgeContext(scenarioType?: string): string {
+  if (scenarioType !== "system-design") return ""
+
+  // Get key system design categories
+  const categories = ["scalability", "reliability", "data"] as const
+  const knowledge: string[] = []
+
+  for (const category of categories) {
+    const categoryKnowledge = getSystemDesignKnowledgeByCategory(category)
+    if (categoryKnowledge.length > 0) {
+      const first = categoryKnowledge[0]
+      knowledge.push(`
+**${first.displayName}**
+- ${first.description}
+- Trade-offs: ${first.tradeoffs?.pros?.slice(0, 2).join(", ") || "Consider scalability vs complexity"}
+- Interview tip: ${first.interviewTips?.[0] || "Ask about real-world applications"}
+`)
+    }
+  }
+
+  if (knowledge.length === 0) return ""
+
+  return `
+## System Design Knowledge for Interviewer
+
+### Key Concepts to Probe
+${knowledge.join("\n")}
+
+### Evaluation Checklist
+- Did they clarify requirements first?
+- Did they discuss trade-offs (not just "this is better")?
+- Did they consider failure modes?
+- Did they estimate scale/capacity?
+- Can they go deeper on any component?
 `
 }
 
@@ -664,7 +793,9 @@ export function buildAIPartnerContext(options: {
   }
 
   if (partnerMessagesCount >= 5) {
-    parts.push(`- HIGH AI USAGE: Consider asking them to explain their understanding of the AI suggestions`)
+    parts.push(
+      `- HIGH AI USAGE: Consider asking them to explain their understanding of the AI suggestions`
+    )
   }
 
   if (partnerMessagesCount >= 3) {
@@ -692,14 +823,20 @@ export function buildUserAnsweredContext(options: {
   if (userAnsweredTopics && userAnsweredTopics.length > 0) {
     parts.push(`
 CANDIDATE HAS ALREADY ANSWERED (do NOT ask about these again):
-${userAnsweredTopics.slice(-5).map((t) => `- ${t}`).join("\n")}
+${userAnsweredTopics
+  .slice(-5)
+  .map((t) => `- ${t}`)
+  .join("\n")}
 If you want to discuss these topics, ACKNOWLEDGE their answer first, then probe DEEPER or move on.`)
   }
 
   if (recentNudgeTopics && recentNudgeTopics.length > 0) {
     parts.push(`
 AVOID REPEATING THESE TOPICS (already asked about):
-${recentNudgeTopics.slice(-3).map((t) => `- ${t}`).join("\n")}
+${recentNudgeTopics
+  .slice(-3)
+  .map((t) => `- ${t}`)
+  .join("\n")}
 If they're still stuck on these, give a CONCRETE hint instead of asking again.`)
   }
 
@@ -729,9 +866,10 @@ export function buildCodeContext(currentCode?: string, starterCodeLength?: numbe
   }
 
   // Truncate if too long
-  const truncatedCode = currentCode.length > MAX_CODE_SIZE
-    ? currentCode.slice(0, MAX_CODE_SIZE) + "\n// ... [code truncated]"
-    : currentCode
+  const truncatedCode =
+    currentCode.length > MAX_CODE_SIZE
+      ? currentCode.slice(0, MAX_CODE_SIZE) + "\n// ... [code truncated]"
+      : currentCode
 
   return `
 === CURRENT SOLUTION CODE ===
@@ -778,11 +916,15 @@ export function buildInterviewContext(options: ContextBuilderOptions): {
     typeSpecificContext = buildBugFixContext()
   }
 
-  // Build knowledge context
+  // Build knowledge context (includes pattern, company, and type-specific knowledge)
   const knowledgeContext = [
     buildPatternKnowledgeContext(options.scenarioPattern),
     buildCompanyKnowledgeContext(options.scenarioCompany),
-  ].filter(Boolean).join("\n")
+    buildDebuggingKnowledgeContext(options.scenarioType),
+    buildSystemDesignKnowledgeContext(options.scenarioType),
+  ]
+    .filter(Boolean)
+    .join("\n")
 
   return {
     userContext,
@@ -795,7 +937,9 @@ export function buildInterviewContext(options: ContextBuilderOptions): {
     typeSpecificContext,
     fuzzyModeContext: buildFuzzyModeContext(options.realInterviewMode, options.hasFuzzyStatement),
     levelContext: buildLevelContext(options.userInfo?.skill_level),
-    knowledgeContext: knowledgeContext ? `\n=== RAG KNOWLEDGE ===\n${knowledgeContext}\n=== END RAG ===\n` : "",
+    knowledgeContext: knowledgeContext
+      ? `\n=== RAG KNOWLEDGE ===\n${knowledgeContext}\n=== END RAG ===\n`
+      : "",
     codeContext: buildCodeContext(options.currentCode, options.starterCodeLength),
     aiPartnerContext: buildAIPartnerContext({
       partnerMessagesCount: options.partnerMessagesCount,
