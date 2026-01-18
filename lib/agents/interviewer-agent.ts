@@ -111,6 +111,32 @@ export class InterviewerAgent implements Agent<InterviewerInput, InterviewerOutp
     // Add problem context
     prompt += `\n\nPROBLEM: ${context.problemTitle} (${context.problemDifficulty})`
 
+    // Add rich context from context-builders (if provided)
+    // This gives v2 full parity with v1's context richness
+    if (context.promptContext) {
+      const pc = context.promptContext
+      if (pc.companyContext) prompt += `\n\n${pc.companyContext}`
+      if (pc.userContext) prompt += `\n\n${pc.userContext}`
+      if (pc.levelContext) prompt += `\n\n${pc.levelContext}`
+      if (pc.patternContext) prompt += `\n\n${pc.patternContext}`
+      if (pc.typeSpecificContext) prompt += `\n\n${pc.typeSpecificContext}`
+      if (pc.edgeCaseContext) prompt += `\n\n${pc.edgeCaseContext}`
+      if (pc.testResultsContext) prompt += `\n\n${pc.testResultsContext}`
+      if (pc.complexityContext) prompt += `\n\n${pc.complexityContext}`
+      if (pc.fuzzyModeContext) prompt += `\n\n${pc.fuzzyModeContext}`
+      if (pc.knowledgeContext) prompt += `\n\n${pc.knowledgeContext}`
+      // Add current code context - this lets the interviewer see and reference the solution
+      if (pc.codeContext) prompt += `\n\n${pc.codeContext}`
+      // Add AI Partner usage tracking - alerts interviewer to AI assistance patterns
+      if (pc.aiPartnerContext) prompt += `\n\n${pc.aiPartnerContext}`
+      // Add user answered topics - prevents re-asking about already covered topics
+      if (pc.userAnsweredContext) prompt += `\n\n${pc.userAnsweredContext}`
+      // Add workspace context - other files in user's codebase
+      if (pc.workspaceContext) prompt += `\n\n${pc.workspaceContext}`
+      // Add RAG-enhanced context - dynamic knowledge retrieval
+      if (pc.ragContext) prompt += `\n\n${pc.ragContext}`
+    }
+
     // Add phase-specific guidance
     const phasePrompt = PHASE_PROMPTS[phase]
     if (phasePrompt) {

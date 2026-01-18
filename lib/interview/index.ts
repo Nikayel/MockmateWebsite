@@ -52,15 +52,6 @@ export type {
   ClarifyingQuestionsCheckResult,
 } from "./clarifying-questions-checker"
 
-// Context-aware proactive triggers (replaces fixed timer)
-export {
-  checkProactiveTrigger,
-  getWhatIfQuestion,
-  getMidCodingProbe,
-  detectWrongApproach,
-} from "./proactive-triggers"
-export type { ProactiveContext, ProactiveTriggerResult } from "./proactive-triggers"
-
 // Company-specific time limits (DRY: single source of truth)
 export {
   STRICT_TIME_COMPANIES,
@@ -141,3 +132,31 @@ export type { ValidationResult, ResponseViolation, ValidationContext } from "./r
 //   shouldRunExtraction,
 // } from "./conversation-extraction"
 export type { ExtendedConversationTracker } from "./conversation-extraction"
+
+// Context builders (DRY: reusable context generation for v1 and v2 routes)
+export {
+  buildUserContext,
+  buildCompanyContext,
+  buildPatternContext,
+  buildEdgeCaseContext,
+  buildTestResultsContext,
+  buildComplexityContext,
+  buildSystemDesignContext,
+  buildBugFixContext,
+  buildFuzzyModeContext,
+  buildProactiveContext,
+  buildLevelContext,
+  buildPatternKnowledgeContext,
+  buildCompanyKnowledgeContext,
+  buildCodeContext,
+  buildAIPartnerContext,
+  buildUserAnsweredContext,
+  buildInterviewContext,
+} from "./context-builders"
+export type {
+  UserInfo,
+  TestResultItem,
+  EdgeCase,
+  SolutionComplexity,
+  ContextBuilderOptions,
+} from "./context-builders"

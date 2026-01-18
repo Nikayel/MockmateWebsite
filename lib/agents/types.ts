@@ -61,6 +61,26 @@ export interface InterviewContext {
   // User state
   hasSubmitted: boolean
   userId?: string
+
+  // Rich context (built by context-builders.ts)
+  // This is injected into the system prompt for full v1 parity
+  promptContext?: {
+    userContext: string
+    companyContext: string
+    patternContext: string
+    edgeCaseContext: string
+    testResultsContext: string
+    complexityContext: string
+    typeSpecificContext: string
+    fuzzyModeContext: string
+    levelContext: string
+    knowledgeContext: string
+    codeContext: string // Current solution code
+    aiPartnerContext: string // AI Partner usage tracking
+    userAnsweredContext: string // Topics already answered
+    workspaceContext: string // Other files in user's codebase
+    ragContext: string // RAG-enhanced dynamic context
+  }
 }
 
 export interface TestResult {
@@ -164,7 +184,15 @@ export interface ValidationViolation {
   hint: string
 }
 
-// Scorer Agent
+// =============================================================================
+// FUTURE: Scoring & Feedback Agents (Phase 2 - post-submission)
+// These types are defined for future implementation of:
+// - ScorerAgent: Calculate scores from evidence
+// - FeedbackWriterAgent: Generate detailed feedback
+// - ConstitutionalAgent: Review feedback for accuracy
+// =============================================================================
+
+// Scorer Agent (PLANNED)
 export interface ScorerInput {
   context: InterviewContext
   state: ConversationState

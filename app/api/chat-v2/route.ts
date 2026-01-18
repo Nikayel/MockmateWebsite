@@ -30,6 +30,249 @@ import {
   type ChatMessage,
   type ConversationState,
 } from "@/lib/agents"
+import {
+  buildInterviewContext as buildRichContext,
+  buildProactiveContext,
+  buildCodeContext,
+} from "@/lib/interview/context-builders"
+import { type DSAPattern } from "@/lib/types/dsa-patterns"
+import { getPatternKnowledge } from "@/lib/rag/knowledge-base/dsa-knowledge"
+import { getCompanyInterviewKnowledge, type CompanyId } from "@/lib/rag/knowledge-base/company-knowledge"
+import { getDynamicChatContext, formatDynamicContextForPrompt, shouldRetrieveDynamicContext } from "@/lib/rag/dynamic-chat-context"
+import { buildHintContext, buildComplexityContext } from "@/lib/rag/context-builder"
+import { truncateText, truncateFileContent } from "@/lib/utils"
+
+// =============================================================================
+// CONTEXT MANAGEMENT CONSTANTS
+// =============================================================================
+
+const MAX_HISTORY_MESSAGES = 20 // Keep last 20 messages
+const MAX_MESSAGE_LENGTH = 4000 // Truncate individual messages
+const MAX_WORKSPACE_FILES = 5 // Limit workspace files
+const MAX_FILE_SIZE = 10000 // 10KB per file max
+
+// =============================================================================
+// CONTEXT WINDOW MANAGEMENT
+// =============================================================================
+
+/**
+ * Sliding window for conversation history
+ * Keeps most recent messages, summarizes old ones if needed
+ */
+function manageContextWindow(
+  context: Array<{ type: string; message: string }>,
+  maxMessages: number = MAX_HISTORY_MESSAGES
+): Array<{ type: string; message: string }> {
+  if (!context || !Array.isArray(context)) return []
+
+  // If within limits, return as-is
+  if (context.length <= maxMessages) {
+    return context.map((msg) => ({
+      ...msg,
+      message: truncateText(msg.message, MAX_MESSAGE_LENGTH),
+    }))
+  }
+
+  // Keep first message (usually greeting) and last N-1 messages
+  const firstMessage = context[0]
+  const recentMessages = context.slice(-(maxMessages - 1))
+
+  // Create summary of dropped messages
+  const droppedCount = context.length - maxMessages
+  const summaryMessage = {
+    type: "model",
+    message: `[Previous ${droppedCount} messages summarized for context management]`,
+  }
+
+  return [
+    {
+      ...firstMessage,
+      message: truncateText(firstMessage.message, MAX_MESSAGE_LENGTH),
+    },
+    summaryMessage,
+    ...recentMessages.map((msg) => ({
+      ...msg,
+      message: truncateText(msg.message, MAX_MESSAGE_LENGTH),
+    })),
+  ]
+}
+
+/**
+ * Manage workspace context size
+ */
+function manageWorkspaceContext(
+  workspaceContext: Array<{ path: string; content: string }>,
+  maxFiles: number = MAX_WORKSPACE_FILES,
+  maxFileSize: number = MAX_FILE_SIZE
+): Array<{ path: string; content: string }> {
+  if (!workspaceContext || !Array.isArray(workspaceContext)) return []
+
+  // Take only the most relevant files (first N)
+  const limitedFiles = workspaceContext.slice(0, maxFiles)
+
+  // Truncate large files
+  return limitedFiles.map((file) => ({
+    path: file.path,
+    content: truncateFileContent(file.content, maxFileSize),
+  }))
+}
+
+/**
+ * Build workspace context string for prompt injection
+ */
+function buildWorkspaceContextString(
+  workspaceContext: Array<{ path: string; content: string }>
+): string {
+  const managedWorkspace = manageWorkspaceContext(workspaceContext)
+  if (managedWorkspace.length === 0) return ""
+
+  let workspaceStr = "\n\n=== USER'S CODEBASE CONTEXT ===\n"
+  managedWorkspace.forEach((file) => {
+    workspaceStr += `\n--- File: ${file.path} ---\n${file.content}\n`
+  })
+  workspaceStr += "=== END CODEBASE CONTEXT ===\n"
+
+  return workspaceStr
+}
+
+// =============================================================================
+// RAG CONTEXT BUILDER
+// =============================================================================
+
+/**
+ * Build RAG-enhanced context for the interviewer
+ * Retrieves relevant patterns, hints, and knowledge from the RAG system
+ * Includes DYNAMIC context based on what the user is currently discussing
+ */
+async function buildRAGContext(options: {
+  scenarioTitle?: string
+  scenarioPattern?: string
+  scenarioCompany?: string
+  scenarioType?: string
+  scenarioId?: string
+  problemText?: string
+  userCode?: string
+  userId?: string
+  userMessage?: string
+  testResults?: { passed: number; total: number; failingTests?: string[] }
+}): Promise<string> {
+  const ragContextParts: string[] = []
+
+  try {
+    // 1. Dynamic context based on user's current message
+    if (options.userMessage && shouldRetrieveDynamicContext(options.userMessage)) {
+      const dynamicContext = await getDynamicChatContext({
+        userMessage: options.userMessage,
+        currentCode: options.userCode,
+        pattern: options.scenarioPattern as DSAPattern,
+        problemTitle: options.scenarioTitle,
+        testResults: options.testResults,
+      })
+
+      // Only add if we got meaningful context
+      if (dynamicContext.retrievedContext || dynamicContext.debuggingHints) {
+        ragContextParts.push(`
+## Dynamic Context (based on user's current question)
+${formatDynamicContextForPrompt(dynamicContext)}
+`)
+      }
+    }
+
+    // 2. Get pattern-specific knowledge if pattern is known
+    if (options.scenarioPattern) {
+      const patternKnowledge = getPatternKnowledge(options.scenarioPattern as DSAPattern)
+      if (patternKnowledge) {
+        ragContextParts.push(`
+## Pattern Knowledge: ${patternKnowledge.displayName}
+
+### When to Use
+${patternKnowledge.whenToUse.slice(0, 3).map((w) => `- ${w}`).join("\n")}
+
+### Key Insights
+${patternKnowledge.keyInsights.slice(0, 3).map((i) => `- ${i}`).join("\n")}
+
+### Common Mistakes to Avoid
+${patternKnowledge.commonMistakes.slice(0, 2).map((m) => `- ${m}`).join("\n")}
+
+### Expected Complexity
+- Time: ${patternKnowledge.timeComplexity.typical}
+- Space: ${patternKnowledge.spaceComplexity.typical}
+`)
+      }
+    }
+
+    // 3. Get company-specific interview knowledge
+    if (options.scenarioCompany && options.scenarioCompany !== "Generic") {
+      const companyKnowledge = getCompanyInterviewKnowledge(options.scenarioCompany as CompanyId)
+      if (companyKnowledge) {
+        ragContextParts.push(`
+## ${companyKnowledge.companyName} Interview Tips
+
+### Interview Style
+${companyKnowledge.interviewStyle.description}
+Pace: ${companyKnowledge.interviewStyle.pace}
+Expectations: ${companyKnowledge.interviewStyle.expectations.slice(0, 3).map((e) => `- ${e}`).join("\n")}
+
+### Focus Areas
+${companyKnowledge.topPatterns.slice(0, 4).map((p) => `- ${p.pattern}`).join("\n")}
+
+### What They Value
+${companyKnowledge.cultureTips.slice(0, 2).map((t) => `- ${t}`).join("\n")}
+`)
+      }
+    }
+
+    // 4. Build complexity knowledge context
+    if (options.scenarioId || options.scenarioPattern) {
+      const complexityContext = buildComplexityContext(
+        options.scenarioId || "",
+        options.scenarioPattern as DSAPattern
+      )
+      if (complexityContext) {
+        ragContextParts.push(complexityContext)
+      }
+    }
+
+    // 5. Build hint context from RAG if we have problem text
+    if (options.problemText && options.problemText.length > 20) {
+      const hintContext = await buildHintContext({
+        problemText: options.problemText,
+        problemPattern: options.scenarioPattern as DSAPattern,
+        userCode: options.userCode,
+        userId: options.userId,
+      })
+
+      if (hintContext.retrievedDocs.length > 0) {
+        ragContextParts.push(`
+## Relevant Knowledge from RAG (${hintContext.retrievedDocs.length} documents)
+
+${hintContext.retrievedDocs
+  .slice(0, 2)
+  .map(
+    (doc, i) => `
+### Reference ${i + 1}
+${doc.text.substring(0, 400)}${doc.text.length > 400 ? "..." : ""}
+`
+  )
+  .join("\n")}
+`)
+      }
+    }
+  } catch (error) {
+    // RAG errors should not break the chat - log and continue
+    logger.error("[Chat-v2] RAG context build error", { error })
+  }
+
+  if (ragContextParts.length === 0) {
+    return ""
+  }
+
+  return `
+=== RAG-ENHANCED CONTEXT ===
+${ragContextParts.join("\n")}
+=== END RAG CONTEXT ===
+`
+}
 
 // =============================================================================
 // REQUEST/RESPONSE TYPES (same as v1 for compatibility)
@@ -46,26 +289,48 @@ interface ChatRequest {
   scenarioType?: string
   scenarioPattern?: string
   scenarioCompany?: string
+  scenarioId?: string
+  problemText?: string
   currentCode?: string
   starterCodeLength?: number
   // State
-  testResults?: Array<{ name: string; passed: boolean; input?: string; expected?: string; actual?: string }>
+  testResults?: Array<{ name: string; passed: boolean; input?: string; expected?: string; actual?: string; description?: string; error?: string }>
+  consoleLogs?: Array<{ type?: string; message?: string }>
   hasSubmitted?: boolean
   conversationTracker?: Partial<ConversationState>
-  solutionComplexity?: { timeComplexity: string; spaceComplexity: string; isOptimal: boolean }
+  solutionComplexity?: { timeComplexity: string; spaceComplexity: string; isOptimal: boolean; estimated?: string; optimal?: string }
+  // User context
+  userContext?: {
+    email?: string
+    full_name?: string
+    subscription_tier?: string
+    sessions_used?: number
+    previous_topics?: string[]
+    skill_level?: string
+  }
+  // Edge cases
+  edgeCases?: Array<{ description: string; input: unknown }>
+  // Workspace context (other files in codebase)
+  workspaceContext?: Array<{ path: string; content: string }>
+  // Special modes
+  realInterviewMode?: boolean
+  hasFuzzyStatement?: boolean
+  // Time tracking
+  elapsedTime?: number
+  timeSinceLastMessage?: number
+  // AI Partner tracking
+  partnerMessagesCount?: number
+  lastPartnerExchange?: string
+  // Nudge tracking
+  recentNudgeTopics?: string[]
+  userAnsweredTopics?: string[]
   // Flags
   isProactive?: boolean
+  isWrapUp?: boolean
 }
 
-interface ChatResponse {
-  text: string
-  state?: ConversationState
-  metrics?: {
-    totalLatencyMs: number
-    agentCalls: Array<{ agent: string; latencyMs: number }>
-    retries: number
-  }
-}
+// Response format matches v1 for frontend compatibility
+// Returns { reply, provider, latencyMs, state?, metrics? }
 
 // =============================================================================
 // INPUT VALIDATION
@@ -102,9 +367,49 @@ function validateRequest(body: ChatRequest): { valid: boolean; error?: string } 
 // CONTEXT CONVERSION
 // =============================================================================
 
-function buildInterviewContext(body: ChatRequest): InterviewContext {
+function buildInterviewContextFromRequest(body: ChatRequest): InterviewContext {
   const testResults = body.testResults || []
   const testsPassed = testResults.filter(t => t.passed).length
+
+  // Build rich context using context-builders (DRY)
+  const richContext = buildRichContext({
+    scenarioTitle: body.scenarioTitle,
+    scenarioType: body.scenarioType,
+    scenarioPattern: body.scenarioPattern,
+    scenarioCompany: body.scenarioCompany,
+    userInfo: body.userContext,
+    currentCode: body.currentCode,
+    starterCodeLength: body.starterCodeLength,
+    testResults: testResults.map(t => ({
+      description: t.description || t.name,
+      passed: t.passed,
+      input: t.input,
+      expected: t.expected,
+      actual: t.actual,
+      error: t.error,
+    })),
+    consoleLogs: body.consoleLogs,
+    hasSubmitted: body.hasSubmitted,
+    solutionComplexity: body.solutionComplexity ? {
+      estimated: body.solutionComplexity.estimated,
+      optimal: body.solutionComplexity.optimal,
+      isOptimal: body.solutionComplexity.isOptimal,
+      timeComplexity: body.solutionComplexity.timeComplexity,
+      spaceComplexity: body.solutionComplexity.spaceComplexity,
+    } : undefined,
+    realInterviewMode: body.realInterviewMode,
+    hasFuzzyStatement: body.hasFuzzyStatement,
+    edgeCases: body.edgeCases,
+    elapsedTime: body.elapsedTime,
+    // AI Partner tracking
+    partnerMessagesCount: body.partnerMessagesCount,
+    lastPartnerExchange: body.lastPartnerExchange,
+    // Nudge tracking
+    recentNudgeTopics: body.recentNudgeTopics,
+    userAnsweredTopics: body.userAnsweredTopics,
+    // Time tracking
+    timeSinceLastMessage: body.timeSinceLastMessage,
+  })
 
   return {
     sessionId: body.sessionId || "unknown",
@@ -116,7 +421,7 @@ function buildInterviewContext(body: ChatRequest): InterviewContext {
     language: detectLanguage(body.currentCode),
     testsHaveRun: testResults.length > 0,
     testResults: testResults.map(t => ({
-      name: t.name,
+      name: t.name || t.description || "Test",
       passed: t.passed,
       input: t.input,
       expected: t.expected,
@@ -129,13 +434,18 @@ function buildInterviewContext(body: ChatRequest): InterviewContext {
     isOptimalSolution: body.solutionComplexity?.isOptimal,
     hasSubmitted: body.hasSubmitted || false,
     userId: body.userId,
+    // Inject rich context for InterviewerAgent to use
+    promptContext: richContext,
   }
 }
 
 function buildMessages(context: ChatRequest["context"]): ChatMessage[] {
   if (!context || !Array.isArray(context)) return []
 
-  return context.map(msg => ({
+  // Apply context window management
+  const managedContext = manageContextWindow(context)
+
+  return managedContext.map(msg => ({
     role: msg.type === "user" ? "user" as const : "assistant" as const,
     content: msg.message,
   }))
@@ -159,6 +469,73 @@ function detectLanguage(code?: string): string {
   if (code.includes("func ") && code.includes("->")) return "swift"
   if (code.includes("fn ") && code.includes("->")) return "rust"
   return "python"
+}
+
+// =============================================================================
+// WRAP-UP MESSAGE BUILDER
+// =============================================================================
+
+function buildWrapUpMessage(options: {
+  allTestsPassed: boolean
+  passedTests: number
+  totalTests: number
+  passRate: number
+  partnerMessagesCount?: number
+  elapsedMinutes: number
+  currentCode?: string
+}): string {
+  const { allTestsPassed, passedTests, totalTests, passRate, partnerMessagesCount, elapsedMinutes, currentCode } = options
+
+  const codeContext = currentCode ? buildCodeContext(currentCode) : ""
+
+  return `[INTERVIEW DEBRIEF] The candidate is ending the session. Give them a real debrief like after an actual interview.
+
+FINAL STATE:
+${codeContext}
+
+TEST RESULTS: ${passedTests}/${totalTests} tests passed (${Math.round(passRate)}%)
+${allTestsPassed ? "STATUS: PASSED" : "STATUS: DID NOT PASS"}
+
+${partnerMessagesCount ? `AI Partner Usage: ${partnerMessagesCount} interactions` : "No AI Partner usage"}
+Time spent: ${elapsedMinutes || "unknown"} minutes
+
+YOUR DEBRIEF SHOULD INCLUDE:
+
+1. VERDICT (be honest):
+${
+  allTestsPassed
+    ? `- Tests passed, so acknowledge that
+   - But still give constructive feedback - passing isn't everything`
+    : `- Tests didn't pass - be direct but kind
+   - Point out what went wrong without being harsh
+   - Encourage them: "This is a common pattern - worth practicing"`
+}
+
+2. WHAT THEY DID WELL (be specific):
+   - Reference actual things from the conversation
+   - "Your initial approach with the hash map was spot on"
+   - "Good that you asked about edge cases upfront"
+   - Don't make things up - only mention things they actually did
+
+3. WHAT TO IMPROVE (be actionable):
+   - "You spent too long without talking - think out loud more"
+   - "Consider edge cases earlier in your process"
+   - "Your brute force was fine, but look into [pattern] for optimization"
+   - Give them something concrete to work on
+
+4. HIRING SIGNAL (be real):
+${
+  allTestsPassed
+    ? `- "If this were a real interview, I'd lean towards a hire recommendation. Your communication was solid and you got to a working solution."
+   - OR "Tests passed, but the process was rough. In a real interview, I'd be on the fence - work on [specific thing]."`
+    : `- "In a real interview, this wouldn't be a pass. But here's the good news: [pattern] problems are very learnable."
+   - Be kind but honest about what it would take`
+}
+
+EXAMPLE GOOD DEBRIEF:
+"Alright, let's wrap up. Tests are passing - nice work. You showed good instincts going for a hash map right away, and I liked that you traced through the example before coding. Two things to work on: you didn't mention edge cases until I asked, and that initial confusion about what to store as keys vs values cost you a few minutes. In a real interview, that'd be a positive signal overall - you communicated well and got to O(n). Good work on this one."
+
+Keep it conversational and real - like you're actually debriefing someone after an interview.`
 }
 
 // =============================================================================
@@ -197,10 +574,142 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Build context for orchestrator
-    const interviewContext = buildInterviewContext(body)
+    // ==========================================================================
+    // CONVERSATION ENDED DETECTION
+    // Check if AI already said goodbye - interview is over
+    // ==========================================================================
+    const recentMessages = body.context?.slice(-4) || []
+    const aiAlreadySaidGoodbye = recentMessages.some(
+      (msg: { message: string; type?: string }) =>
+        msg.type !== "user" &&
+        (msg.message?.toLowerCase().includes("good luck with your") ||
+          msg.message?.toLowerCase().includes("best of luck") ||
+          (msg.message?.toLowerCase().includes("take care") &&
+            msg.message?.toLowerCase().includes("interview")))
+    )
+
+    if (aiAlreadySaidGoodbye) {
+      return NextResponse.json({
+        reply: null,
+        conversationEnded: true,
+        endMessage:
+          "The interview session has ended. Click 'View Detailed Feedback' to see your score breakdown and detailed analysis.",
+      })
+    }
+
+    // ==========================================================================
+    // PROACTIVE MESSAGE HANDLING
+    // Interviewer jumps in without user message
+    // ==========================================================================
+    if (body.isProactive) {
+      const proactiveResult = buildProactiveContext({
+        currentCode: body.currentCode,
+        timeSinceLastMessage: body.timeSinceLastMessage,
+        partnerMessagesCount: body.partnerMessagesCount,
+        lastPartnerExchange: body.lastPartnerExchange,
+        recentNudgeTopics: body.recentNudgeTopics,
+        userAnsweredTopics: body.userAnsweredTopics,
+        scenarioPattern: body.scenarioPattern,
+      })
+
+      if (proactiveResult.shouldSkip) {
+        return NextResponse.json({
+          reply: null,
+          skipped: true,
+          reason: proactiveResult.reason,
+        })
+      }
+
+      // Use proactive message as the "lastMessage" for orchestrator
+      // The orchestrator will generate an appropriate check-in response
+      logger.info("[Chat-v2] Proactive check-in triggered", {
+        sessionId: body.sessionId,
+        timeSinceLastMessage: body.timeSinceLastMessage,
+        hasCode: !!body.currentCode,
+      })
+    }
+
+    // ==========================================================================
+    // WRAP-UP MESSAGE HANDLING
+    // End-of-interview debrief
+    // ==========================================================================
+    if (body.isWrapUp) {
+      const testResults = body.testResults || []
+      const passedTests = testResults.filter((t: { passed: boolean }) => t.passed).length
+      const totalTests = testResults.length
+      const passRate = totalTests > 0 ? (passedTests / totalTests) * 100 : 0
+      const allTestsPassed = passedTests === totalTests && totalTests > 0
+      const elapsedMinutes = body.elapsedTime ? Math.floor(body.elapsedTime / 60) : 0
+
+      // Build wrap-up debrief context
+      const wrapUpMessage = buildWrapUpMessage({
+        allTestsPassed,
+        passedTests,
+        totalTests,
+        passRate,
+        partnerMessagesCount: body.partnerMessagesCount,
+        elapsedMinutes,
+        currentCode: body.currentCode,
+      })
+
+      logger.info("[Chat-v2] Wrap-up debrief requested", {
+        sessionId: body.sessionId,
+        allTestsPassed,
+        passRate: Math.round(passRate),
+      })
+
+      // Use wrap-up message as the context for orchestrator
+      body.message = wrapUpMessage
+    }
+
+    // Build workspace context
+    const workspaceContextStr = body.workspaceContext
+      ? buildWorkspaceContextString(body.workspaceContext)
+      : ""
+
+    // Build RAG context (async - dynamic knowledge retrieval)
+    const testResults = body.testResults || []
+    const testsPassed = testResults.filter(t => t.passed).length
+    const ragContext = await buildRAGContext({
+      scenarioTitle: body.scenarioTitle,
+      scenarioPattern: body.scenarioPattern,
+      scenarioCompany: body.scenarioCompany,
+      scenarioType: body.scenarioType,
+      scenarioId: body.scenarioId,
+      problemText: body.problemText,
+      userCode: body.currentCode,
+      userId: body.userId,
+      userMessage: body.message,
+      testResults: testResults.length > 0 ? {
+        passed: testsPassed,
+        total: testResults.length,
+        failingTests: testResults
+          .filter(t => !t.passed)
+          .map(t => t.description || t.name || "Test failed"),
+      } : undefined,
+    })
+
+    // Build context for orchestrator (uses context-builders for rich context)
+    const interviewContext = buildInterviewContextFromRequest(body)
+
+    // Inject workspace and RAG context into promptContext
+    if (interviewContext.promptContext) {
+      interviewContext.promptContext.workspaceContext = workspaceContextStr
+      interviewContext.promptContext.ragContext = ragContext
+    }
+
     const messages = buildMessages(body.context)
-    const lastMessage = body.message || ""
+    const lastMessage = body.isProactive
+      ? buildProactiveContext({
+          currentCode: body.currentCode,
+          timeSinceLastMessage: body.timeSinceLastMessage,
+          partnerMessagesCount: body.partnerMessagesCount,
+          lastPartnerExchange: body.lastPartnerExchange,
+          recentNudgeTopics: body.recentNudgeTopics,
+          userAnsweredTopics: body.userAnsweredTopics,
+          scenarioPattern: body.scenarioPattern,
+        }).message
+      : body.message || ""
 
     // Log request
     logger.info("[Chat-v2] Processing request", {
@@ -209,6 +718,8 @@ export async function POST(request: NextRequest) {
       messageCount: messages.length,
       testsRun: interviewContext.testsHaveRun,
       hasSubmitted: interviewContext.hasSubmitted,
+      isProactive: body.isProactive,
+      isWrapUp: body.isWrapUp,
     })
 
     // Orchestrate response
@@ -255,9 +766,13 @@ export async function POST(request: NextRequest) {
       },
     }).catch(() => {}) // Fire and forget
 
-    // Return response (same format as v1)
-    const response: ChatResponse = {
-      text: result.data.response,
+    // Return response (same format as v1 for compatibility)
+    // v1 uses "reply" as the key, so we match that
+    return NextResponse.json({
+      reply: result.data.response,
+      provider: "orchestrator-v2",
+      latencyMs: result.metrics?.totalLatencyMs || (Date.now() - startTime),
+      // v2-specific extras
       state: result.data.state,
       metrics: result.metrics ? {
         totalLatencyMs: result.metrics.totalLatencyMs,
@@ -267,9 +782,7 @@ export async function POST(request: NextRequest) {
         })),
         retries: result.metrics.retries,
       } : undefined,
-    }
-
-    return NextResponse.json(response)
+    })
 
   } catch (error) {
     const latency = Date.now() - startTime

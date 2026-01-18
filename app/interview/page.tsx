@@ -192,10 +192,9 @@ function InterviewPageContent() {
   const searchParams = useSearchParams()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
 
-  // A/B Testing: Use new multi-agent orchestrator with ?v2=true
-  // This allows testing the new architecture without affecting production
-  const useV2Orchestrator = searchParams.get("v2") === "true"
-  const chatApiEndpoint = useV2Orchestrator ? "/api/chat-v2" : "/api/chat"
+  // Multi-agent orchestrator endpoint (v2 architecture)
+  // Uses StateTracker + Interviewer + Validator agents
+  const chatApiEndpoint = "/api/chat-v2"
   const {
     markQuestionCompleted,
     markQuestionEvaluating,
