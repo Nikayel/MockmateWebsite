@@ -41,6 +41,7 @@ import { getCompanyInterviewKnowledge, type CompanyId } from "@/lib/rag/knowledg
 import { getDynamicChatContext, formatDynamicContextForPrompt, shouldRetrieveDynamicContext } from "@/lib/rag/dynamic-chat-context"
 import { buildHintContext, buildComplexityContext } from "@/lib/rag/context-builder"
 import { truncateText, truncateFileContent } from "@/lib/utils"
+import { generateAIResponse } from "@/lib/ai-providers"
 
 // =============================================================================
 // CONTEXT MANAGEMENT CONSTANTS
@@ -539,6 +540,169 @@ Keep it conversational and real - like you're actually debriefing someone after 
 }
 
 // =============================================================================
+// PARTNER (AI CODING ASSISTANT) SUPPORT
+// Partner is available for: system-design, bugfix, add-functionality
+// =============================================================================
+
+const PARTNER_SUPPORTED_TYPES = ["system-design", "bugfix", "add-functionality"]
+
+function isPartnerSupported(scenarioType?: string): boolean {
+  if (!scenarioType) return false
+  return PARTNER_SUPPORTED_TYPES.includes(scenarioType.toLowerCase())
+}
+
+function buildPartnerSystemPrompt(options: {
+  scenarioTitle?: string
+  scenarioType?: string
+  userName?: string
+  currentCode?: string
+  workspaceContext?: string
+  ragContext?: string
+}): string {
+  const { scenarioTitle, scenarioType, userName, currentCode, workspaceContext, ragContext } = options
+
+  let typeSpecificGuidance = ""
+  if (scenarioType === "system-design") {
+    typeSpecificGuidance = `
+SYSTEM DESIGN ASSISTANCE:
+- Help brainstorm architectural components and trade-offs
+- Suggest relevant technologies, databases, caching strategies
+- Discuss scalability patterns (load balancing, sharding, CDNs)
+- Help estimate capacity and throughput requirements
+- Remind them about common system design topics: consistency vs availability, CAP theorem
+`
+  } else if (scenarioType === "bugfix") {
+    typeSpecificGuidance = `
+DEBUGGING ASSISTANCE:
+- Help identify potential bug locations through code analysis
+- Suggest debugging strategies (print statements, breakpoints, unit tests)
+- Explain common bug patterns (off-by-one, null references, race conditions)
+- Help trace through code execution with specific inputs
+- DON'T just give the answer - guide them to find it
+`
+  } else if (scenarioType === "add-functionality") {
+    typeSpecificGuidance = `
+FEATURE IMPLEMENTATION ASSISTANCE:
+- Help break down the feature into smaller components
+- Suggest design patterns that fit the use case
+- Discuss API design and data models
+- Help identify edge cases and validation requirements
+- Review their approach before they start coding
+`
+  }
+
+  return `You are an AI coding assistant (similar to ChatGPT, GitHub Copilot, or Claude) that candidates can use during technical interviews, similar to Meta's pilot program allowing AI tools.
+
+CANDIDATE: ${userName || "Candidate"}
+PROBLEM: ${scenarioTitle || "Technical Interview"}
+
+Your role:
+- You're an AI tool available to help during the interview (like Meta's pilot program)
+- Act as a collaborative partner, not an autonomous agent - respond to user requests, don't act independently
+- Provide brief, concise assistance when asked
+- Help debug code issues with short, actionable suggestions
+- Suggest optimizations in bullet points or brief notes
+- Answer questions about algorithms and data structures with summarized explanations
+- Reference their codebase when relevant
+- Be helpful but not overly verbose
+
+HOW TO HELP (Collaborative Partner Approach):
+- Give hints and suggestions, not full solutions (unless they're really stuck after multiple attempts)
+- Ask guiding questions: "What if you tried...?" "Have you considered...?"
+- Explain concepts briefly when asked
+- Point out patterns and best practices
+- Help them understand WHY something works, not just WHAT to do
+- Wait for user requests - don't proactively suggest unless they ask
+- Be a tool they use, not an agent that acts for them
+
+${typeSpecificGuidance}
+
+IMPORTANT:
+- Keep responses SHORT and CONCISE - think of small badge helps, not long explanations. Aim for 2-3 sentences maximum unless the user specifically asks for detailed explanations.
+- Use bullet points or brief notes when possible instead of paragraphs.
+- The interviewer (Sable) will evaluate how effectively the candidate uses your assistance
+- Good AI collaboration means: asking the right questions, understanding the suggestions, and implementing them correctly
+
+${currentCode ? `\nCURRENT CODE:\n${currentCode.slice(0, 5000)}${currentCode.length > 5000 ? "\n// ... [truncated]" : ""}` : ""}
+${workspaceContext || ""}
+${ragContext || ""}
+
+STAY IN CHARACTER: You are an AI coding assistant helping with the interview. Stay focused on the problem at hand. Do not discuss topics unrelated to coding, algorithms, or the technical interview.
+
+Keep responses brief, actionable, and helpful. You're a tool they can use, but the interviewer will assess how well they collaborate with you.`
+}
+
+async function handlePartnerRequest(
+  body: ChatRequest,
+  startTime: number,
+  workspaceContextStr: string,
+  ragContext: string
+): Promise<NextResponse> {
+  // Build partner prompt
+  const userName = body.userContext?.full_name?.split(" ")[0] || "Candidate"
+  const systemPrompt = buildPartnerSystemPrompt({
+    scenarioTitle: body.scenarioTitle,
+    scenarioType: body.scenarioType,
+    userName,
+    currentCode: body.currentCode,
+    workspaceContext: workspaceContextStr,
+    ragContext,
+  })
+
+  // Build conversation history
+  const history: Array<{ role: "user" | "model"; content: string }> = []
+  const context = body.context || []
+  let foundFirstUser = false
+
+  for (const msg of context.slice(-MAX_HISTORY_MESSAGES)) {
+    if (!foundFirstUser && msg.type !== "user") continue
+    foundFirstUser = true
+    history.push({
+      role: msg.type === "user" ? "user" : "model",
+      content: truncateText(msg.message, MAX_MESSAGE_LENGTH),
+    })
+  }
+
+  // Build user message with code context
+  let fullMessage = body.message || ""
+  if (body.currentCode) {
+    fullMessage += `\n\n[Current Code]:\n${body.currentCode.slice(0, 5000)}`
+  }
+
+  try {
+    const response = await generateAIResponse(
+      systemPrompt,
+      fullMessage,
+      history,
+      {
+        complexity: "code",
+        userId: body.userId,
+        sessionId: body.sessionId,
+        eventType: "chat_partner",
+      }
+    )
+
+    logger.info("[Chat-v2] Partner response generated", {
+      sessionId: body.sessionId,
+      latencyMs: Date.now() - startTime,
+      responseLength: response.text.length,
+    })
+
+    return NextResponse.json({
+      reply: response.text,
+      provider: response.provider,
+      latencyMs: response.latencyMs,
+    })
+  } catch (error) {
+    logger.error("[Chat-v2] Partner generation failed", { error })
+    return NextResponse.json(
+      { error: "Failed to generate partner response" },
+      { status: 500 }
+    )
+  }
+}
+
+// =============================================================================
 // MAIN HANDLER
 // =============================================================================
 
@@ -566,12 +730,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: validation.error }, { status: 400 })
     }
 
-    // Only handle interviewer role in v2 (partner uses different logic)
-    if (body.role !== "interviewer") {
-      return NextResponse.json(
-        { error: "chat-v2 currently only supports interviewer role. Use /api/chat for partner." },
-        { status: 400 }
-      )
+    // ==========================================================================
+    // PARTNER ROLE HANDLING
+    // Partner (AI coding assistant) available for system-design, bugfix, add-functionality
+    // ==========================================================================
+    if (body.role === "partner") {
+      if (!isPartnerSupported(body.scenarioType)) {
+        return NextResponse.json(
+          { error: `AI Partner not available for scenario type: ${body.scenarioType || "unknown"}. Partner is available for: ${PARTNER_SUPPORTED_TYPES.join(", ")}` },
+          { status: 400 }
+        )
+      }
+
+      // Build contexts for partner
+      const workspaceContextStr = body.workspaceContext
+        ? buildWorkspaceContextString(body.workspaceContext)
+        : ""
+
+      const ragContext = await buildRAGContext({
+        scenarioTitle: body.scenarioTitle,
+        scenarioPattern: body.scenarioPattern,
+        scenarioCompany: body.scenarioCompany,
+        scenarioType: body.scenarioType,
+        userMessage: body.message,
+        userCode: body.currentCode,
+      })
+
+      return handlePartnerRequest(body, startTime, workspaceContextStr, ragContext)
     }
 
     // ==========================================================================
