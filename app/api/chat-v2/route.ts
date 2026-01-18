@@ -407,7 +407,7 @@ function validateRequest(body: ChatRequest): { valid: boolean; error?: string } 
 // CONTEXT CONVERSION
 // =============================================================================
 
-function buildInterviewContextFromRequest(body: ChatRequest): InterviewContext {
+function buildInterviewContextFromRequest(body: ChatRequest, userTier?: string): InterviewContext {
   const testResults = body.testResults || []
   const testsPassed = testResults.filter((t) => t.passed).length
 
@@ -476,6 +476,7 @@ function buildInterviewContextFromRequest(body: ChatRequest): InterviewContext {
     isOptimalSolution: body.solutionComplexity?.isOptimal,
     hasSubmitted: body.hasSubmitted || false,
     userId: body.userId,
+    userTier: (userTier as "free" | "pro" | "enterprise") || "free",
     // Inject rich context for InterviewerAgent to use
     promptContext: richContext,
   }
@@ -488,7 +489,7 @@ function buildMessages(context: ChatRequest["context"]): ChatMessage[] {
   const managedContext = manageContextWindow(context)
 
   return managedContext.map((msg) => ({
-    role: msg.type === "user" ? ("user" as const) : ("model" as const),
+    role: msg.type === "user" ? ("user" as const) : ("assistant" as const),
     content: msg.message,
   }))
 }
@@ -923,7 +924,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Build context for orchestrator (uses context-builders for rich context)
-    const interviewContext = buildInterviewContextFromRequest(body)
+    const interviewContext = buildInterviewContextFromRequest(body, quotaResult.tier)
 
     // Inject workspace and RAG context into promptContext
     if (interviewContext.promptContext) {

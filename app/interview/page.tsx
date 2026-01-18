@@ -214,6 +214,8 @@ function InterviewPageContent() {
     setShowCompanyPicker,
     realInterviewMode,
     strictTimeLimit,
+    setRateLimitInfo,
+    clearRateLimit,
   } = useInterviewStore()
   const [isLoading, setIsLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
@@ -3312,6 +3314,37 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         })
 
         const data = await response.json()
+
+        // Check for rate limit error
+        if (!response.ok && response.status === 429) {
+          const errorMessage = data.error || ""
+          // Extract reset time if available (format: "Rate limit exceeded. 5000 tokens/minute for free tier.")
+          const isRateLimit =
+            errorMessage.toLowerCase().includes("rate limit") ||
+            errorMessage.toLowerCase().includes("token limit")
+
+          if (isRateLimit) {
+            // Calculate reset time (60 seconds from now for token/minute limits)
+            const resetTime = Date.now() + 60 * 1000
+
+            // Set rate limit info in store
+            setRateLimitInfo({
+              isLimited: true,
+              resetTime,
+              tier: userProfile?.subscription_tier || "free",
+            })
+
+            toast.error("Rate limit reached", {
+              description:
+                userProfile?.subscription_tier === "free"
+                  ? "Upgrade to Pro for higher limits"
+                  : "Please wait a moment before sending another message",
+            })
+
+            setLoading(false)
+            return
+          }
+        }
 
         // Check if conversation has ended (AI already said goodbye)
         if (data.conversationEnded) {

@@ -67,6 +67,7 @@ export class InterviewerAgent implements Agent<InterviewerInput, InterviewerOutp
           complexity: "complex", // Use smart model
           temperature: 0.7,
           userId: input.context.userId || "interviewer-agent",
+          userTier: input.context.userTier || "free",
         }
       )
 

@@ -9,14 +9,22 @@ import { collection, addDoc } from "firebase/firestore"
 /**
  * Track event server-side (for API routes)
  */
-export async function trackEventServer(
-  eventName: string,
-  params: Record<string, any>
-) {
+export async function trackEventServer(eventName: string, params: Record<string, any>) {
   try {
+    // Filter out undefined values to prevent Firebase errors
+    const cleanedParams = Object.entries(params).reduce(
+      (acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = value
+        }
+        return acc
+      },
+      {} as Record<string, any>
+    )
+
     await addDoc(collection(db, "analytics_events"), {
       event_name: eventName,
-      properties: params,
+      properties: cleanedParams,
       timestamp: new Date().toISOString(),
       source: "server",
     })

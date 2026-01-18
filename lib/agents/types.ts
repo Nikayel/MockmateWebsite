@@ -61,6 +61,7 @@ export interface InterviewContext {
   // User state
   hasSubmitted: boolean
   userId?: string
+  userTier?: "free" | "pro" | "enterprise"
 
   // Rich context (built by context-builders.ts)
   // This is injected into the system prompt for full v1 parity

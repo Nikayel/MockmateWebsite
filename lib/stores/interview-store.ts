@@ -87,6 +87,13 @@ interface InterviewState {
   interviewerMessages: ChatMessage[]
   chatMessages: ChatMessage[]
 
+  // Rate Limiting
+  rateLimitInfo: {
+    isLimited: boolean
+    resetTime?: number // Timestamp when limit resets
+    tier: "free" | "pro" | "enterprise"
+  } | null
+
   // Test Results
   testResults: TestResult[]
   testSummary: TestSummary
@@ -164,6 +171,10 @@ interface InterviewActions {
   addChatMessage: (message: ChatMessage) => void
   setInterviewerMessages: (messages: ChatMessage[]) => void
   setChatMessages: (messages: ChatMessage[]) => void
+  setRateLimitInfo: (
+    info: { isLimited: boolean; resetTime?: number; tier: "free" | "pro" | "enterprise" } | null
+  ) => void
+  clearRateLimit: () => void
 
   // Test Actions
   setTestResults: (results: TestResult[]) => void
@@ -247,6 +258,9 @@ const initialState: InterviewState = {
   // Chat
   interviewerMessages: [],
   chatMessages: [],
+
+  // Rate Limiting
+  rateLimitInfo: null,
 
   // Test Results
   testResults: [],
@@ -388,6 +402,8 @@ export const useInterviewStore = create<InterviewState & InterviewActions>()(
         })),
       setInterviewerMessages: (messages) => set({ interviewerMessages: messages }),
       setChatMessages: (messages) => set({ chatMessages: messages }),
+      setRateLimitInfo: (info) => set({ rateLimitInfo: info }),
+      clearRateLimit: () => set({ rateLimitInfo: null }),
 
       // Test Actions
       setTestResults: (results) => set({ testResults: results }),
