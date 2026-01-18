@@ -70,15 +70,20 @@ export class InterviewerAgent implements Agent<InterviewerInput, InterviewerOutp
         }
       )
 
+      // Post-process: strip bold, enforce length
+      const processedResponse = this.postProcessResponse(response.text)
+
       logger.info("[InterviewerAgent] Generated response", {
         phase: input.state.currentPhase,
-        responseLength: response.text.length,
+        responseLength: processedResponse.length,
+        originalLength: response.text.length,
+        wasProcessed: processedResponse !== response.text,
         latencyMs: Date.now() - startTime,
       })
 
       return {
-        response: response.text,
-        suggestedPhase: this.detectPhaseFromResponse(response.text, input.state.currentPhase),
+        response: processedResponse,
+        suggestedPhase: this.detectPhaseFromResponse(processedResponse, input.state.currentPhase),
         confidence: 0.9, // Could be enhanced with actual confidence scoring
       }
     } catch (error) {
@@ -178,7 +183,9 @@ export class InterviewerAgent implements Agent<InterviewerInput, InterviewerOutp
 
     // Add solution complexity context
     if (context.isOptimalSolution !== undefined) {
-      injections.push(`\nSOLUTION COMPLEXITY: ${context.isOptimalSolution ? "Already optimal - focus on edge cases/trade-offs" : "Not optimal - can ask about improvements"}`)
+      injections.push(
+        `\nSOLUTION COMPLEXITY: ${context.isOptimalSolution ? "Already optimal - focus on edge cases/trade-offs" : "Not optimal - can ask about improvements"}`
+      )
     }
 
     return injections.length > 0 ? `\n\n${injections.join("\n")}` : ""
@@ -215,7 +222,9 @@ export class InterviewerAgent implements Agent<InterviewerInput, InterviewerOutp
 
     // Complexity
     if (state.timeComplexityMentioned) {
-      lines.push(`- Time complexity: ${state.timeComplexityValue} ${state.complexityExplanationGiven ? "(with explanation)" : "(no explanation)"}`)
+      lines.push(
+        `- Time complexity: ${state.timeComplexityValue} ${state.complexityExplanationGiven ? "(with explanation)" : "(no explanation)"}`
+      )
     } else {
       lines.push("- Time complexity: NOT DISCUSSED")
     }
@@ -234,16 +243,56 @@ export class InterviewerAgent implements Agent<InterviewerInput, InterviewerOutp
     return lines.join("\n")
   }
 
-  private formatHistory(messages: ChatMessage[]): Array<{ role: "user" | "assistant"; content: string }> {
+  private formatHistory(
+    messages: ChatMessage[]
+  ): Array<{ role: "user" | "model"; content: string }> {
     // Take last 10 messages for context (configurable)
     const recentMessages = messages.slice(-10)
 
     return recentMessages
-      .filter(m => m.role !== "system")
-      .map(m => ({
-        role: m.role === "user" ? "user" as const : "assistant" as const,
+      .filter((m) => m.role !== "system")
+      .map((m) => ({
+        role: m.role === "user" ? ("user" as const) : ("model" as const),
         content: m.content,
       }))
+  }
+
+  /**
+   * Post-process the response to enforce guardrails:
+   * 1. Strip bold/italic formatting
+   * 2. Truncate overly long responses
+   */
+  private postProcessResponse(response: string): string {
+    let processed = response
+
+    // 1. Strip bold formatting (**text** -> text)
+    processed = processed.replace(/\*\*([^*]+)\*\*/g, "$1")
+
+    // 2. Strip italic formatting (*text* -> text)
+    processed = processed.replace(/\*([^*]+)\*/g, "$1")
+
+    // 3. Truncate if too long (more than ~150 words)
+    const words = processed.split(/\s+/)
+    if (words.length > 150) {
+      // Find a good sentence break point
+      const truncated = words.slice(0, 100).join(" ")
+      const lastSentenceEnd = Math.max(
+        truncated.lastIndexOf("."),
+        truncated.lastIndexOf("?"),
+        truncated.lastIndexOf("!")
+      )
+      if (lastSentenceEnd > 50) {
+        processed = truncated.slice(0, lastSentenceEnd + 1)
+      } else {
+        processed = truncated + "..."
+      }
+      logger.warn("[InterviewerAgent] Response truncated", {
+        originalWords: words.length,
+        truncatedWords: processed.split(/\s+/).length,
+      })
+    }
+
+    return processed.trim()
   }
 
   private detectPhaseFromResponse(response: string, currentPhase: InterviewPhase): InterviewPhase {

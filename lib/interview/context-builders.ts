@@ -816,9 +816,42 @@ export function buildAIPartnerContext(options: {
 export function buildUserAnsweredContext(options: {
   userAnsweredTopics?: string[]
   recentNudgeTopics?: string[]
+  closedTopics?: string[]
+  topicProbeCount?: {
+    timeComplexity: number
+    spaceComplexity: number
+    approach: number
+    edgeCases: number
+    duplicates: number
+  }
 }): string {
-  const { userAnsweredTopics, recentNudgeTopics } = options
+  const { userAnsweredTopics, recentNudgeTopics, closedTopics, topicProbeCount } = options
   const parts: string[] = []
+
+  // GUARDRAIL 1: Closed topics - user properly answered, DO NOT re-ask
+  if (closedTopics && closedTopics.length > 0) {
+    parts.push(`
+## CLOSED TOPICS - DO NOT ASK ABOUT THESE AGAIN
+The candidate has PROPERLY ANSWERED these topics. Move on.
+${closedTopics.map((t) => `- ${t.replace(/_/g, " ")}`).join("\n")}`)
+  }
+
+  // GUARDRAIL 2: Over-probed topics - asked too many times
+  if (topicProbeCount) {
+    const overProbed: string[] = []
+    if (topicProbeCount.timeComplexity >= 2) overProbed.push("time complexity")
+    if (topicProbeCount.spaceComplexity >= 2) overProbed.push("space complexity")
+    if (topicProbeCount.approach >= 3) overProbed.push("approach/algorithm")
+    if (topicProbeCount.edgeCases >= 3) overProbed.push("edge cases")
+    if (topicProbeCount.duplicates >= 2) overProbed.push("duplicate handling")
+
+    if (overProbed.length > 0) {
+      parts.push(`
+## STOP ASKING ABOUT THESE - ALREADY ASKED ${overProbed.length > 1 ? "MULTIPLE TIMES" : "TWICE"}
+${overProbed.map((t) => `- ${t}`).join("\n")}
+If you need more info, ask a DIFFERENT question or move to the next phase.`)
+    }
+  }
 
   if (userAnsweredTopics && userAnsweredTopics.length > 0) {
     parts.push(`

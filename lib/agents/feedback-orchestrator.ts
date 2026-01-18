@@ -14,8 +14,16 @@ import { logger } from "@/lib/logger"
 
 // Import agents
 import { ScorerAgent, type ScorerAgentInput, type ScorerAgentOutput } from "./scorer-agent"
-import { FeedbackWriterAgent, type FeedbackWriterAgentInput, type FeedbackWriterAgentOutput } from "./feedback-writer-agent"
-import { ConstitutionalAgent, type ConstitutionalAgentInput, type ConstitutionalAgentOutput } from "./constitutional-agent"
+import {
+  FeedbackWriterAgent,
+  type FeedbackWriterAgentInput,
+  type FeedbackWriterAgentOutput,
+} from "./feedback-writer-agent"
+import {
+  ConstitutionalAgent,
+  type ConstitutionalAgentInput,
+  type ConstitutionalAgentOutput,
+} from "./constitutional-agent"
 
 // Import evidence extraction (DRY - reuse existing)
 import { extractConversationEvidence } from "@/lib/feedback/structured-extraction"
@@ -99,9 +107,7 @@ export class FeedbackOrchestrator {
     this.constitutionalAgent = new ConstitutionalAgent()
   }
 
-  async generateFeedback(
-    request: FeedbackRequest
-  ): Promise<OrchestrationResult<FeedbackResponse>> {
+  async generateFeedback(request: FeedbackRequest): Promise<OrchestrationResult<FeedbackResponse>> {
     const startTime = Date.now()
     const agentCalls: { agent: AgentType; latencyMs: number; tokens?: number }[] = []
 
@@ -191,7 +197,7 @@ export class FeedbackOrchestrator {
       // STEP 4: Constitutional Review (optional)
       // =======================================================================
       let finalScores = scorerOutput.scores
-      let constitutionalReview = {
+      const constitutionalReview = {
         scoreAdjusted: false,
         feedbackCorrected: false,
         issues: [] as string[],
@@ -219,7 +225,10 @@ export class FeedbackOrchestrator {
         })
 
         // Apply score adjustments if needed
-        if (constOutput.scoreAdjustments.madeChanges && constOutput.scoreAdjustments.adjustedScores) {
+        if (
+          constOutput.scoreAdjustments.madeChanges &&
+          constOutput.scoreAdjustments.adjustedScores
+        ) {
           finalScores = constOutput.scoreAdjustments.adjustedScores
           constitutionalReview.scoreAdjusted = true
         }
@@ -292,17 +301,16 @@ export class FeedbackOrchestrator {
     try {
       // Convert transcript to expected format
       const messages = request.transcript.map((m) => ({
-        role: m.role === "user" ? "user" as const : "interviewer" as const,
+        role: m.role === "user" ? ("user" as const) : ("interviewer" as const),
         content: m.content,
       }))
 
-      return await extractConversationEvidence(
-        messages,
-        {
-          optimalTimeComplexity: request.optimalTimeComplexity,
-          optimalSpaceComplexity: request.optimalSpaceComplexity,
-        }
-      )
+      return await extractConversationEvidence(messages, {
+        title: request.scenarioTitle,
+        optimalTimeComplexity: request.optimalTimeComplexity || "Unknown",
+        optimalSpaceComplexity: request.optimalSpaceComplexity || "Unknown",
+        criticalEdgeCases: [],
+      })
     } catch (error) {
       logger.warn("[FeedbackOrchestrator] Evidence extraction failed, using defaults", { error })
 
