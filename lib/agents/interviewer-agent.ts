@@ -271,22 +271,23 @@ export class InterviewerAgent implements Agent<InterviewerInput, InterviewerOutp
     // 2. Strip italic formatting (*text* -> text)
     processed = processed.replace(/\*([^*]+)\*/g, "$1")
 
-    // 3. Truncate if too long (more than ~150 words)
+    // 3. Truncate if too long (more than ~60 words - prompt says max 50)
     const words = processed.split(/\s+/)
-    if (words.length > 150) {
-      // Find a good sentence break point
-      const truncated = words.slice(0, 100).join(" ")
+    if (words.length > 60) {
+      // Find a good sentence break point within first 50 words
+      const truncated = words.slice(0, 50).join(" ")
       const lastSentenceEnd = Math.max(
         truncated.lastIndexOf("."),
         truncated.lastIndexOf("?"),
         truncated.lastIndexOf("!")
       )
-      if (lastSentenceEnd > 50) {
+      // Use sentence break if found after 20 chars, otherwise just cut
+      if (lastSentenceEnd > 20) {
         processed = truncated.slice(0, lastSentenceEnd + 1)
       } else {
-        processed = truncated + "..."
+        processed = truncated
       }
-      logger.warn("[InterviewerAgent] Response truncated", {
+      logger.warn("[InterviewerAgent] Response truncated to ~50 words", {
         originalWords: words.length,
         truncatedWords: processed.split(/\s+/).length,
       })
