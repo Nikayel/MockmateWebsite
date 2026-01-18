@@ -255,9 +255,13 @@ export async function POST(request: NextRequest) {
       },
     }).catch(() => {}) // Fire and forget
 
-    // Return response (same format as v1)
-    const response: ChatResponse = {
-      text: result.data.response,
+    // Return response (same format as v1 for compatibility)
+    // v1 uses "reply" as the key, so we match that
+    return NextResponse.json({
+      reply: result.data.response,
+      provider: "orchestrator-v2",
+      latencyMs: result.metrics?.totalLatencyMs || (Date.now() - startTime),
+      // v2-specific extras
       state: result.data.state,
       metrics: result.metrics ? {
         totalLatencyMs: result.metrics.totalLatencyMs,
@@ -267,9 +271,7 @@ export async function POST(request: NextRequest) {
         })),
         retries: result.metrics.retries,
       } : undefined,
-    }
-
-    return NextResponse.json(response)
+    })
 
   } catch (error) {
     const latency = Date.now() - startTime
