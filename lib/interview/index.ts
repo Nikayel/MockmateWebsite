@@ -126,23 +126,18 @@ export {
 export type { PromptContext } from "./interviewer-prompts"
 
 // Interviewer tools (function calling for state queries)
-export {
-  INTERVIEWER_TOOLS,
-  executeTool,
-  formatToolResultsForPrompt,
-} from "./interviewer-tools"
+export { INTERVIEWER_TOOLS, executeTool, formatToolResultsForPrompt } from "./interviewer-tools"
 export type { ToolDefinition, ToolContext, ToolResult } from "./interviewer-tools"
 
 // Response validation (hard gates)
-export {
-  validateInterviewerResponse,
-  validateWithRetry,
-} from "./response-validation"
+export { validateInterviewerResponse, validateWithRetry } from "./response-validation"
 export type { ValidationResult, ResponseViolation, ValidationContext } from "./response-validation"
 
 // Conversation extraction (LLM-based state detection)
-export {
-  extractConversationState,
-  shouldRunExtraction,
-} from "./conversation-extraction"
+// NOTE: NOT re-exported here to avoid bundling server-side dependencies (ai-providers -> usage-tracking -> firebase-admin)
+// Import directly from "./conversation-extraction" in server-side code (API routes) only.
+// export {
+//   extractConversationState,
+//   shouldRunExtraction,
+// } from "./conversation-extraction"
 export type { ExtendedConversationTracker } from "./conversation-extraction"

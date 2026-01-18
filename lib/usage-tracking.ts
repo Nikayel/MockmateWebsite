@@ -12,56 +12,35 @@
  *
  * NOTE: For new code, consider using the segregated event types from
  * @/lib/types/usage-events.ts which follow Interface Segregation Principle.
+ *
+ * IMPORTANT: This module uses firebase-admin and is SERVER-ONLY.
+ * For client-safe constants and utilities, import from './usage-tracking-client'
  */
 
-import { adminDb } from './firebase-admin'
-import { FieldValue, Timestamp } from 'firebase-admin/firestore'
-import { countTokens } from './token-counter'
-import { logger } from './logger'
+import { adminDb } from "./firebase-admin"
+import { FieldValue, Timestamp } from "firebase-admin/firestore"
+import { countTokens } from "./token-counter"
+import { logger } from "./logger"
 
-// Cost per 1K tokens for each provider (input + output averaged) - Dec 2025
-export const PROVIDER_COSTS = {
-  gemini: 0.000188,         // Gemini 2.5 Flash: $0.075 in + $0.30 out per 1M
-  'gemini-pro': 0.003125,   // Gemini 2.5 Pro: $1.25 in + $5.00 out per 1M
-  deepseek: 0.00021,        // Deepseek: $0.14 in + $0.28 out per 1M
-  claude: 0.0024,           // Claude 3.5 Haiku: $0.80 in + $4.00 out per 1M
-  'claude-sonnet': 0.009,   // Claude Sonnet 4: $3 in + $15 out per 1M
-  'gpt-4o': 0.00625,        // GPT-4o: $2.50 in + $10 out per 1M
-  'gpt-4o-mini': 0.000375,  // GPT-4o mini: $0.15 in + $0.60 out per 1M
-} as const
-
-// Deepgram voice costs (per minute of audio)
-export const DEEPGRAM_COSTS = {
-  'nova-2': 0.0043,         // Nova-2: $0.0043/min (Pay As You Go)
-  'nova': 0.0041,           // Nova: $0.0041/min
-  'enhanced': 0.0145,       // Enhanced: $0.0145/min
-  'base': 0.0125,           // Base: $0.0125/min
-} as const
-
-// Embedding costs per 1K tokens
-export const EMBEDDING_COSTS = {
-  'text-embedding-004': 0.000025,        // Gemini: Free tier generous, ~$0.025/1M chars
-  'text-embedding-3-small': 0.00002,     // OpenAI: $0.02/1M tokens
-  'text-embedding-3-large': 0.00013,     // OpenAI: $0.13/1M tokens
-  'text-embedding-ada-002': 0.0001,      // OpenAI: $0.10/1M tokens (legacy)
-} as const
-
-// Budget caps per subscription tier (per billing cycle)
-export const BUDGET_CAPS = {
-  free: 0.50,        // $0.50 - enough for ~50 sessions with Gemini
-  pro: 25.00,        // $25/month
-  enterprise: 100.00, // $100/month
-} as const
+// Re-export client-safe constants for backward compatibility
+export {
+  PROVIDER_COSTS,
+  DEEPGRAM_COSTS,
+  EMBEDDING_COSTS,
+  BUDGET_CAPS,
+  calculateCost,
+  calculateVoiceCost,
+} from "./usage-tracking-client"
 
 export type UsageEventType =
-  | 'chat_message'
-  | 'feedback_generation'
-  | 'code_execution'
-  | 'hint_request'
-  | 'session_start'
-  | 'session_end'
-  | 'voice_transcription'   // Deepgram STT
-  | 'embedding_generation'  // RAG embeddings
+  | "chat_message"
+  | "feedback_generation"
+  | "code_execution"
+  | "hint_request"
+  | "session_start"
+  | "session_end"
+  | "voice_transcription" // Deepgram STT
+  | "embedding_generation" // RAG embeddings
 
 export interface UsageEvent {
   id?: string
@@ -78,9 +57,9 @@ export interface UsageEvent {
   sessionId?: string
   scenarioId?: string
   // NEW: Granular tracking fields
-  pattern?: string           // DSA pattern (arrays-hashing, trees, etc.)
-  difficulty?: string        // easy, medium, hard
-  scenarioTitle?: string     // Problem title
+  pattern?: string // DSA pattern (arrays-hashing, trees, etc.)
+  difficulty?: string // easy, medium, hard
+  scenarioTitle?: string // Problem title
   isExactTokenCount?: boolean // Whether tokens are accurate or estimated
   metadata?: Record<string, any>
   createdAt: Date | Timestamp
@@ -117,9 +96,9 @@ export interface UsageStats {
 /**
  * Track a usage event
  */
-export async function trackUsageEvent(event: Omit<UsageEvent, 'id' | 'createdAt'>): Promise<void> {
+export async function trackUsageEvent(event: Omit<UsageEvent, "id" | "createdAt">): Promise<void> {
   try {
-    const usageRef = adminDb.collection('usage_events')
+    const usageRef = adminDb.collection("usage_events")
 
     await usageRef.add({
       ...event,
@@ -129,7 +108,7 @@ export async function trackUsageEvent(event: Omit<UsageEvent, 'id' | 'createdAt'
     // Also update the user's aggregate usage for the current period
     await updateUserAggregateUsage(event)
   } catch (error) {
-    logger.error('Failed to track usage event', { error, eventType: event.eventType })
+    logger.error("Failed to track usage event", { error, eventType: event.eventType })
     // Don't throw - usage tracking failures shouldn't break the app
   }
 }
@@ -137,16 +116,18 @@ export async function trackUsageEvent(event: Omit<UsageEvent, 'id' | 'createdAt'
 /**
  * Update user's aggregate usage for the current billing period
  */
-async function updateUserAggregateUsage(event: Omit<UsageEvent, 'id' | 'createdAt'>): Promise<void> {
+async function updateUserAggregateUsage(
+  event: Omit<UsageEvent, "id" | "createdAt">
+): Promise<void> {
   const now = new Date()
   const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
 
   const usageSummaryRef = adminDb
-    .collection('users')
+    .collection("users")
     .doc(event.userId)
-    .collection('usage_summaries')
+    .collection("usage_summaries")
     .doc(periodKey)
 
   await adminDb.runTransaction(async (transaction) => {
@@ -200,19 +181,19 @@ async function updateUserAggregateUsage(event: Omit<UsageEvent, 'id' | 'createdA
 export async function getUserUsageSummary(userId: string): Promise<UserUsageSummary | null> {
   try {
     const now = new Date()
-    const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
 
     // Get usage summary
     const summaryDoc = await adminDb
-      .collection('users')
+      .collection("users")
       .doc(userId)
-      .collection('usage_summaries')
+      .collection("usage_summaries")
       .doc(periodKey)
       .get()
 
     // Get user's subscription tier for budget cap
-    const userDoc = await adminDb.collection('users').doc(userId).get()
-    const tier = (userDoc.data()?.subscription_tier || 'free') as keyof typeof BUDGET_CAPS
+    const userDoc = await adminDb.collection("users").doc(userId).get()
+    const tier = (userDoc.data()?.subscription_tier || "free") as keyof typeof BUDGET_CAPS
     const budgetCap = BUDGET_CAPS[tier] || BUDGET_CAPS.free
 
     if (!summaryDoc.exists) {
@@ -258,7 +239,7 @@ export async function getUserUsageSummary(userId: string): Promise<UserUsageSumm
       budgetUsedPercent: (totalCost / budgetCap) * 100,
     }
   } catch (error) {
-    console.error('[Usage Tracking] Failed to get user summary:', error)
+    console.error("[Usage Tracking] Failed to get user summary:", error)
     return null
   }
 }
@@ -304,32 +285,7 @@ export async function checkUserBudget(userId: string): Promise<{
   }
 }
 
-/**
- * Calculate cost from token counts (for LLM providers)
- */
-export function calculateCost(
-  inputTokens: number,
-  outputTokens: number,
-  provider: string
-): number {
-  const costPer1k = PROVIDER_COSTS[provider as keyof typeof PROVIDER_COSTS] || PROVIDER_COSTS.gemini
-  const totalTokens = inputTokens + outputTokens
-  return (totalTokens / 1000) * costPer1k
-}
-
-/**
- * Calculate cost for voice transcription (Deepgram)
- * @param durationSeconds - Duration of audio in seconds
- * @param model - Deepgram model used
- */
-export function calculateVoiceCost(
-  durationSeconds: number,
-  model: keyof typeof DEEPGRAM_COSTS = 'nova-2'
-): number {
-  const costPerMinute = DEEPGRAM_COSTS[model] || DEEPGRAM_COSTS['nova-2']
-  const minutes = durationSeconds / 60
-  return minutes * costPerMinute
-}
+// Note: calculateCost and calculateVoiceCost are re-exported from usage-tracking-client
 
 /**
  * Calculate cost for embedding generation using ACCURATE token counting
@@ -338,9 +294,9 @@ export function calculateVoiceCost(
  */
 export function calculateEmbeddingCost(
   text: string,
-  model: keyof typeof EMBEDDING_COSTS = 'text-embedding-004'
+  model: keyof typeof EMBEDDING_COSTS = "text-embedding-004"
 ): { cost: number; tokens: number; isExact: boolean } {
-  const costPer1k = EMBEDDING_COSTS[model] || EMBEDDING_COSTS['text-embedding-004']
+  const costPer1k = EMBEDDING_COSTS[model] || EMBEDDING_COSTS["text-embedding-004"]
   const tokenResult = countTokens(text)
   const cost = (tokenResult.tokens / 1000) * costPer1k
   return { cost, tokens: tokenResult.tokens, isExact: tokenResult.isExact }
@@ -351,9 +307,9 @@ export function calculateEmbeddingCost(
  */
 export function calculateEmbeddingCostFromTokens(
   tokens: number,
-  model: keyof typeof EMBEDDING_COSTS = 'text-embedding-004'
+  model: keyof typeof EMBEDDING_COSTS = "text-embedding-004"
 ): number {
-  const costPer1k = EMBEDDING_COSTS[model] || EMBEDDING_COSTS['text-embedding-004']
+  const costPer1k = EMBEDDING_COSTS[model] || EMBEDDING_COSTS["text-embedding-004"]
   return (tokens / 1000) * costPer1k
 }
 
@@ -367,13 +323,13 @@ export async function trackVoiceUsage(params: {
   model?: keyof typeof DEEPGRAM_COSTS
   transcriptLength?: number
 }): Promise<void> {
-  const { userId, sessionId, durationSeconds, model = 'nova-2', transcriptLength } = params
+  const { userId, sessionId, durationSeconds, model = "nova-2", transcriptLength } = params
   const cost = calculateVoiceCost(durationSeconds, model)
 
   await trackUsageEvent({
     userId,
-    eventType: 'voice_transcription',
-    provider: 'deepgram',
+    eventType: "voice_transcription",
+    provider: "deepgram",
     model,
     cost,
     sessionId,
@@ -393,7 +349,7 @@ export async function trackEmbeddingUsage(params: {
   characterCount: number
   embeddingCount: number
   model: keyof typeof EMBEDDING_COSTS
-  provider: 'gemini' | 'openai'
+  provider: "gemini" | "openai"
   latencyMs?: number
 }): Promise<void> {
   const { userId, characterCount, embeddingCount, model, provider, latencyMs } = params
@@ -403,7 +359,7 @@ export async function trackEmbeddingUsage(params: {
 
   await trackUsageEvent({
     userId,
-    eventType: 'embedding_generation',
+    eventType: "embedding_generation",
     provider,
     model,
     totalTokens: estimatedTokens,
@@ -424,16 +380,25 @@ export async function trackEmbeddingUsage(params: {
  */
 export async function trackEmbeddingUsageAccurate(params: {
   userId: string
-  texts: string[]  // The actual texts being embedded
+  texts: string[] // The actual texts being embedded
   model: keyof typeof EMBEDDING_COSTS
-  provider: 'gemini' | 'openai' | 'tfidf'
+  provider: "gemini" | "openai" | "tfidf"
   latencyMs?: number
   cached?: boolean
   dimensions?: number
   // Optional: provide token count if already known from API response (OpenAI)
   tokensFromApi?: number
 }): Promise<{ totalTokens: number; cost: number }> {
-  const { userId, texts, model, provider, latencyMs, cached = false, dimensions, tokensFromApi } = params
+  const {
+    userId,
+    texts,
+    model,
+    provider,
+    latencyMs,
+    cached = false,
+    dimensions,
+    tokensFromApi,
+  } = params
 
   let totalTokens: number
   let isExact: boolean
@@ -459,7 +424,7 @@ export async function trackEmbeddingUsageAccurate(params: {
 
   await trackUsageEvent({
     userId,
-    eventType: 'embedding_generation',
+    eventType: "embedding_generation",
     provider,
     model,
     totalTokens,
@@ -499,10 +464,10 @@ export async function getAdminUsageStats(options?: {
   }>
 }> {
   const now = new Date()
-  const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
 
   // Get all users with their usage summaries
-  const usersSnapshot = await adminDb.collection('users').get()
+  const usersSnapshot = await adminDb.collection("users").get()
 
   const userStats: Array<{
     userId: string
@@ -518,14 +483,14 @@ export async function getAdminUsageStats(options?: {
 
   for (const userDoc of usersSnapshot.docs) {
     const userData = userDoc.data()
-    const tier = userData.subscription_tier || 'free'
+    const tier = userData.subscription_tier || "free"
     const budgetCap = BUDGET_CAPS[tier as keyof typeof BUDGET_CAPS] || BUDGET_CAPS.free
 
     // Get usage summary for this user
     const summaryDoc = await adminDb
-      .collection('users')
+      .collection("users")
       .doc(userDoc.id)
-      .collection('usage_summaries')
+      .collection("usage_summaries")
       .doc(periodKey)
       .get()
 
@@ -539,7 +504,7 @@ export async function getAdminUsageStats(options?: {
     if (cost > 0 || requests > 0) {
       userStats.push({
         userId: userDoc.id,
-        email: userData.email || 'Unknown',
+        email: userData.email || "Unknown",
         tier,
         cost,
         requests,
@@ -585,8 +550,8 @@ export async function getServiceBreakdown(): Promise<{
     // Query usage_events for current month
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const eventsSnapshot = await adminDb
-      .collection('usage_events')
-      .where('createdAt', '>=', startOfMonth)
+      .collection("usage_events")
+      .where("createdAt", ">=", startOfMonth)
       .get()
 
     for (const doc of eventsSnapshot.docs) {
@@ -594,7 +559,7 @@ export async function getServiceBreakdown(): Promise<{
       const eventType = event.eventType as UsageEventType
       const cost = event.cost || 0
       const tokens = event.totalTokens || 0
-      const provider = event.provider || 'unknown'
+      const provider = event.provider || "unknown"
 
       // Aggregate by provider
       if (!result.byProvider[provider]) {
@@ -605,15 +570,16 @@ export async function getServiceBreakdown(): Promise<{
       result.byProvider[provider].tokens += tokens
 
       // Aggregate by service type
-      if (eventType === 'voice_transcription') {
+      if (eventType === "voice_transcription") {
         result.byService.voice.requests++
         result.byService.voice.cost += cost
         result.byService.voice.durationSeconds += event.metadata?.durationSeconds || 0
-      } else if (eventType === 'embedding_generation') {
+      } else if (eventType === "embedding_generation") {
         result.byService.embeddings.requests++
         result.byService.embeddings.cost += cost
         result.byService.embeddings.tokens += tokens
-        result.byService.embeddings.characterCount += event.metadata?.totalCharacters || event.metadata?.characterCount || 0
+        result.byService.embeddings.characterCount +=
+          event.metadata?.totalCharacters || event.metadata?.characterCount || 0
       } else {
         // LLM events (chat_message, feedback_generation, etc.)
         result.byService.llm.requests++
@@ -622,7 +588,7 @@ export async function getServiceBreakdown(): Promise<{
       }
     }
   } catch (error) {
-    console.error('[Usage Tracking] Failed to get service breakdown:', error)
+    console.error("[Usage Tracking] Failed to get service breakdown:", error)
   }
 
   return result
@@ -656,9 +622,9 @@ export async function getUserServiceBreakdown(userId: string): Promise<{
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
     const eventsSnapshot = await adminDb
-      .collection('usage_events')
-      .where('userId', '==', userId)
-      .where('createdAt', '>=', startOfMonth)
+      .collection("usage_events")
+      .where("userId", "==", userId)
+      .where("createdAt", ">=", startOfMonth)
       .get()
 
     for (const doc of eventsSnapshot.docs) {
@@ -671,15 +637,16 @@ export async function getUserServiceBreakdown(userId: string): Promise<{
       result.total.cost += cost
       result.total.tokens += tokens
 
-      if (eventType === 'voice_transcription') {
+      if (eventType === "voice_transcription") {
         result.voice.requests++
         result.voice.cost += cost
         result.voice.durationSeconds += event.metadata?.durationSeconds || 0
-      } else if (eventType === 'embedding_generation') {
+      } else if (eventType === "embedding_generation") {
         result.embeddings.requests++
         result.embeddings.cost += cost
         result.embeddings.tokens += tokens
-        result.embeddings.characterCount += event.metadata?.totalCharacters || event.metadata?.characterCount || 0
+        result.embeddings.characterCount +=
+          event.metadata?.totalCharacters || event.metadata?.characterCount || 0
       } else {
         result.llm.requests++
         result.llm.cost += cost
@@ -687,7 +654,7 @@ export async function getUserServiceBreakdown(userId: string): Promise<{
       }
     }
   } catch (error) {
-    console.error('[Usage Tracking] Failed to get user service breakdown:', error)
+    console.error("[Usage Tracking] Failed to get user service breakdown:", error)
     // Fall back to summary data
     result.llm.tokens = summary.totalTokens
     result.total.requests = summary.totalRequests
@@ -711,13 +678,13 @@ export async function logUserActivity(
   }
 ): Promise<void> {
   try {
-    await adminDb.collection('user_activities').add({
+    await adminDb.collection("user_activities").add({
       userId,
       ...activity,
       createdAt: FieldValue.serverTimestamp(),
     })
   } catch (error) {
-    console.error('[Activity Log] Failed to log activity:', error)
+    console.error("[Activity Log] Failed to log activity:", error)
   }
 }
 
@@ -810,12 +777,12 @@ export async function getGranularUsageBreakdown(options?: {
 
   try {
     let query = adminDb
-      .collection('usage_events')
-      .where('createdAt', '>=', startOfMonth)
-      .orderBy('createdAt', 'desc')
+      .collection("usage_events")
+      .where("createdAt", ">=", startOfMonth)
+      .orderBy("createdAt", "desc")
 
     if (options?.userId) {
-      query = query.where('userId', '==', options.userId)
+      query = query.where("userId", "==", options.userId)
     }
 
     const eventsSnapshot = await query.limit(10000).get()
@@ -825,9 +792,9 @@ export async function getGranularUsageBreakdown(options?: {
 
     for (const doc of eventsSnapshot.docs) {
       const event = doc.data()
-      const pattern = event.pattern || event.metadata?.pattern || 'unknown'
-      const difficulty = event.difficulty || event.metadata?.difficulty || 'unknown'
-      const scenarioId = event.scenarioId || 'unknown'
+      const pattern = event.pattern || event.metadata?.pattern || "unknown"
+      const difficulty = event.difficulty || event.metadata?.difficulty || "unknown"
+      const scenarioId = event.scenarioId || "unknown"
       const scenarioTitle = event.scenarioTitle || event.metadata?.scenarioTitle || scenarioId
       const tokens = event.totalTokens || 0
       const cost = event.cost || 0
@@ -845,7 +812,7 @@ export async function getGranularUsageBreakdown(options?: {
       result.byPattern[pattern].requests++
       result.byPattern[pattern].tokens += tokens
       result.byPattern[pattern].cost += cost
-      if (scenarioId !== 'unknown' && !result.byPattern[pattern].scenarios.includes(scenarioId)) {
+      if (scenarioId !== "unknown" && !result.byPattern[pattern].scenarios.includes(scenarioId)) {
         result.byPattern[pattern].scenarios.push(scenarioId)
       }
 
@@ -878,7 +845,7 @@ export async function getGranularUsageBreakdown(options?: {
     }
 
     // Convert scenario map to array and calculate averages
-    result.byScenario = Array.from(scenarioMap.values()).map(s => ({
+    result.byScenario = Array.from(scenarioMap.values()).map((s) => ({
       ...s,
       avgTokensPerRequest: s.requests > 0 ? Math.round(s.tokens / s.requests) : 0,
     }))
@@ -892,9 +859,8 @@ export async function getGranularUsageBreakdown(options?: {
     result.topTokenScenarios = [...result.byScenario]
       .sort((a, b) => b.tokens - a.tokens)
       .slice(0, limit)
-
   } catch (error) {
-    console.error('[Usage Tracking] Failed to get granular breakdown:', error)
+    console.error("[Usage Tracking] Failed to get granular breakdown:", error)
   }
 
   return result
@@ -928,9 +894,9 @@ export async function getSessionUsageBreakdown(sessionId: string): Promise<{
 
   try {
     const eventsSnapshot = await adminDb
-      .collection('usage_events')
-      .where('sessionId', '==', sessionId)
-      .orderBy('createdAt', 'asc')
+      .collection("usage_events")
+      .where("sessionId", "==", sessionId)
+      .orderBy("createdAt", "asc")
       .get()
 
     for (const doc of eventsSnapshot.docs) {
@@ -944,12 +910,12 @@ export async function getSessionUsageBreakdown(sessionId: string): Promise<{
         eventType: event.eventType,
         tokens,
         cost,
-        provider: event.provider || 'unknown',
+        provider: event.provider || "unknown",
         timestamp: event.createdAt?.toDate() || new Date(),
       })
     }
   } catch (error) {
-    console.error('[Usage Tracking] Failed to get session breakdown:', error)
+    console.error("[Usage Tracking] Failed to get session breakdown:", error)
   }
 
   return result
@@ -985,23 +951,26 @@ export async function getDailyUsageTrends(days: number = 30): Promise<{
 
   try {
     const eventsSnapshot = await adminDb
-      .collection('usage_events')
-      .where('createdAt', '>=', startDate)
-      .orderBy('createdAt', 'asc')
+      .collection("usage_events")
+      .where("createdAt", ">=", startDate)
+      .orderBy("createdAt", "asc")
       .get()
 
-    const dailyMap = new Map<string, {
-      requests: number
-      tokens: number
-      cost: number
-      users: Set<string>
-    }>()
+    const dailyMap = new Map<
+      string,
+      {
+        requests: number
+        tokens: number
+        cost: number
+        users: Set<string>
+      }
+    >()
 
     const allUsers = new Set<string>()
 
     for (const doc of eventsSnapshot.docs) {
       const event = doc.data()
-      const date = event.createdAt?.toDate()?.toISOString().split('T')[0] || 'unknown'
+      const date = event.createdAt?.toDate()?.toISOString().split("T")[0] || "unknown"
       const tokens = event.totalTokens || 0
       const cost = event.cost || 0
       const userId = event.userId
@@ -1034,9 +1003,8 @@ export async function getDailyUsageTrends(days: number = 30): Promise<{
         uniqueUsers: data.users.size,
       }))
       .sort((a, b) => a.date.localeCompare(b.date))
-
   } catch (error) {
-    console.error('[Usage Tracking] Failed to get daily trends:', error)
+    console.error("[Usage Tracking] Failed to get daily trends:", error)
   }
 
   return result
@@ -1067,7 +1035,7 @@ export async function trackLLMUsageAccurate(params: {
     outputText,
     provider,
     model,
-    eventType = 'chat_message',
+    eventType = "chat_message",
     sessionId,
     scenarioId,
     scenarioTitle,

@@ -19,7 +19,7 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { generateCacheKey, getCachedResponse, setCachedResponse } from "./ai-cache"
-import { trackUsageEvent, calculateCost, PROVIDER_COSTS } from "./usage-tracking"
+import { calculateCost } from "./usage-tracking-client"
 import {
   checkRateLimit,
   recordRequestStart,
@@ -28,6 +28,21 @@ import {
   RateLimitTier,
 } from "./rate-limiter"
 import { logger } from "./logger"
+import type { UsageEvent } from "./usage-tracking"
+
+// Lazy wrapper for trackUsageEvent to avoid bundling firebase-admin in client
+async function trackUsageEventSafe(event: Omit<UsageEvent, "id" | "createdAt">): Promise<void> {
+  // Only track on server-side
+  if (typeof window === "undefined") {
+    try {
+      const { trackUsageEvent } = await import("./usage-tracking")
+      await trackUsageEvent(event)
+    } catch (error) {
+      // Usage tracking failure is non-critical - silent fail
+      logger.debug("[Usage Tracking] Failed to track event", { error })
+    }
+  }
+}
 
 // Provider types
 export type AIProvider = "gemini" | "gemini-lite" | "deepseek" | "deepseek-chat" | "claude"
@@ -460,7 +475,7 @@ export async function generateAIResponse(
     if (cached.hit && cached.response) {
       // Track cached usage (no cost) - fire-and-forget
       if (userId) {
-        trackUsageEvent({
+        trackUsageEventSafe({
           userId,
           eventType,
           cached: true,
@@ -574,7 +589,7 @@ export async function generateAIResponse(
           recordRequestEnd(userId)
 
           // Fire-and-forget usage tracking - errors are non-critical
-          trackUsageEvent({
+          trackUsageEventSafe({
             userId,
             eventType,
             provider,
