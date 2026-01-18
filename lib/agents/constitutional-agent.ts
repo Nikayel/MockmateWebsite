@@ -7,8 +7,18 @@
  * Model: Cheap (uses fast model for critique)
  */
 
-import type { Agent, AgentConfig, ConstitutionalInput, ConstitutionalOutput, FeedbackCorrection } from "./types"
-import type { ScoreResult, ScoreCritiqueAdjustment, FeedbackCritiqueAdjustment } from "@/lib/feedback/types"
+import type {
+  Agent,
+  AgentConfig,
+  ConstitutionalInput,
+  ConstitutionalOutput,
+  FeedbackCorrection,
+} from "./types"
+import type {
+  ScoreResult,
+  ScoreCritiqueAdjustment,
+  FeedbackCritiqueAdjustment,
+} from "@/lib/feedback/types"
 import type { ExtractedEvidence } from "@/lib/feedback/structured-extraction"
 import { generateAIResponse } from "@/lib/ai-providers"
 import { logger } from "@/lib/logger"
@@ -60,7 +70,10 @@ export interface ConstitutionalAgentOutput {
 // CONSTITUTIONAL AGENT
 // =============================================================================
 
-export class ConstitutionalAgent implements Agent<ConstitutionalAgentInput, ConstitutionalAgentOutput> {
+export class ConstitutionalAgent implements Agent<
+  ConstitutionalAgentInput,
+  ConstitutionalAgentOutput
+> {
   readonly config: AgentConfig = {
     type: "constitutional",
     modelTier: "cheap", // Fast critique
@@ -76,9 +89,7 @@ export class ConstitutionalAgent implements Agent<ConstitutionalAgentInput, Cons
       originalScore: input.scores.overall,
     })
 
-    const passRate = input.testsTotal > 0
-      ? (input.testsPassed / input.testsTotal) * 100
-      : 0
+    const passRate = input.testsTotal > 0 ? (input.testsPassed / input.testsTotal) * 100 : 0
 
     // Step 1: Critique scores
     const scoreCritique = await this.critiqueScoresWrapper(input, passRate)
@@ -101,13 +112,15 @@ export class ConstitutionalAgent implements Agent<ConstitutionalAgentInput, Cons
     return {
       scoreAdjustments: {
         madeChanges: scoreCritique.madeChanges,
-        adjustedScores: scoreCritique.adjustedScores ? {
-          understanding: scoreCritique.adjustedScores.understanding,
-          problemSolving: scoreCritique.adjustedScores.problemSolving,
-          codeQuality: scoreCritique.adjustedScores.codeQuality,
-          communication: scoreCritique.adjustedScores.communication,
-          overall: this.calculateOverall(scoreCritique.adjustedScores),
-        } : undefined,
+        adjustedScores: scoreCritique.adjustedScores
+          ? {
+              understanding: scoreCritique.adjustedScores.understanding,
+              problemSolving: scoreCritique.adjustedScores.problemSolving,
+              codeQuality: scoreCritique.adjustedScores.codeQuality,
+              communication: scoreCritique.adjustedScores.communication,
+              overall: this.calculateOverall(scoreCritique.adjustedScores),
+            }
+          : undefined,
         reasoning: scoreCritique.reasoning,
       },
       feedbackCorrections: corrections,
@@ -137,17 +150,19 @@ export class ConstitutionalAgent implements Agent<ConstitutionalAgentInput, Cons
           complexityAccurate: input.evidence.timeComplexity.isCorrect || false,
           statedComplexity: input.evidence.timeComplexity.value,
           questionsAsked: input.evidence.interviewerQuestions.length,
-          questionsAnswered: input.evidence.interviewerQuestions.filter(q => q.answered).length,
+          questionsAnswered: input.evidence.interviewerQuestions.filter((q) => q.answered).length,
           edgeCasesConsidered: input.evidence.edgeCases.mentionedByCandidate.length > 0,
           alternativesDiscussed: input.evidence.progression.improvedAfterPrompt,
           communicationScore: input.scores.communication,
         },
         extractedEvidence: input.evidence,
-        problemContext: input.optimalComplexity ? {
-          title: "",
-          optimalTimeComplexity: input.optimalComplexity,
-          optimalSpaceComplexity: "",
-        } : undefined,
+        problemContext: input.optimalComplexity
+          ? {
+              title: "",
+              optimalTimeComplexity: input.optimalComplexity,
+              optimalSpaceComplexity: "",
+            }
+          : undefined,
       })
     } catch (error) {
       logger.warn("[ConstitutionalAgent] Score critique failed, using passthrough", { error })
@@ -163,11 +178,13 @@ export class ConstitutionalAgent implements Agent<ConstitutionalAgentInput, Cons
     input: ConstitutionalAgentInput
   ): Promise<FeedbackCritiqueAdjustment> {
     try {
-      return await critiqueFeedbackText(
-        input.feedbackText,
-        input.scores,
-        input.evidence
-      )
+      const passRate = input.testsTotal > 0 ? (input.testsPassed / input.testsTotal) * 100 : 0
+
+      return await critiqueFeedbackText(input.feedbackText, input.scores, {
+        passRate,
+        scenarioType: input.scenarioType,
+        isIncomplete: false, // Code completeness checked at route level
+      })
     } catch (error) {
       logger.warn("[ConstitutionalAgent] Feedback critique failed, using passthrough", { error })
       return {
@@ -184,8 +201,8 @@ export class ConstitutionalAgent implements Agent<ConstitutionalAgentInput, Cons
     }
 
     return critique.critiques
-      .filter(c => !c.passed && c.suggestion)
-      .map(c => ({
+      .filter((c) => !c.passed && c.suggestion)
+      .map((c) => ({
         field: c.aspect,
         original: c.issue || "",
         corrected: c.suggestion || "",
@@ -219,10 +236,10 @@ export class ConstitutionalAgent implements Agent<ConstitutionalAgentInput, Cons
   private calculateOverall(scores: Partial<ScoreResult>): number {
     // DSA weights
     return Math.round(
-      (scores.understanding || 0) * 0.30 +
-      (scores.problemSolving || 0) * 0.25 +
-      (scores.codeQuality || 0) * 0.25 +
-      (scores.communication || 0) * 0.20
+      (scores.understanding || 0) * 0.3 +
+        (scores.problemSolving || 0) * 0.25 +
+        (scores.codeQuality || 0) * 0.25 +
+        (scores.communication || 0) * 0.2
     )
   }
 }

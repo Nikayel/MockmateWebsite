@@ -99,9 +99,11 @@ export class ScorerAgent implements Agent<ScorerAgentInput, ScorerAgentOutput> {
         scores = calculateSystemDesignScores(preScreen, aiValidation, input.designNotes)
         break
 
-      case "bugfix":
-        scores = calculateBugFixScores(preScreen, aiValidation, input.evidence)
+      case "bugfix": {
+        const passRate = input.testsTotal > 0 ? (input.testsPassed / input.testsTotal) * 100 : 0
+        scores = calculateBugFixScores(passRate, preScreen, aiValidation)
         break
+      }
 
       case "dsa":
       default:
@@ -179,9 +181,9 @@ export class ScorerAgent implements Agent<ScorerAgentInput, ScorerAgentOutput> {
     const passRate = input.testsTotal > 0 ? (input.testsPassed / input.testsTotal) * 100 : 0
 
     // Base scores from evidence
-    let understanding = this.calculateUnderstandingScore(passRate, aiValidation, input.evidence)
+    const understanding = this.calculateUnderstandingScore(passRate, aiValidation, input.evidence)
     let problemSolving = this.calculateProblemSolvingScore(passRate, aiValidation, input.evidence)
-    let codeQuality = this.calculateCodeQualityScore(passRate, input.code)
+    const codeQuality = this.calculateCodeQualityScore(passRate, input.code)
     let communication = aiValidation.communicationScore
 
     // Apply adjustments based on evidence
@@ -207,10 +209,7 @@ export class ScorerAgent implements Agent<ScorerAgentInput, ScorerAgentOutput> {
 
     // Calculate overall using DSA weights
     const overall = Math.round(
-      understanding * 0.30 +
-      problemSolving * 0.25 +
-      codeQuality * 0.25 +
-      communication * 0.20
+      understanding * 0.3 + problemSolving * 0.25 + codeQuality * 0.25 + communication * 0.2
     )
 
     return {
@@ -321,7 +320,9 @@ export class ScorerAgent implements Agent<ScorerAgentInput, ScorerAgentOutput> {
     // Floor 2: High pass rate (>80%) should guarantee minimum 50%
     if (passRate >= 80 && scores.overall < 50) {
       const newOverall = Math.max(scores.overall, 50)
-      adjustments.push(`Score floor applied: ${scores.overall} → ${newOverall} (${passRate}% pass rate)`)
+      adjustments.push(
+        `Score floor applied: ${scores.overall} → ${newOverall} (${passRate}% pass rate)`
+      )
       return { ...scores, overall: newOverall }
     }
 
@@ -340,9 +341,7 @@ export class ScorerAgent implements Agent<ScorerAgentInput, ScorerAgentOutput> {
     const hintPenalty = input.hintsUsed ? Math.min(15, input.hintsUsed * 5) : 0
 
     const mastery = Math.round(
-      correctnessScore * 0.60 +
-      efficiencyScore * 0.25 +
-      (15 - hintPenalty) * (100 / 15) * 0.15
+      correctnessScore * 0.6 + efficiencyScore * 0.25 + (15 - hintPenalty) * (100 / 15) * 0.15
     )
 
     return Math.min(100, Math.max(0, mastery))
