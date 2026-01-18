@@ -187,6 +187,149 @@ interface TestResult {
   error: string | null
 }
 
+/**
+ * Generate structured fallback feedback when AI feedback is unavailable
+ * Creates a complete feedback with TL;DR, What Worked, Fix Next sections
+ */
+function generateFallbackFeedback(params: {
+  problemTitle: string
+  testsPassed: number
+  testsTotal: number
+  passRate: number
+  timeComplexity?: string
+  spaceComplexity?: string
+  optimalTimeComplexity?: string
+  optimalSpaceComplexity?: string
+  elapsedMinutes: number
+  scores: {
+    understanding: number
+    problemSolving: number
+    codeQuality: number
+    communication: number
+  }
+}): string {
+  const {
+    problemTitle,
+    testsPassed,
+    testsTotal,
+    passRate,
+    timeComplexity,
+    spaceComplexity,
+    optimalTimeComplexity,
+    optimalSpaceComplexity,
+    elapsedMinutes,
+    scores,
+  } = params
+
+  const overall = Math.round(
+    scores.understanding * 0.25 +
+      scores.problemSolving * 0.25 +
+      scores.codeQuality * 0.3 +
+      scores.communication * 0.2
+  )
+
+  // Determine performance level
+  const performanceLevel =
+    passRate === 100
+      ? "excellent"
+      : passRate >= 80
+        ? "good"
+        : passRate >= 50
+          ? "partial"
+          : "needs work"
+
+  // Check complexity match
+  const hasOptimalTime =
+    !optimalTimeComplexity || !timeComplexity || timeComplexity === optimalTimeComplexity
+  const hasOptimalSpace =
+    !optimalSpaceComplexity || !spaceComplexity || spaceComplexity === optimalSpaceComplexity
+
+  // Build TL;DR
+  let tldr = ""
+  if (passRate === 100) {
+    tldr = `Strong solution for ${problemTitle} - all ${testsTotal} tests passing.`
+    if (!hasOptimalTime) {
+      tldr += ` Consider optimizing time complexity from ${timeComplexity} to ${optimalTimeComplexity}.`
+    }
+  } else if (passRate >= 80) {
+    tldr = `Good progress on ${problemTitle} with ${testsPassed}/${testsTotal} tests passing. Focus on edge cases.`
+  } else if (passRate >= 50) {
+    tldr = `Partial solution for ${problemTitle}. ${testsTotal - testsPassed} test cases need attention.`
+  } else {
+    tldr = `Solution needs work - only ${testsPassed}/${testsTotal} tests passing. Review the approach.`
+  }
+
+  // Build What Worked
+  const whatWorked: string[] = []
+  if (passRate === 100) {
+    whatWorked.push("All test cases passing - solution handles the core logic correctly")
+  } else if (testsPassed > 0) {
+    whatWorked.push(`${testsPassed} test cases passing - core approach is on track`)
+  }
+  if (hasOptimalTime && timeComplexity) {
+    whatWorked.push(`Achieved optimal time complexity of ${timeComplexity}`)
+  }
+  if (hasOptimalSpace && spaceComplexity) {
+    whatWorked.push(`Efficient space usage at ${spaceComplexity}`)
+  }
+  if (elapsedMinutes <= 20 && passRate >= 80) {
+    whatWorked.push("Good time management - completed efficiently")
+  }
+  if (whatWorked.length === 0) {
+    whatWorked.push("Attempted the problem and ran tests")
+  }
+
+  // Build Fix Next
+  const fixNext: string[] = []
+  if (passRate < 100) {
+    fixNext.push(`Debug failing test cases (${testsTotal - testsPassed} remaining)`)
+  }
+  if (!hasOptimalTime && timeComplexity && optimalTimeComplexity) {
+    fixNext.push(`Optimize time complexity from ${timeComplexity} to ${optimalTimeComplexity}`)
+  }
+  if (scores.communication < 60) {
+    fixNext.push(
+      "Explain your approach before coding - interviewers need to understand your thought process"
+    )
+  }
+  if (fixNext.length === 0 && passRate === 100) {
+    fixNext.push("Consider alternative approaches or optimizations")
+    fixNext.push("Practice explaining your solution verbally")
+  }
+
+  // Build Action Plan
+  const actionPlan: string[] = []
+  if (passRate === 100) {
+    actionPlan.push("Try a harder variation of this problem pattern")
+    actionPlan.push("Practice explaining your approach out loud before coding")
+  } else {
+    actionPlan.push("Review failing test cases and identify patterns")
+    actionPlan.push("Re-attempt this problem after studying similar examples")
+  }
+  actionPlan.push("Time yourself to improve speed while maintaining accuracy")
+
+  // Format the feedback
+  return `**TL;DR** – ${tldr}
+
+**Score Snapshot** (estimated from test results)
+- Understanding: ${scores.understanding}/100 – Based on test pass rate
+- Problem-Solving: ${scores.problemSolving}/100 – Based on solution correctness
+- Code Quality: ${scores.codeQuality}/100 – Based on test results
+- Communication: ${scores.communication}/100 – AI analysis unavailable
+- Overall: ${overall}/100
+
+**What Worked**
+${whatWorked.map((w) => `- ${w}`).join("\n")}
+
+**Fix Next**
+${fixNext.map((f) => `- ${f}`).join("\n")}
+
+**Action Plan**
+${actionPlan.map((a, i) => `${i + 1}. ${a}`).join("\n")}
+
+*Note: This is estimated feedback based on test results. Full AI analysis was unavailable.*`
+}
+
 function InterviewPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -2736,9 +2879,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             },
           }
 
-          // Add 90-second timeout to prevent hanging forever
+          // Add 120-second timeout to prevent hanging forever (matches backend maxDuration)
           const feedbackController = new AbortController()
-          const feedbackTimeoutId = setTimeout(() => feedbackController.abort(), 90000)
+          const feedbackTimeoutId = setTimeout(() => feedbackController.abort(), 120000)
 
           const feedbackResponse = await fetch("/api/generate-feedback", {
             method: "POST",
@@ -2813,6 +2956,12 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             }
             aiFeedbackSucceeded = true
           } else {
+            // API returned non-OK response - log the status for debugging
+            console.warn(
+              `Feedback API returned non-OK status: ${feedbackResponse.status}`,
+              await feedbackResponse.text().catch(() => "Could not read response body")
+            )
+
             const passRate = testSummary.passRate
             const fallbackScores = {
               understanding: Math.min(100, Math.round(passRate * 0.9 + 10)),
@@ -2827,6 +2976,21 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 fallbackScores.codeQuality * 0.3 +
                 fallbackScores.communication * 0.2
             )
+
+            // Generate structured fallback feedback with What Worked, Fix Next sections
+            feedbackText = generateFallbackFeedback({
+              problemTitle: selectedScenario?.title || "the problem",
+              testsPassed: testSummary.passed,
+              testsTotal: testSummary.total,
+              passRate,
+              timeComplexity: efficiencyData?.estimatedTimeComplexity,
+              spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
+              optimalTimeComplexity: efficiencyData?.optimalTimeComplexity,
+              optimalSpaceComplexity: efficiencyData?.optimalSpaceComplexity,
+              elapsedMinutes: Math.round(elapsedTime / 60),
+              scores: fallbackScores,
+            })
+
             // Ensure all fallback scores are valid numbers
             setScoreBreakdown({
               understandingScore:
@@ -2867,6 +3031,21 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               fallbackScores.codeQuality * 0.3 +
               fallbackScores.communication * 0.2
           )
+
+          // Generate structured fallback feedback with What Worked, Fix Next sections
+          feedbackText = generateFallbackFeedback({
+            problemTitle: selectedScenario?.title || "the problem",
+            testsPassed: testSummary.passed,
+            testsTotal: testSummary.total,
+            passRate,
+            timeComplexity: efficiencyData?.estimatedTimeComplexity,
+            spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
+            optimalTimeComplexity: efficiencyData?.optimalTimeComplexity,
+            optimalSpaceComplexity: efficiencyData?.optimalSpaceComplexity,
+            elapsedMinutes: Math.round(elapsedTime / 60),
+            scores: fallbackScores,
+          })
+
           setScoreBreakdown({
             understandingScore: fallbackScores.understanding,
             problemSolvingScore: fallbackScores.problemSolving,

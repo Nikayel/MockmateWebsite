@@ -38,9 +38,10 @@ import {
   type ExtractedEvidence,
 } from "@/lib/feedback/structured-extraction"
 
-// Set maximum duration for feedback generation (90 seconds to allow for AI processing)
+// Set maximum duration for feedback generation (120 seconds to allow for AI processing)
 // This prevents Vercel serverless timeout on complex feedback generation
-export const maxDuration = 90
+// Increased from 90s to 120s to reduce timeout failures
+export const maxDuration = 120
 
 export async function POST(request: NextRequest) {
   // Apply rate limiting
@@ -387,10 +388,10 @@ CODE EFFICIENCY ANALYSIS:
 
     // Step 2.6: Structured Extraction from Transcript (BEFORE scoring)
     // Extract concrete evidence to ground scoring in actual quotes
-    // TIME BUDGET: Skip if already > 30s elapsed to leave time for essential calls
+    // TIME BUDGET: Skip if already > 40s elapsed to leave time for essential calls
     let extractedEvidence: ExtractedEvidence | undefined
     const elapsedBeforeExtraction = Date.now() - startTime
-    const shouldSkipExtraction = elapsedBeforeExtraction > 30000 // 30s threshold
+    const shouldSkipExtraction = elapsedBeforeExtraction > 40000 // 40s threshold (adjusted for 120s total)
 
     if (shouldSkipExtraction) {
       logger.info("[Feedback] Skipping structured extraction due to time budget", {
@@ -577,9 +578,9 @@ CODE EFFICIENCY ANALYSIS:
     )
 
     // Step 5: Constitutional AI Score Critique
-    // TIME BUDGET: Skip if already > 50s elapsed to leave time for feedback generation
+    // TIME BUDGET: Skip if already > 70s elapsed to leave time for feedback generation
     const elapsedBeforeCritique = Date.now() - startTime
-    const shouldSkipScoreCritique = elapsedBeforeCritique > 50000 // 50s threshold
+    const shouldSkipScoreCritique = elapsedBeforeCritique > 70000 // 70s threshold (adjusted for 120s total)
 
     let scoreCritique: Awaited<ReturnType<typeof critiqueScores>> = {
       madeChanges: false,
@@ -899,9 +900,9 @@ CRITICAL INSTRUCTIONS:
     const feedback = aiResponse.text
 
     // Step 6: Constitutional AI Feedback Critique
-    // TIME BUDGET: Skip if already > 75s elapsed to leave buffer for response
+    // TIME BUDGET: Skip if already > 100s elapsed to leave buffer for response
     const elapsedBeforeFeedbackCritique = Date.now() - startTime
-    const shouldSkipFeedbackCritique = elapsedBeforeFeedbackCritique > 75000 // 75s threshold
+    const shouldSkipFeedbackCritique = elapsedBeforeFeedbackCritique > 100000 // 100s threshold (adjusted for 120s total)
 
     let feedbackCritique: Awaited<ReturnType<typeof critiqueFeedbackText>> = {
       madeChanges: false,
