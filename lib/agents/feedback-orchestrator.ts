@@ -98,12 +98,14 @@ export interface FeedbackResponse {
   actionPlan: string[]
 
   // Detailed feedback
-  detailedFeedback: {
-    understanding: string
-    problemSolving: string
-    codeQuality: string
-    communication: string
-  }
+  detailedFeedback:
+    | {
+        understanding: string
+        problemSolving: string
+        codeQuality: string
+        communication: string
+      }
+    | string // String for partial results
 
   // Metadata
   evidence: ExtractedEvidence
@@ -112,6 +114,9 @@ export interface FeedbackResponse {
     feedbackCorrected: boolean
     issues: string[]
   }
+
+  // Flag indicating partial results (scores computed but feedback generation failed)
+  partialResult?: boolean
 }
 
 // =============================================================================
@@ -145,6 +150,11 @@ export class FeedbackOrchestrator {
       testsTotal: request.testsTotal,
       maxDurationMs: maxDuration,
     })
+
+    // Track partial results for error recovery
+    let partialScores: ScoreResult | null = null
+    let partialMasteryScore: number | null = null
+    let partialEvidence: ExtractedEvidence | null = null
 
     try {
       // =======================================================================
@@ -218,6 +228,11 @@ export class FeedbackOrchestrator {
         agent: "scorer",
         latencyMs: Date.now() - scorerStart,
       })
+
+      // Save partial results for error recovery
+      partialScores = scorerOutput.scores
+      partialMasteryScore = scorerOutput.masteryScore
+      partialEvidence = evidence
 
       logger.info("[FeedbackOrchestrator] Scores calculated", {
         overall: scorerOutput.scores.overall,
@@ -347,7 +362,42 @@ export class FeedbackOrchestrator {
       logger.error("[FeedbackOrchestrator] Feedback generation failed", {
         error: error instanceof Error ? error.message : "Unknown error",
         totalLatencyMs: totalLatency,
+        hasPartialScores: partialScores !== null,
       })
+
+      // If we have partial scores from before the failure, return them
+      // This allows the frontend to use real scores in fallback feedback
+      if (partialScores && partialMasteryScore !== null) {
+        logger.info("[FeedbackOrchestrator] Returning partial results with scores", {
+          overall: partialScores.overall,
+        })
+
+        return {
+          success: true, // Mark as success since we have usable data
+          data: {
+            scores: partialScores,
+            masteryScore: partialMasteryScore,
+            // Fallback feedback - frontend can generate better text if needed
+            tldr: "Session evaluated. Review your scores below.",
+            whatWorked: [],
+            fixNext: [],
+            actionPlan: [],
+            detailedFeedback: "",
+            evidence: partialEvidence || this.createDefaultEvidence(),
+            constitutionalReview: {
+              scoreAdjusted: false,
+              feedbackCorrected: false,
+              issues: [],
+            },
+            partialResult: true, // Flag to indicate this is partial
+          },
+          metrics: {
+            totalLatencyMs: totalLatency,
+            agentCalls,
+            retries: 0,
+          },
+        }
+      }
 
       return {
         success: false,

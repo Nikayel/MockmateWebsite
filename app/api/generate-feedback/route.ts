@@ -213,13 +213,49 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: feedbackData, metrics } = orchestratorResult
+    const isPartialResult = feedbackData.partialResult === true
 
     // ==========================================================================
     // POST-PROCESSING
     // ==========================================================================
 
-    // Build the narrative feedback with scores injected
-    const feedbackText = buildFeedbackText(feedbackData)
+    // For partial results (scores computed but feedback text generation failed),
+    // generate minimal feedback using the real scores
+    let feedbackText: string
+    if (isPartialResult) {
+      logger.info("[Feedback API] Using partial result with real scores", {
+        sessionId,
+        scores: feedbackData.scores,
+      })
+      // Build minimal feedback with real scores
+      feedbackText = `**TL;DR** – Session evaluated. Your scores reflect your performance.
+
+**Score Snapshot**
+- Understanding: ${feedbackData.scores.understanding}/100
+- Problem-Solving: ${feedbackData.scores.problemSolving}/100
+- Code Quality: ${feedbackData.scores.codeQuality}/100
+- Communication: ${feedbackData.scores.communication}/100
+- Overall: ${feedbackData.scores.overall}/100
+
+*Note: Full AI feedback was unavailable. Scores computed from code analysis and conversation.*`
+    } else {
+      feedbackText = buildFeedbackText({
+        tldr: feedbackData.tldr,
+        whatWorked: feedbackData.whatWorked,
+        fixNext: feedbackData.fixNext,
+        actionPlan: feedbackData.actionPlan,
+        scores: feedbackData.scores,
+        detailedFeedback:
+          typeof feedbackData.detailedFeedback === "object"
+            ? (feedbackData.detailedFeedback as {
+                understanding?: string
+                problemSolving?: string
+                codeQuality?: string
+                communication?: string
+              })
+            : undefined,
+      })
+    }
     const finalFeedback = injectScoresIntoFeedback(feedbackText, feedbackData.scores)
 
     // Calculate mastery score for spaced repetition
@@ -315,6 +351,8 @@ export async function POST(request: NextRequest) {
             },
           }
         : {}),
+      // Partial result indicator (scores computed but full feedback unavailable)
+      partialResult: isPartialResult,
       latencyMs: totalElapsedMs,
     })
   } catch (error) {

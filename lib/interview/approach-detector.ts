@@ -185,6 +185,19 @@ const APPROACH_PATTERNS: Record<string, CodePatterns> = {
     requiredCount: 1,
   },
 
+  // Two Stacks - used for Min Stack, Max Stack patterns
+  // All operations are O(1) because we maintain a parallel min/max stack
+  "Two Stacks": {
+    indicators: [
+      /minStack|min_stack|minS|mins/i, // Min stack variable
+      /regStack|reg_stack|main_stack|dataStack|data_stack|vals/i, // Regular/data stack variable
+      /self\.\w+\s*=\s*\[\s*\][\s\S]*?self\.\w+\s*=\s*\[\s*\]/m, // Two stack init in Python
+      /this\.\w+\s*=\s*\[\s*\][\s\S]*?this\.\w+\s*=\s*\[\s*\]/m, // Two stack init in JS
+      /getMin|get_min|GetMin/i, // Min retrieval method
+    ],
+    requiredCount: 2, // Need at least 2 indicators for confidence
+  },
+
   // BFS/DFS
   BFS: {
     indicators: [
@@ -454,6 +467,7 @@ function estimateComplexityFromApproach(
     Recursion: { time: "O(2^n)", space: "O(n)" }, // Worst case without memo
     Heap: { time: "O(n log n)", space: "O(n)" },
     Stack: { time: "O(n)", space: "O(n)" },
+    "Two Stacks": { time: "O(1)", space: "O(n)" }, // Min/Max Stack - O(1) per operation
     BFS: { time: "O(V+E)", space: "O(V)" },
     DFS: { time: "O(V+E)", space: "O(V)" },
     Sorting: { time: "O(n log n)", space: "O(1)" },

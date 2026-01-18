@@ -44,19 +44,13 @@ import {
   shouldRunExtraction,
 } from "@/lib/interview/conversation-extraction"
 import { buildCompanyInterviewerPrompt } from "@/lib/interview/company-interviewer-styles"
-import {
-  validateWithRetry,
-  type ValidationContext
-} from "@/lib/interview/response-validation"
+import { validateWithRetry, type ValidationContext } from "@/lib/interview/response-validation"
 import {
   executeTool,
   formatToolResultsForPrompt,
   type ToolContext,
 } from "@/lib/interview/interviewer-tools"
-import {
-  buildInterviewerPrompt,
-  QUICK_INJECTIONS,
-} from "@/lib/interview/interviewer-prompts"
+import { buildInterviewerPrompt, QUICK_INJECTIONS } from "@/lib/interview/interviewer-prompts"
 import { truncateText, truncateFileContent } from "@/lib/utils"
 
 interface UserContext {
@@ -69,7 +63,7 @@ interface UserContext {
 }
 
 // Context window management constants
-const MAX_HISTORY_MESSAGES = 20 // Keep last 20 messages
+const MAX_HISTORY_MESSAGES = 40 // Keep last 40 messages to prevent circular questions
 const MAX_MESSAGE_LENGTH = 4000 // Truncate individual messages
 const MAX_WORKSPACE_FILES = 5 // Limit workspace files
 const MAX_FILE_SIZE = 10000 // 10KB per file max
@@ -732,7 +726,8 @@ DO NOT:
 
     // Build phase-specific context using DETERMINISTIC signals
     // No longer relies on frontend-passed interviewPhase - we compute it here
-    const testsHaveRunNow = testResultsArray && Array.isArray(testResultsArray) && testResultsArray.length > 0
+    const testsHaveRunNow =
+      testResultsArray && Array.isArray(testResultsArray) && testResultsArray.length > 0
     const messageCount = Array.isArray(context) ? context.length : 0
     const currentCodeLen = currentCode?.length || 0
     const starterLen = starterCodeLength || 0
@@ -742,7 +737,9 @@ DO NOT:
       testsHaveRun: testsHaveRunNow || false,
       currentCodeLength: currentCodeLen,
       starterCodeLength: starterLen,
-      approachExplained: enhancedTracker?.approachExplained || (conversationTracker as ConversationTracker)?.approachExplained,
+      approachExplained:
+        enhancedTracker?.approachExplained ||
+        (conversationTracker as ConversationTracker)?.approachExplained,
       messageCount,
     }
 
@@ -809,10 +806,14 @@ ${missingItems.join("\n")}
       const alreadyCovered: string[] = []
 
       if (tracker.timeComplexityMentioned && tracker.timeComplexityValue) {
-        alreadyCovered.push(`✅ COMPLEXITY ALREADY DISCUSSED: ${tracker.timeComplexityValue} - DO NOT ask again`)
+        alreadyCovered.push(
+          `✅ COMPLEXITY ALREADY DISCUSSED: ${tracker.timeComplexityValue} - DO NOT ask again`
+        )
       }
       if (tracker.edgeCasesMentioned.length > 0) {
-        alreadyCovered.push(`✅ EDGE CASES ALREADY DISCUSSED: ${tracker.edgeCasesMentioned.join(", ")} - DO NOT ask again`)
+        alreadyCovered.push(
+          `✅ EDGE CASES ALREADY DISCUSSED: ${tracker.edgeCasesMentioned.join(", ")} - DO NOT ask again`
+        )
       }
 
       if (alreadyCovered.length > 0) {
@@ -872,11 +873,11 @@ SOLUTION COMPLEXITY:
       if (currentPhase === "discussion" || currentPhase === "coding") {
         toolCalls.push({
           name: "check_prerequisites",
-          result: executeTool("check_prerequisites", {}, toolContext)
+          result: executeTool("check_prerequisites", {}, toolContext),
         })
         toolCalls.push({
           name: "get_next_required_topic",
-          result: executeTool("get_next_required_topic", {}, toolContext)
+          result: executeTool("get_next_required_topic", {}, toolContext),
         })
       }
 
@@ -884,25 +885,25 @@ SOLUTION COMPLEXITY:
       if (currentPhase === "testing") {
         toolCalls.push({
           name: "check_already_discussed:complexity",
-          result: executeTool("check_already_discussed", { topic: "complexity" }, toolContext)
+          result: executeTool("check_already_discussed", { topic: "complexity" }, toolContext),
         })
         toolCalls.push({
           name: "check_already_discussed:edge_cases",
-          result: executeTool("check_already_discussed", { topic: "edge_cases" }, toolContext)
+          result: executeTool("check_already_discussed", { topic: "edge_cases" }, toolContext),
         })
       }
 
       // Always include phase info
       toolCalls.push({
         name: "get_interview_phase",
-        result: executeTool("get_interview_phase", {}, toolContext)
+        result: executeTool("get_interview_phase", {}, toolContext),
       })
 
       // Analyze user's message if it seems vague
       if (message && message.length < 80) {
         toolCalls.push({
           name: "analyze_user_response",
-          result: executeTool("analyze_user_response", { user_message: message }, toolContext)
+          result: executeTool("analyze_user_response", { user_message: message }, toolContext),
         })
       }
 
@@ -913,7 +914,9 @@ SOLUTION COMPLEXITY:
     // =================================================================
     // FEW-SHOT EXAMPLES: LLMs learn better from examples than rules
     // =================================================================
-    const fewShotExamples = role === "interviewer" ? `
+    const fewShotExamples =
+      role === "interviewer"
+        ? `
 === EXAMPLES OF GOOD INTERVIEWER BEHAVIOR ===
 
 EXAMPLE 1: User explains approach without complexity
@@ -942,7 +945,8 @@ BAD: "Great job! Click submit"
 GOOD: "Nice, all passing. Walk me through your complexity analysis."
 
 === END EXAMPLES ===
-` : ""
+`
+        : ""
 
     // Build Real Interview Mode context (fuzzy problem statements)
     let fuzzyModeContext = ""
@@ -1426,7 +1430,7 @@ Generate a response that follows these rules.`
         logger.info("[Hard Gates] Response regenerated", {
           sessionId,
           retries: gateResult.retries,
-          remainingViolations: gateResult.violations.map(v => v.rule),
+          remainingViolations: gateResult.violations.map((v) => v.rule),
         })
       }
 
@@ -1434,7 +1438,7 @@ Generate a response that follows these rules.`
       if (gateResult.violations.length > 0) {
         logger.warn("[Hard Gates] Violations in final response", {
           sessionId,
-          violations: gateResult.violations.map(v => ({
+          violations: gateResult.violations.map((v) => ({
             rule: v.rule,
             severity: v.severity,
           })),
