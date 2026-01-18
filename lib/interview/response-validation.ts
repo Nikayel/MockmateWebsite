@@ -169,18 +169,21 @@ const GATES: Gate[] = [
     hint: "The 'View Detailed Feedback' button only appears AFTER submit. Guide them to Submit first.",
   },
 
-  // GATE 6: One question at a time
+  // GATE 6: One question at a time (strict)
   {
     name: "one-question-at-a-time",
-    severity: "warning",
+    severity: "critical",
     check: (ctx) => {
       const questions = ctx.response.match(/\?/g) || []
-      if (questions.length > 2) {
-        return { violated: true, evidence: `${questions.length} questions in one response` }
+      if (questions.length > 1) {
+        return {
+          violated: true,
+          evidence: `${questions.length} questions - only ask one at a time`,
+        }
       }
       return null
     },
-    hint: "Ask ONE focused question at a time. Let them answer before asking the next.",
+    hint: "Only ask ONE question at a time",
   },
 
   // GATE 7: Vague answer acceptance
@@ -223,27 +226,21 @@ const GATES: Gate[] = [
     hint: "Ask open questions: 'What approach are you considering?' not 'Would a hash map help?'",
   },
 
-  // GATE 9: No verbose responses (triggers regeneration, not truncation)
+  // GATE 9: Response too long (character-based, simple)
   {
-    name: "response-too-verbose",
-    severity: "critical", // Critical = triggers regeneration
+    name: "response-too-long",
+    severity: "critical",
     check: (ctx) => {
-      const words = ctx.response.split(/\s+/).filter((w) => w.length > 0)
-      const wordCount = words.length
-
-      // Allow more words for error explanations or complex scenarios
-      const isExplanation = /error|bug|issue|problem with|let me explain/i.test(ctx.response)
-      const threshold = isExplanation ? 80 : 50
-
-      if (wordCount > threshold) {
+      // 400 chars ≈ 2-3 sentences
+      if (ctx.response.length > 400) {
         return {
           violated: true,
-          evidence: `Response has ${wordCount} words (max ${threshold}). Interviews need concise responses.`,
+          evidence: `Response too long (${ctx.response.length} chars) - keep under 3 sentences`,
         }
       }
       return null
     },
-    hint: "Keep responses to 2-3 sentences max. Example: 'You said O(n²) - walk me through why.' ONE question, brief acknowledgment.",
+    hint: "Keep response under 3 sentences. Be direct like: 'You said O(n²) - walk me through why.'",
   },
 ]
 
