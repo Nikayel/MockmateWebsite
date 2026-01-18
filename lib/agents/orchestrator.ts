@@ -29,7 +29,11 @@ import {
 import { InterviewerAgent } from "./interviewer-agent"
 import { StateTrackerAgent } from "./state-tracker-agent"
 import { ResponseValidatorAgent } from "./response-validator-agent"
-import { executeTool, formatToolResultsForPrompt, type ToolContext } from "@/lib/interview/interviewer-tools"
+import {
+  executeTool,
+  formatToolResultsForPrompt,
+  type ToolContext,
+} from "@/lib/interview/interviewer-tools"
 import type { ConversationTracker } from "@/lib/interview/interview-phases"
 
 // =============================================================================
@@ -106,6 +110,9 @@ export class InterviewOrchestrator {
         }
       }
       const state = stateResult.data.state
+
+      // Step 1.5: Inject guardrails from state into context
+      this.injectGuardrailsIntoContext(context, state)
 
       // Step 2: Pre-execute tools for state queries
       const toolResults = this.executeTools(state, context)
@@ -258,7 +265,8 @@ export class InterviewOrchestrator {
           state,
           messages,
           lastUserMessage,
-          toolResults: attempt === 0 ? toolResults : toolResults + this.buildRetryHint(currentResponse),
+          toolResults:
+            attempt === 0 ? toolResults : toolResults + this.buildRetryHint(currentResponse),
         })
         this.recordAgentCall("interviewer", generateStart)
         currentResponse = generateResult.response
@@ -289,7 +297,7 @@ export class InterviewOrchestrator {
       if (validationResult.shouldRegenerate && attempt < this.config.maxInterviewerRetries) {
         logger.info("[Orchestrator] Regenerating due to violations", {
           attempt: attempt + 1,
-          violations: validationResult.violations.map(v => v.rule),
+          violations: validationResult.violations.map((v) => v.rule),
         })
         retries++
         this.metrics.retries = retries
@@ -321,6 +329,48 @@ export class InterviewOrchestrator {
     return `\n\nPREVIOUS RESPONSE (violated rules):\n"${previousResponse.substring(0, 200)}..."\n\nGenerate a DIFFERENT response that follows the rules.`
   }
 
+  /**
+   * Inject guardrails from state into context.
+   * This enriches the userAnsweredContext with closed topics and probe counts.
+   */
+  private injectGuardrailsIntoContext(context: InterviewContext, state: ConversationState): void {
+    if (!context.promptContext) return
+
+    // Build guardrails section from state
+    const guardrails: string[] = []
+
+    // Closed topics - user has properly answered these
+    if (state.closedTopics && state.closedTopics.length > 0) {
+      guardrails.push(`
+## CLOSED TOPICS - DO NOT ASK ABOUT THESE AGAIN
+The candidate has PROPERLY ANSWERED these. Move on.
+${state.closedTopics.map((t) => `- ${t.replace(/_/g, " ")}`).join("\n")}`)
+    }
+
+    // Over-probed topics - asked too many times
+    if (state.topicProbeCount) {
+      const overProbed: string[] = []
+      if (state.topicProbeCount.timeComplexity >= 2) overProbed.push("time complexity")
+      if (state.topicProbeCount.spaceComplexity >= 2) overProbed.push("space complexity")
+      if (state.topicProbeCount.approach >= 3) overProbed.push("approach/algorithm")
+      if (state.topicProbeCount.edgeCases >= 3) overProbed.push("edge cases")
+      if (state.topicProbeCount.duplicates >= 2) overProbed.push("duplicate handling")
+
+      if (overProbed.length > 0) {
+        guardrails.push(`
+## STOP ASKING ABOUT THESE - ALREADY PROBED ENOUGH
+${overProbed.map((t) => `- ${t}`).join("\n")}
+Move to the next phase or ask about something else.`)
+      }
+    }
+
+    // Append to userAnsweredContext
+    if (guardrails.length > 0) {
+      context.promptContext.userAnsweredContext =
+        (context.promptContext.userAnsweredContext || "") + "\n" + guardrails.join("\n")
+    }
+  }
+
   private convertToTracker(state: ConversationState): ConversationTracker {
     return {
       approachExplained: state.approachExplained,
@@ -347,7 +397,11 @@ export class InterviewOrchestrator {
 
   private getMinimalState(context: InterviewContext): ConversationState {
     return {
-      currentPhase: context.hasSubmitted ? "post_interview" : context.testsHaveRun ? "testing" : "discussion",
+      currentPhase: context.hasSubmitted
+        ? "post_interview"
+        : context.testsHaveRun
+          ? "testing"
+          : "discussion",
       messageCount: 0,
       approachExplained: false,
       approachType: "none",
@@ -365,6 +419,14 @@ export class InterviewOrchestrator {
       clarifyingQuestionsAsked: false,
       answeredInterviewerQuestions: 0,
       selfCorrectedBugs: false,
+      topicProbeCount: {
+        timeComplexity: 0,
+        spaceComplexity: 0,
+        approach: 0,
+        edgeCases: 0,
+        duplicates: 0,
+      },
+      closedTopics: [],
     }
   }
 
@@ -415,10 +477,5 @@ export async function orchestrateInterviewResponse(
   lastUserMessage: string,
   previousState?: Partial<ConversationState>
 ): Promise<OrchestrationResult<{ response: string; state: ConversationState }>> {
-  return interviewOrchestrator.generateResponse(
-    context,
-    messages,
-    lastUserMessage,
-    previousState
-  )
+  return interviewOrchestrator.generateResponse(context, messages, lastUserMessage, previousState)
 }

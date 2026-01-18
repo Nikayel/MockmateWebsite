@@ -13,12 +13,12 @@
 // =============================================================================
 
 export type AgentType =
-  | "interviewer"      // Conducts the interview (smart model)
-  | "state_tracker"    // Tracks conversation state (cheap model)
+  | "interviewer" // Conducts the interview (smart model)
+  | "state_tracker" // Tracks conversation state (cheap model)
   | "response_validator" // Validates responses (deterministic)
-  | "scorer"           // Calculates scores (deterministic)
-  | "feedback_writer"  // Generates feedback (smart model)
-  | "constitutional"   // Validates fairness (cheap model)
+  | "scorer" // Calculates scores (deterministic)
+  | "feedback_writer" // Generates feedback (smart model)
+  | "constitutional" // Validates fairness (cheap model)
 
 export type ModelTier = "smart" | "cheap" | "deterministic"
 
@@ -121,6 +121,16 @@ export interface ConversationState {
   clarifyingQuestionsAsked: boolean
   answeredInterviewerQuestions: number
   selfCorrectedBugs: boolean
+
+  // Topic tracking for guardrails (prevents re-asking)
+  topicProbeCount: {
+    timeComplexity: number
+    spaceComplexity: number
+    approach: number
+    edgeCases: number
+    duplicates: number // for problems like 3Sum
+  }
+  closedTopics: string[] // Topics user has properly answered - don't ask again
 }
 
 export type InterviewPhase =

@@ -135,15 +135,16 @@ export class StateTrackerAgent implements Agent<StateTrackerInput, StateTrackerO
 
     // Check if approach was explained
     const lastUserMessages = messages
-      .filter(m => m.role === "user")
+      .filter((m) => m.role === "user")
       .slice(-3)
-      .map(m => m.content.toLowerCase())
+      .map((m) => m.content.toLowerCase())
 
-    const hasApproachSignal = lastUserMessages.some(m =>
-      m.includes("approach") ||
-      m.includes("i would") ||
-      m.includes("i'll use") ||
-      m.includes("my plan")
+    const hasApproachSignal = lastUserMessages.some(
+      (m) =>
+        m.includes("approach") ||
+        m.includes("i would") ||
+        m.includes("i'll use") ||
+        m.includes("my plan")
     )
 
     if (hasApproachSignal) return "discussion"
@@ -195,7 +196,10 @@ export class StateTrackerAgent implements Agent<StateTrackerInput, StateTrackerO
     }
 
     // Space complexity
-    if (lower.includes("space") && (lower.includes("o(") || lower.includes("constant") || lower.includes("linear"))) {
+    if (
+      lower.includes("space") &&
+      (lower.includes("o(") || lower.includes("constant") || lower.includes("linear"))
+    ) {
       state.spaceComplexityMentioned = true
       const spaceMatch = content.match(/space.*O\s*\(\s*([^)]+)\s*\)/i)
       if (spaceMatch) {
@@ -205,20 +209,57 @@ export class StateTrackerAgent implements Agent<StateTrackerInput, StateTrackerO
 
     // Edge cases
     const edgeCases = extractEdgeCases(content)
-    edgeCases.forEach(ec => {
+    edgeCases.forEach((ec) => {
       if (!state.edgeCasesMentioned.includes(ec)) {
         state.edgeCasesMentioned.push(ec)
       }
     })
 
     // Clarifying questions
-    if (content.includes("?") && (lower.includes("what if") || lower.includes("should i") || lower.includes("can i"))) {
+    if (
+      content.includes("?") &&
+      (lower.includes("what if") || lower.includes("should i") || lower.includes("can i"))
+    ) {
       state.clarifyingQuestionsAsked = true
     }
 
     // Bug self-correction
-    if (lower.includes("wait") || lower.includes("actually") || lower.includes("mistake") || lower.includes("bug")) {
+    if (
+      lower.includes("wait") ||
+      lower.includes("actually") ||
+      lower.includes("mistake") ||
+      lower.includes("bug")
+    ) {
       state.selfCorrectedBugs = true
+    }
+
+    // Close topics when user gives a proper answer (with explanation)
+    // Time complexity: closed if mentioned with "because" or reasoning
+    if (state.timeComplexityMentioned && state.complexityExplanationGiven) {
+      if (!state.closedTopics.includes("time_complexity")) {
+        state.closedTopics.push("time_complexity")
+      }
+    }
+
+    // Space complexity: closed if mentioned
+    if (state.spaceComplexityMentioned && state.spaceComplexityValue) {
+      if (!state.closedTopics.includes("space_complexity")) {
+        state.closedTopics.push("space_complexity")
+      }
+    }
+
+    // Approach: closed if explained with specific strategy
+    if (state.approachExplained && state.approachQuality === "specific") {
+      if (!state.closedTopics.includes("approach")) {
+        state.closedTopics.push("approach")
+      }
+    }
+
+    // Edge cases: closed after discussing 2+
+    if (state.edgeCasesMentioned.length >= 2) {
+      if (!state.closedTopics.includes("edge_cases")) {
+        state.closedTopics.push("edge_cases")
+      }
     }
   }
 
@@ -232,23 +273,48 @@ export class StateTrackerAgent implements Agent<StateTrackerInput, StateTrackerO
 
     // Track edge cases interviewer asked about
     const edgeCases = extractEdgeCases(content)
-    edgeCases.forEach(ec => {
+    edgeCases.forEach((ec) => {
       if (!state.edgeCasesAskedByInterviewer.includes(ec)) {
         state.edgeCasesAskedByInterviewer.push(ec)
       }
     })
 
-    // Track questions asked (increment answered count when user responds)
-    if (content.includes("?")) {
-      // This will be matched with user responses
+    // Track topic probes (how many times interviewer asks about each topic)
+    if (lower.includes("time complexity") || lower.includes("big o") || lower.includes("runtime")) {
+      state.topicProbeCount.timeComplexity++
+    }
+    if (lower.includes("space complexity") || lower.includes("memory")) {
+      state.topicProbeCount.spaceComplexity++
+    }
+    if (lower.includes("approach") || lower.includes("algorithm") || lower.includes("strategy")) {
+      state.topicProbeCount.approach++
+    }
+    if (lower.includes("edge case") || lower.includes("corner case") || lower.includes("what if")) {
+      state.topicProbeCount.edgeCases++
+    }
+    if (
+      lower.includes("duplicate") ||
+      lower.includes("skip") ||
+      lower.includes("avoid repeating")
+    ) {
+      state.topicProbeCount.duplicates++
     }
   }
 
   private detectApproachType(content: string): "none" | "brute_force" | "optimized" | "unclear" {
-    if (content.includes("brute force") || content.includes("nested") || content.includes("n squared")) {
+    if (
+      content.includes("brute force") ||
+      content.includes("nested") ||
+      content.includes("n squared")
+    ) {
       return "brute_force"
     }
-    if (content.includes("hash") || content.includes("map") || content.includes("set") || content.includes("single pass")) {
+    if (
+      content.includes("hash") ||
+      content.includes("map") ||
+      content.includes("set") ||
+      content.includes("single pass")
+    ) {
       return "optimized"
     }
     return "unclear"
@@ -283,7 +349,7 @@ export class StateTrackerAgent implements Agent<StateTrackerInput, StateTrackerO
   ): Promise<Partial<ConversationState>> {
     const recentMessages = input.messages.slice(-8)
     const conversationText = recentMessages
-      .map(m => `${m.role.toUpperCase()}: ${m.content}`)
+      .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
       .join("\n\n")
 
     const prompt = `Analyze this interview conversation and extract:
@@ -391,6 +457,14 @@ Return JSON only:
       clarifyingQuestionsAsked: false,
       answeredInterviewerQuestions: 0,
       selfCorrectedBugs: false,
+      topicProbeCount: {
+        timeComplexity: 0,
+        spaceComplexity: 0,
+        approach: 0,
+        edgeCases: 0,
+        duplicates: 0,
+      },
+      closedTopics: [],
     }
   }
 }
