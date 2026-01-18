@@ -12,6 +12,15 @@ import type { ScoreResult } from "@/lib/feedback/types"
 import type { ExtractedEvidence } from "@/lib/feedback/structured-extraction"
 import { generateAIResponse } from "@/lib/ai-providers"
 import { logger } from "@/lib/logger"
+// RAG Knowledge imports for enriched feedback
+import { getPatternKnowledge, getRelatedPatterns } from "@/lib/rag/knowledge-base/dsa-knowledge"
+import {
+  getLeetCodeMapping,
+  getLeetCodeUrl,
+  LEETCODE_MAPPINGS,
+  type LeetCodeMapping,
+} from "@/lib/rag/knowledge-base/leetcode-mapping"
+import type { DSAPattern } from "@/lib/types/dsa-patterns"
 
 // =============================================================================
 // TYPES
@@ -21,6 +30,8 @@ export interface FeedbackWriterAgentInput {
   // Scenario info
   scenarioType: "dsa" | "system-design" | "bugfix"
   scenarioTitle: string
+  scenarioId?: string // For LeetCode mapping
+  scenarioPattern?: string // For pattern-specific tips
 
   // Scores (from ScorerAgent)
   scores: ScoreResult
@@ -54,6 +65,28 @@ export interface FeedbackWriterAgentOutput {
     communication: string
   }
 
+  // Pattern-specific insights (from RAG knowledge)
+  patternInsight?: {
+    patternName: string
+    keyTakeaway: string
+    commonMistake?: string
+  }
+
+  // Practice resources (from LeetCode mapping)
+  practiceLinks?: {
+    currentProblem?: {
+      title: string
+      url: string
+      leetcodeNumber: number
+    }
+    relatedProblems: Array<{
+      title: string
+      url: string
+      leetcodeNumber: number
+      difficulty: string
+    }>
+  }
+
   // Full narrative
   rawFeedback: string
 }
@@ -62,7 +95,10 @@ export interface FeedbackWriterAgentOutput {
 // FEEDBACK WRITER AGENT
 // =============================================================================
 
-export class FeedbackWriterAgent implements Agent<FeedbackWriterAgentInput, FeedbackWriterAgentOutput> {
+export class FeedbackWriterAgent implements Agent<
+  FeedbackWriterAgentInput,
+  FeedbackWriterAgentOutput
+> {
   readonly config: AgentConfig = {
     type: "feedback_writer",
     modelTier: "smart", // Needs quality writing
@@ -76,33 +112,41 @@ export class FeedbackWriterAgent implements Agent<FeedbackWriterAgentInput, Feed
     logger.info("[FeedbackWriterAgent] Generating feedback", {
       scenarioType: input.scenarioType,
       overall: input.scores.overall,
+      scenarioPattern: input.scenarioPattern,
     })
 
-    // Build the prompt with evidence grounding
+    // Build the prompt with evidence grounding + pattern knowledge
     const prompt = this.buildFeedbackPrompt(input)
 
     // Generate feedback using AI
-    const response = await generateAIResponse(
-      this.buildSystemPrompt(input),
-      prompt,
-      [],
-      {
-        complexity: "complex",
-        temperature: 0.3, // Low temperature for consistent feedback
-      }
-    )
+    const response = await generateAIResponse(this.buildSystemPrompt(input), prompt, [], {
+      complexity: "complex",
+      temperature: 0.3, // Low temperature for consistent feedback
+    })
 
     // Parse the structured response
     const parsed = this.parseFeedbackResponse(response.text, input)
+
+    // Enrich with pattern knowledge (from RAG)
+    const patternInsight = this.buildPatternInsight(input.scenarioPattern)
+
+    // Build practice links (from LeetCode mapping)
+    const practiceLinks = this.buildPracticeLinks(input.scenarioId, input.scenarioPattern)
 
     const latency = Date.now() - startTime
     logger.info("[FeedbackWriterAgent] Feedback generated", {
       latencyMs: latency,
       whatWorkedCount: parsed.whatWorked.length,
       fixNextCount: parsed.fixNext.length,
+      hasPatternInsight: !!patternInsight,
+      hasPracticeLinks: !!practiceLinks,
     })
 
-    return parsed
+    return {
+      ...parsed,
+      patternInsight,
+      practiceLinks,
+    }
   }
 
   // ===========================================================================
@@ -110,9 +154,8 @@ export class FeedbackWriterAgent implements Agent<FeedbackWriterAgentInput, Feed
   // ===========================================================================
 
   private buildSystemPrompt(input: FeedbackWriterAgentInput): string {
-    const passRate = input.testsTotal > 0
-      ? Math.round((input.testsPassed / input.testsTotal) * 100)
-      : 0
+    const passRate =
+      input.testsTotal > 0 ? Math.round((input.testsPassed / input.testsTotal) * 100) : 0
 
     return `You are a senior technical interviewer providing feedback after a coding interview.
 
@@ -168,19 +211,40 @@ Paragraph about thinking out loud and responding to questions.`
   private buildFeedbackPrompt(input: FeedbackWriterAgentInput): string {
     const evidence = input.evidence
     const evidenceSummary = this.buildEvidenceSummary(evidence)
+    const patternContext = this.buildPatternContext(input.scenarioPattern)
 
     return `Generate feedback for this ${input.scenarioType.toUpperCase()} interview on "${input.scenarioTitle}".
 
 EXTRACTED EVIDENCE (ground your feedback in this):
 ${evidenceSummary}
-
+${patternContext}
 IMPORTANT GROUNDING RULES:
 - Only mention edge cases if evidence shows they discussed them
 - Only praise complexity analysis if evidence shows they got it right
 - Only mention "good communication" if evidence shows they explained while coding
 - If evidence shows they were silent, mention that in communication feedback
+- If pattern knowledge is provided, reference specific pattern insights in your feedback
 
 Generate structured feedback following the format specified.`
+  }
+
+  /**
+   * Build pattern context for the AI prompt
+   */
+  private buildPatternContext(scenarioPattern?: string): string {
+    if (!scenarioPattern) return ""
+
+    const patternKnowledge = getPatternKnowledge(scenarioPattern as DSAPattern)
+    if (!patternKnowledge) return ""
+
+    return `
+PATTERN KNOWLEDGE (use this to give pattern-specific feedback):
+- Pattern: ${patternKnowledge.displayName}
+- Key Insight: ${patternKnowledge.keyInsights[0] || "N/A"}
+- Common Mistake: ${patternKnowledge.commonMistakes[0] || "N/A"}
+- Expected Time: ${patternKnowledge.timeComplexity.typical}
+- Expected Space: ${patternKnowledge.spaceComplexity.typical}
+`
   }
 
   private buildEvidenceSummary(evidence: ExtractedEvidence): string {
@@ -310,6 +374,113 @@ Generate structured feedback following the format specified.`
     } else {
       return "This problem type needs more practice. Review the fundamentals and try again."
     }
+  }
+
+  /**
+   * Build pattern-specific insight from RAG knowledge
+   */
+  private buildPatternInsight(
+    scenarioPattern?: string
+  ): FeedbackWriterAgentOutput["patternInsight"] {
+    if (!scenarioPattern) return undefined
+
+    const patternKnowledge = getPatternKnowledge(scenarioPattern as DSAPattern)
+    if (!patternKnowledge) return undefined
+
+    return {
+      patternName: patternKnowledge.displayName,
+      keyTakeaway: patternKnowledge.keyInsights[0] || patternKnowledge.description,
+      commonMistake: patternKnowledge.commonMistakes[0],
+    }
+  }
+
+  /**
+   * Build practice links from LeetCode mapping
+   */
+  private buildPracticeLinks(
+    scenarioId?: string,
+    scenarioPattern?: string
+  ): FeedbackWriterAgentOutput["practiceLinks"] {
+    // Get current problem's LeetCode link
+    let currentProblem: { title: string; url: string; leetcodeNumber: number } | undefined
+    if (scenarioId) {
+      const mapping = getLeetCodeMapping(scenarioId)
+      if (mapping) {
+        currentProblem = {
+          title: mapping.title,
+          url: getLeetCodeUrl(mapping),
+          leetcodeNumber: mapping.leetcodeNumber,
+        }
+      }
+    }
+
+    // Get related problems from the same pattern
+    const relatedProblems: Array<{
+      title: string
+      url: string
+      leetcodeNumber: number
+      difficulty: string
+    }> = []
+
+    if (scenarioPattern) {
+      // Find other problems with the same pattern
+      const relatedMappings = LEETCODE_MAPPINGS.filter((m) => {
+        // Skip current problem
+        if (m.scenarioId === scenarioId) return false
+        // Check if problem ID contains the pattern (simple heuristic)
+        const patternLower = scenarioPattern.toLowerCase().replace(/-/g, "")
+        const idLower = m.scenarioId.toLowerCase()
+        return idLower.includes(patternLower) || this.isRelatedByPattern(m, scenarioPattern)
+      }).slice(0, 3) // Limit to 3 related problems
+
+      for (const mapping of relatedMappings) {
+        relatedProblems.push({
+          title: mapping.title,
+          url: getLeetCodeUrl(mapping),
+          leetcodeNumber: mapping.leetcodeNumber,
+          difficulty: mapping.difficulty,
+        })
+      }
+    }
+
+    // If we have neither current nor related, return undefined
+    if (!currentProblem && relatedProblems.length === 0) {
+      return undefined
+    }
+
+    return {
+      currentProblem,
+      relatedProblems,
+    }
+  }
+
+  /**
+   * Check if a LeetCode mapping is related to a pattern
+   */
+  private isRelatedByPattern(mapping: LeetCodeMapping, pattern: string): boolean {
+    // Map pattern names to scenario ID prefixes
+    const patternPrefixes: Record<string, string[]> = {
+      "hash-table": ["two-sum", "contains-duplicate", "valid-anagram", "group-anagrams"],
+      "two-pointers": ["valid-palindrome", "3sum", "container-water", "trapping-rain"],
+      "sliding-window": ["longest-substring", "minimum-window", "sliding-window"],
+      "binary-search": ["binary-search", "search-rotated", "find-minimum", "koko-bananas"],
+      "dynamic-programming": [
+        "climbing-stairs",
+        "house-robber",
+        "coin-change",
+        "longest-increasing",
+      ],
+      "linked-list": ["reverse-linked", "merge-lists", "linked-list-cycle", "remove-nth"],
+      tree: ["invert-tree", "binary-tree", "subtree", "validate-bst"],
+      graph: ["clone-graph", "course-schedule", "pacific-atlantic", "number-islands"],
+      stack: ["valid-parentheses", "min-stack", "largest-rectangle"],
+      heap: ["kth-largest", "top-k-frequent", "find-median"],
+    }
+
+    const prefixes = patternPrefixes[pattern.toLowerCase()] || []
+    const idLower = mapping.scenarioId.toLowerCase()
+
+    return prefixes.some((prefix) => idLower.includes(prefix))
   }
 }
 
