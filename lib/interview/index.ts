@@ -157,6 +157,7 @@ export {
   buildLevelContext,
   buildPatternKnowledgeContext,
   buildCompanyKnowledgeContext,
+  buildCodeContext,
   buildInterviewContext,
 } from "./context-builders"
 export type {

@@ -125,6 +125,8 @@ export class InterviewerAgent implements Agent<InterviewerInput, InterviewerOutp
       if (pc.complexityContext) prompt += `\n\n${pc.complexityContext}`
       if (pc.fuzzyModeContext) prompt += `\n\n${pc.fuzzyModeContext}`
       if (pc.knowledgeContext) prompt += `\n\n${pc.knowledgeContext}`
+      // Add current code context - this lets the interviewer see and reference the solution
+      if (pc.codeContext) prompt += `\n\n${pc.codeContext}`
     }
 
     // Add phase-specific guidance

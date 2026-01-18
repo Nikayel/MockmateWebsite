@@ -638,6 +638,42 @@ ${companyKnowledge.cultureTips.slice(0, 2).map((t) => `- ${t}`).join("\n")}
 }
 
 // =============================================================================
+// CODE CONTEXT
+// =============================================================================
+
+const MAX_CODE_SIZE = 10000 // 10KB max for code context
+
+/**
+ * Build code context for the interviewer to see the current solution
+ */
+export function buildCodeContext(currentCode?: string, starterCodeLength?: number): string {
+  if (!currentCode || !currentCode.trim()) {
+    return ""
+  }
+
+  // Check if code has changed from starter
+  const codeLength = currentCode.length
+  const hasWrittenCode = starterCodeLength ? codeLength > starterCodeLength + 50 : codeLength > 100
+
+  if (!hasWrittenCode) {
+    return "" // Don't include if they haven't written anything
+  }
+
+  // Truncate if too long
+  const truncatedCode = currentCode.length > MAX_CODE_SIZE
+    ? currentCode.slice(0, MAX_CODE_SIZE) + "\n// ... [code truncated]"
+    : currentCode
+
+  return `
+=== CURRENT SOLUTION CODE ===
+${truncatedCode}
+=== END CURRENT CODE ===
+
+IMPORTANT: You can see their code above. Reference specific lines if discussing bugs or improvements.
+`
+}
+
+// =============================================================================
 // COMBINED CONTEXT BUILDER
 // =============================================================================
 
@@ -657,6 +693,7 @@ export function buildInterviewContext(options: ContextBuilderOptions): {
   fuzzyModeContext: string
   levelContext: string
   knowledgeContext: string
+  codeContext: string // Current solution code
 } {
   const { context: userContext, userName } = buildUserContext(options.userInfo)
 
@@ -686,5 +723,6 @@ export function buildInterviewContext(options: ContextBuilderOptions): {
     fuzzyModeContext: buildFuzzyModeContext(options.realInterviewMode, options.hasFuzzyStatement),
     levelContext: buildLevelContext(options.userInfo?.skill_level),
     knowledgeContext: knowledgeContext ? `\n=== RAG KNOWLEDGE ===\n${knowledgeContext}\n=== END RAG ===\n` : "",
+    codeContext: buildCodeContext(options.currentCode, options.starterCodeLength),
   }
 }

@@ -75,6 +75,7 @@ export interface InterviewContext {
     fuzzyModeContext: string
     levelContext: string
     knowledgeContext: string
+    codeContext: string // Current solution code
   }
 }
 
