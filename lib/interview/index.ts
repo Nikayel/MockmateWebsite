@@ -91,7 +91,6 @@ export {
 // Interview phases and tracking
 export {
   detectInterviewPhase,
-  detectInterviewPhaseLegacy,
   createEmptyTracker,
   updateTrackerFromMessage,
   buildTrackingContext,

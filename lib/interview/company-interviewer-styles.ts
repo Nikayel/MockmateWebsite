@@ -363,14 +363,3 @@ DIALOG STYLE EXAMPLES:
 `
 }
 
-// =============================================================================
-// ALL AVAILABLE COMPANIES (for validation/autocomplete)
-// =============================================================================
-
-export function getAllCompanyIds(): string[] {
-  return COMPANY_INTERVIEW_KNOWLEDGE.map((k) => k.companyId)
-}
-
-export function getAllCompanyNames(): string[] {
-  return COMPANY_INTERVIEW_KNOWLEDGE.map((k) => k.companyName)
-}

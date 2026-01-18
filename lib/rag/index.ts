@@ -795,8 +795,6 @@ export {
 
 export {
   getCompanyInterviewKnowledge,
-  getAllCompanyKnowledge,
-  getMostCommonPatterns,
   companyKnowledgeToDocument,
   COMPANY_INTERVIEW_KNOWLEDGE,
 } from "./knowledge-base/company-knowledge"
