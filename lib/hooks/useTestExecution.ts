@@ -89,16 +89,25 @@ export function useTestExecution({
         controlStructures <= 3 ? "Low" : controlStructures <= 7 ? "Medium" : "High"
 
       // Estimate time complexity based on nested loops
-      const nestedLoopCount =
-        (codeToAnalyze.match(/for.*{[^}]*for/g) || []).length +
-        (codeToAnalyze.match(/while.*{[^}]*while/g) || []).length
+      // Detect various nested loop patterns including for+while (common in two-pointer)
+      const forForCount = (codeToAnalyze.match(/for[^{]*\{[^}]*for/g) || []).length
+      const forWhileCount = (codeToAnalyze.match(/for[^{]*\{[^}]*while/g) || []).length
+      const whileForCount = (codeToAnalyze.match(/while[^{]*\{[^}]*for/g) || []).length
+      const whileWhileCount = (codeToAnalyze.match(/while[^{]*\{[^}]*while/g) || []).length
+      const nestedLoopCount = forForCount + forWhileCount + whileForCount + whileWhileCount
+
+      // Check for sort operations
+      const hasSort = /\.sort\s*\(|sorted\s*\(|Arrays\.sort\s*\(|Collections\.sort\s*\(/.test(codeToAnalyze)
+
+      // Determine time complexity - nested loops take precedence over sort
+      // Because O(n²) dominates O(n log n)
       let estimatedTimeComplexity = "O(n)"
       if (nestedLoopCount >= 2) {
         estimatedTimeComplexity = "O(n³)"
       } else if (nestedLoopCount === 1) {
-        estimatedTimeComplexity = "O(n²)"
-      } else if (codeToAnalyze.includes("sort")) {
-        estimatedTimeComplexity = "O(n log n)"
+        estimatedTimeComplexity = "O(n²)" // Nested loop dominates even if sort exists
+      } else if (hasSort) {
+        estimatedTimeComplexity = "O(n log n)" // Only if NO nested loops
       }
 
       // Get optimal complexity from scenario (needed for bounded space check)
