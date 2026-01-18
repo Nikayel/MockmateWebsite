@@ -37,6 +37,7 @@ export interface FeedbackRequest {
   scenarioType: "dsa" | "system-design" | "bugfix"
   scenarioTitle: string
   scenarioPattern?: string
+  scenarioId?: string
 
   // Conversation transcript
   transcript: Array<{ role: "user" | "interviewer"; content: string }>
@@ -51,17 +52,38 @@ export interface FeedbackRequest {
   optimalTimeComplexity?: string
   optimalSpaceComplexity?: string
 
+  // Pre-computed data (from route for efficiency)
+  aiValidation?: {
+    communicationScore: number
+    approachExplained: boolean
+    approachQuality: "none" | "poor" | "basic" | "good" | "excellent"
+    complexityDiscussed: boolean
+    edgeCasesConsidered: boolean
+  }
+  efficiencyMetrics?: {
+    estimatedTimeComplexity: string
+    estimatedSpaceComplexity: string
+    efficiencyScore: number
+    detectedApproach?: string
+  }
+
   // User context
   userId?: string
   userName?: string
   skillLevel?: string
+  sessionId?: string
 
   // Metrics
   timeSpentSeconds?: number
   hintsUsed?: number
 
+  // Time budget options
+  maxDurationMs?: number // Max time for orchestration (default 90000)
+  startTime?: number // When the request started (for time budget calculations)
+
   // Options
   skipConstitutional?: boolean // For testing
+  skipEvidence?: boolean // Skip evidence extraction if already done
 }
 
 export interface FeedbackResponse {
@@ -108,37 +130,73 @@ export class FeedbackOrchestrator {
   }
 
   async generateFeedback(request: FeedbackRequest): Promise<OrchestrationResult<FeedbackResponse>> {
-    const startTime = Date.now()
+    const startTime = request.startTime || Date.now()
+    const maxDuration = request.maxDurationMs || 90000 // Default 90s
     const agentCalls: { agent: AgentType; latencyMs: number; tokens?: number }[] = []
+
+    // Helper to check time budget
+    const getElapsed = () => Date.now() - startTime
+    const hasTimeBudget = (thresholdMs: number) => getElapsed() < thresholdMs
 
     logger.info("[FeedbackOrchestrator] Starting feedback generation", {
       scenarioType: request.scenarioType,
       transcriptLength: request.transcript.length,
       testsPassed: request.testsPassed,
       testsTotal: request.testsTotal,
+      maxDurationMs: maxDuration,
     })
 
     try {
       // =======================================================================
-      // STEP 1: Extract Evidence
+      // STEP 1: Extract Evidence (skip if pre-computed or time budget exceeded)
       // =======================================================================
-      const extractStart = Date.now()
-      const evidence = await this.extractEvidence(request)
-      agentCalls.push({
-        agent: "scorer", // Using scorer type for evidence extraction
-        latencyMs: Date.now() - extractStart,
-      })
+      let evidence: ExtractedEvidence
 
-      logger.info("[FeedbackOrchestrator] Evidence extracted", {
-        approachExplained: evidence.approach.explained,
-        complexityMentioned: evidence.timeComplexity.mentioned,
-        edgeCasesCount: evidence.edgeCases.mentionedByCandidate.length,
-      })
+      if (request.skipEvidence || !hasTimeBudget(maxDuration * 0.3)) {
+        // Use default evidence if skipped
+        logger.info("[FeedbackOrchestrator] Skipping evidence extraction", {
+          reason: request.skipEvidence ? "pre-computed" : "time budget",
+          elapsedMs: getElapsed(),
+        })
+        evidence = this.createDefaultEvidence()
+      } else {
+        const extractStart = Date.now()
+        evidence = await this.extractEvidence(request)
+        agentCalls.push({
+          agent: "scorer", // Using scorer type for evidence extraction
+          latencyMs: Date.now() - extractStart,
+        })
+
+        logger.info("[FeedbackOrchestrator] Evidence extracted", {
+          approachExplained: evidence.approach.explained,
+          complexityMentioned: evidence.timeComplexity.mentioned,
+          edgeCasesCount: evidence.edgeCases.mentionedByCandidate.length,
+        })
+      }
 
       // =======================================================================
       // STEP 2: Calculate Scores
       // =======================================================================
       const scorerStart = Date.now()
+
+      // Build AI validation from pre-computed data if available
+      const aiValidation = request.aiValidation
+        ? {
+            isCoherent: true,
+            responsesRelevant: true,
+            approachExplained: request.aiValidation.approachExplained,
+            approachQuality: request.aiValidation.approachQuality,
+            complexityDiscussed: request.aiValidation.complexityDiscussed,
+            complexityAccurate: false,
+            statedComplexity: null,
+            questionsAsked: 0,
+            questionsAnswered: 0,
+            edgeCasesConsidered: request.aiValidation.edgeCasesConsidered,
+            alternativesDiscussed: false,
+            communicationScore: request.aiValidation.communicationScore,
+          }
+        : undefined
+
       const scorerInput: ScorerAgentInput = {
         scenarioType: request.scenarioType,
         scenarioTitle: request.scenarioTitle,
@@ -147,6 +205,7 @@ export class FeedbackOrchestrator {
         testsPassed: request.testsPassed,
         testsTotal: request.testsTotal,
         evidence,
+        aiValidation, // Pass pre-computed validation if available
         designNotes: request.designNotes,
         optimalTimeComplexity: request.optimalTimeComplexity,
         optimalSpaceComplexity: request.optimalSpaceComplexity,
@@ -194,7 +253,7 @@ export class FeedbackOrchestrator {
       })
 
       // =======================================================================
-      // STEP 4: Constitutional Review (optional)
+      // STEP 4: Constitutional Review (optional, skip if time budget exceeded)
       // =======================================================================
       let finalScores = scorerOutput.scores
       const constitutionalReview = {
@@ -203,7 +262,16 @@ export class FeedbackOrchestrator {
         issues: [] as string[],
       }
 
-      if (!request.skipConstitutional) {
+      // Skip constitutional review if time budget exceeded (80% of max duration)
+      const shouldSkipConstitutional =
+        request.skipConstitutional || !hasTimeBudget(maxDuration * 0.8)
+
+      if (shouldSkipConstitutional) {
+        logger.info("[FeedbackOrchestrator] Skipping constitutional review", {
+          reason: request.skipConstitutional ? "explicitly skipped" : "time budget",
+          elapsedMs: getElapsed(),
+        })
+      } else {
         const constStart = Date.now()
         const constInput: ConstitutionalAgentInput = {
           scores: scorerOutput.scores,
@@ -313,54 +381,56 @@ export class FeedbackOrchestrator {
       })
     } catch (error) {
       logger.warn("[FeedbackOrchestrator] Evidence extraction failed, using defaults", { error })
+      return this.createDefaultEvidence()
+    }
+  }
 
-      // Return default evidence structure
-      return {
-        approach: {
-          explained: false,
-          type: "unclear",
-          quote: null,
-          messageIndex: null,
-        },
-        timeComplexity: {
-          mentioned: false,
-          value: null,
-          explanationGiven: false,
-          quote: null,
-          messageIndex: null,
-          isCorrect: null,
-        },
-        spaceComplexity: {
-          mentioned: false,
-          value: null,
-          quote: null,
-          messageIndex: null,
-          isCorrect: null,
-        },
-        edgeCases: {
-          mentionedByCandidate: [],
-          mentionedAfterPrompt: [],
-          missedCritical: [],
-        },
-        progression: {
-          startedWithBruteForce: false,
-          improvedAfterPrompt: false,
-          selfCorrectedBugs: false,
-          bugQuotes: [],
-        },
-        interviewerQuestions: [],
-        communication: {
-          explainedWhileCoding: false,
-          askedClarifyingQuestions: false,
-          respondedToFeedback: false,
-          quotes: [],
-        },
-        hints: {
-          totalGiven: 0,
-          usedEffectively: false,
-          copiedBlindly: false,
-        },
-      }
+  private createDefaultEvidence(): ExtractedEvidence {
+    return {
+      approach: {
+        explained: false,
+        type: "unclear",
+        quote: null,
+        messageIndex: null,
+      },
+      timeComplexity: {
+        mentioned: false,
+        value: null,
+        explanationGiven: false,
+        quote: null,
+        messageIndex: null,
+        isCorrect: null,
+      },
+      spaceComplexity: {
+        mentioned: false,
+        value: null,
+        quote: null,
+        messageIndex: null,
+        isCorrect: null,
+      },
+      edgeCases: {
+        mentionedByCandidate: [],
+        mentionedAfterPrompt: [],
+        missedCritical: [],
+      },
+      progression: {
+        startedWithBruteForce: false,
+        improvedAfterPrompt: false,
+        selfCorrectedBugs: false,
+        bugQuotes: [],
+      },
+      interviewerQuestions: [],
+      communication: {
+        explainedWhileCoding: false,
+        askedClarifyingQuestions: false,
+        respondedToFeedback: false,
+        quotes: [],
+      },
+      hints: {
+        totalGiven: 0,
+        usedEffectively: false,
+        copiedBlindly: false,
+      },
     }
   }
 }
