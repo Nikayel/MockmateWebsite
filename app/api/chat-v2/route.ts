@@ -37,8 +37,15 @@ import {
 } from "@/lib/interview/context-builders"
 import { type DSAPattern } from "@/lib/types/dsa-patterns"
 import { getPatternKnowledge } from "@/lib/rag/knowledge-base/dsa-knowledge"
-import { getCompanyInterviewKnowledge, type CompanyId } from "@/lib/rag/knowledge-base/company-knowledge"
-import { getDynamicChatContext, formatDynamicContextForPrompt, shouldRetrieveDynamicContext } from "@/lib/rag/dynamic-chat-context"
+import {
+  getCompanyInterviewKnowledge,
+  type CompanyId,
+} from "@/lib/rag/knowledge-base/company-knowledge"
+import {
+  getDynamicChatContext,
+  formatDynamicContextForPrompt,
+  shouldRetrieveDynamicContext,
+} from "@/lib/rag/dynamic-chat-context"
 import { buildHintContext, buildComplexityContext } from "@/lib/rag/context-builder"
 import { truncateText, truncateFileContent } from "@/lib/utils"
 import { generateAIResponse } from "@/lib/ai-providers"
@@ -187,13 +194,22 @@ ${formatDynamicContextForPrompt(dynamicContext)}
 ## Pattern Knowledge: ${patternKnowledge.displayName}
 
 ### When to Use
-${patternKnowledge.whenToUse.slice(0, 3).map((w) => `- ${w}`).join("\n")}
+${patternKnowledge.whenToUse
+  .slice(0, 3)
+  .map((w) => `- ${w}`)
+  .join("\n")}
 
 ### Key Insights
-${patternKnowledge.keyInsights.slice(0, 3).map((i) => `- ${i}`).join("\n")}
+${patternKnowledge.keyInsights
+  .slice(0, 3)
+  .map((i) => `- ${i}`)
+  .join("\n")}
 
 ### Common Mistakes to Avoid
-${patternKnowledge.commonMistakes.slice(0, 2).map((m) => `- ${m}`).join("\n")}
+${patternKnowledge.commonMistakes
+  .slice(0, 2)
+  .map((m) => `- ${m}`)
+  .join("\n")}
 
 ### Expected Complexity
 - Time: ${patternKnowledge.timeComplexity.typical}
@@ -212,13 +228,22 @@ ${patternKnowledge.commonMistakes.slice(0, 2).map((m) => `- ${m}`).join("\n")}
 ### Interview Style
 ${companyKnowledge.interviewStyle.description}
 Pace: ${companyKnowledge.interviewStyle.pace}
-Expectations: ${companyKnowledge.interviewStyle.expectations.slice(0, 3).map((e) => `- ${e}`).join("\n")}
+Expectations: ${companyKnowledge.interviewStyle.expectations
+          .slice(0, 3)
+          .map((e) => `- ${e}`)
+          .join("\n")}
 
 ### Focus Areas
-${companyKnowledge.topPatterns.slice(0, 4).map((p) => `- ${p.pattern}`).join("\n")}
+${companyKnowledge.topPatterns
+  .slice(0, 4)
+  .map((p) => `- ${p.pattern}`)
+  .join("\n")}
 
 ### What They Value
-${companyKnowledge.cultureTips.slice(0, 2).map((t) => `- ${t}`).join("\n")}
+${companyKnowledge.cultureTips
+  .slice(0, 2)
+  .map((t) => `- ${t}`)
+  .join("\n")}
 `)
       }
     }
@@ -295,11 +320,25 @@ interface ChatRequest {
   currentCode?: string
   starterCodeLength?: number
   // State
-  testResults?: Array<{ name: string; passed: boolean; input?: string; expected?: string; actual?: string; description?: string; error?: string }>
+  testResults?: Array<{
+    name: string
+    passed: boolean
+    input?: string
+    expected?: string
+    actual?: string
+    description?: string
+    error?: string
+  }>
   consoleLogs?: Array<{ type?: string; message?: string }>
   hasSubmitted?: boolean
   conversationTracker?: Partial<ConversationState>
-  solutionComplexity?: { timeComplexity: string; spaceComplexity: string; isOptimal: boolean; estimated?: string; optimal?: string }
+  solutionComplexity?: {
+    timeComplexity: string
+    spaceComplexity: string
+    isOptimal: boolean
+    estimated?: string
+    optimal?: string
+  }
   // User context
   userContext?: {
     email?: string
@@ -337,7 +376,7 @@ interface ChatRequest {
 // INPUT VALIDATION
 // =============================================================================
 
-const MAX_MESSAGE_LENGTH = 10000
+const MAX_REQUEST_MESSAGE_LENGTH = 10000
 const MAX_CODE_LENGTH = 100000
 
 function validateRequest(body: ChatRequest): { valid: boolean; error?: string } {
@@ -347,8 +386,8 @@ function validateRequest(body: ChatRequest): { valid: boolean; error?: string } 
   }
 
   // Message length
-  if (body.message && body.message.length > MAX_MESSAGE_LENGTH) {
-    return { valid: false, error: `Message exceeds ${MAX_MESSAGE_LENGTH} characters` }
+  if (body.message && body.message.length > MAX_REQUEST_MESSAGE_LENGTH) {
+    return { valid: false, error: `Message exceeds ${MAX_REQUEST_MESSAGE_LENGTH} characters` }
   }
 
   // Code length
@@ -370,7 +409,7 @@ function validateRequest(body: ChatRequest): { valid: boolean; error?: string } 
 
 function buildInterviewContextFromRequest(body: ChatRequest): InterviewContext {
   const testResults = body.testResults || []
-  const testsPassed = testResults.filter(t => t.passed).length
+  const testsPassed = testResults.filter((t) => t.passed).length
 
   // Build rich context using context-builders (DRY)
   const richContext = buildRichContext({
@@ -381,7 +420,7 @@ function buildInterviewContextFromRequest(body: ChatRequest): InterviewContext {
     userInfo: body.userContext,
     currentCode: body.currentCode,
     starterCodeLength: body.starterCodeLength,
-    testResults: testResults.map(t => ({
+    testResults: testResults.map((t) => ({
       description: t.description || t.name,
       passed: t.passed,
       input: t.input,
@@ -391,13 +430,15 @@ function buildInterviewContextFromRequest(body: ChatRequest): InterviewContext {
     })),
     consoleLogs: body.consoleLogs,
     hasSubmitted: body.hasSubmitted,
-    solutionComplexity: body.solutionComplexity ? {
-      estimated: body.solutionComplexity.estimated,
-      optimal: body.solutionComplexity.optimal,
-      isOptimal: body.solutionComplexity.isOptimal,
-      timeComplexity: body.solutionComplexity.timeComplexity,
-      spaceComplexity: body.solutionComplexity.spaceComplexity,
-    } : undefined,
+    solutionComplexity: body.solutionComplexity
+      ? {
+          estimated: body.solutionComplexity.estimated,
+          optimal: body.solutionComplexity.optimal,
+          isOptimal: body.solutionComplexity.isOptimal,
+          timeComplexity: body.solutionComplexity.timeComplexity,
+          spaceComplexity: body.solutionComplexity.spaceComplexity,
+        }
+      : undefined,
     realInterviewMode: body.realInterviewMode,
     hasFuzzyStatement: body.hasFuzzyStatement,
     edgeCases: body.edgeCases,
@@ -421,7 +462,7 @@ function buildInterviewContextFromRequest(body: ChatRequest): InterviewContext {
     starterCode: "", // We use starterCodeLength instead
     language: detectLanguage(body.currentCode),
     testsHaveRun: testResults.length > 0,
-    testResults: testResults.map(t => ({
+    testResults: testResults.map((t) => ({
       name: t.name || t.description || "Test",
       passed: t.passed,
       input: t.input,
@@ -446,8 +487,8 @@ function buildMessages(context: ChatRequest["context"]): ChatMessage[] {
   // Apply context window management
   const managedContext = manageContextWindow(context)
 
-  return managedContext.map(msg => ({
-    role: msg.type === "user" ? "user" as const : "assistant" as const,
+  return managedContext.map((msg) => ({
+    role: msg.type === "user" ? ("user" as const) : ("assistant" as const),
     content: msg.message,
   }))
 }
@@ -457,15 +498,16 @@ function detectDifficulty(pattern?: string): "easy" | "medium" | "hard" {
   const easyPatterns = ["two-pointers", "hash-table", "array"]
   const hardPatterns = ["dynamic-programming", "graph", "trie", "segment-tree"]
 
-  if (easyPatterns.some(p => pattern.toLowerCase().includes(p))) return "easy"
-  if (hardPatterns.some(p => pattern.toLowerCase().includes(p))) return "hard"
+  if (easyPatterns.some((p) => pattern.toLowerCase().includes(p))) return "easy"
+  if (hardPatterns.some((p) => pattern.toLowerCase().includes(p))) return "hard"
   return "medium"
 }
 
 function detectLanguage(code?: string): string {
   if (!code) return "python"
   if (code.includes("def ") || code.includes("print(")) return "python"
-  if (code.includes("function ") || code.includes("const ") || code.includes("let ")) return "javascript"
+  if (code.includes("function ") || code.includes("const ") || code.includes("let "))
+    return "javascript"
   if (code.includes("public class") || code.includes("public static void")) return "java"
   if (code.includes("func ") && code.includes("->")) return "swift"
   if (code.includes("fn ") && code.includes("->")) return "rust"
@@ -485,7 +527,15 @@ function buildWrapUpMessage(options: {
   elapsedMinutes: number
   currentCode?: string
 }): string {
-  const { allTestsPassed, passedTests, totalTests, passRate, partnerMessagesCount, elapsedMinutes, currentCode } = options
+  const {
+    allTestsPassed,
+    passedTests,
+    totalTests,
+    passRate,
+    partnerMessagesCount,
+    elapsedMinutes,
+    currentCode,
+  } = options
 
   const codeContext = currentCode ? buildCodeContext(currentCode) : ""
 
@@ -559,7 +609,8 @@ function buildPartnerSystemPrompt(options: {
   workspaceContext?: string
   ragContext?: string
 }): string {
-  const { scenarioTitle, scenarioType, userName, currentCode, workspaceContext, ragContext } = options
+  const { scenarioTitle, scenarioType, userName, currentCode, workspaceContext, ragContext } =
+    options
 
   let typeSpecificGuidance = ""
   if (scenarioType === "system-design") {
@@ -670,17 +721,12 @@ async function handlePartnerRequest(
   }
 
   try {
-    const response = await generateAIResponse(
-      systemPrompt,
-      fullMessage,
-      history,
-      {
-        complexity: "code",
-        userId: body.userId,
-        sessionId: body.sessionId,
-        eventType: "chat_partner",
-      }
-    )
+    const response = await generateAIResponse(systemPrompt, fullMessage, history, {
+      complexity: "code",
+      userId: body.userId,
+      sessionId: body.sessionId,
+      eventType: "chat_partner",
+    })
 
     logger.info("[Chat-v2] Partner response generated", {
       sessionId: body.sessionId,
@@ -695,10 +741,7 @@ async function handlePartnerRequest(
     })
   } catch (error) {
     logger.error("[Chat-v2] Partner generation failed", { error })
-    return NextResponse.json(
-      { error: "Failed to generate partner response" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Failed to generate partner response" }, { status: 500 })
   }
 }
 
@@ -737,7 +780,9 @@ export async function POST(request: NextRequest) {
     if (body.role === "partner") {
       if (!isPartnerSupported(body.scenarioType)) {
         return NextResponse.json(
-          { error: `AI Partner not available for scenario type: ${body.scenarioType || "unknown"}. Partner is available for: ${PARTNER_SUPPORTED_TYPES.join(", ")}` },
+          {
+            error: `AI Partner not available for scenario type: ${body.scenarioType || "unknown"}. Partner is available for: ${PARTNER_SUPPORTED_TYPES.join(", ")}`,
+          },
           { status: 400 }
         )
       }
@@ -854,7 +899,7 @@ export async function POST(request: NextRequest) {
 
     // Build RAG context (async - dynamic knowledge retrieval)
     const testResults = body.testResults || []
-    const testsPassed = testResults.filter(t => t.passed).length
+    const testsPassed = testResults.filter((t) => t.passed).length
     const ragContext = await buildRAGContext({
       scenarioTitle: body.scenarioTitle,
       scenarioPattern: body.scenarioPattern,
@@ -865,13 +910,16 @@ export async function POST(request: NextRequest) {
       userCode: body.currentCode,
       userId: body.userId,
       userMessage: body.message,
-      testResults: testResults.length > 0 ? {
-        passed: testsPassed,
-        total: testResults.length,
-        failingTests: testResults
-          .filter(t => !t.passed)
-          .map(t => t.description || t.name || "Test failed"),
-      } : undefined,
+      testResults:
+        testResults.length > 0
+          ? {
+              passed: testsPassed,
+              total: testResults.length,
+              failingTests: testResults
+                .filter((t) => !t.passed)
+                .map((t) => t.description || t.name || "Test failed"),
+            }
+          : undefined,
     })
 
     // Build context for orchestrator (uses context-builders for rich context)
@@ -934,7 +982,7 @@ export async function POST(request: NextRequest) {
       sessionId: interviewContext.sessionId,
       totalLatencyMs: totalLatency,
       orchestratorLatencyMs: result.metrics?.totalLatencyMs,
-      agentCalls: result.metrics?.agentCalls?.map(a => `${a.agent}:${a.latencyMs}ms`),
+      agentCalls: result.metrics?.agentCalls?.map((a) => `${a.agent}:${a.latencyMs}ms`),
       retries: result.metrics?.retries,
       responseLength: result.data.response.length,
     })
@@ -956,19 +1004,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       reply: result.data.response,
       provider: "orchestrator-v2",
-      latencyMs: result.metrics?.totalLatencyMs || (Date.now() - startTime),
+      latencyMs: result.metrics?.totalLatencyMs || Date.now() - startTime,
       // v2-specific extras
       state: result.data.state,
-      metrics: result.metrics ? {
-        totalLatencyMs: result.metrics.totalLatencyMs,
-        agentCalls: result.metrics.agentCalls.map(a => ({
-          agent: a.agent,
-          latencyMs: a.latencyMs,
-        })),
-        retries: result.metrics.retries,
-      } : undefined,
+      metrics: result.metrics
+        ? {
+            totalLatencyMs: result.metrics.totalLatencyMs,
+            agentCalls: result.metrics.agentCalls.map((a) => ({
+              agent: a.agent,
+              latencyMs: a.latencyMs,
+            })),
+            retries: result.metrics.retries,
+          }
+        : undefined,
     })
-
   } catch (error) {
     const latency = Date.now() - startTime
     logger.error("[Chat-v2] Unexpected error", {
@@ -977,10 +1026,7 @@ export async function POST(request: NextRequest) {
       latencyMs: latency,
     })
 
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 

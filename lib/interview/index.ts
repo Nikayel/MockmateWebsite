@@ -43,6 +43,10 @@ export { extractTopicsFromMessage, extractUserAnsweredTopics } from "./topic-ext
 export { analyzeCodeEfficiency } from "./code-analysis"
 export type { CodeEfficiencyMetrics, OptimalComplexity } from "./code-analysis"
 
+// Approach detection (smart complexity analysis)
+export { detectApproach, detectComplexity } from "./approach-detector"
+export type { ApproachDetectionResult } from "./approach-detector"
+
 // Clarifying questions checker (Real Interview Mode)
 // NOTE: Server-only module - import directly from "./clarifying-questions-checker"
 // to avoid bundling firebase-admin into client code.
@@ -147,6 +151,8 @@ export {
   buildLevelContext,
   buildPatternKnowledgeContext,
   buildCompanyKnowledgeContext,
+  buildDebuggingKnowledgeContext,
+  buildSystemDesignKnowledgeContext,
   buildCodeContext,
   buildAIPartnerContext,
   buildUserAnsweredContext,
