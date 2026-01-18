@@ -141,3 +141,28 @@ export type { ValidationResult, ResponseViolation, ValidationContext } from "./r
 //   shouldRunExtraction,
 // } from "./conversation-extraction"
 export type { ExtendedConversationTracker } from "./conversation-extraction"
+
+// Context builders (DRY: reusable context generation for v1 and v2 routes)
+export {
+  buildUserContext,
+  buildCompanyContext,
+  buildPatternContext,
+  buildEdgeCaseContext,
+  buildTestResultsContext,
+  buildComplexityContext,
+  buildSystemDesignContext,
+  buildBugFixContext,
+  buildFuzzyModeContext,
+  buildProactiveContext,
+  buildLevelContext,
+  buildPatternKnowledgeContext,
+  buildCompanyKnowledgeContext,
+  buildInterviewContext,
+} from "./context-builders"
+export type {
+  UserInfo,
+  TestResultItem,
+  EdgeCase,
+  SolutionComplexity,
+  ContextBuilderOptions,
+} from "./context-builders"

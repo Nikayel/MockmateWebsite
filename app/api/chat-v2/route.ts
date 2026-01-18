@@ -30,6 +30,7 @@ import {
   type ChatMessage,
   type ConversationState,
 } from "@/lib/agents"
+import { buildInterviewContext as buildRichContext } from "@/lib/interview/context-builders"
 
 // =============================================================================
 // REQUEST/RESPONSE TYPES (same as v1 for compatibility)
@@ -49,23 +50,41 @@ interface ChatRequest {
   currentCode?: string
   starterCodeLength?: number
   // State
-  testResults?: Array<{ name: string; passed: boolean; input?: string; expected?: string; actual?: string }>
+  testResults?: Array<{ name: string; passed: boolean; input?: string; expected?: string; actual?: string; description?: string; error?: string }>
+  consoleLogs?: Array<{ type?: string; message?: string }>
   hasSubmitted?: boolean
   conversationTracker?: Partial<ConversationState>
-  solutionComplexity?: { timeComplexity: string; spaceComplexity: string; isOptimal: boolean }
+  solutionComplexity?: { timeComplexity: string; spaceComplexity: string; isOptimal: boolean; estimated?: string; optimal?: string }
+  // User context
+  userContext?: {
+    email?: string
+    full_name?: string
+    subscription_tier?: string
+    sessions_used?: number
+    previous_topics?: string[]
+    skill_level?: string
+  }
+  // Edge cases
+  edgeCases?: Array<{ description: string; input: unknown }>
+  // Special modes
+  realInterviewMode?: boolean
+  hasFuzzyStatement?: boolean
+  // Time tracking
+  elapsedTime?: number
+  timeSinceLastMessage?: number
+  // AI Partner tracking
+  partnerMessagesCount?: number
+  lastPartnerExchange?: string
+  // Nudge tracking
+  recentNudgeTopics?: string[]
+  userAnsweredTopics?: string[]
   // Flags
   isProactive?: boolean
+  isWrapUp?: boolean
 }
 
-interface ChatResponse {
-  text: string
-  state?: ConversationState
-  metrics?: {
-    totalLatencyMs: number
-    agentCalls: Array<{ agent: string; latencyMs: number }>
-    retries: number
-  }
-}
+// Response format matches v1 for frontend compatibility
+// Returns { reply, provider, latencyMs, state?, metrics? }
 
 // =============================================================================
 // INPUT VALIDATION
@@ -102,9 +121,41 @@ function validateRequest(body: ChatRequest): { valid: boolean; error?: string } 
 // CONTEXT CONVERSION
 // =============================================================================
 
-function buildInterviewContext(body: ChatRequest): InterviewContext {
+function buildInterviewContextFromRequest(body: ChatRequest): InterviewContext {
   const testResults = body.testResults || []
   const testsPassed = testResults.filter(t => t.passed).length
+
+  // Build rich context using context-builders (DRY)
+  const richContext = buildRichContext({
+    scenarioTitle: body.scenarioTitle,
+    scenarioType: body.scenarioType,
+    scenarioPattern: body.scenarioPattern,
+    scenarioCompany: body.scenarioCompany,
+    userInfo: body.userContext,
+    currentCode: body.currentCode,
+    starterCodeLength: body.starterCodeLength,
+    testResults: testResults.map(t => ({
+      description: t.description || t.name,
+      passed: t.passed,
+      input: t.input,
+      expected: t.expected,
+      actual: t.actual,
+      error: t.error,
+    })),
+    consoleLogs: body.consoleLogs,
+    hasSubmitted: body.hasSubmitted,
+    solutionComplexity: body.solutionComplexity ? {
+      estimated: body.solutionComplexity.estimated,
+      optimal: body.solutionComplexity.optimal,
+      isOptimal: body.solutionComplexity.isOptimal,
+      timeComplexity: body.solutionComplexity.timeComplexity,
+      spaceComplexity: body.solutionComplexity.spaceComplexity,
+    } : undefined,
+    realInterviewMode: body.realInterviewMode,
+    hasFuzzyStatement: body.hasFuzzyStatement,
+    edgeCases: body.edgeCases,
+    elapsedTime: body.elapsedTime,
+  })
 
   return {
     sessionId: body.sessionId || "unknown",
@@ -116,7 +167,7 @@ function buildInterviewContext(body: ChatRequest): InterviewContext {
     language: detectLanguage(body.currentCode),
     testsHaveRun: testResults.length > 0,
     testResults: testResults.map(t => ({
-      name: t.name,
+      name: t.name || t.description || "Test",
       passed: t.passed,
       input: t.input,
       expected: t.expected,
@@ -129,6 +180,8 @@ function buildInterviewContext(body: ChatRequest): InterviewContext {
     isOptimalSolution: body.solutionComplexity?.isOptimal,
     hasSubmitted: body.hasSubmitted || false,
     userId: body.userId,
+    // Inject rich context for InterviewerAgent to use
+    promptContext: richContext,
   }
 }
 
@@ -197,8 +250,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Build context for orchestrator
-    const interviewContext = buildInterviewContext(body)
+    // Build context for orchestrator (uses context-builders for rich context)
+    const interviewContext = buildInterviewContextFromRequest(body)
     const messages = buildMessages(body.context)
     const lastMessage = body.message || ""
 
