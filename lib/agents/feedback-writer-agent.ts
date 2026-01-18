@@ -12,6 +12,9 @@ import type { ScoreResult } from "@/lib/feedback/types"
 import type { ExtractedEvidence } from "@/lib/feedback/structured-extraction"
 import { generateAIResponse } from "@/lib/ai-providers"
 import { logger } from "@/lib/logger"
+// RAG Knowledge imports for enriched feedback
+import { getPatternKnowledge } from "@/lib/rag/knowledge-base/dsa-knowledge"
+import type { DSAPattern } from "@/lib/types/dsa-patterns"
 
 // =============================================================================
 // TYPES
@@ -21,6 +24,7 @@ export interface FeedbackWriterAgentInput {
   // Scenario info
   scenarioType: "dsa" | "system-design" | "bugfix"
   scenarioTitle: string
+  scenarioPattern?: string // For pattern-specific tips
 
   // Scores (from ScorerAgent)
   scores: ScoreResult
@@ -54,6 +58,13 @@ export interface FeedbackWriterAgentOutput {
     communication: string
   }
 
+  // Pattern-specific insights (from RAG knowledge)
+  patternInsight?: {
+    patternName: string
+    keyTakeaway: string
+    commonMistake?: string
+  }
+
   // Full narrative
   rawFeedback: string
 }
@@ -62,7 +73,10 @@ export interface FeedbackWriterAgentOutput {
 // FEEDBACK WRITER AGENT
 // =============================================================================
 
-export class FeedbackWriterAgent implements Agent<FeedbackWriterAgentInput, FeedbackWriterAgentOutput> {
+export class FeedbackWriterAgent implements Agent<
+  FeedbackWriterAgentInput,
+  FeedbackWriterAgentOutput
+> {
   readonly config: AgentConfig = {
     type: "feedback_writer",
     modelTier: "smart", // Needs quality writing
@@ -76,33 +90,36 @@ export class FeedbackWriterAgent implements Agent<FeedbackWriterAgentInput, Feed
     logger.info("[FeedbackWriterAgent] Generating feedback", {
       scenarioType: input.scenarioType,
       overall: input.scores.overall,
+      scenarioPattern: input.scenarioPattern,
     })
 
-    // Build the prompt with evidence grounding
+    // Build the prompt with evidence grounding + pattern knowledge
     const prompt = this.buildFeedbackPrompt(input)
 
     // Generate feedback using AI
-    const response = await generateAIResponse(
-      this.buildSystemPrompt(input),
-      prompt,
-      [],
-      {
-        complexity: "complex",
-        temperature: 0.3, // Low temperature for consistent feedback
-      }
-    )
+    const response = await generateAIResponse(this.buildSystemPrompt(input), prompt, [], {
+      complexity: "complex",
+      temperature: 0.3, // Low temperature for consistent feedback
+    })
 
     // Parse the structured response
     const parsed = this.parseFeedbackResponse(response.text, input)
+
+    // Enrich with pattern knowledge (from RAG)
+    const patternInsight = this.buildPatternInsight(input.scenarioPattern)
 
     const latency = Date.now() - startTime
     logger.info("[FeedbackWriterAgent] Feedback generated", {
       latencyMs: latency,
       whatWorkedCount: parsed.whatWorked.length,
       fixNextCount: parsed.fixNext.length,
+      hasPatternInsight: !!patternInsight,
     })
 
-    return parsed
+    return {
+      ...parsed,
+      patternInsight,
+    }
   }
 
   // ===========================================================================
@@ -110,9 +127,8 @@ export class FeedbackWriterAgent implements Agent<FeedbackWriterAgentInput, Feed
   // ===========================================================================
 
   private buildSystemPrompt(input: FeedbackWriterAgentInput): string {
-    const passRate = input.testsTotal > 0
-      ? Math.round((input.testsPassed / input.testsTotal) * 100)
-      : 0
+    const passRate =
+      input.testsTotal > 0 ? Math.round((input.testsPassed / input.testsTotal) * 100) : 0
 
     return `You are a senior technical interviewer providing feedback after a coding interview.
 
@@ -168,19 +184,40 @@ Paragraph about thinking out loud and responding to questions.`
   private buildFeedbackPrompt(input: FeedbackWriterAgentInput): string {
     const evidence = input.evidence
     const evidenceSummary = this.buildEvidenceSummary(evidence)
+    const patternContext = this.buildPatternContext(input.scenarioPattern)
 
     return `Generate feedback for this ${input.scenarioType.toUpperCase()} interview on "${input.scenarioTitle}".
 
 EXTRACTED EVIDENCE (ground your feedback in this):
 ${evidenceSummary}
-
+${patternContext}
 IMPORTANT GROUNDING RULES:
 - Only mention edge cases if evidence shows they discussed them
 - Only praise complexity analysis if evidence shows they got it right
 - Only mention "good communication" if evidence shows they explained while coding
 - If evidence shows they were silent, mention that in communication feedback
+- If pattern knowledge is provided, reference specific pattern insights in your feedback
 
 Generate structured feedback following the format specified.`
+  }
+
+  /**
+   * Build pattern context for the AI prompt
+   */
+  private buildPatternContext(scenarioPattern?: string): string {
+    if (!scenarioPattern) return ""
+
+    const patternKnowledge = getPatternKnowledge(scenarioPattern as DSAPattern)
+    if (!patternKnowledge) return ""
+
+    return `
+PATTERN KNOWLEDGE (use this to give pattern-specific feedback):
+- Pattern: ${patternKnowledge.displayName}
+- Key Insight: ${patternKnowledge.keyInsights[0] || "N/A"}
+- Common Mistake: ${patternKnowledge.commonMistakes[0] || "N/A"}
+- Expected Time: ${patternKnowledge.timeComplexity.typical}
+- Expected Space: ${patternKnowledge.spaceComplexity.typical}
+`
   }
 
   private buildEvidenceSummary(evidence: ExtractedEvidence): string {
@@ -309,6 +346,24 @@ Generate structured feedback following the format specified.`
       return "Keep practicing - focus on explaining your approach and considering edge cases."
     } else {
       return "This problem type needs more practice. Review the fundamentals and try again."
+    }
+  }
+
+  /**
+   * Build pattern-specific insight from RAG knowledge
+   */
+  private buildPatternInsight(
+    scenarioPattern?: string
+  ): FeedbackWriterAgentOutput["patternInsight"] {
+    if (!scenarioPattern) return undefined
+
+    const patternKnowledge = getPatternKnowledge(scenarioPattern as DSAPattern)
+    if (!patternKnowledge) return undefined
+
+    return {
+      patternName: patternKnowledge.displayName,
+      keyTakeaway: patternKnowledge.keyInsights[0] || patternKnowledge.description,
+      commonMistake: patternKnowledge.commonMistakes[0],
     }
   }
 }

@@ -210,7 +210,13 @@ async function callGemini(
       history: geminiHistory,
     })
 
-    const result = await chat.sendMessage(userMessage)
+    // Add 60-second timeout to prevent hanging
+    const AI_TIMEOUT_MS = 60000
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("AI request timed out after 60 seconds")), AI_TIMEOUT_MS)
+    )
+
+    const result = await Promise.race([chat.sendMessage(userMessage), timeoutPromise])
     const response = await result.response
     return response.text()
   } catch (error: any) {

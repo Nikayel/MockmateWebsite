@@ -2734,9 +2734,14 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             },
           }
 
+          // Add 90-second timeout to prevent hanging forever
+          const feedbackController = new AbortController()
+          const feedbackTimeoutId = setTimeout(() => feedbackController.abort(), 90000)
+
           const feedbackResponse = await fetch("/api/generate-feedback", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal: feedbackController.signal,
             body: JSON.stringify({
               code,
               scenarioTitle: selectedScenario?.title,
@@ -2757,6 +2762,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               userId: user.id,
             }),
           })
+          clearTimeout(feedbackTimeoutId)
 
           if (feedbackResponse.ok) {
             const feedbackData = await feedbackResponse.json()
@@ -2842,8 +2848,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               description: "AI feedback unavailable. Scores based on test results.",
             })
           }
-        } catch (feedbackError) {
+        } catch (feedbackError: any) {
           console.error("Error generating feedback:", feedbackError)
+          const isTimeout = feedbackError?.name === "AbortError"
           const passRate = testSummary.passRate
           const fallbackScores = {
             understanding: Math.min(100, Math.round(passRate * 0.9 + 10)),
@@ -2864,8 +2871,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             codeQualityScore: fallbackScores.codeQuality,
             communicationScore: fallbackScores.communication,
           })
-          toast.warning("Feedback generation delayed", {
-            description: "Using basic feedback. Full analysis may be available shortly.",
+          toast.warning(isTimeout ? "Feedback timed out" : "Feedback generation delayed", {
+            description: isTimeout
+              ? "AI took too long. Using estimated scores based on test results."
+              : "Using basic feedback. Full analysis may be available shortly.",
           })
         }
       }
