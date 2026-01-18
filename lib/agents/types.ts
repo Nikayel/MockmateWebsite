@@ -76,6 +76,8 @@ export interface InterviewContext {
     levelContext: string
     knowledgeContext: string
     codeContext: string // Current solution code
+    aiPartnerContext: string // AI Partner usage tracking
+    userAnsweredContext: string // Topics already answered
   }
 }
 

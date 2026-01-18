@@ -127,6 +127,10 @@ export class InterviewerAgent implements Agent<InterviewerInput, InterviewerOutp
       if (pc.knowledgeContext) prompt += `\n\n${pc.knowledgeContext}`
       // Add current code context - this lets the interviewer see and reference the solution
       if (pc.codeContext) prompt += `\n\n${pc.codeContext}`
+      // Add AI Partner usage tracking - alerts interviewer to AI assistance patterns
+      if (pc.aiPartnerContext) prompt += `\n\n${pc.aiPartnerContext}`
+      // Add user answered topics - prevents re-asking about already covered topics
+      if (pc.userAnsweredContext) prompt += `\n\n${pc.userAnsweredContext}`
     }
 
     // Add phase-specific guidance

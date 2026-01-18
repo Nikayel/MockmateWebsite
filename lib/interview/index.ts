@@ -158,6 +158,8 @@ export {
   buildPatternKnowledgeContext,
   buildCompanyKnowledgeContext,
   buildCodeContext,
+  buildAIPartnerContext,
+  buildUserAnsweredContext,
   buildInterviewContext,
 } from "./context-builders"
 export type {

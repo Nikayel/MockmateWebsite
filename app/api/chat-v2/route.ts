@@ -30,7 +30,11 @@ import {
   type ChatMessage,
   type ConversationState,
 } from "@/lib/agents"
-import { buildInterviewContext as buildRichContext } from "@/lib/interview/context-builders"
+import {
+  buildInterviewContext as buildRichContext,
+  buildProactiveContext,
+  buildCodeContext,
+} from "@/lib/interview/context-builders"
 
 // =============================================================================
 // REQUEST/RESPONSE TYPES (same as v1 for compatibility)
@@ -155,6 +159,14 @@ function buildInterviewContextFromRequest(body: ChatRequest): InterviewContext {
     hasFuzzyStatement: body.hasFuzzyStatement,
     edgeCases: body.edgeCases,
     elapsedTime: body.elapsedTime,
+    // AI Partner tracking
+    partnerMessagesCount: body.partnerMessagesCount,
+    lastPartnerExchange: body.lastPartnerExchange,
+    // Nudge tracking
+    recentNudgeTopics: body.recentNudgeTopics,
+    userAnsweredTopics: body.userAnsweredTopics,
+    // Time tracking
+    timeSinceLastMessage: body.timeSinceLastMessage,
   })
 
   return {
@@ -215,6 +227,73 @@ function detectLanguage(code?: string): string {
 }
 
 // =============================================================================
+// WRAP-UP MESSAGE BUILDER
+// =============================================================================
+
+function buildWrapUpMessage(options: {
+  allTestsPassed: boolean
+  passedTests: number
+  totalTests: number
+  passRate: number
+  partnerMessagesCount?: number
+  elapsedMinutes: number
+  currentCode?: string
+}): string {
+  const { allTestsPassed, passedTests, totalTests, passRate, partnerMessagesCount, elapsedMinutes, currentCode } = options
+
+  const codeContext = currentCode ? buildCodeContext(currentCode) : ""
+
+  return `[INTERVIEW DEBRIEF] The candidate is ending the session. Give them a real debrief like after an actual interview.
+
+FINAL STATE:
+${codeContext}
+
+TEST RESULTS: ${passedTests}/${totalTests} tests passed (${Math.round(passRate)}%)
+${allTestsPassed ? "STATUS: PASSED" : "STATUS: DID NOT PASS"}
+
+${partnerMessagesCount ? `AI Partner Usage: ${partnerMessagesCount} interactions` : "No AI Partner usage"}
+Time spent: ${elapsedMinutes || "unknown"} minutes
+
+YOUR DEBRIEF SHOULD INCLUDE:
+
+1. VERDICT (be honest):
+${
+  allTestsPassed
+    ? `- Tests passed, so acknowledge that
+   - But still give constructive feedback - passing isn't everything`
+    : `- Tests didn't pass - be direct but kind
+   - Point out what went wrong without being harsh
+   - Encourage them: "This is a common pattern - worth practicing"`
+}
+
+2. WHAT THEY DID WELL (be specific):
+   - Reference actual things from the conversation
+   - "Your initial approach with the hash map was spot on"
+   - "Good that you asked about edge cases upfront"
+   - Don't make things up - only mention things they actually did
+
+3. WHAT TO IMPROVE (be actionable):
+   - "You spent too long without talking - think out loud more"
+   - "Consider edge cases earlier in your process"
+   - "Your brute force was fine, but look into [pattern] for optimization"
+   - Give them something concrete to work on
+
+4. HIRING SIGNAL (be real):
+${
+  allTestsPassed
+    ? `- "If this were a real interview, I'd lean towards a hire recommendation. Your communication was solid and you got to a working solution."
+   - OR "Tests passed, but the process was rough. In a real interview, I'd be on the fence - work on [specific thing]."`
+    : `- "In a real interview, this wouldn't be a pass. But here's the good news: [pattern] problems are very learnable."
+   - Be kind but honest about what it would take`
+}
+
+EXAMPLE GOOD DEBRIEF:
+"Alright, let's wrap up. Tests are passing - nice work. You showed good instincts going for a hash map right away, and I liked that you traced through the example before coding. Two things to work on: you didn't mention edge cases until I asked, and that initial confusion about what to store as keys vs values cost you a few minutes. In a real interview, that'd be a positive signal overall - you communicated well and got to O(n). Good work on this one."
+
+Keep it conversational and real - like you're actually debriefing someone after an interview.`
+}
+
+// =============================================================================
 // MAIN HANDLER
 // =============================================================================
 
@@ -250,10 +329,108 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // ==========================================================================
+    // CONVERSATION ENDED DETECTION
+    // Check if AI already said goodbye - interview is over
+    // ==========================================================================
+    const recentMessages = body.context?.slice(-4) || []
+    const aiAlreadySaidGoodbye = recentMessages.some(
+      (msg: { message: string; type?: string }) =>
+        msg.type !== "user" &&
+        (msg.message?.toLowerCase().includes("good luck with your") ||
+          msg.message?.toLowerCase().includes("best of luck") ||
+          (msg.message?.toLowerCase().includes("take care") &&
+            msg.message?.toLowerCase().includes("interview")))
+    )
+
+    if (aiAlreadySaidGoodbye) {
+      return NextResponse.json({
+        reply: null,
+        conversationEnded: true,
+        endMessage:
+          "The interview session has ended. Click 'View Detailed Feedback' to see your score breakdown and detailed analysis.",
+      })
+    }
+
+    // ==========================================================================
+    // PROACTIVE MESSAGE HANDLING
+    // Interviewer jumps in without user message
+    // ==========================================================================
+    if (body.isProactive) {
+      const proactiveResult = buildProactiveContext({
+        currentCode: body.currentCode,
+        timeSinceLastMessage: body.timeSinceLastMessage,
+        partnerMessagesCount: body.partnerMessagesCount,
+        lastPartnerExchange: body.lastPartnerExchange,
+        recentNudgeTopics: body.recentNudgeTopics,
+        userAnsweredTopics: body.userAnsweredTopics,
+        scenarioPattern: body.scenarioPattern,
+      })
+
+      if (proactiveResult.shouldSkip) {
+        return NextResponse.json({
+          reply: null,
+          skipped: true,
+          reason: proactiveResult.reason,
+        })
+      }
+
+      // Use proactive message as the "lastMessage" for orchestrator
+      // The orchestrator will generate an appropriate check-in response
+      logger.info("[Chat-v2] Proactive check-in triggered", {
+        sessionId: body.sessionId,
+        timeSinceLastMessage: body.timeSinceLastMessage,
+        hasCode: !!body.currentCode,
+      })
+    }
+
+    // ==========================================================================
+    // WRAP-UP MESSAGE HANDLING
+    // End-of-interview debrief
+    // ==========================================================================
+    if (body.isWrapUp) {
+      const testResults = body.testResults || []
+      const passedTests = testResults.filter((t: { passed: boolean }) => t.passed).length
+      const totalTests = testResults.length
+      const passRate = totalTests > 0 ? (passedTests / totalTests) * 100 : 0
+      const allTestsPassed = passedTests === totalTests && totalTests > 0
+      const elapsedMinutes = body.elapsedTime ? Math.floor(body.elapsedTime / 60) : 0
+
+      // Build wrap-up debrief context
+      const wrapUpMessage = buildWrapUpMessage({
+        allTestsPassed,
+        passedTests,
+        totalTests,
+        passRate,
+        partnerMessagesCount: body.partnerMessagesCount,
+        elapsedMinutes,
+        currentCode: body.currentCode,
+      })
+
+      logger.info("[Chat-v2] Wrap-up debrief requested", {
+        sessionId: body.sessionId,
+        allTestsPassed,
+        passRate: Math.round(passRate),
+      })
+
+      // Use wrap-up message as the context for orchestrator
+      body.message = wrapUpMessage
+    }
+
     // Build context for orchestrator (uses context-builders for rich context)
     const interviewContext = buildInterviewContextFromRequest(body)
     const messages = buildMessages(body.context)
-    const lastMessage = body.message || ""
+    const lastMessage = body.isProactive
+      ? buildProactiveContext({
+          currentCode: body.currentCode,
+          timeSinceLastMessage: body.timeSinceLastMessage,
+          partnerMessagesCount: body.partnerMessagesCount,
+          lastPartnerExchange: body.lastPartnerExchange,
+          recentNudgeTopics: body.recentNudgeTopics,
+          userAnsweredTopics: body.userAnsweredTopics,
+          scenarioPattern: body.scenarioPattern,
+        }).message
+      : body.message || ""
 
     // Log request
     logger.info("[Chat-v2] Processing request", {
@@ -262,6 +439,8 @@ export async function POST(request: NextRequest) {
       messageCount: messages.length,
       testsRun: interviewContext.testsHaveRun,
       hasSubmitted: interviewContext.hasSubmitted,
+      isProactive: body.isProactive,
+      isWrapUp: body.isWrapUp,
     })
 
     // Orchestrate response

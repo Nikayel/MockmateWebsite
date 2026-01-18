@@ -638,6 +638,75 @@ ${companyKnowledge.cultureTips.slice(0, 2).map((t) => `- ${t}`).join("\n")}
 }
 
 // =============================================================================
+// AI PARTNER TRACKING CONTEXT
+// =============================================================================
+
+/**
+ * Build AI Partner usage context for interviewer awareness
+ */
+export function buildAIPartnerContext(options: {
+  partnerMessagesCount?: number
+  lastPartnerExchange?: string
+}): string {
+  const { partnerMessagesCount, lastPartnerExchange } = options
+
+  if (!partnerMessagesCount || partnerMessagesCount === 0) {
+    return ""
+  }
+
+  const parts: string[] = [
+    `AI PARTNER USAGE ALERT:`,
+    `- Candidate has used AI Partner ${partnerMessagesCount} times this session`,
+  ]
+
+  if (lastPartnerExchange) {
+    parts.push(`- Last AI interaction: "${lastPartnerExchange.slice(0, 200)}..."`)
+  }
+
+  if (partnerMessagesCount >= 5) {
+    parts.push(`- HIGH AI USAGE: Consider asking them to explain their understanding of the AI suggestions`)
+  }
+
+  if (partnerMessagesCount >= 3) {
+    parts.push(`- When they explain code, verify they understand it vs. blindly copied it`)
+  }
+
+  return parts.join("\n")
+}
+
+// =============================================================================
+// USER ANSWERED TOPICS CONTEXT
+// =============================================================================
+
+/**
+ * Build context for topics the user has already answered
+ * Prevents interviewer from re-asking about these topics
+ */
+export function buildUserAnsweredContext(options: {
+  userAnsweredTopics?: string[]
+  recentNudgeTopics?: string[]
+}): string {
+  const { userAnsweredTopics, recentNudgeTopics } = options
+  const parts: string[] = []
+
+  if (userAnsweredTopics && userAnsweredTopics.length > 0) {
+    parts.push(`
+CANDIDATE HAS ALREADY ANSWERED (do NOT ask about these again):
+${userAnsweredTopics.slice(-5).map((t) => `- ${t}`).join("\n")}
+If you want to discuss these topics, ACKNOWLEDGE their answer first, then probe DEEPER or move on.`)
+  }
+
+  if (recentNudgeTopics && recentNudgeTopics.length > 0) {
+    parts.push(`
+AVOID REPEATING THESE TOPICS (already asked about):
+${recentNudgeTopics.slice(-3).map((t) => `- ${t}`).join("\n")}
+If they're still stuck on these, give a CONCRETE hint instead of asking again.`)
+  }
+
+  return parts.join("\n")
+}
+
+// =============================================================================
 // CODE CONTEXT
 // =============================================================================
 
@@ -694,6 +763,8 @@ export function buildInterviewContext(options: ContextBuilderOptions): {
   levelContext: string
   knowledgeContext: string
   codeContext: string // Current solution code
+  aiPartnerContext: string // AI Partner usage tracking
+  userAnsweredContext: string // Topics already answered
 } {
   const { context: userContext, userName } = buildUserContext(options.userInfo)
 
@@ -724,5 +795,13 @@ export function buildInterviewContext(options: ContextBuilderOptions): {
     levelContext: buildLevelContext(options.userInfo?.skill_level),
     knowledgeContext: knowledgeContext ? `\n=== RAG KNOWLEDGE ===\n${knowledgeContext}\n=== END RAG ===\n` : "",
     codeContext: buildCodeContext(options.currentCode, options.starterCodeLength),
+    aiPartnerContext: buildAIPartnerContext({
+      partnerMessagesCount: options.partnerMessagesCount,
+      lastPartnerExchange: options.lastPartnerExchange,
+    }),
+    userAnsweredContext: buildUserAnsweredContext({
+      userAnsweredTopics: options.userAnsweredTopics,
+      recentNudgeTopics: options.recentNudgeTopics,
+    }),
   }
 }
