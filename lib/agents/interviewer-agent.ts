@@ -1,0 +1,249 @@
+/**
+ * Interviewer Agent - Conducts the technical interview
+ *
+ * Responsibilities:
+ * - Generate natural, professional interviewer responses
+ * - Ask probing questions based on phase
+ * - Guide candidate through problem-solving process
+ *
+ * Model: Smart (Claude/GPT-4) - needs nuanced conversation ability
+ *
+ * Does NOT:
+ * - Track conversation state (StateTracker's job)
+ * - Validate responses (Validator's job)
+ * - Calculate scores (Scorer's job)
+ */
+
+import { generateAIResponse } from "@/lib/ai-providers"
+import { logger } from "@/lib/logger"
+import {
+  Agent,
+  AgentConfig,
+  InterviewerInput,
+  InterviewerOutput,
+  ChatMessage,
+  InterviewPhase,
+} from "./types"
+import {
+  INTERVIEWER_SYSTEM_PROMPT,
+  FEW_SHOT_EXAMPLES,
+  PHASE_PROMPTS,
+  QUICK_INJECTIONS,
+} from "@/lib/interview/interviewer-prompts"
+
+// =============================================================================
+// AGENT CONFIGURATION
+// =============================================================================
+
+const INTERVIEWER_CONFIG: AgentConfig = {
+  type: "interviewer",
+  modelTier: "smart",
+  description: "Conducts technical interviews with natural conversation",
+  estimatedTokensPerCall: 500,
+  maxRetries: 2,
+}
+
+// =============================================================================
+// INTERVIEWER AGENT CLASS
+// =============================================================================
+
+export class InterviewerAgent implements Agent<InterviewerInput, InterviewerOutput> {
+  readonly config = INTERVIEWER_CONFIG
+
+  async execute(input: InterviewerInput): Promise<InterviewerOutput> {
+    const startTime = Date.now()
+
+    try {
+      // Build the prompt
+      const systemPrompt = this.buildSystemPrompt(input)
+      const userPrompt = this.buildUserPrompt(input)
+
+      // Generate response
+      const response = await generateAIResponse(
+        systemPrompt,
+        userPrompt,
+        this.formatHistory(input.messages),
+        {
+          complexity: "complex", // Use smart model
+          temperature: 0.7,
+          userId: input.context.userId || "interviewer-agent",
+        }
+      )
+
+      logger.info("[InterviewerAgent] Generated response", {
+        phase: input.state.currentPhase,
+        responseLength: response.text.length,
+        latencyMs: Date.now() - startTime,
+      })
+
+      return {
+        response: response.text,
+        suggestedPhase: this.detectPhaseFromResponse(response.text, input.state.currentPhase),
+        confidence: 0.9, // Could be enhanced with actual confidence scoring
+      }
+    } catch (error) {
+      logger.error("[InterviewerAgent] Failed to generate response", { error })
+      throw error
+    }
+  }
+
+  validateInput(input: InterviewerInput): { valid: boolean; error?: string } {
+    if (!input.context.sessionId) {
+      return { valid: false, error: "Missing sessionId" }
+    }
+    if (!input.lastUserMessage) {
+      return { valid: false, error: "Missing lastUserMessage" }
+    }
+    return { valid: true }
+  }
+
+  // ===========================================================================
+  // PROMPT BUILDING
+  // ===========================================================================
+
+  private buildSystemPrompt(input: InterviewerInput): string {
+    const { state, context } = input
+    const phase = state.currentPhase
+
+    // Start with core system prompt
+    let prompt = INTERVIEWER_SYSTEM_PROMPT
+
+    // Add problem context
+    prompt += `\n\nPROBLEM: ${context.problemTitle} (${context.problemDifficulty})`
+
+    // Add phase-specific guidance
+    const phasePrompt = PHASE_PROMPTS[phase]
+    if (phasePrompt) {
+      prompt += `\n\n${phasePrompt}`
+    }
+
+    // Add few-shot examples
+    prompt += `\n\n${FEW_SHOT_EXAMPLES}`
+
+    // Add tool results if provided (pre-executed state queries)
+    if (input.toolResults) {
+      prompt += `\n\n${input.toolResults}`
+    }
+
+    // Add quick injections based on state
+    prompt += this.buildQuickInjections(input)
+
+    return prompt
+  }
+
+  private buildQuickInjections(input: InterviewerInput): string {
+    const { state, context } = input
+    const injections: string[] = []
+
+    // Check prerequisites for coding transition
+    if (state.currentPhase === "discussion" && !state.hasRunTests) {
+      const hasComplexity = state.timeComplexityMentioned
+      const hasEdgeCases = state.edgeCasesMentioned.length > 0
+
+      if (!hasComplexity || !hasEdgeCases) {
+        injections.push(QUICK_INJECTIONS.blockCoding)
+      }
+    }
+
+    // Handle testing phase
+    if (state.hasRunTests && state.currentPhase === "testing") {
+      injections.push(QUICK_INJECTIONS.continueAfterTests)
+    }
+
+    // Add solution complexity context
+    if (context.isOptimalSolution !== undefined) {
+      injections.push(`\nSOLUTION COMPLEXITY: ${context.isOptimalSolution ? "Already optimal - focus on edge cases/trade-offs" : "Not optimal - can ask about improvements"}`)
+    }
+
+    return injections.length > 0 ? `\n\n${injections.join("\n")}` : ""
+  }
+
+  private buildUserPrompt(input: InterviewerInput): string {
+    const sections: string[] = []
+
+    // Add state summary for context
+    sections.push(this.buildStateSummary(input.state))
+
+    // Add the user's message
+    sections.push(`\nCANDIDATE'S MESSAGE:\n"${input.lastUserMessage}"`)
+
+    // Add test results if in testing phase
+    if (input.state.hasRunTests && input.context.testResults) {
+      const passed = input.context.testsPassed || 0
+      const total = input.context.testsTotal || 0
+      sections.push(`\nTEST RESULTS: ${passed}/${total} tests passed`)
+    }
+
+    return sections.join("\n")
+  }
+
+  private buildStateSummary(state: ConversationState): string {
+    const lines: string[] = ["CONVERSATION STATE:"]
+
+    // Approach
+    if (state.approachExplained) {
+      lines.push(`- Approach: ${state.approachType} (${state.approachQuality})`)
+    } else {
+      lines.push("- Approach: NOT YET EXPLAINED")
+    }
+
+    // Complexity
+    if (state.timeComplexityMentioned) {
+      lines.push(`- Time complexity: ${state.timeComplexityValue} ${state.complexityExplanationGiven ? "(with explanation)" : "(no explanation)"}`)
+    } else {
+      lines.push("- Time complexity: NOT DISCUSSED")
+    }
+
+    // Edge cases
+    if (state.edgeCasesMentioned.length > 0) {
+      lines.push(`- Edge cases mentioned: ${state.edgeCasesMentioned.join(", ")}`)
+    } else {
+      lines.push("- Edge cases: NOT MENTIONED")
+    }
+
+    // Progress
+    lines.push(`- Phase: ${state.currentPhase}`)
+    lines.push(`- Tests run: ${state.hasRunTests ? "YES" : "NO"}`)
+
+    return lines.join("\n")
+  }
+
+  private formatHistory(messages: ChatMessage[]): Array<{ role: "user" | "assistant"; content: string }> {
+    // Take last 10 messages for context (configurable)
+    const recentMessages = messages.slice(-10)
+
+    return recentMessages
+      .filter(m => m.role !== "system")
+      .map(m => ({
+        role: m.role === "user" ? "user" as const : "assistant" as const,
+        content: m.content,
+      }))
+  }
+
+  private detectPhaseFromResponse(response: string, currentPhase: InterviewPhase): InterviewPhase {
+    const lower = response.toLowerCase()
+
+    // Detect phase transitions from response content
+    if (lower.includes("view detailed feedback") || lower.includes("click submit")) {
+      return "post_interview"
+    }
+
+    if (lower.includes("go ahead and code") || lower.includes("start coding")) {
+      return "coding"
+    }
+
+    return currentPhase // No change detected
+  }
+}
+
+// =============================================================================
+// CONVENIENCE TYPES
+// =============================================================================
+
+import type { ConversationState } from "./types"
+
+// =============================================================================
+// SINGLETON EXPORT
+// =============================================================================
+
+export const interviewerAgent = new InterviewerAgent()
