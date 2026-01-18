@@ -331,7 +331,7 @@ export default function SessionDetailPage() {
                           new Date(session.started_at).getTime()) /
                           1000
                       )
-                    : session.elapsed_time || 0
+                    : session.session_state?.elapsed_time || 0
                 }
                 userId={firebaseUser?.uid}
                 problemType={session.type}
