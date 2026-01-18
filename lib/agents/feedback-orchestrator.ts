@@ -358,11 +358,23 @@ export class FeedbackOrchestrator {
       }
     } catch (error) {
       const totalLatency = Date.now() - startTime
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      const errorStack = error instanceof Error ? error.stack : undefined
+
+      console.error("=== FEEDBACK ORCHESTRATOR ERROR ===")
+      console.error("Error:", errorMessage)
+      console.error("Stack:", errorStack)
+      console.error("Total latency:", totalLatency, "ms")
+      console.error("Has partial scores:", partialScores !== null)
+      console.error("Partial scores:", partialScores)
+      console.error("Agent calls so far:", JSON.stringify(agentCalls, null, 2))
+      console.error("===================================")
 
       logger.error("[FeedbackOrchestrator] Feedback generation failed", {
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: errorMessage,
         totalLatencyMs: totalLatency,
         hasPartialScores: partialScores !== null,
+        agentCalls,
       })
 
       // If we have partial scores from before the failure, return them

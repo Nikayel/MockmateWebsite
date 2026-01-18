@@ -105,13 +105,22 @@ export class FeedbackWriterAgent implements Agent<
       )
     )
 
-    const response = await Promise.race([
-      generateAIResponse(this.buildSystemPrompt(input), prompt, [], {
-        complexity: "complex",
-        temperature: 0.3, // Low temperature for consistent feedback
-      }),
-      timeoutPromise,
-    ])
+    console.log("[FeedbackWriterAgent] Starting AI call for feedback generation...")
+
+    let response
+    try {
+      response = await Promise.race([
+        generateAIResponse(this.buildSystemPrompt(input), prompt, [], {
+          complexity: "complex",
+          temperature: 0.3, // Low temperature for consistent feedback
+        }),
+        timeoutPromise,
+      ])
+      console.log("[FeedbackWriterAgent] AI call succeeded, provider:", response.provider)
+    } catch (aiError) {
+      console.error("[FeedbackWriterAgent] AI call failed:", aiError)
+      throw aiError
+    }
 
     // Parse the structured response
     const parsed = this.parseFeedbackResponse(response.text, input)

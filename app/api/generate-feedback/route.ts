@@ -227,12 +227,22 @@ export async function POST(request: NextRequest) {
     const orchestratorResult = await orchestrateFeedbackGeneration(feedbackRequest)
 
     if (!orchestratorResult.success || !orchestratorResult.data) {
+      const errorMessage = orchestratorResult.error || "Feedback generation failed"
+      console.error("=== ORCHESTRATOR FAILED ===")
+      console.error("Session ID:", sessionId)
+      console.error("Error:", errorMessage)
+      console.error("Metrics:", JSON.stringify(orchestratorResult.metrics, null, 2))
+      console.error("Elapsed before orchestrator:", elapsedBeforeOrchestrator, "ms")
+      console.error("Remaining budget:", remainingBudgetMs, "ms")
+      console.error("===========================")
+
       logger.error("[Feedback API] Orchestrator failed", {
-        error: orchestratorResult.error,
+        error: errorMessage,
         sessionId,
+        metrics: orchestratorResult.metrics,
       })
       return NextResponse.json(
-        { error: orchestratorResult.error || "Feedback generation failed" },
+        { error: errorMessage },
         { status: 500 }
       )
     }
