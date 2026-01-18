@@ -2918,7 +2918,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             timeComplexity: efficiencyData?.estimatedTimeComplexity,
             spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
             efficiencyScore: efficiencyData?.efficiencyScore,
-            feedbackStatus: aiFeedbackSucceeded ? "complete" : "complete",
+            feedbackStatus: aiFeedbackSucceeded ? "complete" : "failed",
             scoreBreakdown: cleanScoreBreakdown,
             constitutionalAICritique: localConstitutionalAICritique || undefined,
           })

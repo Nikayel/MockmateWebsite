@@ -37,6 +37,10 @@ import {
   type ExtractedEvidence,
 } from "@/lib/feedback/structured-extraction"
 
+// Set maximum duration for feedback generation (90 seconds to allow for AI processing)
+// This prevents Vercel serverless timeout on complex feedback generation
+export const maxDuration = 90
+
 export async function POST(request: NextRequest) {
   // Apply rate limiting
   const rateLimitResponse = await feedbackRateLimit(request)

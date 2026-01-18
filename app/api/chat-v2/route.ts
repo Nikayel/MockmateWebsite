@@ -488,7 +488,7 @@ function buildMessages(context: ChatRequest["context"]): ChatMessage[] {
   const managedContext = manageContextWindow(context)
 
   return managedContext.map((msg) => ({
-    role: msg.type === "user" ? ("user" as const) : ("assistant" as const),
+    role: msg.type === "user" ? ("user" as const) : ("model" as const),
     content: msg.message,
   }))
 }
@@ -988,16 +988,16 @@ export async function POST(request: NextRequest) {
     })
 
     // Track analytics
-    trackAIChatServer({
-      event: "chat_v2_response",
-      userId: body.userId,
-      sessionId: body.sessionId,
-      properties: {
-        latencyMs: totalLatency,
-        retries: result.metrics?.retries || 0,
-        agentCalls: result.metrics?.agentCalls?.length || 0,
-      },
-    }).catch(() => {}) // Fire and forget
+    if (body.userId && body.sessionId) {
+      trackAIChatServer({
+        userId: body.userId,
+        sessionId: body.sessionId,
+        interactionType: "interviewer",
+        messageLength: body.message?.length || 0,
+        responseTimeMs: totalLatency,
+        provider: "orchestrator-v2",
+      }).catch(() => {}) // Fire and forget
+    }
 
     // Return response (same format as v1 for compatibility)
     // v1 uses "reply" as the key, so we match that

@@ -8,6 +8,9 @@ import type { CompanyId } from "@/lib/data/company-questions/types"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import type { CompanyInterviewKnowledge } from "./types"
 
+// Re-export CompanyId for consumers
+export type { CompanyId }
+
 /**
  * Comprehensive company interview knowledge
  */

@@ -32,6 +32,13 @@ export {
   calculateVoiceCost,
 } from "./usage-tracking-client"
 
+// Direct import for use within this file
+import {
+  BUDGET_CAPS as BUDGET_CAPS_IMPORTED,
+  EMBEDDING_COSTS as EMBEDDING_COSTS_IMPORTED,
+  calculateCost as calculateCostImported,
+} from "./usage-tracking-client"
+
 export type UsageEventType =
   | "chat_message"
   | "feedback_generation"
@@ -193,8 +200,8 @@ export async function getUserUsageSummary(userId: string): Promise<UserUsageSumm
 
     // Get user's subscription tier for budget cap
     const userDoc = await adminDb.collection("users").doc(userId).get()
-    const tier = (userDoc.data()?.subscription_tier || "free") as keyof typeof BUDGET_CAPS
-    const budgetCap = BUDGET_CAPS[tier] || BUDGET_CAPS.free
+    const tier = (userDoc.data()?.subscription_tier || "free") as keyof typeof BUDGET_CAPS_IMPORTED
+    const budgetCap = BUDGET_CAPS_IMPORTED[tier] || BUDGET_CAPS_IMPORTED.free
 
     if (!summaryDoc.exists) {
       const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -294,9 +301,10 @@ export async function checkUserBudget(userId: string): Promise<{
  */
 export function calculateEmbeddingCost(
   text: string,
-  model: keyof typeof EMBEDDING_COSTS = "text-embedding-004"
+  model: keyof typeof EMBEDDING_COSTS_IMPORTED = "text-embedding-004"
 ): { cost: number; tokens: number; isExact: boolean } {
-  const costPer1k = EMBEDDING_COSTS[model] || EMBEDDING_COSTS["text-embedding-004"]
+  const costPer1k =
+    EMBEDDING_COSTS_IMPORTED[model] || EMBEDDING_COSTS_IMPORTED["text-embedding-004"]
   const tokenResult = countTokens(text)
   const cost = (tokenResult.tokens / 1000) * costPer1k
   return { cost, tokens: tokenResult.tokens, isExact: tokenResult.isExact }
@@ -307,9 +315,10 @@ export function calculateEmbeddingCost(
  */
 export function calculateEmbeddingCostFromTokens(
   tokens: number,
-  model: keyof typeof EMBEDDING_COSTS = "text-embedding-004"
+  model: keyof typeof EMBEDDING_COSTS_IMPORTED = "text-embedding-004"
 ): number {
-  const costPer1k = EMBEDDING_COSTS[model] || EMBEDDING_COSTS["text-embedding-004"]
+  const costPer1k =
+    EMBEDDING_COSTS_IMPORTED[model] || EMBEDDING_COSTS_IMPORTED["text-embedding-004"]
   return (tokens / 1000) * costPer1k
 }
 
@@ -484,7 +493,8 @@ export async function getAdminUsageStats(options?: {
   for (const userDoc of usersSnapshot.docs) {
     const userData = userDoc.data()
     const tier = userData.subscription_tier || "free"
-    const budgetCap = BUDGET_CAPS[tier as keyof typeof BUDGET_CAPS] || BUDGET_CAPS.free
+    const budgetCap =
+      BUDGET_CAPS_IMPORTED[tier as keyof typeof BUDGET_CAPS_IMPORTED] || BUDGET_CAPS_IMPORTED.free
 
     // Get usage summary for this user
     const summaryDoc = await adminDb
@@ -1049,7 +1059,7 @@ export async function trackLLMUsageAccurate(params: {
   const inputCount = countTokens(inputText)
   const outputCount = countTokens(outputText)
   const totalTokens = inputCount.tokens + outputCount.tokens
-  const cost = calculateCost(inputCount.tokens, outputCount.tokens, provider)
+  const cost = calculateCostImported(inputCount.tokens, outputCount.tokens, provider)
 
   await trackUsageEvent({
     userId,

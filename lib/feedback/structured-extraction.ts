@@ -24,19 +24,19 @@ export interface ExtractedEvidence {
   // Approach discussion
   approach: {
     explained: boolean
-    type: 'brute_force' | 'optimized' | 'unclear' | 'none'
-    quote: string | null  // Exact quote from transcript
+    type: "brute_force" | "optimized" | "unclear" | "none"
+    quote: string | null // Exact quote from transcript
     messageIndex: number | null
   }
 
   // Complexity discussion
   timeComplexity: {
     mentioned: boolean
-    value: string | null  // e.g., "O(n)"
+    value: string | null // e.g., "O(n)"
     explanationGiven: boolean
     quote: string | null
     messageIndex: number | null
-    isCorrect: boolean | null  // null if not verifiable
+    isCorrect: boolean | null // null if not verifiable
   }
 
   spaceComplexity: {
@@ -49,9 +49,9 @@ export interface ExtractedEvidence {
 
   // Edge cases
   edgeCases: {
-    mentionedByCandidate: string[]  // List with quotes
-    mentionedAfterPrompt: string[]  // Edge cases only mentioned after interviewer asked
-    missedCritical: string[]  // Critical edge cases never mentioned
+    mentionedByCandidate: string[] // List with quotes
+    mentionedAfterPrompt: string[] // Edge cases only mentioned after interviewer asked
+    missedCritical: string[] // Critical edge cases never mentioned
   }
 
   // Problem-solving progression
@@ -59,14 +59,14 @@ export interface ExtractedEvidence {
     startedWithBruteForce: boolean
     improvedAfterPrompt: boolean
     selfCorrectedBugs: boolean
-    bugQuotes: string[]  // Quotes of bug corrections
+    bugQuotes: string[] // Quotes of bug corrections
   }
 
   // Questions and answers
   interviewerQuestions: {
     question: string
     answered: boolean
-    answerQuality: 'good' | 'partial' | 'poor' | 'unanswered'
+    answerQuality: "good" | "partial" | "poor" | "unanswered"
     quote: string | null
   }[]
 
@@ -75,7 +75,7 @@ export interface ExtractedEvidence {
     explainedWhileCoding: boolean
     askedClarifyingQuestions: boolean
     respondedToFeedback: boolean
-    quotes: string[]  // Key communication quotes
+    quotes: string[] // Key communication quotes
   }
 
   // Hints and help
@@ -91,7 +91,7 @@ export interface ExtractedEvidence {
 // =============================================================================
 
 interface TranscriptMessage {
-  role: 'user' | 'interviewer' | 'assistant'
+  role: "user" | "interviewer" | "assistant"
   content: string
   timestamp?: number
 }
@@ -133,13 +133,40 @@ function extractAlgorithmically(
   }
 ): Partial<ExtractedEvidence> {
   const evidence: Partial<ExtractedEvidence> = {
-    approach: { explained: false, type: 'none', quote: null, messageIndex: null },
-    timeComplexity: { mentioned: false, value: null, explanationGiven: false, quote: null, messageIndex: null, isCorrect: null },
-    spaceComplexity: { mentioned: false, value: null, quote: null, messageIndex: null, isCorrect: null },
-    edgeCases: { mentionedByCandidate: [], mentionedAfterPrompt: [], missedCritical: [...problemContext.criticalEdgeCases] },
-    progression: { startedWithBruteForce: false, improvedAfterPrompt: false, selfCorrectedBugs: false, bugQuotes: [] },
+    approach: { explained: false, type: "none", quote: null, messageIndex: null },
+    timeComplexity: {
+      mentioned: false,
+      value: null,
+      explanationGiven: false,
+      quote: null,
+      messageIndex: null,
+      isCorrect: null,
+    },
+    spaceComplexity: {
+      mentioned: false,
+      value: null,
+      quote: null,
+      messageIndex: null,
+      isCorrect: null,
+    },
+    edgeCases: {
+      mentionedByCandidate: [],
+      mentionedAfterPrompt: [],
+      missedCritical: [...problemContext.criticalEdgeCases],
+    },
+    progression: {
+      startedWithBruteForce: false,
+      improvedAfterPrompt: false,
+      selfCorrectedBugs: false,
+      bugQuotes: [],
+    },
     interviewerQuestions: [],
-    communication: { explainedWhileCoding: false, askedClarifyingQuestions: false, respondedToFeedback: false, quotes: [] },
+    communication: {
+      explainedWhileCoding: false,
+      askedClarifyingQuestions: false,
+      respondedToFeedback: false,
+      quotes: [],
+    },
     hints: { totalGiven: 0, usedEffectively: false, copiedBlindly: false },
   }
 
@@ -152,18 +179,18 @@ function extractAlgorithmically(
     const content = msg.content.toLowerCase()
     const originalContent = msg.content
 
-    if (msg.role === 'user') {
+    if (msg.role === "user") {
       // ANSWER DETECTION: If there are pending questions and user responds with substance,
       // mark them as answered. A substantive response is > 20 chars (not just "ok" or "yes")
       if (pendingQuestions.length > 0 && originalContent.length > 20) {
-        pendingQuestions.forEach(pq => {
+        pendingQuestions.forEach((pq) => {
           // Find the question in our evidence and mark it answered
           const questionEntry = evidence.interviewerQuestions!.find(
-            q => q.question === pq.question
+            (q) => q.question === pq.question
           )
           if (questionEntry) {
             questionEntry.answered = true
-            questionEntry.answerQuality = originalContent.length > 100 ? 'good' : 'partial'
+            questionEntry.answerQuality = originalContent.length > 100 ? "good" : "partial"
             questionEntry.quote = originalContent.substring(0, 150)
           }
         })
@@ -175,40 +202,53 @@ function extractAlgorithmically(
       const complexityMatches = originalContent.match(/O\([^)]+\)/gi)
       if (complexityMatches && complexityMatches.length > 0) {
         // Get ALL complexity values and find the dominant one
-        const allComplexities = complexityMatches.map(c => c.toUpperCase())
+        const allComplexities = complexityMatches.map((c) => c.toUpperCase())
         const dominantComplexity = findDominantComplexity(allComplexities)
 
         // Also check for non-O(...) keywords like "n squared", "quadratic", etc.
         // These often represent the actual time complexity
         let keywordComplexity: string | null = null
-        if (content.includes('n squared') || content.includes('n^2') || content.includes('quadratic')) {
-          keywordComplexity = 'O(N²)'
-        } else if (content.includes('n log n')) {
-          keywordComplexity = 'O(N LOG N)'
-        } else if (content.includes('linear') && !content.includes('log')) {
-          keywordComplexity = 'O(N)'
+        if (
+          content.includes("n squared") ||
+          content.includes("n^2") ||
+          content.includes("quadratic")
+        ) {
+          keywordComplexity = "O(N²)"
+        } else if (content.includes("n log n")) {
+          keywordComplexity = "O(N LOG N)"
+        } else if (content.includes("linear") && !content.includes("log")) {
+          keywordComplexity = "O(N)"
         }
 
         // Use keyword complexity if it's "bigger" than the O(...) matches
         // This handles "sorting is O(n log n) but overall is n squared"
-        const finalComplexity = keywordComplexity &&
+        const finalComplexity =
+          keywordComplexity &&
           getComplexityRank(keywordComplexity) > getComplexityRank(dominantComplexity)
-          ? keywordComplexity
-          : dominantComplexity
+            ? keywordComplexity
+            : dominantComplexity
 
         // Determine if time or space based on context
-        if (content.includes('time') || content.includes('runtime') || content.includes('overall') || !evidence.timeComplexity!.mentioned) {
+        if (
+          content.includes("time") ||
+          content.includes("runtime") ||
+          content.includes("overall") ||
+          !evidence.timeComplexity!.mentioned
+        ) {
           evidence.timeComplexity = {
             mentioned: true,
             value: finalComplexity,
-            explanationGiven: content.includes('because') || content.includes('loop') || content.includes('iterate'),
+            explanationGiven:
+              content.includes("because") ||
+              content.includes("loop") ||
+              content.includes("iterate"),
             quote: originalContent.substring(0, 200),
             messageIndex: index,
             isCorrect: finalComplexity === problemContext.optimalTimeComplexity.toUpperCase(),
           }
         }
 
-        if (content.includes('space') || content.includes('memory')) {
+        if (content.includes("space") || content.includes("memory")) {
           evidence.spaceComplexity = {
             mentioned: true,
             value: dominantComplexity, // For space, use the raw match
@@ -223,9 +263,9 @@ function extractAlgorithmically(
       if (
         content.includes("i'll use") ||
         content.includes("i would") ||
-        content.includes('my approach') ||
-        content.includes('thinking') ||
-        content.includes('plan is')
+        content.includes("my approach") ||
+        content.includes("thinking") ||
+        content.includes("plan is")
       ) {
         evidence.approach = {
           explained: true,
@@ -236,7 +276,7 @@ function extractAlgorithmically(
       }
 
       // Check for edge case mentions - use shared keywords from shared-patterns.ts
-      EDGE_CASE_KEYWORDS.forEach(keyword => {
+      EDGE_CASE_KEYWORDS.forEach((keyword) => {
         if (content.includes(keyword)) {
           const quote = `"${originalContent.substring(0, 100)}..."`
           if (interviewerAskedEdgeCase) {
@@ -251,64 +291,70 @@ function extractAlgorithmically(
 
           // Remove from missed if mentioned
           evidence.edgeCases!.missedCritical = evidence.edgeCases!.missedCritical.filter(
-            ec => !ec.toLowerCase().includes(keyword)
+            (ec) => !ec.toLowerCase().includes(keyword)
           )
         }
       })
 
       // Check for clarifying questions
-      if (content.includes('?') && (
-        content.includes('what if') ||
-        content.includes('should i') ||
-        content.includes('can i') ||
-        content.includes('do we')
-      )) {
+      if (
+        content.includes("?") &&
+        (content.includes("what if") ||
+          content.includes("should i") ||
+          content.includes("can i") ||
+          content.includes("do we"))
+      ) {
         evidence.communication!.askedClarifyingQuestions = true
       }
 
       // Check for brute force progression
-      if (content.includes('brute force') || content.includes('n squared') || content.includes('nested loop')) {
+      if (
+        content.includes("brute force") ||
+        content.includes("n squared") ||
+        content.includes("nested loop")
+      ) {
         evidence.progression!.startedWithBruteForce = true
       }
 
       // Check for optimization after brute force
-      if (evidence.progression!.startedWithBruteForce && (
-        content.includes('optimize') ||
-        content.includes('better') ||
-        content.includes('hash') ||
-        content.includes('improve')
-      )) {
+      if (
+        evidence.progression!.startedWithBruteForce &&
+        (content.includes("optimize") ||
+          content.includes("better") ||
+          content.includes("hash") ||
+          content.includes("improve"))
+      ) {
         evidence.progression!.improvedAfterPrompt = true
       }
 
       // Check for bug self-correction
       if (
-        content.includes('wait') ||
-        content.includes('actually') ||
-        content.includes('mistake') ||
-        content.includes('bug') ||
-        content.includes('fix')
+        content.includes("wait") ||
+        content.includes("actually") ||
+        content.includes("mistake") ||
+        content.includes("bug") ||
+        content.includes("fix")
       ) {
         evidence.progression!.selfCorrectedBugs = true
         evidence.progression!.bugQuotes.push(`"${originalContent.substring(0, 100)}..."`)
       }
     }
 
-    if (msg.role === 'interviewer' || msg.role === 'assistant') {
+    if (msg.role === "interviewer" || msg.role === "assistant") {
       // Track interviewer questions and add to pending queue
-      if (content.includes('?')) {
+      if (content.includes("?")) {
         const questionMatch = originalContent.match(/[^.!?]*\?/g)
         if (questionMatch) {
-          questionMatch.forEach(q => {
+          questionMatch.forEach((q) => {
             const questionText = q.trim()
             // Skip very short questions (likely rhetorical) or confirmations
-            if (questionText.length < 15 || questionText.toLowerCase().includes('right?')) {
+            if (questionText.length < 15 || questionText.toLowerCase().includes("right?")) {
               return
             }
             evidence.interviewerQuestions!.push({
               question: questionText,
-              answered: false,  // Will be updated when user responds
-              answerQuality: 'unanswered',
+              answered: false, // Will be updated when user responds
+              answerQuality: "unanswered",
               quote: null,
             })
             // Add to pending questions for next user message to match
@@ -319,20 +365,20 @@ function extractAlgorithmically(
 
       // Track if interviewer asked about edge cases
       if (
-        content.includes('edge case') ||
-        content.includes('empty') ||
-        content.includes('what if') ||
-        content.includes('what happens')
+        content.includes("edge case") ||
+        content.includes("empty") ||
+        content.includes("what if") ||
+        content.includes("what happens")
       ) {
         interviewerAskedEdgeCase = true
       }
 
       // Track hints given
       if (
-        content.includes('hint') ||
-        content.includes('consider') ||
-        content.includes('think about') ||
-        content.includes('what if you')
+        content.includes("hint") ||
+        content.includes("consider") ||
+        content.includes("think about") ||
+        content.includes("what if you")
       ) {
         evidence.hints!.totalGiven++
       }
@@ -342,14 +388,25 @@ function extractAlgorithmically(
   return evidence
 }
 
-function detectApproachType(content: string): 'brute_force' | 'optimized' | 'unclear' {
-  if (content.includes('brute force') || content.includes('nested') || content.includes('n squared') || content.includes('n^2')) {
-    return 'brute_force'
+function detectApproachType(content: string): "brute_force" | "optimized" | "unclear" {
+  if (
+    content.includes("brute force") ||
+    content.includes("nested") ||
+    content.includes("n squared") ||
+    content.includes("n^2")
+  ) {
+    return "brute_force"
   }
-  if (content.includes('hash') || content.includes('map') || content.includes('set') || content.includes('o(n)') || content.includes('single pass')) {
-    return 'optimized'
+  if (
+    content.includes("hash") ||
+    content.includes("map") ||
+    content.includes("set") ||
+    content.includes("o(n)") ||
+    content.includes("single pass")
+  ) {
+    return "optimized"
   }
-  return 'unclear'
+  return "unclear"
 }
 
 /**
@@ -366,14 +423,14 @@ async function extractSemantically(
 ): Promise<Partial<ExtractedEvidence>> {
   const transcriptText = transcript
     .map((m, i) => `[${i}] ${m.role.toUpperCase()}: ${m.content}`)
-    .join('\n\n')
+    .join("\n\n")
 
   const extractionPrompt = `Analyze this interview transcript and extract specific evidence.
 
 PROBLEM: ${problemContext.title}
 OPTIMAL TIME: ${problemContext.optimalTimeComplexity}
 OPTIMAL SPACE: ${problemContext.optimalSpaceComplexity}
-CRITICAL EDGE CASES: ${problemContext.criticalEdgeCases.join(', ')}
+CRITICAL EDGE CASES: ${problemContext.criticalEdgeCases.join(", ")}
 
 TRANSCRIPT:
 ${transcriptText.substring(0, 8000)}
@@ -406,12 +463,24 @@ RULES:
 - Maximum 10 questions to analyze`
 
   try {
-    const response = await generateAIResponse(
-      "You are a transcript analyzer. Return only valid JSON, no markdown.",
-      extractionPrompt,
-      [],
-      { complexity: "critique", temperature: 0.1 }
+    // Add 30-second timeout to prevent hanging
+    const EXTRACTION_TIMEOUT_MS = 30000
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error("Evidence extraction timed out after 30 seconds")),
+        EXTRACTION_TIMEOUT_MS
+      )
     )
+
+    const response = await Promise.race([
+      generateAIResponse(
+        "You are a transcript analyzer. Return only valid JSON, no markdown.",
+        extractionPrompt,
+        [],
+        { complexity: "critique", temperature: 0.1 }
+      ),
+      timeoutPromise,
+    ])
 
     const jsonMatch = response.text.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
@@ -420,7 +489,7 @@ RULES:
         interviewerQuestions: parsed.interviewerQuestions || [],
         communication: {
           explainedWhileCoding: parsed.explainedWhileCoding || false,
-          askedClarifyingQuestions: false,  // Already handled algorithmically
+          askedClarifyingQuestions: false, // Already handled algorithmically
           respondedToFeedback: parsed.respondedToFeedback || false,
           quotes: parsed.communicationQuotes || [],
         },
@@ -441,18 +510,48 @@ function mergeEvidence(
   semantic: Partial<ExtractedEvidence>
 ): ExtractedEvidence {
   return {
-    approach: algorithmic.approach || { explained: false, type: 'none', quote: null, messageIndex: null },
-    timeComplexity: algorithmic.timeComplexity || { mentioned: false, value: null, explanationGiven: false, quote: null, messageIndex: null, isCorrect: null },
-    spaceComplexity: algorithmic.spaceComplexity || { mentioned: false, value: null, quote: null, messageIndex: null, isCorrect: null },
-    edgeCases: algorithmic.edgeCases || { mentionedByCandidate: [], mentionedAfterPrompt: [], missedCritical: [] },
-    progression: algorithmic.progression || { startedWithBruteForce: false, improvedAfterPrompt: false, selfCorrectedBugs: false, bugQuotes: [] },
+    approach: algorithmic.approach || {
+      explained: false,
+      type: "none",
+      quote: null,
+      messageIndex: null,
+    },
+    timeComplexity: algorithmic.timeComplexity || {
+      mentioned: false,
+      value: null,
+      explanationGiven: false,
+      quote: null,
+      messageIndex: null,
+      isCorrect: null,
+    },
+    spaceComplexity: algorithmic.spaceComplexity || {
+      mentioned: false,
+      value: null,
+      quote: null,
+      messageIndex: null,
+      isCorrect: null,
+    },
+    edgeCases: algorithmic.edgeCases || {
+      mentionedByCandidate: [],
+      mentionedAfterPrompt: [],
+      missedCritical: [],
+    },
+    progression: algorithmic.progression || {
+      startedWithBruteForce: false,
+      improvedAfterPrompt: false,
+      selfCorrectedBugs: false,
+      bugQuotes: [],
+    },
     // Prefer semantic for questions (more nuanced)
     interviewerQuestions: semantic.interviewerQuestions?.length
       ? semantic.interviewerQuestions
       : algorithmic.interviewerQuestions || [],
     // Merge communication
     communication: {
-      explainedWhileCoding: semantic.communication?.explainedWhileCoding || algorithmic.communication?.explainedWhileCoding || false,
+      explainedWhileCoding:
+        semantic.communication?.explainedWhileCoding ||
+        algorithmic.communication?.explainedWhileCoding ||
+        false,
       askedClarifyingQuestions: algorithmic.communication?.askedClarifyingQuestions || false,
       respondedToFeedback: semantic.communication?.respondedToFeedback || false,
       quotes: [
@@ -489,8 +588,10 @@ export function buildEvidenceSummary(evidence: ExtractedEvidence): string {
   sections.push(`\n## COMPLEXITY DISCUSSION`)
   if (evidence.timeComplexity.mentioned) {
     sections.push(`- Time complexity discussed: YES - ${evidence.timeComplexity.value}`)
-    sections.push(`- Explanation given: ${evidence.timeComplexity.explanationGiven ? 'YES' : 'NO'}`)
-    sections.push(`- Correct: ${evidence.timeComplexity.isCorrect === null ? 'Unknown' : evidence.timeComplexity.isCorrect ? 'YES' : 'NO'}`)
+    sections.push(`- Explanation given: ${evidence.timeComplexity.explanationGiven ? "YES" : "NO"}`)
+    sections.push(
+      `- Correct: ${evidence.timeComplexity.isCorrect === null ? "Unknown" : evidence.timeComplexity.isCorrect ? "YES" : "NO"}`
+    )
     if (evidence.timeComplexity.quote) {
       sections.push(`- Quote: ${evidence.timeComplexity.quote}`)
     }
@@ -505,14 +606,18 @@ export function buildEvidenceSummary(evidence: ExtractedEvidence): string {
   // Edge cases
   sections.push(`\n## EDGE CASES`)
   if (evidence.edgeCases.mentionedByCandidate.length > 0) {
-    sections.push(`- Mentioned BEFORE interviewer asked: ${evidence.edgeCases.mentionedByCandidate.join(', ')}`)
+    sections.push(
+      `- Mentioned BEFORE interviewer asked: ${evidence.edgeCases.mentionedByCandidate.join(", ")}`
+    )
     sections.push(`  -> DO NOT say "didn't mention edge cases" - they did!`)
   }
   if (evidence.edgeCases.mentionedAfterPrompt.length > 0) {
-    sections.push(`- Mentioned AFTER interviewer asked: ${evidence.edgeCases.mentionedAfterPrompt.join(', ')}`)
+    sections.push(
+      `- Mentioned AFTER interviewer asked: ${evidence.edgeCases.mentionedAfterPrompt.join(", ")}`
+    )
   }
   if (evidence.edgeCases.missedCritical.length > 0) {
-    sections.push(`- Missed critical edge cases: ${evidence.edgeCases.missedCritical.join(', ')}`)
+    sections.push(`- Missed critical edge cases: ${evidence.edgeCases.missedCritical.join(", ")}`)
   }
 
   // Progression
@@ -525,29 +630,35 @@ export function buildEvidenceSummary(evidence: ExtractedEvidence): string {
   }
   if (evidence.progression.selfCorrectedBugs) {
     sections.push(`- Self-corrected bugs: YES (POSITIVE SIGNAL!)`)
-    evidence.progression.bugQuotes.forEach(q => sections.push(`  - ${q}`))
+    evidence.progression.bugQuotes.forEach((q) => sections.push(`  - ${q}`))
   }
 
   // Questions answered
   sections.push(`\n## QUESTIONS ANSWERED`)
-  const answered = evidence.interviewerQuestions.filter(q => q.answered)
+  const answered = evidence.interviewerQuestions.filter((q) => q.answered)
   const total = evidence.interviewerQuestions.length
   sections.push(`- ${answered.length}/${total} interviewer questions answered`)
-  evidence.interviewerQuestions.slice(0, 5).forEach(q => {
+  evidence.interviewerQuestions.slice(0, 5).forEach((q) => {
     sections.push(`- Q: "${q.question.substring(0, 50)}..." -> ${q.answerQuality}`)
   })
 
   // Communication
   sections.push(`\n## COMMUNICATION`)
-  sections.push(`- Explained while coding: ${evidence.communication.explainedWhileCoding ? 'YES' : 'NO'}`)
-  sections.push(`- Asked clarifying questions: ${evidence.communication.askedClarifyingQuestions ? 'YES' : 'NO'}`)
-  sections.push(`- Responded to feedback: ${evidence.communication.respondedToFeedback ? 'YES' : 'NO'}`)
+  sections.push(
+    `- Explained while coding: ${evidence.communication.explainedWhileCoding ? "YES" : "NO"}`
+  )
+  sections.push(
+    `- Asked clarifying questions: ${evidence.communication.askedClarifyingQuestions ? "YES" : "NO"}`
+  )
+  sections.push(
+    `- Responded to feedback: ${evidence.communication.respondedToFeedback ? "YES" : "NO"}`
+  )
 
   // Hints
   sections.push(`\n## HINTS`)
   sections.push(`- Total hints given: ${evidence.hints.totalGiven}`)
 
-  return sections.join('\n')
+  return sections.join("\n")
 }
 
 /**
@@ -555,7 +666,13 @@ export function buildEvidenceSummary(evidence: ExtractedEvidence): string {
  */
 export function buildConstitutionalContext(
   evidence: ExtractedEvidence,
-  scores: { understanding: number; problemSolving: number; codeQuality: number; communication: number; overall: number },
+  scores: {
+    understanding: number
+    problemSolving: number
+    codeQuality: number
+    communication: number
+    overall: number
+  },
   problemContext: { title: string; optimalTimeComplexity: string; optimalSpaceComplexity: string }
 ): string {
   return `

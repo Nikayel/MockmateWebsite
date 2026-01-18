@@ -21,10 +21,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { feedbackRateLimit } from "@/lib/rate-limit"
 import { enforceQuota } from "@/lib/quota-enforcement"
 import { logger } from "@/lib/logger"
-import {
-  orchestrateFeedbackGeneration,
-  type FeedbackRequest,
-} from "@/lib/agents"
+import { orchestrateFeedbackGeneration, type FeedbackRequest } from "@/lib/agents"
 
 // =============================================================================
 // REQUEST/RESPONSE TYPES (same as v1 for compatibility)
@@ -90,10 +87,8 @@ function validateRequest(body: FeedbackApiRequest): { valid: boolean; error?: st
     return { valid: false, error: `Code exceeds ${MAX_CODE_LENGTH} characters` }
   }
 
-  const transcriptLength = body.conversationHistory?.reduce(
-    (sum, msg) => sum + (msg.message?.length || 0),
-    0
-  ) || 0
+  const transcriptLength =
+    body.conversationHistory?.reduce((sum, msg) => sum + (msg.message?.length || 0), 0) || 0
 
   if (transcriptLength > MAX_TRANSCRIPT_LENGTH) {
     return { valid: false, error: `Transcript exceeds ${MAX_TRANSCRIPT_LENGTH} characters` }
@@ -105,6 +100,10 @@ function validateRequest(body: FeedbackApiRequest): { valid: boolean; error?: st
 // =============================================================================
 // MAIN HANDLER
 // =============================================================================
+
+// Set maximum duration for feedback generation (90 seconds to allow for AI processing)
+// This prevents Vercel serverless timeout on complex feedback generation
+export const maxDuration = 90
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
@@ -136,7 +135,7 @@ export async function POST(request: NextRequest) {
       scenarioTitle: body.scenarioTitle,
       scenarioPattern: body.scenarioPattern,
       transcript: (body.conversationHistory || []).map((msg) => ({
-        role: msg.type === "user" ? "user" as const : "interviewer" as const,
+        role: msg.type === "user" ? ("user" as const) : ("interviewer" as const),
         content: msg.message,
       })),
       code: body.code || "",
@@ -235,10 +234,7 @@ export async function POST(request: NextRequest) {
       latencyMs: latency,
     })
 
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 

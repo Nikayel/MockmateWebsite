@@ -96,11 +96,22 @@ export class FeedbackWriterAgent implements Agent<
     // Build the prompt with evidence grounding + pattern knowledge
     const prompt = this.buildFeedbackPrompt(input)
 
-    // Generate feedback using AI
-    const response = await generateAIResponse(this.buildSystemPrompt(input), prompt, [], {
-      complexity: "complex",
-      temperature: 0.3, // Low temperature for consistent feedback
-    })
+    // Generate feedback using AI with timeout to prevent hanging
+    const FEEDBACK_TIMEOUT_MS = 45000 // 45 seconds
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error("Feedback generation timed out after 45 seconds")),
+        FEEDBACK_TIMEOUT_MS
+      )
+    )
+
+    const response = await Promise.race([
+      generateAIResponse(this.buildSystemPrompt(input), prompt, [], {
+        complexity: "complex",
+        temperature: 0.3, // Low temperature for consistent feedback
+      }),
+      timeoutPromise,
+    ])
 
     // Parse the structured response
     const parsed = this.parseFeedbackResponse(response.text, input)
