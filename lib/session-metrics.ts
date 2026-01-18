@@ -688,9 +688,12 @@ async function storeSessionSummary(summary: SessionSummary): Promise<void> {
  * Sync score to interview_sessions collection
  * Ensures dashboard "Recent Avg" matches "This Week" percentage
  *
- * IMPORTANT: Only syncs if no authoritative score exists from generate-feedback API.
+ * IMPORTANT: Only syncs if no score_breakdown already exists.
  * This prevents race conditions where metrics tracking (with incomplete data) overwrites
- * the proper AI-calculated score from the feedback generation.
+ * scores that were already set (either by AI feedback or fallback feedback).
+ *
+ * The interview page sets scores first (via updateInterviewSession), so we should
+ * NOT overwrite those scores with our metrics-based estimates.
  */
 async function syncScoreToInterviewSession(
   sessionId: string,
@@ -700,26 +703,33 @@ async function syncScoreToInterviewSession(
   isReconstructedSession: boolean = false
 ): Promise<void> {
   try {
-    // ALWAYS check if authoritative score already exists from generate-feedback API
-    // The feedback API calculates scores with full AI validation - those are the source of truth
-    // Our locally-calculated scores from interaction metrics are less accurate
+    // Check if score_breakdown already exists - if so, don't overwrite
+    // This can happen when:
+    // 1. AI feedback succeeded and set authoritative scores
+    // 2. Fallback feedback already set estimated scores (from interview page)
+    // In both cases, those scores are the source of truth for the session
     const sessionDoc = await adminDb.collection("interview_sessions").doc(sessionId).get()
     const existingData = sessionDoc.data()
 
-    // If feedback_status is 'complete' and we have a score_breakdown, the generate-feedback API
-    // already set the authoritative scores - don't overwrite them with our estimated scores
+    // If score_breakdown already has numeric values, don't overwrite
+    // Check for any valid score to determine if scores were already set
     if (
-      existingData?.feedback_status === "complete" &&
       existingData?.score_breakdown &&
-      typeof existingData.score_breakdown.understandingScore === "number"
+      (typeof existingData.score_breakdown.understandingScore === "number" ||
+        typeof existingData.score_breakdown.problemSolvingScore === "number" ||
+        typeof existingData.score_breakdown.codeQualityScore === "number" ||
+        typeof existingData.score_breakdown.communicationScore === "number")
     ) {
       console.log(
-        `[Session Metrics] Skipping score sync for ${sessionId} - authoritative score_breakdown exists from generate-feedback`
+        `[Session Metrics] Skipping score sync for ${sessionId} - score_breakdown already exists (feedback_status: ${existingData.feedback_status})`
       )
       return
     }
 
-    // Only sync scores if no authoritative scores exist (fallback case)
+    // Only sync scores if no scores exist yet (edge case: session completed without proper feedback flow)
+    console.log(
+      `[Session Metrics] Syncing scores for ${sessionId} - no existing score_breakdown found`
+    )
     await adminDb
       .collection("interview_sessions")
       .doc(sessionId)
