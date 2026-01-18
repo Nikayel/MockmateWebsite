@@ -134,18 +134,30 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2. Communication validation (AI-powered)
+    // 2. Communication validation (AI-powered) - with timeout to preserve orchestrator budget
     let aiValidation: FeedbackRequest["aiValidation"] | undefined
     const elapsedAfterParsing = Date.now() - startTime
+    const COMM_VALIDATION_TIMEOUT_MS = 25000 // 25s max for communication validation
     if (elapsedAfterParsing < 30000 && transcript.length > 0) {
       try {
-        const commResult = await validateCommunication(transcript)
-        aiValidation = {
-          communicationScore: commResult.communicationScore,
-          approachExplained: commResult.approachExplained,
-          approachQuality: commResult.approachQuality,
-          complexityDiscussed: commResult.complexityDiscussed,
-          edgeCasesConsidered: commResult.edgeCasesConsidered,
+        // Race against timeout to ensure orchestrator has enough budget
+        const commResultPromise = validateCommunication(transcript)
+        const timeoutPromise = new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), COMM_VALIDATION_TIMEOUT_MS)
+        )
+
+        const commResult = await Promise.race([commResultPromise, timeoutPromise])
+
+        if (commResult) {
+          aiValidation = {
+            communicationScore: commResult.communicationScore,
+            approachExplained: commResult.approachExplained,
+            approachQuality: commResult.approachQuality,
+            complexityDiscussed: commResult.complexityDiscussed,
+            edgeCasesConsidered: commResult.edgeCasesConsidered,
+          }
+        } else {
+          logger.warn("[Feedback API] Communication validation timed out after 25s")
         }
       } catch (err) {
         logger.warn("[Feedback API] Communication validation failed", { error: err })
@@ -171,6 +183,19 @@ export async function POST(request: NextRequest) {
     // ==========================================================================
     // CALL MULTI-AGENT ORCHESTRATOR
     // ==========================================================================
+
+    // Calculate remaining time budget for orchestrator
+    // The route has 120s max, we need 10s buffer for response/cleanup
+    const elapsedBeforeOrchestrator = Date.now() - startTime
+    const remainingBudgetMs = Math.max(30000, 110000 - elapsedBeforeOrchestrator) // At least 30s
+    const orchestratorStartTime = Date.now() // Fresh start time for orchestrator
+
+    logger.info("[Feedback API] Starting orchestrator", {
+      elapsedBeforeOrchestratorMs: elapsedBeforeOrchestrator,
+      remainingBudgetMs,
+      sessionId,
+    })
+
     const feedbackRequest: FeedbackRequest = {
       scenarioType: scenarioType as "dsa" | "system-design" | "bugfix",
       scenarioTitle,
@@ -195,8 +220,8 @@ export async function POST(request: NextRequest) {
       userId,
       sessionId,
       timeSpentSeconds: timeSpent ? Math.round(timeSpent) : undefined,
-      maxDurationMs: 100000, // 100s budget for orchestrator (leave 20s for response)
-      startTime,
+      maxDurationMs: remainingBudgetMs, // Use REMAINING time, not fixed 100s
+      startTime: orchestratorStartTime, // Fresh start time for accurate budget tracking
     }
 
     const orchestratorResult = await orchestrateFeedbackGeneration(feedbackRequest)
