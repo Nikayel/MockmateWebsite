@@ -4,10 +4,20 @@
  * Validates interviewer responses against behavioral rules.
  * Uses deterministic checks (not AI) to enforce rules.
  * Returns violations and triggers regeneration for critical issues.
+ *
+ * DRY: Uses shared-patterns.ts for all detection patterns.
  */
 
 import type { ConversationTracker, InterviewPhase } from "./interview-phases"
 import { logger } from "@/lib/logger"
+import {
+  CODING_TRANSITION_PATTERNS,
+  GIVEAWAY_PATTERNS,
+  LEADING_QUESTION_PATTERNS,
+  VAGUE_ANSWER_PATTERNS,
+  ACCEPTANCE_PATTERNS,
+  PROBING_PATTERNS,
+} from "./shared-patterns"
 
 export interface ValidationResult {
   isValid: boolean
@@ -50,17 +60,8 @@ const GATES: Gate[] = [
     name: "no-premature-coding",
     severity: "critical",
     check: (ctx) => {
-      const patterns = [
-        /code it up/i,
-        /go ahead and code/i,
-        /start coding/i,
-        /let's code/i,
-        /go code/i,
-        /begin coding/i,
-        /you can (?:start|begin) (?:coding|implementing)/i,
-      ]
-
-      const match = patterns.find(p => p.test(ctx.response))
+      // Use shared patterns from shared-patterns.ts
+      const match = CODING_TRANSITION_PATTERNS.find(p => p.test(ctx.response))
       if (!match) return null
 
       // Only enforce in pre-test phases
@@ -90,20 +91,11 @@ const GATES: Gate[] = [
     name: "no-giving-answers",
     severity: "critical",
     check: (ctx) => {
-      const giveawayPatterns = [
-        { pattern: /the answer is/i, desc: "giving direct answer" },
-        { pattern: /you should use a hash/i, desc: "suggesting hash map" },
-        { pattern: /it's basically (?:a )?(fibonacci|dp|bfs|dfs)/i, desc: "revealing algorithm" },
-        { pattern: /the trick is to/i, desc: "revealing the trick" },
-        { pattern: /just use (?:a )?(two pointer|sliding window|binary search)/i, desc: "suggesting technique" },
-        { pattern: /the optimal (?:solution|approach|way) (?:is|uses)/i, desc: "revealing optimal approach" },
-        { pattern: /you need to use (?:a )?(map|set|heap|stack|queue)/i, desc: "prescribing data structure" },
-      ]
-
-      for (const { pattern, desc } of giveawayPatterns) {
+      // Use shared patterns from shared-patterns.ts
+      for (const { pattern, type } of GIVEAWAY_PATTERNS) {
         const match = ctx.response.match(pattern)
         if (match) {
-          return { violated: true, evidence: `${desc}: "${match[0]}"` }
+          return { violated: true, evidence: `${type}: "${match[0]}"` }
         }
       }
       return null
@@ -198,38 +190,13 @@ const GATES: Gate[] = [
     check: (ctx) => {
       if (!ctx.lastUserMessage) return null
 
-      const userMsg = ctx.lastUserMessage.toLowerCase()
-      const response = ctx.response.toLowerCase()
-
-      // Detect vague user statements
-      const vagueStatements = [
-        /i(?:'ll| will| can) (?:just )?skip (?:them|it|those)/i,
-        /i(?:'ll| will| can) (?:just )?handle (?:that|it|those)/i,
-        /i(?:'ll| will| can) (?:just )?check (?:for )?(?:that|it)/i,
-        /i(?:'ll| will) (?:just )?(?:use|add) (?:a )?(?:condition|check|if)/i,
-      ]
-
-      const userWasVague = vagueStatements.some(p => p.test(ctx.lastUserMessage || ""))
+      // Use shared patterns from shared-patterns.ts
+      const userWasVague = VAGUE_ANSWER_PATTERNS.some(p => p.test(ctx.lastUserMessage || ""))
       if (!userWasVague) return null
 
-      // Check if interviewer accepted without probing
-      const acceptancePatterns = [
-        /(?:good|great|nice|perfect|sounds good)/i,
-        /go ahead/i,
-        /code it up/i,
-      ]
-
-      const probingPatterns = [
-        /how (?:exactly|specifically|would you)/i,
-        /walk me through/i,
-        /where (?:exactly|specifically)/i,
-        /what (?:will|would) (?:that|you)/i,
-        /show me/i,
-        /can you (?:explain|elaborate)/i,
-      ]
-
-      const accepted = acceptancePatterns.some(p => p.test(response))
-      const probed = probingPatterns.some(p => p.test(response))
+      // Check if interviewer accepted without probing (using shared patterns)
+      const accepted = ACCEPTANCE_PATTERNS.some(p => p.test(ctx.response))
+      const probed = PROBING_PATTERNS.some(p => p.test(ctx.response))
 
       if (accepted && !probed) {
         return { violated: true, evidence: "Accepted vague answer without probing" }
@@ -244,17 +211,11 @@ const GATES: Gate[] = [
     name: "no-leading-questions",
     severity: "warning",
     check: (ctx) => {
-      const leadingPatterns = [
-        { pattern: /are you thinking.*(dp|dynamic|hash|map|set|tree)/i, technique: "data structure" },
-        { pattern: /would a.*(hash|map|set|array|tree|stack|queue).*help/i, technique: "data structure" },
-        { pattern: /have you considered.*(dp|dynamic|hash|sliding|two pointer)/i, technique: "algorithm" },
-        { pattern: /what about using.*(dp|bfs|dfs|binary search|two pointer)/i, technique: "algorithm" },
-      ]
-
-      for (const { pattern, technique } of leadingPatterns) {
+      // Use shared patterns from shared-patterns.ts
+      for (const { pattern, type } of LEADING_QUESTION_PATTERNS) {
         const match = ctx.response.match(pattern)
         if (match) {
-          return { violated: true, evidence: `Leading toward ${technique}: "${match[0]}"` }
+          return { violated: true, evidence: `Leading toward ${type}: "${match[0]}"` }
         }
       }
       return null

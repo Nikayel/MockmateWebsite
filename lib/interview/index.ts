@@ -69,3 +69,80 @@ export {
   getStrictTimeLimitMinutes,
 } from "./company-time-limits"
 export type { StrictTimeConfig } from "./company-time-limits"
+
+// Shared patterns (DRY: single source of truth for all detection patterns)
+export {
+  // Complexity utilities
+  COMPLEXITY_PATTERNS,
+  COMPLEXITY_RANKS,
+  getComplexityRank,
+  findDominantComplexity,
+  normalizeComplexity,
+  // Vague answer detection
+  VAGUE_ANSWER_PATTERNS,
+  isVagueAnswer,
+  // Edge case detection
+  EDGE_CASE_KEYWORDS,
+  extractEdgeCases,
+  // Coding transition detection
+  CODING_TRANSITION_PATTERNS,
+  containsCodingTransition,
+  // Answer giveaway detection
+  GIVEAWAY_PATTERNS,
+  // Leading question detection
+  LEADING_QUESTION_PATTERNS,
+  // Acceptance/probing patterns
+  ACCEPTANCE_PATTERNS,
+  PROBING_PATTERNS,
+  acceptsWithoutProbing,
+} from "./shared-patterns"
+
+// Interview phases and tracking
+export {
+  detectInterviewPhase,
+  detectInterviewPhaseLegacy,
+  createEmptyTracker,
+  updateTrackerFromMessage,
+  buildTrackingContext,
+  getHintGuidance,
+  HINT_PROGRESSION,
+} from "./interview-phases"
+export type {
+  InterviewPhase,
+  PhaseContext,
+  PhaseDetectionContext,
+  ConversationTracker,
+  HintLevel,
+} from "./interview-phases"
+
+// Interviewer prompts (few-shot examples - preferred over verbose rules)
+export {
+  INTERVIEWER_SYSTEM_PROMPT,
+  FEW_SHOT_EXAMPLES,
+  PHASE_PROMPTS,
+  QUICK_INJECTIONS,
+  buildInterviewerPrompt,
+} from "./interviewer-prompts"
+export type { PromptContext } from "./interviewer-prompts"
+
+// Interviewer tools (function calling for state queries)
+export {
+  INTERVIEWER_TOOLS,
+  executeTool,
+  formatToolResultsForPrompt,
+} from "./interviewer-tools"
+export type { ToolDefinition, ToolContext, ToolResult } from "./interviewer-tools"
+
+// Response validation (hard gates)
+export {
+  validateInterviewerResponse,
+  validateWithRetry,
+} from "./response-validation"
+export type { ValidationResult, ResponseViolation, ValidationContext } from "./response-validation"
+
+// Conversation extraction (LLM-based state detection)
+export {
+  extractConversationState,
+  shouldRunExtraction,
+} from "./conversation-extraction"
+export type { ExtendedConversationTracker } from "./conversation-extraction"

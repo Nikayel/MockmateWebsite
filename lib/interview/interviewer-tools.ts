@@ -8,9 +8,11 @@
  * 3. Tool results are structured (not buried in text)
  *
  * Compatible with Claude's tool_use and OpenAI's function_calling.
+ * DRY: Uses shared-patterns.ts for all detection patterns.
  */
 
 import type { ConversationTracker } from "./interview-phases"
+import { VAGUE_ANSWER_PATTERNS, COMPLEXITY_PATTERNS, EDGE_CASE_KEYWORDS } from "./shared-patterns"
 
 // =============================================================================
 // TOOL DEFINITIONS (for LLM)
@@ -301,18 +303,15 @@ function executeAnalyzeUserResponse(userMessage: string, ctx: ToolContext): Tool
   // Check for questions
   const isQuestion = userMessage.includes("?")
 
-  // Check for vague statements
-  const vaguePatterns = [
-    /i(?:'ll| will| can) (?:just )?(?:skip|handle|check|add)/i,
-    /i(?:'ll| will) (?:do|use) (?:that|it|something)/i,
-  ]
-  const isVague = length < 50 && vaguePatterns.some(p => p.test(userMessage))
+  // Check for vague statements - use shared patterns
+  const isVague = length < 100 && VAGUE_ANSWER_PATTERNS.some(p => p.test(userMessage))
 
-  // Check for complexity mentions
-  const mentionsComplexity = /O\(|linear|quadratic|n\s*log\s*n|n\s*squared|constant/i.test(userMessage)
+  // Check for complexity mentions - use shared patterns
+  const mentionsComplexity = COMPLEXITY_PATTERNS.bigO.test(userMessage) ||
+    /linear|quadratic|n\s*log\s*n|n\s*squared|constant|logarithmic/i.test(userMessage)
 
-  // Check for edge case mentions
-  const mentionsEdgeCases = /empty|null|zero|negative|edge|boundary|corner/i.test(lower)
+  // Check for edge case mentions - use shared keywords
+  const mentionsEdgeCases = EDGE_CASE_KEYWORDS.some(keyword => lower.includes(keyword))
 
   // Check for approach explanation
   const explainsApproach = length > 100 && (
