@@ -16,7 +16,6 @@ import {
   type FeedbackScores,
   type StructuredFeedback,
   preScreenConversation,
-  validateConversationWithAI,
   getDefaultValidation,
   analyzeAICodeOverlap,
   analyzeCodeCompleteness,
@@ -30,6 +29,8 @@ import {
   injectScoresIntoFeedback,
   sanitizeFeedbackForScoreConsistency,
 } from "@/lib/feedback"
+// Use new CommunicationAnalyzerAgent for reliable communication scoring
+import { validateCommunication } from "@/lib/agents/communication-analyzer-agent"
 // Import structured extraction for grounded feedback
 import {
   extractConversationEvidence,
@@ -351,7 +352,7 @@ CODE EFFICIENCY ANALYSIS:
           preScreen.candidateMessageCount >= 1
 
     const aiValidation = shouldValidateWithAI
-      ? await validateConversationWithAI(
+      ? await validateCommunication(
           conversationTranscript,
           code,
           efficiencyMetrics
@@ -386,41 +387,55 @@ CODE EFFICIENCY ANALYSIS:
 
     // Step 2.6: Structured Extraction from Transcript (BEFORE scoring)
     // Extract concrete evidence to ground scoring in actual quotes
+    // TIME BUDGET: Skip if already > 30s elapsed to leave time for essential calls
     let extractedEvidence: ExtractedEvidence | undefined
-    try {
-      if (
-        conversationTranscript &&
-        Array.isArray(conversationTranscript) &&
-        conversationTranscript.length > 0
-      ) {
-        const transcriptMessages = conversationTranscript.map(
-          (msg: { type?: string; role?: string; message?: string; content?: string }) => ({
-            role:
-              msg.type === "user" || msg.role === "user" || msg.role === "candidate"
-                ? ("user" as const)
-                : ("interviewer" as const),
-            content: msg.message || msg.content || "",
+    const elapsedBeforeExtraction = Date.now() - startTime
+    const shouldSkipExtraction = elapsedBeforeExtraction > 30000 // 30s threshold
+
+    if (shouldSkipExtraction) {
+      logger.info("[Feedback] Skipping structured extraction due to time budget", {
+        elapsedMs: elapsedBeforeExtraction,
+        sessionId,
+      })
+    } else {
+      try {
+        if (
+          conversationTranscript &&
+          Array.isArray(conversationTranscript) &&
+          conversationTranscript.length > 0
+        ) {
+          const transcriptMessages = conversationTranscript.map(
+            (msg: { type?: string; role?: string; message?: string; content?: string }) => ({
+              role:
+                msg.type === "user" || msg.role === "user" || msg.role === "candidate"
+                  ? ("user" as const)
+                  : ("interviewer" as const),
+              content: msg.message || msg.content || "",
+            })
+          )
+
+          extractedEvidence = await extractConversationEvidence(transcriptMessages, {
+            title: scenarioTitle,
+            optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || "O(n)",
+            optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
+            criticalEdgeCases: ["empty input", "single element", "null values"],
           })
-        )
 
-        extractedEvidence = await extractConversationEvidence(transcriptMessages, {
-          title: scenarioTitle,
-          optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || "O(n)",
-          optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
-          criticalEdgeCases: ["empty input", "single element", "null values"],
-        })
-
-        logger.info("Structured extraction completed for scoring", {
+          logger.info("Structured extraction completed for scoring", {
+            sessionId,
+            approachExplained: extractedEvidence.approach.explained,
+            complexityDiscussed: extractedEvidence.timeComplexity.mentioned,
+            edgeCasesMentioned: extractedEvidence.edgeCases.mentionedByCandidate.length,
+            selfCorrectedBugs: extractedEvidence.progression.selfCorrectedBugs,
+            improvedAfterPrompt: extractedEvidence.progression.improvedAfterPrompt,
+          })
+        }
+      } catch (error) {
+        logger.warn("Structured extraction failed, continuing without evidence", {
+          error,
           sessionId,
-          approachExplained: extractedEvidence.approach.explained,
-          complexityDiscussed: extractedEvidence.timeComplexity.mentioned,
-          edgeCasesMentioned: extractedEvidence.edgeCases.mentionedByCandidate.length,
-          selfCorrectedBugs: extractedEvidence.progression.selfCorrectedBugs,
-          improvedAfterPrompt: extractedEvidence.progression.improvedAfterPrompt,
         })
       }
-    } catch (error) {
-      logger.warn("Structured extraction failed, continuing without evidence", { error, sessionId })
     }
 
     // Step 3: Calculate validated scores using algorithmic + AI signals + extracted evidence
@@ -562,21 +577,36 @@ CODE EFFICIENCY ANALYSIS:
     )
 
     // Step 5: Constitutional AI Score Critique
-    // Now with extracted evidence for grounded critique
-    const scoreCritique = await critiqueScores(algorithmicScores, {
-      passRate,
-      scenarioType: scenarioType || "dsa",
-      aiValidation,
-      codeCompleteness: code ? analyzeCodeCompleteness(code, language || "python") : undefined,
-      hasBlindCopying,
-      // NEW: Pass extracted evidence for grounded critique
-      extractedEvidence,
-      problemContext: {
-        title: scenarioTitle,
-        optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || "O(n)",
-        optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
-      },
-    })
+    // TIME BUDGET: Skip if already > 50s elapsed to leave time for feedback generation
+    const elapsedBeforeCritique = Date.now() - startTime
+    const shouldSkipScoreCritique = elapsedBeforeCritique > 50000 // 50s threshold
+
+    let scoreCritique: Awaited<ReturnType<typeof critiqueScores>> = {
+      madeChanges: false,
+      critiques: [],
+      reasoning: "Skipped due to time budget",
+    }
+
+    if (shouldSkipScoreCritique) {
+      logger.info("[Feedback] Skipping score critique due to time budget", {
+        elapsedMs: elapsedBeforeCritique,
+        sessionId,
+      })
+    } else {
+      scoreCritique = await critiqueScores(algorithmicScores, {
+        passRate,
+        scenarioType: scenarioType || "dsa",
+        aiValidation,
+        codeCompleteness: code ? analyzeCodeCompleteness(code, language || "python") : undefined,
+        hasBlindCopying,
+        extractedEvidence,
+        problemContext: {
+          title: scenarioTitle,
+          optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || "O(n)",
+          optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
+        },
+      })
+    }
 
     // Use adjusted scores if critique made changes
     const finalScores =
@@ -869,11 +899,30 @@ CRITICAL INSTRUCTIONS:
     const feedback = aiResponse.text
 
     // Step 6: Constitutional AI Feedback Critique
-    const feedbackCritique = await critiqueFeedbackText(feedback, finalScores, {
-      passRate,
-      scenarioType: scenarioType || "dsa",
-      isIncomplete: code ? analyzeCodeCompleteness(code, language || "python").isIncomplete : false,
-    })
+    // TIME BUDGET: Skip if already > 75s elapsed to leave buffer for response
+    const elapsedBeforeFeedbackCritique = Date.now() - startTime
+    const shouldSkipFeedbackCritique = elapsedBeforeFeedbackCritique > 75000 // 75s threshold
+
+    let feedbackCritique: Awaited<ReturnType<typeof critiqueFeedbackText>> = {
+      madeChanges: false,
+      critiques: [],
+      reasoning: "Skipped due to time budget",
+    }
+
+    if (shouldSkipFeedbackCritique) {
+      logger.info("[Feedback] Skipping feedback critique due to time budget", {
+        elapsedMs: elapsedBeforeFeedbackCritique,
+        sessionId,
+      })
+    } else {
+      feedbackCritique = await critiqueFeedbackText(feedback, finalScores, {
+        passRate,
+        scenarioType: scenarioType || "dsa",
+        isIncomplete: code
+          ? analyzeCodeCompleteness(code, language || "python").isIncomplete
+          : false,
+      })
+    }
 
     // Use revised feedback if critique made changes
     const rawFinalFeedback =
@@ -1094,6 +1143,18 @@ CRITICAL INSTRUCTIONS:
         logger.error("Misconception analysis error", { error: err })
       }
     }
+
+    // Log total feedback generation time and optimizations applied
+    const totalElapsedMs = Date.now() - startTime
+    logger.info("[Feedback] Generation completed", {
+      sessionId,
+      totalElapsedMs,
+      skippedExtraction: shouldSkipExtraction,
+      skippedScoreCritique: shouldSkipScoreCritique,
+      skippedFeedbackCritique: shouldSkipFeedbackCritique,
+      communicationScore: scores.communication,
+      overallScore: scores.overall,
+    })
 
     return NextResponse.json({
       feedback: finalFeedback,

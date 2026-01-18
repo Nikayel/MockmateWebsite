@@ -21,6 +21,7 @@ import {
 import { InterviewSession } from "@/lib/types"
 import Link from "next/link"
 import { getScenarioById } from "@/lib/scenarios"
+import { getSessionDisplayStatus } from "@/lib/utils"
 
 export default function SessionsPage() {
   const router = useRouter()
@@ -156,34 +157,25 @@ export default function SessionsPage() {
             <div className="overflow-hidden rounded-2xl border border-zinc-800/50 bg-zinc-900/50">
               <div className="divide-y divide-zinc-800/50">
                 {sessions.map((session) => {
-                  const isInProgress = !session.completed_at
+                  // Use shared utility for consistent status across all routes
+                  const status = getSessionDisplayStatus(session)
+                  const isInProgress = status === "in_progress"
+                  const isPostInterviewDiscussion = status === "post_interview"
+                  const isFeedbackPending = status === "evaluating"
+                  const isFailed = status === "failed"
+                  const hasFeedback = status === "completed"
+
                   const scenarioExists = session.scenario_id
                     ? !!getScenarioById(session.scenario_id)
                     : false
-                  // Check if session is in post-interview discussion phase
-                  // (submitted code but user hasn't clicked "View Detailed Feedback" yet)
-                  const isPostInterviewDiscussion =
-                    isInProgress &&
-                    session.session_state?.is_post_interview_discussion &&
-                    session.feedback_status !== "pending"
                   const canReopen =
                     isInProgress &&
                     !isPostInterviewDiscussion &&
                     session.scenario_id &&
                     scenarioExists
-                  // Check if feedback is still being generated
-                  const isFeedbackPending =
-                    session.feedback_status === "pending" ||
-                    (session.completed_at &&
-                      !session.feedback &&
-                      session.feedback_status !== "failed")
-                  const hasFeedback =
-                    session.feedback &&
-                    session.completed_at &&
-                    session.feedback_status === "complete"
                   // Only show score if feedback generation is complete
                   const score =
-                    session.feedback_status === "complete" && session.performance_score
+                    status === "completed" && session.performance_score
                       ? Math.round(session.performance_score)
                       : null
 
@@ -197,16 +189,26 @@ export default function SessionsPage() {
                         className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl font-mono text-sm ${
                           score
                             ? getScoreColor(score)
-                            : isFeedbackPending
-                              ? "animate-pulse bg-blue-500/10 text-blue-400"
-                              : isPostInterviewDiscussion
-                                ? "bg-purple-500/10 text-purple-400"
-                                : isInProgress
-                                  ? "bg-amber-500/10 text-amber-400"
-                                  : "bg-zinc-800 text-zinc-400"
+                            : isFailed
+                              ? "bg-red-500/10 text-red-400"
+                              : isFeedbackPending
+                                ? "animate-pulse bg-blue-500/10 text-blue-400"
+                                : isPostInterviewDiscussion
+                                  ? "bg-purple-500/10 text-purple-400"
+                                  : isInProgress
+                                    ? "bg-amber-500/10 text-amber-400"
+                                    : "bg-zinc-800 text-zinc-400"
                         }`}
                       >
-                        {score ? score : isFeedbackPending ? "..." : isInProgress ? "..." : "—"}
+                        {score
+                          ? score
+                          : isFailed
+                            ? "!"
+                            : isFeedbackPending
+                              ? "..."
+                              : isInProgress
+                                ? "..."
+                                : "—"}
                       </div>
 
                       {/* Content */}
@@ -228,9 +230,14 @@ export default function SessionsPage() {
                               In Progress
                             </span>
                           )}
-                          {isFeedbackPending && !isInProgress && (
+                          {isFeedbackPending && (
                             <span className="rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-400">
                               Generating Feedback...
+                            </span>
+                          )}
+                          {isFailed && (
+                            <span className="rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-400">
+                              Failed
                             </span>
                           )}
                           {hasFeedback && <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />}
@@ -295,6 +302,18 @@ export default function SessionsPage() {
                             >
                               <Clock className="mr-1.5 h-3 w-3" />
                               View Status
+                              <ChevronRight className="ml-1 h-3 w-3" />
+                            </Button>
+                          </Link>
+                        ) : isFailed ? (
+                          <Link href={`/sessions/${session.id}`}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-xs text-red-400 hover:text-red-300"
+                            >
+                              <Terminal className="mr-1.5 h-3 w-3" />
+                              Retry
                               <ChevronRight className="ml-1 h-3 w-3" />
                             </Button>
                           </Link>

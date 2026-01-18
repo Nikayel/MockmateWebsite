@@ -28,6 +28,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { getSessionDisplayStatus } from "@/lib/utils"
 
 const OnboardingModal = dynamic(
   () => import("@/components/OnboardingModal").then((mod) => mod.OnboardingModal),
@@ -546,17 +547,16 @@ export default function DashboardPage() {
                 ) : (
                   <div className="divide-y divide-zinc-800/50">
                     {sessions.map((session) => {
-                      // Determine session state: completed, evaluating, or in-progress
-                      // Note: Legacy sessions may not have feedback_status, treat completed_at as complete
-                      const isEvaluating = session.feedback_status === "pending"
-                      const isCompleted =
-                        session.completed_at &&
-                        (session.feedback_status === "complete" || !session.feedback_status)
-                      const isInProgress = !session.completed_at && !isEvaluating
+                      // Use shared utility for consistent status across all routes
+                      const status = getSessionDisplayStatus(session)
+                      const isEvaluating = status === "evaluating"
+                      const isFailed = status === "failed"
+                      const isCompleted = status === "completed"
+                      const isInProgress = status === "in_progress" || status === "post_interview"
 
-                      // Link to session detail if completed or evaluating, otherwise reopen interview
+                      // Link to session detail if completed, evaluating, or failed; otherwise reopen interview
                       const href =
-                        isCompleted || isEvaluating
+                        isCompleted || isEvaluating || isFailed
                           ? `/sessions/${session.id}`
                           : `/interview?session=${session.id}&scenario=${session.scenario_id}`
 
@@ -575,20 +575,24 @@ export default function DashboardPage() {
                                   : session.performance_score >= 60
                                     ? "bg-amber-500/10 text-amber-400"
                                     : "bg-red-500/10 text-red-400"
-                                : isEvaluating
-                                  ? "bg-blue-500/10 text-blue-400"
-                                  : isInProgress
-                                    ? "bg-amber-500/10 text-amber-400"
-                                    : "bg-zinc-800 text-zinc-500"
+                                : isFailed
+                                  ? "bg-red-500/10 text-red-400"
+                                  : isEvaluating
+                                    ? "bg-blue-500/10 text-blue-400"
+                                    : isInProgress
+                                      ? "bg-amber-500/10 text-amber-400"
+                                      : "bg-zinc-800 text-zinc-500"
                             }`}
                           >
                             {session.performance_score
                               ? Math.round(session.performance_score)
-                              : isEvaluating
-                                ? "⏳"
-                                : isInProgress
-                                  ? "..."
-                                  : "—"}
+                              : isFailed
+                                ? "!"
+                                : isEvaluating
+                                  ? "⏳"
+                                  : isInProgress
+                                    ? "..."
+                                    : "—"}
                           </div>
 
                           {/* Content */}
@@ -613,6 +617,11 @@ export default function DashboardPage() {
                               {isEvaluating && (
                                 <Badge className="border-0 bg-blue-500/10 px-1.5 py-0 text-[10px] text-blue-400">
                                   Evaluating
+                                </Badge>
+                              )}
+                              {isFailed && (
+                                <Badge className="border-0 bg-red-500/10 px-1.5 py-0 text-[10px] text-red-400">
+                                  Failed
                                 </Badge>
                               )}
                               {isInProgress && (

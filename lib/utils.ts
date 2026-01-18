@@ -164,3 +164,59 @@ export function truncateText(
 export function truncateFileContent(content: string, maxSize: number): string {
   return truncateText(content, maxSize, "\n// ... [file truncated for context management]")
 }
+
+/**
+ * Session status utilities for consistent status display across routes.
+ * DRY: Shared logic between /dashboard, /sessions, and /sessions/[id] pages.
+ */
+
+export type SessionDisplayStatus =
+  | "evaluating" // feedback_status === "pending"
+  | "failed" // feedback_status === "failed"
+  | "completed" // Has feedback and completed_at
+  | "in_progress" // No completed_at
+  | "post_interview" // In post-interview discussion phase
+
+export interface SessionStatusInput {
+  completed_at?: string | null
+  feedback_status?: "pending" | "complete" | "failed" | null
+  feedback?: string | null
+  session_state?: {
+    is_post_interview_discussion?: boolean
+  } | null
+}
+
+/**
+ * Determines the display status of a session consistently across all routes.
+ * This replaces duplicated logic in dashboard and sessions pages.
+ */
+export function getSessionDisplayStatus(session: SessionStatusInput): SessionDisplayStatus {
+  // Check if feedback is being generated
+  if (session.feedback_status === "pending") {
+    return "evaluating"
+  }
+
+  // Check if feedback generation failed
+  if (session.feedback_status === "failed") {
+    return "failed"
+  }
+
+  // Check if session is completed with feedback
+  if (session.completed_at && (session.feedback_status === "complete" || session.feedback)) {
+    return "completed"
+  }
+
+  // Check if in post-interview discussion (submitted but not finalized)
+  if (!session.completed_at && session.session_state?.is_post_interview_discussion) {
+    return "post_interview"
+  }
+
+  // Session is in progress
+  if (!session.completed_at) {
+    return "in_progress"
+  }
+
+  // Edge case: completed_at exists but no feedback and not pending/failed
+  // This could be a legacy session - treat as completed
+  return "completed"
+}
