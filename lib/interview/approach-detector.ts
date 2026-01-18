@@ -65,9 +65,10 @@ const APPROACH_PATTERNS: Record<string, CodePatterns> = {
   "Hash Table": {
     indicators: [
       /new\s+Map\s*\(/, // JS Map
-      /\bdict\s*\(|\{\s*\}|defaultdict|Counter/, // Python dict
-      /HashMap|TreeMap/, // Java Map types
+      /\bdict\s*\(|\{\s*\}|defaultdict|Counter|OrderedDict/, // Python dict (including OrderedDict)
+      /HashMap|TreeMap|LinkedHashMap/, // Java Map types
       /\.get\s*\(|\.set\s*\(/, // Map operations
+      /\.move_to_end\s*\(|\.popitem\s*\(/, // OrderedDict-specific operations
     ],
     requiredCount: 1,
   },
@@ -181,6 +182,16 @@ const APPROACH_PATTERNS: Record<string, CodePatterns> = {
       /\bstack\s*[\[=]|\[\s*\][\s\S]*?\.append[\s\S]*?\.pop/m, // Stack operations
       /\.push\s*\([\s\S]*?\.pop\s*\(/m, // JS stack
       /deque\s*\(/m, // Python deque as stack
+    ],
+    requiredCount: 1,
+  },
+
+  // OrderedDict - Python specific for LRU Cache, maintaining insertion order with O(1) operations
+  OrderedDict: {
+    indicators: [
+      /OrderedDict\s*\(/, // Python OrderedDict
+      /\.move_to_end\s*\(/, // OrderedDict move_to_end method
+      /\.popitem\s*\(/, // OrderedDict popitem (with optional last= argument)
     ],
     requiredCount: 1,
   },
@@ -468,6 +479,7 @@ function estimateComplexityFromApproach(
     Heap: { time: "O(n log n)", space: "O(n)" },
     Stack: { time: "O(n)", space: "O(n)" },
     "Two Stacks": { time: "O(1)", space: "O(n)" }, // Min/Max Stack - O(1) per operation
+    OrderedDict: { time: "O(1)", space: "O(n)" }, // Python OrderedDict for LRU Cache - O(1) per operation
     BFS: { time: "O(V+E)", space: "O(V)" },
     DFS: { time: "O(V+E)", space: "O(V)" },
     Sorting: { time: "O(n log n)", space: "O(1)" },
@@ -484,6 +496,7 @@ function estimateComplexityFromApproach(
     "Hash Set",
     "One-pass Hash Table",
     "Two-pass Hash Table",
+    "OrderedDict", // Python OrderedDict has O(1) operations like hash tables
   ]
 
   // Skip nested loop adjustment for hash-based approaches - their complexity

@@ -165,7 +165,7 @@ function fallbackComplexityDetection(code: string): { time: string; space: strin
   // Check for hash structures FIRST - these often have amortized O(n) complexity
   // even when nested loops are present (e.g., Longest Consecutive Sequence)
   const hasHashSet = /\bset\s*\(|new\s+Set\s*\(|HashSet/i.test(code)
-  const hasHashMap = /Map|dict|Counter|\{\s*\}|defaultdict/.test(code)
+  const hasHashMap = /Map|dict|Counter|\{\s*\}|defaultdict|OrderedDict|LinkedHashMap/.test(code)
   const hasHashStructure = hasHashSet || hasHashMap
 
   // Check for the specific pattern of hash set with "in" checks inside a loop
