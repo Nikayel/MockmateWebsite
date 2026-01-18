@@ -61,7 +61,7 @@ const GATES: Gate[] = [
     severity: "critical",
     check: (ctx) => {
       // Use shared patterns from shared-patterns.ts
-      const match = CODING_TRANSITION_PATTERNS.find(p => p.test(ctx.response))
+      const match = CODING_TRANSITION_PATTERNS.find((p) => p.test(ctx.response))
       if (!match) return null
 
       // Only enforce in pre-test phases
@@ -78,12 +78,12 @@ const GATES: Gate[] = [
         if (!hasEdgeCases) missing.push("edge cases")
         return {
           violated: true,
-          evidence: `Said coding phrase without discussing: ${missing.join(", ")}`
+          evidence: `Said coding phrase without discussing: ${missing.join(", ")}`,
         }
       }
       return null
     },
-    hint: "Ask about time complexity and edge cases BEFORE telling them to code"
+    hint: "Ask about time complexity and edge cases BEFORE telling them to code",
   },
 
   // GATE 2: No giving away answers
@@ -100,7 +100,7 @@ const GATES: Gate[] = [
       }
       return null
     },
-    hint: "Ask guiding questions instead of giving the answer. Example: 'What data structure might help here?'"
+    hint: "Ask guiding questions instead of giving the answer. Example: 'What data structure might help here?'",
   },
 
   // GATE 3: No revealing optimal bounds
@@ -127,7 +127,7 @@ const GATES: Gate[] = [
       }
       return null
     },
-    hint: "Don't reveal optimality. Ask: 'What do you think the complexity is? Could it be improved?'"
+    hint: "Don't reveal optimality. Ask: 'What do you think the complexity is? Could it be improved?'",
   },
 
   // GATE 4: No excessive apology
@@ -145,13 +145,13 @@ const GATES: Gate[] = [
         /you're right,? (?:my bad|i should)/i,
       ]
 
-      const apologies = apologyPatterns.filter(p => p.test(ctx.response))
+      const apologies = apologyPatterns.filter((p) => p.test(ctx.response))
       if (apologies.length >= 2) {
         return { violated: true, evidence: `${apologies.length} apologies detected` }
       }
       return null
     },
-    hint: "Acknowledge once, then move forward. Example: 'Good catch. So, what's your complexity analysis?'"
+    hint: "Acknowledge once, then move forward. Example: 'Good catch. So, what's your complexity analysis?'",
   },
 
   // GATE 5: No premature feedback mention
@@ -166,7 +166,7 @@ const GATES: Gate[] = [
       }
       return null
     },
-    hint: "The 'View Detailed Feedback' button only appears AFTER submit. Guide them to Submit first."
+    hint: "The 'View Detailed Feedback' button only appears AFTER submit. Guide them to Submit first.",
   },
 
   // GATE 6: One question at a time
@@ -180,7 +180,7 @@ const GATES: Gate[] = [
       }
       return null
     },
-    hint: "Ask ONE focused question at a time. Let them answer before asking the next."
+    hint: "Ask ONE focused question at a time. Let them answer before asking the next.",
   },
 
   // GATE 7: Vague answer acceptance
@@ -191,19 +191,19 @@ const GATES: Gate[] = [
       if (!ctx.lastUserMessage) return null
 
       // Use shared patterns from shared-patterns.ts
-      const userWasVague = VAGUE_ANSWER_PATTERNS.some(p => p.test(ctx.lastUserMessage || ""))
+      const userWasVague = VAGUE_ANSWER_PATTERNS.some((p) => p.test(ctx.lastUserMessage || ""))
       if (!userWasVague) return null
 
       // Check if interviewer accepted without probing (using shared patterns)
-      const accepted = ACCEPTANCE_PATTERNS.some(p => p.test(ctx.response))
-      const probed = PROBING_PATTERNS.some(p => p.test(ctx.response))
+      const accepted = ACCEPTANCE_PATTERNS.some((p) => p.test(ctx.response))
+      const probed = PROBING_PATTERNS.some((p) => p.test(ctx.response))
 
       if (accepted && !probed) {
         return { violated: true, evidence: "Accepted vague answer without probing" }
       }
       return null
     },
-    hint: "When user gives vague answer, probe: 'How exactly would you handle that? Walk me through the code.'"
+    hint: "When user gives vague answer, probe: 'How exactly would you handle that? Walk me through the code.'",
   },
 
   // GATE 8: No leading questions
@@ -220,7 +220,30 @@ const GATES: Gate[] = [
       }
       return null
     },
-    hint: "Ask open questions: 'What approach are you considering?' not 'Would a hash map help?'"
+    hint: "Ask open questions: 'What approach are you considering?' not 'Would a hash map help?'",
+  },
+
+  // GATE 9: No verbose responses (triggers regeneration, not truncation)
+  {
+    name: "response-too-verbose",
+    severity: "critical", // Critical = triggers regeneration
+    check: (ctx) => {
+      const words = ctx.response.split(/\s+/).filter((w) => w.length > 0)
+      const wordCount = words.length
+
+      // Allow more words for error explanations or complex scenarios
+      const isExplanation = /error|bug|issue|problem with|let me explain/i.test(ctx.response)
+      const threshold = isExplanation ? 80 : 50
+
+      if (wordCount > threshold) {
+        return {
+          violated: true,
+          evidence: `Response has ${wordCount} words (max ${threshold}). Interviews need concise responses.`,
+        }
+      }
+      return null
+    },
+    hint: "Keep responses to 2-3 sentences max. Example: 'You said O(n²) - walk me through why.' ONE question, brief acknowledgment.",
   },
 ]
 
@@ -254,12 +277,12 @@ export function validateInterviewerResponse(ctx: ValidationContext): ValidationR
   }
 
   // Determine if we should regenerate (only for critical violations)
-  const criticalViolations = violations.filter(v => v.severity === "critical")
+  const criticalViolations = violations.filter((v) => v.severity === "critical")
   const shouldRegenerate = criticalViolations.length > 0
 
   // Build hint from violated gates
-  const hints = violations.map(v => {
-    const gate = GATES.find(g => g.name === v.rule)
+  const hints = violations.map((v) => {
+    const gate = GATES.find((g) => g.name === v.rule)
     return gate?.hint || v.description
   })
 
@@ -297,7 +320,7 @@ export async function validateWithRetry(
     // Log violations
     logger.info("[Hard Gates] Violations detected", {
       attempt: i + 1,
-      violations: validation.violations.map(v => v.rule),
+      violations: validation.violations.map((v) => v.rule),
       hint: validation.regenerationHint,
     })
 
@@ -306,7 +329,7 @@ export async function validateWithRetry(
       return {
         response: currentResponse,
         violations: validation.violations,
-        retries
+        retries,
       }
     }
 
@@ -320,7 +343,7 @@ export async function validateWithRetry(
       return {
         response: currentResponse,
         violations: validation.violations,
-        retries
+        retries,
       }
     }
   }

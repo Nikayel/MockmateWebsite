@@ -258,40 +258,17 @@ export class InterviewerAgent implements Agent<InterviewerInput, InterviewerOutp
   }
 
   /**
-   * Post-process the response to enforce guardrails:
-   * 1. Strip bold/italic formatting
-   * 2. Truncate overly long responses
+   * Post-process the response to strip formatting
+   * Note: Length enforcement is done by ResponseValidatorAgent (triggers regeneration)
    */
   private postProcessResponse(response: string): string {
     let processed = response
 
-    // 1. Strip bold formatting (**text** -> text)
+    // Strip bold formatting (**text** -> text)
     processed = processed.replace(/\*\*([^*]+)\*\*/g, "$1")
 
-    // 2. Strip italic formatting (*text* -> text)
+    // Strip italic formatting (*text* -> text)
     processed = processed.replace(/\*([^*]+)\*/g, "$1")
-
-    // 3. Truncate if too long (more than ~60 words - prompt says max 50)
-    const words = processed.split(/\s+/)
-    if (words.length > 60) {
-      // Find a good sentence break point within first 50 words
-      const truncated = words.slice(0, 50).join(" ")
-      const lastSentenceEnd = Math.max(
-        truncated.lastIndexOf("."),
-        truncated.lastIndexOf("?"),
-        truncated.lastIndexOf("!")
-      )
-      // Use sentence break if found after 20 chars, otherwise just cut
-      if (lastSentenceEnd > 20) {
-        processed = truncated.slice(0, lastSentenceEnd + 1)
-      } else {
-        processed = truncated
-      }
-      logger.warn("[InterviewerAgent] Response truncated to ~50 words", {
-        originalWords: words.length,
-        truncatedWords: processed.split(/\s+/).length,
-      })
-    }
 
     return processed.trim()
   }
