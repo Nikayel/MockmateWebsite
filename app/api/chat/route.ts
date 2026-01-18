@@ -44,7 +44,19 @@ import {
   shouldRunExtraction,
 } from "@/lib/interview/conversation-extraction"
 import { buildCompanyInterviewerPrompt } from "@/lib/interview/company-interviewer-styles"
-import { validateInterviewerResponse } from "@/lib/interview/response-validation"
+import {
+  validateWithRetry,
+  type ValidationContext
+} from "@/lib/interview/response-validation"
+import {
+  executeTool,
+  formatToolResultsForPrompt,
+  type ToolContext,
+} from "@/lib/interview/interviewer-tools"
+import {
+  buildInterviewerPrompt,
+  QUICK_INJECTIONS,
+} from "@/lib/interview/interviewer-prompts"
 import { truncateText, truncateFileContent } from "@/lib/utils"
 
 interface UserContext {
@@ -838,6 +850,100 @@ SOLUTION COMPLEXITY:
       }
     }
 
+    // =================================================================
+    // TOOL EXECUTION: Pre-execute tools to give AI structured state
+    // This ensures the AI always has accurate state information
+    // =================================================================
+    let toolResultsContext = ""
+    if (role === "interviewer") {
+      const toolContext: ToolContext = {
+        tracker: (enhancedTracker || conversationTracker) as ConversationTracker | undefined,
+        phase: currentPhase,
+        isOptimalSolution: solutionComplexity?.isOptimal || false,
+        testsHaveRun: testsHaveRunNow || false,
+        testsPassed: testResultsArray?.filter((t: { passed: boolean }) => t.passed).length || 0,
+        testsTotal: testResultsArray?.length || 0,
+      }
+
+      // Execute relevant tools based on phase
+      const toolCalls: Array<{ name: string; result: ReturnType<typeof executeTool> }> = []
+
+      // Always check prerequisites in discussion/coding phases
+      if (currentPhase === "discussion" || currentPhase === "coding") {
+        toolCalls.push({
+          name: "check_prerequisites",
+          result: executeTool("check_prerequisites", {}, toolContext)
+        })
+        toolCalls.push({
+          name: "get_next_required_topic",
+          result: executeTool("get_next_required_topic", {}, toolContext)
+        })
+      }
+
+      // Check what's already discussed in testing phase
+      if (currentPhase === "testing") {
+        toolCalls.push({
+          name: "check_already_discussed:complexity",
+          result: executeTool("check_already_discussed", { topic: "complexity" }, toolContext)
+        })
+        toolCalls.push({
+          name: "check_already_discussed:edge_cases",
+          result: executeTool("check_already_discussed", { topic: "edge_cases" }, toolContext)
+        })
+      }
+
+      // Always include phase info
+      toolCalls.push({
+        name: "get_interview_phase",
+        result: executeTool("get_interview_phase", {}, toolContext)
+      })
+
+      // Analyze user's message if it seems vague
+      if (message && message.length < 80) {
+        toolCalls.push({
+          name: "analyze_user_response",
+          result: executeTool("analyze_user_response", { user_message: message }, toolContext)
+        })
+      }
+
+      // Format tool results for injection into prompt
+      toolResultsContext = formatToolResultsForPrompt(toolCalls)
+    }
+
+    // =================================================================
+    // FEW-SHOT EXAMPLES: LLMs learn better from examples than rules
+    // =================================================================
+    const fewShotExamples = role === "interviewer" ? `
+=== EXAMPLES OF GOOD INTERVIEWER BEHAVIOR ===
+
+EXAMPLE 1: User explains approach without complexity
+User: "I'll use two pointers and sort the array first"
+BAD: "Great, go ahead and code it up"
+GOOD: "Solid approach. What time and space complexity do you expect?"
+
+EXAMPLE 2: User gives vague answer
+User: "I'll just skip the duplicates"
+BAD: "Sounds good, start coding"
+GOOD: "How exactly would you skip them? Walk me through where you'd add that check."
+
+EXAMPLE 3: User asks for the answer
+User: "What's the optimal time complexity?"
+BAD: "It's O(n log n)"
+GOOD: "What do you think? Walk me through your reasoning."
+
+EXAMPLE 4: User has optimal solution
+User: "Is O(n) the best I can do?"
+BAD: "Yes, that's optimal"
+GOOD: "What makes you think O(n) might be optimal? Are there any operations that would require more?"
+
+EXAMPLE 5: Tests pass
+[All tests passed]
+BAD: "Great job! Click submit"
+GOOD: "Nice, all passing. Walk me through your complexity analysis."
+
+=== END EXAMPLES ===
+` : ""
+
     // Build Real Interview Mode context (fuzzy problem statements)
     let fuzzyModeContext = ""
     if (realInterviewMode && hasFuzzyStatement) {
@@ -903,33 +1009,10 @@ ${complexityContext}
 ${enforcedChecklist}
 ${testingPhaseOverride}
 ${fuzzyModeContext}
-${INTERVIEWER_BEHAVIOR_RULES}
 
-WHEN CANDIDATE PROPOSES APPROACH:
-- If brute force: Accept it, then ask about complexity and edge cases before coding
-- If optimal: Acknowledge, then ask about complexity and edge cases before coding
-- DO NOT say "go code" until complexity AND edge cases are discussed (see phase prompt)
+${toolResultsContext}
 
-WHEN CANDIDATE IS STUCK:
-- Use progressive hints (leading question → concrete example → direct nudge)
-- Don't repeat the same question - switch to concrete examples
-- After 2 failed attempts at same concept, give a concrete nudge
-
-WHEN TESTS PASS:
-- Check ALREADY COVERED section above - DO NOT re-ask topics already discussed
-- If complexity NOT discussed yet: ask about it (make them derive it, don't confirm)
-- ONLY ask about optimization IF their solution can be improved (check SOLUTION COMPLEXITY section above)
-- If already optimal: ask about edge cases, trade-offs, or alternative approaches instead
-- The interview CONTINUES after tests pass - keep asking follow-up questions
-
-WHEN INTERVIEW WINDS DOWN (complexity + edge cases discussed):
-- Guide them to Submit: "Solid work. Click Submit when you're ready to wrap up."
-- NEVER say "View Detailed Feedback" - that button only appears AFTER they submit
-
-ACCEPT CORRECT LOGIC:
-- If their approach is valid, acknowledge it and move on
-- If YOU made a mistake, say "You're right, I misspoke"
-- Don't challenge correct solutions just to find something wrong
+${fewShotExamples}
 
 PLATFORM ISSUES:
 - If they can't edit code, ask them to explain verbally instead
@@ -1294,79 +1377,68 @@ Remember: Acknowledge what they said, then probe deeper or move on. Do NOT re-as
       // Don't fail, but log for monitoring
     }
 
-    // POST-GENERATION VALIDATION: Check for interviewer rule violations
-    // This catches common errors that prompt engineering alone can't prevent
-    // Now with regeneration capability for critical violations
+    // HARD GATES: Deterministic validation with retry loop
+    // This catches rule violations that prompt engineering alone can't prevent
+    // Gates are deterministic (not AI) - they always catch specific patterns
     if (role === "interviewer") {
       const activeTracker = (enhancedTracker || conversationTracker) as
         | ConversationTracker
         | undefined
 
-      const validation = validateInterviewerResponse({
+      const validationContext: ValidationContext = {
         response: aiResponse.text,
         phase: currentPhase,
         tracker: activeTracker,
         hasSubmitted: hasSubmitted || false,
         lastUserMessage: message,
-      })
+        isOptimalSolution: solutionComplexity?.isOptimal || false,
+      }
 
-      // Log violations for monitoring
-      if (!validation.isValid) {
-        logger.warn("[Chat API] Interviewer rule violations detected", {
+      // Regeneration function for the retry loop
+      const regenerate = async (hint: string): Promise<string> => {
+        const correctedPrompt = `${systemPrompt}
+
+⚠️ HARD GATE VIOLATION - REGENERATE:
+${hint}
+
+Generate a response that follows these rules.`
+
+        const regeneratedResponse = await generateAIResponse(
+          correctedPrompt,
+          fullUserMessage,
+          history,
+          {
+            complexity,
+            userId,
+            sessionId,
+            eventType: "chat_message_retry",
+          }
+        )
+        return regeneratedResponse.text
+      }
+
+      // Run validation with up to 2 retries for critical violations
+      const gateResult = await validateWithRetry(validationContext, regenerate, 2)
+
+      // Update response if regenerated
+      if (gateResult.retries > 0) {
+        aiResponse.text = gateResult.response
+        logger.info("[Hard Gates] Response regenerated", {
           sessionId,
-          violations: validation.violations.map((v) => ({
+          retries: gateResult.retries,
+          remainingViolations: gateResult.violations.map(v => v.rule),
+        })
+      }
+
+      // Log any remaining violations (warnings that didn't trigger regeneration)
+      if (gateResult.violations.length > 0) {
+        logger.warn("[Hard Gates] Violations in final response", {
+          sessionId,
+          violations: gateResult.violations.map(v => ({
             rule: v.rule,
             severity: v.severity,
-            evidence: v.evidence.substring(0, 100),
           })),
-          phase: currentPhase,
-          trackerState: activeTracker
-            ? {
-                complexityMentioned: activeTracker.timeComplexityMentioned,
-                edgeCasesMentioned: activeTracker.edgeCasesMentioned.length,
-              }
-            : null,
-          responsePreview: aiResponse.text.substring(0, 200),
         })
-
-        // Regenerate on critical violations (max 1 retry to avoid loops)
-        if (validation.shouldRegenerate && validation.regenerationHint) {
-          logger.info("[Chat API] Regenerating response due to critical violation", {
-            sessionId,
-            hint: validation.regenerationHint,
-          })
-
-          // Add the hint to the prompt and regenerate
-          const correctedPrompt = `${systemPrompt}
-
-⚠️ CRITICAL CORRECTION REQUIRED:
-Your previous response violated interviewer rules: ${validation.regenerationHint}
-Generate a new response that follows the rules properly.`
-
-          try {
-            const regeneratedResponse = await generateAIResponse(
-              correctedPrompt,
-              fullUserMessage,
-              history,
-              {
-                complexity,
-                userId,
-                sessionId,
-                eventType: "chat_message_retry",
-              }
-            )
-
-            // Use the regenerated response
-            aiResponse.text = regeneratedResponse.text
-            aiResponse.provider = regeneratedResponse.provider
-            aiResponse.latencyMs = (aiResponse.latencyMs || 0) + (regeneratedResponse.latencyMs || 0)
-
-            logger.info("[Chat API] Successfully regenerated response", { sessionId })
-          } catch (regenError) {
-            // If regeneration fails, use the original response
-            logger.error("[Chat API] Failed to regenerate response", { error: regenError })
-          }
-        }
       }
     }
 

@@ -191,6 +191,11 @@ function InterviewPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
+
+  // A/B Testing: Use new multi-agent orchestrator with ?v2=true
+  // This allows testing the new architecture without affecting production
+  const useV2Orchestrator = searchParams.get("v2") === "true"
+  const chatApiEndpoint = useV2Orchestrator ? "/api/chat-v2" : "/api/chat"
   const {
     markQuestionCompleted,
     markQuestionEvaluating,
@@ -1614,7 +1619,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       // Analyze code patterns for context-aware feedback
       const codeAnalysis = analyzeCodeForProactiveFeedback(code)
 
-      const response = await fetch("/api/chat", {
+      const response = await fetch(chatApiEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1749,7 +1754,7 @@ Interviews are conversations, not just coding exercises.`
           contextPrompt = analyzeCodeForProactiveFeedback(code)
       }
 
-      const response = await fetch("/api/chat", {
+      const response = await fetch(chatApiEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2071,7 +2076,7 @@ Do NOT reintroduce yourself. Continue as if we're in the middle of a discussion 
 
 Be conversational and thorough - like a real interviewer debriefing after a coding interview. The candidate's responses during this discussion will be factored into their final score.`
 
-      const response = await fetch("/api/chat", {
+      const response = await fetch(chatApiEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3261,7 +3266,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             : "\n\n[POST-INTERVIEW DISCUSSION: Continue discussing their solution. If they indicate they're done or have no questions, wrap up gracefully.]"
         }
 
-        const response = await fetch("/api/chat", {
+        const response = await fetch(chatApiEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -3741,7 +3746,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       // Trigger interviewer to provide final feedback
       const finalMessage = `The candidate has submitted their design. Please provide a brief summary of their performance, highlighting strengths and areas for improvement. Keep it concise (2-3 sentences).`
 
-      const response = await fetch("/api/chat", {
+      const response = await fetch(chatApiEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

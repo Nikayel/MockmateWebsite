@@ -4,10 +4,17 @@
  * Extracts concrete evidence from the conversation transcript BEFORE
  * generating feedback. This prevents hallucination and ensures feedback
  * is grounded in what actually happened.
+ *
+ * DRY: Uses shared-patterns.ts for complexity and edge case detection.
  */
 
 import { generateAIResponse } from "@/lib/ai-providers"
 import { logger } from "@/lib/logger"
+import {
+  getComplexityRank,
+  findDominantComplexity,
+  EDGE_CASE_KEYWORDS,
+} from "@/lib/interview/shared-patterns"
 
 // =============================================================================
 // EXTRACTION TYPES
@@ -111,44 +118,8 @@ export async function extractConversationEvidence(
   return mergeEvidence(algorithmicEvidence, semanticEvidence)
 }
 
-/**
- * Get the "rank" of a complexity for comparison
- * Higher rank = worse/bigger complexity
- */
-function getComplexityRank(complexity: string): number {
-  const c = complexity.toUpperCase().replace(/\s+/g, '')
-  // Polynomial complexities
-  if (c.includes('N^3') || c.includes('N³') || c.includes('NCUBED')) return 100
-  if (c.includes('N^2') || c.includes('N²') || c.includes('NSQUARED') || c.includes('QUADRATIC')) return 80
-  if (c.includes('NLOGN') || c.includes('N*LOGN') || c.includes('N LOG N')) return 60
-  if (c.includes('N)') && !c.includes('LOG')) return 40  // O(N)
-  if (c.includes('LOGN') || c.includes('LOG N')) return 30  // O(log n)
-  if (c.includes('1)')) return 10  // O(1)
-  return 50 // Unknown - assume middle ground
-}
-
-/**
- * Find the dominant (highest rank) complexity from a list
- * For time complexity, the dominant one is usually the correct overall complexity
- */
-function findDominantComplexity(complexities: string[]): string {
-  if (complexities.length === 0) return 'O(N)'
-  if (complexities.length === 1) return complexities[0]
-
-  // Find the one with highest rank
-  let dominant = complexities[0]
-  let highestRank = getComplexityRank(dominant)
-
-  for (const c of complexities) {
-    const rank = getComplexityRank(c)
-    if (rank > highestRank) {
-      highestRank = rank
-      dominant = c
-    }
-  }
-
-  return dominant
-}
+// NOTE: getComplexityRank and findDominantComplexity are now imported from shared-patterns.ts
+// This ensures consistent complexity ranking across all modules (DRY principle)
 
 /**
  * Algorithmic extraction - fast, no AI needed
@@ -264,9 +235,8 @@ function extractAlgorithmically(
         }
       }
 
-      // Check for edge case mentions
-      const edgeCaseKeywords = ['empty', 'null', 'none', 'zero', 'negative', 'single', 'one element', 'duplicate', 'edge case']
-      edgeCaseKeywords.forEach(keyword => {
+      // Check for edge case mentions - use shared keywords from shared-patterns.ts
+      EDGE_CASE_KEYWORDS.forEach(keyword => {
         if (content.includes(keyword)) {
           const quote = `"${originalContent.substring(0, 100)}..."`
           if (interviewerAskedEdgeCase) {

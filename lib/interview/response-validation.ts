@@ -1,11 +1,23 @@
 /**
- * Post-Generation Response Validation
+ * Hard Gates - Response Validation with Regeneration
  *
  * Validates interviewer responses against behavioral rules.
- * Returns violations and suggested corrections.
+ * Uses deterministic checks (not AI) to enforce rules.
+ * Returns violations and triggers regeneration for critical issues.
+ *
+ * DRY: Uses shared-patterns.ts for all detection patterns.
  */
 
 import type { ConversationTracker, InterviewPhase } from "./interview-phases"
+import { logger } from "@/lib/logger"
+import {
+  CODING_TRANSITION_PATTERNS,
+  GIVEAWAY_PATTERNS,
+  LEADING_QUESTION_PATTERNS,
+  VAGUE_ANSWER_PATTERNS,
+  ACCEPTANCE_PATTERNS,
+  PROBING_PATTERNS,
+} from "./shared-patterns"
 
 export interface ValidationResult {
   isValid: boolean
@@ -21,263 +33,297 @@ export interface ResponseViolation {
   evidence: string
 }
 
-interface ValidationContext {
+export interface ValidationContext {
   response: string
   phase: InterviewPhase
   tracker: ConversationTracker | undefined
   hasSubmitted: boolean
   lastUserMessage?: string
+  isOptimalSolution?: boolean
 }
 
-// Patterns that indicate vague answer acceptance
-const VAGUE_ACCEPTANCE_PATTERNS = [
-  /(?:go ahead|code it up|start coding|let's code)/i,
+// =============================================================================
+// GATE DEFINITIONS
+// Each gate is a deterministic check that returns a violation or null
+// =============================================================================
+
+interface Gate {
+  name: string
+  severity: "critical" | "warning"
+  check: (ctx: ValidationContext) => { violated: boolean; evidence: string } | null
+  hint: string
+}
+
+const GATES: Gate[] = [
+  // GATE 1: No "code it up" without prerequisites
+  {
+    name: "no-premature-coding",
+    severity: "critical",
+    check: (ctx) => {
+      // Use shared patterns from shared-patterns.ts
+      const match = CODING_TRANSITION_PATTERNS.find(p => p.test(ctx.response))
+      if (!match) return null
+
+      // Only enforce in pre-test phases
+      if (ctx.phase !== "discussion" && ctx.phase !== "coding") return null
+      if (ctx.tracker?.hasRunTests) return null
+
+      // Check prerequisites
+      const hasComplexity = ctx.tracker?.timeComplexityMentioned ?? false
+      const hasEdgeCases = (ctx.tracker?.edgeCasesMentioned?.length ?? 0) > 0
+
+      if (!hasComplexity || !hasEdgeCases) {
+        const missing = []
+        if (!hasComplexity) missing.push("complexity")
+        if (!hasEdgeCases) missing.push("edge cases")
+        return {
+          violated: true,
+          evidence: `Said coding phrase without discussing: ${missing.join(", ")}`
+        }
+      }
+      return null
+    },
+    hint: "Ask about time complexity and edge cases BEFORE telling them to code"
+  },
+
+  // GATE 2: No giving away answers
+  {
+    name: "no-giving-answers",
+    severity: "critical",
+    check: (ctx) => {
+      // Use shared patterns from shared-patterns.ts
+      for (const { pattern, type } of GIVEAWAY_PATTERNS) {
+        const match = ctx.response.match(pattern)
+        if (match) {
+          return { violated: true, evidence: `${type}: "${match[0]}"` }
+        }
+      }
+      return null
+    },
+    hint: "Ask guiding questions instead of giving the answer. Example: 'What data structure might help here?'"
+  },
+
+  // GATE 3: No revealing optimal bounds
+  {
+    name: "no-revealing-optimal",
+    severity: "warning",
+    check: (ctx) => {
+      // Only matters if solution IS optimal
+      if (!ctx.isOptimalSolution) return null
+
+      const patterns = [
+        /(?:this|that|it)(?:'s| is) (?:the )?optimal/i,
+        /(?:can't|cannot) do better/i,
+        /(?:this|that) is (?:the )?(?:best|lowest|minimum) (?:possible|you can)/i,
+        /O\([^)]+\) is (?:the )?(?:optimal|best)/i,
+        /you(?:'ve| have) (?:already )?(?:found|reached|achieved) (?:the )?optimal/i,
+      ]
+
+      for (const pattern of patterns) {
+        const match = ctx.response.match(pattern)
+        if (match) {
+          return { violated: true, evidence: match[0] }
+        }
+      }
+      return null
+    },
+    hint: "Don't reveal optimality. Ask: 'What do you think the complexity is? Could it be improved?'"
+  },
+
+  // GATE 4: No excessive apology
+  {
+    name: "no-excessive-apology",
+    severity: "warning",
+    check: (ctx) => {
+      const apologyPatterns = [
+        /my bad/i,
+        /my mistake/i,
+        /my fault/i,
+        /i misspoke/i,
+        /i should(?:'ve| have)/i,
+        /fair point,? i/i,
+        /you're right,? (?:my bad|i should)/i,
+      ]
+
+      const apologies = apologyPatterns.filter(p => p.test(ctx.response))
+      if (apologies.length >= 2) {
+        return { violated: true, evidence: `${apologies.length} apologies detected` }
+      }
+      return null
+    },
+    hint: "Acknowledge once, then move forward. Example: 'Good catch. So, what's your complexity analysis?'"
+  },
+
+  // GATE 5: No premature feedback mention
+  {
+    name: "no-premature-feedback",
+    severity: "critical",
+    check: (ctx) => {
+      if (ctx.hasSubmitted) return null
+
+      if (/view detailed feedback/i.test(ctx.response)) {
+        return { violated: true, evidence: "Mentioned 'View Detailed Feedback' before submit" }
+      }
+      return null
+    },
+    hint: "The 'View Detailed Feedback' button only appears AFTER submit. Guide them to Submit first."
+  },
+
+  // GATE 6: One question at a time
+  {
+    name: "one-question-at-a-time",
+    severity: "warning",
+    check: (ctx) => {
+      const questions = ctx.response.match(/\?/g) || []
+      if (questions.length > 2) {
+        return { violated: true, evidence: `${questions.length} questions in one response` }
+      }
+      return null
+    },
+    hint: "Ask ONE focused question at a time. Let them answer before asking the next."
+  },
+
+  // GATE 7: Vague answer acceptance
+  {
+    name: "no-accepting-vague-answers",
+    severity: "critical",
+    check: (ctx) => {
+      if (!ctx.lastUserMessage) return null
+
+      // Use shared patterns from shared-patterns.ts
+      const userWasVague = VAGUE_ANSWER_PATTERNS.some(p => p.test(ctx.lastUserMessage || ""))
+      if (!userWasVague) return null
+
+      // Check if interviewer accepted without probing (using shared patterns)
+      const accepted = ACCEPTANCE_PATTERNS.some(p => p.test(ctx.response))
+      const probed = PROBING_PATTERNS.some(p => p.test(ctx.response))
+
+      if (accepted && !probed) {
+        return { violated: true, evidence: "Accepted vague answer without probing" }
+      }
+      return null
+    },
+    hint: "When user gives vague answer, probe: 'How exactly would you handle that? Walk me through the code.'"
+  },
+
+  // GATE 8: No leading questions
+  {
+    name: "no-leading-questions",
+    severity: "warning",
+    check: (ctx) => {
+      // Use shared patterns from shared-patterns.ts
+      for (const { pattern, type } of LEADING_QUESTION_PATTERNS) {
+        const match = ctx.response.match(pattern)
+        if (match) {
+          return { violated: true, evidence: `Leading toward ${type}: "${match[0]}"` }
+        }
+      }
+      return null
+    },
+    hint: "Ask open questions: 'What approach are you considering?' not 'Would a hash map help?'"
+  },
 ]
 
-// Patterns that reveal optimal complexity bounds
-const OPTIMAL_REVEAL_PATTERNS = [
-  /(?:is|that's|this is)\s+(?:the\s+)?optimal/i,
-  /(?:can't|cannot|can not)\s+do\s+better/i,
-  /(?:is|that's)\s+(?:the\s+)?(?:best|lowest|minimum)\s+(?:you can|possible|bound)/i,
-  /O\([^)]+\)\s+is\s+(?:the\s+)?(?:optimal|best|lowest)/i,
-]
-
-// Patterns that indicate excessive apology
-const EXCESSIVE_APOLOGY_PATTERNS = [
-  /my (?:bad|mistake|fault)/i,
-  /you're right,?\s+(?:my bad|I should|fair point)/i,
-  /fair point\.?\s+I should/i,
-  /I should(?:'ve| have) (?:asked|known|done)/i,
-]
+// =============================================================================
+// MAIN VALIDATION FUNCTION
+// =============================================================================
 
 /**
- * Validate an interviewer response against behavioral rules
+ * Validate an interviewer response against all hard gates
+ * Returns violations and hints for regeneration
  */
 export function validateInterviewerResponse(ctx: ValidationContext): ValidationResult {
   const violations: ResponseViolation[] = []
-  const responseLower = ctx.response.toLowerCase()
 
-  // Rule 1: Check for premature "code it up" without prerequisites
-  if (shouldCheckCodeItUp(ctx)) {
-    const codeItUpViolation = checkCodeItUpViolation(ctx)
-    if (codeItUpViolation) {
-      violations.push(codeItUpViolation)
+  // Run all gates
+  for (const gate of GATES) {
+    try {
+      const result = gate.check(ctx)
+      if (result?.violated) {
+        violations.push({
+          rule: gate.name,
+          description: result.evidence,
+          severity: gate.severity,
+          evidence: result.evidence,
+        })
+      }
+    } catch (error) {
+      // Gate threw an error - log but don't fail validation
+      logger.warn(`Gate ${gate.name} threw error`, { error })
     }
   }
 
-  // Rule 2: Check for vague answer acceptance
-  if (ctx.lastUserMessage) {
-    const vagueViolation = checkVagueAnswerAcceptance(ctx)
-    if (vagueViolation) {
-      violations.push(vagueViolation)
-    }
-  }
+  // Determine if we should regenerate (only for critical violations)
+  const criticalViolations = violations.filter(v => v.severity === "critical")
+  const shouldRegenerate = criticalViolations.length > 0
 
-  // Rule 3: Check for revealing optimal bounds
-  const optimalViolation = checkOptimalBoundsReveal(ctx.response)
-  if (optimalViolation) {
-    violations.push(optimalViolation)
-  }
-
-  // Rule 4: Check for excessive apology
-  const apologyViolation = checkExcessiveApology(ctx.response)
-  if (apologyViolation) {
-    violations.push(apologyViolation)
-  }
-
-  // Rule 5: Check for premature feedback mention
-  if (!ctx.hasSubmitted && responseLower.includes("view detailed feedback")) {
-    violations.push({
-      rule: "premature_feedback_mention",
-      description: "Mentioned 'View Detailed Feedback' before user submitted",
-      severity: "critical",
-      evidence: "view detailed feedback",
-    })
-  }
-
-  // Rule 6: Check for leading questions
-  const leadingViolation = checkLeadingQuestions(ctx.response)
-  if (leadingViolation) {
-    violations.push(leadingViolation)
-  }
-
-  // Determine if we should regenerate
-  const hasCritical = violations.some((v) => v.severity === "critical")
-  const shouldRegenerate = hasCritical
+  // Build hint from violated gates
+  const hints = violations.map(v => {
+    const gate = GATES.find(g => g.name === v.rule)
+    return gate?.hint || v.description
+  })
 
   return {
     isValid: violations.length === 0,
     violations,
     shouldRegenerate,
-    regenerationHint: buildRegenerationHint(violations),
+    regenerationHint: hints.length > 0 ? hints.join(". ") : undefined,
   }
 }
 
-function shouldCheckCodeItUp(ctx: ValidationContext): boolean {
-  const isPreTestPhase =
-    (ctx.phase === "discussion" || ctx.phase === "coding") &&
-    ctx.tracker &&
-    !ctx.tracker.hasRunTests
-  return isPreTestPhase
-}
+/**
+ * Run validation with retry loop
+ * Returns the validated (or regenerated) response
+ */
+export async function validateWithRetry(
+  ctx: ValidationContext,
+  regenerate: (hint: string) => Promise<string>,
+  maxRetries: number = 2
+): Promise<{ response: string; violations: ResponseViolation[]; retries: number }> {
+  let currentResponse = ctx.response
+  let totalViolations: ResponseViolation[] = []
+  let retries = 0
 
-function checkCodeItUpViolation(ctx: ValidationContext): ResponseViolation | null {
-  const responseLower = ctx.response.toLowerCase()
-  const codeItUpPhrases = ["code it up", "go ahead and code", "start coding", "go code", "let's code"]
-  const hasCodeItUp = codeItUpPhrases.some((phrase) => responseLower.includes(phrase))
+  for (let i = 0; i <= maxRetries; i++) {
+    const validation = validateInterviewerResponse({
+      ...ctx,
+      response: currentResponse,
+    })
 
-  if (!hasCodeItUp || !ctx.tracker) return null
-
-  const missingPrereqs: string[] = []
-  if (!ctx.tracker.timeComplexityMentioned) {
-    missingPrereqs.push("complexity")
-  }
-  if (ctx.tracker.edgeCasesMentioned.length === 0) {
-    missingPrereqs.push("edge cases")
-  }
-
-  if (missingPrereqs.length > 0) {
-    return {
-      rule: "premature_code_it_up",
-      description: `Said "code it up" without discussing: ${missingPrereqs.join(", ")}`,
-      severity: "critical",
-      evidence: codeItUpPhrases.find((p) => responseLower.includes(p)) || "",
+    if (validation.isValid) {
+      return { response: currentResponse, violations: [], retries }
     }
-  }
 
-  return null
-}
+    // Log violations
+    logger.info("[Hard Gates] Violations detected", {
+      attempt: i + 1,
+      violations: validation.violations.map(v => v.rule),
+      hint: validation.regenerationHint,
+    })
 
-function checkVagueAnswerAcceptance(ctx: ValidationContext): ResponseViolation | null {
-  if (!ctx.lastUserMessage) return null
-
-  const userMsgLower = ctx.lastUserMessage.toLowerCase()
-  const responseLower = ctx.response.toLowerCase()
-
-  // Check if user gave a vague answer
-  const vaguePatterns = [
-    { pattern: /i(?:'ll| will| can) (?:just )?skip (?:them|it|those)/i, topic: "skipping" },
-    { pattern: /i(?:'ll| will| can) (?:just )?(?:use|add) (?:a )?(?:hash|map|set)/i, topic: "data structure" },
-    { pattern: /i(?:'ll| will| can) (?:just )?iterate/i, topic: "iteration" },
-    { pattern: /i(?:'ll| will| can) (?:just )?check (?:for )?(?:that|it)/i, topic: "checking" },
-    { pattern: /i(?:'ll| will| can) (?:just )?handle (?:that|it)/i, topic: "handling" },
-  ]
-
-  const vagueAnswer = vaguePatterns.find((p) => p.pattern.test(userMsgLower))
-  if (!vagueAnswer) return null
-
-  // Check if interviewer accepted it without probing
-  const acceptedWithoutProbing = VAGUE_ACCEPTANCE_PATTERNS.some((p) => p.test(responseLower))
-
-  // Check if interviewer DID probe (good behavior)
-  const probingPatterns = [
-    /how (?:exactly|specifically|would you)/i,
-    /walk me through/i,
-    /what (?:will|would) you/i,
-    /where (?:exactly|specifically)/i,
-    /show me/i,
-    /explain (?:how|what|where)/i,
-  ]
-  const didProbe = probingPatterns.some((p) => p.test(responseLower))
-
-  if (acceptedWithoutProbing && !didProbe) {
-    return {
-      rule: "vague_answer_accepted",
-      description: `Accepted vague answer about "${vagueAnswer.topic}" without probing for specifics`,
-      severity: "critical",
-      evidence: ctx.lastUserMessage.substring(0, 100),
-    }
-  }
-
-  return null
-}
-
-function checkOptimalBoundsReveal(response: string): ResponseViolation | null {
-  for (const pattern of OPTIMAL_REVEAL_PATTERNS) {
-    const match = response.match(pattern)
-    if (match) {
+    // If not critical or no more retries, return current response
+    if (!validation.shouldRegenerate || i === maxRetries) {
       return {
-        rule: "revealed_optimal_bounds",
-        description: "Revealed optimal complexity bounds instead of letting candidate discover it",
-        severity: "warning",
-        evidence: match[0],
+        response: currentResponse,
+        violations: validation.violations,
+        retries
       }
     }
-  }
-  return null
-}
 
-function checkExcessiveApology(response: string): ResponseViolation | null {
-  const apologies: string[] = []
-  for (const pattern of EXCESSIVE_APOLOGY_PATTERNS) {
-    const match = response.match(pattern)
-    if (match) {
-      apologies.push(match[0])
-    }
-  }
-
-  // One apology is fine, multiple is excessive
-  if (apologies.length >= 2) {
-    return {
-      rule: "excessive_apology",
-      description: "Multiple apologies detected - maintain professional composure",
-      severity: "warning",
-      evidence: apologies.join(", "),
-    }
-  }
-
-  return null
-}
-
-function checkLeadingQuestions(response: string): ResponseViolation | null {
-  const leadingPatterns = [
-    { pattern: /are you thinking.*(dp|dynamic|hash|map|set|tree|stack|queue)/i, technique: "data structure/algorithm" },
-    { pattern: /would a.*(hash|map|set|array|tree|stack|queue).*help/i, technique: "data structure" },
-    { pattern: /have you considered.*(dp|dynamic|hash|sliding|two pointer)/i, technique: "algorithm" },
-    { pattern: /it's basically.*(fibonacci|dp|bfs|dfs|binary search)/i, technique: "algorithm" },
-  ]
-
-  for (const { pattern, technique } of leadingPatterns) {
-    if (pattern.test(response)) {
+    // Regenerate
+    try {
+      currentResponse = await regenerate(validation.regenerationHint || "Follow interviewer rules")
+      retries++
+      totalViolations = validation.violations
+    } catch (error) {
+      logger.error("[Hard Gates] Regeneration failed", { error })
       return {
-        rule: "leading_question",
-        description: `Leading question that suggests ${technique}`,
-        severity: "warning",
-        evidence: response.match(pattern)?.[0] || "",
+        response: currentResponse,
+        violations: validation.violations,
+        retries
       }
     }
   }
 
-  return null
-}
-
-function buildRegenerationHint(violations: ResponseViolation[]): string | undefined {
-  if (violations.length === 0) return undefined
-
-  const hints: string[] = []
-
-  for (const v of violations) {
-    switch (v.rule) {
-      case "premature_code_it_up":
-        hints.push("Ask about complexity and edge cases BEFORE saying 'code it up'")
-        break
-      case "vague_answer_accepted":
-        hints.push("Probe for specifics - ask HOW they would implement their vague statement")
-        break
-      case "revealed_optimal_bounds":
-        hints.push("Ask 'What do you think? Can this be improved?' instead of revealing optimality")
-        break
-      case "excessive_apology":
-        hints.push("Acknowledge once, then redirect: 'Let's move forward - what's your complexity analysis?'")
-        break
-      case "premature_feedback_mention":
-        hints.push("Don't mention 'View Detailed Feedback' until after user submits")
-        break
-      case "leading_question":
-        hints.push("Ask open-ended questions like 'Walk me through your approach' instead of suggesting techniques")
-        break
-    }
-  }
-
-  return hints.join(". ")
+  return { response: currentResponse, violations: totalViolations, retries }
 }
