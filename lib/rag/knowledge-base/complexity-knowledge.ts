@@ -2608,10 +2608,71 @@ export const PATTERN_COMPLEXITY_RULES: PatternComplexityRules[] = [
 ]
 
 /**
+ * Normalize a problem ID to match knowledge base format
+ * Handles variations like:
+ * - dsa-longest-consecutive-sequence -> dsa-longest-consecutive
+ * - dsa-product-array-except-self -> dsa-product-except-self
+ * - dsa-top-k-frequent-elements -> dsa-top-k-frequent
+ */
+function normalizeId(problemId: string): string[] {
+  const variations: string[] = [problemId]
+
+  // Common suffix patterns to try removing
+  const suffixesToRemove = [
+    "-sequence",
+    "-elements",
+    "-array",
+    "-numbers",
+    "-list",
+    "-string",
+    "-tree",
+    "-graph",
+  ]
+
+  for (const suffix of suffixesToRemove) {
+    if (problemId.endsWith(suffix)) {
+      variations.push(problemId.slice(0, -suffix.length))
+    }
+  }
+
+  // Handle compound removals (e.g., "-array-except" -> "-except")
+  const compoundPatterns = [
+    { from: "-array-except-self", to: "-except-self" },
+    { from: "-binary-search-tree", to: "-bst" },
+    { from: "-linked-list", to: "-list" },
+    { from: "-without-repeating", to: "" },
+  ]
+
+  for (const { from, to } of compoundPatterns) {
+    if (problemId.includes(from)) {
+      variations.push(problemId.replace(from, to))
+    }
+  }
+
+  return [...new Set(variations)]
+}
+
+/**
  * Get complexity knowledge for a specific problem
+ * Uses fuzzy matching to handle ID variations between scenarios and knowledge base
  */
 export function getComplexityKnowledge(problemId: string): ProblemComplexityKnowledge | undefined {
-  return PROBLEM_COMPLEXITY_DATA.find((p) => p.problemId === problemId)
+  // Try exact match first
+  const exactMatch = PROBLEM_COMPLEXITY_DATA.find((p) => p.problemId === problemId)
+  if (exactMatch) return exactMatch
+
+  // Try normalized variations
+  const variations = normalizeId(problemId)
+  for (const variant of variations) {
+    const match = PROBLEM_COMPLEXITY_DATA.find((p) => p.problemId === variant)
+    if (match) return match
+  }
+
+  // Try slug-based matching as last resort
+  const slug = problemId.replace("dsa-", "").toLowerCase()
+  return PROBLEM_COMPLEXITY_DATA.find(
+    (p) => p.slug && p.slug.toLowerCase().replace(/-/g, "") === slug.replace(/-/g, "")
+  )
 }
 
 /**

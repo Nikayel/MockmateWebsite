@@ -64,10 +64,26 @@ const APPROACH_PATTERNS: Record<string, CodePatterns> = {
   // Hash Map approaches
   "Hash Table": {
     indicators: [
-      /new\s+Map\s*\(|new\s+Set\s*\(/, // JS Map/Set
+      /new\s+Map\s*\(/, // JS Map
       /\bdict\s*\(|\{\s*\}|defaultdict|Counter/, // Python dict
-      /HashMap|HashSet|TreeMap/, // Java
-      /\.get\s*\(|\.has\s*\(|\.set\s*\(|\bin\s+\w+/, // Hash operations
+      /HashMap|TreeMap/, // Java Map types
+      /\.get\s*\(|\.set\s*\(/, // Map operations
+    ],
+    requiredCount: 1,
+  },
+
+  // Hash Set approach - commonly used for O(n) lookups
+  "Hash Set": {
+    indicators: [
+      /new\s+Set\s*\(/, // JS Set
+      /\bset\s*\(/, // Python set()
+      /HashSet/, // Java HashSet
+      /\bin\s+\w+_set|\bin\s+num_set|\bin\s+seen/, // "in set_name" pattern
+      /\.has\s*\(|\.add\s*\(/, // Set operations
+      /not\s+in\s+\w+/, // Python "not in" pattern for set membership
+    ],
+    antiIndicators: [
+      /\.get\s*\(|\.set\s*\(/, // These are Map operations, not Set
     ],
     requiredCount: 1,
   },
@@ -427,10 +443,11 @@ function estimateComplexityFromApproach(
   const complexityMap: Record<string, { time: string; space: string }> = {
     "Brute Force": { time: "O(n²)", space: "O(1)" },
     "Hash Table": { time: "O(n)", space: "O(n)" },
+    "Hash Set": { time: "O(n)", space: "O(n)" },
     "One-pass Hash Table": { time: "O(n)", space: "O(n)" },
     "Two-pass Hash Table": { time: "O(n)", space: "O(n)" },
     "Two Pointers": { time: "O(n)", space: "O(1)" },
-    "Sort + Two Pointers": { time: "O(n²)", space: "O(1)" }, // O(n²) because nested loop dominates
+    "Sort + Two Pointers": { time: "O(n log n)", space: "O(1)" }, // Sorting dominates
     "Binary Search": { time: "O(log n)", space: "O(1)" },
     "Sliding Window": { time: "O(n)", space: "O(1)" },
     "Dynamic Programming": { time: "O(n)", space: "O(n)" }, // Varies, but common case
@@ -442,18 +459,43 @@ function estimateComplexityFromApproach(
     Sorting: { time: "O(n log n)", space: "O(1)" },
   }
 
+  let result = complexityMap[approachName] || { time: "O(n)", space: "O(1)" }
+
+  // IMPORTANT: Hash-based approaches maintain O(n) even with nested loops
+  // because the inner loop is bounded by unique elements (amortized O(1) per element)
+  // Example: Longest Consecutive Sequence - while loop inside for loop is still O(n)
+  // because each element is visited at most twice total, not n times each
+  const hashBasedApproaches = [
+    "Hash Table",
+    "Hash Set",
+    "One-pass Hash Table",
+    "Two-pass Hash Table",
+  ]
+
+  // Skip nested loop adjustment for hash-based approaches - their complexity
+  // comes from amortized O(1) lookups, not naive loop multiplication
+  if (hashBasedApproaches.includes(approachName)) {
+    return result
+  }
+
   // Check for nested loops to upgrade to O(n²) or O(n³)
+  // Only apply to approaches where nested loops actually mean O(n²)
   const hasNestedLoops =
     /for[\s\S]*?for|while[\s\S]*?while|for[\s\S]*?while|while[\s\S]*?for/m.test(code)
   const hasTripleNesting = /for[\s\S]*?for[\s\S]*?for|while[\s\S]*?while[\s\S]*?while/m.test(code)
 
-  let result = complexityMap[approachName] || { time: "O(n)", space: "O(1)" }
+  // Adjust for nesting - but only for approaches that don't already account for it
+  const alreadyQuadratic = ["Brute Force", "Sort + Two Pointers"]
 
-  // Adjust for nesting
-  if (hasTripleNesting) {
+  if (hasTripleNesting && !alreadyQuadratic.includes(approachName)) {
     result = { ...result, time: "O(n³)" }
-  } else if (hasNestedLoops && !["Brute Force", "Sort + Two Pointers"].includes(approachName)) {
-    result = { ...result, time: "O(n²)" }
+  } else if (hasNestedLoops && !alreadyQuadratic.includes(approachName)) {
+    // Only upgrade to O(n²) for genuinely quadratic patterns
+    // Skip for Two Pointers and Sliding Window which use controlled iteration
+    const controlledIterationApproaches = ["Two Pointers", "Sliding Window"]
+    if (!controlledIterationApproaches.includes(approachName)) {
+      result = { ...result, time: "O(n²)" }
+    }
   }
 
   return result

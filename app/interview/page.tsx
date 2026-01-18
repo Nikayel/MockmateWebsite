@@ -2736,9 +2736,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             },
           }
 
-          // Add 90-second timeout to prevent hanging forever
+          // Add 120-second timeout to prevent hanging forever (matches backend maxDuration)
           const feedbackController = new AbortController()
-          const feedbackTimeoutId = setTimeout(() => feedbackController.abort(), 90000)
+          const feedbackTimeoutId = setTimeout(() => feedbackController.abort(), 120000)
 
           const feedbackResponse = await fetch("/api/generate-feedback", {
             method: "POST",

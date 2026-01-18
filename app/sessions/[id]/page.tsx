@@ -298,8 +298,55 @@ export default function SessionDetailPage() {
                 Go to Dashboard
               </Button>
             </div>
+          ) : session.feedback_status === "failed" &&
+            session.score_breakdown &&
+            session.performance_score !== undefined ? (
+            // Feedback API failed but we have fallback scores - show them with a note
+            <>
+              <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-center">
+                <p className="text-sm text-amber-300">
+                  AI feedback was unavailable. Showing estimated scores based on test results.
+                </p>
+              </div>
+              <PracticeFeedback
+                feedback={
+                  session.feedback ||
+                  `Completed ${session.topic || "problem"} with ${session.tests_passed || 0}/${session.tests_total || 0} tests passing.`
+                }
+                performanceScore={session.performance_score || 0}
+                technicalScore={session.technical_score ?? session.mastery_score}
+                scoreBreakdown={session.score_breakdown}
+                testsPassed={
+                  session.tests_passed ??
+                  (session.test_results?.filter((t: any) => t.passed).length || 0)
+                }
+                testsTotal={session.tests_total ?? (session.test_results?.length || 0)}
+                timeComplexity={session.time_complexity}
+                spaceComplexity={session.space_complexity}
+                efficiencyScore={session.efficiency_score}
+                elapsedTime={
+                  session.completed_at && session.started_at
+                    ? Math.round(
+                        (new Date(session.completed_at).getTime() -
+                          new Date(session.started_at).getTime()) /
+                          1000
+                      )
+                    : session.elapsed_time || 0
+                }
+                userId={firebaseUser?.uid}
+                problemType={session.type}
+                difficulty={session.difficulty}
+                problemTitle={session.topic}
+                code={session.final_code || session.session_state?.code}
+                language={session.language || session.session_state?.language || "javascript"}
+                chatMessages={session.session_state?.chat_messages}
+                interviewerMessages={session.session_state?.interviewer_messages}
+                onRetry={() => router.push(`/interview?scenario=${session.scenario_id}`)}
+                onNewProblem={() => router.push("/interview")}
+              />
+            </>
           ) : session.feedback_status === "failed" ? (
-            // Feedback generation failed - allow retry
+            // Feedback generation failed with no fallback scores - allow retry
             <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-12 text-center">
               <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/10">
                 <Terminal className="h-7 w-7 text-red-400" />

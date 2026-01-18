@@ -162,6 +162,18 @@ export function analyzeCodeEfficiency(
  * Used when approach detector doesn't have enough confidence
  */
 function fallbackComplexityDetection(code: string): { time: string; space: string } {
+  // Check for hash structures FIRST - these often have amortized O(n) complexity
+  // even when nested loops are present (e.g., Longest Consecutive Sequence)
+  const hasHashSet = /\bset\s*\(|new\s+Set\s*\(|HashSet/i.test(code)
+  const hasHashMap = /Map|dict|Counter|\{\s*\}|defaultdict/.test(code)
+  const hasHashStructure = hasHashSet || hasHashMap
+
+  // Check for the specific pattern of hash set with "in" checks inside a loop
+  // This is a common O(n) pattern that looks like O(n²) naively
+  // Example: for x in nums: while x+1 in num_set: ... (Longest Consecutive Sequence)
+  const hasHashLookupInLoop =
+    /for[\s\S]*?(?:in\s+\w+_?set|in\s+seen|\.has\s*\(|not\s+in\s+\w+)/m.test(code)
+
   // Estimate time complexity based on nested loops
   // Detect various nested loop patterns including Python (no braces)
   const hasNestedLoops =
@@ -175,20 +187,23 @@ function fallbackComplexityDetection(code: string): { time: string; space: strin
   const hasBinarySearch =
     /while[\s\S]*?(?:left|lo|start)\s*<[=]?\s*(?:right|hi|end)[\s\S]*?mid/m.test(code)
 
-  // Check for hash structures
-  const hasHashMap = /Map|Set|dict|set\(|Counter|\{\s*\}|defaultdict/.test(code)
-
   // Determine time complexity
   let time = "O(n)"
-  if (hasTripleNesting) {
+
+  // IMPORTANT: Hash-based solutions with nested loops are often still O(n)
+  // because the inner loop is bounded by unique elements, not n
+  // Only mark as O(n²) if there's no hash structure involved
+  if (hasTripleNesting && !hasHashStructure) {
     time = "O(n³)"
-  } else if (hasNestedLoops) {
+  } else if (hasNestedLoops && !hasHashStructure && !hasHashLookupInLoop) {
     time = "O(n²)"
   } else if (hasBinarySearch) {
     time = "O(log n)"
-  } else if (hasSort) {
+  } else if (hasSort && !hasNestedLoops) {
+    // Only O(n log n) if sorting is the dominant operation
     time = "O(n log n)"
   }
+  // Hash-based solutions stay at O(n) even with nested loops
 
   // Estimate space complexity
   const hasArrayCreation =
@@ -197,7 +212,7 @@ function fallbackComplexityDetection(code: string): { time: string; space: strin
     )
 
   let space = "O(1)"
-  if (hasHashMap || hasArrayCreation) {
+  if (hasHashStructure || hasArrayCreation) {
     space = "O(n)"
   }
 
