@@ -247,8 +247,9 @@ export class InterviewerAgent implements Agent<InterviewerInput, InterviewerOutp
   private formatHistory(
     messages: ChatMessage[]
   ): Array<{ role: "user" | "model"; content: string }> {
-    // Take last 10 messages for context (configurable)
-    const recentMessages = messages.slice(-10)
+    // Take last 30 messages for context to prevent circular questions
+    // Full interview context helps interviewer remember what was already discussed
+    const recentMessages = messages.slice(-30)
 
     return recentMessages
       .filter((m) => m.role !== "system")

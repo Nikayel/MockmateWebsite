@@ -54,7 +54,7 @@ import { generateAIResponse } from "@/lib/ai-providers"
 // CONTEXT MANAGEMENT CONSTANTS
 // =============================================================================
 
-const MAX_HISTORY_MESSAGES = 20 // Keep last 20 messages
+const MAX_HISTORY_MESSAGES = 40 // Keep last 40 messages to prevent circular questions
 const MAX_MESSAGE_LENGTH = 4000 // Truncate individual messages
 const MAX_WORKSPACE_FILES = 5 // Limit workspace files
 const MAX_FILE_SIZE = 10000 // 10KB per file max
