@@ -72,14 +72,37 @@ export type {
   Agent,
 } from "./types"
 
-// Agents
+// =============================================================================
+// INTERVIEW AGENTS (Phase 1: Live Interview)
+// =============================================================================
+
 export { InterviewerAgent, interviewerAgent } from "./interviewer-agent"
 export { StateTrackerAgent, stateTrackerAgent } from "./state-tracker-agent"
 export { ResponseValidatorAgent, responseValidatorAgent, quickValidate } from "./response-validator-agent"
 
-// Orchestrator
+// Interview Orchestrator
 export {
   InterviewOrchestrator,
   interviewOrchestrator,
   orchestrateInterviewResponse,
 } from "./orchestrator"
+
+// =============================================================================
+// FEEDBACK AGENTS (Phase 2 & 3: Post-Submission)
+// =============================================================================
+
+export { ScorerAgent, createScorerAgent } from "./scorer-agent"
+export type { ScorerAgentInput, ScorerAgentOutput } from "./scorer-agent"
+
+export { FeedbackWriterAgent, createFeedbackWriterAgent } from "./feedback-writer-agent"
+export type { FeedbackWriterAgentInput, FeedbackWriterAgentOutput } from "./feedback-writer-agent"
+
+export { ConstitutionalAgent, createConstitutionalAgent } from "./constitutional-agent"
+export type { ConstitutionalAgentInput, ConstitutionalAgentOutput } from "./constitutional-agent"
+
+// Feedback Orchestrator
+export {
+  FeedbackOrchestrator,
+  orchestrateFeedbackGeneration,
+} from "./feedback-orchestrator"
+export type { FeedbackRequest, FeedbackResponse } from "./feedback-orchestrator"
