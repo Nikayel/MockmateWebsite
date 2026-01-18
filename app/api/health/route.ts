@@ -126,6 +126,45 @@ function checkEnvironment(): { status: "pass" | "fail" | "warn"; message?: strin
   return { status: "pass" }
 }
 
+/**
+ * Check AI provider availability
+ * Returns status of all configured AI providers and whether fallbacks are available
+ */
+function checkAIProviders(): { status: "pass" | "fail" | "warn"; message?: string; details?: Record<string, boolean> } {
+  const providers = {
+    gemini: !!process.env.GEMINI_API_KEY,
+    claude: !!process.env.ANTHROPIC_API_KEY,
+    deepseek: !!process.env.DEEPSEEK_API_KEY,
+  }
+
+  const enabledCount = Object.values(providers).filter(Boolean).length
+
+  // No providers configured - critical failure
+  if (enabledCount === 0) {
+    return {
+      status: "fail",
+      message: "No AI providers configured",
+      details: providers,
+    }
+  }
+
+  // Only one provider - no fallback available (risky)
+  if (enabledCount === 1) {
+    return {
+      status: "warn",
+      message: "Only one AI provider configured - no fallback available",
+      details: providers,
+    }
+  }
+
+  // Multiple providers - good redundancy
+  return {
+    status: "pass",
+    message: `${enabledCount} AI providers available`,
+    details: providers,
+  }
+}
+
 export async function GET(request: NextRequest) {
   const requestId = crypto.randomUUID()
 
@@ -137,12 +176,14 @@ export async function GET(request: NextRequest) {
     ])
 
     const envCheck = checkEnvironment()
+    const aiProvidersCheck = checkAIProviders()
 
     // Determine overall status
     const checks = {
       firebase: firebaseCheck,
       stripe: stripeCheck,
       environment: envCheck,
+      aiProviders: aiProvidersCheck,
     }
 
     const hasFailure = Object.values(checks).some((c) => c.status === "fail")

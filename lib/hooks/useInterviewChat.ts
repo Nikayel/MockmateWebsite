@@ -125,7 +125,10 @@ export function useInterviewChat({
         })
 
         if (!response.ok) {
-          throw new Error("Failed to get response")
+          // Try to parse error response for better error messages
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage = errorData.error || errorData.message || "Failed to get response"
+          throw new Error(errorMessage)
         }
 
         const data = await response.json()
@@ -134,10 +137,17 @@ export function useInterviewChat({
         if (err instanceof Error && err.name === "AbortError") {
           return // Request was cancelled
         }
-        setPartnerMessages((prev) => [
-          ...prev,
-          { type: "ai", message: "Sorry, I encountered an error. Please try again." },
-        ])
+        // Provide more specific error messages based on error type
+        const errorMsg = err instanceof Error ? err.message.toLowerCase() : ""
+        let userMessage = "Sorry, I encountered an error. Please try again."
+
+        if (errorMsg.includes("quota") || errorMsg.includes("rate limit")) {
+          userMessage = "The AI service is temporarily busy. Please wait a moment and try again."
+        } else if (errorMsg.includes("timeout")) {
+          userMessage = "The response took too long. Please try a shorter message."
+        }
+
+        setPartnerMessages((prev) => [...prev, { type: "ai", message: userMessage }])
       } finally {
         setIsLoadingPartner(false)
       }
@@ -187,7 +197,10 @@ export function useInterviewChat({
         })
 
         if (!response.ok) {
-          throw new Error("Failed to get response")
+          // Try to parse error response for better error messages
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage = errorData.error || errorData.message || "Failed to get response"
+          throw new Error(errorMessage)
         }
 
         const data = await response.json()
@@ -196,10 +209,17 @@ export function useInterviewChat({
         if (err instanceof Error && err.name === "AbortError") {
           return // Request was cancelled
         }
-        setInterviewerMessages((prev) => [
-          ...prev,
-          { type: "ai", message: "Sorry, I encountered an error. Please try again." },
-        ])
+        // Provide more specific error messages based on error type
+        const errorMsg = err instanceof Error ? err.message.toLowerCase() : ""
+        let userMessage = "Sorry, I encountered an error. Please try again."
+
+        if (errorMsg.includes("quota") || errorMsg.includes("rate limit")) {
+          userMessage = "The AI service is temporarily busy. Please wait a moment and try again."
+        } else if (errorMsg.includes("timeout")) {
+          userMessage = "The response took too long. Please try a shorter message."
+        }
+
+        setInterviewerMessages((prev) => [...prev, { type: "ai", message: userMessage }])
       } finally {
         setIsLoadingInterviewer(false)
       }
