@@ -13,13 +13,7 @@ import type { ExtractedEvidence } from "@/lib/feedback/structured-extraction"
 import { generateAIResponse } from "@/lib/ai-providers"
 import { logger } from "@/lib/logger"
 // RAG Knowledge imports for enriched feedback
-import { getPatternKnowledge, getRelatedPatterns } from "@/lib/rag/knowledge-base/dsa-knowledge"
-import {
-  getLeetCodeMapping,
-  getLeetCodeUrl,
-  LEETCODE_MAPPINGS,
-  type LeetCodeMapping,
-} from "@/lib/rag/knowledge-base/leetcode-mapping"
+import { getPatternKnowledge } from "@/lib/rag/knowledge-base/dsa-knowledge"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 
 // =============================================================================
@@ -30,7 +24,6 @@ export interface FeedbackWriterAgentInput {
   // Scenario info
   scenarioType: "dsa" | "system-design" | "bugfix"
   scenarioTitle: string
-  scenarioId?: string // For LeetCode mapping
   scenarioPattern?: string // For pattern-specific tips
 
   // Scores (from ScorerAgent)
@@ -70,21 +63,6 @@ export interface FeedbackWriterAgentOutput {
     patternName: string
     keyTakeaway: string
     commonMistake?: string
-  }
-
-  // Practice resources (from LeetCode mapping)
-  practiceLinks?: {
-    currentProblem?: {
-      title: string
-      url: string
-      leetcodeNumber: number
-    }
-    relatedProblems: Array<{
-      title: string
-      url: string
-      leetcodeNumber: number
-      difficulty: string
-    }>
   }
 
   // Full narrative
@@ -130,22 +108,17 @@ export class FeedbackWriterAgent implements Agent<
     // Enrich with pattern knowledge (from RAG)
     const patternInsight = this.buildPatternInsight(input.scenarioPattern)
 
-    // Build practice links (from LeetCode mapping)
-    const practiceLinks = this.buildPracticeLinks(input.scenarioId, input.scenarioPattern)
-
     const latency = Date.now() - startTime
     logger.info("[FeedbackWriterAgent] Feedback generated", {
       latencyMs: latency,
       whatWorkedCount: parsed.whatWorked.length,
       fixNextCount: parsed.fixNext.length,
       hasPatternInsight: !!patternInsight,
-      hasPracticeLinks: !!practiceLinks,
     })
 
     return {
       ...parsed,
       patternInsight,
-      practiceLinks,
     }
   }
 
@@ -392,95 +365,6 @@ PATTERN KNOWLEDGE (use this to give pattern-specific feedback):
       keyTakeaway: patternKnowledge.keyInsights[0] || patternKnowledge.description,
       commonMistake: patternKnowledge.commonMistakes[0],
     }
-  }
-
-  /**
-   * Build practice links from LeetCode mapping
-   */
-  private buildPracticeLinks(
-    scenarioId?: string,
-    scenarioPattern?: string
-  ): FeedbackWriterAgentOutput["practiceLinks"] {
-    // Get current problem's LeetCode link
-    let currentProblem: { title: string; url: string; leetcodeNumber: number } | undefined
-    if (scenarioId) {
-      const mapping = getLeetCodeMapping(scenarioId)
-      if (mapping) {
-        currentProblem = {
-          title: mapping.title,
-          url: getLeetCodeUrl(mapping),
-          leetcodeNumber: mapping.leetcodeNumber,
-        }
-      }
-    }
-
-    // Get related problems from the same pattern
-    const relatedProblems: Array<{
-      title: string
-      url: string
-      leetcodeNumber: number
-      difficulty: string
-    }> = []
-
-    if (scenarioPattern) {
-      // Find other problems with the same pattern
-      const relatedMappings = LEETCODE_MAPPINGS.filter((m) => {
-        // Skip current problem
-        if (m.scenarioId === scenarioId) return false
-        // Check if problem ID contains the pattern (simple heuristic)
-        const patternLower = scenarioPattern.toLowerCase().replace(/-/g, "")
-        const idLower = m.scenarioId.toLowerCase()
-        return idLower.includes(patternLower) || this.isRelatedByPattern(m, scenarioPattern)
-      }).slice(0, 3) // Limit to 3 related problems
-
-      for (const mapping of relatedMappings) {
-        relatedProblems.push({
-          title: mapping.title,
-          url: getLeetCodeUrl(mapping),
-          leetcodeNumber: mapping.leetcodeNumber,
-          difficulty: mapping.difficulty,
-        })
-      }
-    }
-
-    // If we have neither current nor related, return undefined
-    if (!currentProblem && relatedProblems.length === 0) {
-      return undefined
-    }
-
-    return {
-      currentProblem,
-      relatedProblems,
-    }
-  }
-
-  /**
-   * Check if a LeetCode mapping is related to a pattern
-   */
-  private isRelatedByPattern(mapping: LeetCodeMapping, pattern: string): boolean {
-    // Map pattern names to scenario ID prefixes
-    const patternPrefixes: Record<string, string[]> = {
-      "hash-table": ["two-sum", "contains-duplicate", "valid-anagram", "group-anagrams"],
-      "two-pointers": ["valid-palindrome", "3sum", "container-water", "trapping-rain"],
-      "sliding-window": ["longest-substring", "minimum-window", "sliding-window"],
-      "binary-search": ["binary-search", "search-rotated", "find-minimum", "koko-bananas"],
-      "dynamic-programming": [
-        "climbing-stairs",
-        "house-robber",
-        "coin-change",
-        "longest-increasing",
-      ],
-      "linked-list": ["reverse-linked", "merge-lists", "linked-list-cycle", "remove-nth"],
-      tree: ["invert-tree", "binary-tree", "subtree", "validate-bst"],
-      graph: ["clone-graph", "course-schedule", "pacific-atlantic", "number-islands"],
-      stack: ["valid-parentheses", "min-stack", "largest-rectangle"],
-      heap: ["kth-largest", "top-k-frequent", "find-median"],
-    }
-
-    const prefixes = patternPrefixes[pattern.toLowerCase()] || []
-    const idLower = mapping.scenarioId.toLowerCase()
-
-    return prefixes.some((prefix) => idLower.includes(prefix))
   }
 }
 
