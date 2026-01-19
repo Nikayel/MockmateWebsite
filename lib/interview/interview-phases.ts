@@ -12,7 +12,12 @@
  * DRY: Uses shared-patterns.ts for pattern detection.
  */
 
-import { EDGE_CASE_KEYWORDS, extractEdgeCases, normalizeComplexity } from "./shared-patterns"
+import {
+  EDGE_CASE_KEYWORDS,
+  extractEdgeCases,
+  normalizeComplexity,
+  extractComplexityFromText,
+} from "./shared-patterns"
 
 // =============================================================================
 // INTERVIEW PHASES
@@ -270,49 +275,33 @@ export function updateTrackerFromMessage(
       updated.approachExplained = true
     }
 
-    // Check for complexity mentions
-    // Support multiple formats: O(n), O n, O of n, n squared, linear, etc.
-    const complexityPatterns = [
-      /O\s*\(\s*([^)]+)\s*\)/gi, // O(n), O( n log n ), O(n^2)
-      /O\s+of\s+(\w+)/gi, // O of n, O of n squared
-      /O\s+(\d*\s*n\s*(?:\^?\d*|squared|cubed)?(?:\s*log\s*n)?)/gi, // O n, O n^2, O n log n
-      /(\w+)\s+time/gi, // linear time, quadratic time, constant time
-      /time\s+(?:complexity\s+)?(?:is\s+)?(\w+)/gi, // time is linear, time complexity is O(n)
-    ]
+    // Check for complexity mentions using shared voice-aware extraction
+    // This catches: O(n), "on2", "o of n", "linear time", "n squared", etc.
+    const extractedComplexity = extractComplexityFromText(message)
 
-    let complexityMentioned = false
-    for (const pattern of complexityPatterns) {
-      const match = message.match(pattern)
-      if (match) {
-        complexityMentioned = true
-        const complexity = match[0].toUpperCase()
-        if (lowerMessage.includes("time") || lowerMessage.includes("runtime")) {
-          updated.timeComplexityMentioned = true
-          updated.timeComplexityValue = complexity
-        } else if (lowerMessage.includes("space") || lowerMessage.includes("memory")) {
-          updated.spaceComplexityMentioned = true
-          updated.spaceComplexityValue = complexity
-        } else {
-          // Default to time complexity if not specified
-          updated.timeComplexityMentioned = true
-          updated.timeComplexityValue = complexity
-        }
-        break
+    if (extractedComplexity) {
+      // Determine if it's time or space complexity based on context
+      if (lowerMessage.includes("space") || lowerMessage.includes("memory")) {
+        updated.spaceComplexityMentioned = true
+        updated.spaceComplexityValue = extractedComplexity
+      } else {
+        // Default to time complexity (most common)
+        updated.timeComplexityMentioned = true
+        updated.timeComplexityValue = extractedComplexity
       }
     }
 
-    // Also check for explicit complexity keywords - use normalizeComplexity from shared-patterns
+    // Also check for explicit time/space keywords without O notation
+    // e.g., "linear time", "constant space", "quadratic"
     if (
-      !complexityMentioned &&
+      !extractedComplexity &&
       (lowerMessage.includes("linear") ||
         lowerMessage.includes("constant") ||
         lowerMessage.includes("quadratic") ||
         lowerMessage.includes("logarithmic") ||
-        lowerMessage.includes("n squared") ||
-        lowerMessage.includes("n log n"))
+        lowerMessage.includes("exponential"))
     ) {
       updated.timeComplexityMentioned = true
-      // Use normalizeComplexity to get standard format
       updated.timeComplexityValue = normalizeComplexity(lowerMessage)
     }
 
