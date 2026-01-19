@@ -446,12 +446,15 @@ export async function updateProblemMastery(
     // Prepare update data - separate atomic operations from regular updates
     const { increment_review_count, time_spent_minutes, hints_used, ...restUpdate } = update
 
+    // Use last_score from update if provided (for mastery_score), otherwise use performance_score
+    const scoreForLastScore = (restUpdate as any).last_score ?? update.performance_score
+
     // Build the Firestore update object with atomic increments
     const firestoreUpdate: Record<string, any> = {
       ...restUpdate,
       scenario_id: correctScenarioId,
       difficulty: canonicalDifficulty,
-      last_score: update.performance_score,
+      last_score: scoreForLastScore,
       average_score: Math.round(newAverage),
       best_score: newBest,
       scores_history: newScoresHistory,
@@ -477,7 +480,7 @@ export async function updateProblemMastery(
       ...restUpdate,
       scenario_id: correctScenarioId,
       difficulty: canonicalDifficulty,
-      last_score: update.performance_score,
+      last_score: scoreForLastScore,
       average_score: Math.round(newAverage),
       best_score: newBest,
       scores_history: newScoresHistory,
@@ -590,6 +593,7 @@ export async function initializeProblemMasteryFromSession(
     pattern: DSAPattern
     difficulty: Difficulty
     performance_score: number
+    mastery_score?: number // Code-focused score for last_score (optional)
     time_spent_minutes?: number
     hints_used?: number
   }
@@ -603,10 +607,14 @@ export async function initializeProblemMasteryFromSession(
   const doc = await masteryRef.get()
   const now = new Date()
 
+  // Use mastery_score for last_score if provided, otherwise use performance_score
+  const scoreForLastScore = sessionData.mastery_score ?? sessionData.performance_score
+
   if (doc.exists) {
     // Update existing record
     return updateProblemMastery(userId, sessionData.scenario_id, {
       performance_score: sessionData.performance_score,
+      last_score: scoreForLastScore,
       time_spent_minutes: sessionData.time_spent_minutes,
       hints_used: sessionData.hints_used,
     })
@@ -652,7 +660,7 @@ export async function initializeProblemMasteryFromSession(
     interval_days: storageData.interval_days as number,
     review_count: 1,
     next_review_at: storageData.next_review_at as string,
-    last_score: sessionData.performance_score,
+    last_score: scoreForLastScore,
     average_score: sessionData.performance_score,
     best_score: sessionData.performance_score,
     scores_history: [sessionData.performance_score],

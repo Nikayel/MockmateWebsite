@@ -212,10 +212,10 @@ export async function POST(request: NextRequest) {
       const { review_count: _, ...storageDataWithoutCount } = storageData as Record<string, unknown>
 
       // Update problem mastery with atomic increment for review_count
-      // Pass mastery_score so last_score reflects code-focused score (what SR uses)
+      // Pass last_score as masteryScore so last_score reflects code-focused score (what SR uses)
       updatedMastery = await updateProblemMastery(userId, problem_id, {
         performance_score,
-        mastery_score: masteryScore, // Code-focused score for last_score display
+        last_score: masteryScore, // Code-focused score for last_score display
         time_spent_minutes,
         hints_used,
         increment_review_count: true, // Use atomic increment
