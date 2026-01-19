@@ -223,68 +223,130 @@ const GATES: Gate[] = [
     hint: "Ask open questions: 'What approach are you considering?' not 'Would a hash map help?'"
   },
 
-  // GATE 9: No direct correction (from CORE_PRINCIPLES.never)
-  // Catches: "Actually, it's O(n)", "Actually, that's optimal", etc.
-  {
-    name: "no-direct-correction",
-    severity: "critical",
-    check: (ctx) => {
-      const correctionPatterns = [
-        /actually,?\s+(?:it'?s?|that'?s?|this is|the)/i,
-        /no,?\s+(?:it'?s?|that'?s?|the)/i,
-        /that'?s?\s+(?:not correct|incorrect|wrong)/i,
-        /the (?:correct|right|actual) (?:answer|complexity|approach) is/i,
-      ]
+  // GATE 9 & 10: REMOVED - Regex is too fragile for semantic rules
+  // Replaced with LLM-based semantic validation below
+]
 
-      for (const pattern of correctionPatterns) {
-        const match = ctx.response.match(pattern)
-        if (match) {
-          return { violated: true, evidence: `Direct correction: "${match[0]}"` }
-        }
-      }
-      return null
-    },
-    hint: "Don't correct directly. Instead probe: 'Walk me through how you arrived at that. What operations are you counting?'"
+// =============================================================================
+// LLM-BASED SEMANTIC VALIDATION (replaces fragile regex)
+// =============================================================================
+
+/**
+ * Semantic rules that regex can't reliably detect.
+ * These are validated by LLM, not pattern matching.
+ *
+ * Why LLM instead of regex:
+ * - "Actually, it's O(n)" is obvious, but
+ * - "Well, to be precise, the complexity is linear" is the same violation
+ * - "You're iterating twice so it's quadratic" explains complexity for them
+ * - Regex misses all semantic variations
+ */
+export const SEMANTIC_RULES = [
+  {
+    id: "no-direct-correction",
+    description: "AI corrects user's mistake directly instead of probing their reasoning",
+    examples: [
+      "BAD: 'Actually, it's O(n) not O(n²)'",
+      "BAD: 'No, that approach is actually optimal'",
+      "BAD: 'The correct complexity is O(n log n)'",
+      "GOOD: 'Walk me through how you arrived at O(n²)'",
+    ],
   },
-
-  // GATE 10: No explaining complexity for them (from CORE_PRINCIPLES.never)
-  // Catches: "That's O(n²) because of the nested loops", "The complexity comes from..."
   {
-    name: "no-explaining-complexity",
-    severity: "critical",
-    check: (ctx) => {
-      const explainPatterns = [
-        /(?:it'?s?|that'?s?) O\([^)]+\) (?:because|since|due to)/i,
-        /the (?:time |space )?complexity (?:is|comes from|results from)/i,
-        /(?:because|since) (?:of )?(?:the )?(?:nested|inner|outer) loop/i,
-        /(?:sorting|the sort) (?:takes|is|adds) O\(/i,
-        /(?:you'?re?|this is) (?:iterating|looping) (?:through|over)/i,
-      ]
-
-      for (const pattern of explainPatterns) {
-        const match = ctx.response.match(pattern)
-        if (match) {
-          return { violated: true, evidence: `Explained complexity: "${match[0]}"` }
-        }
-      }
-      return null
-    },
-    hint: "Don't explain complexity for them. Ask: 'Walk me through why you think it's that complexity. Where does the n² come from?'"
+    id: "no-explaining-complexity",
+    description: "AI explains complexity/approach instead of asking user to explain",
+    examples: [
+      "BAD: 'It's O(n²) because of the nested loops'",
+      "BAD: 'The sort adds O(n log n) to your solution'",
+      "BAD: 'You're iterating through n elements twice, so it's quadratic'",
+      "GOOD: 'Where does that complexity come from? Walk me through the operations.'",
+    ],
+  },
+  {
+    id: "no-revealing-approach",
+    description: "AI reveals the solution approach instead of guiding with questions",
+    examples: [
+      "BAD: 'You should use a hash map here'",
+      "BAD: 'The trick is to sort first, then use two pointers'",
+      "GOOD: 'What data structure might help you look things up quickly?'",
+    ],
   },
 ]
+
+/**
+ * Build the semantic validation prompt
+ */
+export function buildSemanticValidationPrompt(response: string): string {
+  const rulesText = SEMANTIC_RULES.map(
+    (r) => `${r.id}: ${r.description}\n${r.examples.join("\n")}`
+  ).join("\n\n")
+
+  return `You are a response validator. Check if this interviewer response violates any rules.
+
+RESPONSE TO CHECK:
+"${response}"
+
+RULES (violation = regenerate):
+${rulesText}
+
+Return JSON only:
+{
+  "violated": true/false,
+  "rule": "rule-id or null",
+  "evidence": "quote from response that violates, or null",
+  "suggestion": "how to fix it, or null"
+}
+
+Be strict. If the AI is explaining something instead of asking, that's a violation.
+If the AI is correcting instead of probing, that's a violation.`
+}
+
+export interface SemanticValidationResult {
+  violated: boolean
+  rule: string | null
+  evidence: string | null
+  suggestion: string | null
+}
+
+/**
+ * Validate response semantically using LLM
+ * This catches violations that regex misses
+ */
+export async function validateSemanticRules(
+  response: string,
+  generateAI: (system: string, user: string) => Promise<{ text: string }>
+): Promise<SemanticValidationResult> {
+  try {
+    const prompt = buildSemanticValidationPrompt(response)
+    const result = await generateAI(
+      "You are a strict response validator. Return only valid JSON.",
+      prompt
+    )
+
+    const jsonMatch = result.text.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0])
+    }
+  } catch (error) {
+    logger.warn("Semantic validation failed, allowing response", { error })
+  }
+
+  // Default to allowing if validation fails
+  return { violated: false, rule: null, evidence: null, suggestion: null }
+}
 
 // =============================================================================
 // MAIN VALIDATION FUNCTION
 // =============================================================================
 
 /**
- * Validate an interviewer response against all hard gates
- * Returns violations and hints for regeneration
+ * Validate an interviewer response against regex gates (fast, deterministic)
+ * For semantic validation, use validateInterviewerResponseAsync
  */
 export function validateInterviewerResponse(ctx: ValidationContext): ValidationResult {
   const violations: ResponseViolation[] = []
 
-  // Run all gates
+  // Run all regex gates (fast)
   for (const gate of GATES) {
     try {
       const result = gate.check(ctx)
@@ -318,6 +380,45 @@ export function validateInterviewerResponse(ctx: ValidationContext): ValidationR
     shouldRegenerate,
     regenerationHint: hints.length > 0 ? hints.join(". ") : undefined,
   }
+}
+
+/**
+ * Full validation: regex gates + LLM semantic validation
+ * Use this for complete validation (slower but catches semantic violations)
+ */
+export async function validateInterviewerResponseAsync(
+  ctx: ValidationContext,
+  generateAI: (system: string, user: string) => Promise<{ text: string }>
+): Promise<ValidationResult> {
+  // Step 1: Run fast regex gates
+  const regexResult = validateInterviewerResponse(ctx)
+
+  // If regex already found critical violations, skip expensive LLM call
+  if (regexResult.shouldRegenerate) {
+    return regexResult
+  }
+
+  // Step 2: Run LLM semantic validation for subtle violations
+  const semanticResult = await validateSemanticRules(ctx.response, generateAI)
+
+  if (semanticResult.violated && semanticResult.rule) {
+    const rule = SEMANTIC_RULES.find((r) => r.id === semanticResult.rule)
+    const violation: ResponseViolation = {
+      rule: semanticResult.rule,
+      description: rule?.description || "Semantic rule violation",
+      severity: "critical",
+      evidence: semanticResult.evidence || "See suggestion",
+    }
+
+    return {
+      isValid: false,
+      violations: [...regexResult.violations, violation],
+      shouldRegenerate: true,
+      regenerationHint: semanticResult.suggestion || rule?.examples[3] || "Probe their reasoning instead",
+    }
+  }
+
+  return regexResult
 }
 
 /**
