@@ -242,6 +242,82 @@ const GATES: Gate[] = [
     },
     hint: "Keep response under 3 sentences. Be direct like: 'You said O(n²) - walk me through why.'",
   },
+
+  // GATE 10: Phase-appropriate response
+  {
+    name: "phase-appropriate-response",
+    severity: "critical",
+    check: (ctx) => {
+      const response = ctx.response.toLowerCase()
+      const phase = ctx.phase
+
+      // Intro phase: Should be brief, ask to study problem, not tell them to code
+      if (phase === "intro") {
+        if (CODING_TRANSITION_PATTERNS.some((p) => p.test(response))) {
+          return {
+            violated: true,
+            evidence:
+              "Telling user to code in intro phase - should ask them to study problem first",
+          }
+        }
+        if (response.includes("submit") || response.includes("view detailed feedback")) {
+          return {
+            violated: true,
+            evidence: "Mentioning submit/feedback in intro phase",
+          }
+        }
+      }
+
+      // Discussion phase: Should ask about approach/complexity/edge cases, not tell them to submit
+      if (phase === "discussion") {
+        if (response.includes("submit") || response.includes("view detailed feedback")) {
+          return {
+            violated: true,
+            evidence:
+              "Mentioning submit/feedback in discussion phase - should focus on approach/complexity/edge cases",
+          }
+        }
+      }
+
+      // Coding phase: Should let them code, not ask about approach (they should have explained it already)
+      if (phase === "coding") {
+        if (
+          response.match(/what.*approach|how.*would.*you.*solve|what.*is.*your.*plan/i) &&
+          !response.match(/how.*is.*it.*going|need.*help|stuck/i)
+        ) {
+          return {
+            violated: true,
+            evidence:
+              "Asking about approach in coding phase - they should already have explained it",
+          }
+        }
+      }
+
+      // Testing phase: Should discuss results, not ask to code again
+      if (phase === "testing") {
+        if (CODING_TRANSITION_PATTERNS.some((p) => p.test(response))) {
+          return {
+            violated: true,
+            evidence: "Telling user to code in testing phase - should discuss test results instead",
+          }
+        }
+      }
+
+      // Post-interview: Should guide to feedback, not ask questions
+      if (phase === "post_interview") {
+        const questions = ctx.response.match(/\?/g) || []
+        if (questions.length > 0) {
+          return {
+            violated: true,
+            evidence: "Asking questions in post-interview phase - should guide to feedback instead",
+          }
+        }
+      }
+
+      return null
+    },
+    hint: "Your response must match the current interview phase. Check the phase tool result to ensure you're responding appropriately for the current phase.",
+  },
 ]
 
 // =============================================================================

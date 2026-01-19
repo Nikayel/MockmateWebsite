@@ -38,6 +38,7 @@ import {
   createEmptyTracker,
   updateTrackerFromMessage,
   detectInterviewPhase,
+  validatePhaseTransition,
 } from "@/lib/interview/interview-phases"
 import {
   extractConversationState,
@@ -746,6 +747,22 @@ DO NOT:
     const currentPhase = detectInterviewPhase(phaseContext)
     const phasePrompt = PHASE_PROMPTS[currentPhase] || PHASE_PROMPTS.discussion
 
+    // Log phase detection for monitoring
+    if (role === "interviewer") {
+      logger.info("[Phase Detection] Current phase determined", {
+        sessionId,
+        userId,
+        phase: currentPhase,
+        context: {
+          hasSubmitted: phaseContext.hasSubmitted,
+          testsHaveRun: phaseContext.testsHaveRun,
+          codeWritten: phaseContext.currentCodeLength - phaseContext.starterCodeLength,
+          approachExplained: phaseContext.approachExplained,
+          messageCount: phaseContext.messageCount,
+        },
+      })
+    }
+
     // Build conversation tracking context if available
     // Use enhanced tracker (with LLM extraction) if available
     let trackingContext = ""
@@ -893,10 +910,19 @@ SOLUTION COMPLEXITY:
         })
       }
 
-      // Always include phase info
+      // Always include phase info (required tool for phase awareness)
+      const phaseToolResult = executeTool("get_interview_phase", {}, toolContext)
       toolCalls.push({
         name: "get_interview_phase",
-        result: executeTool("get_interview_phase", {}, toolContext),
+        result: phaseToolResult,
+      })
+
+      // Log phase tool execution
+      logger.debug("[Phase Tool] Phase tool executed", {
+        sessionId,
+        userId,
+        phase: currentPhase,
+        toolResult: phaseToolResult.data,
       })
 
       // Analyze user's message if it seems vague
@@ -979,8 +1005,36 @@ BAD RESPONSES:
 `
     }
 
+    // Build phase awareness section (prominent at top)
+    const phaseAwarenessSection = `
+═══════════════════════════════════════════════════════════════
+🎯 CURRENT INTERVIEW PHASE: ${currentPhase.toUpperCase()}
+═══════════════════════════════════════════════════════════════
+
+⚠️ CRITICAL: You MUST call the get_interview_phase tool to verify the current phase before responding.
+The phase determines what you should and should NOT say.
+
+PHASE TRANSITION RULES:
+- intro → discussion: After user has read the problem
+- discussion → coding: ONLY after complexity AND edge cases are discussed
+- coding → testing: ONLY when user clicks "Run Tests" button
+- testing → post_interview: ONLY when user clicks "Submit" button
+- post_interview → complete: After wrap-up conversation
+
+YOUR RESPONSE MUST MATCH THE CURRENT PHASE:
+${currentPhase === "intro" ? "- Keep it brief, ask them to study the problem\n- DO NOT tell them to code yet" : ""}
+${currentPhase === "discussion" ? "- Focus on approach, complexity, and edge cases\n- DO NOT mention submit/feedback\n- DO NOT tell them to code until prerequisites are met" : ""}
+${currentPhase === "coding" ? "- Let them code, don't interrupt\n- DO NOT ask about approach (they should have explained it)\n- Only help if they're stuck" : ""}
+${currentPhase === "testing" ? "- Discuss test results\n- DO NOT tell them to code again\n- Ask about complexity/edge cases if not already covered" : ""}
+${currentPhase === "post_interview" ? "- Guide to feedback\n- DO NOT ask questions\n- Keep it brief" : ""}
+
+═══════════════════════════════════════════════════════════════
+`
+
     const systemPrompts = {
-      interviewer: `You are Sable, a sharp and direct technical interviewer${isGenericCompany ? "" : ` at ${companyStyle.company}`}. You're known for being brutally honest but fair - you give real signal, not empty praise.
+      interviewer: `${phaseAwarenessSection}
+
+You are Sable, a sharp and direct technical interviewer${isGenericCompany ? "" : ` at ${companyStyle.company}`}. You're known for being brutally honest but fair - you give real signal, not empty praise.
 
 PERSONALITY:
 - Direct, no-nonsense, but not mean. You've seen hundreds of interviews.
@@ -1444,6 +1498,26 @@ Generate a response that follows these rules.`
           })),
         })
       }
+
+      // Log phase consistency check
+      const phaseViolations = gateResult.violations.filter(
+        (v) => v.rule === "phase-appropriate-response"
+      )
+      if (phaseViolations.length > 0) {
+        logger.warn("[Phase Consistency] Response may not match phase", {
+          sessionId,
+          userId,
+          currentPhase,
+          violation: phaseViolations[0].evidence,
+          responsePreview: aiResponse.text.substring(0, 100),
+        })
+      } else {
+        logger.debug("[Phase Consistency] Response matches phase", {
+          sessionId,
+          userId,
+          currentPhase,
+        })
+      }
     }
 
     const responseTimeMs = Date.now() - startTime
@@ -1457,6 +1531,18 @@ Generate a response that follows these rules.`
       responseTimeMs,
       provider: aiResponse.provider, // Track which provider was used
     }).catch((err) => logger.error("Analytics tracking error", { error: err }))
+
+    // Log phase summary for interviewer interactions
+    if (role === "interviewer") {
+      logger.info("[Phase Summary] Interview interaction complete", {
+        sessionId,
+        userId,
+        phase: currentPhase,
+        responseLength: aiResponse.text.length,
+        provider: aiResponse.provider,
+        latencyMs: responseTimeMs,
+      })
+    }
 
     return NextResponse.json({
       reply: aiResponse.text,

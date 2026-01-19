@@ -97,6 +97,75 @@ export function detectInterviewPhase(context: PhaseDetectionContext): InterviewP
 }
 
 // =============================================================================
+// PHASE TRANSITION VALIDATION
+// =============================================================================
+
+/**
+ * Validate that a phase transition is legal based on the state machine
+ *
+ * Legal transitions:
+ * - intro → discussion (after user reads problem)
+ * - discussion → coding (after prerequisites met)
+ * - coding → testing (when tests run)
+ * - testing → post_interview (when submit clicked)
+ * - testing → coding (can go back to fix code)
+ * - post_interview → complete (terminal)
+ *
+ * @param from - Current phase
+ * @param to - Proposed next phase
+ * @param context - Phase detection context to validate transitions
+ * @returns Validation result with reason if invalid
+ */
+export function validatePhaseTransition(
+  from: InterviewPhase,
+  to: InterviewPhase,
+  context: PhaseDetectionContext
+): { valid: boolean; reason?: string } {
+  // Define legal transitions (state machine)
+  const legalTransitions: Record<InterviewPhase, InterviewPhase[]> = {
+    intro: ["discussion"],
+    discussion: ["coding", "discussion"], // Can stay in discussion
+    coding: ["testing", "coding"], // Can stay in coding, or move to testing
+    testing: ["post_interview", "coding"], // Can go back to coding or forward to post_interview
+    post_interview: ["complete"],
+    complete: [], // Terminal state - no transitions allowed
+  }
+
+  // Check if transition is legal
+  if (!legalTransitions[from].includes(to)) {
+    return {
+      valid: false,
+      reason: `Illegal phase transition: cannot transition from "${from}" to "${to}". Legal transitions from "${from}": ${legalTransitions[from].join(", ")}`,
+    }
+  }
+
+  // Additional context-based validation
+  if (to === "testing" && !context.testsHaveRun) {
+    return {
+      valid: false,
+      reason:
+        "Cannot transition to testing phase without tests running. Tests must be executed first.",
+    }
+  }
+
+  if (to === "post_interview" && !context.hasSubmitted) {
+    return {
+      valid: false,
+      reason:
+        "Cannot transition to post_interview phase without submission. User must click Submit first.",
+    }
+  }
+
+  if (to === "coding" && from === "discussion") {
+    // Can transition to coding, but should check prerequisites
+    // This is a soft check - the validation gate will catch if prerequisites aren't met
+    // We don't block here, just log for monitoring
+  }
+
+  return { valid: true }
+}
+
+// =============================================================================
 // PHASE-SPECIFIC PROMPTS (DEPRECATED - use interviewer-prompts.ts)
 // =============================================================================
 
