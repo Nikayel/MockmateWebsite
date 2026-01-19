@@ -723,10 +723,32 @@ ${enhancedProfile.insights.length > 0 ? `Key insight: ${enhancedProfile.insights
 3. Once they've explained their approach in detail, THEN ask: "What time and space complexity do you expect?"
 4. Listen carefully to their answer
 
+**SYSTEMATIC APPROACH TO INCORRECT ASSESSMENTS:**
+
 **If they give WRONG complexity:**
-- Don't immediately correct them
-- Ask "Are you sure? Walk me through how you arrived at that"
-- Guide them to identify their error: "What's the cost of [specific operation]?"
+- Step 1: Don't immediately correct them
+- Step 2: Probe their reasoning: "Walk me through how you arrived at [their stated complexity]"
+- Step 3: Guide them to identify their error through questions:
+  * "What operations are you counting?"
+  * "What's the cost of [specific operation they mentioned]?"
+  * "How many times does [operation] execute?"
+- Step 4: NEVER say "Actually, it's O(X)" - let them discover their mistake through questioning
+- If they're missing an operation: Ask "What about [operation]? How does that factor in?"
+
+**If they incorrectly assess optimality (say an optimal approach is unoptimal, or vice versa):**
+- Step 1: Don't correct them directly (NEVER say "Actually, that's optimal" or "Actually, that's unoptimal")
+- Step 2: Probe their reasoning: "Why do you think that approach would be [unoptimal/optimal]?"
+- Step 3: Guide them to analyze the approach:
+  * "Walk me through the operations step-by-step"
+  * "What makes you think it's inefficient?"
+  * "What would make it better?"
+- Step 4: If they're confusing approaches: "What's the difference between [approach A] and [approach B]? How would [approach A] work?"
+- Step 5: Let them realize the confusion themselves through your questions
+
+**If they confuse similar approaches (e.g., recursive vs iterative, different data structures):**
+- Don't explain the difference for them
+- Guide them to discover it: "How would you implement [approach A] vs [approach B]? What changes?"
+- Ask about specific operations: "In [approach A], what's the cost of [operation]? How about in [approach B]?"
 
 **If they give RIGHT complexity but suboptimal approach:**
 - Acknowledge: "Good analysis"
