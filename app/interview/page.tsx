@@ -2654,6 +2654,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           spaceComplexity: efficiencyMetrics?.estimatedSpaceComplexity,
           efficiencyScore: efficiencyMetrics?.efficiencyScore,
           feedbackStatus: "complete", // Feedback generation is done
+          technicalScore: technicalScore ?? undefined, // Mastery-based score from state
           // CRITICAL: Include scoreBreakdown to prevent overwriting scores
           scoreBreakdown: scoreBreakdown
             ? {
@@ -2833,6 +2834,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
       let feedbackText = `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
       let calculatedPerformanceScore = testSummary.passRate
+      let localTechnicalScore: number | undefined = undefined // Mastery-based score from API
       let scoreBreakdownData: {
         understanding?: number
         problemSolving?: number
@@ -2914,6 +2916,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             feedbackText = feedbackData.feedback || feedbackText
             calculatedPerformanceScore = feedbackData.performanceScore || calculatedPerformanceScore
             if (feedbackData.technicalScore !== undefined) {
+              localTechnicalScore = feedbackData.technicalScore
               setTechnicalScore(feedbackData.technicalScore)
             }
             if (feedbackData.scores) {
@@ -3100,6 +3103,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
             efficiencyScore: efficiencyData?.efficiencyScore,
             feedbackStatus: aiFeedbackSucceeded ? "complete" : "failed",
+            technicalScore: localTechnicalScore, // Mastery-based score from API
             scoreBreakdown: cleanScoreBreakdown,
             constitutionalAICritique: localConstitutionalAICritique || undefined,
           })
@@ -3741,6 +3745,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       // Generate comprehensive feedback
       let comprehensiveFeedback = `Completed system design interview: ${selectedScenario?.title}`
       let calculatedPerformanceScore = 0
+      let localTechnicalScore: number | undefined = undefined // Mastery-based score from API
 
       // Mark session as evaluating BEFORE feedback generation starts
       // This prevents the session from being reopened if user refreshes
@@ -3813,6 +3818,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         calculatedPerformanceScore = feedbackData.scores?.overall || 0
         // Store technical score (mastery-based) for Overall/Technical toggle
         if (feedbackData.technicalScore !== undefined) {
+          localTechnicalScore = feedbackData.technicalScore
           setTechnicalScore(feedbackData.technicalScore)
         }
         // Store score breakdown for technical score calculations and display
@@ -3859,6 +3865,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               language: "notes",
               testResults: [],
               feedbackStatus: "complete", // Feedback generation is done
+              technicalScore: localTechnicalScore, // Mastery-based score from API
               scoreBreakdown: systemDesignScoreBreakdown || undefined,
             }
           )

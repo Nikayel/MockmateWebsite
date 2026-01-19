@@ -514,6 +514,9 @@ export async function updateInterviewSession(
     spaceComplexity?: string
     efficiencyScore?: number
     feedbackStatus?: FeedbackStatus // Track feedback generation state
+    // Technical score from API (mastery-based: correctness + time + independence)
+    // This is different from the breakdown-based calculation and should be preferred
+    technicalScore?: number
     scoreBreakdown?: {
       understanding?: number
       understandingScore?: number
@@ -614,29 +617,40 @@ export async function updateInterviewSession(
 
       // Build score_breakdown object, only including defined values
       // This prevents Firebase errors from undefined field values
-      const scores = { understandingScore, problemSolvingScore, codeQualityScore, communicationScore }
+      const scores = {
+        understandingScore,
+        problemSolvingScore,
+        codeQualityScore,
+        communicationScore,
+      }
       const scoreBreakdownObj: Record<string, number> = {}
       copyDefinedFields(scoreBreakdownObj, scores, Object.keys(scores) as (keyof typeof scores)[])
 
       // Only save score_breakdown if we have at least one defined score
       if (Object.keys(scoreBreakdownObj).length > 0) {
         updateData.score_breakdown = scoreBreakdownObj
-
-        // Calculate and save technical_score (excludes communication, focuses on code mastery)
-        // Uses same weights as ScoreDisplay.tsx for consistency
-        // Only calculate if we have the required scores
-        if (
-          codeQualityScore !== undefined &&
-          problemSolvingScore !== undefined &&
-          understandingScore !== undefined
-        ) {
-          updateData.technical_score = Math.round(
-            codeQualityScore * 0.6 + problemSolvingScore * 0.25 + understandingScore * 0.15
-          )
-          // Also save as mastery_score for backwards compatibility
-          updateData.mastery_score = updateData.technical_score
-        }
       }
+
+      // Fallback technical score calculation (only if API score not provided)
+      // This is less accurate than the API's mastery-based calculation
+      if (
+        additionalData.technicalScore === undefined &&
+        codeQualityScore !== undefined &&
+        problemSolvingScore !== undefined &&
+        understandingScore !== undefined
+      ) {
+        updateData.technical_score = Math.round(
+          codeQualityScore * 0.6 + problemSolvingScore * 0.25 + understandingScore * 0.15
+        )
+        updateData.mastery_score = updateData.technical_score
+      }
+    }
+
+    // Save technical score from API (mastery-based: correctness + time + independence)
+    // This is the authoritative score calculated using objective metrics
+    if (additionalData.technicalScore !== undefined) {
+      updateData.technical_score = additionalData.technicalScore
+      updateData.mastery_score = additionalData.technicalScore
     }
     // Save complexity analysis (user-stated vs code-analyzed)
     if (additionalData.complexityAnalysis) {
