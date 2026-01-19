@@ -38,6 +38,8 @@ import {
   buildEvidenceSummary,
   type ExtractedEvidence,
 } from "@/lib/feedback/structured-extraction"
+// Import transcript analysis for post-interview mistake detection
+import { analyzeTranscriptForMistakes } from "@/lib/feedback/transcript-analysis"
 
 export async function POST(request: NextRequest) {
   // Apply rate limiting
@@ -632,6 +634,67 @@ CODE EFFICIENCY ANALYSIS:
         ? scoreCritique.adjustedScores
         : algorithmicScores
 
+    // Step 5.5: Post-interview transcript analysis for "What You Missed"
+    // Analyze transcript to detect uncorrected mistakes (one-time cost)
+    let analyzedSilentNotes = silentNotes || []
+    if (
+      conversationTranscript &&
+      Array.isArray(conversationTranscript) &&
+      conversationTranscript.length > 0 &&
+      scenarioType !== "system-design" // Skip for system design (different feedback format)
+    ) {
+      try {
+        const transcriptMessages = conversationTranscript.map(
+          (msg: { type?: string; role?: string; message?: string; content?: string }) => ({
+            role:
+              msg.type === "user" || msg.role === "user" || msg.role === "candidate"
+                ? ("user" as const)
+                : ("interviewer" as const),
+            content: msg.message || msg.content || "",
+          })
+        )
+
+        const analysisResult = await analyzeTranscriptForMistakes(
+          transcriptMessages,
+          {
+            title: scenarioTitle,
+            optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || "O(n)",
+            optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
+            criticalEdgeCases: ["empty input", "single element", "null/undefined values"],
+            scenarioType,
+          },
+          extractedEvidence // Reuse existing evidence to avoid duplicate work (DRY)
+        )
+
+        // Merge with any existing silent notes (from real-time tracking, if implemented)
+        if (analysisResult.silentNotes.length > 0) {
+          // Deduplicate by type+context
+          const existingKeys = new Set(
+            analyzedSilentNotes.map(
+              (n: { type: string; context?: string }) => `${n.type}:${n.context || ""}`
+            )
+          )
+          const newNotes = analysisResult.silentNotes.filter(
+            (n) => !existingKeys.has(`${n.type}:${n.context || ""}`)
+          )
+          analyzedSilentNotes = [...analyzedSilentNotes, ...newNotes]
+
+          logger.info("[Feedback API] Transcript analysis complete", {
+            sessionId,
+            detectedMistakes: analysisResult.silentNotes.length,
+            totalSilentNotes: analyzedSilentNotes.length,
+            algorithmicDetections: analysisResult.analysisMetadata.algorithmicDetections,
+            semanticDetections: analysisResult.analysisMetadata.semanticDetections,
+          })
+        }
+      } catch (error) {
+        logger.warn("[Feedback API] Transcript analysis failed, using existing notes", {
+          error,
+          sessionId,
+        })
+      }
+    }
+
     // Send validated summary to AI for narrative generation
     const conversationSummary = `
 COMMUNICATION ANALYSIS (hybrid validated):
@@ -673,7 +736,7 @@ CRITICAL: Your feedback must be consistent with the extracted evidence above.
 - Quote specific examples from the evidence when giving feedback
 `
     : ""
-}${buildSilentNotesContext(silentNotes || [])}
+}${buildSilentNotesContext(analyzedSilentNotes)}
 
 PRE-CALCULATED SCORES (use these as your scores):
 ${
