@@ -13,6 +13,7 @@ import { logger } from "@/lib/logger"
 import {
   getComplexityRank,
   findDominantComplexity,
+  extractComplexityFromText,
   EDGE_CASE_KEYWORDS,
 } from "@/lib/interview/shared-patterns"
 
@@ -199,35 +200,43 @@ function extractAlgorithmically(
       }
 
       // Check for complexity mentions - find DOMINANT complexity, not just first
+      // First try standard O() notation
       const complexityMatches = originalContent.match(/O\([^)]+\)/gi)
+      let dominantComplexity: string | null = null
+
       if (complexityMatches && complexityMatches.length > 0) {
         // Get ALL complexity values and find the dominant one
         const allComplexities = complexityMatches.map((c) => c.toUpperCase())
-        const dominantComplexity = findDominantComplexity(allComplexities)
+        dominantComplexity = findDominantComplexity(allComplexities)
+      }
 
-        // Also check for non-O(...) keywords like "n squared", "quadratic", etc.
-        // These often represent the actual time complexity
-        let keywordComplexity: string | null = null
-        if (
-          content.includes("n squared") ||
-          content.includes("n^2") ||
-          content.includes("quadratic")
-        ) {
-          keywordComplexity = "O(N²)"
-        } else if (content.includes("n log n")) {
-          keywordComplexity = "O(N LOG N)"
-        } else if (content.includes("linear") && !content.includes("log")) {
-          keywordComplexity = "O(N)"
-        }
+      // Also try voice transcription patterns (catches "on2", "o n squared", etc.)
+      // This is critical for voice interviews where "O(n²)" becomes "on2"
+      const voiceComplexity = extractComplexityFromText(originalContent)
 
-        // Use keyword complexity if it's "bigger" than the O(...) matches
-        // This handles "sorting is O(n log n) but overall is n squared"
-        const finalComplexity =
-          keywordComplexity &&
-          dominantComplexity &&
-          getComplexityRank(keywordComplexity) > getComplexityRank(dominantComplexity)
-            ? keywordComplexity
-            : dominantComplexity
+      // Also check for non-O(...) keywords like "n squared", "quadratic", etc.
+      // These often represent the actual time complexity
+      let keywordComplexity: string | null = null
+      if (
+        content.includes("n squared") ||
+        content.includes("n^2") ||
+        content.includes("quadratic")
+      ) {
+        keywordComplexity = "O(N²)"
+      } else if (content.includes("n log n")) {
+        keywordComplexity = "O(N LOG N)"
+      } else if (content.includes("linear") && !content.includes("log")) {
+        keywordComplexity = "O(N)"
+      }
+
+      // Find the best complexity match - prefer the one with highest rank (worst complexity)
+      // This handles "sorting is O(n log n) but overall is n squared"
+      const candidates = [dominantComplexity, voiceComplexity, keywordComplexity].filter(
+        (c): c is string => c !== null
+      )
+
+      if (candidates.length > 0) {
+        const finalComplexity = findDominantComplexity(candidates) || candidates[0]
 
         // Determine if time or space based on context
         if (
@@ -245,17 +254,25 @@ function extractAlgorithmically(
               content.includes("iterate"),
             quote: originalContent.substring(0, 200),
             messageIndex: index,
-            isCorrect: finalComplexity === problemContext.optimalTimeComplexity.toUpperCase(),
+            isCorrect:
+              finalComplexity.toUpperCase().replace(/\s+/g, "") ===
+              problemContext.optimalTimeComplexity.toUpperCase().replace(/\s+/g, ""),
           }
         }
 
         if (content.includes("space") || content.includes("memory")) {
+          // For space, prefer the lower complexity if multiple mentioned
+          // (user might say "time is n2 and space is o1")
+          const spaceComplexity =
+            voiceComplexity && content.includes("space") ? voiceComplexity : finalComplexity
           evidence.spaceComplexity = {
             mentioned: true,
-            value: dominantComplexity, // For space, use the raw match
+            value: spaceComplexity,
             quote: originalContent.substring(0, 200),
             messageIndex: index,
-            isCorrect: dominantComplexity === problemContext.optimalSpaceComplexity.toUpperCase(),
+            isCorrect:
+              spaceComplexity.toUpperCase().replace(/\s+/g, "") ===
+              problemContext.optimalSpaceComplexity.toUpperCase().replace(/\s+/g, ""),
           }
         }
       }

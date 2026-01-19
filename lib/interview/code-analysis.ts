@@ -48,14 +48,50 @@ export function analyzeCodeEfficiency(
     controlStructures <= 3 ? "Low" : controlStructures <= 7 ? "Medium" : "High"
 
   // Estimate time complexity based on nested loops
+  // Handle both JavaScript/TypeScript ({}) and Python (:) syntax
+  // Also handle mixed for/while nesting (common in two-pointer patterns)
+
+  // Count outer loops
+  const forLoops = (code.match(/\bfor\b/gi) || []).length
+  const whileLoops = (code.match(/\bwhile\b/gi) || []).length
+  const totalLoops = forLoops + whileLoops
+
+  // Detect nested loops more robustly:
+  // - JavaScript: for...{ ... for/while
+  // - Python: for...: followed by indented for/while
+  const jsNestedForFor = (code.match(/\bfor\b[^}]*\{[^}]*\bfor\b/gi) || []).length
+  const jsNestedForWhile = (code.match(/\bfor\b[^}]*\{[^}]*\bwhile\b/gi) || []).length
+  const jsNestedWhileFor = (code.match(/\bwhile\b[^}]*\{[^}]*\bfor\b/gi) || []).length
+  const jsNestedWhileWhile = (code.match(/\bwhile\b[^}]*\{[^}]*\bwhile\b/gi) || []).length
+
+  // Python: for...: followed by while (common in two-pointer)
+  // This is a simplified check - looks for for/while followed by another for/while with indentation
+  const pyNestedForWhile = (code.match(/\bfor\b[^:]*:[^\n]*\n\s+while\b/gi) || []).length
+  const pyNestedWhileFor = (code.match(/\bwhile\b[^:]*:[^\n]*\n\s+for\b/gi) || []).length
+  const pyNestedForFor = (code.match(/\bfor\b[^:]*:[^\n]*\n\s+for\b/gi) || []).length
+  const pyNestedWhileWhile = (code.match(/\bwhile\b[^:]*:[^\n]*\n\s+while\b/gi) || []).length
+
   const nestedLoopCount =
-    (code.match(/for.*{[^}]*for/g) || []).length + (code.match(/while.*{[^}]*while/g) || []).length
+    jsNestedForFor +
+    jsNestedForWhile +
+    jsNestedWhileFor +
+    jsNestedWhileWhile +
+    pyNestedForWhile +
+    pyNestedWhileFor +
+    pyNestedForFor +
+    pyNestedWhileWhile
+
   let estimatedTimeComplexity = "O(n)"
-  if (nestedLoopCount >= 2) {
+
+  // IMPORTANT: Check nested loops FIRST, regardless of sort
+  // 3Sum pattern: for loop + while loop inside = O(n²), sort is just O(n log n) preprocessing
+  if (nestedLoopCount >= 2 || totalLoops >= 4) {
     estimatedTimeComplexity = "O(n³)"
-  } else if (nestedLoopCount === 1) {
+  } else if (nestedLoopCount >= 1 || totalLoops >= 3) {
+    // for + nested while = O(n²) (e.g., 3Sum with two-pointer)
     estimatedTimeComplexity = "O(n²)"
-  } else if (code.includes("sort")) {
+  } else if (code.match(/\b(sort|sorted)\b/i)) {
+    // Sort without nested loops = O(n log n)
     estimatedTimeComplexity = "O(n log n)"
   }
 
