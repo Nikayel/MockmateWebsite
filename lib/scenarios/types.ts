@@ -84,6 +84,8 @@ export interface BaseScenario {
 export interface ClarifyingQuestion {
   /** The question topic/intent (used for semantic matching) */
   question: string
+  /** Semantic topic for flexible LLM matching (e.g., "output_format", "edge_cases") */
+  topic?: string
   /** The answer the interviewer would give */
   answer: string
   /** Is this critical to ask? Affects scoring */

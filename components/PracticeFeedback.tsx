@@ -1,7 +1,7 @@
 "use client"
 
 import { parseFeedback } from "@/lib/feedback/parsers"
-import { ScoreDisplay, FeedbackSections, FeedbackActions } from "@/components/practice"
+import { ScoreDisplay, FeedbackSections } from "@/components/practice"
 import type { ChatMessage } from "@/lib/types"
 import type { SessionComplexityAnalysis } from "@/lib/rag/knowledge-base/types"
 
@@ -46,13 +46,25 @@ interface PracticeFeedbackProps {
   language?: string
   chatMessages?: ChatMessage[]
   interviewerMessages?: ChatMessage[]
-  onRetry?: () => void
-  onNewProblem?: () => void
   onExport?: () => void
-  onEndInterview?: () => void
+  onNewProblem?: () => void
   // Complexity analysis
   complexityAnalysis?: SessionComplexityAnalysis | null
   alternativeApproaches?: AlternativeApproach[]
+  // Clarifying questions assessment (Real Interview Mode)
+  clarifyingQuestionsAssessment?: {
+    score: number
+    totalExpected: number
+    totalAsked: number
+    requiredAsked: number
+    requiredTotal: number
+    results: Array<{
+      question: string
+      required: boolean
+      asked: boolean
+      matchedPhrase?: string
+    }>
+  } | null
 }
 
 export default function PracticeFeedback({
@@ -76,12 +88,11 @@ export default function PracticeFeedback({
   language = "javascript",
   chatMessages,
   interviewerMessages,
-  onRetry,
-  onNewProblem,
   onExport,
-  onEndInterview,
+  onNewProblem,
   complexityAnalysis,
   alternativeApproaches,
+  clarifyingQuestionsAssessment,
 }: PracticeFeedbackProps) {
   // Parse feedback text, then override with structured data if available from API
   const parsedSections = parseFeedback(feedback)
@@ -216,20 +227,11 @@ export default function PracticeFeedback({
         timeComplexity={timeComplexity}
         spaceComplexity={spaceComplexity}
         efficiencyScore={efficiencyScore}
+        onExport={onExport}
+        problemTitle={problemTitle}
+        grade={grade}
+        scores={scores}
       />
-
-      <div className="overflow-hidden rounded-2xl border border-zinc-800/50 bg-zinc-900/50">
-        <FeedbackActions
-          onRetry={onRetry}
-          onNewProblem={onNewProblem}
-          onExport={onExport}
-          onEndInterview={onEndInterview}
-          overallScore={overallScore}
-          problemTitle={problemTitle}
-          grade={grade}
-          scores={scores}
-        />
-      </div>
 
       <FeedbackSections
         sections={sections}
@@ -247,6 +249,7 @@ export default function PracticeFeedback({
         interviewerMessages={interviewerMessages}
         complexityAnalysis={complexityAnalysis}
         alternativeApproaches={alternativeApproaches}
+        clarifyingQuestionsAssessment={clarifyingQuestionsAssessment}
       />
     </div>
   )

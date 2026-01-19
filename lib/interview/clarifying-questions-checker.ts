@@ -43,6 +43,7 @@ export interface ClarifyingQuestionsCheckResult {
 
 /**
  * Build the prompt for the LLM to check clarifying questions
+ * Uses topic-based semantic matching for flexible detection
  */
 function buildCheckPrompt(
   expectedQuestions: ClarifyingQuestion[],
@@ -53,25 +54,32 @@ function buildCheckPrompt(
     .map((msg) => `- "${msg.message}"`)
     .join("\n")
 
+  // Use topic field for better semantic grouping, fallback to question
   const questionsToCheck = expectedQuestions
-    .map((q, i) => `${i + 1}. Topic: "${q.question}" (Required: ${q.required ? "YES" : "NO"})`)
+    .map(
+      (q, i) =>
+        `${i + 1}. Topic: "${q.topic || q.question}"
+   - Example phrasing: "${q.question}"
+   - Required: ${q.required ? "YES" : "NO"}
+   - Any question about this topic counts as asked`
+    )
     .join("\n")
 
-  return `You are analyzing an interview conversation to determine if the candidate asked important clarifying questions.
+  return `You are analyzing an interview conversation to determine if the candidate asked about specific TOPICS.
 
 CANDIDATE'S MESSAGES:
 ${conversationText || "(No messages from candidate)"}
 
-EXPECTED CLARIFYING QUESTIONS:
+TOPICS TO CHECK:
 ${questionsToCheck}
 
-For each expected question, determine if the candidate asked about that topic.
-Consider semantic similarity - they don't need exact wording, just the same intent.
+For each topic, determine if the candidate asked about it IN ANY FORM.
+Match semantic intent, not exact words. The candidate may phrase questions differently.
 
-Examples of matches:
-- "Should I return indices or values?" matches "do I return the index or actual number?"
-- "Can I use the same element twice?" matches "is reusing numbers allowed?"
-- "Is the array sorted?" matches "can I assume the input is already in order?"
+Examples of topic matches:
+- Topic "output_format": matches "What should I return?", "length or substring?", "do I return the actual string?"
+- Topic "case_sensitivity": matches "Is it case sensitive?", "Are A and a different?", "uppercase vs lowercase?"
+- Topic "repeating_definition": matches "What counts as repeating?", "consecutive only or any duplicate?"
 
 Respond in JSON format:
 {
@@ -80,7 +88,7 @@ Respond in JSON format:
       "questionIndex": 1,
       "asked": true,
       "confidence": 85,
-      "matchedPhrase": "do I return the index or actual number?"
+      "matchedPhrase": "what do I return, the length or the actual substring?"
     },
     {
       "questionIndex": 2,
@@ -105,7 +113,10 @@ function parseCheckResponse(
     // Extract JSON from response (handle markdown code blocks)
     let jsonStr = response.trim()
     if (jsonStr.startsWith("```")) {
-      jsonStr = jsonStr.replace(/```json?\n?/g, "").replace(/```$/g, "").trim()
+      jsonStr = jsonStr
+        .replace(/```json?\n?/g, "")
+        .replace(/```$/g, "")
+        .trim()
     }
 
     const parsed = JSON.parse(jsonStr)
@@ -113,9 +124,7 @@ function parseCheckResponse(
 
     for (let i = 0; i < expectedQuestions.length; i++) {
       const expected = expectedQuestions[i]
-      const result = parsed.results?.find(
-        (r: any) => r.questionIndex === i + 1
-      )
+      const result = parsed.results?.find((r: any) => r.questionIndex === i + 1)
 
       results.push({
         question: expected.question,
@@ -229,24 +238,20 @@ export async function checkClarifyingQuestions(
   }
 
   try {
-    const systemPrompt = "You are a precise analyzer that checks if interview questions were asked. Respond only in JSON format."
+    const systemPrompt =
+      "You are a precise analyzer that checks if interview questions were asked. Respond only in JSON format."
     const userMessage = buildCheckPrompt(expectedQuestions, conversation)
 
     // Use "simple" complexity to get cheapest providers (Flash Lite → DeepSeek Chat → Haiku)
-    const response: AIResponse = await generateAIResponse(
-      systemPrompt,
-      userMessage,
-      [],
-      {
-        complexity: "simple",
-        temperature: 0.1, // Low temperature for consistent analysis
-        userId: options?.userId,
-        sessionId: options?.sessionId,
-        scenarioId: options?.scenarioId,
-        eventType: "chat_message", // Categorize as chat for cost tracking
-        skipCache: true, // Don't cache this - each interview is unique
-      }
-    )
+    const response: AIResponse = await generateAIResponse(systemPrompt, userMessage, [], {
+      complexity: "simple",
+      temperature: 0.1, // Low temperature for consistent analysis
+      userId: options?.userId,
+      sessionId: options?.sessionId,
+      scenarioId: options?.scenarioId,
+      eventType: "chat_message", // Categorize as chat for cost tracking
+      skipCache: true, // Don't cache this - each interview is unique
+    })
 
     const results = parseCheckResponse(response.text, expectedQuestions)
     const totalAsked = results.filter((r) => r.asked).length
@@ -306,7 +311,9 @@ export function generateClarifyingQuestionsFeedback(
     lines.push("You asked some clarifying questions, but missed a few important ones.")
   } else {
     lines.push("**Clarifying Questions: Needs Improvement**")
-    lines.push("In real interviews, asking clarifying questions shows strong problem-solving skills.")
+    lines.push(
+      "In real interviews, asking clarifying questions shows strong problem-solving skills."
+    )
   }
 
   // Required questions that were missed

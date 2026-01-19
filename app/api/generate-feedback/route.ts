@@ -40,6 +40,12 @@ import {
 } from "@/lib/feedback/structured-extraction"
 // Import transcript analysis for post-interview mistake detection
 import { analyzeTranscriptForMistakes } from "@/lib/feedback/transcript-analysis"
+// Import clarifying questions checker for Real Interview Mode
+import {
+  checkClarifyingQuestions,
+  generateClarifyingQuestionsFeedback,
+  type ClarifyingQuestionsCheckResult,
+} from "@/lib/interview/clarifying-questions-checker"
 
 export async function POST(request: NextRequest) {
   // Apply rate limiting
@@ -76,6 +82,9 @@ export async function POST(request: NextRequest) {
       sessionId,
       userId,
       silentNotes, // Things the interviewer noticed but didn't correct (shown as "What You Missed")
+      // Real Interview Mode (fuzzy problem statements)
+      scenarioClarifyingQuestions, // Clarifying questions from scenario
+      realInterviewMode, // Whether Real Interview Mode was active
     } = await request.json()
 
     if (!code || !scenarioTitle) {
@@ -600,6 +609,66 @@ CODE EFFICIENCY ANALYSIS:
           penalties: phaseAnalysis.penalties,
           totalPenalty: phaseAnalysis.totalPenalty,
         })
+      }
+    }
+
+    // Step 3.6: Clarifying Questions Check (Real Interview Mode only)
+    let clarifyingQuestionsResult: ClarifyingQuestionsCheckResult | undefined
+    if (
+      realInterviewMode &&
+      scenarioClarifyingQuestions &&
+      Array.isArray(scenarioClarifyingQuestions) &&
+      scenarioClarifyingQuestions.length > 0 &&
+      conversationTranscript &&
+      Array.isArray(conversationTranscript)
+    ) {
+      try {
+        // Convert conversation to ChatMessage format expected by the checker
+        const chatMessages = conversationTranscript.map((msg: any) => ({
+          type: (msg.type === "user" || msg.role === "user" || msg.role === "candidate"
+            ? "user"
+            : "ai") as "user" | "ai",
+          message: (msg.message || msg.content || "") as string,
+        }))
+
+        clarifyingQuestionsResult = await checkClarifyingQuestions(
+          scenarioClarifyingQuestions,
+          chatMessages,
+          { userId, sessionId, scenarioId }
+        )
+
+        logger.info("[Feedback API] Clarifying questions check completed", {
+          sessionId,
+          score: clarifyingQuestionsResult.score,
+          requiredAsked: clarifyingQuestionsResult.requiredAsked,
+          requiredTotal: clarifyingQuestionsResult.requiredTotal,
+          provider: clarifyingQuestionsResult.provider,
+          latencyMs: clarifyingQuestionsResult.latencyMs,
+        })
+
+        // Apply clarifying questions bonus/penalty to communication score
+        const cqScore = clarifyingQuestionsResult.score
+        if (cqScore >= 70) {
+          // Good clarifying questions = bonus to communication
+          validatedScores.communication = Math.min(100, validatedScores.communication + 10)
+          logger.info("[Feedback API] Clarifying questions bonus applied", {
+            sessionId,
+            cqScore,
+            bonus: 10,
+          })
+        } else if (cqScore < 30 && clarifyingQuestionsResult.requiredTotal > 0) {
+          // Missed required clarifying questions = penalty
+          validatedScores.communication = Math.max(30, validatedScores.communication - 10)
+          logger.info("[Feedback API] Clarifying questions penalty applied", {
+            sessionId,
+            cqScore,
+            penalty: -10,
+            missedRequired:
+              clarifyingQuestionsResult.requiredTotal - clarifyingQuestionsResult.requiredAsked,
+          })
+        }
+      } catch (error) {
+        logger.warn("[Feedback API] Clarifying questions check failed", { error, sessionId })
       }
     }
 
@@ -1236,6 +1305,24 @@ CRITICAL INSTRUCTIONS:
               incompleteFlow: phaseAnalysis.incompleteFlow,
             }
           : undefined,
+      // Clarifying questions assessment (Real Interview Mode only)
+      clarifyingQuestionsAssessment: clarifyingQuestionsResult
+        ? {
+            score: clarifyingQuestionsResult.score,
+            totalExpected: clarifyingQuestionsResult.totalExpected,
+            totalAsked: clarifyingQuestionsResult.totalAsked,
+            requiredAsked: clarifyingQuestionsResult.requiredAsked,
+            requiredTotal: clarifyingQuestionsResult.requiredTotal,
+            results: clarifyingQuestionsResult.results.map((r) => ({
+              question: r.question,
+              required: r.expected,
+              asked: r.asked,
+              matchedPhrase: r.matchedPhrase,
+            })),
+            provider: clarifyingQuestionsResult.provider,
+            latencyMs: clarifyingQuestionsResult.latencyMs,
+          }
+        : undefined,
       // Constitutional AI critique metadata (only if changes were made)
       ...(scoreCritique.madeChanges || feedbackCritique.madeChanges
         ? {

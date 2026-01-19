@@ -180,6 +180,91 @@ public:
         description: "Empty string",
       },
     ],
+
+    // ==========================================
+    // Real Interview Mode (Fuzzy Mode) Fields
+    // ==========================================
+    fuzzyStatement: "Given a string, find the longest substring without repeating characters.",
+
+    clarifyingQuestions: [
+      {
+        question: "Should I return the length or the actual substring?",
+        topic: "output_format",
+        answer: "Return the length of the longest substring.",
+        required: true,
+      },
+      {
+        question:
+          "What does 'repeating' mean - consecutive duplicates or any duplicates within the substring?",
+        topic: "repeating_definition",
+        answer:
+          "Any duplicate within the substring. For example, 'aba' has repeating 'a's so it's invalid, but 'abc' is valid.",
+        required: true,
+      },
+      {
+        question: "What characters can the string contain?",
+        topic: "character_set",
+        answer: "English letters, digits, symbols, and spaces.",
+        required: false,
+      },
+      {
+        question: "What if the string is empty?",
+        topic: "empty_input",
+        answer: "Return 0 for an empty string.",
+        required: false,
+      },
+      {
+        question: "Is the comparison case-sensitive?",
+        topic: "case_sensitivity",
+        answer: "Yes, 'a' and 'A' are different characters.",
+        required: false,
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Brute force checking all substrings O(n³)",
+        codeSignals: ["three nested loops", "O(n^3)", "for all substrings", "substring.includes"],
+        intervention:
+          "That approach checks every substring which is O(n³). Can you think of a way to do this in a single pass?",
+      },
+      {
+        description: "Not shrinking window correctly when duplicate found",
+        codeSignals: ["left = 0", "reset window", "start over"],
+        intervention:
+          "When you find a duplicate, do you need to reset the entire window? Can you jump directly past the duplicate?",
+      },
+      {
+        description: "Using indexOf instead of hash map",
+        codeSignals: ["indexOf", "lastIndexOf", "findIndex"],
+        intervention:
+          "indexOf is O(n) per lookup. Is there a data structure that gives O(1) lookup for character positions?",
+      },
+    ],
+
+    whatIfQuestions: [
+      "What if all characters are the same, like 'aaaaa'?",
+      "What if all characters are unique?",
+      "What happens when you see a character that's outside your current window?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "using a set or map",
+        question: "What are you storing - just characters, or their positions too?",
+      },
+      {
+        trigger: "handling duplicate found",
+        question:
+          "Let's trace through 'abcabc'. When you hit the second 'a', what happens to your window?",
+      },
+    ],
+
+    optimizationPush: {
+      suboptimalComplexity: "O(n²)",
+      nudge:
+        "Your solution visits some characters multiple times. Can you achieve O(n) using a hash map to track where you last saw each character?",
+    },
   },
 
   {
