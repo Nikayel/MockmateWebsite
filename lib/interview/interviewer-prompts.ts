@@ -7,6 +7,17 @@
  * - Show, don't tell
  *
  * This replaces the 300+ line system prompts with focused examples.
+ *
+ * DRY Architecture:
+ * -----------------
+ * Core principles are defined in: lib/prompts/principles.ts
+ * - INTERVIEWER_PERSONALITY: Name, traits, forbidden phrases
+ * - INTERVIEWER_RULES: Critical rules, flow rules, phase-specific rules
+ * - CODING_PREREQUISITES: What must happen before "code it up"
+ * - HINT_LEVELS: Nudge → Guide → Explain → Reveal
+ *
+ * This file uses those principles to build the actual prompts.
+ * Change principles once → affects all interviewer behavior.
  */
 
 // =============================================================================
