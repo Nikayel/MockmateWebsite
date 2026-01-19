@@ -106,6 +106,8 @@ export {
   buildTrackingContext,
   getHintGuidance,
   HINT_PROGRESSION,
+  addSilentNote,
+  getSilentNoteDescription,
 } from "./interview-phases"
 export type {
   InterviewPhase,
@@ -113,6 +115,8 @@ export type {
   PhaseDetectionContext,
   ConversationTracker,
   HintLevel,
+  SilentNote,
+  SilentNoteType,
 } from "./interview-phases"
 
 // Interviewer prompts (few-shot examples - preferred over verbose rules)

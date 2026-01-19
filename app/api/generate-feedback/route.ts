@@ -29,6 +29,8 @@ import {
   parseFeedbackSections,
   injectScoresIntoFeedback,
   sanitizeFeedbackForScoreConsistency,
+  buildSilentNotesContext,
+  formatSilentNotesForFeedback,
 } from "@/lib/feedback"
 // Import structured extraction for grounded feedback
 import {
@@ -71,6 +73,7 @@ export async function POST(request: NextRequest) {
       phaseTracking,
       sessionId,
       userId,
+      silentNotes, // Things the interviewer noticed but didn't correct (shown as "What You Missed")
     } = await request.json()
 
     if (!code || !scenarioTitle) {
@@ -276,6 +279,12 @@ CRITICAL FORMATTING RULES:
 - Most important improvement needed
 - Second improvement if applicable
 - Third improvement if applicable
+
+**What You Missed** (if SILENT NOTES provided above)
+Include this section ONLY if there are SILENT NOTES in the context.
+These are things the interviewer noticed but didn't correct during the interview.
+Format each note as:
+- **[Type]**: You said "[what they said]" — Correct answer: [correct answer]
 
 **Action Plan**
 CRITICAL RULES FOR ACTION PLAN:
@@ -664,7 +673,7 @@ CRITICAL: Your feedback must be consistent with the extracted evidence above.
 - Quote specific examples from the evidence when giving feedback
 `
     : ""
-}
+}${buildSilentNotesContext(silentNotes || [])}
 
 PRE-CALCULATED SCORES (use these as your scores):
 ${

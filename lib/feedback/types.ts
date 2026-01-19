@@ -11,16 +11,27 @@
  */
 export interface FeedbackScores {
   // New grading criteria
-  understanding: number       // 30% - Can you explain your approach?
-  problemSolving: number      // 25% - Debug & optimize
-  codeQuality: number         // 25% - Clean & efficient
-  communication: number       // 20% - Think out loud
+  understanding: number // 30% - Can you explain your approach?
+  problemSolving: number // 25% - Debug & optimize
+  codeQuality: number // 25% - Clean & efficient
+  communication: number // 20% - Think out loud
   // Legacy (kept for backward compatibility)
   correctness: number
   efficiency: number
   reasoningExplanation: number
   aiCollaboration: number
   overall: number
+}
+
+/**
+ * Silent note from interview - things the interviewer noticed but didn't correct
+ * Used to populate the "What You Missed" section in feedback
+ */
+export interface SilentNoteFeedback {
+  type: string
+  userSaid: string
+  correct?: string
+  context?: string
 }
 
 /**
@@ -34,6 +45,8 @@ export interface StructuredFeedback {
   actionPlan: string[]
   aiWatchlist: string
   rawFeedback: string
+  // NEW: Things the interviewer noticed but didn't correct during the interview
+  whatYouMissed?: SilentNoteFeedback[]
 }
 
 /**
@@ -42,21 +55,21 @@ export interface StructuredFeedback {
  */
 export interface ConversationValidation {
   // Coherence checks - is this real communication or gibberish?
-  isCoherent: boolean              // Are responses actual sentences?
-  responsesRelevant: boolean       // Do responses relate to questions asked?
+  isCoherent: boolean // Are responses actual sentences?
+  responsesRelevant: boolean // Do responses relate to questions asked?
 
   // Approach explanation quality
-  approachExplained: boolean       // Did they explain their approach?
-  approachQuality: 'none' | 'poor' | 'basic' | 'good' | 'excellent'
+  approachExplained: boolean // Did they explain their approach?
+  approachQuality: "none" | "poor" | "basic" | "good" | "excellent"
 
   // Complexity analysis - validated against actual code
-  complexityDiscussed: boolean     // Did they mention complexity?
-  complexityAccurate: boolean      // Was their stated complexity CORRECT?
-  statedComplexity: string | null  // What they claimed (e.g., "O(n)")
+  complexityDiscussed: boolean // Did they mention complexity?
+  complexityAccurate: boolean // Was their stated complexity CORRECT?
+  statedComplexity: string | null // What they claimed (e.g., "O(n)")
 
   // Question-answer quality
-  questionsAsked: number           // How many questions interviewer asked
-  questionsAnswered: number        // How many were substantively answered
+  questionsAsked: number // How many questions interviewer asked
+  questionsAnswered: number // How many were substantively answered
 
   // Technical discussion depth
   edgeCasesConsidered: boolean
@@ -71,7 +84,7 @@ export interface ConversationValidation {
  * Reviews scoring and feedback for fairness, tone, accuracy, actionability
  */
 export interface CritiqueResult {
-  aspect: 'fairness' | 'tone' | 'accuracy' | 'actionability'
+  aspect: "fairness" | "tone" | "accuracy" | "actionability"
   passed: boolean
   issue?: string
   suggestion?: string
@@ -110,10 +123,10 @@ export interface FeedbackCritiqueAdjustment {
  * Detects if candidate blindly copied AI suggestions without understanding
  */
 export interface AICodeOverlapResult {
-  hasHighOverlap: boolean           // True if >70% of code matches AI suggestions
-  overlapPercentage: number         // 0-100
-  copiedSnippets: string[]          // Specific snippets that were copied
-  modificationsMade: boolean        // Did they modify the AI suggestions at all?
+  hasHighOverlap: boolean // True if >70% of code matches AI suggestions
+  overlapPercentage: number // 0-100
+  copiedSnippets: string[] // Specific snippets that were copied
+  modificationsMade: boolean // Did they modify the AI suggestions at all?
 }
 
 /**

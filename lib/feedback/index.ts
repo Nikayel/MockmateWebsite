@@ -21,6 +21,7 @@ export type {
   PreScreenResult,
   ScoreResult,
   ExtendedScoreResult,
+  SilentNoteFeedback,
 } from "./types"
 
 // ============================================================================
@@ -79,4 +80,6 @@ export {
   parseFeedbackSections,
   injectScoresIntoFeedback,
   sanitizeFeedbackForScoreConsistency,
+  formatSilentNotesForFeedback,
+  buildSilentNotesContext,
 } from "./parsers"
