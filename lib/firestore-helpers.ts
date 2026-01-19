@@ -20,18 +20,47 @@ import { Profile, ProfileQuota } from "./types"
 import { PRICING_CONFIG } from "./config"
 
 /**
+ * Validate and sanitize a numeric score value.
+ * Returns the number if valid, or undefined if invalid (NaN, Infinity, etc.)
+ */
+function sanitizeScore(value: any): number | undefined {
+  if (value === undefined || value === null) return undefined
+  const num = typeof value === "number" ? value : parseFloat(value)
+  if (!Number.isFinite(num)) return undefined
+  // Clamp to valid score range
+  return Math.max(0, Math.min(100, Math.round(num)))
+}
+
+/**
  * Sanitize test results for Firestore storage
  * Firestore doesn't support nested arrays, so we stringify complex values
  */
 function sanitizeTestResultsForFirestore(testResults: Array<any>): Array<any> {
-  return testResults.map((t: any) => ({
-    description: t.description,
-    passed: t.passed,
-    input: JSON.stringify(t.input),
-    expected: JSON.stringify(t.expected),
-    actual: JSON.stringify(t.actual),
-    error: t.error,
-  }))
+  return testResults.map((t: any) => {
+    // Safely stringify values - if already string, keep as is
+    const safeStringify = (val: any): string => {
+      if (val === undefined || val === null) return "null"
+      if (typeof val === "string") {
+        // Check if it's already a JSON string
+        try {
+          JSON.parse(val)
+          return val // Already valid JSON string
+        } catch {
+          return JSON.stringify(val) // Plain string, stringify it
+        }
+      }
+      return JSON.stringify(val)
+    }
+
+    return {
+      description: t.description || "",
+      passed: Boolean(t.passed),
+      input: safeStringify(t.input),
+      expected: safeStringify(t.expected),
+      actual: safeStringify(t.actual),
+      error: t.error || null,
+    }
+  })
 }
 
 /**
@@ -560,126 +589,181 @@ export async function updateInterviewSession(
   }
 ): Promise<void> {
   const sessionRef = doc(db, "interview_sessions", sessionId)
-  const updateData: any = {
+
+  // Build critical update data first (must succeed)
+  const criticalData: Record<string, any> = {
     completed_at: new Date().toISOString(),
-    feedback_status: additionalData?.feedbackStatus || "pending", // Default to pending
+    feedback_status: additionalData?.feedbackStatus || "pending",
     updated_at: new Date().toISOString(),
   }
 
-  // Only add performance_score and feedback if defined (Firestore doesn't allow undefined)
-  if (performanceScore !== undefined) {
-    updateData.performance_score = performanceScore
-  }
-  if (feedback !== undefined) {
-    updateData.feedback = feedback
+  // Sanitize and add performance_score (critical field)
+  const sanitizedPerformanceScore = sanitizeScore(performanceScore)
+  if (sanitizedPerformanceScore !== undefined) {
+    criticalData.performance_score = sanitizedPerformanceScore
   }
 
-  // Save additional completion data
+  // Add feedback text (critical field, but may be large)
+  if (feedback !== undefined && feedback !== null) {
+    // Truncate feedback if too large (Firestore has 1MB document limit)
+    criticalData.feedback =
+      typeof feedback === "string" && feedback.length > 50000
+        ? feedback.substring(0, 50000) + "... [truncated]"
+        : feedback
+  }
+
+  // Build non-critical update data (can fail without breaking session)
+  const additionalDataObj: Record<string, any> = {}
+
   if (additionalData) {
-    if (additionalData.code) updateData.final_code = additionalData.code
-    if (additionalData.language) updateData.language = additionalData.language
-    if (additionalData.testResults) {
-      updateData.test_results = sanitizeTestResultsForFirestore(additionalData.testResults)
-      updateData.tests_passed = additionalData.testResults.filter((t: any) => t.passed).length
-      updateData.tests_total = additionalData.testResults.length
+    // Code and language
+    if (additionalData.code) {
+      additionalDataObj.final_code =
+        typeof additionalData.code === "string" && additionalData.code.length > 100000
+          ? additionalData.code.substring(0, 100000)
+          : additionalData.code
     }
-    if (additionalData.timeComplexity) updateData.time_complexity = additionalData.timeComplexity
-    if (additionalData.spaceComplexity) updateData.space_complexity = additionalData.spaceComplexity
-    if (additionalData.efficiencyScore) updateData.efficiency_score = additionalData.efficiencyScore
-    // Save score breakdown for technical score calculations (required for pattern ranking)
-    if (additionalData.scoreBreakdown) {
-      // Extract scores, handling both naming conventions (understanding/understandingScore, etc.)
-      // Only include defined values to prevent Firebase errors
-      const understandingScore =
-        additionalData.scoreBreakdown.understanding !== undefined
-          ? additionalData.scoreBreakdown.understanding
-          : additionalData.scoreBreakdown.understandingScore !== undefined
-            ? additionalData.scoreBreakdown.understandingScore
-            : undefined
-      const problemSolvingScore =
-        additionalData.scoreBreakdown.problemSolving !== undefined
-          ? additionalData.scoreBreakdown.problemSolving
-          : additionalData.scoreBreakdown.problemSolvingScore !== undefined
-            ? additionalData.scoreBreakdown.problemSolvingScore
-            : undefined
-      const codeQualityScore =
-        additionalData.scoreBreakdown.codeQuality !== undefined
-          ? additionalData.scoreBreakdown.codeQuality
-          : additionalData.scoreBreakdown.codeQualityScore !== undefined
-            ? additionalData.scoreBreakdown.codeQualityScore
-            : undefined
-      const communicationScore =
-        additionalData.scoreBreakdown.communication !== undefined
-          ? additionalData.scoreBreakdown.communication
-          : additionalData.scoreBreakdown.communicationScore !== undefined
-            ? additionalData.scoreBreakdown.communicationScore
-            : undefined
+    if (additionalData.language) additionalDataObj.language = additionalData.language
 
-      // Build score_breakdown object, only including defined values
-      // This prevents Firebase errors from undefined field values
-      const scores = {
-        understandingScore,
-        problemSolvingScore,
-        codeQualityScore,
-        communicationScore,
+    // Test results - wrap in try-catch as serialization can fail
+    if (additionalData.testResults && Array.isArray(additionalData.testResults)) {
+      try {
+        additionalDataObj.test_results = sanitizeTestResultsForFirestore(additionalData.testResults)
+        additionalDataObj.tests_passed = additionalData.testResults.filter((t: any) => t?.passed).length
+        additionalDataObj.tests_total = additionalData.testResults.length
+      } catch (err) {
+        console.warn("[updateInterviewSession] Failed to serialize test results:", err)
+        // Continue without test results
       }
-      const scoreBreakdownObj: Record<string, number> = {}
-      copyDefinedFields(scoreBreakdownObj, scores, Object.keys(scores) as (keyof typeof scores)[])
+    }
 
-      // Only save score_breakdown if we have at least one defined score
+    // Complexity strings
+    if (additionalData.timeComplexity) additionalDataObj.time_complexity = additionalData.timeComplexity
+    if (additionalData.spaceComplexity) additionalDataObj.space_complexity = additionalData.spaceComplexity
+
+    // Efficiency score (sanitize)
+    const sanitizedEfficiency = sanitizeScore(additionalData.efficiencyScore)
+    if (sanitizedEfficiency !== undefined) additionalDataObj.efficiency_score = sanitizedEfficiency
+
+    // Score breakdown for technical score calculations
+    if (additionalData.scoreBreakdown) {
+      // Extract and sanitize scores, handling both naming conventions
+      const understandingScore = sanitizeScore(
+        additionalData.scoreBreakdown.understanding ?? additionalData.scoreBreakdown.understandingScore
+      )
+      const problemSolvingScore = sanitizeScore(
+        additionalData.scoreBreakdown.problemSolving ?? additionalData.scoreBreakdown.problemSolvingScore
+      )
+      const codeQualityScore = sanitizeScore(
+        additionalData.scoreBreakdown.codeQuality ?? additionalData.scoreBreakdown.codeQualityScore
+      )
+      const communicationScore = sanitizeScore(
+        additionalData.scoreBreakdown.communication ?? additionalData.scoreBreakdown.communicationScore
+      )
+
+      // Build score_breakdown object, only including valid scores
+      const scoreBreakdownObj: Record<string, number> = {}
+      if (understandingScore !== undefined) scoreBreakdownObj.understandingScore = understandingScore
+      if (problemSolvingScore !== undefined) scoreBreakdownObj.problemSolvingScore = problemSolvingScore
+      if (codeQualityScore !== undefined) scoreBreakdownObj.codeQualityScore = codeQualityScore
+      if (communicationScore !== undefined) scoreBreakdownObj.communicationScore = communicationScore
+
+      // Only save score_breakdown if we have at least one valid score
       if (Object.keys(scoreBreakdownObj).length > 0) {
-        updateData.score_breakdown = scoreBreakdownObj
+        additionalDataObj.score_breakdown = scoreBreakdownObj
       }
 
       // Fallback technical score calculation (only if API score not provided)
-      // This is less accurate than the API's mastery-based calculation
       if (
         additionalData.technicalScore === undefined &&
         codeQualityScore !== undefined &&
         problemSolvingScore !== undefined &&
         understandingScore !== undefined
       ) {
-        updateData.technical_score = Math.round(
+        const calculatedTechnical = Math.round(
           codeQualityScore * 0.6 + problemSolvingScore * 0.25 + understandingScore * 0.15
         )
-        updateData.mastery_score = updateData.technical_score
+        if (Number.isFinite(calculatedTechnical)) {
+          additionalDataObj.technical_score = calculatedTechnical
+          additionalDataObj.mastery_score = calculatedTechnical
+        }
       }
     }
 
-    // Save technical score from API (mastery-based: correctness + time + independence)
-    // This is the authoritative score calculated using objective metrics
-    if (additionalData.technicalScore !== undefined) {
-      updateData.technical_score = additionalData.technicalScore
-      updateData.mastery_score = additionalData.technicalScore
+    // Technical score from API (mastery-based: correctness + time + independence)
+    const sanitizedTechnicalScore = sanitizeScore(additionalData.technicalScore)
+    if (sanitizedTechnicalScore !== undefined) {
+      additionalDataObj.technical_score = sanitizedTechnicalScore
+      additionalDataObj.mastery_score = sanitizedTechnicalScore
     }
-    // Save complexity analysis (user-stated vs code-analyzed)
-    if (additionalData.complexityAnalysis) {
-      updateData.complexity_analysis = {
-        code_analyzed: {
-          time_complexity: additionalData.complexityAnalysis.codeAnalyzed.timeComplexity,
-          space_complexity: additionalData.complexityAnalysis.codeAnalyzed.spaceComplexity,
-          confidence: additionalData.complexityAnalysis.codeAnalyzed.confidence,
-          detected_patterns: additionalData.complexityAnalysis.codeAnalyzed.detectedPatterns || [],
-        },
-        user_stated: additionalData.complexityAnalysis.userStated
-          ? {
-              time_complexity: additionalData.complexityAnalysis.userStated.timeComplexity,
-              space_complexity: additionalData.complexityAnalysis.userStated.spaceComplexity,
-              timestamp: additionalData.complexityAnalysis.userStated.timestamp,
-            }
-          : null,
-        approach_used: additionalData.complexityAnalysis.approachUsed || null,
-        is_accurate: additionalData.complexityAnalysis.isAccurate ?? null,
-        feedback: additionalData.complexityAnalysis.feedback || null,
+
+    // Complexity analysis (optional, can fail)
+    if (additionalData.complexityAnalysis?.codeAnalyzed) {
+      try {
+        additionalDataObj.complexity_analysis = {
+          code_analyzed: {
+            time_complexity: additionalData.complexityAnalysis.codeAnalyzed.timeComplexity || "unknown",
+            space_complexity: additionalData.complexityAnalysis.codeAnalyzed.spaceComplexity || "unknown",
+            confidence: additionalData.complexityAnalysis.codeAnalyzed.confidence || "low",
+            detected_patterns: Array.isArray(additionalData.complexityAnalysis.codeAnalyzed.detectedPatterns)
+              ? additionalData.complexityAnalysis.codeAnalyzed.detectedPatterns
+              : [],
+          },
+          user_stated: additionalData.complexityAnalysis.userStated
+            ? {
+                time_complexity: additionalData.complexityAnalysis.userStated.timeComplexity || null,
+                space_complexity: additionalData.complexityAnalysis.userStated.spaceComplexity || null,
+                timestamp: additionalData.complexityAnalysis.userStated.timestamp || Date.now(),
+              }
+            : null,
+          approach_used: additionalData.complexityAnalysis.approachUsed || null,
+          is_accurate: additionalData.complexityAnalysis.isAccurate ?? null,
+          feedback: additionalData.complexityAnalysis.feedback || null,
+        }
+      } catch (err) {
+        console.warn("[updateInterviewSession] Failed to serialize complexity analysis:", err)
       }
     }
-    // Save Constitutional AI critique for debugging/transparency
+
+    // Constitutional AI critique (optional, can fail)
     if (additionalData.constitutionalAICritique) {
-      updateData.constitutional_ai_critique = additionalData.constitutionalAICritique
+      try {
+        // Ensure the critique is serializable
+        additionalDataObj.constitutional_ai_critique = JSON.parse(
+          JSON.stringify(additionalData.constitutionalAICritique)
+        )
+      } catch (err) {
+        console.warn("[updateInterviewSession] Failed to serialize constitutional AI critique:", err)
+      }
     }
   }
 
-  await setDoc(sessionRef, updateData, { merge: true })
+  // Merge critical and additional data
+  const updateData = { ...criticalData, ...additionalDataObj }
+
+  // Attempt full update
+  try {
+    await setDoc(sessionRef, updateData, { merge: true })
+    return
+  } catch (error) {
+    console.error("[updateInterviewSession] Full update failed:", error, {
+      sessionId,
+      dataKeys: Object.keys(updateData),
+    })
+
+    // Fallback: try to save just the critical data (feedback_status, performance_score, feedback)
+    // This ensures the session at least shows as complete with a score
+    try {
+      console.log("[updateInterviewSession] Attempting fallback with critical data only")
+      await setDoc(sessionRef, criticalData, { merge: true })
+      console.log("[updateInterviewSession] Fallback succeeded - critical data saved")
+      return
+    } catch (fallbackError) {
+      console.error("[updateInterviewSession] Fallback also failed:", fallbackError)
+      // Re-throw the original error since both attempts failed
+      throw error
+    }
+  }
 }
 
 /**
