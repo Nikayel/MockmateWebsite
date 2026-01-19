@@ -690,11 +690,19 @@ export function applyScoreFloors(
     problemSolving = Math.max(65, problemSolving) // You solved all test cases
     codeQuality = Math.max(70, codeQuality) // Your code works perfectly
 
+    // Communication floor for perfect solutions:
+    // Passing 100% of tests IS a form of implicit communication - it proves understanding.
+    // While verbal explanation is valuable, penalizing efficient coders too harshly is unfair.
+    // Floor of 50 ensures they get at least a "passing" communication score.
+    communication = Math.max(50, communication)
+
     // If efficiency metrics show optimal, boost further
     if (isOptimal) {
       understanding = Math.max(70, understanding)
       problemSolving = Math.max(75, problemSolving)
       codeQuality = Math.max(80, codeQuality)
+      // Optimal + 100% pass = stronger implicit communication
+      communication = Math.max(55, communication)
     }
 
     // Recalculate overall if component scores were boosted

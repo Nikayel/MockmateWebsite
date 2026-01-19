@@ -201,9 +201,13 @@ export class ScorerAgent implements Agent<ScorerAgentInput, ScorerAgentOutput> {
       }
 
       // Penalize silent solution (correct but no explanation)
+      // Note: For 100% pass rate, applyScoreFloors will apply a floor of 50-55,
+      // so this cap is less harsh for perfect solutions
       if (passRate >= 80 && !input.evidence.approach.explained) {
-        communication = Math.min(communication, 45)
-        adjustments.push("Cap communication at 45: silent solution (no explanation)")
+        // Less harsh cap for perfect solutions - they proved understanding through code
+        const silentCap = passRate >= 100 ? 55 : 45
+        communication = Math.min(communication, silentCap)
+        adjustments.push(`Cap communication at ${silentCap}: silent solution (no explanation)`)
       }
     }
 
