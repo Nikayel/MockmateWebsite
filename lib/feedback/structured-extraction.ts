@@ -15,6 +15,8 @@ import {
   findDominantComplexity,
   extractComplexityFromText,
   EDGE_CASE_KEYWORDS,
+  findCodingPhaseStart,
+  isCodeExplanation,
 } from "@/lib/interview/shared-patterns"
 
 // =============================================================================
@@ -176,7 +178,21 @@ function extractAlgorithmically(
   // Track pending questions to match with answers
   let pendingQuestions: { question: string; messageIndex: number }[] = []
 
+  // PHASE-AWARE DETECTION: Find when coding phase starts
+  const codingPhaseStartIndex = findCodingPhaseStart(transcript)
+  const codingPhaseExplanations: string[] = []
+
   transcript.forEach((msg, index) => {
+    // CODING PHASE DETECTION: Track explanations after "code it up"
+    if (codingPhaseStartIndex !== -1 && index > codingPhaseStartIndex && msg.role === "user") {
+      // Check if this message is a code explanation (not just noise)
+      if (isCodeExplanation(msg.content)) {
+        codingPhaseExplanations.push(msg.content.substring(0, 150))
+        evidence.communication!.explainedWhileCoding = true
+        evidence.communication!.quotes.push(`[While coding] "${msg.content.substring(0, 100)}..."`)
+      }
+    }
+
     const content = msg.content.toLowerCase()
     const originalContent = msg.content
 
@@ -443,12 +459,20 @@ async function extractSemantically(
     .map((m, i) => `[${i}] ${m.role.toUpperCase()}: ${m.content}`)
     .join("\n\n")
 
+  // Find coding phase start for context
+  const codingPhaseStart = findCodingPhaseStart(transcript)
+  const codingPhaseContext =
+    codingPhaseStart !== -1
+      ? `\n\nCODING PHASE STARTS AT MESSAGE [${codingPhaseStart}] (look for "code it up" or similar)`
+      : "\n\nNO CLEAR CODING TRANSITION DETECTED - use best judgment"
+
   const extractionPrompt = `Analyze this interview transcript and extract specific evidence.
 
 PROBLEM: ${problemContext.title}
 OPTIMAL TIME: ${problemContext.optimalTimeComplexity}
 OPTIMAL SPACE: ${problemContext.optimalSpaceComplexity}
 CRITICAL EDGE CASES: ${problemContext.criticalEdgeCases.join(", ")}
+${codingPhaseContext}
 
 TRANSCRIPT:
 ${transcriptText.substring(0, 8000)}
@@ -456,7 +480,14 @@ ${transcriptText.substring(0, 8000)}
 EXTRACT THE FOLLOWING (use EXACT quotes from transcript):
 
 1. INTERVIEWER QUESTIONS: For each question the interviewer asked, was it answered? Quote the answer.
-2. COMMUNICATION: Did candidate explain their thinking while coding? Quote examples.
+
+2. EXPLAINED WHILE CODING: Did the candidate talk through their code AS they wrote it?
+   - Look for messages AFTER the coding phase started
+   - YES if they said things like: "so here I'm initializing...", "this loop goes through...", "I'm checking if..."
+   - YES if they narrated their logic: "first I'll...", "then I need to...", "this handles the case where..."
+   - NO if they went silent or only said filler words ("hmm", "ok", "let me think")
+   - NO if all their explanation was BEFORE coding started
+
 3. ANSWER QUALITY: Rate each answer as good/partial/poor/unanswered.
 
 Return JSON:
@@ -471,6 +502,7 @@ Return JSON:
   ],
   "communicationQuotes": ["quote1", "quote2"],
   "explainedWhileCoding": true/false,
+  "codingPhaseExplanationQuotes": ["exact quotes of them explaining DURING coding, or empty if silent"],
   "respondedToFeedback": true/false
 }
 
@@ -478,7 +510,8 @@ RULES:
 - Only include REAL questions (not rhetorical)
 - Only quote ACTUAL text from transcript
 - If uncertain, mark as "unanswered" not "good"
-- Maximum 10 questions to analyze`
+- Maximum 10 questions to analyze
+- For "explainedWhileCoding": Be GENEROUS - if they talked about their code at all while coding, mark true`
 
   try {
     const response = await generateAIResponse(
