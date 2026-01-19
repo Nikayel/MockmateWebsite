@@ -2881,9 +2881,15 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             },
           }
 
-          // Add 120-second timeout to prevent hanging forever (matches backend maxDuration)
+          // Add 125-second timeout to prevent hanging forever (slightly longer than backend maxDuration of 120s)
+          // This gives the backend time to complete and return a response before aborting
           const feedbackController = new AbortController()
-          const feedbackTimeoutId = setTimeout(() => feedbackController.abort(), 120000)
+          const feedbackTimeoutId = setTimeout(() => {
+            feedbackController.abort()
+            console.warn("[Feedback] Request aborted due to timeout", {
+              sessionId: currentSessionId,
+            })
+          }, 125000)
 
           const feedbackResponse = await fetch("/api/generate-feedback", {
             method: "POST",
@@ -2913,7 +2919,66 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
 
           if (feedbackResponse.ok) {
             const feedbackData = await feedbackResponse.json()
-            feedbackText = feedbackData.feedback || feedbackText
+
+            // Log feedback data for debugging
+            console.log("[Feedback] API response:", {
+              hasFeedback: !!feedbackData.feedback,
+              feedbackLength: feedbackData.feedback?.length || 0,
+              partialResult: feedbackData.partialResult,
+              timeout: feedbackData.timeout,
+              error: feedbackData.error,
+              errorCategory: feedbackData.errorCategory,
+              performanceScore: feedbackData.performanceScore,
+              hasScores: !!feedbackData.scores,
+            })
+
+            // Check if this was a timeout/partial result
+            if (feedbackData.timeout || feedbackData.partialResult) {
+              const reason = feedbackData.timeout
+                ? "timed out"
+                : feedbackData.errorCategory === "timeout"
+                  ? "took too long"
+                  : feedbackData.errorCategory === "rate limit"
+                    ? "service temporarily unavailable"
+                    : feedbackData.errorCategory === "network"
+                      ? "network issue"
+                      : "processing error"
+
+              toast.warning("Feedback generation issue", {
+                description: `Full AI analysis ${reason}. ${feedbackData.partialResult ? "Using computed scores." : "Using estimated scores."}`,
+              })
+            }
+
+            // Only use API feedback if it's not the basic fallback message
+            // Check if feedback is meaningful (not just "Completed X with Y tests")
+            const isBasicFallback =
+              feedbackData.feedback?.includes("Completed ") &&
+              feedbackData.feedback?.includes(" with ") &&
+              feedbackData.feedback?.includes(" tests passing") &&
+              feedbackData.feedback.length < 100
+
+            if (feedbackData.feedback && !isBasicFallback) {
+              feedbackText = feedbackData.feedback
+            } else if (feedbackData.feedback && isBasicFallback) {
+              console.warn(
+                "[Feedback] API returned basic fallback, keeping existing feedback or generating structured fallback"
+              )
+              // If API returned basic fallback, generate proper structured fallback
+              if (feedbackData.scores) {
+                feedbackText = generateFallbackFeedback({
+                  problemTitle: selectedScenario?.title || "the problem",
+                  testsPassed: testSummary.passed,
+                  testsTotal: testSummary.total,
+                  passRate: testSummary.passRate,
+                  timeComplexity: efficiencyData?.estimatedTimeComplexity,
+                  spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
+                  optimalTimeComplexity: efficiencyData?.optimalTimeComplexity,
+                  optimalSpaceComplexity: efficiencyData?.optimalSpaceComplexity,
+                  elapsedMinutes: Math.round(elapsedTime / 60),
+                  scores: feedbackData.scores,
+                })
+              }
+            }
             calculatedPerformanceScore = feedbackData.performanceScore || calculatedPerformanceScore
             if (feedbackData.technicalScore !== undefined) {
               localTechnicalScore = feedbackData.technicalScore
@@ -3019,7 +3084,15 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           }
         } catch (feedbackError: any) {
           console.error("Error generating feedback:", feedbackError)
-          const isTimeout = feedbackError?.name === "AbortError"
+          const isTimeout =
+            feedbackError?.name === "AbortError" ||
+            feedbackError?.message?.includes("aborted") ||
+            feedbackError?.message?.includes("timeout")
+
+          // Clear timeout if it hasn't fired yet
+          if (feedbackTimeoutId) {
+            clearTimeout(feedbackTimeoutId)
+          }
           const passRate = testSummary.passRate
           const fallbackScores = {
             understanding: Math.min(100, Math.round(passRate * 0.9 + 10)),
@@ -3094,6 +3167,38 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                     : undefined,
               }
             : undefined
+
+          // Ensure feedback text is meaningful before saving
+          // If it's still the basic fallback, generate proper structured feedback
+          const isStillBasicFallback =
+            feedbackText.includes("Completed ") &&
+            feedbackText.includes(" with ") &&
+            feedbackText.includes(" tests passing") &&
+            feedbackText.length < 100
+
+          if (isStillBasicFallback && scoreBreakdownData) {
+            console.warn("[Feedback] Still using basic fallback, generating structured feedback", {
+              sessionId: currentSessionId,
+              originalFeedback: feedbackText.substring(0, 50),
+            })
+            feedbackText = generateFallbackFeedback({
+              problemTitle: selectedScenario?.title || "the problem",
+              testsPassed: testSummary.passed,
+              testsTotal: testSummary.total,
+              passRate: testSummary.passRate,
+              timeComplexity: efficiencyData?.estimatedTimeComplexity,
+              spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
+              optimalTimeComplexity: efficiencyData?.optimalTimeComplexity,
+              optimalSpaceComplexity: efficiencyData?.optimalSpaceComplexity,
+              elapsedMinutes: Math.round(elapsedTime / 60),
+              scores: {
+                understanding: scoreBreakdownData.understanding || 0,
+                problemSolving: scoreBreakdownData.problemSolving || 0,
+                codeQuality: scoreBreakdownData.codeQuality || 0,
+                communication: scoreBreakdownData.communication || 0,
+              },
+            })
+          }
 
           await updateInterviewSession(currentSessionId, calculatedPerformanceScore, feedbackText, {
             code,

@@ -651,6 +651,42 @@ async function storeSessionSummary(summary: SessionSummary): Promise<void> {
     // Technical score is now the same as mastery score (objective metrics)
     const technicalScore = summary.masteryScore
 
+    // Check if interview_sessions has a more authoritative score (from feedback API)
+    // If so, prefer that score over the calculated one for consistency
+    let authoritativeScore = summary.performanceScore
+    try {
+      const interviewSessionDoc = await adminDb
+        .collection("interview_sessions")
+        .doc(summary.sessionId)
+        .get()
+
+      if (interviewSessionDoc.exists) {
+        const interviewData = interviewSessionDoc.data()
+        const feedbackApiScore = interviewData?.performance_score ?? interviewData?.performanceScore
+
+        // If feedback API score exists and is different, use it (it's more authoritative)
+        // This ensures "Recent Avg" and "This Week" show the same score
+        if (feedbackApiScore !== undefined && feedbackApiScore !== null && feedbackApiScore !== 0) {
+          if (Math.abs(feedbackApiScore - summary.performanceScore) > 5) {
+            // Significant difference - prefer feedback API score
+            logger.info("[Session Metrics] Using feedback API score for consistency", {
+              sessionId: summary.sessionId,
+              calculatedScore: summary.performanceScore,
+              feedbackApiScore,
+            })
+            authoritativeScore = feedbackApiScore
+            // Update summary to use authoritative score
+            summary.performanceScore = authoritativeScore
+          }
+        }
+      }
+    } catch (error) {
+      logger.warn("[Session Metrics] Failed to check interview_sessions for authoritative score", {
+        error,
+        sessionId: summary.sessionId,
+      })
+    }
+
     // Store in user's session history
     await adminDb
       .collection("users")
@@ -659,6 +695,7 @@ async function storeSessionSummary(summary: SessionSummary): Promise<void> {
       .doc(summary.sessionId)
       .set({
         ...summary,
+        performanceScore: authoritativeScore, // Use authoritative score
         createdAt: FieldValue.serverTimestamp(),
       })
 
@@ -667,7 +704,7 @@ async function storeSessionSummary(summary: SessionSummary): Promise<void> {
     // IMPORTANT: Pass isReconstructedSession to prevent overwriting authoritative scores
     await syncScoreToInterviewSession(
       summary.sessionId,
-      summary.performanceScore,
+      authoritativeScore, // Use authoritative score
       technicalScore,
       summary.scoreBreakdown,
       summary.isReconstructedSession ?? false

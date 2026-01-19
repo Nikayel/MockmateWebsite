@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
       userId,
       optimalComplexity,
       designNotes,
+      phaseTracking, // Extract but not required - used for future phase-aware feedback
     } = await request.json()
 
     // ==========================================================================
@@ -185,14 +186,61 @@ export async function POST(request: NextRequest) {
     // ==========================================================================
 
     // Calculate remaining time budget for orchestrator
-    // The route has 120s max, we need 10s buffer for response/cleanup
+    // The route has 120s max, we need 15s buffer for response/cleanup/safety
+    // If we're already past 105s, return partial results immediately
     const elapsedBeforeOrchestrator = Date.now() - startTime
-    const remainingBudgetMs = Math.max(30000, 110000 - elapsedBeforeOrchestrator) // At least 30s
+    const SAFETY_BUFFER_MS = 15000 // 15 seconds for response/cleanup
+    const HARD_TIMEOUT_MS = 120000 // Vercel maxDuration
+    const SOFT_TIMEOUT_MS = HARD_TIMEOUT_MS - SAFETY_BUFFER_MS // 105 seconds
+
+    // If we're already past soft timeout, return partial results immediately
+    if (elapsedBeforeOrchestrator >= SOFT_TIMEOUT_MS) {
+      logger.warn("[Feedback API] Approaching timeout, returning partial results", {
+        elapsedBeforeOrchestratorMs: elapsedBeforeOrchestrator,
+        sessionId,
+      })
+
+      // Return minimal feedback with estimated scores
+      const passRate = testsTotal > 0 ? (testsPassed / testsTotal) * 100 : 0
+      const fallbackScores = {
+        understanding: Math.min(100, Math.round(passRate * 0.9 + 10)),
+        problemSolving: Math.round(passRate),
+        codeQuality: Math.min(100, Math.round(passRate * 0.95 + 5)),
+        communication: aiValidation?.communicationScore || 50,
+        overall: Math.round(
+          Math.min(100, Math.round(passRate * 0.9 + 10)) * 0.25 +
+            Math.round(passRate) * 0.25 +
+            Math.min(100, Math.round(passRate * 0.95 + 5)) * 0.3 +
+            (aiValidation?.communicationScore || 50) * 0.2
+        ),
+      }
+
+      return NextResponse.json({
+        feedback: `**TL;DR** – Session evaluated. Processing took longer than expected, so using estimated scores.
+
+**Score Snapshot**
+- Understanding: ${fallbackScores.understanding}/100
+- Problem-Solving: ${fallbackScores.problemSolving}/100
+- Code Quality: ${fallbackScores.codeQuality}/100
+- Communication: ${fallbackScores.communication}/100
+- Overall: ${fallbackScores.overall}/100
+
+*Note: Full AI analysis timed out. Scores computed from test results and basic analysis.*`,
+        performanceScore: fallbackScores.overall,
+        scores: fallbackScores,
+        partialResult: true,
+        timeout: true,
+        latencyMs: elapsedBeforeOrchestrator,
+      })
+    }
+
+    const remainingBudgetMs = Math.max(30000, SOFT_TIMEOUT_MS - elapsedBeforeOrchestrator) // At least 30s
     const orchestratorStartTime = Date.now() // Fresh start time for orchestrator
 
     logger.info("[Feedback API] Starting orchestrator", {
       elapsedBeforeOrchestratorMs: elapsedBeforeOrchestrator,
       remainingBudgetMs,
+      softTimeoutMs: SOFT_TIMEOUT_MS,
       sessionId,
     })
 
@@ -227,14 +275,83 @@ export async function POST(request: NextRequest) {
     const orchestratorResult = await orchestrateFeedbackGeneration(feedbackRequest)
 
     if (!orchestratorResult.success || !orchestratorResult.data) {
+      const elapsedMs = Date.now() - startTime
+      const errorMessage = orchestratorResult.error || "Unknown error"
+
       logger.error("[Feedback API] Orchestrator failed", {
-        error: orchestratorResult.error,
+        error: errorMessage,
         sessionId,
+        userId,
+        elapsedMs,
+        scenarioType,
+        scenarioTitle,
+        testsPassed,
+        testsTotal,
+        transcriptLength: transcript.length,
+        codeLength: code.length,
+        agentCallsCount: orchestratorResult.metrics?.agentCalls?.length || 0,
+        hasPartialScores: orchestratorResult.metrics?.partialScores !== undefined,
       })
-      return NextResponse.json(
-        { error: orchestratorResult.error || "Feedback generation failed" },
-        { status: 500 }
-      )
+
+      // Instead of returning 500 error, return partial results with estimated scores
+      // This allows the frontend to still show scores and save the session
+      const passRate = testsTotal > 0 ? (testsPassed / testsTotal) * 100 : 0
+      const fallbackScores = {
+        understanding: Math.min(100, Math.round(passRate * 0.9 + 10)),
+        problemSolving: Math.round(passRate),
+        codeQuality: Math.min(100, Math.round(passRate * 0.95 + 5)),
+        communication: aiValidation?.communicationScore || 50,
+        overall: Math.round(
+          Math.min(100, Math.round(passRate * 0.9 + 10)) * 0.25 +
+            Math.round(passRate) * 0.25 +
+            Math.min(100, Math.round(passRate * 0.95 + 5)) * 0.3 +
+            (aiValidation?.communicationScore || 50) * 0.2
+        ),
+      }
+
+      // Check if we have partial scores from orchestrator (it might have computed scores before failing)
+      const hasPartialScores = orchestratorResult.metrics?.partialScores
+      const finalScores = hasPartialScores
+        ? orchestratorResult.metrics.partialScores
+        : fallbackScores
+
+      // Determine error category for user-friendly message
+      const errorCategory =
+        errorMessage.includes("timeout") || errorMessage.includes("duration")
+          ? "timeout"
+          : errorMessage.includes("rate limit") || errorMessage.includes("quota")
+            ? "rate limit"
+            : errorMessage.includes("network") || errorMessage.includes("fetch")
+              ? "network"
+              : "processing"
+
+      const userFriendlyError =
+        errorCategory === "timeout"
+          ? "Processing took too long"
+          : errorCategory === "rate limit"
+            ? "Service temporarily unavailable"
+            : errorCategory === "network"
+              ? "Network connection issue"
+              : "Processing error"
+
+      return NextResponse.json({
+        feedback: `**TL;DR** – Session evaluated. AI feedback generation encountered an error, so using ${hasPartialScores ? "computed" : "estimated"} scores.
+
+**Score Snapshot**
+- Understanding: ${finalScores.understanding}/100
+- Problem-Solving: ${finalScores.problemSolving}/100
+- Code Quality: ${finalScores.codeQuality}/100
+- Communication: ${finalScores.communication}/100
+- Overall: ${finalScores.overall}/100
+
+*Note: Full AI feedback was unavailable (${userFriendlyError}). Scores ${hasPartialScores ? "computed from analysis" : "estimated from test results"}.*`,
+        performanceScore: finalScores.overall,
+        scores: finalScores,
+        partialResult: true,
+        error: errorMessage, // Include full error for debugging
+        errorCategory,
+        latencyMs: elapsedMs,
+      })
     }
 
     const { data: feedbackData, metrics } = orchestratorResult
@@ -381,7 +498,61 @@ export async function POST(request: NextRequest) {
       latencyMs: totalElapsedMs,
     })
   } catch (error) {
-    logger.error("Feedback generation error", { error, endpoint: "/api/generate-feedback" })
+    const elapsedMs = Date.now() - startTime
+    const isTimeout =
+      elapsedMs >= 115000 ||
+      (error instanceof Error &&
+        (error.message.includes("timeout") ||
+          error.message.includes("duration") ||
+          error.message.includes("Function execution exceeded")))
+
+    logger.error("Feedback generation error", {
+      error,
+      endpoint: "/api/generate-feedback",
+      elapsedMs,
+      isTimeout,
+      sessionId,
+    })
+
+    // If it's a timeout, return partial results instead of error
+    if (isTimeout) {
+      // Parse test results if available
+      const parsedTestResults = Array.isArray(testResults) ? testResults : []
+      const testsPassed = parsedTestResults.filter((t: any) => t?.passed).length
+      const testsTotal = parsedTestResults.length
+      const passRate = testsTotal > 0 ? (testsPassed / testsTotal) * 100 : 0
+      const fallbackScores = {
+        understanding: Math.min(100, Math.round(passRate * 0.9 + 10)),
+        problemSolving: Math.round(passRate),
+        codeQuality: Math.min(100, Math.round(passRate * 0.95 + 5)),
+        communication: aiValidation?.communicationScore || 50,
+        overall: Math.round(
+          Math.min(100, Math.round(passRate * 0.9 + 10)) * 0.25 +
+            Math.round(passRate) * 0.25 +
+            Math.min(100, Math.round(passRate * 0.95 + 5)) * 0.3 +
+            (aiValidation?.communicationScore || 50) * 0.2
+        ),
+      }
+
+      return NextResponse.json({
+        feedback: `**TL;DR** – Session evaluated. Processing timed out, so using estimated scores.
+
+**Score Snapshot**
+- Understanding: ${fallbackScores.understanding}/100
+- Problem-Solving: ${fallbackScores.problemSolving}/100
+- Code Quality: ${fallbackScores.codeQuality}/100
+- Communication: ${fallbackScores.communication}/100
+- Overall: ${fallbackScores.overall}/100
+
+*Note: Full AI analysis timed out after ${Math.round(elapsedMs / 1000)}s. Scores computed from test results.*`,
+        performanceScore: fallbackScores.overall,
+        scores: fallbackScores,
+        partialResult: true,
+        timeout: true,
+        latencyMs: elapsedMs,
+      })
+    }
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to generate feedback" },
       { status: 500 }
