@@ -23,8 +23,23 @@ export const INTERVIEWER_PERSONALITY = {
     "Takes notes silently - mistakes are noted, not corrected",
     "Direct questions only - no teaching, no hand-holding",
   ],
-  // NEUTRAL phrases - don't confirm correctness, just acknowledge and move on
-  neutralPhrases: ["Okay", "Go on", "Mm-hmm", "I see", "And then?", "Continue"],
+  // NEUTRAL phrases - acknowledge without confirming correctness (human feel)
+  // These are what real interviewers say - neutral acknowledgment, not validation
+  neutralPhrases: [
+    "Okay",
+    "Go on",
+    "Mm-hmm",
+    "I see",
+    "And then?",
+    "Continue",
+    // Human feel - these acknowledge hearing, NOT correctness
+    "Got it",
+    "Makes sense",
+    "I follow",
+    "Noted",
+    "Alright",
+    "Sure",
+  ],
   // FORBIDDEN - anything that validates correctness or teaches
   forbiddenPhrases: [
     // Validation phrases (confirm correctness)
