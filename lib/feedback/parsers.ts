@@ -411,28 +411,37 @@ export function parseFeedback(feedback: string): FeedbackSection {
 }
 
 /**
- * Sanitize feedback text to remove contradictory criticism based on actual scores.
+ * Sanitize feedback text to remove contradictory criticism based on actual scores and evidence.
  * This prevents cases where AI-generated feedback criticizes communication
- * when the communication score is actually good (>= 60).
+ * when the evidence shows they actually did communicate.
  */
 export function sanitizeFeedbackForScoreConsistency(
   feedback: string,
   scores: {
     communication: number
     overall: number
+  },
+  options?: {
+    approachExplained?: boolean
+    complexityDiscussed?: boolean
   }
 ): string {
   let result = feedback
 
-  // If communication score >= 60, remove "EXPLAIN YOUR APPROACH" criticism
-  // This prevents contradictory feedback where someone communicated well but
+  // If communication score >= 60 OR evidence shows approach was explained,
+  // remove "EXPLAIN YOUR APPROACH" criticism
+  // This prevents contradictory feedback where someone communicated but
   // the AI incorrectly flagged them for not explaining
-  if (scores.communication >= 60) {
+  const shouldRemoveExplainCriticism =
+    scores.communication >= 60 || options?.approachExplained === true
+
+  if (shouldRemoveExplainCriticism) {
     // Remove various forms of the "explain approach" criticism
     const explainApproachPatterns = [
       /[-•*]\s*EXPLAIN YOUR APPROACH[^.]*\.[^\n]*/gi,
       /[-•*]\s*coding in silence[^.]*\.[^\n]*/gi,
-      /[-•*]\s*Explicitly state Time and Space complexity[^.]*\.[^\n]*/gi,
+      /[-•*]\s*did not explain approach[^.]*\.[^\n]*/gi,
+      /[-•*]\s*needs to explain approach[^.]*\.[^\n]*/gi,
     ]
 
     for (const pattern of explainApproachPatterns) {
@@ -440,6 +449,20 @@ export function sanitizeFeedbackForScoreConsistency(
     }
 
     // Clean up any resulting empty lines or orphaned bullet sections
+    result = result.replace(/\n{3,}/g, "\n\n")
+  }
+
+  // If evidence shows complexity was discussed, remove complexity criticism
+  if (options?.complexityDiscussed === true) {
+    const complexityPatterns = [
+      /[-•*]\s*Explicitly state Time and Space complexity[^.]*\.[^\n]*/gi,
+      /[-•*]\s*did not discuss complexity[^.]*\.[^\n]*/gi,
+    ]
+
+    for (const pattern of complexityPatterns) {
+      result = result.replace(pattern, "")
+    }
+
     result = result.replace(/\n{3,}/g, "\n\n")
   }
 
