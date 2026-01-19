@@ -24,6 +24,7 @@ import type { ChatMessage } from "@/lib/types"
 import { LearningRecommendations } from "@/components/LearningRecommendations"
 import { NextProblemRecommendations } from "@/components/NextProblemRecommendations"
 import { ScoreInfoTooltip } from "@/components/ui/score-info-tooltip"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import type { FeedbackSection } from "@/lib/feedback/parsers"
 import type { SessionComplexityAnalysis } from "@/lib/rag/knowledge-base/types"
 import { ComplexityAnalysisCard } from "./ComplexityAnalysisCard"
@@ -88,6 +89,7 @@ export const FeedbackSections = memo(function FeedbackSections({
   const [showRecommendations, setShowRecommendations] = useState(false)
   const [showQualityCheck, setShowQualityCheck] = useState(false)
   const [showChatHistory, setShowChatHistory] = useState(false)
+  const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set())
 
   // Combine and sort chat messages by timestamp if available
   const hasChatHistory =
@@ -188,12 +190,53 @@ export const FeedbackSections = memo(function FeedbackSections({
           </div>
           <ul className="space-y-2">
             {sections.whatWorked.length > 0 ? (
-              sections.whatWorked.slice(0, 3).map((item, i) => (
-                <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
-                  <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                  <span className="line-clamp-2">{item}</span>
-                </li>
-              ))
+              sections.whatWorked.slice(0, 3).map((item, i) => {
+                const isExpanded = expandedItems.has(i + 100) // Offset to avoid conflicts with "To Improve"
+                const isTruncated = item.length > 100 || item.split("\n").length > 2
+
+                return (
+                  <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
+                    <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                    <TooltipProvider>
+                      <Tooltip delayDuration={300}>
+                        <TooltipTrigger asChild>
+                          <span
+                            className={`cursor-pointer transition-colors hover:text-emerald-300 ${
+                              isExpanded ? "" : "line-clamp-2"
+                            }`}
+                            onClick={() => {
+                              if (isTruncated) {
+                                setExpandedItems((prev) => {
+                                  const newSet = new Set(prev)
+                                  const key = i + 100
+                                  if (isExpanded) {
+                                    newSet.delete(key)
+                                  } else {
+                                    newSet.add(key)
+                                  }
+                                  return newSet
+                                })
+                              }
+                            }}
+                          >
+                            {item}
+                          </span>
+                        </TooltipTrigger>
+                        {!isExpanded && isTruncated && (
+                          <TooltipContent
+                            className="max-w-sm border-zinc-800 bg-zinc-900 p-3 text-xs leading-relaxed text-zinc-300"
+                            side="top"
+                            sideOffset={5}
+                          >
+                            <p className="whitespace-pre-wrap">{item}</p>
+                            <p className="mt-2 text-[10px] text-zinc-500">Click to expand inline</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
+                  </li>
+                )
+              })
             ) : (
               <li className="text-xs text-zinc-600 italic">No strengths identified</li>
             )}
@@ -208,12 +251,52 @@ export const FeedbackSections = memo(function FeedbackSections({
           </div>
           <ul className="space-y-2">
             {sections.fixNext.length > 0 ? (
-              sections.fixNext.slice(0, 3).map((item, i) => (
-                <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
-                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
-                  <span className="line-clamp-2">{item}</span>
-                </li>
-              ))
+              sections.fixNext.slice(0, 3).map((item, i) => {
+                const isExpanded = expandedItems.has(i)
+                const isTruncated = item.length > 100 || item.split("\n").length > 2
+
+                return (
+                  <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                    <TooltipProvider>
+                      <Tooltip delayDuration={300}>
+                        <TooltipTrigger asChild>
+                          <span
+                            className={`cursor-pointer transition-colors hover:text-amber-300 ${
+                              isExpanded ? "" : "line-clamp-2"
+                            }`}
+                            onClick={() => {
+                              if (isTruncated) {
+                                setExpandedItems((prev) => {
+                                  const newSet = new Set(prev)
+                                  if (isExpanded) {
+                                    newSet.delete(i)
+                                  } else {
+                                    newSet.add(i)
+                                  }
+                                  return newSet
+                                })
+                              }
+                            }}
+                          >
+                            {item}
+                          </span>
+                        </TooltipTrigger>
+                        {!isExpanded && isTruncated && (
+                          <TooltipContent
+                            className="max-w-sm border-zinc-800 bg-zinc-900 p-3 text-xs leading-relaxed text-zinc-300"
+                            side="top"
+                            sideOffset={5}
+                          >
+                            <p className="whitespace-pre-wrap">{item}</p>
+                            <p className="mt-2 text-[10px] text-zinc-500">Click to expand inline</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
+                  </li>
+                )
+              })
             ) : (
               <li className="text-xs text-zinc-600 italic">Review feedback for details</li>
             )}
