@@ -45,7 +45,12 @@ import { extractionService } from "@/lib/services/extraction-service"
 import { phaseService } from "@/lib/services/phase-service"
 import { getFlag, logShadowComparison } from "@/lib/feature-flags"
 import { buildCompanyInterviewerPrompt } from "@/lib/interview/company-interviewer-styles"
-import { validateWithRetry, type ValidationContext } from "@/lib/interview/response-validation"
+import {
+  validateWithRetry,
+  validateSemanticRules,
+  type ValidationContext,
+  type SemanticValidationResult,
+} from "@/lib/interview/response-validation"
 import {
   executeTool,
   formatToolResultsForPrompt,
@@ -1455,6 +1460,56 @@ Generate a response that follows these rules.`
           retries: gateResult.retries,
           remainingViolations: gateResult.violations.map((v) => v.rule),
         })
+      }
+
+      // SEMANTIC VALIDATION: LLM-based check for subtle violations regex misses
+      // Uses DeepSeek (critique complexity) - cheapest provider for validation
+      // Only runs if regex gates passed (avoids wasting LLM calls on already-bad responses)
+      if (gateResult.violations.filter((v) => v.severity === "critical").length === 0) {
+        try {
+          // Create generateAI callback for semantic validation
+          const generateAIForValidation = async (
+            system: string,
+            user: string
+          ): Promise<{ text: string }> => {
+            const result = await generateAIResponse(system, user, [], {
+              complexity: "critique", // Uses DeepSeek - cheapest for validation
+              userId,
+              sessionId,
+              eventType: "chat_message",
+              skipCache: true, // Always validate fresh
+            })
+            return { text: result.text }
+          }
+
+          const semanticResult = await validateSemanticRules(
+            aiResponse.text,
+            generateAIForValidation
+          )
+
+          if (semanticResult.violated && semanticResult.rule) {
+            logger.info("[Semantic Validation] Violation detected", {
+              sessionId,
+              rule: semanticResult.rule,
+              evidence: semanticResult.evidence?.substring(0, 100),
+            })
+
+            // Regenerate with semantic hint
+            const hint =
+              semanticResult.suggestion || "Probe their reasoning instead of explaining/correcting"
+            const regeneratedText = await regenerate(
+              `SEMANTIC VIOLATION (${semanticResult.rule}): ${hint}`
+            )
+            aiResponse.text = regeneratedText
+            logger.info("[Semantic Validation] Response regenerated", { sessionId })
+          }
+        } catch (semanticError) {
+          // Semantic validation failure is non-critical - log and continue
+          logger.warn("[Semantic Validation] Failed, continuing with response", {
+            sessionId,
+            error: semanticError,
+          })
+        }
       }
 
       // Log any remaining violations (warnings that didn't trigger regeneration)
