@@ -1,12 +1,9 @@
 "use client"
 
-import { RotateCcw, Play, Download, XCircle } from "lucide-react"
+import { Download } from "lucide-react"
 
 interface FeedbackActionsProps {
-  onRetry?: () => void
-  onNewProblem?: () => void
   onExport?: () => void
-  onEndInterview?: () => void
   overallScore: number
   problemTitle?: string
   grade: string
@@ -84,10 +81,7 @@ async function generatePDF(
 }
 
 export function FeedbackActions({
-  onRetry,
-  onNewProblem,
   onExport,
-  onEndInterview,
   overallScore,
   problemTitle,
   grade,
@@ -107,42 +101,13 @@ export function FeedbackActions({
   }
 
   return (
-    <div className="flex border-t border-zinc-800/50 text-xs">
-      <button
-        onClick={onRetry}
-        className="flex flex-1 items-center justify-center gap-1.5 py-2.5 text-zinc-400 transition-colors hover:bg-zinc-800/50 hover:text-white"
-      >
-        <RotateCcw className="h-3.5 w-3.5" />
-        Retry
-      </button>
-      <div className="w-px bg-zinc-800/50" />
-      <button
-        onClick={onNewProblem}
-        className="flex flex-1 items-center justify-center gap-1.5 py-2.5 text-white transition-colors hover:bg-zinc-800/50"
-      >
-        <Play className="h-3.5 w-3.5" />
-        New Problem
-      </button>
-      <div className="w-px bg-zinc-800/50" />
-      <button
-        onClick={handleExport}
-        className="flex flex-1 items-center justify-center gap-1.5 py-2.5 text-zinc-400 transition-colors hover:bg-zinc-800/50 hover:text-white"
-      >
-        <Download className="h-3.5 w-3.5" />
-        Export
-      </button>
-      {onEndInterview && (
-        <>
-          <div className="w-px bg-zinc-800/50" />
-          <button
-            onClick={onEndInterview}
-            className="flex flex-1 items-center justify-center gap-1.5 py-2.5 text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300"
-          >
-            <XCircle className="h-3.5 w-3.5" />
-            End
-          </button>
-        </>
-      )}
-    </div>
+    <button
+      onClick={handleExport}
+      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+      title="Export feedback as PDF"
+    >
+      <Download className="h-3 w-3" />
+      Export
+    </button>
   )
 }

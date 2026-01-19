@@ -19,6 +19,7 @@ import {
   MessageCircle,
   User,
   Bot,
+  HelpCircle,
 } from "lucide-react"
 import type { ChatMessage } from "@/lib/types"
 import { LearningRecommendations } from "@/components/LearningRecommendations"
@@ -61,6 +62,20 @@ interface FeedbackSectionsProps {
   // Complexity analysis
   complexityAnalysis?: SessionComplexityAnalysis | null
   alternativeApproaches?: AlternativeApproach[]
+  // Clarifying questions assessment (Real Interview Mode)
+  clarifyingQuestionsAssessment?: {
+    score: number
+    totalExpected: number
+    totalAsked: number
+    requiredAsked: number
+    requiredTotal: number
+    results: Array<{
+      question: string
+      required: boolean
+      asked: boolean
+      matchedPhrase?: string
+    }>
+  } | null
 }
 
 export const FeedbackSections = memo(function FeedbackSections({
@@ -83,6 +98,7 @@ export const FeedbackSections = memo(function FeedbackSections({
   interviewerMessages,
   complexityAnalysis,
   alternativeApproaches,
+  clarifyingQuestionsAssessment,
 }: FeedbackSectionsProps) {
   const [showCode, setShowCode] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
@@ -325,6 +341,76 @@ export const FeedbackSections = memo(function FeedbackSections({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Clarifying Questions Assessment - Real Interview Mode */}
+      {clarifyingQuestionsAssessment && clarifyingQuestionsAssessment.totalExpected > 0 && (
+        <div
+          className={`rounded-xl border p-4 ${
+            clarifyingQuestionsAssessment.score >= 70
+              ? "border-emerald-900/30 bg-emerald-950/20"
+              : clarifyingQuestionsAssessment.score >= 40
+                ? "border-amber-900/30 bg-amber-950/20"
+                : "border-rose-900/30 bg-rose-950/20"
+          }`}
+        >
+          <div className="mb-3 flex items-center gap-1.5">
+            <HelpCircle className="h-3.5 w-3.5 text-sky-400" />
+            <span className="text-xs font-medium text-sky-400">
+              Clarifying Questions ({clarifyingQuestionsAssessment.score}/100)
+            </span>
+            <span className="ml-auto rounded-full bg-sky-900/30 px-2 py-0.5 text-[10px] text-sky-400">
+              Real Interview Mode
+            </span>
+          </div>
+
+          {/* Questions asked */}
+          {clarifyingQuestionsAssessment.results.filter((r) => r.asked).length > 0 && (
+            <div className="mb-3">
+              <p className="mb-1 text-[10px] text-emerald-400">Asked:</p>
+              <ul className="space-y-1">
+                {clarifyingQuestionsAssessment.results
+                  .filter((r) => r.asked)
+                  .map((r, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
+                      <CheckCircle className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
+                      <span>
+                        {r.question}
+                        {r.matchedPhrase && (
+                          <span className="ml-1 text-[10px] text-zinc-500">
+                            (you asked: &ldquo;{r.matchedPhrase}&rdquo;)
+                          </span>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Questions missed (required only) */}
+          {clarifyingQuestionsAssessment.results.filter((r) => !r.asked && r.required).length >
+            0 && (
+            <div>
+              <p className="mb-1 text-[10px] text-amber-400">Should have asked:</p>
+              <ul className="space-y-1">
+                {clarifyingQuestionsAssessment.results
+                  .filter((r) => !r.asked && r.required)
+                  .map((r, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
+                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" />
+                      <span>{r.question}</span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+
+          <p className="mt-3 text-[10px] text-zinc-500">
+            In real interviews, asking clarifying questions before coding shows strong
+            problem-solving skills.
+          </p>
         </div>
       )}
 

@@ -15,6 +15,7 @@ import {
   Clock,
   CheckCircle,
   AlertTriangle,
+  Download,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { FeedbackSection } from "@/lib/feedback/parsers"
@@ -38,6 +39,15 @@ interface ScoreDisplayProps {
   timeComplexity?: string
   spaceComplexity?: string
   efficiencyScore?: number
+  onExport?: () => void
+  problemTitle?: string
+  grade?: string
+  scores?: {
+    understanding: number
+    problemSolving: number
+    codeQuality: number
+    communication: number
+  }
 }
 
 function getLetterGrade(score: number) {
@@ -73,6 +83,10 @@ export function ScoreDisplay({
   timeComplexity,
   spaceComplexity,
   efficiencyScore,
+  onExport,
+  problemTitle,
+  grade: gradeProp,
+  scores: scoresProp,
 }: ScoreDisplayProps) {
   const [showTechnicalOnly, setShowTechnicalOnly] = useState(false)
   const feedbackLower = feedback.toLowerCase()
@@ -284,6 +298,57 @@ export function ScoreDisplay({
             },
           ]
 
+  const handleExport = async () => {
+    try {
+      if (onExport) {
+        onExport()
+      } else {
+        const { default: jsPDF } = await import("jspdf")
+        const doc = new jsPDF()
+        const margin = 20
+        let y = 20
+
+        doc.setFontSize(20)
+        doc.setFont("helvetica", "bold")
+        doc.text("MockMate - Interview Feedback", margin, y)
+        y += 12
+
+        doc.setFontSize(10)
+        doc.setFont("helvetica", "normal")
+        doc.text(
+          `${problemTitle || "Interview Session"} | ${new Date().toLocaleDateString()}`,
+          margin,
+          y
+        )
+        y += 15
+
+        doc.setFontSize(16)
+        doc.setFont("helvetica", "bold")
+        doc.text(`Grade: ${gradeProp || grade} (${overallScore}/100)`, margin, y)
+        y += 12
+
+        doc.setFontSize(11)
+        doc.setFont("helvetica", "normal")
+        const exportScores = scoresProp || scores
+        const criteria = [
+          { name: "Understanding", score: exportScores.understanding, weight: "25%" },
+          { name: "Problem-Solving", score: exportScores.problemSolving, weight: "25%" },
+          { name: "Code Quality", score: exportScores.codeQuality, weight: "30%" },
+          { name: "Communication", score: exportScores.communication, weight: "20%" },
+        ]
+        criteria.forEach((c) => {
+          doc.text(`${c.name} (${c.weight}): ${c.score}%`, margin + 5, y)
+          y += 6
+        })
+
+        doc.save(`mockmate-feedback-${Date.now()}.pdf`)
+      }
+    } catch (error) {
+      console.error("Failed to export PDF:", error)
+      alert("Failed to export PDF. Please try again.")
+    }
+  }
+
   return (
     <div className="w-full space-y-4">
       {/* Screen reader */}
@@ -356,6 +421,14 @@ export function ScoreDisplay({
                   <Clock className="h-3 w-3" />
                   {formatTime(elapsedTime)}
                 </span>
+                <button
+                  onClick={handleExport}
+                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+                  title="Export feedback as PDF"
+                >
+                  <Download className="h-3 w-3" />
+                  Export
+                </button>
                 {problemType === "system-design" ? (
                   <>
                     <span className="flex items-center gap-1">

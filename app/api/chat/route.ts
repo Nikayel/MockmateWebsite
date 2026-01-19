@@ -45,10 +45,7 @@ import { extractionService } from "@/lib/services/extraction-service"
 import { phaseService } from "@/lib/services/phase-service"
 import { getFlag, logShadowComparison } from "@/lib/feature-flags"
 import { buildCompanyInterviewerPrompt } from "@/lib/interview/company-interviewer-styles"
-import {
-  validateWithRetry,
-  type ValidationContext,
-} from "@/lib/interview/response-validation"
+import { validateWithRetry, type ValidationContext } from "@/lib/interview/response-validation"
 import {
   executeTool,
   formatToolResultsForPrompt,
@@ -60,6 +57,7 @@ import {
   FEW_SHOT_EXAMPLES,
   QUICK_INJECTIONS,
 } from "@/lib/interview/interviewer-prompts"
+import { buildFuzzyModeContext } from "@/lib/interview/fuzzy-mode-context"
 import { truncateText, truncateFileContent } from "@/lib/utils"
 
 interface UserContext {
@@ -349,6 +347,8 @@ export async function POST(request: NextRequest) {
       // NEW: Real Interview Mode (fuzzy problem statements)
       realInterviewMode,
       hasFuzzyStatement,
+      scenarioClarifyingQuestions, // Clarifying questions from scenario for fuzzy mode
+      scenarioFuzzyStatement, // The vague problem statement
       // NEW: Starter code length for deterministic phase detection
       starterCodeLength,
     } = await request.json()
@@ -989,35 +989,11 @@ SOLUTION COMPLEXITY:
     // Few-shot examples are now included in buildInterviewerPrompt()
 
     // Build Real Interview Mode context (fuzzy problem statements)
-    let fuzzyModeContext = ""
-    if (realInterviewMode && hasFuzzyStatement) {
-      fuzzyModeContext = `
-═══════════════════════════════════════════════════════════════
-🎯 REAL INTERVIEW MODE ACTIVE
-═══════════════════════════════════════════════════════════════
-The problem statement is intentionally VAGUE (like a real interview).
-The candidate is expected to ask clarifying questions.
-
-YOUR BEHAVIOR IN THIS MODE:
-1. EXPECT and ENCOURAGE clarifying questions - they are a POSITIVE signal!
-2. Answer clarifying questions clearly and concisely
-3. DO NOT volunteer information they didn't ask for
-4. If they ask about input format, output format, constraints - answer them
-5. If they dive into coding without clarifying - that's a yellow flag, but let them proceed
-6. DO NOT say "the problem says..." - they have a vague statement
-
-GOOD RESPONSES TO CLARIFYING QUESTIONS:
-- "Good question — yes, you return the actual values, not indices"
-- "Right, you need to handle duplicates"
-- "The array can have negative numbers"
-
-BAD RESPONSES:
-- "Hold up —" (dismissive)
-- Volunteering all constraints before they ask
-- "As stated in the problem..." (they have vague statement)
-═══════════════════════════════════════════════════════════════
-`
-    }
+    // DRY: Use helper that derives context from scenario clarifying questions
+    const fuzzyModeContext =
+      realInterviewMode && hasFuzzyStatement
+        ? buildFuzzyModeContext(scenarioClarifyingQuestions, scenarioFuzzyStatement)
+        : ""
 
     // Build interviewer prompt using consolidated function
     const interviewerPrompt =

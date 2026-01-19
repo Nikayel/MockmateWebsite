@@ -238,6 +238,20 @@ function InterviewPageContent() {
     actionPlan?: string[]
     tldr?: string
   } | null>(null)
+  // Clarifying questions assessment (Real Interview Mode)
+  const [clarifyingQuestionsAssessment, setClarifyingQuestionsAssessment] = useState<{
+    score: number
+    totalExpected: number
+    totalAsked: number
+    requiredAsked: number
+    requiredTotal: number
+    results: Array<{
+      question: string
+      required: boolean
+      asked: boolean
+      matchedPhrase?: string
+    }>
+  } | null>(null)
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false) // Track AI feedback generation
   const [isGeneratingDiscussion, setIsGeneratingDiscussion] = useState(false)
   const [showCodeInDiscussion, setShowCodeInDiscussion] = useState(false)
@@ -1948,6 +1962,9 @@ Interviews are conversations, not just coding exercises.`
       // Real Interview Mode (fuzzy problem statements)
       realInterviewMode,
       hasFuzzyStatement: !!(selectedScenario as any)?.fuzzyStatement,
+      // Pass clarifying questions for fuzzy mode context
+      scenarioClarifyingQuestions: (selectedScenario as any)?.clarifyingQuestions,
+      scenarioFuzzyStatement: (selectedScenario as any)?.fuzzyStatement,
       // Pass efficiency metrics so interviewer knows if solution is already optimal
       solutionComplexity: efficiencyMetrics
         ? {
@@ -2761,6 +2778,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               phaseTracking,
               sessionId: currentSessionId,
               userId: user.id,
+              // Real Interview Mode (clarifying questions)
+              scenarioClarifyingQuestions: (selectedScenario as any)?.clarifyingQuestions,
+              realInterviewMode,
             }),
           })
 
@@ -2808,6 +2828,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                 actionPlan: feedbackData.structured.actionPlan || [],
                 tldr: feedbackData.structured.tldr || "",
               })
+            }
+            // Store clarifying questions assessment (Real Interview Mode)
+            if (feedbackData.clarifyingQuestionsAssessment) {
+              setClarifyingQuestionsAssessment(feedbackData.clarifyingQuestionsAssessment)
             }
             aiFeedbackSucceeded = true
           } else {
@@ -3583,6 +3607,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           conversationTranscript, // Pass actual conversation for AI analysis
           sessionId: currentSessionId,
           userId: user?.id,
+          // Real Interview Mode (clarifying questions)
+          scenarioClarifyingQuestions: (selectedScenario as any)?.clarifyingQuestions,
+          realInterviewMode,
         }),
       })
 
@@ -5408,9 +5435,8 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
                       problemTitle={selectedScenario?.title}
                       code={code}
                       language={selectedLanguage}
-                      onRetry={resetInterview}
                       onNewProblem={resetInterview}
-                      onEndInterview={() => router.push("/practice")}
+                      clarifyingQuestionsAssessment={clarifyingQuestionsAssessment}
                     />
                   </ErrorBoundary>
                   {isFromRoadmap && activeRoadmap && (

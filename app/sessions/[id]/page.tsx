@@ -274,7 +274,6 @@ export default function SessionDetailPage() {
               language={session.language || session.session_state?.language || "javascript"}
               chatMessages={session.session_state?.chat_messages}
               interviewerMessages={session.session_state?.interviewer_messages}
-              onRetry={() => router.push(`/interview?scenario=${session.scenario_id}`)}
               onNewProblem={() => router.push("/interview")}
             />
           ) : session.feedback_status === "pending" ? (
