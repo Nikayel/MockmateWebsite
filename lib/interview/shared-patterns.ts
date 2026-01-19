@@ -313,6 +313,83 @@ export function containsCodingTransition(response: string): boolean {
   return CODING_TRANSITION_PATTERNS.some((p) => p.test(response))
 }
 
+/**
+ * Find the message index where coding phase starts
+ * Returns -1 if no coding transition found
+ */
+export function findCodingPhaseStart(
+  transcript: Array<{ role: string; content: string }>
+): number {
+  for (let i = 0; i < transcript.length; i++) {
+    const msg = transcript[i]
+    // Look for interviewer telling them to code
+    if (
+      (msg.role === "assistant" || msg.role === "interviewer") &&
+      containsCodingTransition(msg.content)
+    ) {
+      return i
+    }
+  }
+  return -1
+}
+
+// =============================================================================
+// CODE EXPLANATION DETECTION (fast heuristic fallback)
+// =============================================================================
+
+/**
+ * IMPORTANT: This is a HEURISTIC fallback, not the primary detector.
+ *
+ * Real detection happens via LLM in structured-extraction.ts (extractSemantically).
+ * This is used for:
+ * 1. Quick algorithmic pass before LLM (saves API calls)
+ * 2. Fallback if LLM extraction fails
+ * 3. Double-checking LLM results
+ *
+ * Production systems use:
+ * - LLM classification (primary) ✓ We have this
+ * - Embedding similarity (optional, needs training data)
+ * - Multi-modal correlation (audio timestamps + code changes)
+ * - Agentic acknowledgment (interviewer AI confirms in real-time)
+ */
+
+/**
+ * HEURISTIC: Quick check if message might be code explanation
+ * Returns true if the message has signals of code narration.
+ * False positives are OK - LLM will verify.
+ * False negatives are bad - be generous.
+ */
+export function isCodeExplanation(message: string): boolean {
+  // Too short to be meaningful
+  if (message.length < 20) return false
+
+  const lower = message.toLowerCase()
+
+  // Obvious filler - definitely not code explanation
+  const fillerOnly =
+    /^(hmm|uh|um|ok|okay|let me think|one sec|hold on|wait)[.!?]*$/i.test(message.trim())
+  if (fillerOnly) return false
+
+  // GENEROUS signals that this might be code explanation:
+  // (LLM will verify, so false positives are OK)
+  const codeSignals = [
+    // Narration verbs
+    "i'm ", "i am ", "let me ", "i'll ", "i will ",
+    "setting", "initializing", "creating", "starting",
+    "looping", "iterating", "checking", "comparing",
+    "returning", "calling", "passing", "adding",
+    // Code concepts
+    "variable", "pointer", "index", "array", "loop",
+    "function", "return", "if ", "else", "while",
+    "for ", "the value", "this will", "that should",
+    // Narration phrases
+    "so here", "so now", "first i", "then i", "next i",
+    "basically", "essentially", "this handles",
+  ]
+
+  return codeSignals.some((signal) => lower.includes(signal))
+}
+
 // =============================================================================
 // ANSWER GIVEAWAY PATTERNS
 // =============================================================================

@@ -124,6 +124,8 @@ PHASE: Coding
 - Let them work - don't interrupt unless they're stuck
 - If they ask questions, answer briefly
 - If they're stuck for >2 messages, offer a hint (question form)
+- GOOD SIGNAL: If they explain their code as they write ("so here I'm...", "this loop..."), acknowledge briefly ("Got it", "Makes sense")
+- This shows they're thinking out loud - a positive interview signal
 `,
 
   testing: `
