@@ -41,6 +41,9 @@ import {
   extractConversationState,
   shouldRunExtraction,
 } from "@/lib/interview/conversation-extraction"
+import { extractionService } from "@/lib/services/extraction-service"
+import { phaseService } from "@/lib/services/phase-service"
+import { getFlag, logShadowComparison } from "@/lib/feature-flags"
 import { buildCompanyInterviewerPrompt } from "@/lib/interview/company-interviewer-styles"
 import { validateWithRetry, type ValidationContext } from "@/lib/interview/response-validation"
 import {
@@ -381,7 +384,8 @@ export async function POST(request: NextRequest) {
       const messageCount = Array.isArray(context) ? context.length : 0
       const lastExtraction = (conversationTracker as any)?.lastExtractionAt || 0
 
-      if (shouldRunExtraction(messageCount, lastExtraction, message)) {
+      // Feature flag: Use extraction service or direct call
+      if (getFlag("USE_EXTRACTION_SERVICE")) {
         try {
           // Convert context to extraction format
           const recentMessages = (context as Array<{ type: string; message: string }>)
@@ -391,25 +395,57 @@ export async function POST(request: NextRequest) {
               content: m.message,
             }))
 
-          // Run async extraction (non-blocking for response, enhances future requests)
-          const extractionUpdates = await extractConversationState(
-            recentMessages,
-            conversationTracker as ConversationTracker
-          )
+          const result = await extractionService({
+            messages: recentMessages,
+            currentTracker: conversationTracker as ConversationTracker,
+            messageCount,
+            lastExtractionAt: lastExtraction,
+            currentMessage: message,
+          })
 
-          // Merge extraction results with existing tracker
-          if (Object.keys(extractionUpdates).length > 0) {
-            enhancedTracker = {
-              ...(conversationTracker as ConversationTracker),
-              ...extractionUpdates,
-            }
-            logger.info("[Chat API] Enhanced tracker with LLM extraction", { extractionUpdates })
+          if (result.didRun) {
+            enhancedTracker = result.tracker
+            logger.info("[Chat API] Enhanced tracker with extraction service", {
+              confidence: result.confidence,
+            })
           }
         } catch (extractionError) {
-          // Extraction failed, continue with original tracker
-          logger.warn("[Chat API] LLM extraction failed, using regex-based tracker", {
+          logger.warn("[Chat API] Extraction service failed, using original tracker", {
             error: extractionError,
           })
+        }
+      } else {
+        // Original code path
+        if (shouldRunExtraction(messageCount, lastExtraction, message)) {
+          try {
+            // Convert context to extraction format
+            const recentMessages = (context as Array<{ type: string; message: string }>)
+              .slice(-10)
+              .map((m) => ({
+                role: m.type === "user" ? "candidate" : "interviewer",
+                content: m.message,
+              }))
+
+            // Run async extraction (non-blocking for response, enhances future requests)
+            const extractionUpdates = await extractConversationState(
+              recentMessages,
+              conversationTracker as ConversationTracker
+            )
+
+            // Merge extraction results with existing tracker
+            if (Object.keys(extractionUpdates).length > 0) {
+              enhancedTracker = {
+                ...(conversationTracker as ConversationTracker),
+                ...extractionUpdates,
+              }
+              logger.info("[Chat API] Enhanced tracker with LLM extraction", { extractionUpdates })
+            }
+          } catch (extractionError) {
+            // Extraction failed, continue with original tracker
+            logger.warn("[Chat API] LLM extraction failed, using regex-based tracker", {
+              error: extractionError,
+            })
+          }
         }
       }
     }
@@ -746,8 +782,32 @@ DO NOT:
       messageCount,
     }
 
-    const currentPhase = detectInterviewPhase(phaseContext)
-    const phasePrompt = PHASE_PROMPTS[currentPhase] || PHASE_PROMPTS.discussion
+    // Feature flag: Use phase service or direct call
+    let currentPhase: InterviewPhase
+    let phasePrompt: string
+    if (getFlag("USE_PHASE_SERVICE")) {
+      const phaseResult = phaseService({
+        hasSubmitted: hasSubmitted || false,
+        testsHaveRun: testsHaveRunNow || false,
+        currentCodeLength: currentCodeLen,
+        starterCodeLength: starterLen,
+        approachExplained:
+          enhancedTracker?.approachExplained ||
+          (conversationTracker as ConversationTracker)?.approachExplained ||
+          false,
+        messageCount,
+      })
+      currentPhase = phaseResult.phase
+      phasePrompt = phaseResult.prompt
+      logger.debug("[Chat API] Phase detected via service", {
+        phase: currentPhase,
+        codeWritten: phaseResult.metadata.codeWritten,
+      })
+    } else {
+      // Original code path
+      currentPhase = detectInterviewPhase(phaseContext)
+      phasePrompt = PHASE_PROMPTS[currentPhase] || PHASE_PROMPTS.discussion
+    }
 
     // Build conversation tracking context if available
     // Use enhanced tracker (with LLM extraction) if available
