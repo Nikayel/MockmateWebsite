@@ -74,7 +74,9 @@ interface UserContext {
 }
 
 // Context window management constants
-const MAX_HISTORY_MESSAGES = 20 // Keep last 20 messages
+// Full context: Modern LLMs have large context windows (Gemini 1M, Claude 200K, DeepSeek 64K)
+// Most interviews have 30-60 messages, so 200 gives full history with safety cap
+const MAX_HISTORY_MESSAGES = 200 // Full interview context (was 20)
 const MAX_MESSAGE_LENGTH = 4000 // Truncate individual messages
 const MAX_WORKSPACE_FILES = 5 // Limit workspace files
 const MAX_FILE_SIZE = 10000 // 10KB per file max
