@@ -252,8 +252,15 @@ export async function critiqueFeedbackText(
     passRate: number
     scenarioType: string
     isIncomplete: boolean
+    // NEW: Evidence from transcript extraction for fact-checking
+    extractedEvidence?: ExtractedEvidence
   }
 ): Promise<FeedbackCritiqueAdjustment> {
+  // Build evidence summary if available
+  const evidenceSummary = context.extractedEvidence
+    ? buildEvidenceSummary(context.extractedEvidence)
+    : null
+
   const critiquePrompt = `You are a Constitutional AI reviewer ensuring helpful, honest, and constructive feedback.
 
 GENERATED FEEDBACK:
@@ -268,6 +275,20 @@ PERFORMANCE SCORES:
 - Test pass rate: ${context.passRate}%
 - Scenario: ${context.scenarioType}
 - Incomplete: ${context.isIncomplete}
+${
+  evidenceSummary
+    ? `
+EXTRACTED EVIDENCE FROM TRANSCRIPT (use this to verify feedback claims):
+${evidenceSummary}
+
+CRITICAL: Compare feedback claims against this evidence!
+- If evidence shows "approach.explained: YES" with a quote, feedback must NOT say "didn't explain approach"
+- If evidence shows "complexity discussed: YES", feedback must NOT say "didn't discuss complexity"
+- If evidence shows edge cases were mentioned, feedback must NOT say "didn't mention edge cases"
+- Feedback that contradicts evidence is a SEVERE accuracy violation
+`
+    : ""
+}
 
 CONSTITUTIONAL PRINCIPLES - Critique against these 4 aspects:
 
@@ -284,8 +305,10 @@ CONSTITUTIONAL PRINCIPLES - Critique against these 4 aspects:
 3. ACCURACY: Is feedback truthful?
    - Does it match the actual scores?
    - Are technical claims correct?
+   - CRITICAL: Does feedback contradict the extracted evidence above?
    - Red flags: Praising "optimal complexity" when pass rate is low, claiming "explained well" when communication=30
-   - CRITICAL RED FLAG: Criticizing "EXPLAIN YOUR APPROACH" when communication score >= 60 (this means they DID explain)
+   - CRITICAL RED FLAG: Saying "didn't explain approach" when evidence shows they DID with a quote
+   - CRITICAL RED FLAG: Saying "silent coding" when evidence shows they explained before coding
 
 4. ACTIONABILITY: Does feedback give clear next steps?
    - Can the student understand what to improve?
@@ -297,6 +320,7 @@ CRITICAL RULES:
 - Suggest rewrites ONLY if feedback is harmful/misleading
 - If feedback is reasonable, return empty critiques
 - Focus on: overly harsh tone, factual errors, unclear guidance
+- MOST IMPORTANT: Flag if feedback contradicts the extracted evidence
 
 Return JSON:
 {

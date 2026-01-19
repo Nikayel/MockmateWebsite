@@ -240,13 +240,16 @@ If tests passed < 50%:
 - Focus feedback on fixing the failing cases
 
 ## HANDLING POOR COMMUNICATION (CRITICAL)
-If communication score < 60 or "Approach explained: NO" in the analysis:
+If "Approach explained: NO" in the analysis (NOT based on score alone):
 - This is a MAJOR issue even if the solution is correct
 - In real FAANG interviews, you MUST explain your approach before coding
 - TL;DR must mention: "...but needs to explain approach before coding"
 - "Fix Next" MUST include: "EXPLAIN YOUR APPROACH before writing code - interviewers need to understand your thought process"
 - Communication score justification should state: "Did not explain approach before coding"
 - Even with a correct solution, call this out: "You got the right answer, but in a real interview, coding silently is a red flag"
+
+IMPORTANT: If "Approach explained: YES" in the analysis, do NOT tell them to explain their approach - they already did!
+Check the EXTRACTED EVIDENCE section for the actual quotes showing what they said.
 
 ## OUTPUT FORMAT
 
@@ -375,6 +378,10 @@ CODE EFFICIENCY ANALYSIS:
       aiValidation.questionsAnswered = 0
     }
 
+    // RECONCILE SOURCES OF TRUTH: Use extractedEvidence as authoritative when available
+    // This prevents contradictions between aiValidation and extractedEvidence
+    // Evidence has actual quotes, so it's more reliable
+
     // Step 2.5: AI Code Overlap Detection
     // Check if candidate blindly copied AI Partner suggestions
     const aiCodeOverlap = analyzeAICodeOverlap(code, partnerMessages)
@@ -417,6 +424,42 @@ CODE EFFICIENCY ANALYSIS:
       }
     } catch (error) {
       logger.warn("Structured extraction failed, continuing without evidence", { error, sessionId })
+    }
+
+    // RECONCILE SOURCES OF TRUTH: Use extractedEvidence as authoritative when available
+    // This prevents contradictions between aiValidation and extractedEvidence
+    // Evidence has actual quotes, so it's more reliable than LLM guesses
+    if (extractedEvidence) {
+      // If evidence shows approach was explained (with quote), trust it over aiValidation
+      if (extractedEvidence.approach.explained && extractedEvidence.approach.quote) {
+        if (!aiValidation.approachExplained) {
+          logger.info("Reconciling approachExplained: evidence shows YES, aiValidation said NO", {
+            sessionId,
+            evidenceQuote: extractedEvidence.approach.quote?.substring(0, 100),
+          })
+        }
+        aiValidation.approachExplained = true
+        aiValidation.approachQuality =
+          aiValidation.approachQuality === "none" ? "basic" : aiValidation.approachQuality
+      }
+
+      // If evidence shows complexity was discussed with value, trust it
+      if (extractedEvidence.timeComplexity.mentioned && extractedEvidence.timeComplexity.value) {
+        if (!aiValidation.complexityDiscussed) {
+          logger.info("Reconciling complexityDiscussed: evidence shows YES, aiValidation said NO", {
+            sessionId,
+            evidenceValue: extractedEvidence.timeComplexity.value,
+          })
+        }
+        aiValidation.complexityDiscussed = true
+        aiValidation.complexityAccurate = extractedEvidence.timeComplexity.isCorrect ?? false
+        aiValidation.statedComplexity = extractedEvidence.timeComplexity.value
+      }
+
+      // If evidence shows edge cases were mentioned, trust it
+      if (extractedEvidence.edgeCases.mentionedByCandidate.length > 0) {
+        aiValidation.edgeCasesConsidered = true
+      }
     }
 
     // Step 3: Calculate validated scores using algorithmic + AI signals + extracted evidence
@@ -865,10 +908,12 @@ CRITICAL INSTRUCTIONS:
     const feedback = aiResponse.text
 
     // Step 6: Constitutional AI Feedback Critique
+    // Now includes extracted evidence to catch feedback that contradicts what actually happened
     const feedbackCritique = await critiqueFeedbackText(feedback, finalScores, {
       passRate,
       scenarioType: scenarioType || "dsa",
       isIncomplete: code ? analyzeCodeCompleteness(code, language || "python").isIncomplete : false,
+      extractedEvidence, // Pass evidence so Constitutional AI can fact-check feedback claims
     })
 
     // Use revised feedback if critique made changes
@@ -884,8 +929,12 @@ CRITICAL INSTRUCTIONS:
     const feedbackWithScores = injectScoresIntoFeedback(rawFinalFeedback, finalScores, scenarioType)
 
     // Sanitize feedback to remove contradictory criticism
-    // e.g., remove "EXPLAIN YOUR APPROACH" if communication score >= 60
-    const finalFeedback = sanitizeFeedbackForScoreConsistency(feedbackWithScores, finalScores)
+    // e.g., remove "EXPLAIN YOUR APPROACH" if evidence shows they DID explain
+    const finalFeedback = sanitizeFeedbackForScoreConsistency(feedbackWithScores, finalScores, {
+      approachExplained: extractedEvidence?.approach.explained ?? aiValidation.approachExplained,
+      complexityDiscussed:
+        extractedEvidence?.timeComplexity.mentioned ?? aiValidation.complexityDiscussed,
+    })
 
     // USE FINAL SCORES as primary (after Constitutional AI review)
     // AI-generated narrative is just for user-facing feedback text
