@@ -750,6 +750,8 @@ export async function saveSessionState(
     testResults?: Array<any>
     testSummary?: { total: number; passed: number; failed: number; passRate: number }
     isPostInterviewDiscussion?: boolean
+    realInterviewMode?: boolean
+    strictTimeLimit?: number | null
   }
 ): Promise<void> {
   try {
@@ -768,6 +770,8 @@ export async function saveSessionState(
             : undefined,
           test_summary: state.testSummary,
           is_post_interview_discussion: state.isPostInterviewDiscussion ?? false,
+          real_interview_mode: state.realInterviewMode,
+          strict_time_limit: state.strictTimeLimit,
           saved_at: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),
@@ -796,6 +800,8 @@ export async function getSessionState(sessionId: string): Promise<{
   feedbackStatus?: FeedbackStatus
   performanceScore?: number
   feedback?: string
+  realInterviewMode?: boolean
+  strictTimeLimit?: boolean
 } | null> {
   try {
     const sessionRef = doc(db, "interview_sessions", sessionId)
@@ -820,6 +826,8 @@ export async function getSessionState(sessionId: string): Promise<{
       feedbackStatus?: FeedbackStatus
       performanceScore?: number
       feedback?: string
+      realInterviewMode?: boolean
+      strictTimeLimit?: boolean
     } = {
       completedAt: data.completed_at,
       feedbackStatus: data.feedback_status,
@@ -837,6 +845,8 @@ export async function getSessionState(sessionId: string): Promise<{
       result.testResults = data.session_state.test_results
       result.testSummary = data.session_state.test_summary
       result.isPostInterviewDiscussion = data.session_state.is_post_interview_discussion ?? false
+      result.realInterviewMode = data.session_state.real_interview_mode
+      result.strictTimeLimit = data.session_state.strict_time_limit
       result.savedAt = data.session_state.saved_at
     }
 

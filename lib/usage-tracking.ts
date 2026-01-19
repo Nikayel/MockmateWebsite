@@ -35,12 +35,15 @@ export {
 // Direct import for use within this file
 import {
   BUDGET_CAPS as BUDGET_CAPS_IMPORTED,
+  DEEPGRAM_COSTS as DEEPGRAM_COSTS_IMPORTED,
   EMBEDDING_COSTS as EMBEDDING_COSTS_IMPORTED,
   calculateCost as calculateCostImported,
+  calculateVoiceCost as calculateVoiceCostImported,
 } from "./usage-tracking-client"
 
 export type UsageEventType =
   | "chat_message"
+  | "chat_partner"
   | "feedback_generation"
   | "code_execution"
   | "hint_request"
@@ -329,11 +332,11 @@ export async function trackVoiceUsage(params: {
   userId: string
   sessionId?: string
   durationSeconds: number
-  model?: keyof typeof DEEPGRAM_COSTS
+  model?: keyof typeof DEEPGRAM_COSTS_IMPORTED
   transcriptLength?: number
 }): Promise<void> {
   const { userId, sessionId, durationSeconds, model = "nova-2", transcriptLength } = params
-  const cost = calculateVoiceCost(durationSeconds, model)
+  const cost = calculateVoiceCostImported(durationSeconds, model)
 
   await trackUsageEvent({
     userId,
@@ -357,14 +360,17 @@ export async function trackEmbeddingUsage(params: {
   userId: string
   characterCount: number
   embeddingCount: number
-  model: keyof typeof EMBEDDING_COSTS
+  model: keyof typeof EMBEDDING_COSTS_IMPORTED
   provider: "gemini" | "openai"
   latencyMs?: number
 }): Promise<void> {
   const { userId, characterCount, embeddingCount, model, provider, latencyMs } = params
   // Estimate tokens from character count for backwards compatibility
   const estimatedTokens = Math.ceil(characterCount / 4)
-  const cost = calculateEmbeddingCostFromTokens(estimatedTokens, model)
+  const cost = calculateEmbeddingCostFromTokens(
+    estimatedTokens,
+    model as keyof typeof EMBEDDING_COSTS_IMPORTED
+  )
 
   await trackUsageEvent({
     userId,
@@ -390,7 +396,7 @@ export async function trackEmbeddingUsage(params: {
 export async function trackEmbeddingUsageAccurate(params: {
   userId: string
   texts: string[] // The actual texts being embedded
-  model: keyof typeof EMBEDDING_COSTS
+  model: keyof typeof EMBEDDING_COSTS_IMPORTED
   provider: "gemini" | "openai" | "tfidf"
   latencyMs?: number
   cached?: boolean
@@ -722,7 +728,7 @@ export function calculateCostFromText(
   const input = countTokens(inputText)
   const output = countTokens(outputText)
   const totalTokens = input.tokens + output.tokens
-  const cost = calculateCost(input.tokens, output.tokens, provider)
+  const cost = calculateCostImported(input.tokens, output.tokens, provider)
 
   return {
     inputTokens: input.tokens,

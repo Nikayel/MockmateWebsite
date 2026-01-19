@@ -879,7 +879,7 @@ SOLUTION COMPLEXITY:
         phase: currentPhase,
         isOptimalSolution: solutionComplexity?.isOptimal || false,
         testsHaveRun: testsHaveRunNow || false,
-        testsPassed: testResultsArray?.filter((t: { passed: boolean }) => t.passed).length || 0,
+        testsPassed: testResultsArray?.filter((t) => t.passed === true).length || 0,
         testsTotal: testResultsArray?.length || 0,
       }
 
@@ -1469,7 +1469,7 @@ Generate a response that follows these rules.`
             complexity,
             userId,
             sessionId,
-            eventType: "chat_message_retry",
+            eventType: "chat_message",
           }
         )
         return regeneratedResponse.text

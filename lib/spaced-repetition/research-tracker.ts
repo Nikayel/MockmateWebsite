@@ -108,7 +108,7 @@ export async function recordReviewEvent(params: {
       days_since_last_review: params.preReviewState.daysSinceLastReview,
       days_overdue: params.preReviewState.daysOverdue,
       ease_factor: params.preReviewState.easeFactor ?? 2.5, // Default for new problems
-      stability: params.preReviewState.stability ?? null,
+      stability: params.preReviewState.stability ?? undefined,
       predicted_retention: params.preReviewState.predictedRetention ?? 0,
     },
     post_review: {

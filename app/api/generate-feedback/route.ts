@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
   }
 
   const startTime = Date.now()
+  let sessionId: string | undefined
 
   try {
     const {
@@ -62,12 +63,13 @@ export async function POST(request: NextRequest) {
       efficiencyMetrics: providedEfficiencyMetrics,
       conversationTranscript,
       partnerMessages,
-      sessionId,
+      sessionId: requestSessionId,
       userId,
       optimalComplexity,
       designNotes,
       phaseTracking, // Extract but not required - used for future phase-aware feedback
     } = await request.json()
+    sessionId = requestSessionId
 
     // ==========================================================================
     // INPUT VALIDATION
@@ -290,7 +292,7 @@ export async function POST(request: NextRequest) {
         transcriptLength: transcript.length,
         codeLength: code.length,
         agentCallsCount: orchestratorResult.metrics?.agentCalls?.length || 0,
-        hasPartialScores: orchestratorResult.metrics?.partialScores !== undefined,
+        hasPartialScores: orchestratorResult.data?.scores !== undefined,
       })
 
       // Instead of returning 500 error, return partial results with estimated scores
@@ -310,10 +312,8 @@ export async function POST(request: NextRequest) {
       }
 
       // Check if we have partial scores from orchestrator (it might have computed scores before failing)
-      const hasPartialScores = orchestratorResult.metrics?.partialScores
-      const finalScores = hasPartialScores
-        ? orchestratorResult.metrics.partialScores
-        : fallbackScores
+      const hasPartialScores = orchestratorResult.data?.scores !== undefined
+      const finalScores = hasPartialScores ? orchestratorResult.data!.scores : fallbackScores
 
       // Determine error category for user-friendly message
       const errorCategory =
@@ -516,8 +516,18 @@ export async function POST(request: NextRequest) {
 
     // If it's a timeout, return partial results instead of error
     if (isTimeout) {
-      // Parse test results if available
-      const parsedTestResults = Array.isArray(testResults) ? testResults : []
+      // Extract variables from request if available (they might not be in scope in catch block)
+      let parsedTestResults: any[] = []
+      let aiValidationScore = 50
+      try {
+        const requestData = await request.json()
+        parsedTestResults = Array.isArray(requestData.testResults) ? requestData.testResults : []
+        // aiValidation is computed in try block, use default if not available
+        aiValidationScore = 50
+      } catch {
+        // If we can't parse, use defaults
+      }
+
       const testsPassed = parsedTestResults.filter((t: any) => t?.passed).length
       const testsTotal = parsedTestResults.length
       const passRate = testsTotal > 0 ? (testsPassed / testsTotal) * 100 : 0
@@ -525,12 +535,12 @@ export async function POST(request: NextRequest) {
         understanding: Math.min(100, Math.round(passRate * 0.9 + 10)),
         problemSolving: Math.round(passRate),
         codeQuality: Math.min(100, Math.round(passRate * 0.95 + 5)),
-        communication: aiValidation?.communicationScore || 50,
+        communication: aiValidationScore,
         overall: Math.round(
           Math.min(100, Math.round(passRate * 0.9 + 10)) * 0.25 +
             Math.round(passRate) * 0.25 +
             Math.min(100, Math.round(passRate * 0.95 + 5)) * 0.3 +
-            (aiValidation?.communicationScore || 50) * 0.2
+            aiValidationScore * 0.2
         ),
       }
 

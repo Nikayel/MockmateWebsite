@@ -259,11 +259,13 @@ function executeCheckAlreadyDiscussed(topic: string, ctx: ToolContext): ToolResu
       }
 
     case "alternatives":
+      // Check if optimization was discussed (which implies alternatives)
+      const alternativesDiscussed = tracker?.wasAskedToOptimize || tracker?.didOptimize || false
       return {
         success: true,
         data: {
-          discussed: tracker?.alternativesDiscussed ?? false,
-          instruction: tracker?.alternativesDiscussed
+          discussed: alternativesDiscussed,
+          instruction: alternativesDiscussed
             ? "Alternatives already discussed. Move on."
             : "Alternatives NOT discussed. You could ask about other approaches.",
         },
@@ -370,14 +372,20 @@ export function formatToolResultsForPrompt(
 
   // Phase tool gets prominent formatting at the top
   if (phaseTool) {
-    const phaseData = phaseTool.result.data
+    const phaseData = phaseTool.result.data as {
+      phase?: string
+      guidance?: string
+      testsHaveRun?: boolean
+      testResults?: { passed?: number; total?: number; allPassed?: boolean } | null
+      isOptimalSolution?: boolean
+    }
     formatted += `
 ═══════════════════════════════════════════════════════════════
 🔍 TOOL CALL: get_interview_phase (REQUIRED - YOU MUST USE THIS)
 ═══════════════════════════════════════════════════════════════
 CURRENT PHASE: ${phaseData.phase}
 ${phaseData.guidance ? `GUIDANCE: ${phaseData.guidance}` : ""}
-${phaseData.testsHaveRun ? `TEST STATUS: ${phaseData.testResults?.passed}/${phaseData.testResults?.total} passed` : ""}
+${phaseData.testsHaveRun && phaseData.testResults ? `TEST STATUS: ${phaseData.testResults.passed}/${phaseData.testResults.total} passed` : ""}
 ${phaseData.isOptimalSolution ? "SOLUTION STATUS: Optimal solution detected" : ""}
 
 ⚠️ CRITICAL: Your response MUST be appropriate for the ${phaseData.phase} phase.

@@ -14,6 +14,7 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { trackUsageEvent } from "./usage-tracking"
 import type { InteractionMetrics, ScoreBreakdown } from "./scoring"
 import { calculateUserScore, getPerformanceFeedback } from "./scoring"
+import { logger } from "./logger"
 import {
   calculateMasteryScore,
   fromInteractionMetrics,

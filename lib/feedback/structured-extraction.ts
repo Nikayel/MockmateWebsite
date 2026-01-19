@@ -224,9 +224,10 @@ function extractAlgorithmically(
         // This handles "sorting is O(n log n) but overall is n squared"
         const finalComplexity =
           keywordComplexity &&
+          dominantComplexity &&
           getComplexityRank(keywordComplexity) > getComplexityRank(dominantComplexity)
             ? keywordComplexity
-            : dominantComplexity
+            : dominantComplexity || keywordComplexity || null
 
         // Determine if time or space based on context
         if (

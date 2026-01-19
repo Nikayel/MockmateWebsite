@@ -848,7 +848,13 @@ function InterviewPageContent() {
             useInterviewStore.getState().setRealInterviewMode(savedState.realInterviewMode)
           }
           if (savedState?.strictTimeLimit !== undefined) {
-            useInterviewStore.getState().setStrictTimeLimit(savedState.strictTimeLimit)
+            const timeLimit =
+              typeof savedState.strictTimeLimit === "number"
+                ? savedState.strictTimeLimit
+                : savedState.strictTimeLimit
+                  ? null
+                  : null
+            useInterviewStore.getState().setStrictTimeLimit(timeLimit)
           }
 
           // Now start the interview with restored state
@@ -1456,8 +1462,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               testResults,
               testSummary,
               isPostInterviewDiscussion: showPostInterviewDiscussion,
-              realInterviewMode,
-              strictTimeLimit,
+              realInterviewMode: realInterviewMode ?? undefined,
+              strictTimeLimit:
+                typeof strictTimeLimit === "number" ? strictTimeLimit : (strictTimeLimit ?? null),
             })
           }
         } else if (isGuestMode && guestId) {
@@ -2850,6 +2857,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
       )
 
       if (currentSessionId && user && code.trim()) {
+        let feedbackTimeoutId: NodeJS.Timeout | null = null
         try {
           // Prepare conversation transcript - NOW includes ALL messages including post-interview discussion
           const conversationTranscript = [
@@ -2884,7 +2892,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
           // Add 125-second timeout to prevent hanging forever (slightly longer than backend maxDuration of 120s)
           // This gives the backend time to complete and return a response before aborting
           const feedbackController = new AbortController()
-          const feedbackTimeoutId = setTimeout(() => {
+          feedbackTimeoutId = setTimeout(() => {
             feedbackController.abort()
             console.warn("[Feedback] Request aborted due to timeout", {
               sessionId: currentSessionId,
@@ -4503,8 +4511,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
               })),
               testSummary: data.summary,
               isPostInterviewDiscussion: true,
-              realInterviewMode,
-              strictTimeLimit,
+              realInterviewMode: realInterviewMode ?? undefined,
+              strictTimeLimit:
+                typeof strictTimeLimit === "number" ? strictTimeLimit : (strictTimeLimit ?? null),
             })
           } catch (saveError) {
             console.error("Failed to save session state:", saveError)
@@ -5810,7 +5819,9 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             startInterview(selectedScenario, company)
           }}
           scenarioCompanies={selectedScenario.companies || []}
-          hasFuzzyMode={!!selectedScenario.fuzzyStatement}
+          hasFuzzyMode={
+            selectedScenario.type === "dsa" ? !!(selectedScenario as any).fuzzyStatement : false
+          }
         />
       )}
 
