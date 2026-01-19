@@ -144,33 +144,39 @@ public:
 
     clarifyingQuestions: [
       {
+        topic: "output_format",
         question: "Should I return the indices or the actual values?",
         answer: "Return the indices of the two numbers.",
         required: true,
       },
       {
+        topic: "multiple_solutions",
         question: "Can there be multiple valid pairs?",
         answer:
           "Assume exactly one solution exists. You don't need to handle multiple.",
         required: false,
       },
       {
+        topic: "element_reuse",
         question: "Can I use the same element twice?",
         answer:
           "No, you cannot use the same element twice. Each index can only be used once.",
         required: true,
       },
       {
+        topic: "no_solution_case",
         question: "What if no valid pair exists?",
         answer: "You can assume there's always exactly one valid answer.",
         required: false,
       },
       {
+        topic: "input_sorted",
         question: "Is the array sorted?",
         answer: "No, the array is not necessarily sorted.",
         required: false,
       },
       {
+        topic: "negative_numbers",
         question: "Can there be negative numbers?",
         answer: "Yes, numbers can be negative.",
         required: false,

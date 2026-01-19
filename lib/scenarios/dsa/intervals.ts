@@ -118,35 +118,41 @@ export const intervalsScenarios: DSAScenario[] = [
 
     clarifyingQuestions: [
       {
+        topic: "overlap_definition",
         question: "What does 'overlapping' mean exactly?",
         answer:
           "Two intervals overlap if they share any point. For example, [1,4] and [4,5] overlap at point 4.",
         required: true,
       },
       {
+        topic: "input_sorted",
         question: "Are the intervals sorted?",
         answer:
           "No, the intervals are not necessarily sorted. You may need to sort them.",
         required: true,
       },
       {
+        topic: "interval_format",
         question: "What format is each interval?",
         answer:
           "Each interval is [start, end] where start <= end. Both are integers.",
         required: false,
       },
       {
+        topic: "output_sorted",
         question: "Should the result be sorted?",
         answer: "Yes, return merged intervals sorted by start time.",
         required: false,
       },
       {
+        topic: "nested_intervals",
         question: "Can intervals be nested? Like [1,10] and [2,3]?",
         answer:
           "Yes, one interval can fully contain another. They should merge into the larger one.",
         required: false,
       },
       {
+        topic: "single_interval",
         question: "What if there's only one interval?",
         answer: "Return it as-is.",
         required: false,

@@ -100,33 +100,39 @@ Notice that the solution set must not contain duplicate triplets.`,
 
     clarifyingQuestions: [
       {
+        topic: "output_format",
         question: "Should I return the values or the indices?",
         answer: "Return the actual values, not the indices.",
         required: true,
       },
       {
+        topic: "duplicate_handling",
         question: "What if there are duplicate triplets?",
         answer:
           "The solution set must not contain duplicate triplets. Each unique combination should appear only once.",
         required: true,
       },
       {
+        topic: "element_reuse",
         question: "Can I use the same element multiple times?",
         answer:
           "No, you cannot use the same array index twice in a triplet, but different indices with the same value are allowed.",
         required: true,
       },
       {
+        topic: "no_solution_case",
         question: "What if no triplets exist?",
         answer: "Return an empty array.",
         required: false,
       },
       {
+        topic: "input_sorted",
         question: "Is the array sorted?",
         answer: "No, but you can sort it if that helps your approach.",
         required: false,
       },
       {
+        topic: "output_order",
         question: "Does the order of triplets in the result matter?",
         answer: "No, triplets can be in any order.",
         required: false,
