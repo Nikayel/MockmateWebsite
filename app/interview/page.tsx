@@ -1948,6 +1948,10 @@ Interviews are conversations, not just coding exercises.`
       // Real Interview Mode (fuzzy problem statements)
       realInterviewMode,
       hasFuzzyStatement: !!(selectedScenario as any)?.fuzzyStatement,
+      // Pass clarifying questions so interviewer knows how to answer them
+      clarifyingQuestions: realInterviewMode
+        ? (selectedScenario as any)?.clarifyingQuestions || []
+        : [],
       // Pass efficiency metrics so interviewer knows if solution is already optimal
       solutionComplexity: efficiencyMetrics
         ? {

@@ -349,6 +349,7 @@ export async function POST(request: NextRequest) {
       // NEW: Real Interview Mode (fuzzy problem statements)
       realInterviewMode,
       hasFuzzyStatement,
+      clarifyingQuestions, // Expected clarifying questions and their answers
       // NEW: Starter code length for deterministic phase detection
       starterCodeLength,
     } = await request.json()
@@ -991,6 +992,17 @@ SOLUTION COMPLEXITY:
     // Build Real Interview Mode context (fuzzy problem statements)
     let fuzzyModeContext = ""
     if (realInterviewMode && hasFuzzyStatement) {
+      // Build Q&A reference from clarifying questions
+      const qaReference =
+        clarifyingQuestions && clarifyingQuestions.length > 0
+          ? clarifyingQuestions
+              .map(
+                (q: { question: string; answer: string; required?: boolean }) =>
+                  `Q: "${q.question}"\nA: "${q.answer}"${q.required ? " (important)" : ""}`
+              )
+              .join("\n\n")
+          : ""
+
       fuzzyModeContext = `
 ═══════════════════════════════════════════════════════════════
 🎯 REAL INTERVIEW MODE ACTIVE
@@ -1000,21 +1012,21 @@ The candidate is expected to ask clarifying questions.
 
 YOUR BEHAVIOR IN THIS MODE:
 1. EXPECT and ENCOURAGE clarifying questions - they are a POSITIVE signal!
-2. Answer clarifying questions clearly and concisely
+2. Answer clarifying questions clearly and concisely using the Q&A below
 3. DO NOT volunteer information they didn't ask for
-4. If they ask about input format, output format, constraints - answer them
-5. If they dive into coding without clarifying - that's a yellow flag, but let them proceed
-6. DO NOT say "the problem says..." - they have a vague statement
+4. If they dive into coding without clarifying - note it silently, let them proceed
+5. DO NOT say "the problem says..." - they have a vague statement
+${
+  qaReference
+    ? `
+CLARIFYING QUESTIONS & ANSWERS (use these when they ask):
+${qaReference}
 
-GOOD RESPONSES TO CLARIFYING QUESTIONS:
-- "Good question — yes, you return the actual values, not indices"
-- "Right, you need to handle duplicates"
-- "The array can have negative numbers"
-
-BAD RESPONSES:
-- "Hold up —" (dismissive)
-- Volunteering all constraints before they ask
-- "As stated in the problem..." (they have vague statement)
+When they ask something similar to these questions, answer based on the A: provided.
+If they ask something not listed, use your judgment or say "That's a good question - for this problem, [reasonable answer]".
+`
+    : ""
+}
 ═══════════════════════════════════════════════════════════════
 `
     }
