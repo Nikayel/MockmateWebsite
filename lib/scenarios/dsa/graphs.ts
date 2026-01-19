@@ -137,35 +137,41 @@ Example visualization:
 
     clarifyingQuestions: [
       {
+        topic: "island_definition",
         question: "What constitutes an island?",
         answer:
           "An island is a group of '1's (land) connected horizontally or vertically, surrounded by '0's (water).",
         required: true,
       },
       {
+        topic: "diagonal_connections",
         question: "Are diagonal connections considered?",
         answer:
           "No, only horizontal and vertical adjacency counts. Diagonal cells are not connected.",
         required: true,
       },
       {
+        topic: "grid_values",
         question: "What are the grid values?",
         answer: "The grid contains only '1' (land) and '0' (water) as characters.",
         required: false,
       },
       {
+        topic: "boundary_handling",
         question: "What about the grid boundaries?",
         answer:
           "You can assume all four edges of the grid are surrounded by water.",
         required: false,
       },
       {
+        topic: "input_modification",
         question: "Can I modify the input grid?",
         answer:
           "Yes, you can modify the grid in place if it helps your solution.",
         required: false,
       },
       {
+        topic: "empty_input",
         question: "What if the grid is empty?",
         answer: "Return 0 for an empty grid.",
         required: false,

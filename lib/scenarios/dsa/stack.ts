@@ -150,28 +150,33 @@ public:
 
     clarifyingQuestions: [
       {
+        topic: "bracket_types",
         question: "What types of brackets are we dealing with?",
         answer:
           "Only parentheses (), square brackets [], and curly braces {}.",
         required: true,
       },
       {
+        topic: "validity_definition",
         question: "What makes a string 'valid'?",
         answer:
           "Every opening bracket must have a matching closing bracket of the same type, and they must be properly nested.",
         required: true,
       },
       {
+        topic: "other_characters",
         question: "Can the string contain other characters?",
         answer: "No, the string only contains bracket characters.",
         required: false,
       },
       {
+        topic: "empty_input",
         question: "What about an empty string?",
         answer: "An empty string is considered valid.",
         required: false,
       },
       {
+        topic: "input_constraints",
         question: "Is there a maximum length?",
         answer: "The string can have up to 10,000 characters.",
         required: false,
