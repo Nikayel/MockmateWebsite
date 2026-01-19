@@ -6,21 +6,22 @@
  * with many optional fields.
  */
 
-import { Timestamp } from 'firebase-admin/firestore'
+import { Timestamp } from "firebase-admin/firestore"
 
 // =============================================================================
 // Event Type Definitions
 // =============================================================================
 
 export type UsageEventType =
-  | 'chat_message'
-  | 'feedback_generation'
-  | 'code_execution'
-  | 'hint_request'
-  | 'session_start'
-  | 'session_end'
-  | 'voice_transcription'
-  | 'embedding_generation'
+  | "chat_message"
+  | "chat_partner"
+  | "feedback_generation"
+  | "code_execution"
+  | "hint_request"
+  | "session_start"
+  | "session_end"
+  | "voice_transcription"
+  | "embedding_generation"
 
 // =============================================================================
 // Base Event Interface
@@ -48,7 +49,7 @@ export interface BaseUsageEvent {
  * Used by: chat_message, feedback_generation, hint_request
  */
 export interface AIUsageEvent extends BaseUsageEvent {
-  eventType: 'chat_message' | 'feedback_generation' | 'hint_request'
+  eventType: "chat_message" | "chat_partner" | "feedback_generation" | "hint_request"
   provider: string
   model: string
   inputTokens: number
@@ -73,7 +74,7 @@ export interface AIUsageEvent extends BaseUsageEvent {
  * Event interface for code execution
  */
 export interface CodeExecutionEvent extends BaseUsageEvent {
-  eventType: 'code_execution'
+  eventType: "code_execution"
   language: string
   executionTimeMs: number
   success: boolean
@@ -89,7 +90,7 @@ export interface CodeExecutionEvent extends BaseUsageEvent {
  * Event interface for session lifecycle
  */
 export interface SessionEvent extends BaseUsageEvent {
-  eventType: 'session_start' | 'session_end'
+  eventType: "session_start" | "session_end"
   sessionId: string
   scenarioId?: string
   scenarioTitle?: string
@@ -109,7 +110,7 @@ export interface SessionEvent extends BaseUsageEvent {
  * Event interface for voice transcription
  */
 export interface VoiceUsageEvent extends BaseUsageEvent {
-  eventType: 'voice_transcription'
+  eventType: "voice_transcription"
   provider: string
   model: string
   durationSeconds: number
@@ -124,7 +125,7 @@ export interface VoiceUsageEvent extends BaseUsageEvent {
  * Event interface for embedding generation
  */
 export interface EmbeddingUsageEvent extends BaseUsageEvent {
-  eventType: 'embedding_generation'
+  eventType: "embedding_generation"
   provider: string
   model: string
   inputTokens: number
@@ -152,23 +153,25 @@ export type UsageEvent =
 // =============================================================================
 
 export function isAIUsageEvent(event: UsageEvent): event is AIUsageEvent {
-  return ['chat_message', 'feedback_generation', 'hint_request'].includes(event.eventType)
+  return ["chat_message", "chat_partner", "feedback_generation", "hint_request"].includes(
+    event.eventType
+  )
 }
 
 export function isCodeExecutionEvent(event: UsageEvent): event is CodeExecutionEvent {
-  return event.eventType === 'code_execution'
+  return event.eventType === "code_execution"
 }
 
 export function isSessionEvent(event: UsageEvent): event is SessionEvent {
-  return ['session_start', 'session_end'].includes(event.eventType)
+  return ["session_start", "session_end"].includes(event.eventType)
 }
 
 export function isVoiceUsageEvent(event: UsageEvent): event is VoiceUsageEvent {
-  return event.eventType === 'voice_transcription'
+  return event.eventType === "voice_transcription"
 }
 
 export function isEmbeddingUsageEvent(event: UsageEvent): event is EmbeddingUsageEvent {
-  return event.eventType === 'embedding_generation'
+  return event.eventType === "embedding_generation"
 }
 
 // =============================================================================
@@ -178,27 +181,27 @@ export function isEmbeddingUsageEvent(event: UsageEvent): event is EmbeddingUsag
 /**
  * Input type for tracking AI events (omits auto-generated fields)
  */
-export type TrackAIEventInput = Omit<AIUsageEvent, 'id' | 'createdAt'>
+export type TrackAIEventInput = Omit<AIUsageEvent, "id" | "createdAt">
 
 /**
  * Input type for tracking code execution events
  */
-export type TrackCodeExecutionInput = Omit<CodeExecutionEvent, 'id' | 'createdAt'>
+export type TrackCodeExecutionInput = Omit<CodeExecutionEvent, "id" | "createdAt">
 
 /**
  * Input type for tracking session events
  */
-export type TrackSessionEventInput = Omit<SessionEvent, 'id' | 'createdAt'>
+export type TrackSessionEventInput = Omit<SessionEvent, "id" | "createdAt">
 
 /**
  * Input type for tracking voice events
  */
-export type TrackVoiceEventInput = Omit<VoiceUsageEvent, 'id' | 'createdAt'>
+export type TrackVoiceEventInput = Omit<VoiceUsageEvent, "id" | "createdAt">
 
 /**
  * Input type for tracking embedding events
  */
-export type TrackEmbeddingEventInput = Omit<EmbeddingUsageEvent, 'id' | 'createdAt'>
+export type TrackEmbeddingEventInput = Omit<EmbeddingUsageEvent, "id" | "createdAt">
 
 /**
  * Union of all input types

@@ -438,7 +438,7 @@ export async function generateAIResponse(
     userTier?: RateLimitTier
     sessionId?: string
     scenarioId?: string
-    eventType?: "chat_message" | "feedback_generation" | "hint_request"
+    eventType?: "chat_message" | "chat_partner" | "feedback_generation" | "hint_request"
     skipCache?: boolean
     skipRateLimit?: boolean
   } = {}
