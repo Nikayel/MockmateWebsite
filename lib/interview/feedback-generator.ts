@@ -51,6 +51,13 @@ export interface GenerateFeedbackOptions {
   efficiencyMetrics: EfficiencyMetrics | null
   sessionId: string | null
   userId?: string
+  // NEW: Silent notes from conversation tracker (things interviewer noticed but didn't correct)
+  silentNotes?: Array<{
+    type: string
+    userSaid: string
+    correct?: string
+    context?: string
+  }>
 }
 
 export interface FeedbackResult {
@@ -78,8 +85,7 @@ export function calculateInteractionMetrics(
   const interviewerFeedbackAcknowledged = interviewerUserMessages.filter((msg) =>
     /thanks|got it|understand|cool|okay|ok/i.test(msg.message)
   ).length
-  const proactiveInteractions =
-    interviewerQuestionsAnswered > 0 || partnerMessagesSent > 0 ? 1 : 0
+  const proactiveInteractions = interviewerQuestionsAnswered > 0 || partnerMessagesSent > 0 ? 1 : 0
 
   const aiCollaborationMetrics = {
     partnerMessagesSent,
@@ -136,6 +142,7 @@ export async function generateFeedback({
   efficiencyMetrics,
   sessionId,
   userId,
+  silentNotes,
 }: GenerateFeedbackOptions): Promise<FeedbackResult> {
   const { aiCollaborationMetrics, interactionMetrics } = calculateInteractionMetrics(
     chatMessages,
@@ -186,6 +193,8 @@ export async function generateFeedback({
           conversationTranscript,
           sessionId,
           userId,
+          // Silent notes: things the interviewer noticed but didn't correct (shown as "What You Missed")
+          silentNotes: silentNotes || [],
         }),
       })
 

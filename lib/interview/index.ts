@@ -106,6 +106,8 @@ export {
   buildTrackingContext,
   getHintGuidance,
   HINT_PROGRESSION,
+  addSilentNote,
+  getSilentNoteDescription,
 } from "./interview-phases"
 export type {
   InterviewPhase,
@@ -113,6 +115,8 @@ export type {
   PhaseDetectionContext,
   ConversationTracker,
   HintLevel,
+  SilentNote,
+  SilentNoteType,
 } from "./interview-phases"
 
 // Interviewer prompts (few-shot examples - preferred over verbose rules)
@@ -129,9 +133,21 @@ export type { PromptContext } from "./interviewer-prompts"
 export { INTERVIEWER_TOOLS, executeTool, formatToolResultsForPrompt } from "./interviewer-tools"
 export type { ToolDefinition, ToolContext, ToolResult } from "./interviewer-tools"
 
-// Response validation (hard gates)
-export { validateInterviewerResponse, validateWithRetry } from "./response-validation"
-export type { ValidationResult, ResponseViolation, ValidationContext } from "./response-validation"
+// Response validation (hard gates + semantic LLM validation)
+export {
+  validateInterviewerResponse,
+  validateWithRetry,
+  validateSemanticRules,
+  validateInterviewerResponseAsync,
+  SEMANTIC_RULES,
+  buildSemanticValidationPrompt,
+} from "./response-validation"
+export type {
+  ValidationResult,
+  ResponseViolation,
+  ValidationContext,
+  SemanticValidationResult,
+} from "./response-validation"
 
 // Conversation extraction (LLM-based state detection)
 // NOTE: Server-only module - import directly from "./conversation-extraction"

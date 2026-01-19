@@ -548,6 +548,97 @@ export function injectScoresIntoFeedback(
 }
 
 /**
+ * Silent note type descriptions for human-readable feedback
+ * Single source of truth - used by both interview tracking and feedback display
+ */
+const SILENT_NOTE_DESCRIPTIONS: Record<string, string> = {
+  wrong_complexity: "Incorrect complexity analysis",
+  wrong_edge_case: "Wrong answer for edge case",
+  missed_edge_case: "Missed important edge case",
+  wrong_optimality: "Incorrect optimality assessment",
+  confused_approach: "Confused different approaches",
+  incomplete_answer: "Incomplete or vague answer",
+  deflection: "Deflected interviewer question",
+}
+
+/**
+ * Format silent notes into a "What You Missed" section for feedback
+ * @param silentNotes Array of silent notes from the conversation tracker
+ * @returns Formatted markdown section, or empty string if no notes
+ */
+export function formatSilentNotesForFeedback(
+  silentNotes: Array<{
+    type: string
+    userSaid: string
+    correct?: string
+    context?: string
+  }>
+): string {
+  if (!silentNotes || silentNotes.length === 0) {
+    return ""
+  }
+
+  const lines = ["**What You Missed**", ""]
+
+  for (const note of silentNotes) {
+    const description = SILENT_NOTE_DESCRIPTIONS[note.type] || note.type
+    let line = `- **${description}**: You said "${note.userSaid}"`
+
+    if (note.correct) {
+      line += ` — Correct answer: ${note.correct}`
+    }
+    if (note.context) {
+      line += ` (${note.context})`
+    }
+
+    lines.push(line)
+  }
+
+  return lines.join("\n")
+}
+
+/**
+ * Build silent notes context for AI feedback prompt
+ * @param silentNotes Array of silent notes from the conversation tracker
+ * @returns Context string for the AI prompt
+ */
+export function buildSilentNotesContext(
+  silentNotes: Array<{
+    type: string
+    userSaid: string
+    correct?: string
+    context?: string
+  }>
+): string {
+  if (!silentNotes || silentNotes.length === 0) {
+    return ""
+  }
+
+  const lines = [
+    "",
+    "SILENT NOTES (things the interviewer noticed but didn't correct during the interview):",
+    "Include these in a 'What You Missed' section in the feedback.",
+    "",
+  ]
+
+  for (const note of silentNotes) {
+    const description = SILENT_NOTE_DESCRIPTIONS[note.type] || note.type
+    let line = `- ${description}: User said "${note.userSaid}"`
+
+    if (note.correct) {
+      line += ` (correct: ${note.correct})`
+    }
+    if (note.context) {
+      line += ` [${note.context}]`
+    }
+
+    lines.push(line)
+  }
+
+  return lines.join("\n")
+}
+
+/**
  * Parse structured sections from feedback (legacy)
  * Now uses the improved parseBulletList function for better bullet extraction
  */

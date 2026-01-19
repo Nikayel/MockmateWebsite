@@ -127,6 +127,27 @@ export function detectInterviewPhaseLegacy(context: {
 // CONVERSATION TRACKING
 // =============================================================================
 
+/**
+ * Silent notes - things the interviewer noticed but didn't correct
+ * These are shown in feedback as "What You Missed"
+ */
+export type SilentNoteType =
+  | "wrong_complexity" // User stated wrong complexity (e.g., O(1) instead of O(n))
+  | "wrong_edge_case" // User got edge case wrong (e.g., "zero returns zero" when it should be 1)
+  | "missed_edge_case" // User didn't mention important edge case
+  | "wrong_optimality" // User thought solution was optimal when it wasn't (or vice versa)
+  | "confused_approach" // User confused two approaches (e.g., thought brute force was optimized)
+  | "incomplete_answer" // User gave vague/incomplete answer that wasn't probed further
+  | "deflection" // User deflected question ("you tell me")
+
+export interface SilentNote {
+  type: SilentNoteType
+  timestamp: number
+  userSaid: string // What the user said
+  correct?: string // What the correct answer would be (if known)
+  context?: string // Additional context (e.g., which edge case)
+}
+
 export interface ConversationTracker {
   // What has the candidate covered?
   approachExplained: boolean
@@ -161,6 +182,10 @@ export interface ConversationTracker {
   clarifyingQuestionsAsked?: boolean // Did they ask clarifying questions (good sign)
   answeredInterviewerQuestions?: number // How many questions did they answer
   alternativesDiscussed?: boolean // Did they discuss alternative approaches or trade-offs
+
+  // NEW: Silent notes - mistakes the interviewer noticed but didn't correct
+  // These are shown in feedback as "What You Missed"
+  silentNotes?: SilentNote[]
 }
 
 export function createEmptyTracker(): ConversationTracker {
@@ -181,7 +206,45 @@ export function createEmptyTracker(): ConversationTracker {
     bugsMade: 0,
     bugsSelfCorrected: 0,
     hintsGiven: 0,
+    silentNotes: [],
   }
+}
+
+/**
+ * Add a silent note to the tracker
+ * Silent notes track mistakes the interviewer noticed but didn't correct
+ * These are shown in feedback as "What You Missed"
+ */
+export function addSilentNote(
+  tracker: ConversationTracker,
+  note: Omit<SilentNote, "timestamp">
+): ConversationTracker {
+  return {
+    ...tracker,
+    silentNotes: [
+      ...(tracker.silentNotes || []),
+      {
+        ...note,
+        timestamp: Date.now(),
+      },
+    ],
+  }
+}
+
+/**
+ * Get human-readable description for silent note types
+ */
+export function getSilentNoteDescription(type: SilentNoteType): string {
+  const descriptions: Record<SilentNoteType, string> = {
+    wrong_complexity: "Incorrect complexity analysis",
+    wrong_edge_case: "Wrong answer for edge case",
+    missed_edge_case: "Missed important edge case",
+    wrong_optimality: "Incorrect optimality assessment",
+    confused_approach: "Confused different approaches",
+    incomplete_answer: "Incomplete or vague answer",
+    deflection: "Deflected interviewer question",
+  }
+  return descriptions[type] || type
 }
 
 /**
