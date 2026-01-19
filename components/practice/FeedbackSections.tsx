@@ -221,6 +221,30 @@ export const FeedbackSections = memo(function FeedbackSections({
         </div>
       </div>
 
+      {/* What You Missed - Only show if there are silent notes */}
+      {sections.whatYouMissed && sections.whatYouMissed.length > 0 && (
+        <div className="rounded-xl border border-rose-900/30 bg-rose-950/20 p-4">
+          <div className="mb-3 flex items-center gap-1.5">
+            <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
+            <span className="text-xs font-medium text-rose-400">What You Missed</span>
+            <span className="ml-auto rounded-full bg-rose-900/30 px-2 py-0.5 text-[10px] text-rose-400">
+              Interviewer noted silently
+            </span>
+          </div>
+          <p className="mb-3 text-[10px] text-zinc-500">
+            These are mistakes the interviewer noticed but didn&apos;t correct during the session
+          </p>
+          <ul className="space-y-2">
+            {sections.whatYouMissed.slice(0, 5).map((item, i) => (
+              <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
+                <MessageSquareOff className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-500" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Expandable Sections */}
       <div className="space-y-2">
         {/* Code Solution */}

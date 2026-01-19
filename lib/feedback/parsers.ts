@@ -27,6 +27,7 @@ export interface FeedbackSection {
   }
   whatWorked: string[]
   fixNext: string[]
+  whatYouMissed: string[] // Silent notes - things interviewer noticed but didn't correct
   actionPlan: string[]
   aiWatchlist: string
 }
@@ -188,6 +189,7 @@ export function parseFeedback(feedback: string): FeedbackSection {
     scoreJustifications: {},
     whatWorked: [],
     fixNext: [],
+    whatYouMissed: [],
     actionPlan: [],
     aiWatchlist: "",
   }
@@ -394,6 +396,20 @@ export function parseFeedback(feedback: string): FeedbackSection {
     if (match && match[1].trim()) {
       sections.fixNext = parseBulletList(match[1])
       if (sections.fixNext.length > 0) break
+    }
+  }
+
+  // Parse "What You Missed" section (silent notes from interviewer)
+  const whatYouMissedPatterns = [
+    /\*\*What You Missed\*\*[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /##\s*What You Missed[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+    /###\s*What You Missed[:\s]*([\s\S]+?)(?=\n\*\*|\n##|\n###|$)/i,
+  ]
+  for (const pattern of whatYouMissedPatterns) {
+    const match = feedback.match(pattern)
+    if (match && match[1].trim()) {
+      sections.whatYouMissed = parseBulletList(match[1])
+      if (sections.whatYouMissed.length > 0) break
     }
   }
 
