@@ -93,42 +93,151 @@ export class FeedbackWriterAgent implements Agent<
       scenarioPattern: input.scenarioPattern,
     })
 
-    // Build the prompt with evidence grounding + pattern knowledge
-    const prompt = this.buildFeedbackPrompt(input)
+    try {
+      // Build the prompt with evidence grounding + pattern knowledge
+      const prompt = this.buildFeedbackPrompt(input)
 
-    // Generate feedback using AI with timeout to prevent hanging
-    const FEEDBACK_TIMEOUT_MS = 45000 // 45 seconds
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error("Feedback generation timed out after 45 seconds")),
-        FEEDBACK_TIMEOUT_MS
+      // Generate feedback using AI with timeout to prevent hanging
+      const FEEDBACK_TIMEOUT_MS = 45000 // 45 seconds
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Feedback generation timed out after 45 seconds")),
+          FEEDBACK_TIMEOUT_MS
+        )
       )
-    )
 
-    const response = await Promise.race([
-      generateAIResponse(this.buildSystemPrompt(input), prompt, [], {
-        complexity: "complex",
-        temperature: 0.3, // Low temperature for consistent feedback
-      }),
-      timeoutPromise,
-    ])
+      const response = await Promise.race([
+        generateAIResponse(this.buildSystemPrompt(input), prompt, [], {
+          complexity: "complex",
+          temperature: 0.3, // Low temperature for consistent feedback
+        }),
+        timeoutPromise,
+      ])
 
-    // Parse the structured response
-    const parsed = this.parseFeedbackResponse(response.text, input)
+      // Parse the structured response
+      const parsed = this.parseFeedbackResponse(response.text, input)
 
-    // Enrich with pattern knowledge (from RAG)
+      // Enrich with pattern knowledge (from RAG)
+      const patternInsight = this.buildPatternInsight(input.scenarioPattern)
+
+      const latency = Date.now() - startTime
+      logger.info("[FeedbackWriterAgent] Feedback generated", {
+        latencyMs: latency,
+        whatWorkedCount: parsed.whatWorked.length,
+        fixNextCount: parsed.fixNext.length,
+        hasPatternInsight: !!patternInsight,
+      })
+
+      return {
+        ...parsed,
+        patternInsight,
+      }
+    } catch (error) {
+      const latency = Date.now() - startTime
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+
+      logger.error("[FeedbackWriterAgent] Feedback generation failed, using fallback", {
+        error: errorMessage,
+        latencyMs: latency,
+        scenarioType: input.scenarioType,
+        overall: input.scores.overall,
+      })
+
+      // Return fallback feedback based on scores
+      return this.generateFallbackFeedback(input)
+    }
+  }
+
+  /**
+   * Generate fallback feedback when AI call fails
+   * Uses scores to construct basic feedback without AI
+   */
+  private generateFallbackFeedback(input: FeedbackWriterAgentInput): FeedbackWriterAgentOutput {
+    const { scores, scenarioTitle } = input
+    const passRate =
+      input.testsTotal > 0 ? Math.round((input.testsPassed / input.testsTotal) * 100) : 0
+
+    // Generate TL;DR based on overall score
+    const tldr = this.generateDefaultTldr(input)
+
+    // Generate what worked based on scores
+    const whatWorked: string[] = []
+    if (passRate >= 80) whatWorked.push("Strong test case coverage")
+    if (scores.understanding >= 60) whatWorked.push("Good problem understanding")
+    if (scores.codeQuality >= 70) whatWorked.push("Clean, maintainable code")
+    if (scores.communication >= 50) whatWorked.push("Communicated approach effectively")
+    if (whatWorked.length === 0) whatWorked.push("Attempted the problem")
+
+    // Generate fix next based on lower scores
+    const fixNext: string[] = []
+    if (passRate < 100) fixNext.push("Review failing test cases and edge cases")
+    if (scores.understanding < 60) fixNext.push("Practice explaining your approach more clearly")
+    if (scores.codeQuality < 60) fixNext.push("Focus on code cleanliness and readability")
+    if (scores.communication < 40) fixNext.push("Work on thinking out loud while coding")
+    if (fixNext.length === 0) fixNext.push("Keep practicing to maintain your skills")
+
+    // Generate action plan
+    const actionPlan = [
+      `Review the ${scenarioTitle} problem pattern`,
+      "Practice similar problems to reinforce concepts",
+    ]
+
+    // Generate detailed feedback sections
+    const detailedFeedback = {
+      understanding:
+        scores.understanding >= 60
+          ? "You demonstrated a solid understanding of the problem requirements."
+          : "Consider spending more time analyzing the problem before coding.",
+      problemSolving:
+        scores.problemSolving >= 60
+          ? "Your problem-solving approach was methodical."
+          : "Try breaking down the problem into smaller steps.",
+      codeQuality:
+        scores.codeQuality >= 60
+          ? "Your code was well-structured and readable."
+          : "Focus on writing cleaner, more maintainable code.",
+      communication:
+        scores.communication >= 50
+          ? "You communicated your thought process effectively."
+          : "Practice explaining your reasoning while coding.",
+    }
+
     const patternInsight = this.buildPatternInsight(input.scenarioPattern)
 
-    const latency = Date.now() - startTime
-    logger.info("[FeedbackWriterAgent] Feedback generated", {
-      latencyMs: latency,
-      whatWorkedCount: parsed.whatWorked.length,
-      fixNextCount: parsed.fixNext.length,
-      hasPatternInsight: !!patternInsight,
-    })
+    // Build raw feedback text
+    const rawFeedback = `## TL;DR
+${tldr}
+
+## What Worked
+${whatWorked.map((w) => `- ${w}`).join("\n")}
+
+## Fix Next
+${fixNext.map((f) => `- ${f}`).join("\n")}
+
+## Action Plan
+${actionPlan.map((a, i) => `${i + 1}. ${a}`).join("\n")}
+
+## Detailed Feedback
+
+### Understanding
+${detailedFeedback.understanding}
+
+### Problem-Solving
+${detailedFeedback.problemSolving}
+
+### Code Quality
+${detailedFeedback.codeQuality}
+
+### Communication
+${detailedFeedback.communication}`
 
     return {
-      ...parsed,
+      tldr,
+      whatWorked,
+      fixNext,
+      actionPlan,
+      detailedFeedback,
+      rawFeedback,
       patternInsight,
     }
   }

@@ -499,23 +499,40 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     const elapsedMs = Date.now() - startTime
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorLower = errorMessage.toLowerCase()
+
+    // Comprehensive error detection - determine if we should return partial results
     const isTimeout =
       elapsedMs >= 115000 ||
-      (error instanceof Error &&
-        (error.message.includes("timeout") ||
-          error.message.includes("duration") ||
-          error.message.includes("Function execution exceeded")))
+      errorLower.includes("timeout") ||
+      errorLower.includes("duration") ||
+      errorLower.includes("function execution exceeded") ||
+      errorLower.includes("timed out")
+
+    const isRecoverableError =
+      isTimeout ||
+      errorLower.includes("quota") ||
+      errorLower.includes("rate limit") ||
+      errorLower.includes("provider") ||
+      errorLower.includes("ai") ||
+      errorLower.includes("api error") ||
+      errorLower.includes("failed to generate") ||
+      errorLower.includes("network") ||
+      errorLower.includes("fetch")
 
     logger.error("Feedback generation error", {
-      error,
+      error: errorMessage,
       endpoint: "/api/generate-feedback",
       elapsedMs,
       isTimeout,
+      isRecoverableError,
       sessionId,
     })
 
-    // If it's a timeout, return partial results instead of error
-    if (isTimeout) {
+    // For recoverable errors, return partial results instead of 500 error
+    // This allows the session to complete with estimated scores
+    if (isRecoverableError) {
       // Extract variables from request if available (they might not be in scope in catch block)
       let parsedTestResults: any[] = []
       let aiValidationScore = 50
@@ -544,8 +561,15 @@ export async function POST(request: NextRequest) {
         ),
       }
 
+      // Determine user-friendly error message
+      const userErrorReason = isTimeout
+        ? `timed out after ${Math.round(elapsedMs / 1000)}s`
+        : errorLower.includes("quota") || errorLower.includes("rate limit")
+          ? "service is temporarily busy"
+          : "encountered a processing error"
+
       return NextResponse.json({
-        feedback: `**TL;DR** – Session evaluated. Processing timed out, so using estimated scores.
+        feedback: `**TL;DR** – Session evaluated. AI processing ${userErrorReason}, so using estimated scores.
 
 **Score Snapshot**
 - Understanding: ${fallbackScores.understanding}/100
@@ -554,17 +578,19 @@ export async function POST(request: NextRequest) {
 - Communication: ${fallbackScores.communication}/100
 - Overall: ${fallbackScores.overall}/100
 
-*Note: Full AI analysis timed out after ${Math.round(elapsedMs / 1000)}s. Scores computed from test results.*`,
+*Note: Full AI feedback was unavailable. Scores estimated from test results.*`,
         performanceScore: fallbackScores.overall,
         scores: fallbackScores,
         partialResult: true,
-        timeout: true,
+        timeout: isTimeout,
+        error: errorMessage, // Include for debugging
         latencyMs: elapsedMs,
       })
     }
 
+    // For truly unrecoverable errors (should be rare), return 500
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to generate feedback" },
+      { error: errorMessage || "Failed to generate feedback" },
       { status: 500 }
     )
   }

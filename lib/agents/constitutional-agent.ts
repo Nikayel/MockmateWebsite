@@ -89,43 +89,66 @@ export class ConstitutionalAgent implements Agent<
       originalScore: input.scores.overall,
     })
 
-    const passRate = input.testsTotal > 0 ? (input.testsPassed / input.testsTotal) * 100 : 0
+    try {
+      const passRate = input.testsTotal > 0 ? (input.testsPassed / input.testsTotal) * 100 : 0
 
-    // Step 1: Critique scores
-    const scoreCritique = await this.critiqueScoresWrapper(input, passRate)
+      // Step 1: Critique scores
+      const scoreCritique = await this.critiqueScoresWrapper(input, passRate)
 
-    // Step 2: Critique feedback text
-    const feedbackCritique = await this.critiqueFeedbackWrapper(input)
+      // Step 2: Critique feedback text
+      const feedbackCritique = await this.critiqueFeedbackWrapper(input)
 
-    // Step 3: Apply Constitutional AI rules
-    const corrections = this.extractCorrections(feedbackCritique)
-    const issues = this.collectIssues(scoreCritique, feedbackCritique)
+      // Step 3: Apply Constitutional AI rules
+      const corrections = this.extractCorrections(feedbackCritique)
+      const issues = this.collectIssues(scoreCritique, feedbackCritique)
 
-    const latency = Date.now() - startTime
-    logger.info("[ConstitutionalAgent] Review complete", {
-      latencyMs: latency,
-      scoreMadeChanges: scoreCritique.madeChanges,
-      feedbackCorrections: corrections.length,
-      issuesFound: issues.length,
-    })
+      const latency = Date.now() - startTime
+      logger.info("[ConstitutionalAgent] Review complete", {
+        latencyMs: latency,
+        scoreMadeChanges: scoreCritique.madeChanges,
+        feedbackCorrections: corrections.length,
+        issuesFound: issues.length,
+      })
 
-    return {
-      scoreAdjustments: {
-        madeChanges: scoreCritique.madeChanges,
-        adjustedScores: scoreCritique.adjustedScores
-          ? {
-              understanding: scoreCritique.adjustedScores.understanding,
-              problemSolving: scoreCritique.adjustedScores.problemSolving,
-              codeQuality: scoreCritique.adjustedScores.codeQuality,
-              communication: scoreCritique.adjustedScores.communication,
-              overall: this.calculateOverall(scoreCritique.adjustedScores),
-            }
-          : undefined,
-        reasoning: scoreCritique.reasoning,
-      },
-      feedbackCorrections: corrections,
-      isValid: issues.length === 0,
-      issues,
+      return {
+        scoreAdjustments: {
+          madeChanges: scoreCritique.madeChanges,
+          adjustedScores: scoreCritique.adjustedScores
+            ? {
+                understanding: scoreCritique.adjustedScores.understanding,
+                problemSolving: scoreCritique.adjustedScores.problemSolving,
+                codeQuality: scoreCritique.adjustedScores.codeQuality,
+                communication: scoreCritique.adjustedScores.communication,
+                overall: this.calculateOverall(scoreCritique.adjustedScores),
+              }
+            : undefined,
+          reasoning: scoreCritique.reasoning,
+        },
+        feedbackCorrections: corrections,
+        isValid: issues.length === 0,
+        issues,
+      }
+    } catch (error) {
+      const latency = Date.now() - startTime
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+
+      logger.error("[ConstitutionalAgent] Review failed, skipping constitutional review", {
+        error: errorMessage,
+        latencyMs: latency,
+        scenarioType: input.scenarioType,
+      })
+
+      // Return a passthrough result (no changes)
+      return {
+        scoreAdjustments: {
+          madeChanges: false,
+          adjustedScores: undefined,
+          reasoning: "Constitutional review unavailable",
+        },
+        feedbackCorrections: [],
+        isValid: true, // Assume valid since we can't verify
+        issues: [],
+      }
     }
   }
 
