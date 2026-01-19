@@ -17,6 +17,13 @@
 /**
  * Patterns for detecting complexity mentions in text
  * Used by: interview-phases.ts, conversation-extraction.ts, structured-extraction.ts
+ *
+ * IMPORTANT: Voice transcriptions often produce non-standard formats like:
+ * - "on2" instead of "O(n²)"
+ * - "o n squared" instead of "O(n²)"
+ * - "o of n" instead of "O(n)"
+ * - "o1" instead of "O(1)"
+ * These are handled by VOICE_COMPLEXITY_PATTERNS below.
  */
 export const COMPLEXITY_PATTERNS = {
   // Standard O notation: O(n), O(n²), O(n log n)
@@ -38,6 +45,85 @@ export const COMPLEXITY_PATTERNS = {
     cubic: ["O(n³)", "O(n^3)", "cubic", "n cubed"],
     exponential: ["O(2^n)", "exponential", "2^n"],
   },
+}
+
+/**
+ * Voice transcription patterns for complexity
+ * These catch common speech-to-text outputs that standard patterns miss
+ */
+export const VOICE_COMPLEXITY_PATTERNS = [
+  // "on2" / "on 2" / "o n 2" -> O(n²)
+  { pattern: /\bo\s*n\s*2\b/i, complexity: "O(n²)" },
+  { pattern: /\bon2\b/i, complexity: "O(n²)" },
+  // "on squared" / "o n squared" -> O(n²)
+  { pattern: /\bo\s*n\s*squared\b/i, complexity: "O(n²)" },
+  { pattern: /\bon\s*squared\b/i, complexity: "O(n²)" },
+  // "o1" / "o 1" -> O(1)
+  { pattern: /\bo\s*1\b/i, complexity: "O(1)" },
+  { pattern: /\bo1\b/i, complexity: "O(1)" },
+  // "on" / "o n" (alone, not part of other words) -> O(n)
+  { pattern: /\bo\s*n\b(?!\s*(?:log|squared|2|3))/i, complexity: "O(n)" },
+  { pattern: /\bon\b(?!\s*(?:log|squared|2|3|e|ce|ly))/i, complexity: "O(n)" },
+  // "on log n" / "o n log n" -> O(n log n)
+  { pattern: /\bo\s*n\s*log\s*n\b/i, complexity: "O(n log n)" },
+  { pattern: /\bon\s*log\s*n\b/i, complexity: "O(n log n)" },
+  // "oen log en" (voice mishear) -> O(n log n)
+  { pattern: /\bo\s*e?n\s*log\s*e?n\b/i, complexity: "O(n log n)" },
+  // "log n" -> O(log n)
+  { pattern: /\blog\s*n\b/i, complexity: "O(log n)" },
+]
+
+/**
+ * Extract complexity from text, including voice transcriptions
+ */
+export function extractComplexityFromText(text: string): string | null {
+  const lower = text.toLowerCase()
+
+  // First try voice transcription patterns (most specific)
+  for (const { pattern, complexity } of VOICE_COMPLEXITY_PATTERNS) {
+    if (pattern.test(lower)) {
+      return complexity
+    }
+  }
+
+  // Then try standard O notation
+  const bigOMatch = text.match(COMPLEXITY_PATTERNS.bigO)
+  if (bigOMatch && bigOMatch.length > 0) {
+    return bigOMatch[0]
+  }
+
+  // Then try verbal patterns
+  const verbalMatch = text.match(COMPLEXITY_PATTERNS.verbal)
+  if (verbalMatch && verbalMatch.length > 0) {
+    return verbalMatch[0]
+  }
+
+  // Check for natural language keywords
+  for (const [type, keywords] of Object.entries(COMPLEXITY_PATTERNS.keywords)) {
+    for (const keyword of keywords) {
+      if (lower.includes(keyword.toLowerCase())) {
+        // Return the standard O notation for this type
+        switch (type) {
+          case "constant":
+            return "O(1)"
+          case "logarithmic":
+            return "O(log n)"
+          case "linear":
+            return "O(n)"
+          case "linearithmic":
+            return "O(n log n)"
+          case "quadratic":
+            return "O(n²)"
+          case "cubic":
+            return "O(n³)"
+          case "exponential":
+            return "O(2^n)"
+        }
+      }
+    }
+  }
+
+  return null
 }
 
 /**
