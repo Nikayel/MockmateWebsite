@@ -31,8 +31,6 @@ import {
   type InterviewPhase,
   type ConversationTracker,
   type PhaseDetectionContext,
-  PHASE_PROMPTS,
-  INTERVIEWER_BEHAVIOR_RULES,
   buildTrackingContext,
   getHintGuidance,
   createEmptyTracker,
@@ -44,10 +42,7 @@ import {
   shouldRunExtraction,
 } from "@/lib/interview/conversation-extraction"
 import { buildCompanyInterviewerPrompt } from "@/lib/interview/company-interviewer-styles"
-import {
-  validateWithRetry,
-  type ValidationContext
-} from "@/lib/interview/response-validation"
+import { validateWithRetry, type ValidationContext } from "@/lib/interview/response-validation"
 import {
   executeTool,
   formatToolResultsForPrompt,
@@ -55,6 +50,8 @@ import {
 } from "@/lib/interview/interviewer-tools"
 import {
   buildInterviewerPrompt,
+  PHASE_PROMPTS,
+  FEW_SHOT_EXAMPLES,
   QUICK_INJECTIONS,
 } from "@/lib/interview/interviewer-prompts"
 import { truncateText, truncateFileContent } from "@/lib/utils"
@@ -732,7 +729,8 @@ DO NOT:
 
     // Build phase-specific context using DETERMINISTIC signals
     // No longer relies on frontend-passed interviewPhase - we compute it here
-    const testsHaveRunNow = testResultsArray && Array.isArray(testResultsArray) && testResultsArray.length > 0
+    const testsHaveRunNow =
+      testResultsArray && Array.isArray(testResultsArray) && testResultsArray.length > 0
     const messageCount = Array.isArray(context) ? context.length : 0
     const currentCodeLen = currentCode?.length || 0
     const starterLen = starterCodeLength || 0
@@ -742,7 +740,9 @@ DO NOT:
       testsHaveRun: testsHaveRunNow || false,
       currentCodeLength: currentCodeLen,
       starterCodeLength: starterLen,
-      approachExplained: enhancedTracker?.approachExplained || (conversationTracker as ConversationTracker)?.approachExplained,
+      approachExplained:
+        enhancedTracker?.approachExplained ||
+        (conversationTracker as ConversationTracker)?.approachExplained,
       messageCount,
     }
 
@@ -778,16 +778,23 @@ DO NOT:
     if (shouldEnforceChecklist) {
       const missingItems: string[] = []
 
-      // Check if complexity has been discussed
-      if (!tracker.timeComplexityMentioned) {
+      // IMPORTANT: Only ask about complexity AFTER they've explained their approach
+      // Don't rush to complexity questions when they're still exploring the problem
+      const hasExplainedApproach =
+        tracker.approachExplained ||
+        tracker.approachQuality === "specific" ||
+        tracker.approachQuality === "detailed"
+
+      // Check if complexity has been discussed (only if they've explained approach)
+      if (hasExplainedApproach && !tracker.timeComplexityMentioned) {
         missingItems.push(
-          '⚠️ ASK ABOUT COMPLEXITY: "What time and space complexity are you targeting?"'
+          '⚠️ ASK ABOUT COMPLEXITY: "What time and space complexity do you expect with your approach?"'
         )
       }
 
-      // Check if edge cases have been discussed
-      if (tracker.edgeCasesMentioned.length === 0) {
-        missingItems.push('⚠️ ASK ABOUT EDGE CASES: "Any edge cases you\'re thinking about?"')
+      // Check if edge cases have been discussed (only if they've explained approach)
+      if (hasExplainedApproach && tracker.edgeCasesMentioned.length === 0) {
+        missingItems.push('⚠️ ASK ABOUT EDGE CASES: "What edge cases should we consider?"')
       }
 
       if (missingItems.length > 0) {
@@ -809,10 +816,14 @@ ${missingItems.join("\n")}
       const alreadyCovered: string[] = []
 
       if (tracker.timeComplexityMentioned && tracker.timeComplexityValue) {
-        alreadyCovered.push(`✅ COMPLEXITY ALREADY DISCUSSED: ${tracker.timeComplexityValue} - DO NOT ask again`)
+        alreadyCovered.push(
+          `✅ COMPLEXITY ALREADY DISCUSSED: ${tracker.timeComplexityValue} - DO NOT ask again`
+        )
       }
       if (tracker.edgeCasesMentioned.length > 0) {
-        alreadyCovered.push(`✅ EDGE CASES ALREADY DISCUSSED: ${tracker.edgeCasesMentioned.join(", ")} - DO NOT ask again`)
+        alreadyCovered.push(
+          `✅ EDGE CASES ALREADY DISCUSSED: ${tracker.edgeCasesMentioned.join(", ")} - DO NOT ask again`
+        )
       }
 
       if (alreadyCovered.length > 0) {
@@ -872,11 +883,11 @@ SOLUTION COMPLEXITY:
       if (currentPhase === "discussion" || currentPhase === "coding") {
         toolCalls.push({
           name: "check_prerequisites",
-          result: executeTool("check_prerequisites", {}, toolContext)
+          result: executeTool("check_prerequisites", {}, toolContext),
         })
         toolCalls.push({
           name: "get_next_required_topic",
-          result: executeTool("get_next_required_topic", {}, toolContext)
+          result: executeTool("get_next_required_topic", {}, toolContext),
         })
       }
 
@@ -884,25 +895,25 @@ SOLUTION COMPLEXITY:
       if (currentPhase === "testing") {
         toolCalls.push({
           name: "check_already_discussed:complexity",
-          result: executeTool("check_already_discussed", { topic: "complexity" }, toolContext)
+          result: executeTool("check_already_discussed", { topic: "complexity" }, toolContext),
         })
         toolCalls.push({
           name: "check_already_discussed:edge_cases",
-          result: executeTool("check_already_discussed", { topic: "edge_cases" }, toolContext)
+          result: executeTool("check_already_discussed", { topic: "edge_cases" }, toolContext),
         })
       }
 
       // Always include phase info
       toolCalls.push({
         name: "get_interview_phase",
-        result: executeTool("get_interview_phase", {}, toolContext)
+        result: executeTool("get_interview_phase", {}, toolContext),
       })
 
       // Analyze user's message if it seems vague
       if (message && message.length < 80) {
         toolCalls.push({
           name: "analyze_user_response",
-          result: executeTool("analyze_user_response", { user_message: message }, toolContext)
+          result: executeTool("analyze_user_response", { user_message: message }, toolContext),
         })
       }
 
@@ -910,39 +921,7 @@ SOLUTION COMPLEXITY:
       toolResultsContext = formatToolResultsForPrompt(toolCalls)
     }
 
-    // =================================================================
-    // FEW-SHOT EXAMPLES: LLMs learn better from examples than rules
-    // =================================================================
-    const fewShotExamples = role === "interviewer" ? `
-=== EXAMPLES OF GOOD INTERVIEWER BEHAVIOR ===
-
-EXAMPLE 1: User explains approach without complexity
-User: "I'll use two pointers and sort the array first"
-BAD: "Great, go ahead and code it up"
-GOOD: "Solid approach. What time and space complexity do you expect?"
-
-EXAMPLE 2: User gives vague answer
-User: "I'll just skip the duplicates"
-BAD: "Sounds good, start coding"
-GOOD: "How exactly would you skip them? Walk me through where you'd add that check."
-
-EXAMPLE 3: User asks for the answer
-User: "What's the optimal time complexity?"
-BAD: "It's O(n log n)"
-GOOD: "What do you think? Walk me through your reasoning."
-
-EXAMPLE 4: User has optimal solution
-User: "Is O(n) the best I can do?"
-BAD: "Yes, that's optimal"
-GOOD: "What makes you think O(n) might be optimal? Are there any operations that would require more?"
-
-EXAMPLE 5: Tests pass
-[All tests passed]
-BAD: "Great job! Click submit"
-GOOD: "Nice, all passing. Walk me through your complexity analysis."
-
-=== END EXAMPLES ===
-` : ""
+    // Few-shot examples are now included in buildInterviewerPrompt()
 
     // Build Real Interview Mode context (fuzzy problem statements)
     let fuzzyModeContext = ""
@@ -975,51 +954,39 @@ BAD RESPONSES:
 `
     }
 
+    // Build interviewer prompt using consolidated function
+    const interviewerPrompt =
+      role === "interviewer"
+        ? buildInterviewerPrompt({
+            phase: currentPhase,
+            problemTitle: scenarioTitle || "",
+            problemDifficulty: scenarioPattern || patternMeta?.name || "medium",
+            userLevel: candidateLevel,
+            companyContext,
+            userContextString,
+            problemContext,
+            levelContext,
+            scenarioContext: isSystemDesign
+              ? systemDesignContext
+              : isBugFix
+                ? bugFixContext
+                : patternContext,
+            edgeCaseContext,
+            consoleContext,
+            trackingContext,
+            hintGuidance,
+            complexityContext,
+            enforcedChecklist,
+            testingPhaseOverride,
+            fuzzyModeContext,
+            toolResultsContext,
+            isGenericCompany,
+            companyName: companyStyle.company,
+          })
+        : ""
+
     const systemPrompts = {
-      interviewer: `You are Sable, a sharp and direct technical interviewer${isGenericCompany ? "" : ` at ${companyStyle.company}`}. You're known for being brutally honest but fair - you give real signal, not empty praise.
-
-PERSONALITY:
-- Direct, no-nonsense, but not mean. You've seen hundreds of interviews.
-- Casual language: "Nice", "Hmm", "Walk me through that", "Bold choice"
-- Genuinely curious about how candidates think
-- React naturally - you're not a robot
-
-NEVER SAY:
-- "Great question!" / "That's absolutely correct!" / "I appreciate you sharing that"
-- Long paragraphs of praise or generic encouragement
-
-CORE RULES:
-- Keep responses SHORT (2-4 sentences max)
-- Ask ONE question at a time
-- Sound natural and conversational
-- NEVER mention "View Detailed Feedback" until user has clicked Submit (you'll know via POST-INTERVIEW phase)
-${isGenericCompany ? "- Standard technical interview" : `- Adapt to ${companyStyle.company}'s interview culture`}
-
-${companyContext}
-${userContextString}${problemContext}
-${levelContext}
-${isSystemDesign ? systemDesignContext : isBugFix ? bugFixContext : patternContext}
-${edgeCaseContext}
-${consoleContext}
-
-${phasePrompt}
-${trackingContext}
-${hintGuidance}
-${complexityContext}
-${enforcedChecklist}
-${testingPhaseOverride}
-${fuzzyModeContext}
-
-${toolResultsContext}
-
-${fewShotExamples}
-
-PLATFORM ISSUES:
-- If they can't edit code, ask them to explain verbally instead
-- Don't repeat instructions they said they can't follow
-
-${scenarioTitle ? `Problem: ${scenarioTitle}` : ""}
-Continue naturally. Use their first name only.`,
+      interviewer: interviewerPrompt,
 
       partner: `You are an AI coding assistant (similar to ChatGPT, GitHub Copilot, or Claude) that candidates can use during technical interviews, similar to Meta's pilot program allowing AI tools.
 
@@ -1426,7 +1393,7 @@ Generate a response that follows these rules.`
         logger.info("[Hard Gates] Response regenerated", {
           sessionId,
           retries: gateResult.retries,
-          remainingViolations: gateResult.violations.map(v => v.rule),
+          remainingViolations: gateResult.violations.map((v) => v.rule),
         })
       }
 
@@ -1434,7 +1401,7 @@ Generate a response that follows these rules.`
       if (gateResult.violations.length > 0) {
         logger.warn("[Hard Gates] Violations in final response", {
           sessionId,
-          violations: gateResult.violations.map(v => ({
+          violations: gateResult.violations.map((v) => ({
             rule: v.rule,
             severity: v.severity,
           })),

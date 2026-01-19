@@ -14,9 +14,9 @@ import {
   updateTrackerFromMessage,
   detectInterviewPhase,
   buildTrackingContext,
-  PHASE_PROMPTS,
   getHintGuidance,
 } from "@/lib/interview/interview-phases"
+import { PHASE_PROMPTS } from "@/lib/interview/interviewer-prompts"
 import {
   extractTopicsFromMessage,
   extractUserAnsweredTopics,
@@ -50,9 +50,7 @@ export interface UseInterviewPhaseReturn {
   reset: () => void
 }
 
-export function useInterviewPhase(
-  options: UseInterviewPhaseOptions = {}
-): UseInterviewPhaseReturn {
+export function useInterviewPhase(options: UseInterviewPhaseOptions = {}): UseInterviewPhaseReturn {
   const { starterCodeLength = 0 } = options
 
   const [conversationTracker, setConversationTracker] =

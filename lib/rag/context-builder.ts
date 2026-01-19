@@ -710,9 +710,18 @@ ${enhancedProfile.insights.length > 0 ? `Key insight: ${enhancedProfile.insights
     // Interviewer instructions for complexity questioning
     context += `### How to Ask About Complexity
 
-**After they finish coding:**
-1. Ask "What's the time and space complexity of your solution?"
-2. Listen carefully to their answer
+**TIMING IS CRITICAL - Don't ask too early:**
+- ❌ DON'T ask about complexity when they're just confirming understanding ("So I can take 1 or 2 steps, right?")
+- ❌ DON'T ask about complexity immediately after they mention an approach
+- ✅ DO ask about complexity AFTER they've explained their approach in detail
+- ✅ DO ask about complexity AFTER they've walked through how their solution works
+- ✅ DO ask about complexity AFTER they finish coding (if not already discussed)
+
+**Natural flow:**
+1. Let them explore and explain their approach first
+2. Ask clarifying questions: "Walk me through how that works", "What happens when..."
+3. Once they've explained their approach in detail, THEN ask: "What time and space complexity do you expect?"
+4. Listen carefully to their answer
 
 **If they give WRONG complexity:**
 - Don't immediately correct them

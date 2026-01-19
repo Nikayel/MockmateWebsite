@@ -445,7 +445,8 @@ export function calculateValidatedScores(
   // === COMMUNICATION SCORE (20%) ===
   // CRITICAL: Real interviews require explaining your approach BEFORE coding
   // Passing tests without explanation is NOT good communication
-  let communication = 35 // Lower base - must earn through actual communication
+  // Start low - must earn through actual communication
+  let communication = aiValidation.communicationScore || 10
 
   // If AI detected incoherence or gibberish, cap severely
   if (!aiValidation.isCoherent) {
@@ -515,12 +516,19 @@ export function calculateValidatedScores(
   } else {
     // No indicators at all - truly silent coder
     // Real interviewers care about thought process, not just the answer
+    // Zero communication should be severely punished (around 10-15)
+    // Override any previous boosts - silent coding is unacceptable
+    // Set directly to 10-15 range, don't trust AI validation which might be too lenient
     if (isCorrectSolution) {
-      // Correct but silent = poor communication, cap at 45
-      communication = Math.min(45, communication)
+      // Correct but silent = very poor communication, set to 10-15
+      // Even if they solved it, no explanation means they failed the interview aspect
+      // Use AI's score if it's already very low (<=15), otherwise cap at 15
+      const aiScore = aiValidation.communicationScore || 10
+      communication = aiScore <= 15 ? aiScore : 15
     } else {
-      // Wrong AND silent = very poor communication
-      communication = Math.min(35, communication)
+      // Wrong AND silent = extremely poor communication
+      const aiScore = aiValidation.communicationScore || 5
+      communication = aiScore <= 10 ? aiScore : 10
     }
   }
 

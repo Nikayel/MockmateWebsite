@@ -117,25 +117,11 @@ export function detectInterviewPhaseLegacy(context: {
 }
 
 // =============================================================================
-// PHASE-SPECIFIC PROMPTS (DEPRECATED - use interviewer-prompts.ts)
+// PHASE-SPECIFIC PROMPTS (DEPRECATED - REMOVED)
 // =============================================================================
-
-/**
- * @deprecated Use PHASE_PROMPTS from './interviewer-prompts' instead.
- *
- * The verbose prompts have been replaced with few-shot examples which work better.
- * This export is kept for backwards compatibility only.
- *
- * Migration: import { PHASE_PROMPTS } from './interviewer-prompts'
- */
-export const PHASE_PROMPTS: Record<InterviewPhase, string> = {
-  intro: "PHASE: Introduction - Keep brief, let them study the problem",
-  discussion: "PHASE: Discussion - Ask about complexity and edge cases BEFORE coding",
-  coding: "PHASE: Coding - Let them work, hint if stuck",
-  testing: "PHASE: Testing - Discuss results, complexity, improvements",
-  post_interview: "PHASE: Wrap-up - Guide to View Detailed Feedback",
-  complete: "PHASE: Complete - No AI interaction",
-}
+//
+// PHASE_PROMPTS has been moved to interviewer-prompts.ts
+// Import from there: import { PHASE_PROMPTS } from './interviewer-prompts'
 
 // =============================================================================
 // CONVERSATION TRACKING
@@ -396,24 +382,14 @@ export function buildTrackingContext(tracker: ConversationTracker): string {
 }
 
 // =============================================================================
-// INTERVIEWER BEHAVIOR RULES (DEPRECATED - replaced by hard gates + few-shot)
+// INTERVIEWER BEHAVIOR RULES (DEPRECATED - REMOVED)
 // =============================================================================
-
-/**
- * @deprecated These verbose rules have been replaced by:
- * 1. Hard gates in response-validation.ts (deterministic enforcement)
- * 2. Few-shot examples in interviewer-prompts.ts (better LLM learning)
- *
- * Verbose rules are kept for reference only. LLMs learn better from examples.
- */
-export const INTERVIEWER_BEHAVIOR_RULES = `
-[DEPRECATED] See interviewer-prompts.ts for few-shot examples and response-validation.ts for hard gates.
-Key rules (now enforced by hard gates):
-- no-premature-coding: Ask complexity + edge cases before coding
-- no-giving-answers: Use guiding questions
-- no-revealing-optimal: Don't confirm optimality
-- no-accepting-vague-answers: Probe for specifics
-`
+//
+// INTERVIEWER_BEHAVIOR_RULES has been replaced by:
+// 1. Hard gates in response-validation.ts (deterministic enforcement)
+// 2. Few-shot examples in interviewer-prompts.ts (better LLM learning)
+//
+// See response-validation.ts for hard gates and interviewer-prompts.ts for examples.
 
 // =============================================================================
 // PROGRESSIVE HINT SYSTEM

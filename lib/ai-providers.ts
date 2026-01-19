@@ -81,10 +81,10 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     enabled: !!process.env.DEEPSEEK_API_KEY,
     apiKey: process.env.DEEPSEEK_API_KEY,
     baseUrl: "https://api.deepseek.com/v1",
-    model: "deepseek-reasoner", // R1 model - $0.55/1M input, $2.19/1M output - best for critique/reasoning
+    model: "deepseek-chat", // V3 model - $0.27/1M input, $1.10/1M output - fast chat fallback
     maxTokens: 1024,
     temperature: 0.7,
-    costPer1kTokens: 0.00137, // Averaged - only used for Constitutional AI critique (~$0.003/critique)
+    costPer1kTokens: 0.000685, // Averaged - cheaper than reasoner, good for chat
   },
   "deepseek-chat": {
     name: "deepseek-chat",

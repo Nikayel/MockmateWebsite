@@ -292,7 +292,8 @@ VALIDATION RULES:
   traced through examples, AND discussed complexity - that's 60-80 range minimum.
   Don't penalize natural/conversational communication style.
 
-CRITICAL: Silent coding (no explanation at all) = communication score < 40.
+CRITICAL: Silent coding (no explanation at all) = communication score around 10-15.
+Zero communication should be severely punished - even correct solutions without explanation deserve ~10-15.
 But conversational explanations count! "I'm thinking..." or tracing through examples IS explaining.
 
 VOICE TRANSCRIPTION NOTE: The conversation may be from voice input with transcription artifacts:

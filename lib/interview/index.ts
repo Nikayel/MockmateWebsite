@@ -126,23 +126,18 @@ export {
 export type { PromptContext } from "./interviewer-prompts"
 
 // Interviewer tools (function calling for state queries)
-export {
-  INTERVIEWER_TOOLS,
-  executeTool,
-  formatToolResultsForPrompt,
-} from "./interviewer-tools"
+export { INTERVIEWER_TOOLS, executeTool, formatToolResultsForPrompt } from "./interviewer-tools"
 export type { ToolDefinition, ToolContext, ToolResult } from "./interviewer-tools"
 
 // Response validation (hard gates)
-export {
-  validateInterviewerResponse,
-  validateWithRetry,
-} from "./response-validation"
+export { validateInterviewerResponse, validateWithRetry } from "./response-validation"
 export type { ValidationResult, ResponseViolation, ValidationContext } from "./response-validation"
 
 // Conversation extraction (LLM-based state detection)
-export {
-  extractConversationState,
-  shouldRunExtraction,
-} from "./conversation-extraction"
+// NOTE: Server-only module - import directly from "./conversation-extraction"
+// to avoid bundling firebase-admin into client code.
+// export {
+//   extractConversationState,
+//   shouldRunExtraction,
+// } from "./conversation-extraction"
 export type { ExtendedConversationTracker } from "./conversation-extraction"

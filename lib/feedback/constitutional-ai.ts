@@ -125,6 +125,12 @@ CRITICAL RULES:
 - If scores are reasonable, return empty critiques
 - Focus on catching: unfair penalties, demotivating harshness, dishonest inflation
 
+CRITICAL: SILENT CODING (no explanation) = VERY LOW COMMUNICATION SCORE
+- If "Approach explained: false" AND "Silent solution: true", communication score should be 10-15
+- DO NOT boost communication scores for silent coders, even if they solved the problem correctly
+- Real interviews require explaining your approach - silent coding is unacceptable
+- Example: Communication=40 for silent coder is TOO HIGH, should be ~10-15
+
 Return JSON:
 {
   "critiques": [
