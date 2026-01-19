@@ -614,7 +614,12 @@ export async function updateInterviewSession(
 
       // Build score_breakdown object, only including defined values
       // This prevents Firebase errors from undefined field values
-      const scores = { understandingScore, problemSolvingScore, codeQualityScore, communicationScore }
+      const scores = {
+        understandingScore,
+        problemSolvingScore,
+        codeQualityScore,
+        communicationScore,
+      }
       const scoreBreakdownObj: Record<string, number> = {}
       copyDefinedFields(scoreBreakdownObj, scores, Object.keys(scores) as (keyof typeof scores)[])
 
@@ -736,6 +741,8 @@ export async function saveSessionState(
     testResults?: Array<any>
     testSummary?: { total: number; passed: number; failed: number; passRate: number }
     isPostInterviewDiscussion?: boolean
+    realInterviewMode?: boolean
+    strictTimeLimit?: number | null
   }
 ): Promise<void> {
   try {
@@ -754,6 +761,8 @@ export async function saveSessionState(
             : undefined,
           test_summary: state.testSummary,
           is_post_interview_discussion: state.isPostInterviewDiscussion ?? false,
+          real_interview_mode: state.realInterviewMode,
+          strict_time_limit: state.strictTimeLimit,
           saved_at: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),
@@ -777,6 +786,8 @@ export async function getSessionState(sessionId: string): Promise<{
   testResults?: Array<any>
   testSummary?: { total: number; passed: number; failed: number; passRate: number }
   isPostInterviewDiscussion?: boolean
+  realInterviewMode?: boolean
+  strictTimeLimit?: number | null
   savedAt?: string
   completedAt?: string
   feedbackStatus?: FeedbackStatus
@@ -801,6 +812,8 @@ export async function getSessionState(sessionId: string): Promise<{
       testResults?: Array<any>
       testSummary?: { total: number; passed: number; failed: number; passRate: number }
       isPostInterviewDiscussion?: boolean
+      realInterviewMode?: boolean
+      strictTimeLimit?: number | null
       savedAt?: string
       completedAt?: string
       feedbackStatus?: FeedbackStatus
@@ -823,6 +836,8 @@ export async function getSessionState(sessionId: string): Promise<{
       result.testResults = data.session_state.test_results
       result.testSummary = data.session_state.test_summary
       result.isPostInterviewDiscussion = data.session_state.is_post_interview_discussion ?? false
+      result.realInterviewMode = data.session_state.real_interview_mode
+      result.strictTimeLimit = data.session_state.strict_time_limit
       result.savedAt = data.session_state.saved_at
     }
 

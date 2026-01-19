@@ -160,6 +160,7 @@ export interface ConversationTracker {
   // NEW: Positive signals
   clarifyingQuestionsAsked?: boolean // Did they ask clarifying questions (good sign)
   answeredInterviewerQuestions?: number // How many questions did they answer
+  alternativesDiscussed?: boolean // Did they discuss alternative approaches or trade-offs
 }
 
 export function createEmptyTracker(): ConversationTracker {

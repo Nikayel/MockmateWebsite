@@ -3851,7 +3851,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         setInterviewerMessages((prev) => {
           const recentMessages = prev.slice(-2)
           const hasRecentErrorMsg = recentMessages.some(
-            (msg) => msg.type === "ai" && (msg.message.includes("problem running your code") || msg.message.includes("error in your code"))
+            (msg) =>
+              msg.type === "ai" &&
+              (msg.message.includes("problem running your code") ||
+                msg.message.includes("error in your code"))
           )
           if (hasRecentErrorMsg) {
             return prev
@@ -4033,7 +4036,10 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
         setInterviewerMessages((prev) => {
           const recentMessages = prev.slice(-2)
           const hasRecentErrorMsg = recentMessages.some(
-            (msg) => msg.type === "ai" && (msg.message.includes("problem running your code") || msg.message.includes("error in your code"))
+            (msg) =>
+              msg.type === "ai" &&
+              (msg.message.includes("problem running your code") ||
+                msg.message.includes("error in your code"))
           )
           if (hasRecentErrorMsg) {
             return prev
@@ -5467,7 +5473,7 @@ Take a breath, study the prompt on the left, and tell me how you plan to attack 
             startInterview(selectedScenario, company)
           }}
           scenarioCompanies={selectedScenario.companies || []}
-          hasFuzzyMode={!!selectedScenario.fuzzyStatement}
+          hasFuzzyMode={!!(selectedScenario as any).fuzzyStatement}
         />
       )}
 
