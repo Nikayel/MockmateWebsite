@@ -222,6 +222,55 @@ const GATES: Gate[] = [
     },
     hint: "Ask open questions: 'What approach are you considering?' not 'Would a hash map help?'"
   },
+
+  // GATE 9: No direct correction (from CORE_PRINCIPLES.never)
+  // Catches: "Actually, it's O(n)", "Actually, that's optimal", etc.
+  {
+    name: "no-direct-correction",
+    severity: "critical",
+    check: (ctx) => {
+      const correctionPatterns = [
+        /actually,?\s+(?:it'?s?|that'?s?|this is|the)/i,
+        /no,?\s+(?:it'?s?|that'?s?|the)/i,
+        /that'?s?\s+(?:not correct|incorrect|wrong)/i,
+        /the (?:correct|right|actual) (?:answer|complexity|approach) is/i,
+      ]
+
+      for (const pattern of correctionPatterns) {
+        const match = ctx.response.match(pattern)
+        if (match) {
+          return { violated: true, evidence: `Direct correction: "${match[0]}"` }
+        }
+      }
+      return null
+    },
+    hint: "Don't correct directly. Instead probe: 'Walk me through how you arrived at that. What operations are you counting?'"
+  },
+
+  // GATE 10: No explaining complexity for them (from CORE_PRINCIPLES.never)
+  // Catches: "That's O(n²) because of the nested loops", "The complexity comes from..."
+  {
+    name: "no-explaining-complexity",
+    severity: "critical",
+    check: (ctx) => {
+      const explainPatterns = [
+        /(?:it'?s?|that'?s?) O\([^)]+\) (?:because|since|due to)/i,
+        /the (?:time |space )?complexity (?:is|comes from|results from)/i,
+        /(?:because|since) (?:of )?(?:the )?(?:nested|inner|outer) loop/i,
+        /(?:sorting|the sort) (?:takes|is|adds) O\(/i,
+        /(?:you'?re?|this is) (?:iterating|looping) (?:through|over)/i,
+      ]
+
+      for (const pattern of explainPatterns) {
+        const match = ctx.response.match(pattern)
+        if (match) {
+          return { violated: true, evidence: `Explained complexity: "${match[0]}"` }
+        }
+      }
+      return null
+    },
+    hint: "Don't explain complexity for them. Ask: 'Walk me through why you think it's that complexity. Where does the n² come from?'"
+  },
 ]
 
 // =============================================================================
