@@ -17,7 +17,10 @@ import {
   VAGUE_ANSWER_PATTERNS,
   ACCEPTANCE_PATTERNS,
   PROBING_PATTERNS,
+  containsSummarizing,
+  countSentences,
 } from "./shared-patterns"
+import { SEMANTIC_RULES, buildSemanticValidationPrompt } from "./semantic-rules"
 
 export interface ValidationResult {
   isValid: boolean
@@ -275,104 +278,40 @@ const GATES: Gate[] = [
     },
     hint: "Don't teach edge cases. If they get it wrong, say 'Okay, noted.' and move on. Don't explain the correct answer.",
   },
-]
 
-// =============================================================================
-// LLM-BASED SEMANTIC VALIDATION (replaces fragile regex)
-// =============================================================================
+  // GATE 11: Response brevity - prevent classroom-style monologues
+  {
+    name: "response-brevity",
+    severity: "warning",
+    check: (ctx) => {
+      const count = countSentences(ctx.response)
+      if (count > 5) {
+        return { violated: true, evidence: `${count} sentences (max 4-5)` }
+      }
+      return null
+    },
+    hint: "Keep responses to 2-4 sentences. Ask ONE question, wait for answer.",
+  },
 
-/**
- * Semantic rules that regex can't reliably detect.
- * These are validated by LLM, not pattern matching.
- *
- * Why LLM instead of regex:
- * - "Actually, it's O(n)" is obvious, but
- * - "Well, to be precise, the complexity is linear" is the same violation
- * - "You're iterating twice so it's quadratic" explains complexity for them
- * - Regex misses all semantic variations
- */
-export const SEMANTIC_RULES = [
+  // GATE 12: No summarizing/parroting back what user said
   {
-    id: "no-direct-correction",
-    description: "AI corrects user's mistake directly instead of probing their reasoning",
-    examples: [
-      "BAD: 'Actually, it's O(n) not O(n²)'",
-      "BAD: 'No, that approach is actually optimal'",
-      "BAD: 'The correct complexity is O(n log n)'",
-      "GOOD: 'Walk me through how you arrived at O(n²)'",
-    ],
-  },
-  {
-    id: "no-explaining-complexity",
-    description: "AI explains complexity/approach instead of asking user to explain",
-    examples: [
-      "BAD: 'It's O(n²) because of the nested loops'",
-      "BAD: 'The sort adds O(n log n) to your solution'",
-      "BAD: 'You're iterating through n elements twice, so it's quadratic'",
-      "GOOD: 'Where does that complexity come from? Walk me through the operations.'",
-    ],
-  },
-  {
-    id: "no-revealing-approach",
-    description: "AI reveals the solution approach instead of guiding with questions",
-    examples: [
-      "BAD: 'You should use a hash map here'",
-      "BAD: 'The trick is to sort first, then use two pointers'",
-      "GOOD: 'What data structure might help you look things up quickly?'",
-    ],
-  },
-  {
-    id: "no-validation-phrases",
-    description: "AI validates/confirms correctness instead of staying neutral",
-    examples: [
-      "BAD: 'Nice, you've got the right idea'",
-      "BAD: 'Perfect, you've got the logic down'",
-      "BAD: 'That checks out'",
-      "BAD: 'Exactly'",
-      "GOOD: 'Okay. Walk me through why.' (neutral, doesn't confirm)",
-      "GOOD: 'Mm-hmm. What else?' (neutral acknowledgment)",
-    ],
-  },
-  {
-    id: "no-teaching-edge-cases",
-    description: "AI teaches the correct answer for edge cases instead of noting the mistake",
-    examples: [
-      "BAD: 'Actually, think about it - if you're already at stair 0, there's one way to be there'",
-      "BAD: 'The answer for zero should actually be 1, not 0'",
-      "BAD: 'You're already there, you don't need to climb'",
-      "GOOD: 'Okay, noted. Anything else?' (doesn't teach the correct answer)",
-      "GOOD: 'Alright. Let's move on.' (notes mistake, doesn't explain)",
-    ],
+    name: "no-summarizing",
+    severity: "warning",
+    check: (ctx) => {
+      const match = containsSummarizing(ctx.response)
+      if (match) {
+        return { violated: true, evidence: `Summarizing: "${match[0]}"` }
+      }
+      return null
+    },
+    hint: "Don't paraphrase. Move forward: 'Okay. How would that handle empty input?'",
   },
 ]
 
-/**
- * Build the semantic validation prompt
- */
-export function buildSemanticValidationPrompt(response: string): string {
-  const rulesText = SEMANTIC_RULES.map(
-    (r) => `${r.id}: ${r.description}\n${r.examples.join("\n")}`
-  ).join("\n\n")
-
-  return `You are a response validator. Check if this interviewer response violates any rules.
-
-RESPONSE TO CHECK:
-"${response}"
-
-RULES (violation = regenerate):
-${rulesText}
-
-Return JSON only:
-{
-  "violated": true/false,
-  "rule": "rule-id or null",
-  "evidence": "quote from response that violates, or null",
-  "suggestion": "how to fix it, or null"
-}
-
-Be strict. If the AI is explaining something instead of asking, that's a violation.
-If the AI is correcting instead of probing, that's a violation.`
-}
+// =============================================================================
+// LLM-BASED SEMANTIC VALIDATION
+// =============================================================================
+// Rules defined in ./semantic-rules.ts
 
 export interface SemanticValidationResult {
   violated: boolean
