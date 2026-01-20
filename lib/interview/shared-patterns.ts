@@ -55,15 +55,17 @@ export const VOICE_COMPLEXITY_PATTERNS = [
   // "on2" / "on 2" / "o n 2" -> O(n²)
   { pattern: /\bo\s*n\s*2\b/i, complexity: "O(n²)" },
   { pattern: /\bon2\b/i, complexity: "O(n²)" },
-  // "on squared" / "o n squared" -> O(n²)
-  { pattern: /\bo\s*n\s*squared\b/i, complexity: "O(n²)" },
-  { pattern: /\bon\s*squared\b/i, complexity: "O(n²)" },
+  // "on squared" / "o n squared" / "on square" / "o n square" -> O(n²)
+  // IMPORTANT: "square" (without 'd') is common in voice transcription
+  { pattern: /\bo\s*n\s*squared?\b/i, complexity: "O(n²)" },
+  { pattern: /\bon\s*squared?\b/i, complexity: "O(n²)" },
   // "o1" / "o 1" -> O(1)
   { pattern: /\bo\s*1\b/i, complexity: "O(1)" },
   { pattern: /\bo1\b/i, complexity: "O(1)" },
   // "on" / "o n" (alone, not part of other words) -> O(n)
-  { pattern: /\bo\s*n\b(?!\s*(?:log|squared|2|3))/i, complexity: "O(n)" },
-  { pattern: /\bon\b(?!\s*(?:log|squared|2|3|e|ce|ly))/i, complexity: "O(n)" },
+  // Negative lookahead to avoid matching "o n square" which should be O(n²)
+  { pattern: /\bo\s*n\b(?!\s*(?:log|squared?|2|3))/i, complexity: "O(n)" },
+  { pattern: /\bon\b(?!\s*(?:log|squared?|2|3|e|ce|ly))/i, complexity: "O(n)" },
   // "on log n" / "o n log n" -> O(n log n)
   { pattern: /\bo\s*n\s*log\s*n\b/i, complexity: "O(n log n)" },
   { pattern: /\bon\s*log\s*n\b/i, complexity: "O(n log n)" },

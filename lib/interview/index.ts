@@ -41,7 +41,7 @@ export { extractTopicsFromMessage, extractUserAnsweredTopics } from "./topic-ext
 
 // Code analysis utilities
 export { analyzeCodeEfficiency } from "./code-analysis"
-export type { CodeEfficiencyMetrics, OptimalComplexity } from "./code-analysis"
+export type { CodeEfficiencyMetrics, OptimalComplexity, AnalysisOptions } from "./code-analysis"
 
 // Clarifying questions checker (Real Interview Mode)
 // NOTE: Server-only module - import directly from "./clarifying-questions-checker"

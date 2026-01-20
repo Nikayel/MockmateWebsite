@@ -80,12 +80,16 @@ export const DSA_PATTERN_KNOWLEDGE: DSAPatternKnowledge[] = [
       'Start from same end for fast/slow pointer problems',
       'Movement logic depends on the condition being checked',
       'Often achieves O(1) space when problem seems to need O(n)',
+      'DUPLICATE SKIPPING: After incrementing left, compare nums[left] == nums[left-1] (left-1 is where we came FROM)',
+      'DUPLICATE SKIPPING: After decrementing right, compare nums[right] == nums[right+1] (right+1 is where we came FROM)',
+      'The +1/-1 direction in duplicate checks depends on movement direction, not pointer position',
     ],
     commonMistakes: [
       'Off-by-one errors in pointer movement',
       'Infinite loops when pointers don\'t move correctly',
       'Forgetting to handle equal elements',
       'Not considering when pointers cross',
+      'Confusing duplicate skip direction - after DECREMENTING right, check right+1 (previous position), not right-1',
     ],
     timeComplexity: {
       typical: 'O(n)',

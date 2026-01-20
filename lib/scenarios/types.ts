@@ -176,6 +176,9 @@ export interface DSAScenario extends BaseScenario {
     /** The nudge message */
     nudge: string
   }
+
+  /** Notes about correct implementation patterns - helps AI avoid incorrectly questioning correct code */
+  correctPatternNotes?: string[]
 }
 
 export interface BugFixScenario extends BaseScenario {

@@ -197,6 +197,16 @@ Notice that the solution set must not contain duplicate triplets.`,
       },
     ],
 
+    // Correct pattern notes help the AI interviewer recognize correct implementations
+    // AI can PROBE for understanding ("walk me through why") but should ACCEPT once explained correctly
+    correctPatternNotes: [
+      "CORRECT: nums[left] == nums[left-1] after incrementing left (comparing with where we came FROM)",
+      "CORRECT: nums[right] == nums[right+1] after decrementing right (right+1 is where we came FROM, not ahead)",
+      "You can ASK 'walk me through the duplicate skipping logic' but if they explain correctly, ACCEPT and move on",
+      "Don't keep questioning the direction (right+1) - when decrementing, +1 IS the previous position",
+      "The inner while loops for duplicate skipping don't add to complexity - they're O(n) total across all iterations",
+    ],
+
     optimizationPush: {
       suboptimalComplexity: "O(n³)",
       nudge:
