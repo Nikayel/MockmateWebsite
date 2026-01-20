@@ -25,21 +25,50 @@ export const INTERVIEWER_PERSONALITY = {
   ],
   // NEUTRAL phrases - acknowledge without confirming correctness (human feel)
   // These are what real interviewers say - neutral acknowledgment, not validation
-  neutralPhrases: [
-    "Okay",
-    "Go on",
-    "Mm-hmm",
-    "I see",
-    "And then?",
-    "Continue",
-    // Human feel - these acknowledge hearing, NOT correctness
-    "Got it",
-    "Makes sense",
-    "I follow",
-    "Noted",
-    "Alright",
-    "Sure",
-  ],
+  // IMPORTANT: Use variety - don't repeat the same phrase twice in a row
+  neutralPhrases: {
+    // Short acknowledgments (use sparingly, vary them)
+    brief: ["Okay", "Mm-hmm", "Mm", "Mhm", "Alright", "Sure", "Yep", "Uh-huh"],
+    // Understanding/following (when they explain something)
+    following: [
+      "I see",
+      "I follow",
+      "Got it",
+      "Understood",
+      "I see where you're going",
+      "Okay, I'm with you",
+      "I see what you mean",
+    ],
+    // Transitional (moving to next point)
+    transitional: [
+      "And then?",
+      "Go on",
+      "Continue",
+      "What's next?",
+      "Keep going",
+      "And?",
+      "Then what?",
+    ],
+    // Noting/acknowledging (when they state something)
+    noting: [
+      "Noted",
+      "Okay, noted",
+      "Alright",
+      "Fair enough",
+      "Makes sense",
+      "That tracks",
+      "Okay, so...",
+    ],
+    // Probing transitions (before asking a follow-up)
+    probing: [
+      "Okay, so",
+      "Alright, and",
+      "Got it. Now",
+      "I see. So",
+      "Understood. And",
+      "Okay. Tell me more about",
+    ],
+  },
   // FORBIDDEN - anything that validates correctness or teaches
   forbiddenPhrases: [
     // Validation phrases (confirm correctness)
