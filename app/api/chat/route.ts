@@ -626,8 +626,12 @@ ${
   allPassed
     ? `INTERVIEWER BEHAVIOR WHEN ALL TESTS PASS:
 - DO NOT say "let's run the tests" - they already did and passed!
-- Move to follow-up questions: complexity analysis, optimizations, edge cases
-- Example: "Nice, tests are passing. What's the time complexity?" or "Good - now let's talk about how you'd optimize this"`
+- If complexity AND edge cases were already discussed: guide them to Submit
+  * Say: "Tests are passing. When you're ready, click Submit to wrap up the interview."
+- If complexity NOT discussed: ask ONE question about time complexity
+- If edge cases NOT discussed: ask ONE question about edge cases
+- After ONE follow-up question, guide them to Submit on your next turn
+- DO NOT keep asking endless questions - wrap up promptly`
     : `INTERVIEWER BEHAVIOR WHEN TESTS FAIL:
 - Acknowledge the failing tests
 - Ask them to debug: "Looks like test ${testResultsArray.findIndex((t) => !t.passed) + 1} is failing - what do you think is happening there?"
@@ -898,16 +902,31 @@ ${missingItems.join("\n")}
         )
       }
 
-      if (alreadyCovered.length > 0) {
+      // Check if ALL key topics are covered
+      const allTopicsCovered =
+        tracker.timeComplexityMentioned && tracker.edgeCasesMentioned.length > 0
+
+      if (allTopicsCovered && testsHaveRunNow) {
+        // All topics covered - guide to Submit immediately
+        testingPhaseOverride = `
+═══════════════════════════════════════════════════════════════
+ALL KEY TOPICS COVERED - GUIDE TO SUBMIT:
+✅ Complexity: DISCUSSED (${tracker.timeComplexityValue || "mentioned"})
+✅ Edge cases: DISCUSSED (${tracker.edgeCasesMentioned.join(", ")})
+✅ Tests: PASSED
+
+ACTION: Give brief acknowledgment, then say "When you're ready, click Submit to wrap up the interview."
+DO NOT ask more questions - the interview discussion is complete.
+═══════════════════════════════════════════════════════════════
+`
+      } else if (alreadyCovered.length > 0) {
+        // Some topics covered - don't re-ask, but still need to cover missing topics
         testingPhaseOverride = `
 ═══════════════════════════════════════════════════════════════
 ALREADY COVERED (DO NOT RE-ASK):
 ${alreadyCovered.join("\n")}
 
-INSTEAD, focus on:
-- Ask about trade-offs or alternative approaches
-- Discuss what edge cases might still be missing
-- Ask about optimization potential (only if not already optimal)
+REMAINING: Ask ONE question about any missing topic, then guide to Submit.
 ═══════════════════════════════════════════════════════════════
 `
       }

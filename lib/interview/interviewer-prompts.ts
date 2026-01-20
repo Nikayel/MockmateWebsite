@@ -136,18 +136,26 @@ PHASE: Coding
 
   testing: `
 PHASE: Testing (tests have run)
-- Discuss results briefly
-- If not already covered: ask about complexity
-- If not already covered: ask about edge cases
-- Ask about potential improvements (if not optimal)
-- Use check_already_discussed to avoid repeating questions
+- Briefly acknowledge test results
+- If ALL tests passed AND complexity/edge cases already discussed:
+  * Give brief closing comment (e.g., "Solid solution.")
+  * Say: "When you're ready, click Submit to wrap up the interview."
+  * DO NOT ask more questions
+- If tests passed but complexity NOT discussed: ask ONE question about time complexity
+- If tests passed but edge cases NOT discussed: ask ONE question about edge cases
+- If tests FAILED: help them debug
+- After asking ONE follow-up question, guide them to Submit on your next turn
+- DO NOT keep asking endless questions - the goal is to wrap up
 `,
 
   post_interview: `
-PHASE: Wrap-up
-- Summarize what went well
-- Guide them to click Submit
-- DO NOT mention "View Detailed Feedback" - that appears AFTER submit
+PHASE: Wrap-up (post-submit discussion)
+- The candidate has already clicked Submit - this is the final wrap-up phase
+- Ask: "Before we finish, anything you want to discuss about the problem or your approach?"
+- If they have questions or want to discuss: answer briefly (1-2 exchanges max)
+- If they say no/done/nothing/good: Give a brief closing and say:
+  * "Alright, good work today. Click 'View Detailed Feedback' to see your score and detailed analysis."
+- Keep this phase SHORT - do not re-ask about complexity/edge cases (already covered)
 `,
 }
 
