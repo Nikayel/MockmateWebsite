@@ -20,18 +20,37 @@ cp .env.example .env.local
 
 ### 2. Environment Setup
 
-Get credentials from the team lead for:
+Get credentials from the team lead for. See `.env.example` for the full list.
 
 ```env
-# Required for local development
-NEXT_PUBLIC_FIREBASE_API_KEY=
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=
-GEMINI_API_KEY=
+# Required - AI & Firebase
+GEMINI_API_KEY=                          # AI chat & embeddings
+FIREBASE_ADMIN_PROJECT_ID=               # Firebase project
+FIREBASE_ADMIN_CLIENT_EMAIL=             # Firebase service account
+FIREBASE_ADMIN_PRIVATE_KEY=              # Firebase private key
 
-# Optional (payment features)
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
+# Required - Database
+NEXT_PUBLIC_SUPABASE_URL=                # Supabase project URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=           # Supabase anon key
+
+# Optional - Payments
+STRIPE_SECRET_KEY=                       # Stripe API key
+STRIPE_WEBHOOK_SECRET=                   # Stripe webhook signing
+
+# Optional - RAG/Vector Search
+PINECONE_API_KEY=                        # Vector database
+OPENAI_API_KEY=                          # Fallback embeddings
+
+# Optional - Voice Interviews
+NEXT_PUBLIC_DEEPGRAM_API_KEY=            # Speech-to-text
+
+# Optional - Email & Rate Limiting
+BREVO_API_KEY=                           # Email notifications
+UPSTASH_REDIS_REST_URL=                  # Distributed rate limiting
+UPSTASH_REDIS_REST_TOKEN=                # Upstash auth token
+
+# Optional - Cron Jobs
+CRON_SECRET=                             # Secure cron endpoints
 ```
 
 ### 3. Start Development
@@ -55,11 +74,17 @@ Visit http://localhost:3000 - you should see the landing page!
 ### Key Commands
 
 ```bash
-pnpm dev          # Start development server
+pnpm dev          # Start development server (Turbopack - fast)
+pnpm dev:webpack  # Start with Webpack (if Turbopack issues)
 pnpm build        # Production build
+pnpm build:analyze # Build with bundle analyzer
 pnpm test         # Run tests
 pnpm test:watch   # Run tests in watch mode
-pnpm lint         # Check code style
+pnpm test:coverage # Run tests with coverage report
+pnpm lint         # Check code style (ESLint)
+pnpm lint:fix     # Auto-fix lint issues
+pnpm format       # Format code (Prettier)
+pnpm format:check # Check formatting
 pnpm typecheck    # Check TypeScript errors
 ```
 
@@ -79,8 +104,14 @@ pnpm typecheck    # Check TypeScript errors
 | `app/api/chat/route.ts` | AI chat endpoint | ⭐⭐⭐ |
 | `app/api/execute/route.ts` | Code execution | ⭐⭐⭐ |
 | `lib/types.ts` | TypeScript types | ⭐⭐⭐ |
+| `lib/ai-providers.ts` | AI model integration | ⭐⭐⭐ |
 | `lib/stores/interview-store.ts` | Interview state | ⭐⭐ |
 | `lib/auth-context.tsx` | Authentication | ⭐⭐ |
+| `lib/validations/` | Zod API schemas | ⭐⭐ |
+| `lib/voice/` | Voice/speech-to-text | ⭐⭐ |
+| `lib/prompts/` | AI prompt templates | ⭐⭐ |
+| `lib/feedback/` | Session feedback system | ⭐⭐ |
+| `lib/quota-enforcement.ts` | Usage quota system | ⭐ |
 | `lib/rag/` | RAG system | ⭐ |
 | `lib/spaced-repetition/` | Learning algorithms | ⭐ |
 
@@ -91,15 +122,16 @@ pnpm typecheck    # Check TypeScript errors
 Each area can be owned by an engineer:
 
 ### 1. Interview Engine
-**Files:** `components/interview/`, `app/api/chat/`, `app/api/execute/`
+**Files:** `components/interview/`, `app/api/chat/`, `app/api/execute/`, `lib/prompts/`
 
 The core interview experience:
 - AI chat with interviewer/partner modes
-- Code editor (CodeMirror)
+- Code editor (CodeMirror 6)
 - Code execution and test validation
-- Real-time feedback
+- Real-time feedback with clarifying questions
+- Session history and replay
 
-**Key Technologies:** CodeMirror, Google Gemini, Piston API
+**Key Technologies:** CodeMirror 6, Google Gemini, Piston API, React 19, Next.js 16
 
 ### 2. Learning System
 **Files:** `lib/spaced-repetition/`, `components/roadmap/`, `app/api/spaced-repetition/`
@@ -123,27 +155,31 @@ AI capabilities:
 
 **Key Technologies:** Pinecone, Gemini embeddings, vector search
 
-### 4. User Dashboard
-**Files:** `components/dashboard/`, `components/practice/`, `app/(pages)/`
+### 4. User Dashboard & Pages
+**Files:** `components/dashboard/`, `components/practice/`, `app/dashboard/`, `app/sessions/`, `app/profile/`
 
 User-facing features:
-- Progress metrics
-- Session history
-- Practice mode
-- Profile settings
+- Progress metrics and analytics
+- Session history with detailed replay
+- Practice mode with problem selection
+- Profile settings and account management
+- Blog (`app/blog/`) and Careers (`app/careers/`) pages
+- Pricing and upgrade flows (`app/pricing/`, `app/upgrade/`)
 
-**Key Technologies:** React, Zustand, Recharts
+**Key Technologies:** React 19, Zustand, Recharts, Framer Motion
 
 ### 5. Platform & Infrastructure
-**Files:** `lib/admin/`, `lib/rate-limiter.ts`, `app/api/webhook/`
+**Files:** `lib/admin/`, `lib/rate-limiter.ts`, `lib/quota-enforcement.ts`, `app/api/webhook/`
 
 Platform reliability:
 - Authentication & RBAC
-- Rate limiting & quotas
-- Stripe integration
-- Admin panel
+- Rate limiting & quotas (Upstash Redis or Firestore)
+- Stripe integration & subscription sync
+- Admin panel with analytics
+- Guest sessions (`lib/guest-session.ts`)
+- Referral system (`lib/referrals.ts`)
 
-**Key Technologies:** Firebase Admin, Stripe, Firestore
+**Key Technologies:** Firebase Admin, Stripe, Firestore, Upstash Redis
 
 ### 6. Growth & Engagement
 **Files:** `lib/email/`, `lib/services/`, `app/api/cron/`
@@ -155,6 +191,17 @@ User retention:
 - Analytics
 
 **Key Technologies:** Brevo, Vercel Cron
+
+### 7. Voice Mode
+**Files:** `lib/voice/`, `components/interview/`
+
+Spoken interview experience:
+- Real-time speech-to-text transcription
+- Voice-based problem discussion
+- Deepgram integration for high accuracy
+- Fallback to browser Web Speech API
+
+**Key Technologies:** Deepgram, Web Speech API
 
 ---
 
@@ -364,14 +411,16 @@ export const useStore = create(
 
 ## First Week Checklist
 
-- [ ] Local dev environment running
+- [ ] Local dev environment running (`pnpm dev`)
 - [ ] Can log in with GitHub
-- [ ] Read through key documentation
+- [ ] Read through key documentation (README, ARCHITECTURE, API)
 - [ ] Explore codebase for 2-3 hours
-- [ ] Run tests successfully
+- [ ] Run tests successfully (`pnpm test`)
+- [ ] Run lint and typecheck (`pnpm lint && pnpm typecheck`)
+- [ ] Try an interview session (both text and voice mode if enabled)
 - [ ] Make a small PR (typo fix, comment, etc.)
 - [ ] Attend team sync meeting
-- [ ] Identify domain of interest
+- [ ] Identify domain of interest from the 7 engineering domains
 
 ---
 
@@ -379,10 +428,31 @@ export const useStore = create(
 
 | Resource | URL |
 |----------|-----|
+| Production Site | https://codesparring.com |
 | Vercel Dashboard | https://vercel.com/nikayel |
 | Firebase Console | https://console.firebase.google.com |
 | Stripe Dashboard | https://dashboard.stripe.com |
-| Production Site | https://codesparring.com |
+| Pinecone Console | https://app.pinecone.io |
+| Brevo Dashboard | https://app.brevo.com |
+| Deepgram Console | https://console.deepgram.com |
+| GitHub Repo | https://github.com/Nikayel/MockmateWebsite |
+
+---
+
+## Tech Stack Quick Reference
+
+| Layer | Technology |
+|-------|------------|
+| Framework | Next.js 16 (App Router, Turbopack) |
+| UI | React 19, Tailwind CSS v4, shadcn/ui |
+| State | Zustand |
+| Database | Firebase Firestore, Supabase |
+| AI | Google Gemini, OpenAI (fallback) |
+| Vectors | Pinecone |
+| Payments | Stripe |
+| Email | Brevo |
+| Voice | Deepgram |
+| Testing | Vitest, React Testing Library |
 
 ---
 
