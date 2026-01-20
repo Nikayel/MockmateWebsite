@@ -30,6 +30,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Claude Code
+CLAUDE.md
+
 # Extension directory (cloned repo for context, not part of website build)
 /extension/
 
