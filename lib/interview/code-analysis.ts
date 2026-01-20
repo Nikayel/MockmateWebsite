@@ -10,6 +10,13 @@ export interface OptimalComplexity {
   space?: string
 }
 
+export interface AnalysisOptions {
+  /** Test pass rate (0-100). If 100%, we're more confident the solution is optimal */
+  testPassRate?: number
+  /** The DSA pattern type (e.g., "two-pointers", "sliding-window") for pattern-aware estimation */
+  pattern?: string
+}
+
 export interface CodeEfficiencyMetrics {
   linesOfCode: number
   complexity: "Low" | "Medium" | "High"
@@ -21,14 +28,56 @@ export interface CodeEfficiencyMetrics {
 }
 
 /**
+ * Detect obvious brute force patterns relative to the optimal complexity.
+ * Returns true if the code appears to use a clearly suboptimal approach.
+ */
+function detectBruteForcePattern(code: string, optimalTime?: string): boolean {
+  const forLoops = (code.match(/\bfor\b/gi) || []).length
+
+  // Count actual nested for loops (not just any loops)
+  const tripleNestedFor = (code.match(/\bfor\b[^}]*\{[^}]*\bfor\b[^}]*\{[^}]*\bfor\b/gi) || []).length > 0 ||
+    (code.match(/\bfor\b[^:]*:[^\n]*\n\s+for\b[^:]*:[^\n]*\n\s+for\b/gi) || []).length > 0
+
+  // For O(n) optimal: 2+ nested for loops is likely brute force
+  if (optimalTime === "O(n)" && forLoops >= 2) {
+    const hasNestedFor = (code.match(/\bfor\b[^}]*\{[^}]*\bfor\b/gi) || []).length > 0 ||
+      (code.match(/\bfor\b[^:]*:[^\n]*\n\s+for\b/gi) || []).length > 0
+    if (hasNestedFor) return true
+  }
+
+  // For O(n²) optimal: 3 nested for loops is brute force (like brute force 3Sum)
+  if (optimalTime === "O(n²)" && tripleNestedFor) {
+    return true
+  }
+
+  // For O(n log n) optimal: 2+ nested for loops is brute force
+  if (optimalTime === "O(n log n)" && forLoops >= 2) {
+    const hasNestedFor = (code.match(/\bfor\b[^}]*\{[^}]*\bfor\b/gi) || []).length > 0 ||
+      (code.match(/\bfor\b[^:]*:[^\n]*\n\s+for\b/gi) || []).length > 0
+    if (hasNestedFor) return true
+  }
+
+  return false
+}
+
+/**
  * Analyze code efficiency and estimate complexity.
+ *
+ * SYSTEMATIC APPROACH:
+ * 1. Use pattern recognition for common DSA patterns (two-pointers, sliding-window, etc.)
+ * 2. Detect and exclude "helper" loops (duplicate-skipping, pointer advancement)
+ * 3. If all tests pass and no brute force detected, trust the optimal complexity
+ * 4. Only penalize when there's clear evidence of suboptimal approach
+ *
  * @param code - The source code to analyze
  * @param optimalComplexity - Optional optimal complexity from the scenario
+ * @param options - Additional options like test pass rate for smarter estimation
  * @returns Efficiency metrics including estimated and optimal complexity
  */
 export function analyzeCodeEfficiency(
   code: string,
-  optimalComplexity?: OptimalComplexity
+  optimalComplexity?: OptimalComplexity,
+  options?: AnalysisOptions
 ): CodeEfficiencyMetrics {
   // Calculate lines of code (excluding empty lines and comments)
   const lines = code.split("\n")
@@ -55,6 +104,24 @@ export function analyzeCodeEfficiency(
   const forLoops = (code.match(/\bfor\b/gi) || []).length
   const whileLoops = (code.match(/\bwhile\b/gi) || []).length
   const totalLoops = forLoops + whileLoops
+
+  // Detect duplicate-skipping while loops (common in two-pointer solutions like 3Sum)
+  // These loops check array element equality like nums[x] == nums[x-1] or nums[x] == nums[x+1]
+  // They don't add to time complexity - they're bounded by O(n) total across all iterations
+  // because each element is only visited/skipped once
+  const dedupeLoopPattern =
+    /\bwhile\b[^:\n{]*(?:nums|arr|array|s|str|list|result|res|candidates|numbers)\s*\[[^\]]+\]\s*==\s*(?:nums|arr|array|s|str|list|result|res|candidates|numbers)\s*\[[^\]]+(?:\+|\-)\s*1\s*\]/gi
+  const dedupeLoops = (code.match(dedupeLoopPattern) || []).length
+
+  // Adjust loop counts: dedupe loops don't contribute to higher complexity
+  const effectiveTotalLoops = totalLoops - dedupeLoops
+
+  // Detect two-pointer pattern: while with left < right (or similar)
+  // This is a classic O(n) scan pattern used in problems like 3Sum, Container With Most Water, etc.
+  const hasTwoPointerPattern =
+    forLoops >= 1 &&
+    whileLoops >= 1 &&
+    /\bwhile\b[^:\n{]*\b(left|l|lo|low|start|i)\b[^:\n{]*(<|<=)[^:\n{]*\b(right|r|hi|high|end|j)\b/i.test(code)
 
   // Detect nested loops more robustly:
   // - JavaScript: for...{ ... for/while
@@ -83,11 +150,16 @@ export function analyzeCodeEfficiency(
 
   let estimatedTimeComplexity = "O(n)"
 
-  // IMPORTANT: Check nested loops FIRST, regardless of sort
-  // 3Sum pattern: for loop + while loop inside = O(n²), sort is just O(n log n) preprocessing
-  if (nestedLoopCount >= 2 || totalLoops >= 4) {
+  // IMPORTANT: Two-pointer pattern with for + while(left < right) is O(n²)
+  // Even with dedupe loops, the overall complexity is O(n) for outer loop × O(n) for two-pointer scan
+  if (hasTwoPointerPattern) {
+    // Two-pointer with optional duplicate skipping = O(n²)
+    // Examples: 3Sum, 4Sum with two-pointer inner loop
+    estimatedTimeComplexity = "O(n²)"
+  } else if (nestedLoopCount >= 2 || effectiveTotalLoops >= 4) {
+    // True O(n³): multiple levels of nesting without two-pointer optimization
     estimatedTimeComplexity = "O(n³)"
-  } else if (nestedLoopCount >= 1 || totalLoops >= 3) {
+  } else if (nestedLoopCount >= 1 || effectiveTotalLoops >= 3) {
     // for + nested while = O(n²) (e.g., 3Sum with two-pointer)
     estimatedTimeComplexity = "O(n²)"
   } else if (code.match(/\b(sort|sorted)\b/i)) {
@@ -127,6 +199,21 @@ export function analyzeCodeEfficiency(
   // Get optimal complexity from scenario (or use defaults)
   const optimalTimeComplexity = optimalComplexity?.time || "N/A"
   const optimalSpaceComplexity = optimalComplexity?.space || "N/A"
+
+  // SYSTEMATIC APPROACH: If all tests pass and no clear brute force, trust optimal complexity
+  // This handles edge cases where pattern recognition might miss something
+  // Rationale: If the solution works correctly for all test cases, and doesn't use an obviously
+  // suboptimal approach (like 3 nested for loops for a 2-pointer problem), it's likely optimal
+  const testPassRate = options?.testPassRate ?? 0
+  const isBruteForce = detectBruteForcePattern(code, optimalTimeComplexity)
+
+  if (testPassRate === 100 && optimalTimeComplexity !== "N/A" && !isBruteForce) {
+    // All tests pass and no brute force detected - trust the optimal complexity
+    // This is the systematic fallback when pattern recognition might be imperfect
+    estimatedTimeComplexity = optimalTimeComplexity
+    // For space, only trust optimal if we didn't detect extra data structures
+    // (some problems allow O(n) space for the output itself)
+  }
 
   // Calculate efficiency score (0-100)
   let efficiencyScore = 100
