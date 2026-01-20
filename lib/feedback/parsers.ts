@@ -37,7 +37,7 @@ export interface FeedbackSection {
  */
 function parseScoreWithJustification(label: string, scoreText: string, is100: boolean = true) {
   const regexWithJustification = new RegExp(
-    `[-•]?\\s*${label}[:\s–-]*(\\d+)\\s*\\/\\s*${is100 ? "100" : "10"}[–-\\s]+(.+?)(?=\\n|$)`,
+    `[-•]?\\s*${label}[:\\s–-]*(\\d+)\\s*\\/\\s*${is100 ? "100" : "10"}[–-\\s]+(.+?)(?=\\n|$)`,
     "i"
   )
   const matchWithJustification = scoreText.match(regexWithJustification)
@@ -47,7 +47,7 @@ function parseScoreWithJustification(label: string, scoreText: string, is100: bo
     return { score: is100 ? score : score * 10, justification }
   }
   const regexWithoutJustification = new RegExp(
-    `[-•]?\\s*${label}[:\s–-]*(\\d+)\\s*\\/\\s*${is100 ? "100" : "10"}`,
+    `[-•]?\\s*${label}[:\\s–-]*(\\d+)\\s*\\/\\s*${is100 ? "100" : "10"}`,
     "i"
   )
   const matchWithoutJustification = scoreText.match(regexWithoutJustification)
