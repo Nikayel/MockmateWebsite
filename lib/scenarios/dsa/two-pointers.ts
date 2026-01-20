@@ -197,6 +197,15 @@ Notice that the solution set must not contain duplicate triplets.`,
       },
     ],
 
+    // Correct pattern notes help the AI interviewer recognize correct implementations
+    // and avoid incorrectly questioning them
+    correctPatternNotes: [
+      "Duplicate skipping for left pointer: nums[left] == nums[left-1] (comparing with previous position after incrementing)",
+      "Duplicate skipping for right pointer: nums[right] == nums[right+1] (comparing with previous position after decrementing - right+1 is where we came FROM)",
+      "IMPORTANT: When decrementing right, right+1 is the PREVIOUS position (where we just were), so nums[right] == nums[right+1] is CORRECT",
+      "The inner while loops for duplicate skipping don't add to O(n²) complexity - they're bounded by O(n) total",
+    ],
+
     optimizationPush: {
       suboptimalComplexity: "O(n³)",
       nudge:

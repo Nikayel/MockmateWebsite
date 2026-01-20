@@ -51,6 +51,8 @@ export interface DynamicChatContext {
     commonWrongApproaches?: Array<{ description: string; intervention: string }>
     midCodingProbes?: Array<{ trigger: string; question: string }>
     optimizationPush?: { suboptimalComplexity: string; nudge: string }
+    /** Notes about correct implementation patterns - helps AI avoid incorrectly questioning correct code */
+    correctPatternNotes?: string[]
   }
 }
 
@@ -510,6 +512,8 @@ ${results.length > 0 ? `**From Knowledge Base:**\n${results[0].text.substring(0,
           question: p.question,
         })),
         optimizationPush: options.scenario.optimizationPush,
+        // Include correct pattern notes to help AI avoid incorrectly questioning correct implementations
+        correctPatternNotes: options.scenario.correctPatternNotes,
       }
     : undefined
 
@@ -582,6 +586,13 @@ export function formatDynamicContextForPrompt(context: DynamicChatContext): stri
     if (proactive.optimizationPush) {
       parts.push(
         `\n**Optimization Nudge:** If solution is ${proactive.optimizationPush.suboptimalComplexity}, say: "${proactive.optimizationPush.nudge}"`
+      )
+    }
+
+    // Include correct pattern notes to help AI avoid incorrectly questioning correct implementations
+    if (proactive.correctPatternNotes && proactive.correctPatternNotes.length > 0) {
+      parts.push(
+        `\n**Correct Pattern Notes (DO NOT question these - they are correct):**\n${proactive.correctPatternNotes.map((note) => `- ${note}`).join("\n")}`
       )
     }
   }
