@@ -266,7 +266,7 @@ async function getRecentSessionsForUser(userId: string) {
  * Get learning state for a user
  * Aggregates data from:
  * - user_learning_state: streak, topics, last activity
- * - user_problem_mastery: problem-level mastery
+ * - problem_mastery: problem-level mastery (unified collection)
  * - user_stats: aggregate session stats (PRIMARY FALLBACK)
  * - users/{userId}/session_summaries: individual sessions (SECONDARY FALLBACK)
  */
@@ -277,7 +277,8 @@ async function getLearningStateForUser(userId: string) {
       await Promise.all([
         adminDb.collection("user_learning_state").doc(userId).get(),
         adminDb.collection("user_stats").doc(userId).get(),
-        adminDb.collection("user_problem_mastery").doc(userId).collection("problems").get(),
+        // Use problem_mastery (unified collection for SR + score tracking)
+        adminDb.collection("problem_mastery").doc(userId).collection("problems").get(),
         // Also fetch session summaries as fallback for computing stats
         adminDb
           .collection("users")

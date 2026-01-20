@@ -19,7 +19,10 @@ import type { SessionScores, ScorePersistenceInput, MasteryLevel } from "./types
  * Updates three collections in a single batch:
  * 1. session_summaries - Individual session record
  * 2. user_stats - Aggregate statistics (using increment)
- * 3. user_problem_mastery - Per-problem tracking
+ * 3. problem_mastery - Per-problem tracking (unified with spaced repetition)
+ *
+ * NOTE: We use `problem_mastery` (not `user_problem_mastery`) to consolidate
+ * with the spaced repetition collection. This eliminates data duplication.
  *
  * @param input - Score persistence input
  */
@@ -63,9 +66,10 @@ export async function persistSessionScores(input: ScorePersistenceInput): Promis
     { merge: true }
   )
 
-  // 3. Problem mastery
+  // 3. Problem mastery - UNIFIED collection for both score tracking and spaced repetition
+  // This consolidates user_problem_mastery and problem_mastery into one collection
   const masteryRef = adminDb
-    .collection("user_problem_mastery")
+    .collection("problem_mastery")
     .doc(userId)
     .collection("problems")
     .doc(problemId)
@@ -74,6 +78,9 @@ export async function persistSessionScores(input: ScorePersistenceInput): Promis
     masteryRef,
     {
       last_score: scores.masteryScore,
+      review_count: FieldValue.increment(1),
+      last_review_at: FieldValue.serverTimestamp(),
+      // Also keep old field names for backwards compatibility during migration
       practice_count: FieldValue.increment(1),
       last_practiced: FieldValue.serverTimestamp(),
     },
@@ -212,8 +219,8 @@ export async function getMasteryStatistics(userId: string): Promise<{
   reviewing: number
   mastered: number
 }> {
-  // Read from problem_mastery collection (where spaced repetition stores mastery_level)
-  // NOT user_problem_mastery (which is for score persistence only)
+  // Read from problem_mastery collection (unified collection for both SR and score tracking)
+  // user_problem_mastery is deprecated - all data now goes to problem_mastery
   const snapshot = await adminDb
     .collection("problem_mastery")
     .doc(userId)
@@ -278,6 +285,8 @@ export async function getMasteredProblems(userId: string): Promise<
  * Update mastery level for a problem
  * Called after spaced repetition calculates new level
  *
+ * NOTE: Uses `problem_mastery` (unified collection) instead of `user_problem_mastery`
+ *
  * @param userId - User ID
  * @param problemId - Problem ID
  * @param masteryLevel - New mastery level
@@ -289,8 +298,9 @@ export async function updateProblemMasteryLevel(
   masteryLevel: MasteryLevel,
   interval: number
 ): Promise<void> {
+  // Use problem_mastery (unified with spaced repetition)
   const ref = adminDb
-    .collection("user_problem_mastery")
+    .collection("problem_mastery")
     .doc(userId)
     .collection("problems")
     .doc(problemId)
@@ -298,7 +308,8 @@ export async function updateProblemMasteryLevel(
   await ref.set(
     {
       mastery_level: masteryLevel,
-      current_interval: interval,
+      interval_days: interval, // Standard SR field name
+      current_interval: interval, // Backwards compatibility
       last_updated: FieldValue.serverTimestamp(),
     },
     { merge: true }

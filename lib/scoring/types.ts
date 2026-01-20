@@ -85,8 +85,13 @@ export interface ScorePersistenceInput {
   scores: SessionScores
 }
 
+import { SCORING } from "../constants"
+
 /**
  * Score weights for different calculation methods
+ *
+ * IMPORTANT: These are re-exported from lib/constants.ts for backwards compatibility.
+ * All weight definitions should be in constants.ts (single source of truth).
  *
  * Philosophy:
  * - Performance Score = Full interview simulation (communication matters)
@@ -94,19 +99,17 @@ export interface ScorePersistenceInput {
  */
 export const SCORE_WEIGHTS = {
   // Performance score (full interview simulation)
-  // Communication bumped to 30% to reflect real interview importance
-  // (At Google, poor communicators often get rejected even with correct solutions)
   performance: {
-    understanding: 0.25,
-    problemSolving: 0.25,
-    codeQuality: 0.2,
-    communication: 0.3,
+    understanding: SCORING.PERFORMANCE_WEIGHTS.UNDERSTANDING,
+    problemSolving: SCORING.PERFORMANCE_WEIGHTS.PROBLEM_SOLVING,
+    codeQuality: SCORING.PERFORMANCE_WEIGHTS.CODE_QUALITY,
+    communication: SCORING.PERFORMANCE_WEIGHTS.COMMUNICATION,
   },
   // Technical score = Mastery score (objective metrics only)
   // Calculated in lib/spaced-repetition/mastery-score.ts
   technical: {
-    correctness: 0.6, // 60% - Test pass rate
-    timeEfficiency: 0.25, // 25% - Time relative to expected
-    independence: 0.15, // 15% - Minimal hint usage
+    correctness: SCORING.TECHNICAL_WEIGHTS.CORRECTNESS,
+    timeEfficiency: SCORING.TECHNICAL_WEIGHTS.TIME_EFFICIENCY,
+    independence: SCORING.TECHNICAL_WEIGHTS.INDEPENDENCE,
   },
 } as const

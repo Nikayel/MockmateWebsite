@@ -252,9 +252,9 @@ async function backfillResearchData(): Promise<{
           .doc("current")
           .get()
 
-        // Get problem mastery data
+        // Get problem mastery data (unified collection)
         const masterySnap = await adminDb
-          .collection("user_problem_mastery")
+          .collection("problem_mastery")
           .doc(userId)
           .collection("problems")
           .get()

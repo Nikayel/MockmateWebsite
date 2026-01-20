@@ -8,13 +8,19 @@
 /**
  * Structured feedback schema - NEW GRADING CRITERIA
  * Aligned with real Meta/Google AI-assisted interview scoring
+ *
+ * Weight definitions are in lib/constants.ts (SCORING.PERFORMANCE_WEIGHTS)
+ * - understanding: 25% - Can you explain your approach? (LLM-evaluated)
+ * - problemSolving: 25% - Debug & optimize
+ * - codeQuality: 30% - Clean & efficient (tests pass)
+ * - communication: 20% - Think out loud
  */
 export interface FeedbackScores {
-  // New grading criteria
-  understanding: number // 30% - Can you explain your approach?
-  problemSolving: number // 25% - Debug & optimize
-  codeQuality: number // 25% - Clean & efficient
-  communication: number // 20% - Think out loud
+  // Primary grading criteria (see lib/constants.ts for weights)
+  understanding: number
+  problemSolving: number
+  codeQuality: number
+  communication: number
   // Legacy (kept for backward compatibility)
   correctness: number
   efficiency: number
