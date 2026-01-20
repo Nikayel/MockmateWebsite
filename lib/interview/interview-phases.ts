@@ -25,6 +25,7 @@ import {
 
 export type InterviewPhase =
   | "intro" // Initial greeting and problem introduction
+  | "clarification" //Letting oua user to talk througha and ask qs
   | "discussion" // Candidate explains approach, interviewer probes
   | "coding" // Candidate writes code, interviewer observes
   | "testing" // Tests run, discuss results and complexity
@@ -82,8 +83,10 @@ export function detectInterviewPhase(context: PhaseDetectionContext): InterviewP
 
   // 3. CODE LENGTH: Compare current code to starter template
   // If they've written >50 chars of actual code, they're coding
+  // Safety: Also require messageCount > 4 to ensure clarification phase
+  // isn't bypassed during early conversation (defense in depth)
   const codeWritten = context.currentCodeLength - context.starterCodeLength
-  if (codeWritten > 50) {
+  if (codeWritten > 50 && context.messageCount > 4) {
     return "coding"
   }
 
@@ -92,9 +95,15 @@ export function detectInterviewPhase(context: PhaseDetectionContext): InterviewP
     return "discussion"
   }
 
-  // 5. SIMPLE COUNT: Very early in conversation → intro
-  if (context.messageCount <= 2) {
+  // 5. SIMPLE COUNT: Very first message only → intro
+  if (context.messageCount === 0) {
     return "intro"
+  }
+
+  // 6. Early conversation, user hasn't explained approach yet → clarification
+  // This gives them space to read and ask questions before we probe for approach
+  if (context.messageCount <= 4 && !context.approachExplained) {
+    return "clarification"
   }
 
   // 6. DEFAULT: Still in discussion phase

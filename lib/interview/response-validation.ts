@@ -309,6 +309,48 @@ const GATES: Gate[] = [
     },
     hint: "Don't paraphrase. Move forward: 'Okay. How would that handle empty input?'",
   },
+
+  // GATE 13: No asking for approach during clarification phase
+  {
+    name: "no-approach-in-clarification",
+    severity: "critical",
+    check: (ctx) => {
+      // Only applies to clarification phase (early messages, approach not explained)
+      if (ctx.phase !== "clarification") {
+        return null
+      }
+
+      // Patterns that ask for approach too early
+      const approachPatterns = [
+        /what(?:'s| is) your (?:approach|thinking|plan)/i,
+        /what(?:'s| is) your thinking/i, // "What's your thinking on how to solve"
+        /how (?:are you|would you) (?:thinking|approach|tackle|solve)/i,
+        /how are you thinking/i, // "how are you thinking about solving this"
+        /walk me through (?:your|the) (?:approach|plan|thinking)/i,
+        /walk me through your approach/i,
+        /what approach/i,
+        /how do you (?:want to|plan to) (?:solve|approach|tackle)/i,
+        /before you (?:start )?coding/i,
+        /let's (?:hear|discuss) your (?:approach|plan)/i,
+        /let's dive in/i, // "Let's dive into Group Anagrams" - rushing past clarification
+        /dive into/i,
+        /understand your approach/i, // "I want to understand your approach"
+        /your approach/i, // Generic catch-all for approach questions
+      ]
+
+      for (const pattern of approachPatterns) {
+        const match = ctx.response.match(pattern)
+        if (match) {
+          return {
+            violated: true,
+            evidence: `Asked for approach in clarification phase: "${match[0]}"`,
+          }
+        }
+      }
+      return null
+    },
+    hint: "In clarification phase, don't ask for approach. Say 'Take your time. Any questions about the problem?' Let THEM bring up their approach.",
+  },
 ]
 
 // =============================================================================

@@ -13,6 +13,18 @@ export interface SemanticRule {
 
 export const SEMANTIC_RULES: SemanticRule[] = [
   {
+    id: "no-approach-in-clarification",
+    description:
+      "During CLARIFICATION phase, AI asks about approach/thinking/solution before user brings it up",
+    examples: [
+      "BAD: 'What's your thinking on how to solve this?'",
+      "BAD: 'Before you start coding, I want to understand your approach'",
+      "BAD: 'How are you thinking about solving this?'",
+      "GOOD: 'Take your time reading. Any questions about the problem?'",
+      "GOOD: 'Let me know if anything is unclear.'",
+    ],
+  },
+  {
     id: "no-direct-correction",
     description: "AI corrects user's mistake directly instead of probing their reasoning",
     examples: [

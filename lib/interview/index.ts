@@ -121,7 +121,6 @@ export type {
 
 // Interviewer prompts (few-shot examples - preferred over verbose rules)
 export {
-  INTERVIEWER_SYSTEM_PROMPT,
   FEW_SHOT_EXAMPLES,
   PHASE_PROMPTS,
   QUICK_INJECTIONS,

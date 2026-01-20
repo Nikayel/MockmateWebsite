@@ -814,6 +814,13 @@ DO NOT:
       phasePrompt = PHASE_PROMPTS[currentPhase] || PHASE_PROMPTS.discussion
     }
 
+    // Debug logging for phase detection
+    logger.info("[Chat API] Phase detection", {
+      currentPhase,
+      messageCount,
+      approachExplained: phaseContext.approachExplained,
+    })
+
     // Build conversation tracking context if available
     // Use enhanced tracker (with LLM extraction) if available
     let trackingContext = ""
@@ -1402,14 +1409,39 @@ Remember: Acknowledge what they said, then probe deeper or move on. Do NOT re-as
         isOptimalSolution: solutionComplexity?.isOptimal || false,
       }
 
+      // DEBUG: Log validation context
+      logger.info("[Hard Gates] Validation context", {
+        sessionId,
+        phase: currentPhase,
+        responsePreview: aiResponse.text.substring(0, 100),
+      })
+
       // Regeneration function for the retry loop
       const regenerate = async (hint: string): Promise<string> => {
+        // Build a forceful correction prompt that REPLACES the original prompt
         const correctedPrompt = `${systemPrompt}
 
-⚠️ HARD GATE VIOLATION - REGENERATE:
-${hint}
+⚠️⚠️⚠️ CRITICAL VIOLATION - YOU MUST FIX THIS ⚠️⚠️⚠️
 
-Generate a response that follows these rules.`
+Your previous response violated interview rules and was REJECTED.
+
+VIOLATION: ${hint}
+
+YOU MUST generate a DIFFERENT response that follows the rules.
+
+${
+  currentPhase === "clarification"
+    ? `
+CLARIFICATION PHASE RULES:
+- Do NOT ask about their approach, thinking, or plan
+- Do NOT say "before you start coding" or "walk me through"
+- ONLY say something like: "Take your time reading. Any questions about the problem?"
+- Keep it SHORT (1-2 sentences max)
+`
+    : ""
+}
+
+Generate a compliant response NOW:`
 
         const regeneratedResponse = await generateAIResponse(
           correctedPrompt,
@@ -1420,6 +1452,7 @@ Generate a response that follows these rules.`
             userId,
             sessionId,
             eventType: "chat_message",
+            skipCache: true, // Must skip cache for regeneration - cache key only uses first 500 chars of system prompt
           }
         )
         return regeneratedResponse.text
@@ -1438,9 +1471,36 @@ Generate a response that follows these rules.`
         })
       }
 
-      // NOTE: Semantic validation removed - was redundant with 10 regex gates
-      // The regex gates catch validation phrases, teaching, giveaways, etc.
-      // Extra LLM call added latency without significant benefit
+      // Semantic validation for CLARIFICATION phase only
+      // Regex is fragile - use LLM to catch "asking for approach" that regex misses
+      // Only run for clarification phase to minimize latency impact
+      const hasCriticalViolations = gateResult.violations.some((v) => v.severity === "critical")
+      if (currentPhase === "clarification" && !hasCriticalViolations) {
+        const { validateSemanticRules } = await import("@/lib/interview/response-validation")
+        const semanticResult = await validateSemanticRules(
+          aiResponse.text,
+          async (system, user) => {
+            const result = await generateAIResponse(system, user, [], {
+              complexity: "simple",
+              userId,
+              sessionId,
+              eventType: "chat_message", // Reuse existing event type
+            })
+            return { text: result.text }
+          }
+        )
+
+        if (semanticResult.violated && semanticResult.rule === "no-approach-in-clarification") {
+          logger.info("[Semantic] Clarification phase violation detected", {
+            sessionId,
+            evidence: semanticResult.evidence,
+          })
+          // Regenerate with specific hint
+          const hint =
+            "CLARIFICATION PHASE: Do NOT ask about approach/thinking/plan. Say: 'Take your time. Any questions about the problem?'"
+          aiResponse.text = await regenerate(hint)
+        }
+      }
 
       // Log any remaining violations (warnings that didn't trigger regeneration)
       if (gateResult.violations.length > 0) {
@@ -1470,6 +1530,15 @@ Generate a response that follows these rules.`
       reply: aiResponse.text,
       provider: aiResponse.provider, // Include provider for debugging
       latencyMs: aiResponse.latencyMs,
+      // DEBUG: Include phase info to verify detection
+      _debug: {
+        phase: currentPhase,
+        messageCount,
+        approachExplained: phaseContext.approachExplained,
+        currentCodeLength: currentCodeLen,
+        starterCodeLength: starterLen,
+        codeWritten: currentCodeLen - starterLen,
+      },
     })
   } catch (error: any) {
     logger.error("Chat API error", {

@@ -172,6 +172,15 @@ const isLanguageSupported = (lang: string): lang is SupportedLanguage => {
   return SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage)
 }
 
+/**
+ * Generate the initial interviewer greeting message
+ * Gives user space to read the problem and ask clarifying questions
+ */
+const getInitialInterviewerMessage = (title: string, difficulty: string, problemType: string) =>
+  `Hey, I'm Sable, your interviewer for this session. Today we're working on **${title}**, a ${difficulty} ${problemType} problem.
+
+Take a moment to read through the problem on the left. Let me know if you have any questions about the requirements before we dive in.`
+
 interface ChatMessage {
   type: "user" | "ai"
   message: string
@@ -876,21 +885,11 @@ Let's continue!`
           } else {
             // Fresh start - no previous progress
             const isDSAScenario = scenario.type === "dsa"
-            initialMessage = isDSAScenario
-              ? `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${scenario.title}**, a ${scenario.difficulty} ${problemType} problem.
-
-Here's what I expect:
-- Walk me through your plan before you code; if you skip that, I'll call it out.
-- Narrate while you build so I can understand your reasoning.
-
-Take a breath, study the prompt on the left, and tell me how you plan to attack this.`
-              : `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${scenario.title}**, a ${scenario.difficulty} ${problemType} problem.
-
-Here's what I expect:
-- Walk me through your plan before you code; if you skip that, I'll call it out.
-- Narrate while you build so I can understand your reasoning.
-
-Take a breath, study the prompt on the left, and tell me how you plan to attack this.`
+            initialMessage = getInitialInterviewerMessage(
+              scenario.title,
+              scenario.difficulty,
+              problemType
+            )
 
             setInterviewerMessages([{ type: "ai", message: initialMessage }])
             if (!isDSAScenario) {
@@ -1959,6 +1958,8 @@ Interviews are conversations, not just coding exercises.`
       interviewPhase: getCurrentInterviewPhase(),
       conversationTracker,
       hasSubmitted: showPostInterviewDiscussion,
+      // Pass starterCodeLength for accurate phase detection (systemic fix)
+      starterCodeLength: starterCode.trim().length,
       // Real Interview Mode (fuzzy problem statements)
       realInterviewMode,
       hasFuzzyStatement: !!(selectedScenario as any)?.fuzzyStatement,
@@ -1979,6 +1980,7 @@ Interviews are conversations, not just coding exercises.`
       getCurrentInterviewPhase,
       conversationTracker,
       showPostInterviewDiscussion,
+      starterCode,
       efficiencyMetrics,
       realInterviewMode,
       selectedScenario,
@@ -2471,21 +2473,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           : scenario.type.toUpperCase()
     // Different initial message for DSA vs other scenarios
     const isDSA = scenario.type === "dsa"
-    const initialMessage = isDSA
-      ? `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${scenario.title}**, a ${scenario.difficulty} ${problemType} problem.
-
-Here's what I expect:
-- Walk me through your plan before you code; if you skip that, I'll call it out.
-- Narrate while you build so I can understand your reasoning.
-
-Take a breath, study the prompt on the left, and tell me how you plan to attack this.`
-      : `Hey, I'm Sable—your interviewer for this session. I keep things direct and brutally honest so you get signal that actually helps you improve. Today we're tackling **${scenario.title}**, a ${scenario.difficulty} ${problemType} problem.
-
-Here's what I expect:
-- Walk me through your plan before you code; if you skip that, I'll call it out.
-- Narrate while you build so I can understand your reasoning.
-
-Take a breath, study the prompt on the left, and tell me how you plan to attack this.`
+    const initialMessage = getInitialInterviewerMessage(
+      scenario.title,
+      scenario.difficulty,
+      problemType
+    )
 
     setInterviewerMessages([{ type: "ai", message: initialMessage }])
     setRecentNudgeTopics([]) // Reset tracked topics for new interview

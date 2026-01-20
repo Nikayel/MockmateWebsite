@@ -46,7 +46,8 @@ export interface PhaseResponse {
  * but some transitions are allowed to go "backwards" in certain cases.
  */
 const PHASE_TRANSITIONS: Record<InterviewPhase, InterviewPhase[]> = {
-  intro: ["discussion"],
+  intro: ["clarification"],
+  clarification: ["discussion"],
   discussion: ["coding", "testing"], // Can skip to testing if tests run early
   coding: ["testing", "discussion"], // Can go back to discussion if needed
   testing: ["coding", "post_interview"], // Can go back to fix code
