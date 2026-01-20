@@ -223,6 +223,8 @@ function InterviewPageContent() {
   const [isLoading, setIsLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
   const [showScenarioBrowser, setShowScenarioBrowser] = useState(true)
+  // Locked company for CompanyPicker when coming from roadmap with fuzzy scenario
+  const [lockedCompanyForPicker, setLockedCompanyForPicker] = useState<InterviewTargetCompany>(null)
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null)
   const [isInterviewStarted, setIsInterviewStarted] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
@@ -2200,15 +2202,23 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
     // Determine target company:
     // 1. If override provided (from company picker), use it
-    // 2. If from roadmap, use roadmap's target company
+    // 2. If from roadmap, use roadmap's target company (but show picker if fuzzy)
     // 3. If freeball with multiple companies and no selection, show picker
     // 4. If freeball with single company, use that company
     // 5. Otherwise, use "freeball" (generic)
     let effectiveTargetCompany: InterviewTargetCompany = companyOverride ?? targetCompany
+    const hasFuzzyMode = !!(scenario as any).fuzzyStatement
 
     if (!effectiveTargetCompany) {
       // Check if coming from roadmap
       if (activeRoadmap?.targetCompany) {
+        // If scenario has fuzzy mode, show picker to ask about Real Interview Mode
+        // Company is pre-selected/locked from roadmap
+        if (hasFuzzyMode) {
+          setLockedCompanyForPicker(activeRoadmap.targetCompany)
+          setShowCompanyPicker(true)
+          return // Wait for user to choose Real Interview Mode
+        }
         effectiveTargetCompany = activeRoadmap.targetCompany
       }
       // Check if scenario has companies tagged
@@ -2218,6 +2228,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           effectiveTargetCompany = scenario.companies[0].toLowerCase() as CompanyId
         } else {
           // Multiple companies - show picker
+          setLockedCompanyForPicker(null) // Not locked, let user choose
           setShowCompanyPicker(true)
           return // Wait for user to pick
         }
@@ -5493,13 +5504,17 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         />
       )}
 
-      {/* Company Picker Dialog (for freeball sessions) */}
+      {/* Company Picker Dialog (for freeball sessions or roadmap with fuzzy mode) */}
       {selectedScenario && (
         <CompanyPicker
           open={showCompanyPicker}
-          onClose={() => setShowCompanyPicker(false)}
+          onClose={() => {
+            setShowCompanyPicker(false)
+            setLockedCompanyForPicker(null)
+          }}
           onSelect={(company, realInterviewMode, strictTimeLimit) => {
             setShowCompanyPicker(false)
+            setLockedCompanyForPicker(null)
             // Store real interview mode and strict time settings
             useInterviewStore.getState().setRealInterviewMode(realInterviewMode)
             useInterviewStore.getState().setStrictTimeLimit(strictTimeLimit)
@@ -5508,6 +5523,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           }}
           scenarioCompanies={selectedScenario.companies || []}
           hasFuzzyMode={!!(selectedScenario as any).fuzzyStatement}
+          lockedCompany={lockedCompanyForPicker}
         />
       )}
 

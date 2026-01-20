@@ -6,11 +6,14 @@
  * or "Just Practicing" for generic feedback.
  *
  * Also includes "Real Interview Mode" toggle for fuzzy problem statements.
+ *
+ * When `lockedCompany` is provided (e.g., from roadmap), the company is pre-selected
+ * and locked, and the dialog focuses on the fuzzy mode choice.
  */
 
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -20,7 +23,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Building2, Target, Sparkles, Clock, Info } from "lucide-react"
+import { Building2, Target, Sparkles, Clock, Info, Lock, MessageSquareMore } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import type { CompanyId } from "@/lib/data/company-questions/types"
 import { COMPANY_MAP } from "@/lib/data/company-questions"
@@ -37,6 +40,7 @@ interface CompanyPickerProps {
   ) => void
   scenarioCompanies: string[] // Companies tagged on the scenario
   hasFuzzyMode?: boolean // Whether the scenario has fuzzy statement data
+  lockedCompany?: InterviewTargetCompany // Pre-selected company (e.g., from roadmap) - locks selection
 }
 
 export function CompanyPicker({
@@ -45,9 +49,19 @@ export function CompanyPicker({
   onSelect,
   scenarioCompanies,
   hasFuzzyMode = false,
+  lockedCompany,
 }: CompanyPickerProps) {
-  const [selected, setSelected] = useState<InterviewTargetCompany>(null)
+  const [selected, setSelected] = useState<InterviewTargetCompany>(lockedCompany ?? null)
   const [realInterviewMode, setRealInterviewMode] = useState(false)
+
+  // Sync selected state when lockedCompany changes
+  useEffect(() => {
+    if (lockedCompany) {
+      setSelected(lockedCompany)
+    }
+  }, [lockedCompany])
+
+  const isLocked = !!lockedCompany
 
   // Map scenario company strings to CompanyId (if they match)
   const availableCompanies = scenarioCompanies
@@ -70,17 +84,68 @@ export function CompanyPicker({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-[#00d9ff]" />
-              Which company are you targeting?
+              {isLocked ? (
+                <>
+                  <MessageSquareMore className="h-5 w-5 text-[#00d9ff]" />
+                  Real Interview Mode Available
+                </>
+              ) : (
+                <>
+                  <Target className="h-5 w-5 text-[#00d9ff]" />
+                  Which company are you targeting?
+                </>
+              )}
             </DialogTitle>
             <DialogDescription>
-              We&apos;ll tailor hints and feedback to match the company&apos;s interview style.
+              {isLocked
+                ? "This question supports a more realistic interview experience."
+                : "We'll tailor hints and feedback to match the company's interview style."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 py-4">
-            {/* Company options from scenario tags */}
-            {availableCompanies.length > 0 && (
+            {/* Locked company display (from roadmap) */}
+            {isLocked && selected && selected !== "freeball" && (
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                  Targeting (from your roadmap):
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="cursor-default gap-2 bg-[#00d9ff] text-black hover:bg-[#00d9ff]"
+                    disabled
+                  >
+                    <Building2 className="h-4 w-4" />
+                    {COMPANY_MAP[selected as CompanyId]?.name || selected}
+                    <Lock className="h-3 w-3 opacity-60" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Locked freeball display */}
+            {isLocked && selected === "freeball" && (
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                  Practice mode (from your roadmap):
+                </p>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="cursor-default gap-2 bg-gray-600 hover:bg-gray-600"
+                  disabled
+                >
+                  <Sparkles className="h-4 w-4" />
+                  General Practice
+                  <Lock className="h-3 w-3 opacity-60" />
+                </Button>
+              </div>
+            )}
+
+            {/* Company options from scenario tags (only when not locked) */}
+            {!isLocked && availableCompanies.length > 0 && (
               <div className="space-y-2">
                 <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                   This question is asked at:
@@ -107,24 +172,26 @@ export function CompanyPicker({
               </div>
             )}
 
-            {/* Freeball option */}
-            <div className="space-y-2 pt-2">
-              <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                Or practice without targeting:
-              </p>
-              <Button
-                variant={selected === "freeball" ? "default" : "outline"}
-                size="sm"
-                className={`gap-2 ${selected === "freeball" ? "bg-gray-600 hover:bg-gray-600/90" : ""}`}
-                onClick={() => setSelected("freeball")}
-              >
-                <Sparkles className="h-4 w-4" />
-                Freeballing (just practicing)
-              </Button>
-            </div>
+            {/* Freeball option (only when not locked) */}
+            {!isLocked && (
+              <div className="space-y-2 pt-2">
+                <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                  Or practice without targeting:
+                </p>
+                <Button
+                  variant={selected === "freeball" ? "default" : "outline"}
+                  size="sm"
+                  className={`gap-2 ${selected === "freeball" ? "bg-gray-600 hover:bg-gray-600/90" : ""}`}
+                  onClick={() => setSelected("freeball")}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Freeballing (just practicing)
+                </Button>
+              </div>
+            )}
 
-            {/* Info about selection */}
-            {selected && selected !== "freeball" && (
+            {/* Info about selection (only when not locked) */}
+            {!isLocked && selected && selected !== "freeball" && (
               <div className="bg-muted/50 rounded-lg p-3 text-sm">
                 <p className="text-muted-foreground">
                   <span className="text-foreground font-medium">
@@ -140,7 +207,7 @@ export function CompanyPicker({
               </div>
             )}
 
-            {selected === "freeball" && (
+            {!isLocked && selected === "freeball" && (
               <div className="bg-muted/50 rounded-lg p-3 text-sm">
                 <p className="text-muted-foreground">
                   You&apos;ll get{" "}
@@ -212,14 +279,14 @@ export function CompanyPicker({
 
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>
-              Cancel
+              {isLocked ? "Skip" : "Cancel"}
             </Button>
             <Button
               onClick={handleConfirm}
               disabled={!selected}
               className="bg-[#00d9ff] text-black hover:bg-[#00d9ff]/90"
             >
-              Start Interview
+              {isLocked && realInterviewMode ? "Start Real Interview" : "Start Interview"}
             </Button>
           </div>
         </DialogContent>
