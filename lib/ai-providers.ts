@@ -116,7 +116,7 @@ const FALLBACK_ORDER: Record<TaskComplexity, AIProvider[]> = {
   complex: ["gemini", "claude", "deepseek"], // Feedback generation - quality matters (uses reasoner)
   dialogue: ["claude", "gemini", "deepseek-chat"], // for the conversation in the chat
   code: ["deepseek-chat", "gemini", "claude"],
-  critique: ["deepseek", "claude", "gemini"],
+  critique: ["gemini", "claude", "deepseek"], // Constitutional AI - Gemini 3.0 Flash for better reasoning (DeepSeek was making false positives)
 }
 
 // Retry configuration

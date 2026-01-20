@@ -165,9 +165,8 @@ If no issues found, return:
 }`
 
   try {
-    // Using a DIFFERENT provider than the main scoring to ensure independent critique
-    // Main scoring uses Calude, so Deepseek here for true Constitutional AI
-    // Deepseek is excellent at reasoning/critique tasks and much cheaper than Claude
+    // Constitutional AI critique - uses Gemini 3.0 Flash for better reasoning
+    // Gemini has superior context understanding (e.g., "constant time" explanation vs claiming O(1))
     const response = await generateAIResponse(
       "You are a Constitutional AI reviewer. Return only valid JSON, no markdown.",
       critiquePrompt,
@@ -175,7 +174,6 @@ If no issues found, return:
       {
         complexity: "critique",
         temperature: 0.2,
-        // IMPORTANT: Different provider for true Constitutional AI (cheaper than Claude)
       }
     )
 
@@ -350,16 +348,15 @@ If no issues:
 }`
 
   try {
-    // Use a DIFFERENT provider than the main scoring to ensure independent critique
-    // Main scoring uses Gemini, so use Deepseek here for true Constitutional AI
-    // Deepseek is excellent at reasoning/critique tasks and much cheaper than Claude
+    // Constitutional AI critique - uses Gemini 3.0 Flash for better reasoning
+    // Gemini understands context better (won't misinterpret "constant time" explanations)
     const response = await generateAIResponse(
       "You are a Constitutional AI reviewer. Return only valid JSON, no markdown.",
       critiquePrompt,
       [],
       {
         complexity: "critique",
-        temperature: 0.2, // IMPORTANT: Different provider for true Constitutional AI (cheaper than Claude)
+        temperature: 0.2,
       }
     )
 
