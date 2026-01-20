@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from "react"
 import { Brain, User, MessageSquare, Send, Mic, MicOff, ChevronDown } from "lucide-react"
+import { FormattedText } from "@/components/ui/FormattedText"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -132,7 +133,12 @@ export function InterviewerChat({
     hasNewMessages,
     scrollToBottom,
     handleScroll,
-  } = useSmartScroll([interviewerMessages, isLoadingInterviewer, isGeneratingDiscussion, isRecording])
+  } = useSmartScroll([
+    interviewerMessages,
+    isLoadingInterviewer,
+    isGeneratingDiscussion,
+    isRecording,
+  ])
 
   // Rotating thinking message
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0)
@@ -191,73 +197,75 @@ export function InterviewerChat({
           <div
             ref={chatContainerRef}
             onScroll={handleScroll}
-            className="absolute inset-0 space-y-2 overflow-y-auto pr-2 scroll-smooth"
+            className="absolute inset-0 space-y-2 overflow-y-auto scroll-smooth pr-2"
             role="log"
             aria-label="Interview chat messages"
             aria-live="polite"
             aria-relevant="additions"
           >
-          {interviewerMessages.length === 0 ? (
-            <div className="py-8 text-center text-gray-400">
-              <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
-              <p className="text-xs">Interview will begin when you start...</p>
-            </div>
-          ) : (
-            <>
-              {interviewerMessages.map((msg, index) => (
-                <div
-                  key={`msg-${msg.type}-${index}`}
-                  className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
-                >
+            {interviewerMessages.length === 0 ? (
+              <div className="py-8 text-center text-gray-400">
+                <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                <p className="text-xs">Interview will begin when you start...</p>
+              </div>
+            ) : (
+              <>
+                {interviewerMessages.map((msg, index) => (
                   <div
-                    className={`max-w-[90%] rounded-lg p-2 ${
-                      msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-100"
-                    }`}
+                    key={`msg-${msg.type}-${index}`}
+                    className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
                   >
-                    <div className="mb-1 flex items-center space-x-1">
-                      {msg.type === "user" ? (
-                        <User className="h-3 w-3" />
-                      ) : (
-                        <Brain className="animate-neural-pulse h-3 w-3 text-[#00d9ff]" />
-                      )}
-                      <span className="text-xs opacity-75">
-                        {msg.type === "user" ? "You" : "CodeSparring AI"}
-                      </span>
-                    </div>
-                    <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.message}</p>
-                  </div>
-                </div>
-              ))}
-              {/* Thinking indicator - shows when AI is processing */}
-              {(isLoadingInterviewer || isGeneratingDiscussion) && (
-                <div className="flex justify-start">
-                  <div className="max-w-[90%] rounded-lg border border-gray-700/50 bg-gray-800/50 p-2 text-gray-400">
-                    <div className="flex items-center space-x-2">
-                      <Brain className="h-3 w-3 animate-pulse text-[#00d9ff]" />
-                      <span className="text-xs">
-                        {SABLE_THINKING_MESSAGES[thinkingMessageIndex]}
-                      </span>
-                      <span className="flex space-x-0.5">
-                        <span
-                          className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
-                          style={{ animationDelay: "0ms" }}
-                        />
-                        <span
-                          className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
-                          style={{ animationDelay: "150ms" }}
-                        />
-                        <span
-                          className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
-                          style={{ animationDelay: "300ms" }}
-                        />
-                      </span>
+                    <div
+                      className={`max-w-[90%] rounded-lg p-2 ${
+                        msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-100"
+                      }`}
+                    >
+                      <div className="mb-1 flex items-center space-x-1">
+                        {msg.type === "user" ? (
+                          <User className="h-3 w-3" />
+                        ) : (
+                          <Brain className="animate-neural-pulse h-3 w-3 text-[#00d9ff]" />
+                        )}
+                        <span className="text-xs opacity-75">
+                          {msg.type === "user" ? "You" : "CodeSparring AI"}
+                        </span>
+                      </div>
+                      <FormattedText className="text-xs leading-relaxed">
+                        {msg.message}
+                      </FormattedText>
                     </div>
                   </div>
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </>
-          )}
+                ))}
+                {/* Thinking indicator - shows when AI is processing */}
+                {(isLoadingInterviewer || isGeneratingDiscussion) && (
+                  <div className="flex justify-start">
+                    <div className="max-w-[90%] rounded-lg border border-gray-700/50 bg-gray-800/50 p-2 text-gray-400">
+                      <div className="flex items-center space-x-2">
+                        <Brain className="h-3 w-3 animate-pulse text-[#00d9ff]" />
+                        <span className="text-xs">
+                          {SABLE_THINKING_MESSAGES[thinkingMessageIndex]}
+                        </span>
+                        <span className="flex space-x-0.5">
+                          <span
+                            className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                            style={{ animationDelay: "0ms" }}
+                          />
+                          <span
+                            className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                            style={{ animationDelay: "150ms" }}
+                          />
+                          <span
+                            className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                            style={{ animationDelay: "300ms" }}
+                          />
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </>
+            )}
           </div>
           {/* Scroll to bottom button - appears when user scrolls up and new messages arrive */}
           {(hasNewMessages || !isAtBottom) && interviewerMessages.length > 0 && (
@@ -402,58 +410,58 @@ export function AIChatPartner({
         <div
           ref={chatContainerRef}
           onScroll={handleScroll}
-          className="absolute inset-0 space-y-1 overflow-y-auto rounded bg-gray-800/30 p-2 scroll-smooth"
+          className="absolute inset-0 space-y-1 overflow-y-auto scroll-smooth rounded bg-gray-800/30 p-2"
         >
-        {chatMessages.map((msg, index) => (
-          <div
-            key={`chat-${msg.type}-${index}`}
-            className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
-          >
+          {chatMessages.map((msg, index) => (
             <div
-              className={`max-w-[85%] rounded p-1.5 text-xs ${
-                msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-100"
-              }`}
+              key={`chat-${msg.type}-${index}`}
+              className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
             >
-              <div className="mb-0.5 flex items-center space-x-1">
-                {msg.type === "user" ? (
-                  <User className="h-2.5 w-2.5" />
-                ) : (
-                  <Brain className="animate-neural-pulse h-2.5 w-2.5 text-[#00d9ff]" />
-                )}
-                <span className="text-xs opacity-75">
-                  {msg.type === "user" ? "You" : "AI Partner"}
-                </span>
-              </div>
-              <p className="text-xs leading-tight">{msg.message}</p>
-            </div>
-          </div>
-        ))}
-        {/* Thinking indicator for AI Partner */}
-        {isLoadingChat && (
-          <div className="flex justify-start">
-            <div className="max-w-[85%] rounded border border-gray-600/50 bg-gray-700/50 p-1.5 text-gray-400">
-              <div className="flex items-center space-x-1.5">
-                <Brain className="h-2.5 w-2.5 animate-pulse text-[#00d9ff]" />
-                <span className="text-xs">{SABLE_THINKING_MESSAGES[thinkingMessageIndex]}</span>
-                <span className="flex space-x-0.5">
-                  <span
-                    className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
-                    style={{ animationDelay: "0ms" }}
-                  />
-                  <span
-                    className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
-                    style={{ animationDelay: "150ms" }}
-                  />
-                  <span
-                    className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
-                    style={{ animationDelay: "300ms" }}
-                  />
-                </span>
+              <div
+                className={`max-w-[85%] rounded p-1.5 text-xs ${
+                  msg.type === "user" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-100"
+                }`}
+              >
+                <div className="mb-0.5 flex items-center space-x-1">
+                  {msg.type === "user" ? (
+                    <User className="h-2.5 w-2.5" />
+                  ) : (
+                    <Brain className="animate-neural-pulse h-2.5 w-2.5 text-[#00d9ff]" />
+                  )}
+                  <span className="text-xs opacity-75">
+                    {msg.type === "user" ? "You" : "AI Partner"}
+                  </span>
+                </div>
+                <FormattedText className="text-xs leading-tight">{msg.message}</FormattedText>
               </div>
             </div>
-          </div>
-        )}
-        <div ref={chatEndRef} />
+          ))}
+          {/* Thinking indicator for AI Partner */}
+          {isLoadingChat && (
+            <div className="flex justify-start">
+              <div className="max-w-[85%] rounded border border-gray-600/50 bg-gray-700/50 p-1.5 text-gray-400">
+                <div className="flex items-center space-x-1.5">
+                  <Brain className="h-2.5 w-2.5 animate-pulse text-[#00d9ff]" />
+                  <span className="text-xs">{SABLE_THINKING_MESSAGES[thinkingMessageIndex]}</span>
+                  <span className="flex space-x-0.5">
+                    <span
+                      className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                      style={{ animationDelay: "0ms" }}
+                    />
+                    <span
+                      className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                      style={{ animationDelay: "150ms" }}
+                    />
+                    <span
+                      className="h-1 w-1 animate-bounce rounded-full bg-[#00d9ff]"
+                      style={{ animationDelay: "300ms" }}
+                    />
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={chatEndRef} />
         </div>
         {/* Scroll to bottom button for AI Partner */}
         {(hasNewMessages || !isAtBottom) && chatMessages.length > 0 && (

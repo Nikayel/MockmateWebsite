@@ -2533,6 +2533,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                 communication: scoreBreakdown.communicationScore,
               }
             : undefined,
+          clarifyingQuestionsAssessment: clarifyingQuestionsAssessment || undefined,
         })
 
         // Store system design notes if not already stored
@@ -2711,6 +2712,19 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       } | null = null
       let aiFeedbackSucceeded = false
       let localConstitutionalAICritique: Record<string, unknown> | null = null
+      let localClarifyingQuestionsAssessment: {
+        score: number
+        totalExpected: number
+        totalAsked: number
+        requiredAsked: number
+        requiredTotal: number
+        results: Array<{
+          question: string
+          required: boolean
+          asked: boolean
+          matchedPhrase?: string
+        }>
+      } | null = null
 
       const efficiencyData = analyzeCodeEfficiency(
         code,
@@ -2824,6 +2838,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             // Store clarifying questions assessment (Real Interview Mode)
             if (feedbackData.clarifyingQuestionsAssessment) {
               setClarifyingQuestionsAssessment(feedbackData.clarifyingQuestionsAssessment)
+              localClarifyingQuestionsAssessment = feedbackData.clarifyingQuestionsAssessment
             }
             aiFeedbackSucceeded = true
           } else {
@@ -2934,6 +2949,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             feedbackStatus: aiFeedbackSucceeded ? "complete" : "complete",
             scoreBreakdown: cleanScoreBreakdown,
             constitutionalAICritique: localConstitutionalAICritique || undefined,
+            clarifyingQuestionsAssessment: localClarifyingQuestionsAssessment || undefined,
           })
 
           trackSessionCompletion({

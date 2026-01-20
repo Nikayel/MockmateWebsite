@@ -157,6 +157,20 @@ export interface InterviewSession {
     interviewer_messages?: ChatMessage[]
     is_post_interview_discussion?: boolean
   }
+  // Clarifying questions assessment (Real Interview Mode)
+  clarifying_questions_assessment?: {
+    score: number
+    totalExpected: number
+    totalAsked: number
+    requiredAsked: number
+    requiredTotal: number
+    results: Array<{
+      question: string
+      required: boolean
+      asked: boolean
+      matchedPhrase?: string
+    }>
+  }
 }
 
 export interface ErrorState {

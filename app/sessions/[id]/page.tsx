@@ -275,6 +275,7 @@ export default function SessionDetailPage() {
               chatMessages={session.session_state?.chat_messages}
               interviewerMessages={session.session_state?.interviewer_messages}
               onNewProblem={() => router.push("/interview")}
+              clarifyingQuestionsAssessment={session.clarifying_questions_assessment}
             />
           ) : session.feedback_status === "pending" ? (
             // Session is being evaluated - show evaluating state

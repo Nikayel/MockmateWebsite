@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react"
+import { FormattedText } from "@/components/ui/FormattedText"
 import nextDynamic from "next/dynamic"
 
 const VoiceModeToggle = nextDynamic(
@@ -239,7 +240,7 @@ export function PostInterviewView({
                       {msg.type === "user" ? "You" : "CodeSparring AI"}
                     </span>
                   </div>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                  <FormattedText className="text-sm leading-relaxed">{msg.message}</FormattedText>
                 </div>
               </div>
             ))}

@@ -554,6 +554,20 @@ export async function updateInterviewSession(
         reasoning: string
       } | null
     }
+    // Clarifying questions assessment (Real Interview Mode)
+    clarifyingQuestionsAssessment?: {
+      score: number
+      totalExpected: number
+      totalAsked: number
+      requiredAsked: number
+      requiredTotal: number
+      results: Array<{
+        question: string
+        required: boolean
+        asked: boolean
+        matchedPhrase?: string
+      }>
+    }
   }
 ): Promise<void> {
   const sessionRef = doc(db, "interview_sessions", sessionId)
@@ -668,6 +682,10 @@ export async function updateInterviewSession(
     if (additionalData.constitutionalAICritique) {
       updateData.constitutional_ai_critique = additionalData.constitutionalAICritique
     }
+    // Save clarifying questions assessment (Real Interview Mode)
+    if (additionalData.clarifyingQuestionsAssessment) {
+      updateData.clarifying_questions_assessment = additionalData.clarifyingQuestionsAssessment
+    }
   }
 
   await setDoc(sessionRef, updateData, { merge: true })
@@ -706,8 +724,8 @@ export async function markSessionEvaluating(
           code: state.code,
           language: state.language,
           elapsed_time: state.elapsedTime,
-          chat_messages: state.chatMessages?.slice(-50) || [], // Keep last 50 messages
-          interviewer_messages: state.interviewerMessages?.slice(-50) || [],
+          chat_messages: state.chatMessages || [],
+          interviewer_messages: state.interviewerMessages || [],
           ...(state.testResults && {
             test_results: sanitizeTestResultsForFirestore(state.testResults.slice(-20)),
           }),
@@ -754,8 +772,8 @@ export async function saveSessionState(
           code: state.code,
           language: state.selectedLanguage,
           elapsed_time: state.elapsedTime,
-          chat_messages: state.chatMessages?.slice(-50), // Keep last 50 messages
-          interviewer_messages: state.interviewerMessages?.slice(-50),
+          chat_messages: state.chatMessages,
+          interviewer_messages: state.interviewerMessages,
           test_results: state.testResults
             ? sanitizeTestResultsForFirestore(state.testResults.slice(-20))
             : undefined,
@@ -1250,9 +1268,9 @@ export async function saveGuestSessionState(
           code: state.code,
           language: state.selectedLanguage,
           elapsed_time: state.elapsedTime,
-          chat_messages: state.chatMessages?.slice(-20),
-          interviewer_messages: state.interviewerMessages?.slice(-20),
-          test_results: state.testResults?.slice(-10),
+          chat_messages: state.chatMessages,
+          interviewer_messages: state.interviewerMessages,
+          test_results: state.testResults,
           saved_at: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),

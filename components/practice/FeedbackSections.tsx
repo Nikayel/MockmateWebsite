@@ -20,6 +20,7 @@ import {
   User,
   Bot,
   HelpCircle,
+  Lightbulb,
 } from "lucide-react"
 import type { ChatMessage } from "@/lib/types"
 import { LearningRecommendations } from "@/components/LearningRecommendations"
@@ -29,6 +30,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { FeedbackSection } from "@/lib/feedback/parsers"
 import type { SessionComplexityAnalysis } from "@/lib/rag/knowledge-base/types"
 import { ComplexityAnalysisCard } from "./ComplexityAnalysisCard"
+import { FormattedText } from "@/components/ui/FormattedText"
 
 interface AlternativeApproach {
   name: string
@@ -105,6 +107,7 @@ export const FeedbackSections = memo(function FeedbackSections({
   const [showRecommendations, setShowRecommendations] = useState(false)
   const [showQualityCheck, setShowQualityCheck] = useState(false)
   const [showChatHistory, setShowChatHistory] = useState(false)
+  const [showWhatYouMissed, setShowWhatYouMissed] = useState(false)
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set())
 
   // Combine and sort chat messages by timestamp if available
@@ -235,7 +238,7 @@ export const FeedbackSections = memo(function FeedbackSections({
                               }
                             }}
                           >
-                            {item}
+                            <FormattedText>{item}</FormattedText>
                           </span>
                         </TooltipTrigger>
                         {!isExpanded && isTruncated && (
@@ -244,7 +247,7 @@ export const FeedbackSections = memo(function FeedbackSections({
                             side="top"
                             sideOffset={5}
                           >
-                            <p className="whitespace-pre-wrap">{item}</p>
+                            <FormattedText>{item}</FormattedText>
                             <p className="mt-2 text-[10px] text-zinc-500">Click to expand inline</p>
                           </TooltipContent>
                         )}
@@ -295,7 +298,7 @@ export const FeedbackSections = memo(function FeedbackSections({
                               }
                             }}
                           >
-                            {item}
+                            <FormattedText>{item}</FormattedText>
                           </span>
                         </TooltipTrigger>
                         {!isExpanded && isTruncated && (
@@ -304,7 +307,7 @@ export const FeedbackSections = memo(function FeedbackSections({
                             side="top"
                             sideOffset={5}
                           >
-                            <p className="whitespace-pre-wrap">{item}</p>
+                            <FormattedText>{item}</FormattedText>
                             <p className="mt-2 text-[10px] text-zinc-500">Click to expand inline</p>
                           </TooltipContent>
                         )}
@@ -320,72 +323,137 @@ export const FeedbackSections = memo(function FeedbackSections({
         </div>
       </div>
 
-      {/* What You Missed - Only show if there are silent notes */}
+      {/* What You Missed - Collapsible section with coaching tone */}
       {sections.whatYouMissed && sections.whatYouMissed.length > 0 && (
-        <div className="rounded-xl border border-rose-900/30 bg-rose-950/20 p-4">
-          <div className="mb-3 flex items-center gap-1.5">
-            <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
-            <span className="text-xs font-medium text-rose-400">What You Missed</span>
-            <span className="ml-auto rounded-full bg-rose-900/30 px-2 py-0.5 text-[10px] text-rose-400">
-              Interviewer noted silently
-            </span>
-          </div>
-          <p className="mb-3 text-[10px] text-zinc-500">
-            These are mistakes the interviewer noticed but didn&apos;t correct during the session
-          </p>
-          <ul className="space-y-2">
-            {sections.whatYouMissed.slice(0, 5).map((item, i) => (
-              <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
-                <MessageSquareOff className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-500" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
+        <div className="overflow-hidden rounded-xl border border-zinc-800/50 bg-zinc-900/50">
+          <button
+            onClick={() => setShowWhatYouMissed(!showWhatYouMissed)}
+            className="flex w-full items-center justify-between p-4 transition-colors hover:bg-zinc-800/30"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10">
+                <Lightbulb className="h-4 w-4 text-violet-400" />
+              </div>
+              <div className="text-left">
+                <h3 className="text-sm font-medium text-white">Learning Opportunities</h3>
+                <p className="text-[10px] text-zinc-500">
+                  {sections.whatYouMissed.length} insight
+                  {sections.whatYouMissed.length > 1 ? "s" : ""} from your session
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-violet-500/10 px-2.5 py-1 text-[10px] font-medium text-violet-400">
+                Review
+              </span>
+              {showWhatYouMissed ? (
+                <ChevronUp className="h-4 w-4 text-zinc-500" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-zinc-500" />
+              )}
+            </div>
+          </button>
+
+          {showWhatYouMissed && (
+            <div className="border-t border-zinc-800/50 p-4">
+              <p className="mb-4 text-[11px] leading-relaxed text-zinc-400">
+                These are areas the interviewer noticed but didn&apos;t mention during the session.
+                Understanding these will help you improve for future interviews.
+              </p>
+              <div className="space-y-2">
+                {sections.whatYouMissed.slice(0, 5).map((item, i) => (
+                  <div key={i} className="rounded-lg border border-zinc-700/50 bg-zinc-800/30 p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-[10px] font-medium text-violet-400">
+                        {i + 1}
+                      </div>
+                      <div className="flex-1 text-xs leading-relaxed text-zinc-300">
+                        <FormattedText>{item}</FormattedText>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-4 text-[10px] text-zinc-500">
+                💡 Focus on one or two areas at a time in your next practice session.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
       {/* Clarifying Questions Assessment - Real Interview Mode */}
       {clarifyingQuestionsAssessment && clarifyingQuestionsAssessment.totalExpected > 0 && (
-        <div
-          className={`rounded-xl border p-4 ${
-            clarifyingQuestionsAssessment.score >= 70
-              ? "border-emerald-900/30 bg-emerald-950/20"
-              : clarifyingQuestionsAssessment.score >= 40
-                ? "border-amber-900/30 bg-amber-950/20"
-                : "border-rose-900/30 bg-rose-950/20"
-          }`}
-        >
-          <div className="mb-3 flex items-center gap-1.5">
-            <HelpCircle className="h-3.5 w-3.5 text-sky-400" />
-            <span className="text-xs font-medium text-sky-400">
-              Clarifying Questions ({clarifyingQuestionsAssessment.score}/100)
-            </span>
-            <span className="ml-auto rounded-full bg-sky-900/30 px-2 py-0.5 text-[10px] text-sky-400">
-              Real Interview Mode
-            </span>
+        <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/50 p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500/10">
+                <HelpCircle className="h-4 w-4 text-sky-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-white">Clarifying Questions</h3>
+                <p className="text-[10px] text-zinc-500">Real Interview Mode assessment</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div
+                className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${
+                  clarifyingQuestionsAssessment.score >= 70
+                    ? "bg-emerald-500/10 text-emerald-400"
+                    : clarifyingQuestionsAssessment.score >= 40
+                      ? "bg-amber-500/10 text-amber-400"
+                      : "bg-rose-500/10 text-rose-400"
+                }`}
+              >
+                {clarifyingQuestionsAssessment.score}/100
+              </div>
+            </div>
+          </div>
+
+          {/* Summary stats */}
+          <div className="mb-4 grid grid-cols-2 gap-2">
+            <div className="rounded-lg bg-zinc-800/50 p-2.5 text-center">
+              <div className="text-lg font-semibold text-emerald-400">
+                {clarifyingQuestionsAssessment.totalAsked}
+              </div>
+              <div className="text-[10px] text-zinc-500">Questions Asked</div>
+            </div>
+            <div className="rounded-lg bg-zinc-800/50 p-2.5 text-center">
+              <div className="text-lg font-semibold text-zinc-400">
+                {clarifyingQuestionsAssessment.totalExpected}
+              </div>
+              <div className="text-[10px] text-zinc-500">Expected</div>
+            </div>
           </div>
 
           {/* Questions asked */}
           {clarifyingQuestionsAssessment.results.filter((r) => r.asked).length > 0 && (
             <div className="mb-3">
-              <p className="mb-1 text-[10px] text-emerald-400">Asked:</p>
-              <ul className="space-y-1">
+              <div className="mb-2 flex items-center gap-1.5">
+                <CheckCircle className="h-3 w-3 text-emerald-500" />
+                <span className="text-[11px] font-medium text-emerald-400">
+                  Questions You Asked
+                </span>
+              </div>
+              <div className="space-y-1.5">
                 {clarifyingQuestionsAssessment.results
                   .filter((r) => r.asked)
                   .map((r, i) => (
-                    <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
-                      <CheckCircle className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
-                      <span>
-                        {r.question}
-                        {r.matchedPhrase && (
-                          <span className="ml-1 text-[10px] text-zinc-500">
-                            (you asked: &ldquo;{r.matchedPhrase}&rdquo;)
+                    <div
+                      key={i}
+                      className="rounded-lg border border-emerald-900/20 bg-emerald-950/20 p-2.5"
+                    >
+                      <div className="text-xs text-zinc-300">{r.question}</div>
+                      {r.matchedPhrase && (
+                        <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-zinc-500">
+                          <span className="rounded bg-zinc-800 px-1.5 py-0.5">
+                            &ldquo;{r.matchedPhrase}&rdquo;
                           </span>
-                        )}
-                      </span>
-                    </li>
+                        </div>
+                      )}
+                    </div>
                   ))}
-              </ul>
+              </div>
             </div>
           )}
 
@@ -393,23 +461,28 @@ export const FeedbackSections = memo(function FeedbackSections({
           {clarifyingQuestionsAssessment.results.filter((r) => !r.asked && r.required).length >
             0 && (
             <div>
-              <p className="mb-1 text-[10px] text-amber-400">Should have asked:</p>
-              <ul className="space-y-1">
+              <div className="mb-2 flex items-center gap-1.5">
+                <AlertTriangle className="h-3 w-3 text-amber-500" />
+                <span className="text-[11px] font-medium text-amber-400">Should Have Asked</span>
+              </div>
+              <div className="space-y-1.5">
                 {clarifyingQuestionsAssessment.results
                   .filter((r) => !r.asked && r.required)
                   .map((r, i) => (
-                    <li key={i} className="flex items-start gap-2 text-xs text-zinc-300">
-                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" />
-                      <span>{r.question}</span>
-                    </li>
+                    <div
+                      key={i}
+                      className="rounded-lg border border-amber-900/20 bg-amber-950/20 p-2.5"
+                    >
+                      <div className="text-xs text-zinc-300">{r.question}</div>
+                    </div>
                   ))}
-              </ul>
+              </div>
             </div>
           )}
 
-          <p className="mt-3 text-[10px] text-zinc-500">
-            In real interviews, asking clarifying questions before coding shows strong
-            problem-solving skills.
+          <p className="mt-4 rounded-lg bg-zinc-800/30 p-2.5 text-[10px] leading-relaxed text-zinc-500">
+            💡 In FAANG interviews, asking clarifying questions before coding demonstrates strong
+            problem-solving and communication skills.
           </p>
         </div>
       )}
@@ -516,7 +589,7 @@ export const FeedbackSections = memo(function FeedbackSections({
                       <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-zinc-800 text-[10px] font-medium text-zinc-400">
                         {i + 1}
                       </span>
-                      <span>{item}</span>
+                      <FormattedText>{item}</FormattedText>
                     </li>
                   ))}
                 </ol>
@@ -577,7 +650,7 @@ export const FeedbackSections = memo(function FeedbackSections({
                                 : "bg-zinc-800 text-zinc-300"
                             }`}
                           >
-                            <p className="break-words whitespace-pre-wrap">{msg.message}</p>
+                            <FormattedText className="break-words">{msg.message}</FormattedText>
                           </div>
                           {msg.type === "user" && (
                             <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-500/20">
@@ -626,7 +699,7 @@ export const FeedbackSections = memo(function FeedbackSections({
                                 : "bg-zinc-800 text-zinc-300"
                             }`}
                           >
-                            <p className="break-words whitespace-pre-wrap">{msg.message}</p>
+                            <FormattedText className="break-words">{msg.message}</FormattedText>
                           </div>
                           {msg.type === "user" && (
                             <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-500/20">
