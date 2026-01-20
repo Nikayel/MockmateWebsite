@@ -749,7 +749,7 @@ Follow up: Could you come up with a one-pass algorithm using only constant extra
     type: "dsa",
     pattern: "two-pointers",
     difficulty: "easy",
-    companies: ["Amazon", "Microsoft", "Apple"],
+    companies: ["Amazon", "Microsoft", "Apple", "ZipRecruiter"],
     description: "Reverse a string array in-place",
     tags: ["string", "two-pointers", "array"],
     estimatedTime: 10,

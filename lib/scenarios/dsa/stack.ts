@@ -12,7 +12,7 @@ export const stackScenarios: DSAScenario[] = [
     type: "dsa",
     pattern: "stack",
     difficulty: "easy",
-    companies: ["Amazon", "Google", "Meta", "Microsoft", "Roblox", "TikTok"],
+    companies: ["Amazon", "Google", "Meta", "Microsoft", "Roblox", "TikTok", "ZipRecruiter"],
     description: "Determine if a string containing parentheses is valid",
     tags: ["stack", "string"],
     estimatedTime: 15,
@@ -251,7 +251,7 @@ public:
     type: "dsa",
     pattern: "stack",
     difficulty: "medium",
-    companies: ["Amazon", "Microsoft", "Apple", "Meta"],
+    companies: ["Amazon", "Microsoft", "Apple", "Meta", "ZipRecruiter"],
     description:
       "Design a stack that supports push, pop, top, and retrieving the minimum element in constant time",
     tags: ["stack", "design"],

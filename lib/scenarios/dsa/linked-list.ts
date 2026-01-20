@@ -434,7 +434,7 @@ impl LRUCache {
     type: "dsa",
     pattern: "linked-list",
     difficulty: "easy",
-    companies: ["Amazon", "Google", "Meta"],
+    companies: ["Amazon", "Google", "Meta", "ZipRecruiter"],
     description: "Merge two sorted linked lists into one sorted list.",
     tags: ["linked-list", "recursion", "two-pointers"],
     estimatedTime: 20,
