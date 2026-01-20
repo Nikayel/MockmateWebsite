@@ -2234,6 +2234,119 @@ export const COMPANY_INTERVIEW_KNOWLEDGE: CompanyInterviewKnowledge[] = [
       ],
     },
   },
+  {
+    companyId: "ziprecruiter",
+    companyName: "ZipRecruiter",
+    interviewStyle: {
+      description:
+        "ZipRecruiter interviews are rated 2.9/5 difficulty on Glassdoor with 41.5% positive experiences. The OA uses CodeSignal with 4 problems in 60-120 minutes (LC Easy-Easy-Medium-Medium pattern). Unlike companies pursuing extreme algorithmic difficulty, ZipRecruiter focuses on 'detail traps' and 'logical complexity' - problems that test border processing, state management, and simulation rather than advanced algorithms. Passing score believed to be 520+. Average time to hire is 25 days.",
+      pace: "Moderate pace, 4 rounds total (1 screening + 3 loop)",
+      expectations: [
+        "LeetCode Easy to Medium (rarely advanced algorithms)",
+        "OA: 4 questions in 60-120 min, CodeSignal format",
+        "Focus on simulation, state management, complex logic",
+        "Border processing (empty arrays, edge cases) heavily tested",
+        "Live coding rounds focus on HOW you solve, not just IF",
+        "ML roles: arrays/hashmaps + recommendation system design",
+      ],
+    },
+    topPatterns: [
+      {
+        pattern: "arrays-hashing",
+        frequency: 90,
+        tips: [
+          "Array intersection problems reported",
+          "Difference between sums at even/odd indices",
+          "Find longest common prefix between arrays",
+          "Processing student score records and averages",
+        ],
+      },
+      {
+        pattern: "string",
+        frequency: 85,
+        tips: [
+          "Count all 3 splits of a string",
+          "Cyclic shifting to ordered sequence",
+          "String manipulation with DFS algorithms",
+          "Prefix trie knowledge helpful for some tasks",
+        ],
+      },
+      {
+        pattern: "intervals",
+        frequency: 75,
+        tips: [
+          "Lamp illumination coverage problems",
+          "Count control points covered by ranges",
+          "Beacon coverage in rectangular regions",
+          "Interval intersection problems",
+        ],
+      },
+      {
+        pattern: "matrix",
+        frequency: 70,
+        tips: [
+          "Frame sum and distinct sum in matrix submatrices",
+          "Sum/deduplicate sub-frames operations",
+          "Return max occurring names from 2D array",
+          "Matrix rotation and addition operations",
+        ],
+      },
+      {
+        pattern: "stack",
+        frequency: 50,
+        tips: [
+          "Min Stack implementation in live coding",
+          "Stack vs queue differences asked",
+          "Valid parentheses style problems",
+        ],
+      },
+    ],
+    interviewProcess: [
+      "Initial Recruiter Call (30 min) - intro, fit assessment, background",
+      "CodeSignal OA: 4 problems, 60-120 min (Easy-Easy-Medium-Medium)",
+      "Technical Phone Screen (45 min) - collaborative real-time coding",
+      "Onsite (4 rounds): problem solving, ML coding (if applicable), ML system design, behavioral",
+    ],
+    cultureTips: [
+      "Job marketplace AI matching is core product",
+      "Show passion for helping people find opportunities",
+      "Collaboration and innovation valued",
+      "Articulate thinking process clearly during interviews",
+      "Distributed systems experience is a plus",
+      "Use STAR method for behavioral questions",
+    ],
+    commonQuestionTypes: [
+      "Frame Sum and Distinct Sum in Matrix (Medium)",
+      "Difference Between Sums at Even/Odd Indices (Easy)",
+      "Student with Highest Average Score (Medium)",
+      "Count Control Points Illuminated by Lamps (Medium)",
+      "Beacon coverage in rectangular region (geometry)",
+      "Longest common prefix between two arrays",
+      "2D array max occurring elements with tie handling",
+      "URL shortening service design",
+      "Recommendation system design (ML roles)",
+      "SQL + algorithms for data roles",
+    ],
+    dosDonts: {
+      dos: [
+        "Practice CodeSignal format - aim for 520+ score",
+        "Focus on edge cases and border processing",
+        "Master state management and simulation problems",
+        "Explain your thought process clearly",
+        "Prepare distributed systems concepts",
+        "Know stack/queue differences cold",
+        "Practice array intersection and interval problems",
+      ],
+      donts: [
+        "Expect LeetCode Hard - focus on detail traps instead",
+        "Ignore empty array/string edge cases",
+        "Skip matrix manipulation practice",
+        "Underestimate logical complexity of 'easy' problems",
+        "Forget ML design prep if applying for ML roles",
+        "Be unfamiliar with CodeSignal platform",
+      ],
+    },
+  },
 ]
 
 /**

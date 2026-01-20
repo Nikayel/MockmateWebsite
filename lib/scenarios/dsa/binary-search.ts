@@ -12,7 +12,7 @@ export const binarySearchScenarios: DSAScenario[] = [
     type: "dsa",
     pattern: "binary-search",
     difficulty: "easy",
-    companies: ["Google", "Amazon", "Meta", "Microsoft", "NVIDIA", "TikTok"],
+    companies: ["Google", "Amazon", "Meta", "Microsoft", "NVIDIA", "TikTok", "ZipRecruiter"],
     description: "Implement binary search on a sorted array",
     tags: ["array", "binary-search"],
     estimatedTime: 15,

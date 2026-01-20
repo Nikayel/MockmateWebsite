@@ -66,6 +66,7 @@ export type Company =
   | "Oracle"
   | "Spotify"
   | "Twitch"
+  | "ZipRecruiter"
 
 export interface BaseScenario {
   id: string

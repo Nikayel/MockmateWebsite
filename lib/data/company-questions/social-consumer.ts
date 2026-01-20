@@ -615,6 +615,225 @@ export const redditData: CompanyQuestionData = {
   },
 }
 
+export const ziprecruiterData: CompanyQuestionData = {
+  id: "ziprecruiter",
+  name: "ZipRecruiter",
+  logo: "/company-logos/ziprecruiter.svg",
+  careers_url: "https://www.ziprecruiter.com/careers",
+
+  difficultyDistribution: {
+    easy: 30,
+    medium: 55,
+    hard: 15,
+  },
+
+  topPatterns: [
+    { pattern: "arrays-hashing", frequency: 90, priority: 10, typicalDifficulty: "medium" },
+    { pattern: "string", frequency: 85, priority: 9, typicalDifficulty: "medium" },
+    { pattern: "two-pointers", frequency: 70, priority: 8, typicalDifficulty: "medium" },
+    { pattern: "binary-search", frequency: 65, priority: 7, typicalDifficulty: "medium" },
+    { pattern: "trees", frequency: 60, priority: 7, typicalDifficulty: "medium" },
+    { pattern: "sliding-window", frequency: 55, priority: 6, typicalDifficulty: "medium" },
+    { pattern: "stack", frequency: 50, priority: 6, typicalDifficulty: "medium" },
+    { pattern: "sorting", frequency: 50, priority: 6, typicalDifficulty: "easy" },
+    { pattern: "bfs", frequency: 45, priority: 5, typicalDifficulty: "medium" },
+    { pattern: "dfs", frequency: 45, priority: 5, typicalDifficulty: "medium" },
+  ],
+
+  mustKnowQuestions: [
+    {
+      scenarioId: "dsa-two-sum",
+      title: "Two Sum",
+      frequency: "very_common",
+      lastReported: "2025 Q1",
+    },
+    {
+      scenarioId: "dsa-valid-parentheses",
+      title: "Valid Parentheses",
+      frequency: "very_common",
+      lastReported: "2025 Q1",
+    },
+    {
+      scenarioId: "dsa-merge-sorted-array",
+      title: "Merge Sorted Array",
+      frequency: "common",
+      lastReported: "2024 Q4",
+    },
+    {
+      scenarioId: "dsa-min-stack",
+      title: "Min Stack",
+      frequency: "common",
+      lastReported: "2025 Q1",
+      variants: ["Implement Min Stack with O(1) operations"],
+    },
+    {
+      scenarioId: "dsa-even-odd-index-sum-difference",
+      title: "Difference Between Sums at Even and Odd Indices",
+      frequency: "common",
+      lastReported: "2025 Q1",
+      variants: ["Filter elements by range constraint"],
+    },
+    {
+      scenarioId: "dsa-student-highest-average",
+      title: "Student with Highest Average Score",
+      frequency: "common",
+      lastReported: "2025 Q1",
+      variants: ["Handle tie-breaker alphabetically"],
+    },
+    {
+      scenarioId: "dsa-rotate-array",
+      title: "Rotate Array / Cyclic Rotation",
+      frequency: "common",
+      lastReported: "2024 Q4",
+      variants: ["Determine if string is cyclic rotation of another"],
+    },
+    {
+      scenarioId: "dsa-rotate-image",
+      title: "Rotate Image (Matrix 90°)",
+      frequency: "common",
+      lastReported: "2024 Q4",
+    },
+    {
+      scenarioId: "dsa-spiral-matrix",
+      title: "Spiral Matrix Traversal",
+      frequency: "occasional",
+      lastReported: "2024 Q4",
+    },
+    {
+      scenarioId: "dsa-number-of-islands",
+      title: "Number of Islands (BFS/DFS)",
+      frequency: "occasional",
+      lastReported: "2024 Q3",
+    },
+    {
+      scenarioId: "dsa-top-k-frequent-elements",
+      title: "Top K Frequent Elements",
+      frequency: "occasional",
+      variants: ["Max occurring element in 2D array"],
+    },
+    {
+      scenarioId: "dsa-merge-two-sorted-lists",
+      title: "Merge Two Sorted Lists",
+      frequency: "common",
+      lastReported: "2025 Q1",
+    },
+  ],
+
+  interviewProcess: {
+    totalRounds: 4,
+    rounds: [
+      {
+        type: "phone_screen",
+        duration: 30,
+        description: "Initial recruiter call - company intro and background discussion",
+        focusAreas: ["background", "motivation", "role-fit"],
+      },
+      {
+        type: "coding",
+        duration: 60,
+        description: "Online Assessment (CodeSignal/HackerRank) - 4 coding problems",
+        focusAreas: ["algorithms", "data-structures", "speed"],
+      },
+      {
+        type: "coding",
+        duration: 45,
+        description: "Technical Phone Screen - live coding with interviewer",
+        focusAreas: ["problem-solving", "communication", "code-quality"],
+      },
+      {
+        type: "coding",
+        duration: 180,
+        description: "Virtual Onsite - 3-4 rounds including coding, system design (senior), and behavioral",
+        focusAreas: ["algorithms", "system-design", "ML-design", "behavioral"],
+      },
+    ],
+    timeline: "2-4 weeks",
+    tips: [
+      "OA has 4 problems: 2 Easy + 2 Medium in 60 minutes - speed matters",
+      "Focus on simulation, state management, and complex logic problems",
+      "Questions often have business context (job matching, resume processing)",
+      "Edge cases and border handling are heavily tested",
+      "Practice on CodeSignal and HackerRank platforms",
+      "Live coding rounds focus on HOW you solve, not just getting the answer",
+      "SQL knowledge is valuable for some roles",
+      "React/frontend experience is a plus for full-stack positions",
+    ],
+  },
+
+  interviewStyle: {
+    pace: "moderate",
+    communicationEmphasis: 8,
+    codeQualityEmphasis: 7,
+    optimalSolutionRequired: false,
+    allowsPseudocode: true,
+    providesHints: true,
+    uniqueTraits: [
+      "LeetCode Easy to Medium difficulty (rarely Hard)",
+      "Detail traps and logical complexity over algorithm difficulty",
+      "Business context in problems (job marketplace domain)",
+      "OA uses CodeSignal or HackerRank",
+      "Interviewers are generally helpful and provide hints",
+      "Interview difficulty rated 2.9/5 by candidates",
+    ],
+  },
+
+  compensation: {
+    entryLevel: "$100k - $130k TC",
+    midLevel: "$140k - $200k TC",
+    seniorLevel: "$200k - $300k TC",
+  },
+
+  coreValues: {
+    principles: [
+      "Put Job Seekers First - empower people to find their next great opportunity",
+      "AI-Driven Innovation - use technology to simplify the hiring process",
+      "Build for Scale - serve millions of job seekers and employers",
+      "Move Fast, Stay Agile - iterate quickly on product improvements",
+      "Collaboration - work together across teams to solve complex problems",
+    ],
+    behavioralExpectations: [
+      "Show passion for helping people find jobs and grow careers",
+      "Demonstrate ability to work with large-scale data and systems",
+      "Exhibit strong problem-solving with attention to edge cases",
+      "Display collaborative mindset and openness to feedback",
+      "Show interest in AI/ML and recommendation systems",
+    ],
+    valueKeywords: [
+      "job marketplace",
+      "AI matching",
+      "job seekers",
+      "employers",
+      "scale",
+      "recommendation",
+      "career",
+      "hiring",
+    ],
+  },
+
+  engineeringCulture: {
+    philosophy: [
+      "AI-driven smart matching technology at the core",
+      "Full-stack development with modern frameworks",
+      "Distributed systems serving millions of users",
+      "Data-driven product decisions",
+      "Mobile-first with #1 rated job search app",
+    ],
+    techStack: [
+      "ReactJS",
+      "JavaScript/TypeScript",
+      "Python",
+      "Java",
+      "MySQL",
+      "Redis",
+      "Kubernetes",
+      "AWS",
+    ],
+    codeReviewStyle: "collaborative reviews with focus on readability and maintainability",
+    deploymentPhilosophy: "continuous deployment with feature flags and A/B testing",
+    documentationExpectations: "documentation for APIs and major system components",
+  },
+}
+
 /**
  * Combined social & consumer companies
  */
@@ -623,4 +842,5 @@ export const socialConsumerCompanies: CompanyQuestionData[] = [
   snapData,
   pinterestData,
   redditData,
+  ziprecruiterData,
 ]

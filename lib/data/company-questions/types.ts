@@ -43,6 +43,7 @@ export type CompanyId =
   | "oracle"
   | "spotify"
   | "twitch"
+  | "ziprecruiter"
 
 export type QuestionFrequency = "very_common" | "common" | "occasional" | "rare"
 

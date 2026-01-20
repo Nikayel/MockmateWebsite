@@ -12,7 +12,7 @@ export const graphsScenarios: DSAScenario[] = [
     type: "dsa",
     pattern: "graphs",
     difficulty: "medium",
-    companies: ["Amazon", "Meta", "Google", "Microsoft", "Salesforce", "Twitch"],
+    companies: ["Amazon", "Meta", "Google", "Microsoft", "Salesforce", "Twitch", "ZipRecruiter"],
     description: "Count the number of islands in a 2D grid",
     tags: ["array", "depth-first-search", "breadth-first-search", "union-find", "matrix"],
     estimatedTime: 25,

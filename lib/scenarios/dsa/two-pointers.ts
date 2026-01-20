@@ -749,7 +749,7 @@ Follow up: Could you come up with a one-pass algorithm using only constant extra
     type: "dsa",
     pattern: "two-pointers",
     difficulty: "easy",
-    companies: ["Amazon", "Microsoft", "Apple"],
+    companies: ["Amazon", "Microsoft", "Apple", "ZipRecruiter"],
     description: "Reverse a string array in-place",
     tags: ["string", "two-pointers", "array"],
     estimatedTime: 10,
@@ -1085,6 +1085,508 @@ Return the minimum number of boats to carry every given person.`,
         expected: 4,
         description: "No pairing possible",
       },
+    ],
+  },
+  {
+    id: "dsa-merge-sorted-array",
+    title: "Merge Sorted Array",
+    type: "dsa",
+    pattern: "two-pointers",
+    difficulty: "easy",
+    companies: ["Meta", "Microsoft", "Amazon", "ZipRecruiter"],
+    description: "Merge two sorted arrays into one sorted array in-place",
+    tags: ["array", "two-pointers", "sorting"],
+    estimatedTime: 15,
+    problemStatement: `You are given two integer arrays nums1 and nums2, sorted in non-decreasing order, and two integers m and n, representing the number of elements in nums1 and nums2 respectively.
+
+Merge nums1 and nums2 into a single array sorted in non-decreasing order.
+
+The final sorted array should not be returned by the function, but instead be stored inside the array nums1. To accommodate this, nums1 has a length of m + n, where the first m elements denote the elements that should be merged, and the last n elements are set to 0 and should be ignored. nums2 has a length of n.`,
+    examples: [
+      {
+        input: "nums1 = [1,2,3,0,0,0], m = 3, nums2 = [2,5,6], n = 3",
+        output: "[1,2,2,3,5,6]",
+        explanation: "The arrays we are merging are [1,2,3] and [2,5,6]. The result is [1,2,2,3,5,6].",
+      },
+      {
+        input: "nums1 = [1], m = 1, nums2 = [], n = 0",
+        output: "[1]",
+        explanation: "The arrays we are merging are [1] and []. The result is [1].",
+      },
+      {
+        input: "nums1 = [0], m = 0, nums2 = [1], n = 1",
+        output: "[1]",
+        explanation: "The arrays we are merging are [] and [1]. The result is [1].",
+      },
+    ],
+    constraints: [
+      "nums1.length == m + n",
+      "nums2.length == n",
+      "0 <= m, n <= 200",
+      "1 <= m + n <= 200",
+      "-10^9 <= nums1[i], nums2[j] <= 10^9",
+    ],
+    hints: [
+      "Start from the end of both arrays to avoid overwriting elements",
+      "Use three pointers: one for nums1's end, one for nums2's end, and one for the merged position",
+      "Compare elements and place the larger one at the merged position",
+    ],
+    starterCode: {
+      javascript: `function merge(nums1, m, nums2, n) {
+  // Write your solution here (modify nums1 in-place)
+
+}`,
+      typescript: `function merge(nums1: number[], m: number, nums2: number[], n: number): void {
+  // Write your solution here (modify nums1 in-place)
+
+}`,
+      python: `def merge(nums1, m, nums2, n):
+    # Write your solution here (modify nums1 in-place)
+    pass`,
+      java: `class Solution {
+    public void merge(int[] nums1, int m, int[] nums2, int n) {
+        // Write your solution here (modify nums1 in-place)
+    }
+}`,
+      cpp: `class Solution {
+public:
+    void merge(vector<int>& nums1, int m, vector<int>& nums2, int n) {
+        // Write your solution here (modify nums1 in-place)
+    }
+};`,
+      csharp: `public class Solution {
+    public void Merge(int[] nums1, int m, int[] nums2, int n) {
+        // Write your solution here (modify nums1 in-place)
+    }
+}`,
+      go: `func merge(nums1 []int, m int, nums2 []int, n int) {
+    // Write your solution here (modify nums1 in-place)
+}`,
+      rust: `impl Solution {
+    pub fn merge(nums1: &mut Vec<i32>, m: i32, nums2: &mut Vec<i32>, n: i32) {
+        // Write your solution here (modify nums1 in-place)
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: "O(m + n)",
+      space: "O(1)",
+    },
+    testCases: [
+      {
+        input: { nums1: [1, 2, 3, 0, 0, 0], m: 3, nums2: [2, 5, 6], n: 3 },
+        expected: [1, 2, 2, 3, 5, 6],
+        description: "Standard case with overlapping values",
+      },
+      {
+        input: { nums1: [1], m: 1, nums2: [], n: 0 },
+        expected: [1],
+        description: "Empty nums2",
+      },
+      {
+        input: { nums1: [0], m: 0, nums2: [1], n: 1 },
+        expected: [1],
+        description: "Empty nums1 (only zeros)",
+      },
+      {
+        input: { nums1: [4, 5, 6, 0, 0, 0], m: 3, nums2: [1, 2, 3], n: 3 },
+        expected: [1, 2, 3, 4, 5, 6],
+        description: "nums2 all smaller than nums1",
+      },
+      {
+        input: { nums1: [1, 2, 3, 0, 0, 0], m: 3, nums2: [4, 5, 6], n: 3 },
+        expected: [1, 2, 3, 4, 5, 6],
+        description: "nums2 all larger than nums1",
+      },
+    ],
+    fuzzyStatement: "Merge two sorted arrays into one sorted array.",
+    clarifyingQuestions: [
+      {
+        topic: "in_place",
+        question: "Should I modify the first array in-place or return a new array?",
+        answer: "Modify nums1 in-place. It has extra space at the end to accommodate all elements.",
+        required: true,
+      },
+      {
+        topic: "space",
+        question: "Can I use extra space?",
+        answer: "The optimal solution uses O(1) extra space by working backwards.",
+        required: false,
+      },
+    ],
+    commonWrongApproaches: [
+      {
+        description: "Starting from the beginning and shifting elements",
+        codeSignals: ["insert", "shift", "splice", "for i in range(m)"],
+        intervention:
+          "Starting from the beginning requires shifting elements which is O(n²). Can you think of a way to avoid this by starting from the end?",
+      },
+      {
+        description: "Creating a new array instead of modifying in-place",
+        codeSignals: ["new Array", "result = []", "merged = []", "new int["],
+        intervention:
+          "The problem asks you to modify nums1 in-place. Can you do this without creating a new array?",
+      },
+    ],
+    whatIfQuestions: [
+      "What if m is 0 (nums1 has no elements to merge)?",
+      "What if n is 0 (nums2 is empty)?",
+      "What if all elements in nums2 are smaller than all elements in nums1?",
+      "What if there are duplicate elements across both arrays?",
+    ],
+    midCodingProbes: [
+      {
+        trigger: "started with three pointers",
+        question: "Which pointer are you using for the write position, and why start from the end?",
+      },
+      {
+        trigger: "comparing elements",
+        question: "Walk me through what happens when nums1=[4,5,6,0,0,0] and nums2=[1,2,3].",
+      },
+      {
+        trigger: "handling edge case",
+        question: "What happens when one of the arrays is exhausted but the other still has elements?",
+      },
+    ],
+    optimizationPush: {
+      suboptimalComplexity: "O((m+n)²)",
+      nudge:
+        "Shifting elements is costly. Can you achieve O(m+n) by filling from the back instead of the front?",
+    },
+    correctPatternNotes: [
+      "Using three pointers (p1, p2, p for write position) is correct",
+      "Starting from the end (m+n-1) and working backwards is optimal",
+      "Handling remaining elements from nums2 at the end is necessary",
+    ],
+  },
+  {
+    id: "dsa-even-odd-index-sum-difference",
+    title: "Difference Between Sums at Even and Odd Indices",
+    type: "dsa",
+    pattern: "two-pointers",
+    difficulty: "easy",
+    companies: ["ZipRecruiter"],
+    description: "Calculate the difference between sums of elements at even and odd indices",
+    tags: ["array", "math"],
+    estimatedTime: 10,
+    problemStatement: `Given an integer array nums, calculate the sum of elements at even indices and the sum of elements at odd indices. Return the difference (even sum - odd sum).
+
+Only consider elements within the range [-100, 100]. Elements outside this range should be ignored.`,
+    examples: [
+      {
+        input: "nums = [1, 2, 3, 4, 5]",
+        output: "3",
+        explanation: "Even indices (0, 2, 4): 1 + 3 + 5 = 9. Odd indices (1, 3): 2 + 4 = 6. Difference: 9 - 6 = 3.",
+      },
+      {
+        input: "nums = [10, 20, 30, 40]",
+        output: "-20",
+        explanation: "Even indices: 10 + 30 = 40. Odd indices: 20 + 40 = 60. Difference: 40 - 60 = -20.",
+      },
+      {
+        input: "nums = [5, 200, 10, -5]",
+        output: "20",
+        explanation: "200 is outside [-100, 100] so ignored. Even: 5 + 10 = 15. Odd: -5 = -5. Difference: 15 - (-5) = 20.",
+      },
+    ],
+    constraints: [
+      "1 <= nums.length <= 10^5",
+      "-10^9 <= nums[i] <= 10^9",
+      "Only consider elements where -100 <= nums[i] <= 100",
+    ],
+    hints: [
+      "Iterate through the array once",
+      "Check if index is even or odd using modulo",
+      "Filter elements by the range constraint",
+    ],
+    starterCode: {
+      javascript: `function evenOddDifference(nums) {
+  // Write your solution here
+
+}`,
+      typescript: `function evenOddDifference(nums: number[]): number {
+  // Write your solution here
+
+}`,
+      python: `def even_odd_difference(nums):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public int evenOddDifference(int[] nums) {
+        // Write your solution here
+        return 0;
+    }
+}`,
+      cpp: `class Solution {
+public:
+    int evenOddDifference(vector<int>& nums) {
+        // Write your solution here
+        return 0;
+    }
+};`,
+      csharp: `public class Solution {
+    public int EvenOddDifference(int[] nums) {
+        // Write your solution here
+        return 0;
+    }
+}`,
+      go: `func evenOddDifference(nums []int) int {
+    // Write your solution here
+    return 0
+}`,
+      rust: `impl Solution {
+    pub fn even_odd_difference(nums: Vec<i32>) -> i32 {
+        // Write your solution here
+        0
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: "O(n)",
+      space: "O(1)",
+    },
+    testCases: [
+      {
+        input: { nums: [1, 2, 3, 4, 5] },
+        expected: 3,
+        description: "Standard case",
+      },
+      {
+        input: { nums: [10, 20, 30, 40] },
+        expected: -20,
+        description: "Negative result",
+      },
+      {
+        input: { nums: [5, 200, 10, -5] },
+        expected: 20,
+        description: "Filter out-of-range element",
+      },
+      {
+        input: { nums: [100, -100, 100, -100] },
+        expected: 400,
+        description: "Boundary values",
+      },
+      {
+        input: { nums: [0] },
+        expected: 0,
+        description: "Single element",
+      },
+    ],
+    fuzzyStatement: "Given an array, find the difference between sums at even and odd positions.",
+    clarifyingQuestions: [
+      {
+        topic: "index_definition",
+        question: "Are indices 0-based or 1-based? Is index 0 considered even or odd?",
+        answer: "Indices are 0-based. Index 0 is even, index 1 is odd, etc.",
+        required: true,
+      },
+      {
+        topic: "range_filter",
+        question: "Should I include all elements or only certain values?",
+        answer: "Only include elements within the range [-100, 100]. Skip elements outside this range.",
+        required: true,
+      },
+      {
+        topic: "result_sign",
+        question: "Which sum comes first in the difference calculation?",
+        answer: "Return (even sum - odd sum). The result can be negative.",
+        required: true,
+      },
+    ],
+    commonWrongApproaches: [
+      {
+        description: "Forgetting to filter by range",
+        codeSignals: ["no range check", "no if condition for 100"],
+        intervention:
+          "Remember the constraint about the range [-100, 100]. Are you filtering out elements outside this range?",
+      },
+      {
+        description: "Using 1-based indexing",
+        codeSignals: ["index + 1", "starting from 1"],
+        intervention:
+          "Careful with your indexing - the problem uses 0-based indices where 0 is even.",
+      },
+    ],
+    whatIfQuestions: [
+      "What if the array is empty?",
+      "What if all elements are outside the valid range?",
+      "What happens with negative numbers at odd indices?",
+      "What if all elements are at boundary values (100 or -100)?",
+    ],
+    midCodingProbes: [
+      {
+        trigger: "iterating through array",
+        question: "How are you determining if an index is even or odd?",
+      },
+      {
+        trigger: "filtering values",
+        question: "What happens to the element 200 in the array [5, 200, 10]?",
+      },
+    ],
+  },
+  {
+    id: "dsa-student-highest-average",
+    title: "Student with Highest Average Score",
+    type: "dsa",
+    pattern: "two-pointers",
+    difficulty: "medium",
+    companies: ["ZipRecruiter"],
+    description: "Find the student with the highest average score from a list of records",
+    tags: ["array", "hash-table", "sorting"],
+    estimatedTime: 20,
+    problemStatement: `You are given a list of student score records. Each record contains a student name and a score. A student may have multiple scores.
+
+Calculate the average score for each student and return the name of the student with the highest average. If there's a tie, return the name that comes first alphabetically.`,
+    examples: [
+      {
+        input: 'records = [["Alice", 90], ["Bob", 85], ["Alice", 95], ["Bob", 80]]',
+        output: '"Alice"',
+        explanation: "Alice's average: (90 + 95) / 2 = 92.5. Bob's average: (85 + 80) / 2 = 82.5. Alice wins.",
+      },
+      {
+        input: 'records = [["Charlie", 100], ["David", 100]]',
+        output: '"Charlie"',
+        explanation: "Both have average 100. Charlie comes first alphabetically.",
+      },
+    ],
+    constraints: [
+      "1 <= records.length <= 10^4",
+      "Each record is [name, score]",
+      "1 <= name.length <= 20",
+      "0 <= score <= 100",
+    ],
+    hints: [
+      "Use a hash map to group scores by student name",
+      "Calculate average for each student",
+      "Track the maximum average and handle ties alphabetically",
+    ],
+    starterCode: {
+      javascript: `function highestAverage(records) {
+  // Write your solution here
+
+}`,
+      typescript: `function highestAverage(records: [string, number][]): string {
+  // Write your solution here
+
+}`,
+      python: `def highest_average(records):
+    # Write your solution here
+    pass`,
+      java: `class Solution {
+    public String highestAverage(String[][] records) {
+        // Write your solution here
+        return "";
+    }
+}`,
+      cpp: `class Solution {
+public:
+    string highestAverage(vector<vector<string>>& records) {
+        // Write your solution here
+        return "";
+    }
+};`,
+      csharp: `public class Solution {
+    public string HighestAverage(string[][] records) {
+        // Write your solution here
+        return "";
+    }
+}`,
+      go: `func highestAverage(records [][]string) string {
+    // Write your solution here
+    return ""
+}`,
+      rust: `impl Solution {
+    pub fn highest_average(records: Vec<Vec<String>>) -> String {
+        // Write your solution here
+        String::new()
+    }
+}`,
+    },
+    optimalComplexity: {
+      time: "O(n)",
+      space: "O(k) where k is number of unique students",
+    },
+    testCases: [
+      {
+        input: { records: [["Alice", 90], ["Bob", 85], ["Alice", 95], ["Bob", 80]] },
+        expected: "Alice",
+        description: "Alice has higher average",
+      },
+      {
+        input: { records: [["Charlie", 100], ["David", 100]] },
+        expected: "Charlie",
+        description: "Tie - alphabetically first",
+      },
+      {
+        input: { records: [["Zoe", 50]] },
+        expected: "Zoe",
+        description: "Single student",
+      },
+      {
+        input: { records: [["A", 80], ["B", 90], ["A", 100]] },
+        expected: "A",
+        description: "A's average 90 equals B's single score",
+      },
+    ],
+    fuzzyStatement: "Given a list of student scores, find who has the highest average.",
+    clarifyingQuestions: [
+      {
+        topic: "tie_breaker",
+        question: "What if multiple students have the same highest average?",
+        answer: "Return the name that comes first alphabetically.",
+        required: true,
+      },
+      {
+        topic: "single_score",
+        question: "Can a student have only one score?",
+        answer: "Yes, a student may have just one score. Their average is that single score.",
+        required: false,
+      },
+      {
+        topic: "return_format",
+        question: "Should I return the student's name or their average?",
+        answer: "Return only the student's name as a string.",
+        required: true,
+      },
+    ],
+    commonWrongApproaches: [
+      {
+        description: "Not handling tie-breaker alphabetically",
+        codeSignals: ["max only", "no sort", "first found"],
+        intervention:
+          "What happens if two students have the same average? How do you decide which name to return?",
+      },
+      {
+        description: "Integer division causing precision loss",
+        codeSignals: ["sum // count", "int(sum/count)", "sum / count (integer)"],
+        intervention:
+          "Be careful with integer vs floating-point division. Averages like 92.5 need decimal precision.",
+      },
+    ],
+    whatIfQuestions: [
+      "What if a student appears only once in the records?",
+      "What if two students have exactly the same average?",
+      "What if all students have different averages?",
+      "What if a student has scores of 0?",
+    ],
+    midCodingProbes: [
+      {
+        trigger: "building hash map",
+        question: "What are you storing in your map - the total score, or a list of scores?",
+      },
+      {
+        trigger: "calculating average",
+        question: "How are you calculating the average - are you using integer or floating-point division?",
+      },
+      {
+        trigger: "finding maximum",
+        question: "How are you handling the tie-breaker when averages are equal?",
+      },
+    ],
+    correctPatternNotes: [
+      "Using a hash map with name as key and (sum, count) as value is efficient",
+      "Using floating-point division for average calculation is necessary",
+      "Sorting alphabetically or using string comparison for tie-breaking is correct",
     ],
   },
 ]
