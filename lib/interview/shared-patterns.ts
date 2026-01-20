@@ -456,3 +456,40 @@ export function acceptsWithoutProbing(response: string): boolean {
   const probed = PROBING_PATTERNS.some((p) => p.test(response))
   return accepted && !probed
 }
+
+// =============================================================================
+// SUMMARIZING PATTERNS
+// =============================================================================
+
+/**
+ * Patterns indicating AI is parroting/restating instead of advancing
+ * Used by: response-validation.ts (no-summarizing gate)
+ */
+export const SUMMARIZING_PATTERNS = [
+  /so (?:you're|you are) saying/i,
+  /in other words/i,
+  /to summarize/i,
+  /(?:so |)basically,? what you(?:'re| are)? (?:saying|proposing|suggesting)/i,
+  /if i understand (?:correctly|you)/i,
+  /let me (?:make sure i understand|recap|summarize)/i,
+  /so what you(?:'re| are) (?:proposing|suggesting|saying)/i,
+  /you(?:'re| are) essentially saying/i,
+]
+
+/**
+ * Check if response contains summarizing language
+ */
+export function containsSummarizing(response: string): RegExpMatchArray | null {
+  for (const p of SUMMARIZING_PATTERNS) {
+    const match = response.match(p)
+    if (match) return match
+  }
+  return null
+}
+
+/**
+ * Count real sentences (>15 chars) in text
+ */
+export function countSentences(text: string): number {
+  return text.split(/[.!?]+/).filter((s) => s.trim().length > 15).length
+}
