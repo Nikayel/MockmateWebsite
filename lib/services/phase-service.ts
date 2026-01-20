@@ -49,6 +49,7 @@ const PHASE_TRANSITIONS: Record<InterviewPhase, InterviewPhase[]> = {
   intro: ["clarification"],
   clarification: ["discussion"],
   discussion: ["coding", "testing"], // Can skip to testing if tests run early
+  clarification: ["discussion"], // After clarifying questions, proceed to approach discussion
   coding: ["testing", "discussion"], // Can go back to discussion if needed
   testing: ["coding", "post_interview"], // Can go back to fix code
   post_interview: ["complete"],
