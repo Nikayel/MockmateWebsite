@@ -589,10 +589,10 @@ export function formatDynamicContextForPrompt(context: DynamicChatContext): stri
       )
     }
 
-    // Include correct pattern notes to help AI avoid incorrectly questioning correct implementations
+    // Include correct pattern notes - AI can probe for understanding but should accept correct explanations
     if (proactive.correctPatternNotes && proactive.correctPatternNotes.length > 0) {
       parts.push(
-        `\n**Correct Pattern Notes (DO NOT question these - they are correct):**\n${proactive.correctPatternNotes.map((note) => `- ${note}`).join("\n")}`
+        `\n**Correct Implementation Patterns (you can probe for understanding, but ACCEPT once explained correctly - don't keep challenging):**\n${proactive.correctPatternNotes.map((note) => `- ${note}`).join("\n")}`
       )
     }
   }

@@ -224,13 +224,20 @@ Analyze and return this exact JSON structure (no markdown, no explanation):
   "approachQuality": "none|poor|basic|good|excellent",
   "complexityDiscussed": true/false,
   "complexityAccurate": true/false,
-  "statedComplexity": "O(n)" or null,
+  "statedComplexity": "EXACT complexity they stated" or null,
   "questionsAsked": ${interviewerQuestions},
   "questionsAnswered": number,
   "edgeCasesConsidered": true/false,
   "alternativesDiscussed": true/false,
   "communicationScore": 0-100
 }
+
+IMPORTANT for statedComplexity:
+- Extract the EXACT complexity value the candidate stated (e.g., "O(n)", "O(n²)", "O(n log n)")
+- Voice transcription may produce: "o n square" = O(n²), "o n 2" = O(n²), "o n squared" = O(n²)
+- "quadratic" or "n squared" = O(n²)
+- "linear" = O(n), "constant" = O(1)
+- If they said multiple complexities, use the LAST one they settled on
 
 VALIDATION RULES:
 - isCoherent: false if responses are gibberish, random words, or nonsensical
