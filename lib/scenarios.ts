@@ -52,8 +52,8 @@ export type {
   Scenario,
 } from "./scenarios/types"
 
-// Import Scenario type for use in this file
-import type { Scenario } from "./scenarios/types"
+// Import types for use in this file
+import type { Scenario, ScenarioType, DifficultyLevel, Company } from "./scenarios/types"
 
 // ============================================================================
 // Combined Scenarios Array
