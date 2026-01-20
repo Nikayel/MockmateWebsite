@@ -66,6 +66,67 @@ export const SCORING = {
   MASTERY_THRESHOLD: 80,
   /** Good performance threshold */
   GOOD_THRESHOLD: 60,
+
+  /**
+   * PERFORMANCE SCORE WEIGHTS (Full interview simulation)
+   * Used for: interview readiness, includes communication skills
+   *
+   * Philosophy: Real FAANG interviews heavily weight communication.
+   * A silent optimal solution is a C at best - you must explain your thinking.
+   */
+  PERFORMANCE_WEIGHTS: {
+    /** Understanding: Can you explain your approach? (LLM-evaluated) */
+    UNDERSTANDING: 0.25,
+    /** Problem Solving: Debug & optimize effectively */
+    PROBLEM_SOLVING: 0.25,
+    /** Code Quality: Clean, efficient, passes tests */
+    CODE_QUALITY: 0.3,
+    /** Communication: Think out loud, answer questions */
+    COMMUNICATION: 0.2,
+  },
+
+  /**
+   * TECHNICAL SCORE WEIGHTS (Code-only metrics, no communication)
+   * Used for: spaced repetition, pattern mastery tracking
+   *
+   * This is the same as "mastery score" - they are unified.
+   * Focuses purely on objective code metrics.
+   */
+  TECHNICAL_WEIGHTS: {
+    /** Correctness: Test pass rate */
+    CORRECTNESS: 0.6,
+    /** Time Efficiency: Solve speed relative to expected time */
+    TIME_EFFICIENCY: 0.25,
+    /** Independence: Minimal hint usage */
+    INDEPENDENCE: 0.15,
+  },
+
+  /**
+   * Performance level thresholds (for feedback categorization)
+   */
+  PERFORMANCE_LEVELS: {
+    EXCELLENT: 85,
+    GOOD: 70,
+    DEVELOPING: 50,
+    // Below 50 = needs work
+  },
+
+  /**
+   * Letter grade thresholds
+   */
+  LETTER_GRADES: {
+    A_PLUS: 95,
+    A: 90,
+    A_MINUS: 85,
+    B_PLUS: 80,
+    B: 75,
+    B_MINUS: 70,
+    C_PLUS: 65,
+    C: 60,
+    C_MINUS: 55,
+    D: 50,
+    // Below 50 = F
+  },
 } as const
 
 // =============================================================================
@@ -132,3 +193,79 @@ export const UI = {
   /** Sidebar expanded width in pixels */
   SIDEBAR_EXPANDED_WIDTH: 256,
 } as const
+
+// =============================================================================
+// Scoring Utility Functions
+// =============================================================================
+
+/**
+ * Get letter grade from numeric score (0-100)
+ * Uses thresholds defined in SCORING.LETTER_GRADES
+ */
+export function getLetterGrade(score: number): string {
+  const { LETTER_GRADES } = SCORING
+  if (score >= LETTER_GRADES.A_PLUS) return "A+"
+  if (score >= LETTER_GRADES.A) return "A"
+  if (score >= LETTER_GRADES.A_MINUS) return "A-"
+  if (score >= LETTER_GRADES.B_PLUS) return "B+"
+  if (score >= LETTER_GRADES.B) return "B"
+  if (score >= LETTER_GRADES.B_MINUS) return "B-"
+  if (score >= LETTER_GRADES.C_PLUS) return "C+"
+  if (score >= LETTER_GRADES.C) return "C"
+  if (score >= LETTER_GRADES.C_MINUS) return "C-"
+  if (score >= LETTER_GRADES.D) return "D"
+  return "F"
+}
+
+/**
+ * Get performance level from numeric score (0-100)
+ * Uses thresholds defined in SCORING.PERFORMANCE_LEVELS
+ */
+export function getPerformanceLevel(
+  score: number
+): "excellent" | "good" | "developing" | "needs-work" {
+  const { PERFORMANCE_LEVELS } = SCORING
+  if (score >= PERFORMANCE_LEVELS.EXCELLENT) return "excellent"
+  if (score >= PERFORMANCE_LEVELS.GOOD) return "good"
+  if (score >= PERFORMANCE_LEVELS.DEVELOPING) return "developing"
+  return "needs-work"
+}
+
+/**
+ * Calculate weighted performance score from components
+ * Uses weights from SCORING.PERFORMANCE_WEIGHTS
+ */
+export function calculatePerformanceScore(components: {
+  understanding: number
+  problemSolving: number
+  codeQuality: number
+  communication: number
+}): number {
+  const w = SCORING.PERFORMANCE_WEIGHTS
+  return Math.round(
+    components.understanding * w.UNDERSTANDING +
+      components.problemSolving * w.PROBLEM_SOLVING +
+      components.codeQuality * w.CODE_QUALITY +
+      components.communication * w.COMMUNICATION
+  )
+}
+
+/**
+ * Calculate weighted technical/mastery score from components
+ * Uses weights from SCORING.TECHNICAL_WEIGHTS
+ *
+ * NOTE: Technical score and mastery score are the same thing.
+ * Both measure objective code metrics without communication.
+ */
+export function calculateTechnicalScore(components: {
+  correctness: number
+  timeEfficiency: number
+  independence: number
+}): number {
+  const w = SCORING.TECHNICAL_WEIGHTS
+  return Math.round(
+    components.correctness * w.CORRECTNESS +
+      components.timeEfficiency * w.TIME_EFFICIENCY +
+      components.independence * w.INDEPENDENCE
+  )
+}

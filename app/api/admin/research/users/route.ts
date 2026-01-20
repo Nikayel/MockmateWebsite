@@ -106,9 +106,9 @@ export async function GET(request: NextRequest) {
       const userStatsDoc = await adminDb.collection("user_stats").doc(userId).get()
       const userStats = userStatsDoc.exists ? userStatsDoc.data() : null
 
-      // Get problem mastery for pattern breakdown
+      // Get problem mastery for pattern breakdown (unified collection)
       const masterySnap = await adminDb
-        .collection("user_problem_mastery")
+        .collection("problem_mastery")
         .doc(userId)
         .collection("problems")
         .get()

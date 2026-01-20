@@ -22,6 +22,7 @@
  */
 
 import type { InteractionMetrics } from "../scoring"
+import { SCORING } from "../constants"
 
 // =============================================================================
 // TYPES
@@ -77,13 +78,13 @@ export interface MasteryScoreResult {
 }
 
 // =============================================================================
-// CONFIGURATION
+// CONFIGURATION - Weights imported from constants.ts (single source of truth)
 // =============================================================================
 
 const WEIGHTS = {
-  correctness: 0.6, // Did the code work?
-  timeEfficiency: 0.25, // How quickly did they solve it?
-  independence: 0.15, // Did they need hints?
+  correctness: SCORING.TECHNICAL_WEIGHTS.CORRECTNESS, // 60% - Did the code work?
+  timeEfficiency: SCORING.TECHNICAL_WEIGHTS.TIME_EFFICIENCY, // 25% - How quickly?
+  independence: SCORING.TECHNICAL_WEIGHTS.INDEPENDENCE, // 15% - Hint dependency
 }
 
 // Expected solve times by difficulty (minutes)

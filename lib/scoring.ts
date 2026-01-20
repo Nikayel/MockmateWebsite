@@ -100,14 +100,16 @@ export interface ScoreBreakdown {
 }
 
 // =============================================================================
-// SCORING WEIGHTS
+// SCORING WEIGHTS - Imported from constants for single source of truth
 // =============================================================================
 
+import { SCORING } from "./constants"
+
 const WEIGHTS = {
-  codeQuality: 0.3, // 30% - Your code must work and be clean
-  problemSolving: 0.25, // 25% - How you approach and debug problems
-  understanding: 0.25, // 25% - Can you explain what you wrote?
-  communication: 0.2, // 20% - Did you share your thought process?
+  codeQuality: SCORING.PERFORMANCE_WEIGHTS.CODE_QUALITY, // 30%
+  problemSolving: SCORING.PERFORMANCE_WEIGHTS.PROBLEM_SOLVING, // 25%
+  understanding: SCORING.PERFORMANCE_WEIGHTS.UNDERSTANDING, // 25%
+  communication: SCORING.PERFORMANCE_WEIGHTS.COMMUNICATION, // 20%
 }
 
 // =============================================================================

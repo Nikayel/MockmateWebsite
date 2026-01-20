@@ -956,11 +956,14 @@ async function updateUserLearningState(summary: SessionSummary): Promise<void> {
 /**
  * Update user's problem mastery (tracks mastery level per problem)
  * This powers the detailed Learning Progress stats
+ *
+ * NOTE: Uses unified `problem_mastery` collection (consolidates with spaced repetition)
  */
 async function updateUserProblemMastery(summary: SessionSummary): Promise<void> {
   try {
+    // Use problem_mastery (unified collection) instead of user_problem_mastery
     const masteryRef = adminDb
-      .collection("user_problem_mastery")
+      .collection("problem_mastery")
       .doc(summary.userId)
       .collection("problems")
       .doc(summary.scenarioId)
