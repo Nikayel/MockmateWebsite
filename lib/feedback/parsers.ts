@@ -158,14 +158,34 @@ function parseBulletList(text: string, preferNumbered: boolean = false): string[
 
 /**
  * Filter out section headers and other non-content lines
+ *
+ * IMPORTANT: Bullets formatted as "**Bold label**: content" should NOT be filtered
+ * because they are valid content (bold label with description), not headers.
+ * Only filter out pure headers like "**What Worked**" (bold text without content after).
  */
 function filterHeaderLines(items: string[]): string[] {
-  return items.filter(
-    (item) =>
-      item.length > 3 &&
-      !item.startsWith("**") &&
-      !item.match(/^(What Worked|Fix Next|To Improve|Action Plan|Score Snapshot)/i)
-  )
+  return items.filter((item) => {
+    if (item.length <= 3) return false
+
+    // Check if it starts with bold markdown
+    if (item.startsWith("**")) {
+      // If it's "**Label**: content" format, it's valid content (bold label with description)
+      // Pattern: starts with **, has closing **, then : or - and more text
+      const hasBoldLabelWithContent = /^\*\*[^*]+\*\*\s*[:–-]\s*.+/.test(item)
+      if (hasBoldLabelWithContent) {
+        return true // Keep it - it's formatted content, not a header
+      }
+      // Otherwise it's a pure header like "**What Worked**" - filter it out
+      return false
+    }
+
+    // Filter out known section header text
+    if (/^(What Worked|Fix Next|To Improve|Action Plan|Score Snapshot)/i.test(item)) {
+      return false
+    }
+
+    return true
+  })
 }
 
 /**

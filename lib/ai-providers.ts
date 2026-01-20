@@ -61,7 +61,7 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     name: "gemini",
     enabled: true,
     apiKey: process.env.GEMINI_API_KEY,
-    model: "gemini-3-flash-preview", // Upgraded: $0.50/1M input, $3/1M output - better reasoning
+    model: "gemini-3.0-flash", // Gemini 3.0 Flash - smart & fast
     maxTokens: 1024,
     temperature: 0.7,
     costPer1kTokens: 0.00175, // Averaged (input + output) / 2
@@ -109,14 +109,15 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
 }
 
 // Fallback order based on task complexity
-// Cost-optimized: Flash Lite for simple (cheapest), Flash for standard, Claude for complex quality
+// Gemini 3.0 Flash prioritized while free credits available ($300)
+// Flash is smart + fast, use it for everything except where Claude quality is critical
 const FALLBACK_ORDER: Record<TaskComplexity, AIProvider[]> = {
-  simple: ["gemini-lite", "gemini", "deepseek-chat", "claude"], // Chat, hints - cheapest path (Flash Lite -> deepseek-chat)
-  standard: ["gemini", "gemini-lite", "deepseek-chat", "claude"], // Interview interactions - balanced
-  complex: ["gemini", "claude", "deepseek"], // Feedback generation - quality matters (uses reasoner)
-  dialogue: ["claude", "gemini", "deepseek-chat"], // for the conversation in the chat
-  code: ["deepseek-chat", "gemini", "claude"],
-  critique: ["deepseek", "claude", "gemini"],
+  simple: ["gemini-lite", "gemini", "deepseek-chat", "claude"], // Chat, hints - cheapest (Flash Lite)
+  standard: ["gemini", "gemini-lite", "deepseek-chat", "claude"], // Interview interactions
+  complex: ["gemini", "claude", "deepseek"], // Feedback generation - Gemini 3.0 Flash is smart enough
+  dialogue: ["gemini", "claude", "deepseek-chat"], // Interviewer conversation - Gemini first now
+  code: ["gemini", "deepseek-chat", "claude"], // Code tasks - Gemini first (good at code)
+  critique: ["gemini", "claude", "deepseek"], // Constitutional AI - Gemini for better reasoning
 }
 
 // Retry configuration
