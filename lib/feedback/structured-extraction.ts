@@ -11,9 +11,6 @@
 import { generateAIResponse } from "@/lib/ai-providers"
 import { logger } from "@/lib/logger"
 import {
-  getComplexityRank,
-  findDominantComplexity,
-  extractComplexityFromText,
   EDGE_CASE_KEYWORDS,
   findCodingPhaseStart,
   isCodeExplanation,
@@ -215,83 +212,9 @@ function extractAlgorithmically(
         pendingQuestions = []
       }
 
-      // Check for complexity mentions - find DOMINANT complexity, not just first
-      // First try standard O() notation
-      const complexityMatches = originalContent.match(/O\([^)]+\)/gi)
-      let dominantComplexity: string | null = null
-
-      if (complexityMatches && complexityMatches.length > 0) {
-        // Get ALL complexity values and find the dominant one
-        const allComplexities = complexityMatches.map((c) => c.toUpperCase())
-        dominantComplexity = findDominantComplexity(allComplexities)
-      }
-
-      // Also try voice transcription patterns (catches "on2", "o n squared", etc.)
-      // This is critical for voice interviews where "O(n²)" becomes "on2"
-      const voiceComplexity = extractComplexityFromText(originalContent)
-
-      // Also check for non-O(...) keywords like "n squared", "quadratic", etc.
-      // These often represent the actual time complexity
-      let keywordComplexity: string | null = null
-      if (
-        content.includes("n squared") ||
-        content.includes("n^2") ||
-        content.includes("quadratic")
-      ) {
-        keywordComplexity = "O(N²)"
-      } else if (content.includes("n log n")) {
-        keywordComplexity = "O(N LOG N)"
-      } else if (content.includes("linear") && !content.includes("log")) {
-        keywordComplexity = "O(N)"
-      }
-
-      // Find the best complexity match - prefer the one with highest rank (worst complexity)
-      // This handles "sorting is O(n log n) but overall is n squared"
-      const candidates = [dominantComplexity, voiceComplexity, keywordComplexity].filter(
-        (c): c is string => c !== null
-      )
-
-      if (candidates.length > 0) {
-        const finalComplexity = findDominantComplexity(candidates) || candidates[0]
-
-        // Determine if time or space based on context
-        if (
-          content.includes("time") ||
-          content.includes("runtime") ||
-          content.includes("overall") ||
-          !evidence.timeComplexity!.mentioned
-        ) {
-          evidence.timeComplexity = {
-            mentioned: true,
-            value: finalComplexity,
-            explanationGiven:
-              content.includes("because") ||
-              content.includes("loop") ||
-              content.includes("iterate"),
-            quote: originalContent.substring(0, 200),
-            messageIndex: index,
-            isCorrect:
-              finalComplexity.toUpperCase().replace(/\s+/g, "") ===
-              problemContext.optimalTimeComplexity.toUpperCase().replace(/\s+/g, ""),
-          }
-        }
-
-        if (content.includes("space") || content.includes("memory")) {
-          // For space, prefer the lower complexity if multiple mentioned
-          // (user might say "time is n2 and space is o1")
-          const spaceComplexity =
-            voiceComplexity && content.includes("space") ? voiceComplexity : finalComplexity
-          evidence.spaceComplexity = {
-            mentioned: true,
-            value: spaceComplexity,
-            quote: originalContent.substring(0, 200),
-            messageIndex: index,
-            isCorrect:
-              spaceComplexity.toUpperCase().replace(/\s+/g, "") ===
-              problemContext.optimalSpaceComplexity.toUpperCase().replace(/\s+/g, ""),
-          }
-        }
-      }
+      // COMPLEXITY EXTRACTION MOVED TO SEMANTIC PHASE
+      // Regex-based extraction was causing false positives - e.g., capturing "brute force is O(n²)"
+      // when user actually implemented O(n). AI semantic extraction now handles this with context.
 
       // Check for approach explanation
       if (
@@ -445,6 +368,7 @@ function detectApproachType(content: string): "brute_force" | "optimized" | "unc
 
 /**
  * Semantic extraction - uses AI for nuanced understanding
+ * Now includes COMPLEXITY EXTRACTION to avoid false positives from regex
  */
 async function extractSemantically(
   transcript: TranscriptMessage[],
@@ -479,19 +403,43 @@ ${transcriptText.substring(0, 8000)}
 
 EXTRACT THE FOLLOWING (use EXACT quotes from transcript):
 
-1. INTERVIEWER QUESTIONS: For each question the interviewer asked, was it answered? Quote the answer.
+1. COMPLEXITY CLAIMS FOR IMPLEMENTED SOLUTION:
+   CRITICAL: Only extract complexity claims the candidate made FOR THEIR ACTUAL IMPLEMENTED SOLUTION.
+   - IGNORE discussions of alternatives (e.g., "brute force would be O(n²)")
+   - IGNORE hypotheticals (e.g., "if we did X it would be O(n²)")
+   - IGNORE comparisons (e.g., "that approach is O(n²) but mine is O(n)")
+   - ONLY capture what they said their solution's complexity IS
 
-2. EXPLAINED WHILE CODING: Did the candidate talk through their code AS they wrote it?
+   Example of what TO capture: "My solution is O(n)" or "Time complexity is O(n)"
+   Example of what to IGNORE: "Brute force is O(n²)" when they implemented O(n)
+
+2. INTERVIEWER QUESTIONS: For each question the interviewer asked, was it answered? Quote the answer.
+
+3. EXPLAINED WHILE CODING: Did the candidate talk through their code AS they wrote it?
    - Look for messages AFTER the coding phase started
    - YES if they said things like: "so here I'm initializing...", "this loop goes through...", "I'm checking if..."
    - YES if they narrated their logic: "first I'll...", "then I need to...", "this handles the case where..."
    - NO if they went silent or only said filler words ("hmm", "ok", "let me think")
    - NO if all their explanation was BEFORE coding started
 
-3. ANSWER QUALITY: Rate each answer as good/partial/poor/unanswered.
+4. ANSWER QUALITY: Rate each answer as good/partial/poor/unanswered.
 
 Return JSON:
 {
+  "complexityClaims": {
+    "timeComplexity": {
+      "claimedForSolution": "O(n)" or null,
+      "quote": "exact quote where they stated this",
+      "messageIndex": number or null,
+      "explanationGiven": true/false
+    },
+    "spaceComplexity": {
+      "claimedForSolution": "O(n)" or null,
+      "quote": "exact quote where they stated this",
+      "messageIndex": number or null
+    },
+    "discussedAlternatives": ["O(n²) for brute force"]
+  },
   "interviewerQuestions": [
     {
       "question": "exact question from transcript",
@@ -507,6 +455,7 @@ Return JSON:
 }
 
 RULES:
+- For complexity: Be PRECISE - only capture what they claimed for THEIR solution, not alternatives
 - Only include REAL questions (not rhetorical)
 - Only quote ACTUAL text from transcript
 - If uncertain, mark as "unanswered" not "good"
@@ -524,7 +473,35 @@ RULES:
     const jsonMatch = response.text.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0])
+
+      // Build complexity evidence from semantic extraction
+      const timeComplexityEvidence = parsed.complexityClaims?.timeComplexity
+      const spaceComplexityEvidence = parsed.complexityClaims?.spaceComplexity
+
       return {
+        timeComplexity: timeComplexityEvidence?.claimedForSolution
+          ? {
+              mentioned: true,
+              value: timeComplexityEvidence.claimedForSolution,
+              explanationGiven: timeComplexityEvidence.explanationGiven || false,
+              quote: timeComplexityEvidence.quote || null,
+              messageIndex: timeComplexityEvidence.messageIndex || null,
+              isCorrect:
+                timeComplexityEvidence.claimedForSolution.toUpperCase().replace(/\s+/g, "") ===
+                problemContext.optimalTimeComplexity.toUpperCase().replace(/\s+/g, ""),
+            }
+          : undefined,
+        spaceComplexity: spaceComplexityEvidence?.claimedForSolution
+          ? {
+              mentioned: true,
+              value: spaceComplexityEvidence.claimedForSolution,
+              quote: spaceComplexityEvidence.quote || null,
+              messageIndex: spaceComplexityEvidence.messageIndex || null,
+              isCorrect:
+                spaceComplexityEvidence.claimedForSolution.toUpperCase().replace(/\s+/g, "") ===
+                problemContext.optimalSpaceComplexity.toUpperCase().replace(/\s+/g, ""),
+            }
+          : undefined,
         interviewerQuestions: parsed.interviewerQuestions || [],
         communication: {
           explainedWhileCoding: parsed.explainedWhileCoding || false,
@@ -555,7 +532,8 @@ function mergeEvidence(
       quote: null,
       messageIndex: null,
     },
-    timeComplexity: algorithmic.timeComplexity || {
+    // PREFER SEMANTIC for complexity (AI understands context, avoids false positives)
+    timeComplexity: semantic.timeComplexity || {
       mentioned: false,
       value: null,
       explanationGiven: false,
@@ -563,7 +541,7 @@ function mergeEvidence(
       messageIndex: null,
       isCorrect: null,
     },
-    spaceComplexity: algorithmic.spaceComplexity || {
+    spaceComplexity: semantic.spaceComplexity || {
       mentioned: false,
       value: null,
       quote: null,
