@@ -33,7 +33,7 @@ import {
   type NotificationType,
 } from "@/lib/rag/knowledge-base/notification-knowledge"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
-import { isToday, getTodayInTimezone } from "@/lib/email/timezone"
+import { isToday } from "@/lib/email/timezone"
 
 export interface SessionCompletionData {
   userId: string
@@ -292,12 +292,23 @@ async function getPreviousStats(userId: string): Promise<{
 
     const problemsSolved = problemsSnapshot.size
 
-    // Get patterns where user has mastered level
-    const masteredPatterns: string[] = []
+    // Get patterns where user has mastered at least MIN_PROBLEMS_FOR_PATTERN_MASTERY problems
+    // This must be consistent with checkIfPatternJustMastered
+    const MIN_PROBLEMS_FOR_PATTERN_MASTERY = 3
+    const patternMasteryCount = new Map<string, number>()
+
     problemsSnapshot.forEach((doc) => {
       const data = doc.data()
-      if (data.mastery_level === "mastered" && !masteredPatterns.includes(data.pattern)) {
-        masteredPatterns.push(data.pattern)
+      if (data.mastery_level === "mastered") {
+        const count = patternMasteryCount.get(data.pattern) || 0
+        patternMasteryCount.set(data.pattern, count + 1)
+      }
+    })
+
+    const masteredPatterns: string[] = []
+    patternMasteryCount.forEach((count, pattern) => {
+      if (count >= MIN_PROBLEMS_FOR_PATTERN_MASTERY) {
+        masteredPatterns.push(pattern)
       }
     })
 
@@ -544,8 +555,18 @@ async function sendSessionNotification(
     if (!prefs.enabled) return false
     if (!prefs.typePreferences[type]?.enabled) return false
 
-    // Generate message
-    const { title, body } = generateNotificationMessage(knowledge, variables)
+    // Generate message with appropriate tone based on notification type
+    const toneForType: Record<
+      string,
+      "motivational" | "informative" | "urgent" | "celebratory" | "supportive"
+    > = {
+      milestone_celebration: "celebratory",
+      streak_maintenance: "urgent",
+      weak_pattern_focus: "supportive",
+      daily_practice_reminder: "motivational",
+    }
+    const preferredTone = toneForType[type] || "informative"
+    const { title, body } = generateNotificationMessage(knowledge, variables, preferredTone)
 
     // Create in-app notification
     await createInAppNotificationServer({

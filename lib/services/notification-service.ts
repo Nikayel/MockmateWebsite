@@ -55,10 +55,20 @@ export function generateNotificationMessage(
     | "celebratory"
     | "supportive" = "informative"
 ): { title: string; body: string } {
-  // Find template with preferred tone, or fall back to first available
-  const template =
-    knowledge.messageTemplates.find((t) => t.tone === preferredTone) ||
-    knowledge.messageTemplates[0]
+  // Find template with preferred tone that matches the provided variables
+  // First, filter by tone
+  const templatesWithTone = knowledge.messageTemplates.filter((t) => t.tone === preferredTone)
+  const candidateTemplates =
+    templatesWithTone.length > 0 ? templatesWithTone : knowledge.messageTemplates
+
+  // Find the best matching template based on provided variables
+  // A template matches if all its required variables are present in the provided variables
+  const providedVariableKeys = Object.keys(variables)
+  const matchingTemplate = candidateTemplates.find((t) =>
+    t.variables.every((v) => providedVariableKeys.includes(v))
+  )
+
+  const template = matchingTemplate || candidateTemplates[0]
 
   if (!template) {
     return {
@@ -71,6 +81,13 @@ export function generateNotificationMessage(
   let body = template.template
   for (const [key, value] of Object.entries(variables)) {
     body = body.replace(new RegExp(`{${key}}`, "g"), String(value))
+  }
+
+  // Check for any unreplaced placeholders and log a warning
+  const unreplacedPlaceholders = body.match(/\{[^}]+\}/g)
+  if (unreplacedPlaceholders) {
+    // If there are unreplaced placeholders, the template doesn't match - use a generic message
+    body = knowledge.description
   }
 
   // Generate title based on type
