@@ -1208,7 +1208,7 @@ CRITICAL INSTRUCTIONS:
           title: scenarioTitle,
           pattern,
           difficulty,
-          performanceScore: scores.overall, // Full interview score (includes communication 20%)
+          performanceScore: scores.overall, // Full interview score (includes communication 30%)
           masteryScore: masteryScoreResult.masteryScore, // Technical-only score for SR algorithm
           timeSpentMinutes: timeSpent ? Math.round(timeSpent / 60) : undefined,
           hintsUsed: interactionMetrics?.hintsUsed || 0,

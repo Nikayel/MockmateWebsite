@@ -86,7 +86,8 @@
       "Bash(/usr/local/bin/node ./node_modules/.bin/tsc:*)",
       "Bash(PATH=\"/usr/local/bin:$PATH\" /usr/local/bin/node node_modules/typescript/bin/tsc:*)",
       "Bash(PATH=\"/usr/local/bin:$PATH\" /usr/local/bin/node:*)",
-      "Bash(/Users/nikayeljamal/.bun/bin/bun tsc:*)"
+      "Bash(/Users/nikayeljamal/.bun/bin/bun tsc:*)",
+      "Bash(gh pr view:*)"
     ]
   }
 }

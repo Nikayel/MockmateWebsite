@@ -54,6 +54,48 @@ export const CACHE_TTL = {
 } as const
 
 // =============================================================================
+// Scoring Types & Interfaces
+// =============================================================================
+
+/**
+ * Components for calculating performance score (full interview simulation)
+ * Each component is scored 0-100
+ */
+export interface PerformanceScoreComponents {
+  /** How well user understood and explained their approach (0-100) */
+  understanding: number
+  /** Problem solving approach and debugging skills (0-100) */
+  problemSolving: number
+  /** Code correctness, efficiency, and cleanliness (0-100) */
+  codeQuality: number
+  /** Communication skills - explaining thought process (0-100) */
+  communication: number
+}
+
+/**
+ * Components for calculating technical/mastery score (code-only metrics)
+ * Each component is scored 0-100
+ */
+export interface TechnicalScoreComponents {
+  /** Test pass rate (0-100) */
+  correctness: number
+  /** How quickly solved relative to expected time (0-100) */
+  timeEfficiency: number
+  /** Minimal hint usage (0-100) */
+  independence: number
+}
+
+/**
+ * Performance level categories for feedback
+ */
+export type PerformanceLevel = "excellent" | "good" | "developing" | "needs-work"
+
+/**
+ * Letter grade type derived from score thresholds
+ */
+export type LetterGrade = "A+" | "A" | "A-" | "B+" | "B" | "B-" | "C+" | "C" | "C-" | "D" | "F"
+
+// =============================================================================
 // Scoring & Thresholds
 // =============================================================================
 
@@ -80,9 +122,9 @@ export const SCORING = {
     /** Problem Solving: Debug & optimize effectively */
     PROBLEM_SOLVING: 0.25,
     /** Code Quality: Clean, efficient, passes tests */
-    CODE_QUALITY: 0.3,
+    CODE_QUALITY: 0.2,
     /** Communication: Think out loud, answer questions */
-    COMMUNICATION: 0.2,
+    COMMUNICATION: 0.3,
   },
 
   /**
@@ -99,6 +141,38 @@ export const SCORING = {
     TIME_EFFICIENCY: 0.25,
     /** Independence: Minimal hint usage */
     INDEPENDENCE: 0.15,
+  },
+
+  /**
+   * SYSTEM DESIGN WEIGHTS (Discussion-based interview)
+   * Communication is heavily weighted because system design is about
+   * explaining architectural decisions and trade-offs.
+   */
+  SYSTEM_DESIGN_WEIGHTS: {
+    /** Understanding: Requirements gathering */
+    UNDERSTANDING: 0.2,
+    /** Problem Solving: Architecture & scalability */
+    PROBLEM_SOLVING: 0.3,
+    /** Code Quality: Design depth */
+    CODE_QUALITY: 0.2,
+    /** Communication: Critical for system design */
+    COMMUNICATION: 0.3,
+  },
+
+  /**
+   * BUG FIX WEIGHTS (Debugging-focused interview)
+   * Understanding is heavily weighted because finding and explaining
+   * the root cause is the most important skill in debugging.
+   */
+  BUG_FIX_WEIGHTS: {
+    /** Understanding: Finding + explaining the bug */
+    UNDERSTANDING: 0.35,
+    /** Problem Solving: Debugging approach */
+    PROBLEM_SOLVING: 0.25,
+    /** Code Quality: Clean fix */
+    CODE_QUALITY: 0.2,
+    /** Communication: Explaining process */
+    COMMUNICATION: 0.2,
   },
 
   /**
@@ -202,7 +276,7 @@ export const UI = {
  * Get letter grade from numeric score (0-100)
  * Uses thresholds defined in SCORING.LETTER_GRADES
  */
-export function getLetterGrade(score: number): string {
+export function getLetterGrade(score: number): LetterGrade {
   const { LETTER_GRADES } = SCORING
   if (score >= LETTER_GRADES.A_PLUS) return "A+"
   if (score >= LETTER_GRADES.A) return "A"
@@ -221,9 +295,7 @@ export function getLetterGrade(score: number): string {
  * Get performance level from numeric score (0-100)
  * Uses thresholds defined in SCORING.PERFORMANCE_LEVELS
  */
-export function getPerformanceLevel(
-  score: number
-): "excellent" | "good" | "developing" | "needs-work" {
+export function getPerformanceLevel(score: number): PerformanceLevel {
   const { PERFORMANCE_LEVELS } = SCORING
   if (score >= PERFORMANCE_LEVELS.EXCELLENT) return "excellent"
   if (score >= PERFORMANCE_LEVELS.GOOD) return "good"
@@ -232,22 +304,32 @@ export function getPerformanceLevel(
 }
 
 /**
+ * Clamp a score to valid bounds (0-100)
+ * Ensures all scores are within the expected range
+ */
+export function clampScore(score: number): number {
+  return Math.min(100, Math.max(0, Math.round(score)))
+}
+
+/**
  * Calculate weighted performance score from components
  * Uses weights from SCORING.PERFORMANCE_WEIGHTS
+ *
+ * Input scores are clamped to 0-100 range for safety.
+ * Output is also bounded to 0-100.
  */
-export function calculatePerformanceScore(components: {
-  understanding: number
-  problemSolving: number
-  codeQuality: number
-  communication: number
-}): number {
+export function calculatePerformanceScore(components: PerformanceScoreComponents): number {
   const w = SCORING.PERFORMANCE_WEIGHTS
-  return Math.round(
-    components.understanding * w.UNDERSTANDING +
-      components.problemSolving * w.PROBLEM_SOLVING +
-      components.codeQuality * w.CODE_QUALITY +
-      components.communication * w.COMMUNICATION
-  )
+  // Clamp inputs to valid range
+  const u = clampScore(components.understanding)
+  const ps = clampScore(components.problemSolving)
+  const cq = clampScore(components.codeQuality)
+  const c = clampScore(components.communication)
+
+  const score =
+    u * w.UNDERSTANDING + ps * w.PROBLEM_SOLVING + cq * w.CODE_QUALITY + c * w.COMMUNICATION
+
+  return clampScore(score)
 }
 
 /**
@@ -256,16 +338,57 @@ export function calculatePerformanceScore(components: {
  *
  * NOTE: Technical score and mastery score are the same thing.
  * Both measure objective code metrics without communication.
+ *
+ * Input scores are clamped to 0-100 range for safety.
+ * Output is also bounded to 0-100.
  */
-export function calculateTechnicalScore(components: {
-  correctness: number
-  timeEfficiency: number
-  independence: number
-}): number {
+export function calculateTechnicalScore(components: TechnicalScoreComponents): number {
   const w = SCORING.TECHNICAL_WEIGHTS
-  return Math.round(
-    components.correctness * w.CORRECTNESS +
-      components.timeEfficiency * w.TIME_EFFICIENCY +
-      components.independence * w.INDEPENDENCE
-  )
+  // Clamp inputs to valid range
+  const cor = clampScore(components.correctness)
+  const te = clampScore(components.timeEfficiency)
+  const ind = clampScore(components.independence)
+
+  const score = cor * w.CORRECTNESS + te * w.TIME_EFFICIENCY + ind * w.INDEPENDENCE
+
+  return clampScore(score)
+}
+
+/**
+ * Calculate technical/mastery score from score breakdown (legacy format)
+ * This is a fallback for when objective metrics (correctness, time, independence)
+ * are not available, using the AI-evaluated breakdown instead.
+ *
+ * Uses a different weight distribution since breakdown scores are different metrics:
+ * - Code Quality: 60% (closest proxy for correctness)
+ * - Problem Solving: 25% (approach quality)
+ * - Understanding: 15% (comprehension)
+ *
+ * @deprecated Prefer calculateTechnicalScore with objective metrics when available
+ */
+export function calculateTechnicalScoreFromBreakdown(breakdown: {
+  codeQualityScore: number
+  problemSolvingScore: number
+  understandingScore: number
+}): number {
+  // Clamp inputs to valid range
+  const cq = clampScore(breakdown.codeQualityScore)
+  const ps = clampScore(breakdown.problemSolvingScore)
+  const u = clampScore(breakdown.understandingScore)
+
+  // Use hardcoded weights for legacy breakdown calculation
+  // These weights differ from TECHNICAL_WEIGHTS because breakdown scores
+  // are AI-evaluated subjective metrics, not objective metrics
+  const LEGACY_WEIGHTS = {
+    CODE_QUALITY: 0.6,
+    PROBLEM_SOLVING: 0.25,
+    UNDERSTANDING: 0.15,
+  }
+
+  const score =
+    cq * LEGACY_WEIGHTS.CODE_QUALITY +
+    ps * LEGACY_WEIGHTS.PROBLEM_SOLVING +
+    u * LEGACY_WEIGHTS.UNDERSTANDING
+
+  return clampScore(score)
 }

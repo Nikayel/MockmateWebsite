@@ -5,6 +5,7 @@
  */
 
 import type { FeedbackScores } from "./types"
+import { calculatePerformanceScore } from "@/lib/constants"
 
 export interface FeedbackSection {
   tldr: string
@@ -366,14 +367,14 @@ export function parseFeedback(feedback: string): FeedbackSection {
       sections.scores.communication > 0
 
     if (hasNewScores) {
-      // Use canonical weights from lib/scoring/types.ts SCORE_WEIGHTS.performance
-      // Understanding: 25%, Problem-Solving: 25%, Code Quality: 30%, Communication: 20%
-      sections.scores.overall = Math.round(
-        sections.scores.understanding * 0.25 +
-          sections.scores.problemSolving * 0.25 +
-          sections.scores.codeQuality * 0.3 +
-          sections.scores.communication * 0.2
-      )
+      // Use canonical weights from lib/constants.ts SCORING.PERFORMANCE_WEIGHTS
+      // Single source of truth for performance score calculation
+      sections.scores.overall = calculatePerformanceScore({
+        understanding: sections.scores.understanding,
+        problemSolving: sections.scores.problemSolving,
+        codeQuality: sections.scores.codeQuality,
+        communication: sections.scores.communication,
+      })
     } else {
       sections.scores.overall = Math.round(
         (sections.scores.correctness +

@@ -18,6 +18,7 @@ import {
 } from "firebase/firestore"
 import { Profile, ProfileQuota } from "./types"
 import { PRICING_CONFIG } from "./config"
+import { calculateTechnicalScoreFromBreakdown } from "./constants"
 
 /**
  * Sanitize test results for Firestore storage
@@ -642,16 +643,18 @@ export async function updateInterviewSession(
         updateData.score_breakdown = scoreBreakdownObj
 
         // Calculate and save technical_score (excludes communication, focuses on code mastery)
-        // Uses same weights as ScoreDisplay.tsx for consistency
+        // Uses centralized calculateTechnicalScoreFromBreakdown from lib/constants.ts
         // Only calculate if we have the required scores
         if (
           codeQualityScore !== undefined &&
           problemSolvingScore !== undefined &&
           understandingScore !== undefined
         ) {
-          updateData.technical_score = Math.round(
-            codeQualityScore * 0.6 + problemSolvingScore * 0.25 + understandingScore * 0.15
-          )
+          updateData.technical_score = calculateTechnicalScoreFromBreakdown({
+            codeQualityScore,
+            problemSolvingScore,
+            understandingScore,
+          })
           // Also save as mastery_score for backwards compatibility
           updateData.mastery_score = updateData.technical_score
         }

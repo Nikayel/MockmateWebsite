@@ -12,36 +12,45 @@
  *
  * These functions are kept for backwards compatibility but should not be used
  * for new code. They return a fallback calculation based on score breakdown.
+ *
+ * NOTE: All calculation logic is now delegated to lib/constants.ts
+ * (Single Source of Truth for scoring calculations)
  */
 
 import { ScoreBreakdown, SCORE_WEIGHTS } from "./types"
+import { calculateTechnicalScoreFromBreakdown as centralCalculate } from "@/lib/constants"
 
 /**
  * @deprecated Use masteryScore directly from session data.
  * This fallback uses the old AI-based calculation for backwards compatibility.
+ *
+ * Delegates to calculateTechnicalScoreFromBreakdown in lib/constants.ts
  */
 export function calculateTechnicalScore(breakdown: ScoreBreakdown): number {
-  // Fallback: use a weighted average of code quality and problem solving
-  // This is only used when masteryScore is not available
-  const score =
-    breakdown.codeQualityScore * 0.6 +
-    breakdown.problemSolvingScore * 0.25 +
-    breakdown.understandingScore * 0.15
-
-  return Math.round(score)
+  // Delegate to central utility function (Single Source of Truth)
+  return centralCalculate({
+    codeQualityScore: breakdown.codeQualityScore,
+    problemSolvingScore: breakdown.problemSolvingScore,
+    understandingScore: breakdown.understandingScore,
+  })
 }
 
 /**
  * @deprecated Use masteryScore directly from session data.
+ *
+ * Delegates to calculateTechnicalScoreFromBreakdown in lib/constants.ts
  */
 export function calculateTechnicalScoreFromComponents(
   understandingScore: number,
   problemSolvingScore: number,
   codeQualityScore: number
 ): number {
-  const score = codeQualityScore * 0.6 + problemSolvingScore * 0.25 + understandingScore * 0.15
-
-  return Math.round(score)
+  // Delegate to central utility function (Single Source of Truth)
+  return centralCalculate({
+    codeQualityScore,
+    problemSolvingScore,
+    understandingScore,
+  })
 }
 
 /**

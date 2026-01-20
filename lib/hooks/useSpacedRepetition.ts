@@ -9,10 +9,13 @@
  */
 
 import { useState } from "react"
+import type { MasteryLevel } from "@/lib/scoring/types"
 
 export type Priority = "critical" | "high" | "medium" | "low"
-export type MasteryLevel = "new" | "learning" | "reviewing" | "mastered"
 export type Algorithm = "sm2" | "fsrs"
+
+// Re-export MasteryLevel for backwards compatibility
+export type { MasteryLevel }
 
 export interface DueItem {
   problem_id: string

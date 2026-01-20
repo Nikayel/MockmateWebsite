@@ -323,19 +323,21 @@ const GATES: Gate[] = [
       // Patterns that ask for approach too early
       const approachPatterns = [
         /what(?:'s| is) your (?:approach|thinking|plan)/i,
-        /what(?:'s| is) your thinking/i, // "What's your thinking on how to solve"
+        /what(?:'s| is) your thinking/i,
         /how (?:are you|would you) (?:thinking|approach|tackle|solve)/i,
-        /how are you thinking/i, // "how are you thinking about solving this"
+        /how are you thinking/i,
         /walk me through (?:your|the) (?:approach|plan|thinking)/i,
-        /walk me through your approach/i,
         /what approach/i,
         /how do you (?:want to|plan to) (?:solve|approach|tackle)/i,
         /before you (?:start )?coding/i,
         /let's (?:hear|discuss) your (?:approach|plan)/i,
-        /let's dive in/i, // "Let's dive into Group Anagrams" - rushing past clarification
+        /let's dive in/i,
         /dive into/i,
-        /understand your approach/i, // "I want to understand your approach"
-        /your approach/i, // Generic catch-all for approach questions
+        /understand your approach/i,
+        /your approach/i,
+        /how you plan to attack/i,
+        /tell me how you/i,
+        /clarifying question/i, // Interviewer shouldn't ask clarifying questions - USER asks them
       ]
 
       for (const pattern of approachPatterns) {
@@ -349,7 +351,7 @@ const GATES: Gate[] = [
       }
       return null
     },
-    hint: "In clarification phase, don't ask for approach. Say 'Take your time. Any questions about the problem?' Let THEM bring up their approach.",
+    hint: "In clarification phase, don't ask for approach. Say 'Take your time reading. Any questions about the problem?' Let THEM bring up their approach.",
   },
 ]
 

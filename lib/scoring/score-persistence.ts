@@ -10,8 +10,9 @@
  */
 
 import { adminDb } from "@/lib/firebase-admin"
-import { FieldValue, Timestamp } from "firebase-admin/firestore"
+import { FieldValue } from "firebase-admin/firestore"
 import type { SessionScores, ScorePersistenceInput, MasteryLevel } from "./types"
+import { calculateTechnicalScoreFromBreakdown } from "@/lib/constants"
 
 /**
  * Persist all session scores atomically
@@ -80,9 +81,6 @@ export async function persistSessionScores(input: ScorePersistenceInput): Promis
       last_score: scores.masteryScore,
       review_count: FieldValue.increment(1),
       last_review_at: FieldValue.serverTimestamp(),
-      // Also keep old field names for backwards compatibility during migration
-      practice_count: FieldValue.increment(1),
-      last_practiced: FieldValue.serverTimestamp(),
     },
     { merge: true }
   )
@@ -137,17 +135,16 @@ export async function getExistingSessionScores(
   if (!data) return null
 
   // Calculate approximate technical score if missing
-  // Technical score excludes communication, so we estimate by removing 20% communication contribution
-  // Performance = 0.25*U + 0.25*PS + 0.30*CQ + 0.20*C
-  // Assume average communication (50) contributes 10 points, rescale remaining 80% to 100%
+  // Technical score excludes communication, so we estimate from breakdown
+  // Uses centralized calculateTechnicalScoreFromBreakdown from lib/constants.ts
   const estimatedTechnicalScore =
     data.technicalScore ??
     (data.scoreBreakdown
-      ? Math.round(
-          data.scoreBreakdown.understandingScore * 0.15 +
-            data.scoreBreakdown.problemSolvingScore * 0.25 +
-            data.scoreBreakdown.codeQualityScore * 0.6
-        )
+      ? calculateTechnicalScoreFromBreakdown({
+          codeQualityScore: data.scoreBreakdown.codeQualityScore,
+          problemSolvingScore: data.scoreBreakdown.problemSolvingScore,
+          understandingScore: data.scoreBreakdown.understandingScore,
+        })
       : Math.max(0, Math.round((data.performanceScore - 10) / 0.8)))
 
   // Mastery score is harder to estimate - use a conservative approach
@@ -308,8 +305,7 @@ export async function updateProblemMasteryLevel(
   await ref.set(
     {
       mastery_level: masteryLevel,
-      interval_days: interval, // Standard SR field name
-      current_interval: interval, // Backwards compatibility
+      interval_days: interval,
       last_updated: FieldValue.serverTimestamp(),
     },
     { merge: true }

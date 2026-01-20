@@ -13,6 +13,7 @@ import type {
 } from "./types"
 import type { ExtractedEvidence } from "./structured-extraction"
 import { analyzeCodeCompleteness, isBlankDesignTemplate } from "./completeness-analysis"
+import { SCORING, clampScore } from "../constants"
 
 // ============================================================================
 // SYSTEM DESIGN SCORING
@@ -171,19 +172,22 @@ export function calculateSystemDesignScores(
   }
 
   // System design weighting: Communication is most important
+  // Uses SCORING.SYSTEM_DESIGN_WEIGHTS from lib/constants.ts (Single Source of Truth)
+  const sdw = SCORING.SYSTEM_DESIGN_WEIGHTS
   const overall = Math.round(
-    understanding * 0.2 + // Requirements & understanding
-      problemSolving * 0.3 + // Architecture & scalability
-      codeQuality * 0.2 + // Design depth
-      communication * 0.3 // Critical for system design
+    understanding * sdw.UNDERSTANDING +
+      problemSolving * sdw.PROBLEM_SOLVING +
+      codeQuality * sdw.CODE_QUALITY +
+      communication * sdw.COMMUNICATION
   )
 
+  // Clamp all scores to valid 0-100 range
   return {
-    understanding: Math.round(understanding),
-    problemSolving: Math.round(problemSolving),
-    codeQuality: Math.round(codeQuality),
-    communication: Math.round(communication),
-    overall,
+    understanding: clampScore(understanding),
+    problemSolving: clampScore(problemSolving),
+    codeQuality: clampScore(codeQuality),
+    communication: clampScore(communication),
+    overall: clampScore(overall),
   }
 }
 
@@ -253,19 +257,22 @@ export function calculateBugFixScores(
   }
 
   // Bug fix weighting: Understanding the bug is most important
+  // Uses SCORING.BUG_FIX_WEIGHTS from lib/constants.ts (Single Source of Truth)
+  const bfw = SCORING.BUG_FIX_WEIGHTS
   const overall = Math.round(
-    understanding * 0.35 + // Finding + explaining the bug
-      problemSolving * 0.25 + // Debugging approach
-      codeQuality * 0.2 + // Clean fix
-      communication * 0.2 // Explaining process
+    understanding * bfw.UNDERSTANDING +
+      problemSolving * bfw.PROBLEM_SOLVING +
+      codeQuality * bfw.CODE_QUALITY +
+      communication * bfw.COMMUNICATION
   )
 
+  // Clamp all scores to valid 0-100 range
   return {
-    understanding: Math.round(understanding),
-    problemSolving: Math.round(problemSolving),
-    codeQuality: Math.round(codeQuality),
-    communication: Math.round(communication),
-    overall,
+    understanding: clampScore(understanding),
+    problemSolving: clampScore(problemSolving),
+    codeQuality: clampScore(codeQuality),
+    communication: clampScore(communication),
+    overall: clampScore(overall),
   }
 }
 
@@ -603,8 +610,13 @@ export function calculateValidatedScores(
   // BUT overall will still be capped due to other components being low
 
   // === OVERALL SCORE ===
+  // Use canonical weights from lib/constants.ts SCORING.PERFORMANCE_WEIGHTS
+  const w = SCORING.PERFORMANCE_WEIGHTS
   let overall = Math.round(
-    understanding * 0.3 + problemSolving * 0.25 + codeQuality * 0.25 + communication * 0.2
+    understanding * w.UNDERSTANDING +
+      problemSolving * w.PROBLEM_SOLVING +
+      codeQuality * w.CODE_QUALITY +
+      communication * w.COMMUNICATION
   )
 
   // FINAL CAP: Incomplete solutions CANNOT pass (cap at 30%)
@@ -614,12 +626,13 @@ export function calculateValidatedScores(
     overall = Math.min(28, overall) // Hard cap at 28% - this is a failing grade
   }
 
+  // Clamp all scores to valid 0-100 range
   return {
-    understanding: Math.round(understanding),
-    problemSolving: Math.round(problemSolving),
-    codeQuality: Math.round(codeQuality),
-    communication: Math.round(communication),
-    overall,
+    understanding: clampScore(understanding),
+    problemSolving: clampScore(problemSolving),
+    codeQuality: clampScore(codeQuality),
+    communication: clampScore(communication),
+    overall: clampScore(overall),
   }
 }
 
@@ -706,8 +719,13 @@ export function applyScoreFloors(
     }
 
     // Recalculate overall if component scores were boosted
+    // Use canonical weights from lib/constants.ts SCORING.PERFORMANCE_WEIGHTS
+    const pw = SCORING.PERFORMANCE_WEIGHTS
     const newOverall = Math.round(
-      understanding * 0.3 + problemSolving * 0.25 + codeQuality * 0.25 + communication * 0.2
+      understanding * pw.UNDERSTANDING +
+        problemSolving * pw.PROBLEM_SOLVING +
+        codeQuality * pw.CODE_QUALITY +
+        communication * pw.COMMUNICATION
     )
     overall = Math.max(overall, newOverall)
   } else if (passRate >= 80) {

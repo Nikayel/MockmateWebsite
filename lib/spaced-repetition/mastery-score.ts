@@ -371,7 +371,7 @@ export function fromInteractionMetrics(metrics: InteractionMetrics): MasteryScor
  * Use when full InteractionMetrics aren't available
  *
  * Key Philosophy:
- * - Interview Score includes 20% communication weight
+ * - Interview Score includes 30% communication weight (see lib/constants.ts)
  * - Mastery Score should focus on CODE CORRECTNESS only
  * - For SR, we want to know "do they KNOW this pattern?" not "can they explain it?"
  */
@@ -408,27 +408,27 @@ export function quickMasteryScore(params: {
   // Fallback when no test data: derive mastery from performance score
   // IMPORTANT: Properly extract technical portion by removing communication component
 
-  // Interview score breakdown (from SCORE_WEIGHTS.performance in lib/scoring/types.ts):
+  // Interview score breakdown (from SCORING.PERFORMANCE_WEIGHTS in lib/constants.ts):
   // - Understanding: 25% (technical)
   // - Problem-Solving: 25% (technical)
-  // - Code Quality: 30% (technical)
-  // - Communication: 20% (NON-technical - exclude this for mastery)
+  // - Code Quality: 20% (technical)
+  // - Communication: 30% (NON-technical - exclude this for mastery)
   //
-  // Formula: performance = 0.25*U + 0.25*PS + 0.30*CQ + 0.20*C
-  // Technical components = 0.25*U + 0.25*PS + 0.30*CQ (80% of total weight)
+  // Formula: performance = 0.25*U + 0.25*PS + 0.20*CQ + 0.30*C
+  // Technical components = 0.25*U + 0.25*PS + 0.20*CQ (70% of total weight)
   //
   // To extract technical score, we:
   // 1. Assume communication was average (50/100 = 0.50 normalized)
-  // 2. Communication contributes: 0.20 * 50 = 10 points to performance score
-  // 3. Technical contribution: performanceScore - 10
-  // 4. Rescale from 80-point scale to 100-point scale: (technical / 0.80)
+  // 2. Communication contributes: 0.30 * 50 = 15 points to performance score
+  // 3. Technical contribution: performanceScore - 15
+  // 4. Rescale from 70-point scale to 100-point scale: (technical / 0.70)
 
   const assumedCommunicationScore = 50 // Average communication performance
-  const communicationContribution = 0.2 * assumedCommunicationScore // 10 points
+  const communicationContribution = 0.3 * assumedCommunicationScore // 15 points
   const technicalPoints = performanceScore - communicationContribution
 
-  // Rescale from 80-point max to 100-point scale
-  const baseScore = technicalPoints / 0.8
+  // Rescale from 70-point max to 100-point scale
+  const baseScore = technicalPoints / 0.7
 
   // Apply hint penalty - heavier for spaced repetition
   // Each hint indicates they needed help understanding the pattern

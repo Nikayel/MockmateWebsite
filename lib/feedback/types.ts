@@ -12,8 +12,8 @@
  * Weight definitions are in lib/constants.ts (SCORING.PERFORMANCE_WEIGHTS)
  * - understanding: 25% - Can you explain your approach? (LLM-evaluated)
  * - problemSolving: 25% - Debug & optimize
- * - codeQuality: 30% - Clean & efficient (tests pass)
- * - communication: 20% - Think out loud
+ * - codeQuality: 20% - Clean & efficient (tests pass)
+ * - communication: 30% - Think out loud (intentionally high - poor communicators get rejected even with correct solutions)
  */
 export interface FeedbackScores {
   // Primary grading criteria (see lib/constants.ts for weights)

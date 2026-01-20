@@ -85,12 +85,19 @@ export interface InteractionMetrics {
   workspaceContextUsed: boolean
 }
 
+/**
+ * Full score breakdown from client-side scoring algorithm
+ *
+ * NOTE: This interface extends the persistence ScoreBreakdown (lib/scoring/types.ts)
+ * with the aiCollaborationIndicator field which is only used for display,
+ * not for persistence or spaced repetition calculations.
+ */
 export interface ScoreBreakdown {
   // Primary scores (what really matters)
-  codeQualityScore: number // 30% - Tests, efficiency, readability
+  codeQualityScore: number // 20% - Tests, efficiency, readability
   problemSolvingScore: number // 25% - Approach, debugging, optimization
   understandingScore: number // 25% - Code explanation, complexity analysis
-  communicationScore: number // 20% - Sharing thought process, answering questions
+  communicationScore: number // 30% - Sharing thought process, answering questions
 
   // Secondary indicators (informational, not heavily weighted)
   aiCollaborationIndicator: number // How effectively AI was used (if at all)
@@ -106,10 +113,10 @@ export interface ScoreBreakdown {
 import { SCORING } from "./constants"
 
 const WEIGHTS = {
-  codeQuality: SCORING.PERFORMANCE_WEIGHTS.CODE_QUALITY, // 30%
+  codeQuality: SCORING.PERFORMANCE_WEIGHTS.CODE_QUALITY, // 20%
   problemSolving: SCORING.PERFORMANCE_WEIGHTS.PROBLEM_SOLVING, // 25%
   understanding: SCORING.PERFORMANCE_WEIGHTS.UNDERSTANDING, // 25%
-  communication: SCORING.PERFORMANCE_WEIGHTS.COMMUNICATION, // 20%
+  communication: SCORING.PERFORMANCE_WEIGHTS.COMMUNICATION, // 30%
 }
 
 // =============================================================================
@@ -126,7 +133,7 @@ const WEIGHTS = {
  * - Strategic AI use > AI spam
  */
 export function calculateUserScore(metrics: InteractionMetrics): ScoreBreakdown {
-  // 1. CODE QUALITY SCORE (30%)
+  // 1. CODE QUALITY SCORE (20%)
   // The most objective metric - does your code work?
   const testPassRate =
     metrics.testCasesTotal > 0 ? (metrics.testCasesPassed / metrics.testCasesTotal) * 100 : 0
@@ -209,7 +216,7 @@ export function calculateUserScore(metrics: InteractionMetrics): ScoreBreakdown 
 
   understandingScore = Math.min(100, Math.max(0, Math.round(understandingScore)))
 
-  // 4. COMMUNICATION SCORE (20%)
+  // 4. COMMUNICATION SCORE (30%)
   // Did you share your thinking? Real interviews require this.
   let communicationScore = 0
 

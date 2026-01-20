@@ -971,14 +971,16 @@ async function updateUserProblemMastery(summary: SessionSummary): Promise<void> 
     await adminDb.runTransaction(async (transaction) => {
       const doc = await transaction.get(masteryRef)
 
-      // Calculate mastery level based on score
-      const getMasteryLevel = (score: number, practiceCount: number): string => {
-        if (practiceCount < 2) return "novice"
-        if (score >= 90) return "expert"
-        if (score >= 75) return "proficient"
-        if (score >= 60) return "practicing"
-        if (score >= 40) return "learning"
-        return "novice"
+      // Calculate mastery level for spaced repetition
+      // Uses canonical MasteryLevel: "new" | "learning" | "reviewing" | "mastered"
+      // (defined in lib/scoring/types.ts - must match for getMasteryStatistics to work)
+      type MasteryLevel = "new" | "learning" | "reviewing" | "mastered"
+      const getMasteryLevel = (score: number, practiceCount: number): MasteryLevel => {
+        if (practiceCount < 2) return "new"
+        if (score >= 85 && practiceCount >= 5) return "mastered"
+        if (score >= 70 && practiceCount >= 3) return "reviewing"
+        if (score >= 50) return "learning"
+        return "new"
       }
 
       if (!doc.exists) {
@@ -990,29 +992,29 @@ async function updateUserProblemMastery(summary: SessionSummary): Promise<void> 
           mastery_level: getMasteryLevel(summary.performanceScore, 1),
           last_score: summary.performanceScore,
           best_score: summary.performanceScore,
-          practice_count: 1,
+          review_count: 1,
           total_score: summary.performanceScore,
           average_score: summary.performanceScore,
-          first_practiced_at: summary.completedAt,
-          last_practiced_at: summary.completedAt,
+          first_review_at: summary.completedAt,
+          last_review_at: summary.completedAt,
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
         })
       } else {
         const data = doc.data()!
-        const practiceCount = (data.practice_count || 0) + 1
+        const reviewCount = (data.review_count || data.practice_count || 0) + 1
         const totalScore = (data.total_score || 0) + summary.performanceScore
-        const averageScore = Math.round(totalScore / practiceCount)
+        const averageScore = Math.round(totalScore / reviewCount)
         const bestScore = Math.max(data.best_score || 0, summary.performanceScore)
 
         transaction.update(masteryRef, {
-          mastery_level: getMasteryLevel(averageScore, practiceCount),
+          mastery_level: getMasteryLevel(averageScore, reviewCount),
           last_score: summary.performanceScore,
           best_score: bestScore,
-          practice_count: practiceCount,
+          review_count: reviewCount,
           total_score: totalScore,
           average_score: averageScore,
-          last_practiced_at: summary.completedAt,
+          last_review_at: summary.completedAt,
           updatedAt: FieldValue.serverTimestamp(),
         })
       }

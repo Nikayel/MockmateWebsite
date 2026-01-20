@@ -21,6 +21,7 @@ import { logger } from "@/lib/logger"
 import type { ExtractedEvidence } from "./structured-extraction"
 import { buildEvidenceSummary } from "./structured-extraction"
 import { FEEDBACK_PRINCIPLES, CORE_PRINCIPLES } from "@/lib/prompts"
+import { calculatePerformanceScore } from "@/lib/constants"
 
 // ============================================================================
 // SCORE CRITIQUE
@@ -185,12 +186,13 @@ If no issues found, return:
       if (result.madeChanges && result.adjustedScores) {
         // Recalculate overall from components to ensure consistency
         // Don't trust AI to do the math correctly
-        const recalculatedOverall = Math.round(
-          result.adjustedScores.understanding * 0.3 +
-            result.adjustedScores.problemSolving * 0.25 +
-            result.adjustedScores.codeQuality * 0.25 +
-            result.adjustedScores.communication * 0.2
-        )
+        // Uses centralized calculatePerformanceScore from lib/constants.ts
+        const recalculatedOverall = calculatePerformanceScore({
+          understanding: result.adjustedScores.understanding,
+          problemSolving: result.adjustedScores.problemSolving,
+          codeQuality: result.adjustedScores.codeQuality,
+          communication: result.adjustedScores.communication,
+        })
 
         // If AI's overall differs significantly from recalculated, use recalculated
         const aiOverall = result.adjustedScores.overall

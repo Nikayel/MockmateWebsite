@@ -25,7 +25,7 @@ import {
 
 export type InterviewPhase =
   | "intro" // Initial greeting and problem introduction
-  | "clarification" //Letting oua user to talk througha and ask qs
+  | "clarification" // User reads problem and asks clarifying questions
   | "discussion" // Candidate explains approach, interviewer probes
   | "coding" // Candidate writes code, interviewer observes
   | "testing" // Tests run, discuss results and complexity

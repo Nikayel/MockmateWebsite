@@ -14,7 +14,11 @@
  */
 
 /**
- * Breakdown of individual score components (0-100 each)
+ * Breakdown of individual score components for persistence (0-100 each)
+ *
+ * NOTE: This is the minimal breakdown stored in Firestore.
+ * For the full client-side breakdown with aiCollaborationIndicator,
+ * see ScoreBreakdown in lib/scoring.ts
  */
 export interface ScoreBreakdown {
   understandingScore: number // How well user understood the problem
@@ -86,6 +90,15 @@ export interface ScorePersistenceInput {
 }
 
 import { SCORING } from "../constants"
+
+// Re-export scoring component interfaces from constants
+// These provide typed parameters for score calculation functions
+export type {
+  PerformanceScoreComponents,
+  TechnicalScoreComponents,
+  PerformanceLevel,
+  LetterGrade,
+} from "../constants"
 
 /**
  * Score weights for different calculation methods

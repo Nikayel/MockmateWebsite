@@ -25,6 +25,11 @@ export type {
   MasteryLevel,
   MasteryStatistics,
   ScorePersistenceInput,
+  // Component interfaces for typed score calculations
+  PerformanceScoreComponents,
+  TechnicalScoreComponents,
+  PerformanceLevel,
+  LetterGrade,
 } from "./types"
 
 export { SCORE_WEIGHTS } from "./types"

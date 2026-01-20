@@ -13,12 +13,13 @@ import { adminAuth, adminDb } from "@/lib/firebase-admin"
 import { getUserStats, getRecentSessions, getPerformanceTrends } from "@/lib/session-metrics"
 import { getUserUsageSummary } from "@/lib/usage-tracking"
 import { getMasteryStatistics, getUserScoreStats } from "@/lib/scoring"
+import { calculateTechnicalScoreFromBreakdown } from "@/lib/constants"
 
 /**
  * @deprecated Technical score is now unified with Mastery score.
  * Prefer using session.mastery_score or session.technical_score directly.
  *
- * This fallback calculates from breakdown using the old AI-based weights.
+ * This fallback calculates from breakdown using the centralized function.
  * Only used when mastery_score is not available.
  */
 function calculateTechScoreFallback(
@@ -26,8 +27,12 @@ function calculateTechScoreFallback(
   problemSolving: number,
   codeQuality: number
 ): number {
-  // Old AI-based weights - kept for backwards compatibility only
-  return Math.round(codeQuality * 0.6 + problemSolving * 0.25 + understanding * 0.15)
+  // Uses centralized calculateTechnicalScoreFromBreakdown from lib/constants.ts
+  return calculateTechnicalScoreFromBreakdown({
+    codeQualityScore: codeQuality,
+    problemSolvingScore: problemSolving,
+    understandingScore: understanding,
+  })
 }
 
 /**
@@ -367,7 +372,7 @@ export async function GET(request: NextRequest) {
           totalSessions: finalStats?.totalSessions || 0,
           totalPracticeMinutes: finalStats?.totalPracticeMinutes || 0,
           totalPracticeHours: Math.round((finalStats?.totalPracticeMinutes || 0) / 6) / 10, // 1 decimal place
-          averageScore: finalStats?.averageScore || 0, // Overall score (includes communication 20%)
+          averageScore: finalStats?.averageScore || 0, // Overall score (includes communication 30%)
           averageTechnicalScore:
             technicalScoreOverride ?? // Use calculated technical score from breakdowns
             (finalStats as any)?.averageTechnicalScore ??
