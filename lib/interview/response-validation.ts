@@ -22,6 +22,9 @@ import {
 } from "./shared-patterns"
 import { SEMANTIC_RULES, buildSemanticValidationPrompt } from "./semantic-rules"
 
+// Re-export for consumers
+export { SEMANTIC_RULES, buildSemanticValidationPrompt }
+
 export interface ValidationResult {
   isValid: boolean
   violations: ResponseViolation[]
