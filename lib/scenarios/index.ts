@@ -23,6 +23,7 @@ import type {
   DSAScenario,
   BugFixScenario,
   SystemDesignScenario,
+  AddFunctionalityScenario,
   ScenarioMeta,
   ScenarioType,
   DifficultyLevel,
@@ -31,7 +32,14 @@ import type {
 import { DSAPattern } from "../types/dsa-patterns"
 
 // Re-export types for convenience
-export type { Scenario, DSAScenario, BugFixScenario, SystemDesignScenario, ScenarioMeta }
+export type {
+  Scenario,
+  DSAScenario,
+  BugFixScenario,
+  SystemDesignScenario,
+  AddFunctionalityScenario,
+  ScenarioMeta,
+}
 export type { ScenarioType, DifficultyLevel, Company }
 
 // Re-export from legacy for backward compatibility

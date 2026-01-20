@@ -13,31 +13,9 @@
  * NOTE: All scenarios use pure JavaScript/Python for sandbox testability.
  */
 
-import type { BaseScenario } from "./scenarios"
-
-export interface AddFunctionalityScenario extends BaseScenario {
-  type: "add-functionality"
-  problemStatement: string
-  featureRequirements: string[]
-  existingCode: {
-    [language: string]: string
-  }
-  codebaseFiles: {
-    [language: string]: {
-      fileName: string
-      content: string
-      description: string
-    }[]
-  }
-  hints: string[]
-  testCases: {
-    input: any
-    expected: any
-    description: string
-    compareAsSet?: boolean
-  }[]
-  acceptanceCriteria: string[]
-}
+// Re-export AddFunctionalityScenario from the canonical types file
+export type { AddFunctionalityScenario } from "./scenarios/types"
+import type { AddFunctionalityScenario } from "./scenarios/types"
 
 // =============================================================================
 // ADD FUNCTIONALITY SCENARIOS - Real-world feature implementation

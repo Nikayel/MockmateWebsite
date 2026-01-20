@@ -9,7 +9,7 @@
 
 // External scenario imports (real-world scenarios from separate files)
 import { realWorldBugFixScenarios, realWorldSystemDesignScenarios } from "./scenarios-realworld"
-import { addFunctionalityScenarios, AddFunctionalityScenario } from "./scenarios-add-functionality"
+import { addFunctionalityScenarios } from "./scenarios-add-functionality"
 import { DSAPattern, DSA_PATTERNS } from "./types/dsa-patterns"
 
 // Import modular DSA scenarios
@@ -36,165 +36,24 @@ import { bugFixScenarios } from "./scenarios/bugfix"
 import { systemDesignScenarios } from "./scenarios/system-design"
 
 // ============================================================================
-// Type Definitions
+// Type Definitions - Re-exported from canonical source
 // ============================================================================
 
-export type ScenarioType =
-  | "dsa"
-  | "bugfix"
-  | "optimization"
-  | "security"
-  | "system-design"
-  | "add-functionality"
-export type DifficultyLevel = "easy" | "medium" | "hard"
-export type Company =
-  | "Google"
-  | "Meta"
-  | "Amazon"
-  | "Netflix"
-  | "Apple"
-  | "Microsoft"
-  | "Startup"
-  | "Generic"
-  | "Airbnb"
-  | "Shopify"
-  | "Walmart"
-  | "Stripe"
-  | "Slack"
-  | "Notion"
-  | "Figma"
-  | "Discord"
-  | "LinkedIn"
-  | "Bloomberg"
-  | "Cloudflare"
-  | "Algolia"
-  | "Elasticsearch"
-  | "Twitter"
-  | "Uber"
-  | "Lyft"
-  | "DoorDash"
-  | "Instacart"
-  | "eBay"
-  | "Alibaba"
-  | "Dropbox"
-  | "Box"
-  | "Goldman Sachs"
-  | "Jane Street"
-  | "Coinbase"
-  | "Robinhood"
-  | "Square"
-  | "Databricks"
-  | "Snowflake"
-  | "Palantir"
-  | "Veeva"
-  | "Salesforce"
-  // Popular tech companies for interns and new grads
-  | "Roblox"
-  | "TikTok"
-  | "NVIDIA"
-  | "Snap"
-  | "Pinterest"
-  | "Reddit"
-  | "Atlassian"
-  | "Oracle"
-  | "Spotify"
-  | "Twitch"
+// Re-export all types from the canonical types file to avoid duplication
+export type {
+  ScenarioType,
+  DifficultyLevel,
+  Company,
+  BaseScenario,
+  DSAScenario,
+  BugFixScenario,
+  SystemDesignScenario,
+  AddFunctionalityScenario,
+  Scenario,
+} from "./scenarios/types"
 
-export interface BaseScenario {
-  id: string
-  title: string
-  type: ScenarioType
-  difficulty: DifficultyLevel
-  companies: Company[]
-  description: string
-  tags: string[]
-  estimatedTime: number // in minutes
-}
-
-export interface DSAScenario extends BaseScenario {
-  type: "dsa"
-  // Pattern category (like LeetCode/NeetCode)
-  pattern: DSAPattern
-  problemStatement: string
-  examples: {
-    input: string
-    output: string
-    explanation?: string
-  }[]
-  constraints: string[]
-  hints: string[]
-  starterCode: {
-    [language: string]: string
-  }
-  optimalComplexity: {
-    time: string
-    space: string
-  }
-  testCases: {
-    input: any
-    expected: any
-    description: string
-    compareAsSet?: boolean
-  }[]
-}
-
-export interface BugFixScenario extends BaseScenario {
-  type: "bugfix"
-  problemStatement: string
-  buggyCode: {
-    [language: string]: string
-  }
-  // Multi-file codebase for realistic scenarios
-  codebaseFiles: {
-    [language: string]: {
-      fileName: string
-      content: string
-      description: string
-    }[]
-  }
-  expectedBehavior: string
-  bugDescription: string
-  hints: string[]
-  testCases: {
-    input: any
-    expected: any
-    description: string
-    compareAsSet?: boolean
-  }[]
-}
-
-export interface SystemDesignScenario extends BaseScenario {
-  type: "system-design"
-  problemStatement: string
-  functionalRequirements: string[]
-  nonFunctionalRequirements: string[]
-  constraints: string[]
-  keyComponents: string[]
-  hints: string[]
-  evaluationCriteria: {
-    category: string
-    description: string
-    weight: number // percentage
-  }[]
-  exampleSolution: {
-    overview: string
-    architecture: string[]
-    dataModel: string[]
-    apiDesign: string[]
-    scalability: string[]
-    tradeoffs: string[]
-  }
-  discussionPoints: string[]
-}
-
-export type Scenario =
-  | DSAScenario
-  | BugFixScenario
-  | SystemDesignScenario
-  | AddFunctionalityScenario
-
-// Re-export AddFunctionalityScenario for convenience
-export type { AddFunctionalityScenario } from "./scenarios-add-functionality"
+// Import Scenario type for use in this file
+import type { Scenario } from "./scenarios/types"
 
 // ============================================================================
 // Combined Scenarios Array

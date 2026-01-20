@@ -233,7 +233,35 @@ export interface SystemDesignScenario extends BaseScenario {
   discussionPoints: string[]
 }
 
-export type Scenario = DSAScenario | BugFixScenario | SystemDesignScenario
+export interface AddFunctionalityScenario extends BaseScenario {
+  type: "add-functionality"
+  problemStatement: string
+  featureRequirements: string[]
+  existingCode: {
+    [language: string]: string
+  }
+  codebaseFiles: {
+    [language: string]: {
+      fileName: string
+      content: string
+      description: string
+    }[]
+  }
+  hints: string[]
+  testCases: {
+    input: any
+    expected: any
+    description: string
+    compareAsSet?: boolean
+  }[]
+  acceptanceCriteria: string[]
+}
+
+export type Scenario =
+  | DSAScenario
+  | BugFixScenario
+  | SystemDesignScenario
+  | AddFunctionalityScenario
 
 // Scenario metadata for listing without loading full content
 export interface ScenarioMeta {

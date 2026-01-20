@@ -6,48 +6,82 @@
  * when they are needed.
  */
 
-import type { Scenario, ScenarioType, DifficultyLevel, Company, DSAScenario, BugFixScenario, SystemDesignScenario } from './scenarios'
-import type { AddFunctionalityScenario } from './scenarios-add-functionality'
-import type { DSAPattern } from './types/dsa-patterns'
+import type { Scenario, ScenarioType, DifficultyLevel, Company, DSAScenario } from "./scenarios"
+import type { DSAPattern } from "./types/dsa-patterns"
 
 // Cache for loaded scenarios
 const scenarioCache: Map<string, Scenario[]> = new Map()
 let allScenariosLoaded = false
 let allScenarios: Scenario[] = []
 
-// Scenario category loaders
-const scenarioLoaders = {
+// Scenario category loaders - all return Scenario[] for type consistency
+const scenarioLoaders: Record<string, () => Promise<Scenario[]>> = {
   // DSA Pattern loaders
-  'arrays-hashing': () => import('./scenarios/dsa/arrays-hashing').then(m => m.arraysHashingScenarios),
-  'two-pointers': () => import('./scenarios/dsa/two-pointers').then(m => m.twoPointersScenarios),
-  'stack': () => import('./scenarios/dsa/stack').then(m => m.stackScenarios),
-  'sliding-window': () => import('./scenarios/dsa/sliding-window').then(m => m.slidingWindowScenarios),
-  'linked-list': () => import('./scenarios/dsa/linked-list').then(m => m.linkedListScenarios),
-  'trees': () => import('./scenarios/dsa/trees').then(m => m.treesScenarios),
-  'graphs': () => import('./scenarios/dsa/graphs').then(m => m.graphsScenarios),
-  'dynamic-programming': () => import('./scenarios/dsa/dynamic-programming').then(m => m.dpScenarios),
-  'heap': () => import('./scenarios/dsa/heap').then(m => m.heapScenarios),
-  'binary-search': () => import('./scenarios/dsa/binary-search').then(m => m.binarySearchScenarios),
-  'backtracking': () => import('./scenarios/dsa/backtracking').then(m => m.backtrackingScenarios),
-  'intervals': () => import('./scenarios/dsa/intervals').then(m => m.intervalsScenarios),
-  'math-geometry': () => import('./scenarios/dsa/math-geometry').then(m => m.mathGeometryScenarios),
-  'binary-search-tree': () => import('./scenarios/dsa/binary-search-tree').then(m => m.binarySearchTreeScenarios),
+  "arrays-hashing": () =>
+    import("./scenarios/dsa/arrays-hashing").then((m) => m.arraysHashingScenarios as Scenario[]),
+  "two-pointers": () =>
+    import("./scenarios/dsa/two-pointers").then((m) => m.twoPointersScenarios as Scenario[]),
+  stack: () => import("./scenarios/dsa/stack").then((m) => m.stackScenarios as Scenario[]),
+  "sliding-window": () =>
+    import("./scenarios/dsa/sliding-window").then((m) => m.slidingWindowScenarios as Scenario[]),
+  "linked-list": () =>
+    import("./scenarios/dsa/linked-list").then((m) => m.linkedListScenarios as Scenario[]),
+  trees: () => import("./scenarios/dsa/trees").then((m) => m.treesScenarios as Scenario[]),
+  graphs: () => import("./scenarios/dsa/graphs").then((m) => m.graphsScenarios as Scenario[]),
+  "dynamic-programming": () =>
+    import("./scenarios/dsa/dynamic-programming").then((m) => m.dpScenarios as Scenario[]),
+  heap: () => import("./scenarios/dsa/heap").then((m) => m.heapScenarios as Scenario[]),
+  "binary-search": () =>
+    import("./scenarios/dsa/binary-search").then((m) => m.binarySearchScenarios as Scenario[]),
+  backtracking: () =>
+    import("./scenarios/dsa/backtracking").then((m) => m.backtrackingScenarios as Scenario[]),
+  intervals: () =>
+    import("./scenarios/dsa/intervals").then((m) => m.intervalsScenarios as Scenario[]),
+  "math-geometry": () =>
+    import("./scenarios/dsa/math-geometry").then((m) => m.mathGeometryScenarios as Scenario[]),
+  "binary-search-tree": () =>
+    import("./scenarios/dsa/binary-search-tree").then(
+      (m) => m.binarySearchTreeScenarios as Scenario[]
+    ),
 
   // Bug fix scenarios
-  'bugfix': () => import('./scenarios/bugfix').then(m => m.bugFixScenarios),
+  bugfix: () => import("./scenarios/bugfix").then((m) => m.bugFixScenarios as Scenario[]),
 
   // System design scenarios
-  'system-design': () => import('./scenarios/system-design').then(m => m.systemDesignScenarios),
+  "system-design": () =>
+    import("./scenarios/system-design").then((m) => m.systemDesignScenarios as Scenario[]),
 
   // Real-world scenarios
-  'realworld-bugfix': () => import('./scenarios-realworld').then(m => m.realWorldBugFixScenarios),
-  'realworld-system-design': () => import('./scenarios-realworld').then(m => m.realWorldSystemDesignScenarios),
+  "realworld-bugfix": () =>
+    import("./scenarios-realworld").then((m) => m.realWorldBugFixScenarios as Scenario[]),
+  "realworld-system-design": () =>
+    import("./scenarios-realworld").then((m) => m.realWorldSystemDesignScenarios as Scenario[]),
 
   // Add functionality scenarios
-  'add-functionality': () => import('./scenarios-add-functionality').then(m => m.addFunctionalityScenarios),
-} as const
+  "add-functionality": () =>
+    import("./scenarios-add-functionality").then((m) => m.addFunctionalityScenarios as Scenario[]),
+}
 
-type ScenarioCategory = keyof typeof scenarioLoaders
+type ScenarioCategory =
+  | "arrays-hashing"
+  | "two-pointers"
+  | "stack"
+  | "sliding-window"
+  | "linked-list"
+  | "trees"
+  | "graphs"
+  | "dynamic-programming"
+  | "heap"
+  | "binary-search"
+  | "backtracking"
+  | "intervals"
+  | "math-geometry"
+  | "binary-search-tree"
+  | "bugfix"
+  | "system-design"
+  | "realworld-bugfix"
+  | "realworld-system-design"
+  | "add-functionality"
 
 /**
  * Load scenarios for a specific category
@@ -96,21 +130,31 @@ export async function loadAllScenarios(): Promise<Scenario[]> {
  */
 export async function loadScenariosByType(type: ScenarioType): Promise<Scenario[]> {
   const categoryMap: Record<ScenarioType, ScenarioCategory[]> = {
-    'dsa': [
-      'arrays-hashing', 'two-pointers', 'stack', 'sliding-window',
-      'linked-list', 'trees', 'graphs', 'dynamic-programming',
-      'heap', 'binary-search', 'backtracking', 'intervals',
-      'math-geometry', 'binary-search-tree'
+    dsa: [
+      "arrays-hashing",
+      "two-pointers",
+      "stack",
+      "sliding-window",
+      "linked-list",
+      "trees",
+      "graphs",
+      "dynamic-programming",
+      "heap",
+      "binary-search",
+      "backtracking",
+      "intervals",
+      "math-geometry",
+      "binary-search-tree",
     ],
-    'bugfix': ['bugfix', 'realworld-bugfix'],
-    'system-design': ['system-design', 'realworld-system-design'],
-    'add-functionality': ['add-functionality'],
-    'optimization': [], // Add categories if needed
-    'security': [], // Add categories if needed
+    bugfix: ["bugfix", "realworld-bugfix"],
+    "system-design": ["system-design", "realworld-system-design"],
+    "add-functionality": ["add-functionality"],
+    optimization: [], // Add categories if needed
+    security: [], // Add categories if needed
   }
 
   const categories = categoryMap[type] || []
-  const promises = categories.map(cat => loadScenarioCategory(cat))
+  const promises = categories.map((cat) => loadScenarioCategory(cat))
   const results = await Promise.all(promises)
   return results.flat()
 }
@@ -122,13 +166,13 @@ export async function loadScenariosByType(type: ScenarioType): Promise<Scenario[
 export async function getScenarioByIdLazy(id: string): Promise<Scenario | undefined> {
   // Check cache first
   for (const scenarios of scenarioCache.values()) {
-    const found = scenarios.find(s => s.id === id)
+    const found = scenarios.find((s) => s.id === id)
     if (found) return found
   }
 
   // If not in cache, load all scenarios
   const all = await loadAllScenarios()
-  return all.find(s => s.id === id)
+  return all.find((s) => s.id === id)
 }
 
 /**
@@ -146,7 +190,7 @@ export async function filterScenariosLazy(filters: {
 
   if (filters.type && filters.type.length > 0 && filters.type.length < 3) {
     // Load only the needed types
-    const typePromises = filters.type.map(t => loadScenariosByType(t))
+    const typePromises = filters.type.map((t) => loadScenariosByType(t))
     const results = await Promise.all(typePromises)
     scenarios = results.flat()
   } else {
@@ -159,7 +203,11 @@ export async function filterScenariosLazy(filters: {
     if (filters.type && filters.type.length > 0 && !filters.type.includes(scenario.type)) {
       return false
     }
-    if (filters.difficulty && filters.difficulty.length > 0 && !filters.difficulty.includes(scenario.difficulty)) {
+    if (
+      filters.difficulty &&
+      filters.difficulty.length > 0 &&
+      !filters.difficulty.includes(scenario.difficulty)
+    ) {
       return false
     }
     if (filters.companies && filters.companies.length > 0) {
@@ -168,7 +216,7 @@ export async function filterScenariosLazy(filters: {
       )
       if (!hasMatchingCompany) return false
     }
-    if (filters.pattern && scenario.type === 'dsa') {
+    if (filters.pattern && scenario.type === "dsa") {
       if ((scenario as DSAScenario).pattern !== filters.pattern) {
         return false
       }
@@ -191,9 +239,9 @@ export async function filterScenariosLazy(filters: {
 export function preloadCommonScenarios(): void {
   // Preload DSA scenarios in the background (most commonly used)
   setTimeout(() => {
-    loadScenarioCategory('arrays-hashing')
-    loadScenarioCategory('two-pointers')
-    loadScenarioCategory('trees')
+    loadScenarioCategory("arrays-hashing")
+    loadScenarioCategory("two-pointers")
+    loadScenarioCategory("trees")
   }, 1000)
 }
 
