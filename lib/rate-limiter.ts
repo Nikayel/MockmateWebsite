@@ -7,11 +7,14 @@
  * - Budget limiting (cost per billing cycle)
  *
  * Uses sliding window algorithm for smooth rate limiting.
+ *
+ * IMPORTANT: This module now uses distributed storage (Firestore) in production
+ * to ensure rate limits work correctly across serverless instances.
  */
 
-import { adminDb } from './firebase-admin'
-import { FieldValue, Timestamp } from 'firebase-admin/firestore'
-import { BUDGET_CAPS, getUserUsageSummary } from './usage-tracking'
+import { adminDb } from "./firebase-admin"
+import { getUserUsageSummary } from "./usage-tracking"
+import { logger } from "./logger"
 
 // Rate limit configuration by tier
 export const RATE_LIMITS = {
@@ -19,19 +22,19 @@ export const RATE_LIMITS = {
     requestsPerMinute: 10,
     tokensPerMinute: 5000,
     maxConcurrentRequests: 2,
-    budgetPerCycle: 0.50, // $0.50
+    budgetPerCycle: 0.5, // $0.50
   },
   pro: {
     requestsPerMinute: 30,
     tokensPerMinute: 20000,
     maxConcurrentRequests: 5,
-    budgetPerCycle: 25.00, // $25
+    budgetPerCycle: 25.0, // $25
   },
   enterprise: {
     requestsPerMinute: 100,
     tokensPerMinute: 100000,
     maxConcurrentRequests: 20,
-    budgetPerCycle: 100.00, // $100
+    budgetPerCycle: 100.0, // $100
   },
 } as const
 
@@ -39,34 +42,154 @@ export type RateLimitTier = keyof typeof RATE_LIMITS
 
 export interface RateLimitResult {
   allowed: boolean
-  reason?: 'rate_limit' | 'budget_exceeded' | 'concurrent_limit'
+  reason?: "rate_limit" | "budget_exceeded" | "concurrent_limit" | "session_limit"
   retryAfterMs?: number
+  retryAfterSeconds?: number
   currentUsage?: {
     requestsThisMinute: number
     tokensThisMinute: number
     concurrentRequests: number
     budgetUsedPercent: number
   }
+  limit?: {
+    requestsPerMinute: number
+    tokensPerMinute: number
+    maxConcurrent: number
+  }
+  tier?: RateLimitTier
   message?: string
+  code?: string // Machine-readable error code for frontend
 }
 
-// In-memory sliding window for fast rate limiting
+// In-memory sliding window for fast rate limiting (fallback for development)
 interface WindowEntry {
   timestamp: number
   tokens: number
 }
 
+// In-memory stores (used as fallback in development)
 const requestWindows = new Map<string, WindowEntry[]>()
 const concurrentRequests = new Map<string, number>()
 
 const WINDOW_SIZE_MS = 60 * 1000 // 1 minute
 
+// Check if we should use distributed (Firestore) rate limiting
+const useDistributedRateLimiting =
+  process.env.NODE_ENV === "production" || process.env.USE_DISTRIBUTED_RATE_LIMIT === "true"
+
+/**
+ * Get rate limit state from Firestore (distributed)
+ */
+async function getDistributedRateLimitState(userId: string): Promise<{
+  requestCount: number
+  tokenCount: number
+  concurrent: number
+  oldestTimestamp: number | null
+}> {
+  const now = Date.now()
+  const windowStart = now - WINDOW_SIZE_MS
+  const docRef = adminDb.collection("user_rate_limits").doc(userId)
+
+  try {
+    const doc = await docRef.get()
+    if (!doc.exists) {
+      return { requestCount: 0, tokenCount: 0, concurrent: 0, oldestTimestamp: null }
+    }
+
+    const data = doc.data()!
+    const entries: WindowEntry[] = data.entries || []
+
+    // Filter to only entries within the window
+    const validEntries = entries.filter((e) => e.timestamp > windowStart)
+
+    return {
+      requestCount: validEntries.length,
+      tokenCount: validEntries.reduce((sum, e) => sum + e.tokens, 0),
+      concurrent: data.concurrent || 0,
+      oldestTimestamp: validEntries.length > 0 ? validEntries[0].timestamp : null,
+    }
+  } catch (error) {
+    logger.error("Failed to get distributed rate limit state", { userId, error })
+    // Fall back to in-memory
+    return {
+      requestCount: getRequestCount(userId),
+      tokenCount: getTokenCount(userId),
+      concurrent: concurrentRequests.get(userId) || 0,
+      oldestTimestamp: getOldestRequestTime(userId),
+    }
+  }
+}
+
+/**
+ * Record request start in Firestore (distributed)
+ */
+async function recordDistributedRequestStart(
+  userId: string,
+  estimatedTokens: number
+): Promise<void> {
+  const now = Date.now()
+  const windowStart = now - WINDOW_SIZE_MS
+  const docRef = adminDb.collection("user_rate_limits").doc(userId)
+
+  try {
+    await adminDb.runTransaction(async (transaction) => {
+      const doc = await transaction.get(docRef)
+      const data = doc.exists ? doc.data()! : { entries: [], concurrent: 0 }
+
+      // Filter old entries and add new one
+      const entries: WindowEntry[] = (data.entries || []).filter(
+        (e: WindowEntry) => e.timestamp > windowStart
+      )
+      entries.push({ timestamp: now, tokens: estimatedTokens })
+
+      transaction.set(
+        docRef,
+        {
+          entries,
+          concurrent: (data.concurrent || 0) + 1,
+          updatedAt: now,
+        },
+        { merge: true }
+      )
+    })
+  } catch (error) {
+    logger.error("Failed to record distributed request start", { userId, error })
+    // Fall back to in-memory
+    recordRequestStart(userId, estimatedTokens)
+  }
+}
+
+/**
+ * Record request end in Firestore (distributed)
+ */
+async function recordDistributedRequestEnd(userId: string): Promise<void> {
+  const docRef = adminDb.collection("user_rate_limits").doc(userId)
+
+  try {
+    await adminDb.runTransaction(async (transaction) => {
+      const doc = await transaction.get(docRef)
+      if (!doc.exists) return
+
+      const data = doc.data()!
+      transaction.update(docRef, {
+        concurrent: Math.max(0, (data.concurrent || 1) - 1),
+        updatedAt: Date.now(),
+      })
+    })
+  } catch (error) {
+    logger.error("Failed to record distributed request end", { userId, error })
+    // Fall back to in-memory
+    recordRequestEnd(userId)
+  }
+}
+
 /**
  * Check if a request is allowed under rate limits
+ * Uses distributed storage (Firestore) in production for correct cross-instance enforcement
  */
 export async function checkRateLimit(
   userId: string,
-  tier: RateLimitTier = 'free',
+  tier: RateLimitTier = "free",
   estimatedTokens: number = 500
 ): Promise<RateLimitResult> {
   // Perform lazy cleanup to prevent memory buildup
@@ -75,59 +198,77 @@ export async function checkRateLimit(
   const limits = RATE_LIMITS[tier] || RATE_LIMITS.free
   const now = Date.now()
 
+  // Get rate limit state (distributed or in-memory)
+  const state = useDistributedRateLimiting
+    ? await getDistributedRateLimitState(userId)
+    : {
+        requestCount: getRequestCount(userId),
+        tokenCount: getTokenCount(userId),
+        concurrent: concurrentRequests.get(userId) || 0,
+        oldestTimestamp: getOldestRequestTime(userId),
+      }
+
+  const buildUsage = (budgetPercent: number = 0) => ({
+    requestsThisMinute: state.requestCount,
+    tokensThisMinute: state.tokenCount,
+    concurrentRequests: state.concurrent,
+    budgetUsedPercent: budgetPercent,
+  })
+
+  const buildLimit = () => ({
+    requestsPerMinute: limits.requestsPerMinute,
+    tokensPerMinute: limits.tokensPerMinute,
+    maxConcurrent: limits.maxConcurrentRequests,
+  })
+
   // 1. Check concurrent requests
-  const concurrent = concurrentRequests.get(userId) || 0
-  if (concurrent >= limits.maxConcurrentRequests) {
+  if (state.concurrent >= limits.maxConcurrentRequests) {
     return {
       allowed: false,
-      reason: 'concurrent_limit',
+      reason: "concurrent_limit",
+      code: "CONCURRENT_LIMIT_EXCEEDED",
       message: `Too many concurrent requests. Max ${limits.maxConcurrentRequests} for ${tier} tier.`,
-      currentUsage: {
-        requestsThisMinute: getRequestCount(userId),
-        tokensThisMinute: getTokenCount(userId),
-        concurrentRequests: concurrent,
-        budgetUsedPercent: 0,
-      },
+      tier,
+      limit: buildLimit(),
+      currentUsage: buildUsage(),
     }
   }
 
   // 2. Check request rate
-  const requestCount = getRequestCount(userId)
-  if (requestCount >= limits.requestsPerMinute) {
-    const oldestRequest = getOldestRequestTime(userId)
-    const retryAfterMs = oldestRequest ? (oldestRequest + WINDOW_SIZE_MS - now) : 1000
+  if (state.requestCount >= limits.requestsPerMinute) {
+    const retryAfterMs = state.oldestTimestamp
+      ? Math.max(0, state.oldestTimestamp + WINDOW_SIZE_MS - now)
+      : 1000
 
     return {
       allowed: false,
-      reason: 'rate_limit',
-      retryAfterMs: Math.max(0, retryAfterMs),
+      reason: "rate_limit",
+      code: "REQUEST_RATE_LIMIT_EXCEEDED",
+      retryAfterMs,
+      retryAfterSeconds: Math.ceil(retryAfterMs / 1000),
       message: `Rate limit exceeded. ${limits.requestsPerMinute} requests/minute for ${tier} tier.`,
-      currentUsage: {
-        requestsThisMinute: requestCount,
-        tokensThisMinute: getTokenCount(userId),
-        concurrentRequests: concurrent,
-        budgetUsedPercent: 0,
-      },
+      tier,
+      limit: buildLimit(),
+      currentUsage: buildUsage(),
     }
   }
 
   // 3. Check token rate
-  const tokenCount = getTokenCount(userId)
-  if (tokenCount + estimatedTokens > limits.tokensPerMinute) {
-    const oldestRequest = getOldestRequestTime(userId)
-    const retryAfterMs = oldestRequest ? (oldestRequest + WINDOW_SIZE_MS - now) : 1000
+  if (state.tokenCount + estimatedTokens > limits.tokensPerMinute) {
+    const retryAfterMs = state.oldestTimestamp
+      ? Math.max(0, state.oldestTimestamp + WINDOW_SIZE_MS - now)
+      : 1000
 
     return {
       allowed: false,
-      reason: 'rate_limit',
-      retryAfterMs: Math.max(0, retryAfterMs),
-      message: `Token limit exceeded. ${limits.tokensPerMinute} tokens/minute for ${tier} tier.`,
-      currentUsage: {
-        requestsThisMinute: requestCount,
-        tokensThisMinute: tokenCount,
-        concurrentRequests: concurrent,
-        budgetUsedPercent: 0,
-      },
+      reason: "rate_limit",
+      code: "TOKEN_RATE_LIMIT_EXCEEDED",
+      retryAfterMs,
+      retryAfterSeconds: Math.ceil(retryAfterMs / 1000),
+      message: `Token limit exceeded. ${limits.tokensPerMinute.toLocaleString()} tokens/minute for ${tier} tier.`,
+      tier,
+      limit: buildLimit(),
+      currentUsage: buildUsage(),
     }
   }
 
@@ -136,25 +277,20 @@ export async function checkRateLimit(
   if (usageSummary && usageSummary.budgetRemaining <= 0) {
     return {
       allowed: false,
-      reason: 'budget_exceeded',
+      reason: "budget_exceeded",
+      code: "MONTHLY_BUDGET_EXCEEDED",
       message: `Monthly budget of $${usageSummary.budgetCap.toFixed(2)} exceeded. Upgrade your plan or wait until next billing cycle.`,
-      currentUsage: {
-        requestsThisMinute: requestCount,
-        tokensThisMinute: tokenCount,
-        concurrentRequests: concurrent,
-        budgetUsedPercent: 100,
-      },
+      tier,
+      limit: buildLimit(),
+      currentUsage: buildUsage(100),
     }
   }
 
   return {
     allowed: true,
-    currentUsage: {
-      requestsThisMinute: requestCount,
-      tokensThisMinute: tokenCount,
-      concurrentRequests: concurrent,
-      budgetUsedPercent: usageSummary?.budgetUsedPercent || 0,
-    },
+    tier,
+    limit: buildLimit(),
+    currentUsage: buildUsage(usageSummary?.budgetUsedPercent || 0),
   }
 }
 
@@ -284,12 +420,80 @@ export async function withRateLimit<T>(
     return { rateLimited: true, error: rateCheck }
   }
 
-  recordRequestStart(userId, estimatedTokens)
+  // Use distributed or in-memory based on environment
+  if (useDistributedRateLimiting) {
+    await recordDistributedRequestStart(userId, estimatedTokens)
+  } else {
+    recordRequestStart(userId, estimatedTokens)
+  }
 
   try {
     const result = await fn()
     return { result, rateLimited: false }
   } finally {
+    if (useDistributedRateLimiting) {
+      await recordDistributedRequestEnd(userId)
+    } else {
+      recordRequestEnd(userId)
+    }
+  }
+}
+
+/**
+ * Helper to start tracking a request (exported for direct use in API routes)
+ */
+export async function startRequestTracking(
+  userId: string,
+  estimatedTokens: number = 500
+): Promise<void> {
+  if (useDistributedRateLimiting) {
+    await recordDistributedRequestStart(userId, estimatedTokens)
+  } else {
+    recordRequestStart(userId, estimatedTokens)
+  }
+}
+
+/**
+ * Helper to end tracking a request (exported for direct use in API routes)
+ */
+export async function endRequestTracking(userId: string): Promise<void> {
+  if (useDistributedRateLimiting) {
+    await recordDistributedRequestEnd(userId)
+  } else {
     recordRequestEnd(userId)
   }
+}
+
+/**
+ * Build a rate limit error response with detailed info for frontend
+ */
+export function buildRateLimitResponse(result: RateLimitResult): Response {
+  return new Response(
+    JSON.stringify({
+      error: result.message,
+      code: result.code || "RATE_LIMIT_EXCEEDED",
+      type: result.reason,
+      tier: result.tier,
+      retryAfter: result.retryAfterSeconds,
+      currentUsage: result.currentUsage,
+      limit: result.limit,
+    }),
+    {
+      status: 429,
+      headers: {
+        "Content-Type": "application/json",
+        "Retry-After": String(result.retryAfterSeconds || 60),
+        "X-RateLimit-Limit": String(result.limit?.requestsPerMinute || 10),
+        "X-RateLimit-Remaining": String(
+          Math.max(
+            0,
+            (result.limit?.requestsPerMinute || 10) - (result.currentUsage?.requestsThisMinute || 0)
+          )
+        ),
+        "X-RateLimit-Reset": String(
+          Math.ceil(Date.now() / 1000) + (result.retryAfterSeconds || 60)
+        ),
+      },
+    }
+  )
 }

@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { chatRateLimit } from "@/lib/rate-limit"
 import { enforceQuota } from "@/lib/quota-enforcement"
 import {
+  checkRateLimit,
+  startRequestTracking,
+  endRequestTracking,
+  buildRateLimitResponse,
+  type RateLimitTier,
+} from "@/lib/rate-limiter"
+import {
   generateAIResponse,
   validateResponseRelevance,
   type TaskComplexity,
@@ -293,16 +300,29 @@ ${ragContextParts.join("\n")}
 }
 
 export async function POST(request: NextRequest) {
-  // Apply rate limiting
+  // Apply IP-based rate limiting (first layer - prevents abuse)
   const rateLimitResponse = await chatRateLimit(request)
   if (rateLimitResponse) {
     return rateLimitResponse
   }
 
-  // Enforce quota limits (session & budget)
+  // Enforce quota limits (session & budget) and get user tier
   const quotaResult = await enforceQuota(request)
   if (!quotaResult.allowed && quotaResult.response) {
     return quotaResult.response
+  }
+
+  // Apply tier-based rate limiting (second layer - per-user limits)
+  const tier = (quotaResult.tier || "free") as RateLimitTier
+  const rateLimitUserId = quotaResult.userId || "anonymous"
+
+  if (rateLimitUserId !== "anonymous") {
+    const tierRateCheck = await checkRateLimit(rateLimitUserId, tier, 1000) // ~1000 tokens per chat
+    if (!tierRateCheck.allowed) {
+      return buildRateLimitResponse(tierRateCheck)
+    }
+    // Track request start for concurrent limiting
+    await startRequestTracking(rateLimitUserId, 1000)
   }
 
   const startTime = Date.now()
@@ -1547,6 +1567,11 @@ Generate a compliant response NOW:`
       }).catch((err) => logger.error("Analytics tracking error", { error: err }))
     }
 
+    // End request tracking for tier-based rate limiting
+    if (rateLimitUserId !== "anonymous") {
+      await endRequestTracking(rateLimitUserId)
+    }
+
     return NextResponse.json({
       reply: aiResponse.text,
       provider: aiResponse.provider, // Include provider for debugging
@@ -1562,6 +1587,11 @@ Generate a compliant response NOW:`
       },
     })
   } catch (error: any) {
+    // End request tracking on error too
+    if (rateLimitUserId !== "anonymous") {
+      await endRequestTracking(rateLimitUserId).catch(() => {})
+    }
+
     logger.error("Chat API error", {
       error,
       message: error?.message,

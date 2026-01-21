@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next"
 import { Work_Sans, Open_Sans } from "next/font/google"
 import { Toaster } from "sonner"
 import { AuthProvider } from "@/lib/auth-context"
+import { RateLimitProvider } from "@/lib/contexts/rate-limit-context"
 import { ErrorBoundaryProvider } from "@/components/providers/error-boundary-provider"
 import { AnnouncementProvider } from "@/components/announcements"
 import { CookieConsent } from "@/components/CookieConsent"
@@ -213,12 +214,14 @@ html {
         <ReferralCapture />
         <ErrorBoundaryProvider>
           <AuthProvider>
-            <AnnouncementProvider>
-              <div id="main-content">{children}</div>
-              <Toaster position="top-right" richColors />
-              <CookieConsent />
-              <ConsentAnalytics />
-            </AnnouncementProvider>
+            <RateLimitProvider>
+              <AnnouncementProvider>
+                <div id="main-content">{children}</div>
+                <Toaster position="top-right" richColors />
+                <CookieConsent />
+                <ConsentAnalytics />
+              </AnnouncementProvider>
+            </RateLimitProvider>
           </AuthProvider>
         </ErrorBoundaryProvider>
       </body>

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { feedbackRateLimit } from "@/lib/rate-limit"
 import { enforceQuota } from "@/lib/quota-enforcement"
+import {
+  checkRateLimit,
+  startRequestTracking,
+  endRequestTracking,
+  buildRateLimitResponse,
+  type RateLimitTier,
+} from "@/lib/rate-limiter"
 import { generateFeedbackResponse } from "@/lib/ai-providers"
 import { trackFeedbackGenerationServer } from "@/lib/analytics-server"
 import { embedAndStoreSolution } from "@/lib/rag"
@@ -48,16 +55,28 @@ import {
 } from "@/lib/interview/clarifying-questions-checker"
 
 export async function POST(request: NextRequest) {
-  // Apply rate limiting
+  // Apply IP-based rate limiting (first layer)
   const rateLimitResponse = await feedbackRateLimit(request)
   if (rateLimitResponse) {
     return rateLimitResponse
   }
 
-  // Enforce quota limits (session & budget)
+  // Enforce quota limits (session & budget) and get user tier
   const quotaResult = await enforceQuota(request)
   if (!quotaResult.allowed && quotaResult.response) {
     return quotaResult.response
+  }
+
+  // Apply tier-based rate limiting (second layer)
+  const tier = (quotaResult.tier || "free") as RateLimitTier
+  const rateLimitUserId = quotaResult.userId || "anonymous"
+
+  if (rateLimitUserId !== "anonymous") {
+    const tierRateCheck = await checkRateLimit(rateLimitUserId, tier, 2000) // Feedback uses ~2000 tokens
+    if (!tierRateCheck.allowed) {
+      return buildRateLimitResponse(tierRateCheck)
+    }
+    await startRequestTracking(rateLimitUserId, 2000)
   }
 
   const startTime = Date.now()
@@ -1281,6 +1300,11 @@ CRITICAL INSTRUCTIONS:
       }
     }
 
+    // End request tracking
+    if (rateLimitUserId !== "anonymous") {
+      await endRequestTracking(rateLimitUserId)
+    }
+
     return NextResponse.json({
       feedback: finalFeedback,
       performanceScore: scores.overall,
@@ -1354,6 +1378,11 @@ CRITICAL INSTRUCTIONS:
       latencyMs: aiResponse.latencyMs,
     })
   } catch (error) {
+    // End request tracking on error
+    if (rateLimitUserId !== "anonymous") {
+      await endRequestTracking(rateLimitUserId).catch(() => {})
+    }
+
     logger.error("Feedback generation error", { error, endpoint: "/api/generate-feedback" })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to generate feedback" },

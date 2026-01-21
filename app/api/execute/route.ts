@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { getScenarioById } from "@/lib/scenarios"
 import { executeRateLimit } from "@/lib/rate-limit"
 import { enforceQuota } from "@/lib/quota-enforcement"
+import {
+  checkRateLimit,
+  startRequestTracking,
+  endRequestTracking,
+  buildRateLimitResponse,
+  type RateLimitTier,
+} from "@/lib/rate-limiter"
 import { trackCodeExecutionServer } from "@/lib/analytics-server"
 import { executeWithPiston, parseExecutionOutput } from "@/lib/piston"
 import { logger } from "@/lib/logger"
@@ -197,16 +204,28 @@ function buildFullCode(code: string, scenario: any, language: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  // Apply rate limiting
+  // Apply IP-based rate limiting (first layer)
   const rateLimitResponse = await executeRateLimit(request)
   if (rateLimitResponse) {
     return rateLimitResponse
   }
 
-  // Enforce quota limits (session & budget)
+  // Enforce quota limits (session & budget) and get user tier
   const quotaResult = await enforceQuota(request)
   if (!quotaResult.allowed && quotaResult.response) {
     return quotaResult.response
+  }
+
+  // Apply tier-based rate limiting (second layer)
+  const tier = (quotaResult.tier || "free") as RateLimitTier
+  const rateLimitUserId = quotaResult.userId || "anonymous"
+
+  if (rateLimitUserId !== "anonymous") {
+    const tierRateCheck = await checkRateLimit(rateLimitUserId, tier, 100) // Code execution uses minimal tokens
+    if (!tierRateCheck.allowed) {
+      return buildRateLimitResponse(tierRateCheck)
+    }
+    await startRequestTracking(rateLimitUserId, 100)
   }
 
   const startTime = Date.now()
@@ -405,6 +424,11 @@ export async function POST(request: NextRequest) {
       }).catch((err) => logger.error("Analytics tracking error", { error: err }))
     }
 
+    // End request tracking
+    if (rateLimitUserId !== "anonymous") {
+      await endRequestTracking(rateLimitUserId)
+    }
+
     return NextResponse.json({
       success: allPassed && serviceErrorCount === 0, // Only fully successful if no service errors
       results,
@@ -421,6 +445,11 @@ export async function POST(request: NextRequest) {
       error: null,
     })
   } catch (error) {
+    // End request tracking on error
+    if (rateLimitUserId !== "anonymous") {
+      await endRequestTracking(rateLimitUserId).catch(() => {})
+    }
+
     logger.error("Execute API error", { error, endpoint: "/api/execute" })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to execute code" },
