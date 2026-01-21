@@ -14,6 +14,7 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronUp,
+  X,
 } from "lucide-react"
 import { FormattedText } from "@/components/ui/FormattedText"
 import nextDynamic from "next/dynamic"
@@ -78,6 +79,7 @@ export interface PostInterviewViewProps {
   setShowCodeInDiscussion: (show: boolean) => void
   setShowPostInterviewDiscussion: (show: boolean) => void
   proceedToFinalFeedback: () => void
+  onClose?: () => void
 }
 
 export function PostInterviewView({
@@ -99,9 +101,23 @@ export function PostInterviewView({
   setShowCodeInDiscussion,
   setShowPostInterviewDiscussion,
   proceedToFinalFeedback,
+  onClose,
 }: PostInterviewViewProps) {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
+      {onClose && (
+        <div className="mb-4 flex justify-end">
+          <Button
+            onClick={onClose}
+            variant="ghost"
+            size="sm"
+            className="text-gray-400 hover:bg-gray-800 hover:text-white"
+          >
+            <X className="mr-2 h-4 w-4" />
+            Close & Return to Dashboard
+          </Button>
+        </div>
+      )}
       <div className="mb-6 text-center">
         <CheckCircle className="text-accent mx-auto mb-3 h-12 w-12" />
         <h2 className="font-heading mb-2 text-2xl font-bold text-white">Solution Complete!</h2>

@@ -5429,6 +5429,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                   setShowCodeInDiscussion={setShowCodeInDiscussion}
                   setShowPostInterviewDiscussion={setShowPostInterviewDiscussion}
                   proceedToFinalFeedback={proceedToFinalFeedback}
+                  onClose={() => router.push("/dashboard")}
                 />
               ) : isGeneratingFeedback ? (
                 <FeedbackLoadingState onGoToDashboard={() => router.push("/dashboard")} />
