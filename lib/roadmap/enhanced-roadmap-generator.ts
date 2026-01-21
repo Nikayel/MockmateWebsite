@@ -56,6 +56,15 @@ import {
   RoadmapAdjustments,
 } from "./edge-case-handlers"
 
+import {
+  PRIORITY_WEIGHTS,
+  REVIEW_BUFFER_DAYS,
+  MAX_NEW_PATTERNS_PER_DAY,
+  REVIEW_TO_NEW_RATIO,
+  DAILY_QUESTION_LIMITS,
+  KNOWLEDGE_GAP_MULTIPLIERS,
+} from "./constants"
+
 /**
  * Enhanced configuration
  */
@@ -97,24 +106,20 @@ export interface EnhancedRoadmapConfig {
 export const DEFAULT_ENHANCED_CONFIG: EnhancedRoadmapConfig = {
   fsrs: DEFAULT_FSRS_CONFIG,
   interleaving: DEFAULT_INTERLEAVING_CONFIG,
+  // Use shared priority weights (roleAlignment is enhanced-specific, redistributed from others)
   weights: {
-    companyRelevance: 0.25,
-    spacedRepetition: 0.25,
-    knowledgeGap: 0.2,
-    timeEfficiency: 0.15,
-    prerequisites: 0.05,
-    roleAlignment: 0.1,
+    companyRelevance: PRIORITY_WEIGHTS.companyFrequency - 0.05, // 0.25 (redistributed 0.05 to roleAlignment)
+    spacedRepetition: PRIORITY_WEIGHTS.mustKnow, // 0.25
+    knowledgeGap: PRIORITY_WEIGHTS.knowledgeGap, // 0.20
+    timeEfficiency: PRIORITY_WEIGHTS.timeEfficiency, // 0.15
+    prerequisites: PRIORITY_WEIGHTS.prerequisites, // 0.05
+    roleAlignment: PRIORITY_WEIGHTS.roleAlignment, // 0.05
   },
-  reviewBufferDays: 3,
-  maxNewPatternsPerDay: 2,
-  reviewToNewRatio: 0.7,
-  // Realistic daily limits - quality over quantity
-  maxQuestionsPerDay: {
-    intern: 3, // Interns need more time per problem
-    beginner: 4,
-    intermediate: 5,
-    advanced: 6,
-  },
+  reviewBufferDays: REVIEW_BUFFER_DAYS,
+  maxNewPatternsPerDay: MAX_NEW_PATTERNS_PER_DAY,
+  reviewToNewRatio: REVIEW_TO_NEW_RATIO,
+  // Use shared daily limits from constants
+  maxQuestionsPerDay: DAILY_QUESTION_LIMITS,
 }
 
 /**
@@ -428,19 +433,21 @@ export function buildEnhancedDailySchedule(
     .sort((a, b) => b.avgPriority - a.avgPriority)
 
   let remainingQuestions = [...prioritizedQuestions]
-  // Store dates as UTC midnight to ensure consistent comparison across timezones.
-  // The comparison logic in utils.ts uses getStoredDateComponents which extracts year/month/day
-  // from the UTC representation for UTC midnight dates, so we store dates at UTC midnight.
+  // Store dates using local time for consistency with user's calendar view
+  // The comparison logic in utils.ts (getStoredDateComponents) handles both UTC and local formats
   const today = new Date()
-  const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()))
+  // Reset to midnight in local timezone
+  today.setHours(0, 0, 0, 0)
 
   for (let day = 0; day < availableDays && remainingQuestions.length > 0; day++) {
-    const dayDate = new Date(todayUTC)
-    dayDate.setUTCDate(dayDate.getUTCDate() + day)
+    const dayDate = new Date(today)
+    dayDate.setDate(dayDate.getDate() + day)
 
     // Determine focus cluster for today (rotate)
-    const focusClusterIndex = day % clusterOrder.length
-    const focusCluster = clusterOrder[focusClusterIndex]?.cluster || "other"
+    // Guard against division by zero when clusterOrder is empty
+    const focusClusterIndex = clusterOrder.length > 0 ? day % clusterOrder.length : 0
+    const focusCluster =
+      clusterOrder.length > 0 ? clusterOrder[focusClusterIndex]?.cluster || "other" : "other"
 
     // Build today's plan
     const todaysQuestions: PrioritizedQuestion[] = []
@@ -479,6 +486,10 @@ export function buildEnhancedDailySchedule(
       (q) => (getPatternCluster(q.pattern) || "other") !== focusCluster
     )
 
+    // Track questions deferred due to cognitive load or interleaving preference
+    // These will remain in remainingQuestions for the next day
+    const deferredForCognitiveLoad: string[] = []
+
     for (const q of otherQuestions) {
       // Check max questions per day limit
       if (todaysQuestions.length >= maxQuestionsPerDay) {
@@ -487,6 +498,8 @@ export function buildEnhancedDailySchedule(
 
       const isNewPattern = !todaysPatterns.has(q.pattern)
       if (isNewPattern && newPatternsToday >= config.maxNewPatternsPerDay) {
+        // Deferred due to cognitive load - will be scheduled tomorrow
+        deferredForCognitiveLoad.push(q.scenarioId)
         continue
       }
 
@@ -496,14 +509,20 @@ export function buildEnhancedDailySchedule(
       )
 
       if (todaysMinutes + q.estimatedMinutes <= dailyMinutes) {
-        // Add related patterns with higher priority
-        if (hasRelatedPattern || todaysQuestions.length < 2) {
+        // Add related patterns with higher priority, but still add unrelated if there's room
+        // This ensures questions aren't lost - they're either added now or stay in queue for tomorrow
+        if (
+          hasRelatedPattern ||
+          todaysQuestions.length < 2 ||
+          newPatternsToday < config.maxNewPatternsPerDay
+        ) {
           todaysQuestions.push(q)
           todaysMinutes += q.estimatedMinutes
           todaysPatterns.add(q.pattern)
           if (isNewPattern) newPatternsToday++
           remainingQuestions = remainingQuestions.filter((rq) => rq.scenarioId !== q.scenarioId)
         }
+        // If none of the conditions match, question stays in remainingQuestions for next day
       }
     }
 
@@ -535,8 +554,8 @@ export function buildEnhancedDailySchedule(
 
   // Add review days
   for (let i = 0; i < config.reviewBufferDays; i++) {
-    const dayDate = new Date(todayUTC)
-    dayDate.setUTCDate(dayDate.getUTCDate() + availableDays + i)
+    const dayDate = new Date(today)
+    dayDate.setDate(dayDate.getDate() + availableDays + i)
 
     const reviewThemes = [
       "Review Day - Weak Areas",
@@ -777,7 +796,7 @@ export function generateEnhancedRoadmap(
       pattern,
       total: stats.total,
       completed: stats.completed,
-      percentage: 0,
+      percentage: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0,
     })),
     dailyPlans,
     milestones,

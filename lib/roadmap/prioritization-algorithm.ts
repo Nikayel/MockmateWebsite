@@ -12,68 +12,38 @@ import {
   DailyPlan,
   PersonalizedRoadmap,
   Milestone,
-  CompanyId,
 } from "@/lib/data/company-questions/types"
 import { getCompanyById } from "@/lib/data/company-questions"
 import { DSAScenario } from "@/lib/scenarios"
+import {
+  PRIORITY_WEIGHTS,
+  BASE_TIME_ESTIMATES,
+  EXPERIENCE_TIME_MULTIPLIERS,
+  MIN_QUESTIONS_PER_PATTERN,
+  REVIEW_BUFFER_DAYS,
+  INTERN_PRIORITY_PATTERNS,
+  KNOWLEDGE_GAP_MULTIPLIERS,
+  MILESTONE_COMPLETION_PERCENTAGE,
+  DAILY_QUESTION_LIMITS as SHARED_DAILY_LIMITS,
+  getAdjustedTimeEstimate as getAdjustedTime,
+} from "./constants"
 
 /**
  * Configuration constants for the algorithm
+ * Uses shared constants from constants.ts for consistency
  */
 const CONFIG = {
-  // Weight factors for priority scoring (should sum to 1.0)
-  weights: {
-    companyFrequency: 0.35, // How often company asks this pattern
-    mustKnow: 0.25, // Is this a must-know question?
-    knowledgeGap: 0.2, // Does user need to learn this?
-    timeEfficiency: 0.15, // ROI based on time available
-    prerequisites: 0.05, // Are prerequisites met?
-  },
-
-  // Time estimates by difficulty (minutes) - adjusted by experience level
-  timeEstimates: {
-    easy: 25,
-    medium: 40,
-    hard: 60,
-  },
-
-  // Time multipliers for different experience levels (interns need more time)
-  timeMultipliers: {
-    intern: 1.5, // Interns typically need 50% more time
-    beginner: 1.3, // Beginners need 30% more time
-    intermediate: 1.0,
-    advanced: 0.8, // Advanced users are faster
-  },
-
-  // Minimum questions per pattern for adequate coverage
-  minQuestionsPerPattern: {
-    intern: 6, // Interns should practice more fundamentals
-    beginner: 5,
-    intermediate: 3,
-    advanced: 2,
-  },
-
-  // Maximum daily study time (minutes)
+  weights: PRIORITY_WEIGHTS,
+  timeEstimates: BASE_TIME_ESTIMATES,
+  timeMultipliers: EXPERIENCE_TIME_MULTIPLIERS,
+  minQuestionsPerPattern: MIN_QUESTIONS_PER_PATTERN,
   maxDailyMinutes: {
     light: 60,
     moderate: 120,
     intense: 180,
   },
-
-  // Days to leave for review before interview
-  reviewBufferDays: 3,
-
-  // Intern-specific patterns to prioritize (commonly asked in internship interviews)
-  internPriorityPatterns: [
-    "arrays-hashing",
-    "two-pointers",
-    "sliding-window",
-    "binary-search",
-    "stack",
-    "trees",
-    "dp-1d",
-    "string",
-  ] as const,
+  reviewBufferDays: REVIEW_BUFFER_DAYS,
+  internPriorityPatterns: INTERN_PRIORITY_PATTERNS,
 }
 
 /**
@@ -118,12 +88,7 @@ export function calculatePriorityScore(
   // 3. Knowledge gap score (20%)
   const familiarity = assessment.patternFamiliarity.find((p) => p.pattern === scenario.pattern)
   if (familiarity) {
-    const gapMultiplier = {
-      unknown: 1.0,
-      seen: 0.7,
-      practiced: 0.4,
-      confident: 0.1,
-    }[familiarity.level]
+    const gapMultiplier = KNOWLEDGE_GAP_MULTIPLIERS[familiarity.level]
     score += gapMultiplier * CONFIG.weights.knowledgeGap * 100
     if (familiarity.level === "unknown") {
       reasons.push("New pattern to learn")
@@ -238,10 +203,18 @@ export function prioritizeQuestions(
   companyData: CompanyQuestionData
 ): PrioritizedQuestion[] {
   const relevantScenarios = getRelevantScenarios(scenarios, companyData)
+  const experienceLevel = assessment.experienceLevel as
+    | "intern"
+    | "beginner"
+    | "intermediate"
+    | "advanced"
 
   const prioritized: PrioritizedQuestion[] = relevantScenarios.map((scenario) => {
     const { score, reasons } = calculatePriorityScore(scenario, assessment, companyData)
     const isMustKnow = companyData.mustKnowQuestions.some((q) => q.scenarioId === scenario.id)
+
+    // Use experience-adjusted time estimate instead of base time
+    const adjustedMinutes = getAdjustedTime(scenario.difficulty, experienceLevel)
 
     return {
       scenarioId: scenario.id,
@@ -249,7 +222,7 @@ export function prioritizeQuestions(
       pattern: scenario.pattern as DSAPattern,
       difficulty: scenario.difficulty,
       priorityScore: score,
-      estimatedMinutes: CONFIG.timeEstimates[scenario.difficulty],
+      estimatedMinutes: adjustedMinutes,
       reasons,
       isRequired: isMustKnow,
       dependencies: [], // Will be populated based on pattern prerequisites
@@ -265,13 +238,7 @@ export function prioritizeQuestions(
  * Quality over quantity - these are achievable targets that lead to mastery
  */
 function getDailyQuestionLimit(experienceLevel: string): number {
-  const limits: Record<string, number> = {
-    intern: 3, // Interns need more time per problem - focus on depth
-    beginner: 4, // Building fundamentals
-    intermediate: 5, // Balanced pace
-    advanced: 6, // Experienced can handle more
-  }
-  return limits[experienceLevel] || 4
+  return SHARED_DAILY_LIMITS[experienceLevel as keyof typeof SHARED_DAILY_LIMITS] || 4
 }
 
 /**
@@ -348,6 +315,8 @@ export function buildDailySchedule(
   let currentDay = 0
   let remainingQuestions = [...questionsToSchedule]
   const today = new Date()
+  // Reset to midnight in local timezone for consistent date comparison
+  today.setHours(0, 0, 0, 0)
 
   // Distribute questions across days
   while (remainingQuestions.length > 0 && currentDay < availableDays) {
@@ -459,6 +428,8 @@ export function createMilestones(
 ): Milestone[] {
   const milestones: Milestone[] = []
   const today = new Date()
+  // Reset to midnight in local timezone for consistent date comparison
+  today.setHours(0, 0, 0, 0)
 
   // Get top patterns for this company
   const topPatterns = companyData.topPatterns.slice(0, 5)
@@ -504,7 +475,7 @@ export function createMilestones(
 
   // Add must-know questions milestone
   const mustKnowIds = companyData.mustKnowQuestions.map((q) => q.scenarioId)
-  const midPoint = Math.floor(assessment.daysRemaining * 0.6)
+  const midPoint = Math.floor(assessment.daysRemaining * MILESTONE_COMPLETION_PERCENTAGE)
   const mustKnowDate = new Date(today)
   mustKnowDate.setDate(mustKnowDate.getDate() + midPoint)
 
@@ -535,16 +506,7 @@ export function createMilestones(
   return milestones.sort((a, b) => a.targetDate.getTime() - b.targetDate.getTime())
 }
 
-/**
- * Realistic daily question limits by experience level
- * Quality > Quantity - these are achievable targets
- */
-const DAILY_QUESTION_LIMITS = {
-  intern: 3, // Interns need more time per problem
-  beginner: 4,
-  intermediate: 5,
-  advanced: 6,
-}
+// Note: DAILY_QUESTION_LIMITS imported from ./constants as SHARED_DAILY_LIMITS
 
 /**
  * Generate a complete personalized roadmap
@@ -615,7 +577,7 @@ export function generatePersonalizedRoadmap(
       pattern,
       total: stats.total,
       completed: stats.completed,
-      percentage: 0,
+      percentage: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0,
     })),
     dailyPlans,
     milestones,
