@@ -272,6 +272,18 @@ async function processInactivityReminders(now: Date, results: any): Promise<void
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
   const seventyTwoHoursAgo = new Date(now.getTime() - 72 * 60 * 60 * 1000)
 
+  // DUPLICATE PREVENTION: Pre-fetch all inactivity emails sent in last 24 hours
+  // This prevents sending multiple inactivity reminders within a 24-hour window
+  const recentInactivityEmailsSnap = await db
+    .collection("email_notifications")
+    .where("email_type", "in", ["inactivity_24h", "inactivity_48h"])
+    .where("created_at", ">=", twentyFourHoursAgo.toISOString())
+    .get()
+
+  const usersWithRecentInactivityEmail = new Set(
+    recentInactivityEmailsSnap.docs.map((doc) => doc.data().user_id)
+  )
+
   // Get learning states where last_session_at is before 24h ago
   // Filter for 72h in memory to avoid composite index requirement
   let learningStatesSnap
@@ -301,6 +313,12 @@ async function processInactivityReminders(now: Date, results: any): Promise<void
     const learningState = doc.data() as UserLearningState
     const userId = learningState.user_id
 
+    // DUPLICATE PREVENTION: Skip if user already received inactivity email in last 24 hours
+    if (usersWithRecentInactivityEmail.has(userId)) {
+      results.inactivityEmails.skipped++
+      continue
+    }
+
     try {
       // Get user profile
       const profileSnap = await db.collection("profiles").doc(userId).get()
@@ -329,7 +347,11 @@ async function processInactivityReminders(now: Date, results: any): Promise<void
 
       // Check rate limits (pass user's timezone for accurate daily counter)
       const userTimezone = profile.notification_preferences?.timezone || "America/Los_Angeles"
-      const rateCheck = canSendEmail(profile.last_email_sent_at, profile.emails_sent_today, userTimezone)
+      const rateCheck = canSendEmail(
+        profile.last_email_sent_at,
+        profile.emails_sent_today,
+        userTimezone
+      )
       if (!rateCheck.allowed) {
         results.inactivityEmails.skipped++
         continue
@@ -395,6 +417,16 @@ async function processInactivityReminders(now: Date, results: any): Promise<void
 }
 
 async function processSpacedRepetitionReminders(now: Date, results: any): Promise<void> {
+  // DUPLICATE PREVENTION: Pre-fetch all spaced repetition emails sent in last 24 hours
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+  const recentSREmailsSnap = await db
+    .collection("email_notifications")
+    .where("email_type", "==", "spaced_repetition")
+    .where("created_at", ">=", twentyFourHoursAgo.toISOString())
+    .get()
+
+  const usersWithRecentSREmail = new Set(recentSREmailsSnap.docs.map((doc) => doc.data().user_id))
+
   // Find users with problem mastery data (new system)
   const problemMasteryUsersSnap = await db.collection("problem_mastery").limit(100).get()
 
@@ -404,6 +436,12 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
   for (const userDoc of problemMasteryUsersSnap.docs) {
     const userId = userDoc.id
     processedUsers.add(userId)
+
+    // DUPLICATE PREVENTION: Skip if user already received SR email in last 24 hours
+    if (usersWithRecentSREmail.has(userId)) {
+      results.spacedRepetitionEmails.skipped++
+      continue
+    }
 
     try {
       // Get problems due for this user
@@ -458,7 +496,11 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
 
       // Check rate limits (pass user's timezone for accurate daily counter)
       const userTimezone = profile.notification_preferences?.timezone || "America/Los_Angeles"
-      const rateCheck = canSendEmail(profile.last_email_sent_at, profile.emails_sent_today, userTimezone)
+      const rateCheck = canSendEmail(
+        profile.last_email_sent_at,
+        profile.emails_sent_today,
+        userTimezone
+      )
       if (!rateCheck.allowed) {
         results.spacedRepetitionEmails.skipped++
         continue
@@ -525,6 +567,12 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
     // Skip if already processed via problem_mastery
     if (processedUsers.has(userId)) continue
 
+    // DUPLICATE PREVENTION: Skip if user already received SR email in last 24 hours
+    if (usersWithRecentSREmail.has(userId)) {
+      results.spacedRepetitionEmails.skipped++
+      continue
+    }
+
     // Find topics due for review
     const topicsDue: Array<{
       topicId: string
@@ -578,7 +626,11 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
 
       // Check rate limits (pass user's timezone for accurate daily counter)
       const userTimezone = profile.notification_preferences?.timezone || "America/Los_Angeles"
-      const rateCheck = canSendEmail(profile.last_email_sent_at, profile.emails_sent_today, userTimezone)
+      const rateCheck = canSendEmail(
+        profile.last_email_sent_at,
+        profile.emails_sent_today,
+        userTimezone
+      )
       if (!rateCheck.allowed) {
         results.spacedRepetitionEmails.skipped++
         continue
@@ -638,6 +690,18 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
 }
 
 async function processRoadmapReminders(now: Date, results: any): Promise<void> {
+  // DUPLICATE PREVENTION: Pre-fetch all roadmap emails sent in last 24 hours
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+  const recentRoadmapEmailsSnap = await db
+    .collection("email_notifications")
+    .where("email_type", "in", ["daily_roadmap", "interview_countdown", "behind_schedule"])
+    .where("created_at", ">=", twentyFourHoursAgo.toISOString())
+    .get()
+
+  const usersWithRecentRoadmapEmail = new Set(
+    recentRoadmapEmailsSnap.docs.map((doc) => doc.data().user_id)
+  )
+
   // Get all active roadmaps
   const roadmapsSnap = await db
     .collection("user_roadmaps")
@@ -648,6 +712,12 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
   for (const doc of roadmapsSnap.docs) {
     const roadmap = doc.data()
     const userId = roadmap.userId
+
+    // DUPLICATE PREVENTION: Skip if user already received roadmap email in last 24 hours
+    if (usersWithRecentRoadmapEmail.has(userId)) {
+      results.roadmapEmails.skipped++
+      continue
+    }
 
     try {
       // Get user profile
@@ -677,7 +747,11 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
 
       // Check rate limits (pass user's timezone for accurate daily counter)
       const userTimezone = profile.notification_preferences?.timezone || DEFAULT_TIMEZONE
-      const rateCheck = canSendEmail(profile.last_email_sent_at, profile.emails_sent_today, userTimezone)
+      const rateCheck = canSendEmail(
+        profile.last_email_sent_at,
+        profile.emails_sent_today,
+        userTimezone
+      )
       if (!rateCheck.allowed) {
         results.roadmapEmails.skipped++
         continue
