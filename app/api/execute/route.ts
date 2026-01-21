@@ -63,7 +63,12 @@ function validateResult(
 }
 
 // Legacy validation logic (kept for backwards compatibility)
-function legacyValidateResult(actual: any, expected: any, testCase: any, scenarioType: string): boolean {
+function legacyValidateResult(
+  actual: any,
+  expected: any,
+  testCase: any,
+  scenarioType: string
+): boolean {
   // For DSA array problems, check if arrays are equal
   if (Array.isArray(expected) && Array.isArray(actual)) {
     if (expected.length !== actual.length) return false
@@ -332,7 +337,14 @@ export async function POST(request: NextRequest) {
         }
 
         // Validate result using property-based validation
-        const passed = validateResult(actualResult, testCase.expected, testCase, scenario.type, scenarioId, language)
+        const passed = validateResult(
+          actualResult,
+          testCase.expected,
+          testCase,
+          scenario.type,
+          scenarioId,
+          language
+        )
 
         if (!passed) {
           allPassed = false
@@ -379,17 +391,19 @@ export async function POST(request: NextRequest) {
     })
 
     // Track code execution analytics
-    trackCodeExecutionServer({
-      sessionId,
-      userId,
-      language,
-      scenarioId,
-      scenarioType: scenario.type,
-      passed: allPassed,
-      totalTests: totalCount,
-      passedTests: passedCount,
-      executionTimeMs,
-    }).catch((err) => logger.error("Analytics tracking error", { error: err }))
+    if (sessionId) {
+      trackCodeExecutionServer({
+        sessionId,
+        userId,
+        language,
+        scenarioId,
+        scenarioType: scenario.type,
+        passed: allPassed,
+        totalTests: totalCount,
+        passedTests: passedCount,
+        executionTimeMs,
+      }).catch((err) => logger.error("Analytics tracking error", { error: err }))
+    }
 
     return NextResponse.json({
       success: allPassed && serviceErrorCount === 0, // Only fully successful if no service errors

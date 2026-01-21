@@ -1536,14 +1536,16 @@ Generate a compliant response NOW:`
     const responseTimeMs = Date.now() - startTime
 
     // Track AI chat interaction with provider info
-    trackAIChatServer({
-      sessionId,
-      userId,
-      interactionType: role === "interviewer" ? "interviewer" : "partner",
-      messageLength: message?.length || 0,
-      responseTimeMs,
-      provider: aiResponse.provider, // Track which provider was used
-    }).catch((err) => logger.error("Analytics tracking error", { error: err }))
+    if (sessionId) {
+      trackAIChatServer({
+        sessionId,
+        userId,
+        interactionType: role === "interviewer" ? "interviewer" : "partner",
+        messageLength: message?.length || 0,
+        responseTimeMs,
+        provider: aiResponse.provider, // Track which provider was used
+      }).catch((err) => logger.error("Analytics tracking error", { error: err }))
+    }
 
     return NextResponse.json({
       reply: aiResponse.text,
