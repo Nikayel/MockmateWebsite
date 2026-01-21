@@ -676,7 +676,7 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
       }
 
       // Check rate limits (pass user's timezone for accurate daily counter)
-      const userTimezone = profile.notification_preferences?.timezone || "America/Los_Angeles"
+      const userTimezone = profile.notification_preferences?.timezone || DEFAULT_TIMEZONE
       const rateCheck = canSendEmail(profile.last_email_sent_at, profile.emails_sent_today, userTimezone)
       if (!rateCheck.allowed) {
         results.roadmapEmails.skipped++
@@ -712,8 +712,7 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
       if (daysUntilInterview <= 0) continue
 
       // Get today's questions from dailyPlans
-      // Use user's timezone for accurate "today" comparison
-      const userTimezone = profile.notification_preferences?.timezone || DEFAULT_TIMEZONE
+      // userTimezone already defined above for rate limiting
       const todaysQuestions: Array<{
         title: string
         pattern: string
