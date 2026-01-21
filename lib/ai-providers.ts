@@ -61,7 +61,7 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     name: "gemini",
     enabled: true,
     apiKey: process.env.GEMINI_API_KEY,
-    model: "gemini-3.0-flash", // Gemini 3.0 Flash - smart & fast
+    model: "gemini-3-flash-preview", // Gemini 3 Flash Preview - fast with thinking
     maxTokens: 1024,
     temperature: 0.7,
     costPer1kTokens: 0.00175, // Averaged (input + output) / 2
