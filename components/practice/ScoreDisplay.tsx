@@ -16,7 +16,9 @@ import {
   CheckCircle,
   AlertTriangle,
   Download,
+  Info,
 } from "lucide-react"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import type { FeedbackSection } from "@/lib/feedback/parsers"
 
@@ -382,22 +384,94 @@ export function ScoreDisplay({
                 </div>
               </div>
               {/* Score type toggle */}
-              <button
-                onClick={() => setShowTechnicalOnly(!showTechnicalOnly)}
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors",
-                  showTechnicalOnly
-                    ? "bg-violet-500/20 text-violet-400"
-                    : "bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700"
-                )}
-                title={
-                  showTechnicalOnly
-                    ? "Technical score: Test pass rate (60%), Time efficiency (25%), Independence (15%)"
-                    : "Overall score: Includes communication (20%)"
-                }
-              >
-                {showTechnicalOnly ? "Technical" : "Overall"}
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setShowTechnicalOnly(!showTechnicalOnly)}
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors",
+                    showTechnicalOnly
+                      ? "bg-violet-500/20 text-violet-400"
+                      : "bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700"
+                  )}
+                >
+                  {showTechnicalOnly ? "Technical" : "Overall"}
+                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className={cn(
+                        "transition-colors",
+                        showTechnicalOnly
+                          ? "text-violet-400 hover:text-violet-300"
+                          : "text-zinc-400 hover:text-zinc-300"
+                      )}
+                    >
+                      <Info className="h-3 w-3" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="right"
+                    className="max-w-xs border border-zinc-700 bg-zinc-800 text-zinc-100"
+                  >
+                    {showTechnicalOnly ? (
+                      <div className="space-y-2 p-1">
+                        <p className="font-semibold text-violet-400">Technical Score Breakdown</p>
+                        <p className="text-[11px] text-zinc-300">
+                          Excludes communication - pure coding ability:
+                        </p>
+                        <ul className="space-y-1 text-[11px] text-zinc-300">
+                          <li>
+                            <span className="font-medium text-violet-400">60%</span> Code Quality —
+                            test pass rate, efficiency, complexity
+                          </li>
+                          <li>
+                            <span className="font-medium text-violet-400">25%</span> Problem Solving
+                            — approach, debugging, optimization attempts
+                          </li>
+                          <li>
+                            <span className="font-medium text-violet-400">15%</span> Understanding —
+                            code explanation, complexity analysis
+                          </li>
+                        </ul>
+                        <p className="border-t border-zinc-700 pt-1 text-[10px] text-zinc-500">
+                          Technical can differ from Overall because it heavily weights Code Quality
+                          (60%) while Overall includes Communication (20%) and weights Code Quality
+                          at only 30%.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 p-1">
+                        <p className="font-semibold text-zinc-200">Overall Score Breakdown</p>
+                        <p className="text-[11px] text-zinc-300">
+                          Full interview performance including soft skills:
+                        </p>
+                        <ul className="space-y-1 text-[11px] text-zinc-300">
+                          <li>
+                            <span className="font-medium text-zinc-200">30%</span> Code Quality —
+                            test pass rate, efficiency, complexity
+                          </li>
+                          <li>
+                            <span className="font-medium text-zinc-200">25%</span> Problem Solving —
+                            approach, debugging, optimization attempts
+                          </li>
+                          <li>
+                            <span className="font-medium text-zinc-200">25%</span> Understanding —
+                            code explanation, complexity analysis
+                          </li>
+                          <li>
+                            <span className="font-medium text-zinc-200">20%</span> Communication —
+                            thought process, answering questions
+                          </li>
+                        </ul>
+                        <p className="border-t border-zinc-700 pt-1 text-[10px] text-zinc-500">
+                          Click to see Technical score which excludes communication and focuses on
+                          pure coding ability.
+                        </p>
+                      </div>
+                    )}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
             </div>
 
             {/* TL;DR */}

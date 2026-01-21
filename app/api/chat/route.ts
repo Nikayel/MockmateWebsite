@@ -79,7 +79,7 @@ interface UserContext {
 // Context window management constants
 // Full context: Modern LLMs have large context windows (Gemini 1M, Claude 200K, DeepSeek 64K)
 // Most interviews have 30-60 messages, so 200 gives full history with safety cap
-const MAX_HISTORY_MESSAGES = 200 // Full interview context (was 20)
+const MAX_HISTORY_MESSAGES = 30 // Reduced for latency (was 200)
 const MAX_MESSAGE_LENGTH = 4000 // Truncate individual messages
 const MAX_WORKSPACE_FILES = 5 // Limit workspace files
 const MAX_FILE_SIZE = 10000 // 10KB per file max
@@ -405,7 +405,14 @@ export async function POST(request: NextRequest) {
     // LLM-based conversation extraction for more accurate tracking
     // Only run for interviewer mode and when key signals detected
     let enhancedTracker = conversationTracker as ConversationTracker | undefined
-    if (role === "interviewer" && conversationTracker && context && message) {
+    const ENABLE_LLM_EXTRACTION = true
+    if (
+      ENABLE_LLM_EXTRACTION &&
+      role === "interviewer" &&
+      conversationTracker &&
+      context &&
+      message
+    ) {
       const messageCount = Array.isArray(context) ? context.length : 0
       const lastExtraction = (conversationTracker as any)?.lastExtractionAt || 0
 
@@ -1410,6 +1417,17 @@ Remember: Acknowledge what they said, then probe deeper or move on. Do NOT re-as
 
     // Determine task complexity for provider selection
     const complexity: TaskComplexity = role == "interviewer" ? "dialogue" : "code"
+
+    // DEBUG: Log prompt sizes to identify latency source
+    const historyChars = history.reduce((sum, h) => sum + h.content.length, 0)
+    logger.info("[Chat API] Prompt size debug", {
+      systemPromptChars: systemPrompt.length,
+      userMessageChars: fullUserMessage.length,
+      historyMessages: history.length,
+      historyChars,
+      totalEstimatedChars: systemPrompt.length + fullUserMessage.length + historyChars,
+      estimatedTokens: Math.ceil((systemPrompt.length + fullUserMessage.length + historyChars) / 4),
+    })
 
     // Use AI provider abstraction with fallback
     // Pass userId/sessionId for proper cost tracking

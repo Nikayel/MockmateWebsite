@@ -89,7 +89,10 @@
       "Bash(/Users/nikayeljamal/.bun/bin/bun tsc:*)",
       "Bash(gh pr view:*)",
       "Bash(export PATH=\"/opt/homebrew/bin:$PATH\")",
-      "Bash(source:*)"
+      "Bash(source:*)",
+      "Bash(export PATH=\"$HOME/Library/pnpm:$PATH\")",
+      "Bash(pnpm run lint)",
+      "Bash(/Users/nikayeljamal/.nvm/versions/node/v20.19.5/bin/npx tsc --noEmit --skipLibCheck)"
     ]
   }
 }

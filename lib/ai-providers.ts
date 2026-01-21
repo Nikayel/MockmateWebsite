@@ -65,7 +65,7 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     maxTokens: 1024,
     temperature: 0.7,
     costPer1kTokens: 0.00175, // Averaged (input + output) / 2
-    thinkingLevel: "low", // minimal/low/medium/high - low for balanced speed/quality
+    thinkingLevel: "minimal", // minimal/low/medium/high - minimal for fastest responses
   },
   "gemini-lite": {
     name: "gemini-lite",
