@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { getPendingRewards, markRewardPaid } from "@/lib/referrals"
+import { getPendingRewards, markRewardPaid, checkRewardEligibility } from "@/lib/referrals"
 import { requirePermission, errorResponse, unauthorizedResponse } from "@/lib/admin/middleware"
 import { PERMISSIONS } from "@/lib/admin/rbac"
 
@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
  * Body:
  * - rewardId: string
  * - notes?: string
+ * - skipEligibilityCheck?: boolean (for admin override in special cases)
  */
 export async function POST(request: NextRequest) {
   const authResult = await requirePermission(request, PERMISSIONS.MANAGE_USERS)
@@ -50,10 +51,21 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { rewardId, notes } = body
+    const { rewardId, notes, skipEligibilityCheck } = body
 
     if (!rewardId) {
       return errorResponse("rewardId is required", 400)
+    }
+
+    // Check eligibility before processing (unless admin explicitly overrides)
+    if (!skipEligibilityCheck) {
+      const eligibility = await checkRewardEligibility(rewardId)
+      if (!eligibility.eligible) {
+        return errorResponse(
+          `Reward not eligible: ${eligibility.reason}. Use skipEligibilityCheck to override.`,
+          400
+        )
+      }
     }
 
     const success = await markRewardPaid(rewardId, authResult.context!.userId, notes)

@@ -16,7 +16,11 @@ import {
 } from "@/lib/email"
 import { logger } from "@/lib/logger"
 import { trackEventServer } from "@/lib/analytics-server"
-import { markReferralConverted, voidReferralRewards } from "@/lib/referrals"
+import {
+  markReferralConverted,
+  voidReferralRewards,
+  voidReferrerConversionRewards,
+} from "@/lib/referrals"
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY environment variable is required")
@@ -859,13 +863,20 @@ export async function POST(request: NextRequest) {
             description: charge.refunded ? "Full refund" : "Partial refund",
           })
 
-          // REFERRAL CLAWBACK: Void any pending referral rewards for this user
-          // This prevents fraud where someone signs up via referral, gets the referrer $10, then refunds
+          // REFERRAL CLAWBACK: Void pending referral rewards
+          // Two scenarios:
+          // 1. User was referred - void rewards their referrer would get (voidReferralRewards)
+          // 2. User referred others - void their pending conversion rewards (voidReferrerConversionRewards)
           try {
-            await voidReferralRewards(
-              userId,
-              `Refund processed: ${charge.refunded ? "full" : "partial"} refund`
-            )
+            const refundReason = `Refund processed: ${charge.refunded ? "full" : "partial"} refund`
+
+            // Void rewards where this user is the referred user (their referrer loses rewards)
+            await voidReferralRewards(userId, refundReason)
+
+            // Void conversion rewards where this user is the referrer
+            // This handles case where a Pro user who referred others refunds their subscription
+            await voidReferrerConversionRewards(userId, refundReason)
+
             paymentLogger.info("Voided referral rewards due to refund", { userId })
           } catch (clawbackError) {
             paymentLogger.error("Failed to void referral rewards", { userId, error: clawbackError })

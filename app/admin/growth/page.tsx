@@ -70,8 +70,8 @@ interface DetailedReferral {
   signupDate: string
   convertedToPro: boolean
   convertedDate?: string
-  signupRewardStatus: 'pending' | 'paid'
-  conversionRewardStatus: 'pending' | 'credited' | 'n/a'
+  signupRewardStatus: "pending" | "paid"
+  conversionRewardStatus: "pending" | "credited" | "n/a"
 }
 
 interface ReferralData {
@@ -101,7 +101,7 @@ interface RewardItem {
   id: string
   referrerId: string
   referredUserId: string
-  type: 'signup_cash' | 'conversion_credit'
+  type: "signup_credit" | "conversion_cash" | "conversion_credit"
   amount: number
   status: string
   createdAt: string
@@ -214,7 +214,7 @@ export default function GrowthPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <Loader2 className="h-10 w-10 animate-spin text-[#00d9ff]" />
       </div>
     )
@@ -222,12 +222,12 @@ export default function GrowthPage() {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
         <AlertCircle className="h-10 w-10 text-red-400" />
-        <p className="text-red-400 text-sm">{error}</p>
+        <p className="text-sm text-red-400">{error}</p>
         <button
           onClick={() => loadData()}
-          className="text-sm text-gray-400 hover:text-white underline"
+          className="text-sm text-gray-400 underline hover:text-white"
         >
           Try again
         </button>
@@ -236,9 +236,12 @@ export default function GrowthPage() {
   }
 
   const totalResponses = npsData?.stats.totalResponses || 0
-  const promoterPercent = totalResponses > 0 ? (npsData?.stats.promoters || 0) / totalResponses * 100 : 0
-  const passivePercent = totalResponses > 0 ? (npsData?.stats.passives || 0) / totalResponses * 100 : 0
-  const detractorPercent = totalResponses > 0 ? (npsData?.stats.detractors || 0) / totalResponses * 100 : 0
+  const promoterPercent =
+    totalResponses > 0 ? ((npsData?.stats.promoters || 0) / totalResponses) * 100 : 0
+  const passivePercent =
+    totalResponses > 0 ? ((npsData?.stats.passives || 0) / totalResponses) * 100 : 0
+  const detractorPercent =
+    totalResponses > 0 ? ((npsData?.stats.detractors || 0) / totalResponses) * 100 : 0
 
   return (
     <div className={spacing.pageGap}>
@@ -257,7 +260,7 @@ export default function GrowthPage() {
           Net Promoter Score (NPS)
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           <MetricCard
             title="NPS Score"
             value={npsData?.stats.npsScore || 0}
@@ -291,16 +294,20 @@ export default function GrowthPage() {
         <Card className={cardStyles.default}>
           <CardHeader className="pb-4">
             <CardTitle className={typography.cardTitle}>Response Distribution</CardTitle>
-            <CardDescription className={typography.cardDescription}>Promoters (9-10), Passives (7-8), Detractors (0-6)</CardDescription>
+            <CardDescription className={typography.cardDescription}>
+              Promoters (9-10), Passives (7-8), Detractors (0-6)
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <ThumbsUp className="h-5 w-5 text-green-400" />
                 <div className="flex-1">
-                  <div className="flex justify-between mb-1">
-                    <span className="text-green-400 font-medium">Promoters</span>
-                    <span className="text-gray-400">{npsData?.stats.promoters || 0} ({promoterPercent.toFixed(0)}%)</span>
+                  <div className="mb-1 flex justify-between">
+                    <span className="font-medium text-green-400">Promoters</span>
+                    <span className="text-gray-400">
+                      {npsData?.stats.promoters || 0} ({promoterPercent.toFixed(0)}%)
+                    </span>
                   </div>
                   <Progress value={promoterPercent} className="h-2 bg-gray-800" />
                 </div>
@@ -308,9 +315,11 @@ export default function GrowthPage() {
               <div className="flex items-center gap-4">
                 <Meh className="h-5 w-5 text-yellow-400" />
                 <div className="flex-1">
-                  <div className="flex justify-between mb-1">
-                    <span className="text-yellow-400 font-medium">Passives</span>
-                    <span className="text-gray-400">{npsData?.stats.passives || 0} ({passivePercent.toFixed(0)}%)</span>
+                  <div className="mb-1 flex justify-between">
+                    <span className="font-medium text-yellow-400">Passives</span>
+                    <span className="text-gray-400">
+                      {npsData?.stats.passives || 0} ({passivePercent.toFixed(0)}%)
+                    </span>
                   </div>
                   <Progress value={passivePercent} className="h-2 bg-gray-800" />
                 </div>
@@ -318,9 +327,11 @@ export default function GrowthPage() {
               <div className="flex items-center gap-4">
                 <ThumbsDown className="h-5 w-5 text-red-400" />
                 <div className="flex-1">
-                  <div className="flex justify-between mb-1">
-                    <span className="text-red-400 font-medium">Detractors</span>
-                    <span className="text-gray-400">{npsData?.stats.detractors || 0} ({detractorPercent.toFixed(0)}%)</span>
+                  <div className="mb-1 flex justify-between">
+                    <span className="font-medium text-red-400">Detractors</span>
+                    <span className="text-gray-400">
+                      {npsData?.stats.detractors || 0} ({detractorPercent.toFixed(0)}%)
+                    </span>
                   </div>
                   <Progress value={detractorPercent} className="h-2 bg-gray-800" />
                 </div>
@@ -328,18 +339,18 @@ export default function GrowthPage() {
             </div>
 
             {/* NPS by Tier */}
-            <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-800">
-              {(['free', 'pro', 'enterprise'] as const).map((tier) => {
+            <div className="grid grid-cols-3 gap-4 border-t border-gray-800 pt-4">
+              {(["free", "pro", "enterprise"] as const).map((tier) => {
                 const tierData = npsData?.stats.responsesByTier[tier]
                 return (
-                  <div key={tier} className="bg-gray-800/50 rounded-lg p-4 text-center">
-                    <Badge className="mb-2" variant={tier === 'pro' ? 'default' : 'outline'}>
+                  <div key={tier} className="rounded-lg bg-gray-800/50 p-4 text-center">
+                    <Badge className="mb-2" variant={tier === "pro" ? "default" : "outline"}>
                       {tier.charAt(0).toUpperCase() + tier.slice(1)}
                     </Badge>
                     <p className={`text-2xl font-bold ${getNPSColor(tierData?.nps || 0)}`}>
                       {tierData?.nps || 0}
                     </p>
-                    <p className="text-xs text-gray-400 mt-1">{tierData?.count || 0} responses</p>
+                    <p className="mt-1 text-xs text-gray-400">{tierData?.count || 0} responses</p>
                   </div>
                 )
               })}
@@ -355,24 +366,30 @@ export default function GrowthPage() {
           <CardContent>
             <div className="space-y-3">
               {npsData?.recentResponses.slice(0, 10).map((response) => (
-                <div key={response.id} className="flex items-start gap-3 p-3 bg-gray-800/30 rounded-lg">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${getScoreColor(response.score)}`}>
+                <div
+                  key={response.id}
+                  className="flex items-start gap-3 rounded-lg bg-gray-800/30 p-3"
+                >
+                  <div
+                    className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold text-white ${getScoreColor(response.score)}`}
+                  >
                     {response.score}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     {response.feedback ? (
-                      <p className="text-gray-300 text-sm">&quot;{response.feedback}&quot;</p>
+                      <p className="text-sm text-gray-300">&quot;{response.feedback}&quot;</p>
                     ) : (
-                      <p className="text-gray-500 text-sm italic">No feedback provided</p>
+                      <p className="text-sm text-gray-500 italic">No feedback provided</p>
                     )}
-                    <p className="text-xs text-gray-500 mt-1">
-                      {new Date(response.createdAt).toLocaleDateString()} • {response.subscriptionTier}
+                    <p className="mt-1 text-xs text-gray-500">
+                      {new Date(response.createdAt).toLocaleDateString()} •{" "}
+                      {response.subscriptionTier}
                     </p>
                   </div>
                 </div>
               ))}
               {(!npsData?.recentResponses || npsData.recentResponses.length === 0) && (
-                <p className="text-center text-gray-500 py-8">No NPS responses yet</p>
+                <p className="py-8 text-center text-gray-500">No NPS responses yet</p>
               )}
             </div>
           </CardContent>
@@ -386,7 +403,7 @@ export default function GrowthPage() {
           Referral Program
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           <MetricCard
             title="Total Referrals"
             value={referralData?.totalReferrals || 0}
@@ -406,11 +423,15 @@ export default function GrowthPage() {
             value={(referralData?.viralCoefficient || 0).toFixed(2)}
             subtitle="Referrals per user"
             icon={TrendingUp}
-            valueColor={referralData?.viralCoefficient && referralData.viralCoefficient >= 1 ? "text-green-400" : "text-yellow-400"}
+            valueColor={
+              referralData?.viralCoefficient && referralData.viralCoefficient >= 1
+                ? "text-green-400"
+                : "text-yellow-400"
+            }
           />
           <MetricCard
             title="Organic vs Referred"
-            value={`${((referralData?.referralsBySource.referred || 0) / ((referralData?.referralsBySource.organic || 1) + (referralData?.referralsBySource.referred || 0)) * 100).toFixed(0)}%`}
+            value={`${(((referralData?.referralsBySource.referred || 0) / ((referralData?.referralsBySource.organic || 1) + (referralData?.referralsBySource.referred || 0))) * 100).toFixed(0)}%`}
             subtitle="% from referrals"
             icon={ArrowUpRight}
           />
@@ -420,32 +441,67 @@ export default function GrowthPage() {
         <Card className={cardStyles.default}>
           <CardHeader className="pb-4">
             <CardTitle className={typography.cardTitle}>Top Referrers</CardTitle>
-            <CardDescription className={typography.cardDescription}>Users who have referred the most people</CardDescription>
+            <CardDescription className={typography.cardDescription}>
+              Users who have referred the most people
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className={tableStyles.container}>
               <table className={tableStyles.table}>
                 <thead>
                   <tr className={tableStyles.headerRow}>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>#</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Email</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Referrals</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Conversions</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Conv. Rate</th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                    >
+                      #
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                    >
+                      Email
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}
+                    >
+                      Referrals
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}
+                    >
+                      Conversions
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}
+                    >
+                      Conv. Rate
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {referralData?.topReferrers.slice(0, 10).map((referrer, idx) => (
                     <tr key={referrer.userId} className={tableStyles.row}>
-                      <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>{idx + 1}</td>
-                      <td className={`${spacing.tableCellPadding} ${typography.tableCell}`}>{referrer.email}</td>
-                      <td className={`${spacing.tableCellPadding} text-right text-white font-medium tabular-nums`}>{referrer.referralCount}</td>
-                      <td className={`${spacing.tableCellPadding} text-right text-green-400 tabular-nums`}>{referrer.conversions}</td>
-                      <td className={`${spacing.tableCellPadding} text-right ${typography.tableCellMuted} tabular-nums`}>
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
+                        {idx + 1}
+                      </td>
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCell}`}>
+                        {referrer.email}
+                      </td>
+                      <td
+                        className={`${spacing.tableCellPadding} text-right font-medium text-white tabular-nums`}
+                      >
+                        {referrer.referralCount}
+                      </td>
+                      <td
+                        className={`${spacing.tableCellPadding} text-right text-green-400 tabular-nums`}
+                      >
+                        {referrer.conversions}
+                      </td>
+                      <td
+                        className={`${spacing.tableCellPadding} text-right ${typography.tableCellMuted} tabular-nums`}
+                      >
                         {referrer.referralCount > 0
-                          ? `${(referrer.conversions / referrer.referralCount * 100).toFixed(0)}%`
-                          : '-'
-                        }
+                          ? `${((referrer.conversions / referrer.referralCount) * 100).toFixed(0)}%`
+                          : "-"}
                       </td>
                     </tr>
                   ))}
@@ -462,28 +518,66 @@ export default function GrowthPage() {
         <Card className={cardStyles.default}>
           <CardHeader className="pb-4">
             <CardTitle className={typography.cardTitle}>All Referrals</CardTitle>
-            <CardDescription className={typography.cardDescription}>Who referred who, signup status, and reward tracking</CardDescription>
+            <CardDescription className={typography.cardDescription}>
+              Who referred who, signup status, and reward tracking
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className={tableStyles.container}>
               <table className={tableStyles.table}>
                 <thead>
                   <tr className={tableStyles.headerRow}>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Referrer</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Referred</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Code</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Signed Up</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-center`}>Pro?</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-center`}>$10 Owed</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-center`}>Free Month</th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                    >
+                      Referrer
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                    >
+                      Referred
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                    >
+                      Code
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                    >
+                      Signed Up
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-center`}
+                    >
+                      Pro?
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-center`}
+                    >
+                      $10 Owed
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-center`}
+                    >
+                      Free Month
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {referralData?.detailedReferrals?.map((ref) => (
                     <tr key={ref.id} className={tableStyles.row}>
-                      <td className={`${spacing.tableCellPadding} ${typography.tableCell}`}>{ref.referrerEmail}</td>
-                      <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>{ref.referredEmail}</td>
-                      <td className={`${spacing.tableCellPadding} font-mono text-xs ${typography.tableCellMuted}`}>{ref.referralCode}</td>
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCell}`}>
+                        {ref.referrerEmail}
+                      </td>
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
+                        {ref.referredEmail}
+                      </td>
+                      <td
+                        className={`${spacing.tableCellPadding} font-mono text-xs ${typography.tableCellMuted}`}
+                      >
+                        {ref.referralCode}
+                      </td>
                       <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
                         {new Date(ref.signupDate).toLocaleDateString()}
                       </td>
@@ -491,20 +585,22 @@ export default function GrowthPage() {
                         {ref.convertedToPro ? (
                           <Badge className={badgeVariants.success}>Pro</Badge>
                         ) : (
-                          <Badge variant="outline" className={badgeVariants.muted}>Free</Badge>
+                          <Badge variant="outline" className={badgeVariants.muted}>
+                            Free
+                          </Badge>
                         )}
                       </td>
                       <td className={`${spacing.tableCellPadding} text-center`}>
-                        {ref.signupRewardStatus === 'paid' ? (
+                        {ref.signupRewardStatus === "paid" ? (
                           <Badge className={badgeVariants.success}>Paid</Badge>
                         ) : (
                           <Badge className={badgeVariants.warning}>Owe $10</Badge>
                         )}
                       </td>
                       <td className={`${spacing.tableCellPadding} text-center`}>
-                        {ref.conversionRewardStatus === 'credited' ? (
+                        {ref.conversionRewardStatus === "credited" ? (
                           <Badge className={badgeVariants.purple}>Credited</Badge>
-                        ) : ref.conversionRewardStatus === 'pending' ? (
+                        ) : ref.conversionRewardStatus === "pending" ? (
                           <Badge className={badgeVariants.warning}>Pending</Badge>
                         ) : (
                           <span className="text-gray-600">—</span>
@@ -514,7 +610,8 @@ export default function GrowthPage() {
                   ))}
                 </tbody>
               </table>
-              {(!referralData?.detailedReferrals || referralData.detailedReferrals.length === 0) && (
+              {(!referralData?.detailedReferrals ||
+                referralData.detailedReferrals.length === 0) && (
                 <p className={tableStyles.emptyState}>No referrals yet</p>
               )}
             </div>
@@ -528,10 +625,10 @@ export default function GrowthPage() {
               <CardTitle className={typography.cardTitle}>Weekly Referral Trend</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
                 {referralData.weeklyTrend.slice(0, 12).map((week) => (
-                  <div key={week.week} className="bg-gray-800/50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-gray-500 mb-1">{week.week}</p>
+                  <div key={week.week} className="rounded-lg bg-gray-800/50 p-3 text-center">
+                    <p className="mb-1 text-xs text-gray-500">{week.week}</p>
                     <p className="text-lg font-bold text-white">{week.referrals}</p>
                     <p className="text-xs text-green-400">{week.conversions} conv</p>
                   </div>
@@ -550,7 +647,7 @@ export default function GrowthPage() {
         </h2>
 
         {/* Rewards Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <MetricCard
             title="Pending Cash Payouts"
             value={`$${rewardsData?.totals.pendingCash || 0}`}
@@ -574,26 +671,56 @@ export default function GrowthPage() {
               <DollarSign className="h-5 w-5 text-green-400" />
               Pending Cash Rewards ($10 per signup)
             </CardTitle>
-            <CardDescription className={typography.cardDescription}>Manual PayPal payouts to referrers</CardDescription>
+            <CardDescription className={typography.cardDescription}>
+              Manual PayPal payouts to referrers
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className={tableStyles.container}>
               <table className={tableStyles.table}>
                 <thead>
                   <tr className={tableStyles.headerRow}>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Referrer</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Referred User</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Amount</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Date</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Action</th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                    >
+                      Referrer
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                    >
+                      Referred User
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}
+                    >
+                      Amount
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                    >
+                      Date
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}
+                    >
+                      Action
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {rewardsData?.cashRewards.map((reward) => (
                     <tr key={reward.id} className={tableStyles.row}>
-                      <td className={`${spacing.tableCellPadding} ${typography.tableCell}`}>{reward.referrerEmail}</td>
-                      <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>{reward.referredEmail}</td>
-                      <td className={`${spacing.tableCellPadding} text-right text-green-400 font-medium tabular-nums`}>${reward.amount}</td>
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCell}`}>
+                        {reward.referrerEmail}
+                      </td>
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
+                        {reward.referredEmail}
+                      </td>
+                      <td
+                        className={`${spacing.tableCellPadding} text-right font-medium text-green-400 tabular-nums`}
+                      >
+                        ${reward.amount}
+                      </td>
                       <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
                         {new Date(reward.createdAt).toLocaleDateString()}
                       </td>
@@ -609,7 +736,7 @@ export default function GrowthPage() {
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
                             <>
-                              <Check className="h-4 w-4 mr-1" />
+                              <Check className="mr-1 h-4 w-4" />
                               Mark Paid
                             </>
                           )}
@@ -633,27 +760,55 @@ export default function GrowthPage() {
               <Gift className="h-5 w-5 text-purple-400" />
               Pending Free Month Credits
             </CardTitle>
-            <CardDescription className={typography.cardDescription}>1 free month when referred user upgrades to Pro</CardDescription>
+            <CardDescription className={typography.cardDescription}>
+              1 free month when referred user upgrades to Pro
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className={tableStyles.container}>
               <table className={tableStyles.table}>
                 <thead>
                   <tr className={tableStyles.headerRow}>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Referrer</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Converted User</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Credit</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Date</th>
-                    <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Action</th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                    >
+                      Referrer
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                    >
+                      Converted User
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}
+                    >
+                      Credit
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                    >
+                      Date
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}
+                    >
+                      Action
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {rewardsData?.creditRewards.map((reward) => (
                     <tr key={reward.id} className={tableStyles.row}>
-                      <td className={`${spacing.tableCellPadding} ${typography.tableCell}`}>{reward.referrerEmail}</td>
-                      <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>{reward.referredEmail}</td>
-                      <td className={`${spacing.tableCellPadding} text-right text-purple-400 font-medium tabular-nums`}>
-                        {reward.amount} month{reward.amount > 1 ? 's' : ''}
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCell}`}>
+                        {reward.referrerEmail}
+                      </td>
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
+                        {reward.referredEmail}
+                      </td>
+                      <td
+                        className={`${spacing.tableCellPadding} text-right font-medium text-purple-400 tabular-nums`}
+                      >
+                        {reward.amount} month{reward.amount > 1 ? "s" : ""}
                       </td>
                       <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
                         {new Date(reward.createdAt).toLocaleDateString()}
@@ -670,7 +825,7 @@ export default function GrowthPage() {
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
                             <>
-                              <Check className="h-4 w-4 mr-1" />
+                              <Check className="mr-1 h-4 w-4" />
                               Mark Credited
                             </>
                           )}
