@@ -9,6 +9,7 @@
  */
 
 import { sendEmail, upsertContact, EmailResult } from "./brevo"
+import { DEFAULT_TIMEZONE, getTodayInTimezone, getDateInTimezone } from "./timezone"
 import {
   getWelcomeEmailSubject,
   getWelcomeEmailHtml,
@@ -321,21 +322,27 @@ export const EMAIL_RATE_LIMITS: EmailRateLimits = {
 
 /**
  * Check if we can send an email to a user based on rate limits
+ *
+ * IMPORTANT: Uses timezone-aware date comparison for the daily counter.
+ * This ensures the counter resets at midnight in the user's timezone,
+ * not UTC. Pass the user's timezone for accurate rate limiting.
  */
 export function canSendEmail(
   lastEmailSentAt: string | undefined,
-  emailsSentToday: number | undefined
+  emailsSentToday: number | undefined,
+  userTimezone?: string
 ): { allowed: boolean; reason?: string } {
   const now = new Date()
+  const timezone = userTimezone || DEFAULT_TIMEZONE
 
   // Calculate effective emails sent today
-  // If last email was on a different day, the counter is stale - treat as 0
+  // If last email was on a different day (in user's timezone), the counter is stale - treat as 0
   let effectiveEmailsToday = emailsSentToday || 0
   if (lastEmailSentAt) {
-    const lastSentDate = new Date(lastEmailSentAt).toISOString().split("T")[0]
-    const todayDate = now.toISOString().split("T")[0]
+    const lastSentDate = getDateInTimezone(lastEmailSentAt, timezone)
+    const todayDate = getTodayInTimezone(timezone)
     if (lastSentDate !== todayDate) {
-      effectiveEmailsToday = 0 // New day, reset counter
+      effectiveEmailsToday = 0 // New day in user's timezone, reset counter
     }
   }
 

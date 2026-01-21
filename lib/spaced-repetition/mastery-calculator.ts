@@ -3,12 +3,22 @@
  *
  * Calculates aggregate mastery statistics for patterns, difficulty levels,
  * and overall user progress.
+ *
+ * IMPORTANT: Streak calculations are timezone-aware to properly track
+ * consecutive calendar days in the user's local timezone.
  */
 
 import { adminDb } from "../firebase-admin"
 import type { DSAPattern } from "../types/dsa-patterns"
 import type { ProblemMastery } from "./scheduler"
-import type { Difficulty, MasteryLevel } from "./sm2-algorithm"
+import type { Difficulty } from "./sm2-algorithm"
+import type { Profile } from "../types"
+import {
+  DEFAULT_TIMEZONE,
+  getTodayInTimezone,
+  getDateInTimezone,
+  getDaysDifference,
+} from "../email/timezone"
 
 export interface PatternMasteryStats {
   pattern: DSAPattern
@@ -241,6 +251,11 @@ export function calculateOverallStats(
 
 /**
  * Get complete mastery statistics for a user
+ *
+ * IMPORTANT: This function validates the streak at read time to ensure
+ * the dashboard shows accurate data even if the user hasn't practiced
+ * in multiple days. The streak is only stored/updated when a session
+ * is completed, but we need to show 0 if the streak is broken.
  */
 export async function getUserMasteryStats(userId: string): Promise<UserMasteryStats> {
   // Get all problem mastery records
@@ -254,8 +269,45 @@ export async function getUserMasteryStats(userId: string): Promise<UserMasterySt
   const learningStateDoc = await learningStateRef.get()
   const learningState = learningStateDoc.data()
 
-  const streakDays = learningState?.streak_days || 0
+  // Get user's timezone for accurate streak validation
+  let userTimezone = DEFAULT_TIMEZONE
+  try {
+    const profileDoc = await adminDb.collection("profiles").doc(userId).get()
+    if (profileDoc.exists) {
+      const profile = profileDoc.data() as Profile
+      userTimezone = profile.notification_preferences?.timezone || DEFAULT_TIMEZONE
+    }
+  } catch {
+    // Use default timezone if profile fetch fails
+  }
+
+  // Validate streak: check if it's still valid based on last_session_at
+  // The stored streak_days is only updated when a session is completed,
+  // so we need to check if the streak is broken (missed a day)
+  let streakDays = learningState?.streak_days || 0
   const longestStreak = learningState?.longest_streak_days || streakDays
+  const lastSessionAt = learningState?.last_session_at
+
+  if (streakDays > 0 && lastSessionAt) {
+    const today = getTodayInTimezone(userTimezone)
+    const lastSessionDate = getDateInTimezone(lastSessionAt, userTimezone)
+
+    // If last session was today, streak is valid
+    if (lastSessionDate === today) {
+      // Streak is current, no change needed
+    } else {
+      // Calculate days since last session
+      const daysSinceLastSession = getDaysDifference(lastSessionAt, new Date(), userTimezone)
+
+      if (daysSinceLastSession > 1) {
+        // Missed more than 1 day - streak is broken
+        // Return 0 to show accurate data on dashboard
+        // Note: We don't update the database here - that happens on next session
+        streakDays = 0
+      }
+      // If daysSinceLastSession === 1, streak is at risk but not broken yet
+    }
+  }
 
   return {
     overall: calculateOverallStats(problems, streakDays, longestStreak),
@@ -336,6 +388,10 @@ export async function updateUserLearningStateSummary(userId: string): Promise<vo
 
 /**
  * Get daily goal progress
+ *
+ * IMPORTANT: Uses timezone-aware date calculation to correctly determine
+ * "today" in the user's local timezone. A user practicing at 11 PM PST
+ * should see that counted as "today" even if it's already tomorrow in UTC.
  */
 export async function getDailyGoalProgress(userId: string): Promise<{
   daily_goal: number
@@ -348,15 +404,42 @@ export async function getDailyGoalProgress(userId: string): Promise<{
 
   const dailyGoal = data?.daily_goal || 5 // Default 5 problems per day
 
-  // Get problems reviewed today
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  // Get user's timezone for accurate "today" calculation
+  let userTimezone = DEFAULT_TIMEZONE
+  try {
+    const profileDoc = await adminDb.collection("profiles").doc(userId).get()
+    if (profileDoc.exists) {
+      const profile = profileDoc.data() as Profile
+      userTimezone = profile.notification_preferences?.timezone || DEFAULT_TIMEZONE
+    }
+  } catch {
+    // Use default timezone if profile fetch fails
+  }
 
+  // Get today's date string in user's timezone (YYYY-MM-DD)
+  const todayStr = getTodayInTimezone(userTimezone)
+
+  // Get all problem mastery records and filter by today in user's timezone
+  // We can't use Firestore's where clause directly because timestamps are stored in UTC
+  // and we need to compare against the user's local "today"
   const masteryRef = adminDb.collection("problem_mastery").doc(userId).collection("problems")
 
-  const snapshot = await masteryRef.where("last_reviewed_at", ">=", today.toISOString()).get()
+  // Query for problems reviewed in the last 48 hours to cover timezone edge cases
+  const twoDaysAgo = new Date()
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
 
-  const problemsToday = snapshot.docs.map((doc) => (doc.data() as ProblemMastery).problem_id)
+  const snapshot = await masteryRef
+    .where("last_reviewed_at", ">=", twoDaysAgo.toISOString())
+    .get()
+
+  // Filter to only include problems reviewed "today" in user's timezone
+  const problemsToday = snapshot.docs
+    .filter((doc) => {
+      const problem = doc.data() as ProblemMastery
+      const reviewDate = getDateInTimezone(problem.last_reviewed_at, userTimezone)
+      return reviewDate === todayStr
+    })
+    .map((doc) => (doc.data() as ProblemMastery).problem_id)
 
   return {
     daily_goal: dailyGoal,
