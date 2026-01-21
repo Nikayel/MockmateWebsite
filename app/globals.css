@@ -217,8 +217,11 @@
   animation-duration: 2s; /* Slower spin */
 }
 
-/* Focus mode styles - Distraction-free coding
-   Header dims in focus mode but reveals on hover */
+/* ===== FOCUS MODE STYLES =====
+   Research: Distraction-free environments improve deep work (Newport, 2016)
+   - Reduces cognitive load by removing peripheral information
+   - Centered content improves reading comprehension
+   - Smooth transitions reduce jarring context switches */
 
 .focus-mode-active .focus-header {
   opacity: 0.4;
@@ -227,6 +230,41 @@
 
 .focus-mode-active .focus-header:hover {
   opacity: 1;
+}
+
+/* Focus mode: Subtle vignette effect for tunnel vision */
+.focus-mode-active {
+  --focus-vignette: radial-gradient(
+    ellipse at center,
+    transparent 60%,
+    oklch(0.1 0.005 260 / 0.3) 100%
+  );
+}
+
+/* Focus mode: Editor gets full attention */
+.focus-mode-active .glass-effect {
+  border-color: oklch(0.35 0.02 210 / 0.5) !important;
+  box-shadow:
+    0 0 40px oklch(0.7 0.08 210 / 0.1),
+    inset 0 1px 0 oklch(0.5 0.05 210 / 0.1);
+}
+
+/* Focus mode: Reduce distracting animations */
+.focus-mode-active .animate-pulse,
+.focus-mode-active .animate-bounce {
+  animation: none !important;
+}
+
+.focus-mode-active .animate-neural-pulse {
+  animation-duration: 4s;
+}
+
+/* Focus mode: Floating buttons styling */
+.focus-mode-active .focus-float-button {
+  backdrop-filter: blur(12px);
+  box-shadow:
+    0 4px 20px oklch(0 0 0 / 0.4),
+    0 0 0 1px oklch(0.4 0.02 210 / 0.3);
 }
 
 @theme inline {
@@ -282,11 +320,29 @@
 @layer base {
   /* Exclude code editor from global border styles */
   *:not(.cm-editor):not(.cm-editor *) {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Better focus states - Research: Clear focus indicators improve accessibility (WCAG 2.1)
+     Only show focus ring for keyboard navigation, not mouse clicks */
+  button:focus-visible,
+  a:focus-visible,
+  [role="button"]:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    @apply ring-accent/50 ring-offset-background ring-2 ring-offset-1 outline-none;
+  }
+
+  /* Remove default outline on click/tap */
+  button:focus:not(:focus-visible),
+  a:focus:not(:focus-visible),
+  [role="button"]:focus:not(:focus-visible) {
+    @apply ring-0 outline-none;
   }
 
   /* Cursor pointer for all clickable elements */

@@ -4410,6 +4410,15 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
                 {/* Right: Actions - Research-backed controls for cognitive load reduction */}
                 <div className="flex shrink-0 items-center gap-1.5">
+                  {/* Focus Mode Active Indicator */}
+                  {focusMode && (
+                    <div className="bg-accent/15 text-accent ring-accent/30 hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium ring-1 sm:flex">
+                      <div className="bg-accent h-1.5 w-1.5 animate-pulse rounded-full" />
+                      <span className="hidden lg:inline">Focus Active</span>
+                      <span className="lg:hidden">Focus</span>
+                    </div>
+                  )}
+
                   {/* Timer with hide toggle - WCAG 2.1: Let users manage time on their terms */}
                   {isInterviewStarted && (
                     <div className="bg-secondary/50 flex items-center overflow-hidden rounded-lg">
@@ -4440,21 +4449,22 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                     </div>
                   )}
 
-                  {/* Calm Mode Toggle - Research: Muted colors reduce anxiety */}
+                  {/* Calm Mode Toggle - Research: Muted colors reduce anxiety (Küller et al. 2006) */}
                   <button
                     onClick={() => setCalmMode(!calmMode)}
-                    className={`hidden items-center gap-1 rounded-lg px-2 py-1 text-xs transition-all sm:flex ${
+                    className={`focus:ring-neural/50 hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all duration-200 focus:ring-2 focus:outline-none sm:flex ${
                       calmMode
-                        ? "bg-neural/20 text-neural border-neural/30 border"
-                        : "bg-secondary/50 text-muted-foreground hover:text-foreground"
+                        ? "bg-neural/20 text-neural border-neural/40 shadow-neural/20 border shadow-sm"
+                        : "bg-secondary/50 text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
                     }`}
                     title={calmMode ? "Exit Calm Mode" : "Calm Mode (muted colors for focus)"}
                   >
-                    <Leaf className="h-3 w-3" />
+                    <Leaf className="h-3.5 w-3.5" />
                     <span className="hidden lg:inline">{calmMode ? "Calm" : "Calm"}</span>
                   </button>
 
                   {/* Focus Mode Toggle - Desktop only
+                      Research: Distraction-free environments improve deep work
                       Keyboard shortcut: Cmd/Ctrl+K, Z (VS Code style chord) */}
                   <button
                     onClick={() => {
@@ -4465,17 +4475,17 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                         setCalmMode(true)
                       }
                     }}
-                    className={`hidden items-center gap-1 rounded-lg px-2 py-1 text-xs transition-all lg:flex ${
+                    className={`focus:ring-accent/50 hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all duration-200 focus:ring-2 focus:outline-none lg:flex ${
                       focusMode
-                        ? "bg-accent text-accent-foreground"
-                        : "bg-secondary/50 text-muted-foreground hover:text-foreground"
+                        ? "bg-accent/90 text-accent-foreground shadow-accent/25 ring-accent/50 shadow-md ring-1"
+                        : "bg-secondary/50 text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
                     }`}
                     title={focusMode ? "Exit Focus Mode (Esc)" : "Focus Mode ⌘K Z"}
                   >
                     {focusMode ? (
-                      <Minimize2 className="h-3 w-3" />
+                      <Minimize2 className="h-3.5 w-3.5" />
                     ) : (
-                      <Maximize2 className="h-3 w-3" />
+                      <Maximize2 className="h-3.5 w-3.5" />
                     )}
                     <span className="hidden xl:inline">{focusMode ? "Exit Focus" : "Focus"}</span>
                   </button>
@@ -4511,25 +4521,27 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                       : "grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)_260px] xl:grid-cols-[320px_minmax(0,1fr)_300px] 2xl:grid-cols-[380px_minmax(0,1fr)_340px]"
                   }`}
                 >
-                  {/* Focus Mode: Floating problem peek button */}
+                  {/* Focus Mode: Floating problem peek button
+                      Research: Quick reference reduces working memory load */}
                   {focusMode && selectedScenario && (
                     <button
                       onClick={() => setShowProblemPeek(!showProblemPeek)}
-                      className={`fixed top-20 left-4 z-50 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium shadow-lg transition-all ${
+                      className={`focus-float-button focus:ring-accent/50 fixed top-20 left-4 z-50 flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium shadow-xl transition-all duration-200 focus:ring-2 focus:outline-none ${
                         showProblemPeek
-                          ? "bg-accent text-accent-foreground"
-                          : "border border-gray-600 bg-gray-800/90 text-gray-300 hover:bg-gray-700/90"
+                          ? "bg-accent/90 text-accent-foreground shadow-accent/25"
+                          : "hover:border-accent/30 border border-gray-600/50 bg-gray-800/95 text-gray-200 backdrop-blur-md hover:bg-gray-700/95 hover:text-white"
                       }`}
-                      title="Peek at problem description"
+                      title="Peek at problem description (quick reference)"
                     >
-                      <Target className="h-3.5 w-3.5" />
+                      <Target className={`h-4 w-4 ${showProblemPeek ? "" : "text-accent"}`} />
                       <span>{showProblemPeek ? "Hide Problem" : "Show Problem"}</span>
                     </button>
                   )}
 
-                  {/* Focus Mode: Problem peek overlay */}
+                  {/* Focus Mode: Problem peek overlay
+                      Research: Floating panels allow reference without context switch */}
                   {focusMode && showProblemPeek && selectedScenario && (
-                    <div className="fixed top-32 left-4 z-40 max-h-[60vh] w-96 overflow-hidden rounded-xl border border-gray-700 bg-gray-900/95 shadow-2xl backdrop-blur-sm">
+                    <div className="focus-float-button border-accent/20 fixed top-32 left-4 z-40 max-h-[60vh] w-[420px] overflow-hidden rounded-2xl border bg-gray-900/98 shadow-2xl shadow-black/50 backdrop-blur-xl">
                       <div className="flex items-center justify-between border-b border-gray-700 p-4">
                         <div className="flex items-center gap-2">
                           <Target className="text-accent h-4 w-4" />
@@ -4586,8 +4598,12 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                   */}
                   <Card
                     className={`glass-effect order-1 h-full flex-col overflow-hidden border-gray-700 bg-gray-900/50 ${
-                      focusMode ? "hidden" : "" // Hide in focus mode
-                    } ${activePanel === "problem" ? "flex" : "hidden lg:flex"}`}
+                      focusMode
+                        ? "hidden" // Always hidden in focus mode - no responsive override
+                        : activePanel === "problem"
+                          ? "flex"
+                          : "hidden lg:flex"
+                    }`}
                   >
                     {/* IMPROVED: Enhanced header with title and difficulty badge */}
                     <CardHeader className="flex-shrink-0 border-b border-gray-700/50 pb-3">
@@ -5281,8 +5297,12 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                   */}
                   <Card
                     className={`glass-effect order-3 h-full flex-col overflow-hidden border-gray-700 bg-gray-900/50 ${
-                      focusMode ? "hidden" : "" // Hide in focus mode
-                    } ${activePanel === "chat" ? "flex" : "hidden lg:flex"}`}
+                      focusMode
+                        ? "hidden" // Always hidden in focus mode - no responsive override
+                        : activePanel === "chat"
+                          ? "flex"
+                          : "hidden lg:flex"
+                    }`}
                   >
                     <CardHeader className="flex-shrink-0 pb-2">
                       <CardTitle className="flex items-center space-x-2 text-sm text-white">
