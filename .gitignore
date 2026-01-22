@@ -32,6 +32,8 @@ next-env.d.ts
 
 # Claude Code
 CLAUDE.md
+.claude/settings.local.json
+.claude/skills/
 
 # Extension directory (cloned repo for context, not part of website build)
 /extension/

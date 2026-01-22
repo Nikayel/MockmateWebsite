@@ -9,7 +9,7 @@ import { Footer } from "@/components/footer"
 import { type DueItem } from "@/components/practice"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
-import { Loader2, Lock, ArrowRight, HelpCircle } from "lucide-react"
+import { Loader2, Lock, ArrowRight, HelpCircle, List, CalendarDays } from "lucide-react"
 import Link from "next/link"
 
 // Dynamic imports for heavy components - reduces initial bundle size
@@ -26,6 +26,11 @@ const DueForReview = dynamic(
 const PatternMastery = dynamic(
   () => import("@/components/practice").then((mod) => mod.PatternMastery),
   { ssr: false, loading: () => <div className="h-48 animate-pulse rounded-lg bg-white/5" /> }
+)
+
+const ReviewCalendar = dynamic(
+  () => import("@/components/practice").then((mod) => mod.ReviewCalendar),
+  { ssr: false, loading: () => <div className="h-96 animate-pulse rounded-lg bg-white/5" /> }
 )
 
 interface StatsData {
@@ -93,6 +98,7 @@ export default function PracticePage() {
   const [error, setError] = useState<string | null>(null)
   const [isPro, setIsPro] = useState<boolean | null>(null)
   const [isDeferring, setIsDeferring] = useState(false)
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list")
 
   const getAuthToken = useCallback(async () => {
     const { auth } = await import("@/lib/firebase")
@@ -364,27 +370,71 @@ export default function PracticePage() {
 
           {/* Main Content */}
           <div className="space-y-8">
-            {/* Due for Review */}
-            <div className="rounded-xl border border-white/5 bg-gray-900/30 p-6">
-              <DueForReview
-                dueNow={due?.due_now || []}
-                dueInMinutes={due?.due_in_minutes || []}
-                dueToday={due?.due_today || []}
-                upcoming={due?.upcoming || []}
-                totalDue={due?.stats.total_due || 0}
-                overdueCount={due?.stats.overdue_count || 0}
-                userAlgorithm={due?.user_algorithm}
-                onSkip={handleSkipProblem}
-                onMarkReviewed={handleMarkReviewed}
-                isLoading={isLoading}
-                // Overwhelm management
-                maxDailyReviews={due?.settings?.max_daily_reviews}
-                isOverwhelmed={due?.settings?.is_overwhelmed}
-                deferCount={due?.settings?.defer_count}
-                onBatchDefer={handleBatchDefer}
-                isDeferring={isDeferring}
-              />
+            {/* View Toggle */}
+            <div className="mb-4 flex items-center justify-end">
+              <div className="inline-flex rounded-lg border border-white/10 bg-white/5 p-1">
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    viewMode === "list"
+                      ? "bg-white/10 text-white"
+                      : "text-gray-500 hover:text-gray-300"
+                  }`}
+                >
+                  <List className="h-4 w-4" />
+                  List
+                </button>
+                <button
+                  onClick={() => setViewMode("calendar")}
+                  className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    viewMode === "calendar"
+                      ? "bg-white/10 text-white"
+                      : "text-gray-500 hover:text-gray-300"
+                  }`}
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  Calendar
+                </button>
+              </div>
             </div>
+
+            {/* Due for Review - List View */}
+            {viewMode === "list" && (
+              <div className="rounded-xl border border-white/5 bg-gray-900/30 p-6">
+                <DueForReview
+                  dueNow={due?.due_now || []}
+                  dueInMinutes={due?.due_in_minutes || []}
+                  dueToday={due?.due_today || []}
+                  upcoming={due?.upcoming || []}
+                  totalDue={due?.stats.total_due || 0}
+                  overdueCount={due?.stats.overdue_count || 0}
+                  userAlgorithm={due?.user_algorithm}
+                  onSkip={handleSkipProblem}
+                  onMarkReviewed={handleMarkReviewed}
+                  isLoading={isLoading}
+                  // Overwhelm management
+                  maxDailyReviews={due?.settings?.max_daily_reviews}
+                  isOverwhelmed={due?.settings?.is_overwhelmed}
+                  deferCount={due?.settings?.defer_count}
+                  onBatchDefer={handleBatchDefer}
+                  isDeferring={isDeferring}
+                />
+              </div>
+            )}
+
+            {/* Due for Review - Calendar View */}
+            {viewMode === "calendar" && (
+              <div className="rounded-xl border border-white/5 bg-gray-900/30 p-6">
+                <ReviewCalendar
+                  dueItems={[
+                    ...(due?.due_now || []),
+                    ...(due?.due_in_minutes || []),
+                    ...(due?.due_today || []),
+                  ]}
+                  upcoming={due?.upcoming || []}
+                />
+              </div>
+            )}
 
             {/* Pattern Mastery */}
             <div className="rounded-xl border border-white/5 bg-gray-900/30 p-6">
