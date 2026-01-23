@@ -16,12 +16,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Use a fast model for complexity analysis (it's a focused task)
-    const response = await generateAIResponse({
-      message: userPrompt,
-      systemPrompt,
-      context: [],
-      taskComplexity: "simple", // Fast response for simple analysis
+    const aiResponse = await generateAIResponse(systemPrompt, userPrompt, [], {
+      complexity: "simple", // Fast response for simple analysis
     })
+    const response = aiResponse.text
 
     // Parse the JSON response from the LLM
     let result
