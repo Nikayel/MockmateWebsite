@@ -43,6 +43,10 @@ export { extractTopicsFromMessage, extractUserAnsweredTopics } from "./topic-ext
 export { analyzeCodeEfficiency } from "./code-analysis"
 export type { CodeEfficiencyMetrics, OptimalComplexity, AnalysisOptions } from "./code-analysis"
 
+// LLM-based complexity analysis (semantic understanding, not regex)
+export { analyzeComplexityWithLLM, compareComplexity } from "./llm-complexity-analysis"
+export type { LLMComplexityResult, LLMComplexityRequest } from "./llm-complexity-analysis"
+
 // Clarifying questions checker (Real Interview Mode)
 // NOTE: Server-only module - import directly from "./clarifying-questions-checker"
 // to avoid bundling firebase-admin into client code.
