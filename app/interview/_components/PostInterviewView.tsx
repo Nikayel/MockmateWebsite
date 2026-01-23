@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import {
   Code,
   CheckCircle,
+  XCircle,
   Brain,
   User,
   Send,
@@ -15,6 +16,9 @@ import {
   ChevronDown,
   ChevronUp,
   X,
+  MessageSquare,
+  Clock,
+  Zap,
 } from "lucide-react"
 import { FormattedText } from "@/components/ui/FormattedText"
 import nextDynamic from "next/dynamic"
@@ -212,9 +216,12 @@ export function PostInterviewView({
     }
   }, [isLoadingInterviewer, isGeneratingDiscussion, scrollToBottom])
 
+  // Determine debrief phase based on message count
+  const debriefPhase = interviewerMessages.length <= 2 ? "technical" : "wrapup"
+
   return (
     <div className="mx-auto flex h-full max-w-7xl flex-col px-4 py-6">
-      {/* Header Section - Compact */}
+      {/* Header Section - FAANG-style Debrief */}
       <div className="mb-4 flex-shrink-0">
         {onClose && (
           <div className="mb-3 flex justify-end">
@@ -230,55 +237,42 @@ export function PostInterviewView({
           </div>
         )}
         <div className="text-center">
-          <div className="mb-2 flex items-center justify-center gap-3">
-            <CheckCircle className="text-accent h-8 w-8" />
-            <h2 className="font-heading text-xl font-bold text-white">Solution Complete!</h2>
+          {/* Status indicator - subtle, not celebratory */}
+          <div className="mb-3 flex items-center justify-center gap-2">
+            {testSummary.passRate === 100 ? (
+              <CheckCircle className="h-5 w-5 text-green-500" />
+            ) : (
+              <XCircle className="h-5 w-5 text-yellow-500" />
+            )}
+            <span className="text-sm font-medium text-gray-300">
+              {testSummary.passed}/{testSummary.total} tests passed
+            </span>
           </div>
-          <p className="mb-3 text-sm text-gray-300">
-            {testSummary.passRate === 100
-              ? "All tests passed! Let's discuss your solution."
-              : `${testSummary.passed}/${testSummary.total} tests passed. Let's discuss your solution.`}
+
+          {/* Main header - Debrief focused */}
+          <h2 className="font-heading mb-2 text-xl font-bold text-white">
+            {debriefPhase === "technical" ? "Technical Debrief" : "Wrapping Up"}
+          </h2>
+          <p className="mb-3 text-sm text-gray-400">
+            {debriefPhase === "technical"
+              ? "Let's discuss your solution - complexity, trade-offs, and alternatives."
+              : "Any final questions before we wrap up?"}
           </p>
-          {/* Stats & Continue Editing */}
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {testSummary.passRate < 100 && (
+
+          {/* Action buttons - Continue editing if tests failed */}
+          {testSummary.passRate < 100 && (
+            <div className="mb-3">
               <Button
                 onClick={() => setShowPostInterviewDiscussion(false)}
                 variant="outline"
                 size="sm"
-                className="border-accent text-accent hover:bg-accent/10"
+                className="border-yellow-600 text-yellow-500 hover:bg-yellow-600/10"
               >
                 <Code className="mr-1.5 h-3.5 w-3.5" />
                 Continue Editing
               </Button>
-            )}
-            {testSummary.total > 0 && (
-              <>
-                <Badge className="bg-[#00d9ff] text-black">
-                  {testSummary.passed}/{testSummary.total} Tests
-                </Badge>
-                {efficiencyMetrics && (
-                  <>
-                    <Badge
-                      className={`${
-                        efficiencyMetrics.efficiencyScore >= 80
-                          ? "bg-[#00d9ff]"
-                          : efficiencyMetrics.efficiencyScore >= 60
-                            ? "bg-[#00d9ff]/70"
-                            : "bg-gray-600"
-                      } text-black`}
-                    >
-                      Efficiency: {efficiencyMetrics.efficiencyScore}/100
-                    </Badge>
-                    <Badge variant="outline" className="border-gray-600 text-gray-300">
-                      {efficiencyMetrics.estimatedTimeComplexity} /{" "}
-                      {efficiencyMetrics.estimatedSpaceComplexity}
-                    </Badge>
-                  </>
-                )}
-              </>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -308,6 +302,24 @@ export function PostInterviewView({
             </CardHeader>
             {showCodeInDiscussion && (
               <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden pb-3">
+                {/* Efficiency Metrics - Compact inline display */}
+                {efficiencyMetrics && (
+                  <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-gray-700/50 bg-gray-800/30 px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                      <Clock className="h-3 w-3" />
+                      <span>Time: {efficiencyMetrics.estimatedTimeComplexity}</span>
+                    </div>
+                    <div className="h-3 w-px bg-gray-700" />
+                    <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                      <Zap className="h-3 w-3" />
+                      <span>Space: {efficiencyMetrics.estimatedSpaceComplexity}</span>
+                    </div>
+                    <div className="h-3 w-px bg-gray-700" />
+                    <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                      <span>{efficiencyMetrics.linesOfCode} lines</span>
+                    </div>
+                  </div>
+                )}
                 {/* Scrollable Code Editor Container */}
                 <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-gray-700">
                   <CodeEditor height="100%" language={selectedLanguage} value={code} readOnly />
@@ -345,14 +357,22 @@ export function PostInterviewView({
         <div className="flex min-h-0 flex-col">
           <Card className="glass-effect flex min-h-0 flex-1 flex-col overflow-hidden border-gray-700 bg-gray-900/50">
             <CardHeader className="flex-shrink-0 py-3">
-              <CardTitle className="flex items-center space-x-2 text-sm text-white">
-                <div className="relative">
-                  <Brain className="text-accent animate-neural-pulse h-4 w-4" />
-                  <div className="bg-accent absolute inset-0 rounded-full opacity-30 blur-md"></div>
+              <CardTitle className="flex items-center justify-between text-sm text-white">
+                <div className="flex items-center space-x-2">
+                  <div className="relative">
+                    <MessageSquare className="text-accent h-4 w-4" />
+                  </div>
+                  <span className="font-semibold text-white">
+                    {debriefPhase === "technical" ? "Technical Discussion" : "Final Questions"}
+                  </span>
                 </div>
-                <span className="from-accent to-neural bg-gradient-to-r bg-clip-text font-bold text-transparent">
-                  Post-Interview Discussion
-                </span>
+                {/* Phase indicator */}
+                <Badge
+                  variant="outline"
+                  className="border-gray-600 text-xs text-gray-400"
+                >
+                  {debriefPhase === "technical" ? "Debrief" : "Wrap-up"}
+                </Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 pt-0">
@@ -480,14 +500,17 @@ export function PostInterviewView({
       </div>
 
       {/* Action Button - Fixed at Bottom */}
-      <div className="mt-4 flex flex-shrink-0 justify-center">
+      <div className="mt-4 flex flex-shrink-0 flex-col items-center gap-2">
         <Button
           onClick={proceedToFinalFeedback}
-          className="bg-accent hover:bg-accent/80 text-accent-foreground px-6"
+          className="bg-accent hover:bg-accent/80 text-accent-foreground px-8 py-2"
         >
-          View Detailed Feedback
+          End Interview
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
+        <p className="text-xs text-gray-500">
+          You&apos;ll receive detailed feedback and performance analysis
+        </p>
       </div>
     </div>
   )

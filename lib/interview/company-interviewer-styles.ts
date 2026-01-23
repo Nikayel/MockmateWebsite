@@ -260,7 +260,7 @@ function buildDialogExamples(
   }
 
   // Wrapping up
-  const wrappingUp = `Nice work on this one. Click 'View Detailed Feedback' to see your full ${company} evaluation.`
+  const wrappingUp = `Nice work on this one. Click 'End Interview' whenever you're ready to see your full ${company} evaluation.`
 
   return { greeting, probing, hinting, praising, wrappingUp }
 }
@@ -326,7 +326,7 @@ export function getGenericStyle(): CompanyInterviewerStyle {
       probing: "Interesting. What made you choose that approach?",
       hinting: "Have you thought about what happens with edge cases?",
       praising: "Good reasoning there.",
-      wrappingUp: "Nice work today. Click 'View Detailed Feedback' to see your full evaluation.",
+      wrappingUp: "Nice work today. Click 'End Interview' whenever you're ready to see your full evaluation.",
     },
   }
 }

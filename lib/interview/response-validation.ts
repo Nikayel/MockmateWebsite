@@ -167,12 +167,12 @@ const GATES: Gate[] = [
     check: (ctx) => {
       if (ctx.hasSubmitted) return null
 
-      if (/view detailed feedback/i.test(ctx.response)) {
-        return { violated: true, evidence: "Mentioned 'View Detailed Feedback' before submit" }
+      if (/view detailed feedback|end interview/i.test(ctx.response)) {
+        return { violated: true, evidence: "Mentioned 'End Interview' before submit" }
       }
       return null
     },
-    hint: "The 'View Detailed Feedback' button only appears AFTER submit. Guide them to Submit first.",
+    hint: "The 'End Interview' button only appears AFTER submit. Guide them to Submit first.",
   },
 
   // GATE 6: One question at a time

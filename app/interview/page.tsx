@@ -265,7 +265,7 @@ function InterviewPageContent() {
   } | null>(null)
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false) // Track AI feedback generation
   const [isGeneratingDiscussion, setIsGeneratingDiscussion] = useState(false)
-  const [showCodeInDiscussion, setShowCodeInDiscussion] = useState(false)
+  const [showCodeInDiscussion, setShowCodeInDiscussion] = useState(true) // Expanded by default for better UX
   const [code, setCode] = useState("")
   const [selectedLanguage, setSelectedLanguage] = useState<
     "javascript" | "typescript" | "python" | "java" | "cpp" | "csharp" | "go" | "rust"
@@ -3358,11 +3358,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           // Show end session prompt instead of continuing conversation
           toast.info(
             data.endMessage ||
-              "Session complete! Click 'View Detailed Feedback' to see your results.",
+              "Session complete! Click 'End Interview' to see your results.",
             {
               duration: 5000,
               action: {
-                label: "View Detailed Feedback",
+                label: "End Interview",
                 onClick: proceedToFinalFeedback,
               },
             }
@@ -3408,11 +3408,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             // Show prompt to end session after the final message
             setTimeout(() => {
               toast.info(
-                "Click 'View Detailed Feedback' to see your score breakdown and analysis.",
+                "Click 'End Interview' to see your score breakdown and analysis.",
                 {
                   duration: 8000,
                   action: {
-                    label: "View Detailed Feedback",
+                    label: "End Interview",
                     onClick: proceedToFinalFeedback,
                   },
                 }
