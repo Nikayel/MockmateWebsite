@@ -35,6 +35,7 @@ export interface DueItem {
   retention_estimate: number
   algorithm?: Algorithm // User's assigned algorithm
   fsrs_state?: "new" | "learning" | "review" | "relearning" // FSRS-specific state
+  last_reviewed_at?: string // ISO date - when this problem was last practiced
 }
 
 export interface UseSpacedRepetitionOptions {

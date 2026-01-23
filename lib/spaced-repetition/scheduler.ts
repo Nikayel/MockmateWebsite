@@ -111,6 +111,7 @@ export interface DueItem {
   retention_estimate: number
   algorithm?: SpacedRepetitionAlgorithm // User's assigned algorithm
   fsrs_state?: "new" | "learning" | "review" | "relearning" // FSRS-specific state
+  last_reviewed_at?: string // ISO date - when this problem was last practiced
 }
 
 export interface DueQueueResult {
@@ -263,6 +264,7 @@ export async function getDueProblems(
       retention_estimate: retention,
       algorithm: userAlgorithm,
       fsrs_state: fsrsState,
+      last_reviewed_at: data.last_reviewed_at,
     }
 
     // Categorize based on timing

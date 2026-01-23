@@ -162,8 +162,8 @@ function TodayFocusCard({ items, onStart }: { items: DueItem[]; onStart?: () => 
       <div className="flex items-center justify-between">
         <span className="text-xs text-gray-500">
           Last practiced:{" "}
-          {topItem.last_practiced_at
-            ? new Date(topItem.last_practiced_at).toLocaleDateString()
+          {topItem.last_reviewed_at
+            ? new Date(topItem.last_reviewed_at).toLocaleDateString()
             : "Never"}
         </span>
         {onStart && (
