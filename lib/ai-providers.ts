@@ -177,20 +177,19 @@ async function callGemini(
     // thinkingConfig must be set with thinkingBudget for MINIMAL to actually limit thinking
     if (config.thinkingLevel && config.model.includes("gemini-3")) {
       const thinkingLevel = config.thinkingLevel.toUpperCase()
-      generationConfig.thinkingConfig = {
-        thinkingBudget:
-          thinkingLevel === "MINIMAL"
-            ? 0
-            : thinkingLevel === "LOW"
-              ? 1024
-              : thinkingLevel === "MEDIUM"
-                ? 8192
-                : 24576,
-      }
+      const thinkingBudget =
+        thinkingLevel === "MINIMAL"
+          ? 0
+          : thinkingLevel === "LOW"
+            ? 1024
+            : thinkingLevel === "MEDIUM"
+              ? 8192
+              : 24576
+      generationConfig.thinkingConfig = { thinkingBudget }
       logger.debug("[Gemini] Thinking config applied", {
         model: config.model,
         thinkingLevel,
-        thinkingBudget: generationConfig.thinkingConfig.thinkingBudget,
+        thinkingBudget,
       })
     }
 

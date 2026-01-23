@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
       result = JSON.parse(cleanedResponse)
     } catch (parseError) {
-      logger.error({ error: parseError, response }, "Failed to parse LLM complexity response")
+      logger.error("Failed to parse LLM complexity response", { error: parseError, response })
 
       // Try to extract complexity from free-form text
       const timeMatch = response.match(/time\s*complexity[:\s]+O\([^)]+\)/i)
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error) {
-    logger.error({ error }, "Complexity analysis API error")
+    logger.error("Complexity analysis API error", { error })
     return NextResponse.json(
       {
         timeComplexity: "Unknown",
