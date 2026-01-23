@@ -259,30 +259,12 @@ ${companyKnowledge.cultureTips
     }
 
     // 4. Build hint context from RAG if we have problem text
-    if (options.problemText && options.problemText.length > 20) {
-      const hintContext = await buildHintContext({
-        problemText: options.problemText,
-        problemPattern: options.scenarioPattern as DSAPattern,
-        userCode: options.userCode,
-        userId: options.userId,
-      })
-
-      if (hintContext.retrievedDocs.length > 0) {
-        ragContextParts.push(`
-## Relevant Knowledge from RAG (${hintContext.retrievedDocs.length} documents)
-
-${hintContext.retrievedDocs
-  .slice(0, 2)
-  .map(
-    (doc, i) => `
-### Reference ${i + 1}
-${doc.text.substring(0, 400)}${doc.text.length > 400 ? "..." : ""}
-`
-  )
-  .join("\n")}
-`)
-      }
-    }
+    // DISABLED: Redundant with getDynamicChatContext() above - was causing duplicate embeddings
+    // The dynamic context already retrieves relevant hints based on user intent
+    // Keeping this disabled saves ~5s per message (2-3 embedding calls)
+    // if (options.problemText && options.problemText.length > 20) {
+    //   const hintContext = await buildHintContext({...})
+    // }
   } catch (error) {
     // RAG errors should not break the chat - log and continue
     logger.error("[Chat API] RAG context build error", { error })

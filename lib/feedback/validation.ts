@@ -165,6 +165,81 @@ export function analyzeAICodeOverlap(
 // ============================================================================
 
 /**
+ * Heuristic-based approach detection as a safety net
+ * Detects obvious signs of approach explanation that AI might miss
+ */
+function detectApproachHeuristically(candidateMessages: Array<{ content: string }>): {
+  explained: boolean
+  quality: string
+  complexityMentioned: boolean
+  edgeCasesMentioned: boolean
+} {
+  const allContent = candidateMessages.map((m) => m.content.toLowerCase()).join(" ")
+
+  // Approach keywords/phrases
+  const approachPatterns = [
+    /\b(two pointers?|sliding window|hash ?map|hash ?set|dictionary|freq|bucket|sort|heap|stack|queue|bfs|dfs|binary search|dp|dynamic programming|recursion|memoiz)/i,
+    /\b(i('ll|'m going to|want to|can|could|would) (use|try|loop|iterate|check|compare|add|remove|keep track))/i,
+    /\b(approach|strategy|idea|solution|algorithm|method|way to solve)/i,
+    /\b(first|then|after that|next|finally|so what i)/i,
+    /\b(time complexity|space complexity|o\s*\(|o\s*of\s*n|linear|constant|quadratic|log)/i,
+    /\b(brute force|optimiz|more efficient|better approach)/i,
+    /\b(loop over|iterate through|traverse|walk through)/i,
+    /\b(as (i|we) (loop|iterate|go|move)|while (we|i) (have|loop))/i,
+  ]
+
+  // Complexity patterns
+  const complexityPatterns = [
+    /\bo\s*\(\s*n\s*\)/i,
+    /\bo\s*\(\s*1\s*\)/i,
+    /\bo\s*\(\s*n\s*log\s*n\s*\)/i,
+    /\bo\s*\(\s*n\s*(squared|²|\^2|square)\s*\)/i,
+    /\btime complexity/i,
+    /\bspace complexity/i,
+    /\blinear( time)?/i,
+    /\bconstant( space)?/i,
+    /\bquadratic/i,
+  ]
+
+  // Edge case patterns
+  const edgeCasePatterns = [
+    /\b(empty|null|none|zero|single|one element|edge case|boundary|special case)/i,
+    /\b(what if|if it's empty|if there's nothing|if the (string|array|input) is)/i,
+    /\b(negative|duplicate|unicode|lowercase|uppercase)/i,
+  ]
+
+  const approachMatches = approachPatterns.filter((p) => p.test(allContent)).length
+  const complexityMatches = complexityPatterns.filter((p) => p.test(allContent)).length
+  const edgeCaseMatches = edgeCasePatterns.filter((p) => p.test(allContent)).length
+
+  // Check for substantial explanation (long messages explaining logic)
+  const substantialExplanations = candidateMessages.filter(
+    (m) =>
+      m.content.length > 150 && // Long message
+      (approachPatterns.some((p) => p.test(m.content.toLowerCase())) || // Contains approach keywords
+        /\b(so|because|the reason|which means|that way|this will|this would)\b/i.test(m.content)) // Contains explanation connectors
+  ).length
+
+  const explained = approachMatches >= 2 || substantialExplanations >= 1
+
+  let quality = "none"
+  if (explained) {
+    if (approachMatches >= 4 || substantialExplanations >= 2) {
+      quality = "good"
+    } else if (approachMatches >= 2 || substantialExplanations >= 1) {
+      quality = "basic"
+    }
+  }
+
+  return {
+    explained,
+    quality,
+    complexityMentioned: complexityMatches >= 1,
+    edgeCasesMentioned: edgeCaseMatches >= 1,
+  }
+}
+
+/**
  * STEP 2: AI validation of conversation quality
  * Only called if pre-screening passes basic checks
  * Returns structured validation that algorithm uses for scoring
@@ -174,6 +249,18 @@ export async function validateConversationWithAI(
   code: string,
   actualComplexity: { time: string; space: string } | null
 ): Promise<ConversationValidation> {
+  // Run heuristic detection first as a safety net
+  const candidateMessages = transcript.filter((m) => m.role === "candidate" || m.role === "user")
+  const heuristicResult = detectApproachHeuristically(candidateMessages)
+
+  logger.info("[AI Validation] Heuristic detection result", {
+    explained: heuristicResult.explained,
+    quality: heuristicResult.quality,
+    complexityMentioned: heuristicResult.complexityMentioned,
+    edgeCasesMentioned: heuristicResult.edgeCasesMentioned,
+    candidateMessageCount: candidateMessages.length,
+  })
+
   // IMPORTANT: Include BOTH early messages (approach explanation) and late messages (complexity)
   // Taking only the last 15 would miss the approach explanation at the start!
   let messagesToAnalyze: Array<{ role: string; content: string }> = []
@@ -319,10 +406,29 @@ Return ONLY the JSON object, nothing else.`
       { complexity: "standard", temperature: 0.1 } // Use better model for accurate conversation analysis
     )
 
+    // Log raw AI validation response
+    logger.info("[AI Validation] Raw response from AI", {
+      provider: response.provider,
+      latencyMs: response.latencyMs,
+      responseLength: response.text.length,
+      responsePreview: response.text.substring(0, 300),
+    })
+
     // Parse AI response
     const jsonMatch = response.text.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0])
+
+      // Log parsed values before any adjustments
+      logger.info("[AI Validation] Parsed AI response (before adjustments)", {
+        approachExplained: parsed.approachExplained,
+        approachQuality: parsed.approachQuality,
+        complexityDiscussed: parsed.complexityDiscussed,
+        rawCommunicationScore: parsed.communicationScore,
+        edgeCasesConsidered: parsed.edgeCasesConsidered,
+        questionsAnswered: parsed.questionsAnswered,
+        alternativesDiscussed: parsed.alternativesDiscussed,
+      })
 
       // Calculate engagement metrics from transcript for sanity checks
       const candidateMessages = transcript.filter((m) => m.role === "candidate")
@@ -334,6 +440,15 @@ Return ONLY the JSON object, nothing else.`
       const hasTotalContentEngagement = totalCandidateChars >= 400 && candidateMessages.length >= 3
       const hasSubstantialEngagement =
         (candidateMessages.length >= 5 && avgMessageLength >= 80) || hasTotalContentEngagement
+
+      // Log engagement metrics for debugging
+      logger.info("[AI Validation] Engagement metrics", {
+        candidateMessageCount: candidateMessages.length,
+        totalCandidateChars,
+        avgMessageLength: Math.round(avgMessageLength),
+        hasTotalContentEngagement,
+        hasSubstantialEngagement,
+      })
 
       // Check if interviewer praised communication (strong signal that AI validation is wrong)
       const interviewerMessages = transcript.filter((m) => m.role === "interviewer")
@@ -356,16 +471,42 @@ Return ONLY the JSON object, nothing else.`
       let approachExplained = Boolean(parsed.approachExplained)
       let approachQuality = parsed.approachQuality || "none"
       let communicationScore = Math.min(100, Math.max(0, Number(parsed.communicationScore) || 50))
-      const edgeCasesConsidered = Boolean(parsed.edgeCasesConsidered)
+      let edgeCasesConsidered = Boolean(parsed.edgeCasesConsidered)
+      let complexityDiscussed = Boolean(parsed.complexityDiscussed)
+
+      // HEURISTIC SAFETY NET: If heuristics detect approach but AI didn't, override
+      // This catches cases where AI is wrong due to voice transcription artifacts or model errors
+      if (!approachExplained && heuristicResult.explained) {
+        logger.warn(
+          "[AI Validation] Overriding with heuristic detection - AI missed approach explanation",
+          {
+            aiApproachExplained: parsed.approachExplained,
+            heuristicExplained: heuristicResult.explained,
+            heuristicQuality: heuristicResult.quality,
+          }
+        )
+        approachExplained = true
+        approachQuality = heuristicResult.quality || "basic"
+      }
+
+      // Also use heuristics to boost complexity and edge case detection
+      if (!complexityDiscussed && heuristicResult.complexityMentioned) {
+        logger.info("[AI Validation] Heuristic detected complexity discussion missed by AI")
+        complexityDiscussed = true
+      }
+      if (!edgeCasesConsidered && heuristicResult.edgeCasesMentioned) {
+        logger.info("[AI Validation] Heuristic detected edge cases missed by AI")
+        edgeCasesConsidered = true
+      }
 
       // Override if AI seems wrong: substantial engagement + complexity discussed = they explained
-      if (!approachExplained && hasSubstantialEngagement && Boolean(parsed.complexityDiscussed)) {
+      if (!approachExplained && hasSubstantialEngagement && complexityDiscussed) {
         logger.warn(
           "[AI Validation] Overriding approachExplained - substantial engagement with complexity discussion detected",
           {
             candidateMessageCount: candidateMessages.length,
             avgMessageLength: Math.round(avgMessageLength),
-            complexityDiscussed: parsed.complexityDiscussed,
+            complexityDiscussed,
             originalApproachExplained: parsed.approachExplained,
           }
         )
@@ -395,37 +536,38 @@ Return ONLY the JSON object, nothing else.`
         communicationScore = Math.max(communicationScore, 75)
       }
 
-      // ADDITIONAL SAFETY NET: If user has substantial engagement AND explained approach
-      // AND discussed complexity, the communication score should reflect good communication
-      // This catches cases where AI returns "basic" (50) for legitimately good sessions
-      if (
-        approachExplained &&
-        Boolean(parsed.complexityDiscussed) &&
-        hasSubstantialEngagement &&
-        communicationScore < 65
-      ) {
-        // Calculate expected minimum based on quality
+      // ADDITIONAL SAFETY NET: If user explained approach AND discussed complexity,
+      // the communication score should reflect good communication
+      // This catches cases where AI returns unreasonably low scores for legitimately good sessions
+      // Relaxed: don't require hasSubstantialEngagement - trust the AI's boolean flags
+      if (approachExplained && Boolean(parsed.complexityDiscussed) && communicationScore < 65) {
+        // Calculate expected minimum based on quality - raised minimums to be more fair
         const qualityMinimumMap: Record<string, number> = {
-          excellent: 80,
-          good: 70,
-          basic: 60,
-          poor: 45,
-          none: 30,
+          excellent: 85,
+          good: 75,
+          basic: 65,
+          poor: 50,
+          none: 35,
         }
-        const qualityMinimum = qualityMinimumMap[approachQuality] || 50
+        const qualityMinimum = qualityMinimumMap[approachQuality] || 55
 
-        if (communicationScore < qualityMinimum) {
+        // Additional boost if edge cases were discussed - shows thorough communication
+        const edgeCaseBonus = edgeCasesConsidered ? 5 : 0
+        const finalMinimum = Math.min(90, qualityMinimum + edgeCaseBonus)
+
+        if (communicationScore < finalMinimum) {
           logger.warn(
             "[AI Validation] Boosting communication score - approach explained + complexity discussed deserves higher score",
             {
               originalScore: communicationScore,
-              newScore: qualityMinimum,
+              newScore: finalMinimum,
               approachQuality,
               complexityDiscussed: parsed.complexityDiscussed,
               edgeCasesConsidered,
+              edgeCaseBonus,
             }
           )
-          communicationScore = qualityMinimum
+          communicationScore = finalMinimum
         }
       }
 
@@ -435,12 +577,14 @@ Return ONLY the JSON object, nothing else.`
       }
 
       // Log validation results for debugging
-      logger.info("[AI Validation] Result", {
+      logger.info("[AI Validation] Final result (after all adjustments)", {
         edgeCasesConsidered,
         approachExplained,
-        complexityDiscussed: Boolean(parsed.complexityDiscussed),
+        approachQuality,
+        complexityDiscussed,
         communicationScore,
         candidateMessageCount: candidateMessages.length,
+        heuristicOverrideUsed: heuristicResult.explained && !Boolean(parsed.approachExplained),
       })
 
       return {
@@ -448,7 +592,7 @@ Return ONLY the JSON object, nothing else.`
         responsesRelevant: Boolean(parsed.responsesRelevant),
         approachExplained,
         approachQuality,
-        complexityDiscussed: Boolean(parsed.complexityDiscussed),
+        complexityDiscussed, // Use the potentially-updated variable
         complexityAccurate: Boolean(parsed.complexityAccurate),
         statedComplexity: parsed.statedComplexity || null,
         questionsAsked: Number(parsed.questionsAsked) || interviewerQuestions,

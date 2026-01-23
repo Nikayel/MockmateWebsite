@@ -107,6 +107,34 @@ You must write an algorithm with O(log n) runtime complexity.`,
         description: "Edge: Two elements, target is first",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What if the target is at the very beginning or end?",
+      "How do you avoid integer overflow when calculating mid?",
+      "What's the difference between using < vs <= in the while condition?",
+      "When would binary search fail (i.e., what's the precondition)?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "calculating mid",
+        question: "Why use left + (right - left) / 2 instead of (left + right) / 2?",
+      },
+      {
+        trigger: "updating pointers",
+        question: "When you update left or right, why do you use mid + 1 or mid - 1?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Off-by-one errors in pointer updates",
+        codeSignals: ["left = mid", "right = mid", "infinite loop"],
+        intervention:
+          "If you set left = mid instead of mid + 1, you might create an infinite loop when left == mid. Think about what happens.",
+      },
+    ],
   },
   {
     id: "dsa-search-rotated-sorted-array",
@@ -240,6 +268,34 @@ public:
         description: "Edge: Target at end of first sorted half",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "How do you determine which half is sorted?",
+      "What if the array wasn't rotated at all?",
+      "What if there are duplicates? How would that change things?",
+      "Could you find the pivot point first, then do standard binary search?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "comparing with endpoints",
+        question: "How do you know if the left half is sorted or the right half?",
+      },
+      {
+        trigger: "deciding which half",
+        question: "Once you know which half is sorted, how do you decide if target is there?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Not handling the sorted vs rotated half correctly",
+        codeSignals: ["only checking mid", "missing half check"],
+        intervention:
+          "You need to identify which half is sorted first. Compare nums[left] with nums[mid] - what does that tell you?",
+      },
+    ],
   },
   {
     id: "dsa-find-first-last-position",
@@ -286,6 +342,25 @@ public:
         description: "Target not found",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "Why can't you find both positions with a single binary search?",
+      "How do you modify binary search to find the leftmost occurrence?",
+      "What if all elements in the array are the same as target?",
+      "What if target appears only once?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "finding left boundary",
+        question: "When you find target, why do you continue searching left?",
+      },
+      {
+        trigger: "finding right boundary",
+        question: "For the right boundary, when do you stop? At target or after?",
+      },
+    ],
   },
   {
     id: "dsa-find-minimum-rotated-sorted-array",
@@ -327,6 +402,25 @@ public:
     testCases: [
       { input: { nums: [3, 4, 5, 1, 2] }, expected: 1, description: "Rotated array" },
       { input: { nums: [11, 13, 15, 17] }, expected: 11, description: "Not rotated" },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What if the array is not rotated at all?",
+      "Why compare with the rightmost element instead of leftmost?",
+      "What if there are duplicates (like in Find Minimum II)?",
+      "Could you also find the rotation point using this?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "comparing mid with right",
+        question: "If nums[mid] > nums[right], which half contains the minimum?",
+      },
+      {
+        trigger: "narrowing search space",
+        question: "When do you know you've found the minimum?",
+      },
     ],
   },
   {
@@ -387,6 +481,25 @@ public:
         description: "Target not found",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "Why treat the matrix as a 1D array?",
+      "How do you convert a 1D index back to 2D coordinates?",
+      "What's the difference between this problem and Search Matrix II?",
+      "Could you use two binary searches instead of one?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "converting indices",
+        question: "Given 1D index i, what's the formula for row and column?",
+      },
+      {
+        trigger: "setting up search space",
+        question: "What's your left and right boundary for the 1D representation?",
+      },
+    ],
   },
   {
     id: "dsa-koko-eating-bananas",
@@ -426,6 +539,34 @@ public:
         input: { piles: [30, 11, 23, 4, 20], h: 5 },
         expected: 30,
         description: "Tight constraint",
+      },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "Why binary search on the eating speed instead of the piles?",
+      "What's the minimum possible speed? Maximum?",
+      "Why use ceiling division when calculating hours per pile?",
+      "This is called 'binary search on answer' - what does that mean?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "setting search bounds",
+        question: "What's the minimum speed that makes sense? What's the maximum?",
+      },
+      {
+        trigger: "calculating hours needed",
+        question: "For a pile of 11 bananas at speed 4, how many hours does it take?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Using floor division instead of ceiling",
+        codeSignals: ["Math.floor", "//", "integer division"],
+        intervention:
+          "If Koko has 7 bananas and eats at speed 3, how many hours? It's not 2 - she needs to spend the full hour even for partial piles.",
       },
     ],
   },
@@ -474,6 +615,34 @@ public:
     testCases: [
       { input: { nums1: [1, 3], nums2: [2] }, expected: 2.0, description: "Odd total length" },
       { input: { nums1: [1, 2], nums2: [3, 4] }, expected: 2.5, description: "Even total length" },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "Why binary search on the smaller array?",
+      "What does a valid partition look like?",
+      "How do you handle when one array is empty?",
+      "Why can't you just merge and find median? What's the constraint?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "partitioning arrays",
+        question: "If you partition array A at index i, where do you partition array B?",
+      },
+      {
+        trigger: "checking valid partition",
+        question: "What condition makes a partition 'valid' for finding the median?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Merging arrays first",
+        codeSignals: ["merge", "concat", "combine arrays"],
+        intervention:
+          "That's O(m+n) time. The problem requires O(log(min(m,n))). Can you think of a binary search approach?",
+      },
     ],
   },
   {
@@ -534,6 +703,25 @@ You are given an API bool isBadVersion(version) which returns whether version is
       { input: { n: 10, bad: 1 }, expected: 1, description: "First version is bad" },
       { input: { n: 10, bad: 10 }, expected: 10, description: "Last version is first bad" },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What if the first version is bad?",
+      "What if the last version is the only bad one?",
+      "Why minimize API calls? How does binary search help?",
+      "This is like finding the first 'true' in a boolean array - can you see that?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "deciding direction",
+        question: "If version mid is bad, can the first bad version be after mid?",
+      },
+      {
+        trigger: "termination condition",
+        question: "When does your loop terminate? What will left point to?",
+      },
+    ],
   },
   {
     id: "dsa-search-insert-position",
@@ -593,6 +781,25 @@ You must write an algorithm with O(log n) runtime complexity.`,
         description: "Single element, insert before",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What does the left pointer represent when the loop ends?",
+      "How is this different from standard binary search?",
+      "What if target is larger than all elements?",
+      "What if target is smaller than all elements?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "when target equals mid",
+        question: "If you find the target, can you return immediately?",
+      },
+      {
+        trigger: "return value",
+        question: "Why return left instead of right at the end?",
+      },
+    ],
   },
   // ==================== NEW HIGH-VALUE ADDITIONS ====================
   {
@@ -650,6 +857,26 @@ Implement the TimeMap class:
         description: "Basic operations",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "Why is the timestamps list naturally sorted?",
+      "What if there's no value at or before the requested timestamp?",
+      "What kind of binary search do you need - find exact, or find floor?",
+      "Could you use a TreeMap instead? What's the trade-off?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "storing values",
+        question: "What data structure do you use to store multiple values for the same key?",
+      },
+      {
+        trigger: "binary search variant",
+        question:
+          "You need the largest timestamp <= query. How do you modify binary search for this?",
+      },
+    ],
   },
   {
     id: "dsa-capacity-ship-packages",
@@ -697,6 +924,34 @@ Return the least weight capacity of the ship that will result in all packages be
         description: "Uneven weights",
       },
       { input: { weights: [1, 2, 3, 1, 1], days: 4 }, expected: 3, description: "Light packages" },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "Why must the minimum capacity be max(weights)?",
+      "How is this similar to Koko Eating Bananas?",
+      "Why can't packages be reordered?",
+      "What pattern does this problem follow?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "defining search space",
+        question: "What's the smallest possible ship capacity? What's the largest?",
+      },
+      {
+        trigger: "simulating days",
+        question: "For a given capacity, how do you calculate the number of days needed?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Starting minimum capacity at 1",
+        codeSignals: ["left = 1", "start at 1"],
+        intervention:
+          "If the heaviest package weighs 10, can a ship with capacity 5 ever ship it? What should your minimum capacity be?",
+      },
     ],
   },
 ]

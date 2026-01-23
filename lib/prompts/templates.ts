@@ -10,7 +10,12 @@
  * - Avoids copy-paste drift between similar prompts
  */
 
-import { INTERVIEWER_PERSONALITY, INTERVIEWER_RULES, FEEDBACK_PRINCIPLES, HINT_LEVELS } from "./principles"
+import {
+  INTERVIEWER_PERSONALITY,
+  INTERVIEWER_RULES,
+  FEEDBACK_PRINCIPLES,
+  HINT_LEVELS,
+} from "./principles"
 import { DSA_RUBRIC, SYSTEM_DESIGN_RUBRIC, BUG_FIX_RUBRIC, COMMUNICATION_RUBRIC } from "./rubrics"
 
 // =============================================================================
@@ -40,32 +45,34 @@ export function feedbackOutputFormat(options?: { includeScoreSnapshot?: boolean 
   const includeSnapshot = options?.includeScoreSnapshot ?? true
 
   return `
-OUTPUT FORMAT (use markdown):
+OUTPUT FORMAT (use markdown) - YOU MUST INCLUDE ALL SECTIONS:
 
-## TL;DR
+**TL;DR**
 ${FEEDBACK_PRINCIPLES.structure.tldr}
 
 ${
   includeSnapshot
-    ? `## Score Snapshot
+    ? `**Score Snapshot**
 ${FEEDBACK_PRINCIPLES.structure.scoreSnapshot}`
     : ""
 }
 
-## What Worked
+**What Worked**
 ${FEEDBACK_PRINCIPLES.structure.whatWorked}
-- Use bullet points
-- Be specific with evidence
+- Use bullet points (at least 2-3 items)
+- Be specific with evidence from the transcript
 
-## Fix Next
+**Fix Next**
 ${FEEDBACK_PRINCIPLES.structure.fixNext}
-- Use bullet points
-- Be actionable
+- Use bullet points (at least 2 items)
+- Be actionable and specific
 
-## Action Plan
+**Action Plan**
 ${FEEDBACK_PRINCIPLES.structure.actionPlan}
 - Concrete next steps
-- Resources if applicable`
+- Resources if applicable
+
+CRITICAL: You MUST include ALL sections above. Do not skip any section. Each section header must start with ** (bold).`
 }
 
 /**
@@ -327,19 +334,22 @@ Respond with JSON:
 /**
  * Hint generation prompt template
  */
-export function hintGenerationPrompt(level: 1 | 2 | 3 | 4, context: {
-  problemTitle: string
-  problemText: string
-  userCode: string
-  language: string
-  category: string
-  testFailures?: string[]
-  patternKnowledge?: {
-    displayName: string
-    keyInsights: string[]
-    commonMistakes: string[]
+export function hintGenerationPrompt(
+  level: 1 | 2 | 3 | 4,
+  context: {
+    problemTitle: string
+    problemText: string
+    userCode: string
+    language: string
+    category: string
+    testFailures?: string[]
+    patternKnowledge?: {
+      displayName: string
+      keyInsights: string[]
+      commonMistakes: string[]
+    }
   }
-}): string {
+): string {
   const hintLevel = HINT_LEVELS[level]
 
   let prompt = `Generate a ${hintLevel.name.toUpperCase()} hint (Level ${level}).
@@ -368,7 +378,10 @@ ${context.userCode || "// No code written yet"}
     prompt += `
 
 ## Failing Tests
-${context.testFailures.slice(0, 3).map((t) => `- ${t}`).join("\n")}`
+${context.testFailures
+  .slice(0, 3)
+  .map((t) => `- ${t}`)
+  .join("\n")}`
   }
 
   prompt += `

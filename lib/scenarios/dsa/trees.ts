@@ -91,6 +91,25 @@ Example visualization:
         description: "Empty tree",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What if the tree is empty or has only one node?",
+      "Can you do this iteratively instead of recursively?",
+      "What's the space complexity of your recursive solution?",
+      "Does the order of swapping matter - left first or right first?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "swapping children",
+        question: "After swapping at a node, what do you need to do with the children?",
+      },
+      {
+        trigger: "base case",
+        question: "What's your base case for the recursion?",
+      },
+    ],
   },
 
   {
@@ -179,6 +198,25 @@ Example visualization:
         description: "Different values",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What if both trees are empty?",
+      "What if one tree is empty and the other isn't?",
+      "How many comparisons do you need in the worst case?",
+      "Could two different trees have the same inorder traversal?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "checking null conditions",
+        question: "What are all the cases for null comparisons?",
+      },
+      {
+        trigger: "comparing values",
+        question: "If values match, is that enough to say the trees are the same?",
+      },
+    ],
   },
 
   {
@@ -259,6 +297,25 @@ Example visualization:
         input: { root: [] },
         expected: 0,
         description: "Empty tree",
+      },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What's the difference between depth and height of a tree?",
+      "What if the tree is completely skewed (like a linked list)?",
+      "Could you solve this with BFS? What would that look like?",
+      "What's the space complexity for a balanced vs unbalanced tree?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "returning depth",
+        question: "Why add 1 to the max of left and right depths?",
+      },
+      {
+        trigger: "base case",
+        question: "What should you return for a null node - 0 or -1?",
       },
     ],
   },
@@ -342,6 +399,25 @@ Example visualization:
         description: "Single node is symmetric",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "Is this problem related to 'Same Tree'? How?",
+      "What if the tree has only a root?",
+      "Can you solve this iteratively with a queue?",
+      "What exactly needs to match for two subtrees to be mirrors?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "helper function",
+        question: "What two nodes are you comparing in your helper function?",
+      },
+      {
+        trigger: "comparing children",
+        question: "When comparing mirrors, which child of left matches which child of right?",
+      },
+    ],
   },
 
   {
@@ -420,6 +496,25 @@ Example visualization:
         input: { root: [3, 4, 5, 1, 2, null, null, null, null, 0], subRoot: [4, 1, 2] },
         expected: false,
         description: "Not exact match due to extra node",
+      },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What's the difference between subtree check and 'same tree' check?",
+      "What if subRoot has additional children that the main tree doesn't?",
+      "Could you optimize using tree serialization and string matching?",
+      "What's the time complexity of your approach?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "calling isSameTree",
+        question: "At which nodes do you call isSameTree?",
+      },
+      {
+        trigger: "recursion structure",
+        question: "If current node doesn't match, where else do you look?",
       },
     ],
   },
@@ -509,6 +604,34 @@ Example visualization:
         description: "Empty tree is balanced",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What's the naive O(n²) approach and why is it suboptimal?",
+      "How can you check balanced in O(n) time?",
+      "What does returning -1 signify in the optimized approach?",
+      "Is a completely empty tree considered balanced?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "calculating heights",
+        question: "Are you calculating height multiple times for the same node?",
+      },
+      {
+        trigger: "early termination",
+        question: "If you find an unbalanced subtree, do you need to check the rest?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Only checking root's children heights",
+        codeSignals: ["only check root", "left - right"],
+        intervention:
+          "You're checking if root is balanced, but what about all the subtrees? Each node needs to be balanced.",
+      },
+    ],
   },
 
   // ==================== MEDIUM PROBLEMS ====================
@@ -594,6 +717,25 @@ Example visualization:
         description: "Empty tree",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What if the tree is left-skewed? Would you still see all nodes from the right?",
+      "How is this different from level order traversal?",
+      "Could you solve this with DFS? Which order would you traverse?",
+      "What's the space complexity of BFS vs DFS for this problem?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "BFS level processing",
+        question: "How do you know which node is the last in each level?",
+      },
+      {
+        trigger: "DFS approach",
+        question: "If using DFS, why visit right child before left?",
+      },
+    ],
   },
 
   {
@@ -671,6 +813,25 @@ Return the number of good nodes in the binary tree.`,
         input: { root: [1] },
         expected: 1,
         description: "Single node",
+      },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "Is the root always a good node? Why?",
+      "What if all nodes have the same value?",
+      "What if all values are negative?",
+      "What state do you need to pass down the recursion?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "tracking max value",
+        question: "What initial value should max start with at the root?",
+      },
+      {
+        trigger: "counting",
+        question: "Do you count before or after updating the max?",
       },
     ],
   },
@@ -755,6 +916,35 @@ Example visualization:
         input: { preorder: [-1], inorder: [-1] },
         expected: [-1],
         description: "Single node",
+      },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "Why can't you reconstruct from just preorder or just inorder alone?",
+      "What if there were duplicate values in the tree?",
+      "How does inorder help you split left and right subtrees?",
+      "What optimization can you do to find the root index in inorder quickly?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "finding root in inorder",
+        question: "How do you efficiently find where the root is in the inorder array?",
+      },
+      {
+        trigger: "slicing arrays",
+        question:
+          "After finding root, how do you determine the boundaries for left and right subtrees?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Linear search for root in inorder each time",
+        codeSignals: ["indexOf", "index()", "for loop to find"],
+        intervention:
+          "That's O(n) per recursive call. Could you precompute the indices with a hashmap?",
       },
     ],
   },
@@ -925,6 +1115,25 @@ Design an algorithm to serialize and deserialize a binary tree. There is no rest
         description: "Left child only",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "Why use preorder traversal for serialization?",
+      "How do you represent null nodes in your serialized string?",
+      "Could you use BFS instead? What would change?",
+      "What delimiter would you use and why does it matter?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "serialization format",
+        question: "How will you distinguish between values and null markers?",
+      },
+      {
+        trigger: "deserialization",
+        question: "How do you know when to stop building the left subtree and start the right?",
+      },
+    ],
   },
 
   {
@@ -996,6 +1205,34 @@ Design an algorithm to serialize and deserialize a binary tree. There is no rest
         input: { root: [2, -1] },
         expected: 2,
         description: "Best path is just root",
+      },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "Can the path go through the root? Does it have to?",
+      "What if all node values are negative?",
+      "Why might you NOT include a subtree in the max path?",
+      "What's the difference between the path through a node vs the path returned to parent?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "handling negative values",
+        question: "If a subtree sum is negative, should you include it in your path?",
+      },
+      {
+        trigger: "global max vs return value",
+        question: "Why do you return something different than what you update the max with?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Returning path through node instead of single branch",
+        codeSignals: ["return left + right + node", "return both branches"],
+        intervention:
+          "A path can't fork when going to a parent. You can only return one branch plus the current node to the parent.",
       },
     ],
   },
@@ -1089,6 +1326,25 @@ Example visualization:
         description: "Two node tree",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What if one node is an ancestor of the other?",
+      "What if p and q are the same node?",
+      "How is this different from LCA in a BST?",
+      "Could you solve this if you had parent pointers?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "base case returning node",
+        question: "Why return the node if it equals p or q?",
+      },
+      {
+        trigger: "checking left and right returns",
+        question: "What does it mean if both left and right return non-null?",
+      },
+    ],
   },
 
   {
@@ -1171,6 +1427,25 @@ Example visualization:
         input: { root: [] },
         expected: [],
         description: "Empty tree",
+      },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "Why use BFS instead of DFS for level order?",
+      "How do you know when one level ends and the next begins?",
+      "Could you do this with DFS? What extra state would you need?",
+      "What's the maximum size the queue could grow to?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "processing level",
+        question: "Why capture the queue size before processing nodes?",
+      },
+      {
+        trigger: "adding to result",
+        question: "When do you add the current level array to the result?",
       },
     ],
   },
@@ -1257,6 +1532,25 @@ Example visualization:
         input: { root: [1] },
         expected: 0,
         description: "Single node - no edges",
+      },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "Does the diameter always pass through the root?",
+      "What's the relationship between diameter and height?",
+      "How is this similar to the max path sum problem?",
+      "What if the longest path is entirely in a subtree?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "calculating diameter at a node",
+        question: "For a given node, what's the diameter passing through it?",
+      },
+      {
+        trigger: "global variable for max",
+        question: "Why do you need a global/outer variable instead of just returning?",
       },
     ],
   },
@@ -1541,6 +1835,34 @@ A valid BST is defined as follows:
         input: { root: [5, 4, 6, null, null, 3, 7] },
         expected: false,
         description: "Invalid - 3 < 5 but in right subtree",
+      },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "Why can't you just check if left < root < right at each node?",
+      "What bounds do you pass to the left child? The right child?",
+      "Could you solve this with inorder traversal? How?",
+      "What if there are duplicate values?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "passing bounds",
+        question: "What initial bounds do you use for the root?",
+      },
+      {
+        trigger: "inorder approach",
+        question: "What property should the inorder traversal have for a valid BST?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Only checking immediate parent-child relationship",
+        codeSignals: ["left.val < root.val", "only parent comparison"],
+        intervention:
+          "That checks immediate children, but what about grandchildren? A node in the right subtree must be greater than ALL ancestors on the path.",
       },
     ],
   },

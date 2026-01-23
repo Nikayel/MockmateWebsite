@@ -318,18 +318,27 @@ export function getPerformanceFeedback(score: ScoreBreakdown): PerformanceFeedba
       "Keep practicing! Focus on understanding the problem fully before coding, and practice explaining your approach out loud."
   }
 
-  // Identify strengths
-  if (codeQualityScore >= 80) {
+  // Identify strengths - lowered threshold to 70 to catch more legitimate strengths
+  // Also show strengths even if one category (like communication) is low
+  if (codeQualityScore >= 70) {
     strengths.push("Strong code quality - your solution is efficient and readable")
   }
-  if (problemSolvingScore >= 80) {
+  if (problemSolvingScore >= 70) {
     strengths.push("Excellent problem-solving approach - you broke down the problem effectively")
   }
-  if (understandingScore >= 80) {
-    strengths.push("Deep understanding - you clearly explained your code and reasoning")
+  if (understandingScore >= 70) {
+    strengths.push("Deep understanding - you grasped the problem requirements well")
   }
-  if (communicationScore >= 80) {
+  if (communicationScore >= 70) {
     strengths.push("Great communication - you shared your thought process clearly")
+  }
+
+  // Bonus: If they passed all tests, that's a strength regardless of other scores
+  if (codeQualityScore >= 85 && problemSolvingScore >= 85) {
+    // Don't duplicate - check if we already have code quality strength
+    if (!strengths.some((s) => s.includes("code quality"))) {
+      strengths.push("Correct solution - all test cases passed")
+    }
   }
 
   // Generate recommendations based on weak areas

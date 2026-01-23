@@ -97,6 +97,38 @@ Example visualization:
         description: "Three nodes: [1,2,3] -> [3,2,1]",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What if the list is empty or has only one node?",
+      "Can you do this iteratively and recursively? What are the trade-offs?",
+      "What's the space complexity of your recursive approach vs iterative?",
+      "What if you needed to reverse only a portion of the list?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "setting up three pointers",
+        question: "Walk me through what each of prev, curr, and next represents at the start.",
+      },
+      {
+        trigger: "moving pointers",
+        question: "What happens to the original head node after the reversal completes?",
+      },
+      {
+        trigger: "recursive approach",
+        question: "What's your base case, and why?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Losing reference to next node before reassigning",
+        codeSignals: ["curr.next = prev", "without saving next"],
+        intervention:
+          "Before you reassign curr.next, make sure you've saved the reference to the next node - otherwise you'll lose the rest of the list.",
+      },
+    ],
   },
   {
     id: "dsa-linked-list-cycle",
@@ -194,6 +226,38 @@ Example visualization:
         input: { values: [], pos: -1 },
         expected: false,
         description: "Empty list",
+      },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "Why does Floyd's algorithm work? Can you explain the math?",
+      "What if the cycle includes all nodes vs just a few?",
+      "Could you detect a cycle using O(n) space? Why is O(1) better here?",
+      "What if you needed to find WHERE the cycle starts, not just IF it exists?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "initializing slow and fast pointers",
+        question: "Why does fast move 2 steps while slow moves 1?",
+      },
+      {
+        trigger: "while loop condition",
+        question: "What conditions must you check to avoid null pointer errors?",
+      },
+      {
+        trigger: "comparing slow and fast",
+        question: "If they meet, does that always mean there's a cycle? Why?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Using a Set to store visited nodes",
+        codeSignals: ["new Set", "visited", "seen", "O(n) space"],
+        intervention:
+          "That works but uses O(n) space. Can you think of a way to detect the cycle with O(1) space?",
       },
     ],
   },
@@ -427,6 +491,44 @@ impl LRUCache {
         description: "Edge: Get updates LRU order (key 2 evicted after get(1))",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "Why do you need BOTH a hash map and a doubly linked list?",
+      "What if capacity is 1? Does your solution handle that?",
+      "How would you modify this for an LFU (Least Frequently Used) cache?",
+      "What happens if put() is called with an existing key?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "creating hash map or dictionary",
+        question: "What will you store as the value in your hash map?",
+      },
+      {
+        trigger: "implementing get",
+        question: "After get(), should the accessed node move in the list? Where?",
+      },
+      {
+        trigger: "implementing put with eviction",
+        question: "Which node do you evict, and how do you find it in O(1)?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Using only a hash map without linked list",
+        codeSignals: ["only Map", "no linked list", "array for ordering"],
+        intervention:
+          "How will you track the access order and evict the least recently used item in O(1) without a linked list?",
+      },
+      {
+        description: "Using singly linked list instead of doubly",
+        codeSignals: ["singly linked", "no prev pointer"],
+        intervention:
+          "With a singly linked list, how would you remove a node in O(1)? You need to update the previous node's next pointer.",
+      },
+    ],
   },
   {
     id: "dsa-merge-two-sorted-lists",
@@ -518,6 +620,34 @@ Example visualization:
         input: { list1: [5], list2: [1, 2, 4] },
         expected: [1, 2, 4, 5],
         description: "Single element in first list",
+      },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What if one list is empty?",
+      "What if the lists have very different lengths?",
+      "Could you do this recursively? What would the base case be?",
+      "What's the space complexity of iterative vs recursive approach?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "using dummy node",
+        question: "Why use a dummy node? What edge case does it simplify?",
+      },
+      {
+        trigger: "comparing values",
+        question: "After one list is exhausted, what do you do with the remaining nodes?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Not handling remaining nodes after one list ends",
+        codeSignals: ["only handles equal length"],
+        intervention:
+          "What happens when you reach the end of one list but the other still has nodes?",
       },
     ],
   },
@@ -624,6 +754,34 @@ Construct a deep copy of the list. The deep copy should consist of exactly n bra
         description: "Single node with null random",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What's the difference between shallow copy and deep copy here?",
+      "What if multiple nodes have random pointing to the same node?",
+      "Can you do this in O(1) space without a hash map?",
+      "What if random points to the node itself?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "creating hash map for old to new",
+        question: "In your first pass, are you creating the nodes or just storing references?",
+      },
+      {
+        trigger: "connecting random pointers",
+        question: "How do you find the corresponding new node for an old node's random pointer?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Trying to copy next and random in single pass",
+        codeSignals: ["single pass", "one loop for everything"],
+        intervention:
+          "If you try to set the random pointer before all nodes are created, what happens if random points to a node you haven't created yet?",
+      },
+    ],
   },
   {
     id: "dsa-reorder-list",
@@ -670,6 +828,38 @@ Example visualization:
     testCases: [
       { input: { head: [1, 2, 3, 4] }, expected: [1, 4, 2, 3], description: "Even length" },
       { input: { head: [1, 2, 3, 4, 5] }, expected: [1, 5, 2, 4, 3], description: "Odd length" },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What if the list has only 1 or 2 nodes?",
+      "How do you handle odd vs even length lists?",
+      "Why do you need to reverse the second half?",
+      "Could you solve this with O(n) space using a different approach?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "finding the middle",
+        question: "For a list of 4 nodes, where should the middle be? What about 5 nodes?",
+      },
+      {
+        trigger: "reversing second half",
+        question: "After reversing, how are the two halves structured?",
+      },
+      {
+        trigger: "merging halves",
+        question: "Walk me through how you interleave the two halves.",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Using extra array to store values",
+        codeSignals: ["store values", "array", "O(n) space"],
+        intervention:
+          "That works but uses O(n) space. The problem can be solved in O(1) space - think about modifying the list in place.",
+      },
     ],
   },
   {
@@ -735,6 +925,34 @@ Example visualization (n=2):
         input: { head: [1, 2, 3], n: 3 },
         expected: [2, 3],
         description: "Edge: n equals list length",
+      },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What if n equals the length of the list (removing the head)?",
+      "Can you do this in one pass instead of two?",
+      "What if n is larger than the list length?",
+      "Why use a dummy node here?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "moving fast pointer n steps",
+        question: "After fast moves n steps, what's the gap between fast and slow?",
+      },
+      {
+        trigger: "reaching the node to remove",
+        question: "You need to remove slow.next - why not slow itself?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Two-pass solution counting length first",
+        codeSignals: ["count length", "two passes", "length - n"],
+        intervention:
+          "That works, but can you think of a way to do this in a single pass using two pointers?",
       },
     ],
   },
@@ -806,6 +1024,34 @@ Example visualization:
         description: "Edge: Simple carry (5 + 5 = 10)",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What if the two numbers have different lengths?",
+      "What if there's a carry at the very end (e.g., 99 + 1)?",
+      "Why are the digits stored in reverse order? How does that help?",
+      "What if the digits were stored in forward order instead?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "handling carry",
+        question: "What values can the carry be? Just 0 or 1?",
+      },
+      {
+        trigger: "loop termination",
+        question: "When do you stop the loop? What if there's a remaining carry?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Converting lists to numbers, adding, then back to list",
+        codeSignals: ["parseInt", "Number()", "toString", "convert to number"],
+        intervention:
+          "Be careful - the numbers can be very large (100 digits). Converting to integers might cause overflow. Can you add digit by digit instead?",
+      },
+    ],
   },
   {
     id: "dsa-linked-list-cycle-ii",
@@ -871,6 +1117,34 @@ Follow up: Can you solve it using O(1) memory?`,
       { input: { values: [1, 2], pos: 0 }, expected: 0, description: "Cycle at head" },
       { input: { values: [1], pos: -1 }, expected: null, description: "No cycle" },
       { input: { values: [1, 2, 3, 4, 5], pos: 2 }, expected: 2, description: "Cycle at middle" },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "How is this different from just detecting if a cycle exists?",
+      "Can you explain why moving from head and meeting point converges at cycle start?",
+      "What if the cycle starts at the head?",
+      "What's the mathematical proof that this works?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "after detecting cycle meeting point",
+        question: "Once slow and fast meet, what do you do next to find the cycle start?",
+      },
+      {
+        trigger: "second phase with two pointers",
+        question: "Why do both pointers move 1 step at a time in the second phase?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Using hash set to find first repeated node",
+        codeSignals: ["Set", "visited", "seen.has"],
+        intervention:
+          "That uses O(n) space. Can you modify Floyd's algorithm to find the cycle start in O(1) space?",
+      },
     ],
   },
   {
@@ -947,6 +1221,34 @@ Note that the linked lists may intersect at different positions, and the interse
         description: "No intersection",
       },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What if the lists have different lengths before the intersection?",
+      "Why does the two-pointer approach work mathematically?",
+      "Could you solve this with a hash set? What's the trade-off?",
+      "What if both lists are the same list (intersect at head)?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "switching pointers to other list",
+        question: "When pointer A reaches the end, why redirect it to headB?",
+      },
+      {
+        trigger: "checking equality",
+        question: "If there's no intersection, when do both pointers become null simultaneously?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Comparing node values instead of references",
+        codeSignals: ["node.val ==", "value comparison"],
+        intervention:
+          "The intersection is about the same node reference, not the same value. Two different nodes could have the same value.",
+      },
+    ],
   },
   {
     id: "dsa-remove-duplicates-sorted-list",
@@ -997,6 +1299,25 @@ Note that the linked lists may intersect at different positions, and the interse
       { input: { values: [] }, expected: [], description: "Empty list" },
       { input: { values: [1] }, expected: [1], description: "Single node" },
       { input: { values: [1, 1, 1] }, expected: [1], description: "All duplicates" },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What if the list is empty or has one node?",
+      "What if ALL nodes have the same value?",
+      "How would this change if the list wasn't sorted?",
+      "What if we needed to remove ALL occurrences including the first?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "comparing adjacent values",
+        question: "When you find a duplicate, which node do you skip?",
+      },
+      {
+        trigger: "updating next pointer",
+        question: "What if there are three or more consecutive duplicates?",
+      },
     ],
   },
   // ==================== NEW HIGH-VALUE ADDITIONS ====================
@@ -1051,6 +1372,34 @@ Example visualization:
       { input: { values: [1, 2] }, expected: false, description: "Not palindrome" },
       { input: { values: [1, 2, 1] }, expected: true, description: "Odd palindrome" },
       { input: { values: [1] }, expected: true, description: "Single node" },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What's the space complexity of using a stack vs reversing in place?",
+      "How do you handle odd vs even length lists?",
+      "Should you restore the list to its original form after checking?",
+      "What if the list has only 1 or 2 nodes?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "finding middle node",
+        question: "Where should slow pointer end up for a list of length 4? Length 5?",
+      },
+      {
+        trigger: "reversing second half",
+        question: "After reversal, what does the original list look like?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Converting to array and checking",
+        codeSignals: ["array", "values.push", "O(n) space"],
+        intervention:
+          "That works but uses O(n) space. Can you check palindrome in O(1) space by modifying the list?",
+      },
     ],
   },
   {
@@ -1111,6 +1460,24 @@ Example visualization:
       },
       { input: { values: [1] }, expected: [1], description: "Single node" },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "For even-length lists, which middle node do you return?",
+      "Could you find the middle without the two-pointer technique?",
+      "What's the relationship between slow pointer position and list length?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "setting up slow and fast",
+        question: "What should fast's initial position be? Same as slow or one ahead?",
+      },
+      {
+        trigger: "loop condition",
+        question: "When do you stop - when fast is null or when fast.next is null?",
+      },
+    ],
   },
   {
     id: "dsa-reverse-nodes-k-group",
@@ -1157,6 +1524,34 @@ You may not alter the values in the list's nodes, only nodes themselves may be c
       },
       { input: { values: [1, 2, 3], k: 1 }, expected: [1, 2, 3], description: "k=1, no change" },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What happens to the remaining nodes if they're less than k?",
+      "How do you connect reversed groups to each other?",
+      "What if k equals the list length?",
+      "Can you do this iteratively and recursively?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "counting k nodes",
+        question: "Why do you need to count k nodes before reversing?",
+      },
+      {
+        trigger: "connecting groups",
+        question: "After reversing a group, what was the first node becomes what?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Not preserving remaining nodes less than k",
+        codeSignals: ["reverse all", "ignoring remainder"],
+        intervention:
+          "The problem says if remaining nodes are less than k, leave them as is. How do you handle that?",
+      },
+    ],
   },
   {
     id: "dsa-sort-list",
@@ -1200,6 +1595,35 @@ You may not alter the values in the list's nodes, only nodes themselves may be c
       { input: { values: [] }, expected: [], description: "Empty list" },
       { input: { values: [1] }, expected: [1], description: "Single node" },
     ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "Why is merge sort preferred over quick sort for linked lists?",
+      "What's the space complexity of recursive merge sort on linked lists?",
+      "Can you achieve O(1) space with bottom-up merge sort?",
+      "How do you split the list in half without knowing its length?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "finding middle to split",
+        question:
+          "When you split at the middle, what must you do to actually separate the two halves?",
+      },
+      {
+        trigger: "merging two sorted lists",
+        question: "This merge step - haven't we seen this problem before?",
+      },
+    ],
+
+    commonWrongApproaches: [
+      {
+        description: "Converting to array, sorting, rebuilding list",
+        codeSignals: ["array", "sort()", "rebuild"],
+        intervention:
+          "That works but uses O(n) space. Can you sort the list in place using merge sort?",
+      },
+    ],
   },
   {
     id: "dsa-swap-nodes-pairs",
@@ -1238,6 +1662,25 @@ You may not alter the values in the list's nodes, only nodes themselves may be c
       { input: { values: [1, 2, 3] }, expected: [2, 1, 3], description: "Odd length" },
       { input: { values: [] }, expected: [], description: "Empty" },
       { input: { values: [1] }, expected: [1], description: "Single node" },
+    ],
+
+    // Proactive AI Interviewer Fields
+    whatIfQuestions: [
+      "What if there's an odd number of nodes?",
+      "Is this similar to reverse nodes in k-group with k=2?",
+      "What's different about the iterative vs recursive approach here?",
+      "Why use a dummy node?",
+    ],
+
+    midCodingProbes: [
+      {
+        trigger: "swapping a pair",
+        question: "When you swap nodes A and B, how many pointer reassignments do you need?",
+      },
+      {
+        trigger: "advancing to next pair",
+        question: "After swapping, where should your pointer be for the next iteration?",
+      },
     ],
   },
 ]

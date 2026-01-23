@@ -61,11 +61,10 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     name: "gemini",
     enabled: true,
     apiKey: process.env.GEMINI_API_KEY,
-    model: "gemini-3-flash-preview", // Gemini 3 Flash Preview - fast with thinking
-    maxTokens: 1024,
+    model: "gemini-2.5-flash", // Gemini 2.5 Flash - fast without thinking overhead
+    maxTokens: 4096, // Increased further to prevent feedback truncation
     temperature: 0.7,
-    costPer1kTokens: 0.00175, // Averaged (input + output) / 2
-    thinkingLevel: "minimal", // minimal/low/medium/high - minimal for fastest responses
+    costPer1kTokens: 0.00015, // $0.10/1M input, $0.40/1M output averaged
   },
   "gemini-lite": {
     name: "gemini-lite",
@@ -175,10 +174,24 @@ async function callGemini(
     }
 
     // Add thinking config for Gemini 3.0 Flash
+    // thinkingConfig must be set with thinkingBudget for MINIMAL to actually limit thinking
     if (config.thinkingLevel && config.model.includes("gemini-3")) {
+      const thinkingLevel = config.thinkingLevel.toUpperCase()
       generationConfig.thinkingConfig = {
-        thinkingLevel: config.thinkingLevel.toUpperCase(), // API expects MINIMAL, LOW, MEDIUM, HIGH
+        thinkingBudget:
+          thinkingLevel === "MINIMAL"
+            ? 0
+            : thinkingLevel === "LOW"
+              ? 1024
+              : thinkingLevel === "MEDIUM"
+                ? 8192
+                : 24576,
       }
+      logger.debug("[Gemini] Thinking config applied", {
+        model: config.model,
+        thinkingLevel,
+        thinkingBudget: generationConfig.thinkingConfig.thinkingBudget,
+      })
     }
 
     const model = genAI.getGenerativeModel({

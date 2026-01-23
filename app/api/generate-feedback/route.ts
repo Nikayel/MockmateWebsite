@@ -1058,6 +1058,12 @@ CRITICAL INSTRUCTIONS:
       : systemInstruction
 
     // Use AI provider abstraction for narrative feedback only
+    logger.info("[Feedback API] Generating AI feedback", {
+      sessionId,
+      systemInstructionLength: enhancedSystemInstruction.length,
+      promptLength: prompt.length,
+    })
+
     const aiResponse = await generateFeedbackResponse(
       enhancedSystemInstruction,
       prompt,
@@ -1066,6 +1072,19 @@ CRITICAL INSTRUCTIONS:
     )
 
     const feedback = aiResponse.text
+
+    // Log raw AI response for debugging
+    logger.info("[Feedback API] Raw AI response received", {
+      sessionId,
+      provider: aiResponse.provider,
+      latencyMs: aiResponse.latencyMs,
+      responseLength: feedback.length,
+      hasTLDR: feedback.includes("TL;DR") || feedback.includes("**TL;DR"),
+      hasWhatWorked: feedback.includes("What Worked"),
+      hasFixNext: feedback.includes("Fix Next") || feedback.includes("To Improve"),
+      hasScoreSnapshot: feedback.includes("Score Snapshot"),
+      responsePreview: feedback.substring(0, 500),
+    })
 
     // Step 6: Constitutional AI Feedback Critique
     // Now includes extracted evidence to catch feedback that contradicts what actually happened
@@ -1081,6 +1100,15 @@ CRITICAL INSTRUCTIONS:
       feedbackCritique.madeChanges && feedbackCritique.revisedFeedback
         ? feedbackCritique.revisedFeedback
         : feedback
+
+    // Log Constitutional AI changes
+    logger.info("[Feedback API] Constitutional AI critique", {
+      sessionId,
+      madeChanges: feedbackCritique.madeChanges,
+      originalLength: feedback.length,
+      revisedLength: rawFinalFeedback.length,
+      lengthDiff: rawFinalFeedback.length - feedback.length,
+    })
 
     // CRITICAL: Inject authoritative scores into feedback text
     // This ensures the Score Snapshot section in the feedback text always matches
@@ -1113,6 +1141,31 @@ CRITICAL INSTRUCTIONS:
 
     // Parse structured sections from AI narrative (use final critiqued feedback)
     const sections = parseFeedbackSections(finalFeedback)
+
+    // Log parsing results for debugging
+    logger.info("[Feedback API] Parsed feedback sections", {
+      sessionId,
+      finalFeedbackLength: finalFeedback.length,
+      tldrLength: sections.tldr?.length || 0,
+      whatWorkedCount: sections.whatWorked?.length || 0,
+      fixNextCount: sections.fixNext?.length || 0,
+      actionPlanCount: sections.actionPlan?.length || 0,
+      whatWorkedItems: sections.whatWorked?.slice(0, 2) || [],
+      fixNextItems: sections.fixNext?.slice(0, 2) || [],
+    })
+
+    // Warn if critical sections are missing
+    if (!sections.whatWorked || sections.whatWorked.length === 0) {
+      logger.warn("[Feedback API] MISSING: What Worked section is empty", {
+        sessionId,
+        finalFeedbackPreview: finalFeedback.substring(0, 1000),
+      })
+    }
+    if (!sections.fixNext || sections.fixNext.length === 0) {
+      logger.warn("[Feedback API] MISSING: Fix Next section is empty", {
+        sessionId,
+      })
+    }
 
     // Build structured response
     const structuredFeedback: StructuredFeedback = {

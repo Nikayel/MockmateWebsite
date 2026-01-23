@@ -99,6 +99,7 @@ IMPORTANT: Use the extracted evidence above to verify if scores match what actua
 - If evidence shows candidate discussed complexity, don't claim they didn't
 - If evidence shows candidate self-corrected bugs, give credit (positive signal)
 - If evidence shows candidate improved from brute force to optimal, give credit for progression
+- CRITICAL: If the transcript shows the candidate explaining their approach (mentioning algorithms, data structures, or step-by-step logic), they are NOT a "silent solution" - do NOT lower communication score
 `
     : ""
 }
