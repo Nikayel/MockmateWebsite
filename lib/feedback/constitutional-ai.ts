@@ -36,6 +36,39 @@ import { calculatePerformanceScore } from "@/lib/constants"
  * - Honesty: Don't inflate scores for incomplete work
  * - Helpfulness: Scores should guide improvement
  */
+/**
+ * Pre-validate evidence before Constitutional AI critique
+ * Prevents AI from wrongly reducing scores when evidence shows communication
+ */
+function validateEvidenceAgainstScores(
+  evidence: ExtractedEvidence | undefined,
+  currentCommunicationScore: number
+): { shouldEnforceFloor: boolean; minScore: number; reason: string } {
+  if (!evidence) {
+    return { shouldEnforceFloor: false, minScore: 10, reason: "No evidence" }
+  }
+
+  const hasCommunicationQuotes = evidence.communication.quotes.length > 0
+  const hasApproachQuote = evidence.approach.explained && evidence.approach.quote
+  const hasComplexityQuote = evidence.timeComplexity.mentioned && evidence.timeComplexity.quote
+
+  // If ANY of these are true, they are NOT a silent coder
+  if (hasCommunicationQuotes || hasApproachQuote || hasComplexityQuote) {
+    let minScore = 50 // Base for any communication
+    if (hasApproachQuote) minScore += 10
+    if (hasComplexityQuote) minScore += 10
+    minScore = Math.min(80, minScore)
+
+    return {
+      shouldEnforceFloor: currentCommunicationScore < minScore,
+      minScore,
+      reason: `Evidence: ${[hasApproachQuote && "approach", hasComplexityQuote && "complexity", hasCommunicationQuotes && "quotes"].filter(Boolean).join(", ")}`,
+    }
+  }
+
+  return { shouldEnforceFloor: false, minScore: 10, reason: "No communication evidence" }
+}
+
 export async function critiqueScores(
   scores: ScoreResult | ExtendedScoreResult,
   context: {
@@ -51,6 +84,8 @@ export async function critiqueScores(
       optimalTimeComplexity: string
       optimalSpaceComplexity: string
     }
+    // NEW: Pass actual conversation for ground-truth verification
+    conversationTranscript?: Array<{ role: string; content: string }>
   }
 ): Promise<ScoreCritiqueAdjustment> {
   const silentSolution = "silentSolution" in scores ? scores.silentSolution : false
@@ -102,7 +137,26 @@ IMPORTANT: Use the extracted evidence above to verify if scores match what actua
 - CRITICAL: If the transcript shows the candidate explaining their approach (mentioning algorithms, data structures, or step-by-step logic), they are NOT a "silent solution" - do NOT lower communication score
 `
     : ""
-}
+}${
+    context.conversationTranscript && context.conversationTranscript.length > 0
+      ? `
+ACTUAL CONVERSATION TRANSCRIPT (source of truth - use this to verify claims):
+${context.conversationTranscript
+  .slice(-20) // Last 20 messages for context
+  .map(
+    (m) =>
+      `[${m.role.toUpperCase()}]: ${m.content.slice(0, 200)}${m.content.length > 200 ? "..." : ""}`
+  )
+  .join("\n")}
+
+CRITICAL: Read the transcript above to verify:
+1. Did the candidate actually explain their approach? Look for explanations of logic/algorithm.
+2. Did they discuss complexity? Look for "O(n)", "log n", "linear", "constant", etc.
+3. Did they communicate while coding? Look for narration during implementation.
+4. If transcript shows communication but scores are low, this is an ACCURACY violation.
+`
+      : ""
+  }
 
 CONSTITUTIONAL PRINCIPLES - Critique against these 4 aspects:
 
@@ -132,11 +186,40 @@ CRITICAL RULES:
 - If scores are reasonable, return empty critiques
 - Focus on catching: unfair penalties, demotivating harshness, dishonest inflation
 
-CRITICAL: SILENT CODING (no explanation) = VERY LOW COMMUNICATION SCORE
-- If "Approach explained: false" AND "Silent solution: true", communication score should be 10-15
-- DO NOT boost communication scores for silent coders, even if they solved the problem correctly
-- Real interviews require explaining your approach - silent coding is unacceptable
-- Example: Communication=40 for silent coder is TOO HIGH, should be ~10-15
+SILENT CODER DETECTION - CHECK EVIDENCE FIRST:
+Before reducing communication score for "silent coding", VERIFY with the transcript:
+
+1. IF extracted evidence shows communication.quotes with content:
+   -> They communicated. Do NOT reduce score.
+
+2. IF evidence shows approach.explained = YES with quote:
+   -> They explained approach. Do NOT treat as silent.
+
+3. IF evidence shows timeComplexity.mentioned = YES with quote:
+   -> They discussed complexity. This is GOOD communication.
+
+4. IF the transcript above shows them explaining their logic:
+   -> They are NOT a silent coder. Do NOT reduce score.
+
+5. ONLY apply silent coder penalty if ALL of these are true:
+   - No communication quotes in evidence
+   - No approach explanation with quote
+   - No complexity discussion with quote
+   - Transcript shows only filler words ("hmm", "ok") or silence
+
+6. If evidence/transcript shows communication but score is low:
+   -> This is an ACCURACY violation - score should be RAISED, not lowered.
+
+Example of WRONG critique:
+- Evidence shows they explained approach with quote
+- Communication score is 55
+- AI lowers to 25 "because silent coder"
+- THIS IS INCORRECT - evidence proves they communicated
+
+Example of CORRECT critique:
+- Evidence shows communication quotes exist
+- Communication score is 25
+- AI RAISES to 60+ "because evidence shows they communicated"
 
 Return JSON:
 {
@@ -217,6 +300,42 @@ If no issues found, return:
           critiques: result.critiques,
           reasoning: result.reasoning,
         })
+      }
+
+      // POST-CRITIQUE VALIDATION: Ensure AI didn't reduce score when evidence shows communication
+      const evidenceCheck = validateEvidenceAgainstScores(
+        context.extractedEvidence,
+        scores.communication
+      )
+
+      if (evidenceCheck.shouldEnforceFloor) {
+        const currentCommScore = result.adjustedScores?.communication ?? scores.communication
+
+        if (currentCommScore < evidenceCheck.minScore) {
+          logger.warn("[Constitutional AI] Enforcing evidence-based floor", {
+            aiSuggestedScore: currentCommScore,
+            enforcedMinimum: evidenceCheck.minScore,
+            reason: evidenceCheck.reason,
+          })
+
+          // If result has adjusted scores, update them
+          if (result.adjustedScores) {
+            result.adjustedScores.communication = evidenceCheck.minScore
+            result.adjustedScores.overall = calculatePerformanceScore(result.adjustedScores)
+          } else {
+            // Create adjusted scores with the floor
+            result.adjustedScores = {
+              understanding: scores.understanding,
+              problemSolving: scores.problemSolving,
+              codeQuality: scores.codeQuality,
+              communication: evidenceCheck.minScore,
+              overall: 0, // Will be recalculated
+            }
+            result.adjustedScores.overall = calculatePerformanceScore(result.adjustedScores)
+            result.madeChanges = true
+            result.reasoning = `${result.reasoning || ""} Evidence-based floor applied: ${evidenceCheck.reason}.`
+          }
+        }
       }
 
       return result

@@ -714,6 +714,13 @@ CODE EFFICIENCY ANALYSIS:
         optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || "O(n)",
         optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
       },
+      // NEW: Pass actual conversation for ground-truth verification
+      conversationTranscript: conversationTranscript?.map(
+        (msg: { type?: string; role?: string; message?: string; content?: string }) => ({
+          role: msg.type === "user" || msg.role === "user" ? "candidate" : "interviewer",
+          content: msg.message || msg.content || "",
+        })
+      ),
     })
 
     // Use adjusted scores if critique made changes

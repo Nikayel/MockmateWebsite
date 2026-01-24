@@ -14,6 +14,7 @@ import {
   EDGE_CASE_KEYWORDS,
   findCodingPhaseStart,
   isCodeExplanation,
+  fuzzyExtractComplexity,
 } from "@/lib/interview/shared-patterns"
 
 // =============================================================================
@@ -413,6 +414,20 @@ EXTRACT THE FOLLOWING (use EXACT quotes from transcript):
    Example of what TO capture: "My solution is O(n)" or "Time complexity is O(n)"
    Example of what to IGNORE: "Brute force is O(n²)" when they implemented O(n)
 
+   VOICE TRANSCRIPTION HANDLING (IMPORTANT):
+   Voice transcription often produces non-standard formats. Interpret these charitably:
+   - "o log in" or "log in" = O(log n)
+   - "o log n" or "log n" = O(log n)
+   - "o n" or "oh n" or "o en" = O(n)
+   - "o 1" or "o one" = O(1)
+   - "n squared" or "n square" = O(n²)
+   - "constant" = O(1), "linear" = O(n), "logarithmic" = O(log n)
+
+   BE GENEROUS with voice transcription - if it sounds like a complexity, interpret it charitably.
+   Example: "Time is o log in. And space is constant." should extract:
+   - timeComplexity.claimedForSolution: "O(log n)"
+   - spaceComplexity.claimedForSolution: "O(1)"
+
 2. INTERVIEWER QUESTIONS: For each question the interviewer asked, was it answered? Quote the answer.
 
 3. EXPLAINED WHILE CODING: Did the candidate talk through their code AS they wrote it?
@@ -477,6 +492,21 @@ RULES:
       // Build complexity evidence from semantic extraction
       const timeComplexityEvidence = parsed.complexityClaims?.timeComplexity
       const spaceComplexityEvidence = parsed.complexityClaims?.spaceComplexity
+
+      // Normalize voice transcription after extraction
+      // This catches cases where the AI preserved the voice format
+      if (timeComplexityEvidence?.claimedForSolution) {
+        const normalized = fuzzyExtractComplexity(timeComplexityEvidence.claimedForSolution)
+        if (normalized) {
+          timeComplexityEvidence.claimedForSolution = normalized
+        }
+      }
+      if (spaceComplexityEvidence?.claimedForSolution) {
+        const normalized = fuzzyExtractComplexity(spaceComplexityEvidence.claimedForSolution)
+        if (normalized) {
+          spaceComplexityEvidence.claimedForSolution = normalized
+        }
+      }
 
       return {
         timeComplexity: timeComplexityEvidence?.claimedForSolution

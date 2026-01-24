@@ -11,7 +11,6 @@
 import type { ConversationTracker, InterviewPhase } from "./interview-phases"
 import { logger } from "@/lib/logger"
 import {
-  CODING_TRANSITION_PATTERNS,
   GIVEAWAY_PATTERNS,
   LEADING_QUESTION_PATTERNS,
   VAGUE_ANSWER_PATTERNS,
@@ -19,6 +18,7 @@ import {
   PROBING_PATTERNS,
   containsSummarizing,
   countSentences,
+  containsCodingTransition, // Enhanced detection with semantic fallback
 } from "./shared-patterns"
 import { SEMANTIC_RULES, buildSemanticValidationPrompt } from "./semantic-rules"
 
@@ -66,9 +66,9 @@ const GATES: Gate[] = [
     name: "no-premature-coding",
     severity: "critical",
     check: (ctx) => {
-      // Use shared patterns from shared-patterns.ts
-      const match = CODING_TRANSITION_PATTERNS.find((p) => p.test(ctx.response))
-      if (!match) return null
+      // Use enhanced detection from shared-patterns.ts
+      // This catches both regex patterns AND semantic intent (e.g., "You may now proceed with coding")
+      if (!containsCodingTransition(ctx.response)) return null
 
       // Only enforce in pre-test phases
       if (ctx.phase !== "discussion" && ctx.phase !== "coding") return null
@@ -84,7 +84,7 @@ const GATES: Gate[] = [
         if (!hasEdgeCases) missing.push("edge cases")
         return {
           violated: true,
-          evidence: `Said coding phrase without discussing: ${missing.join(", ")}`,
+          evidence: `Detected coding transition without discussing: ${missing.join(", ")}`,
         }
       }
       return null

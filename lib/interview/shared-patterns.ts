@@ -73,6 +73,24 @@ export const VOICE_COMPLEXITY_PATTERNS = [
   { pattern: /\bo\s*e?n\s*log\s*e?n\b/i, complexity: "O(n log n)" },
   // "log n" -> O(log n)
   { pattern: /\blog\s*n\b/i, complexity: "O(log n)" },
+
+  // NEW: Common voice transcription artifacts for O(log n)
+  // "o log in" is very common - voice transcribes "log n" as "log in"
+  { pattern: /\bo\s*log\s*in\b/i, complexity: "O(log n)" },
+  { pattern: /\boh\s*log\s*n\b/i, complexity: "O(log n)" },
+  { pattern: /\boh\s*log\s*in\b/i, complexity: "O(log n)" },
+  // "log in" alone (not "log in to") -> O(log n)
+  { pattern: /\blog\s*in\b(?!\s*to)/i, complexity: "O(log n)" },
+  { pattern: /\blog\s*of\s*n\b/i, complexity: "O(log n)" },
+  { pattern: /\blogn\b/i, complexity: "O(log n)" },
+  { pattern: /\blogarithm/i, complexity: "O(log n)" },
+
+  // NEW: More O(1) variations
+  { pattern: /\bconstant\s*(?:time|space)\b/i, complexity: "O(1)" },
+
+  // NEW: Voice artifacts for O(n)
+  { pattern: /\bo\s*en\b/i, complexity: "O(n)" },
+  { pattern: /\boh\s*n\b/i, complexity: "O(n)" },
 ]
 
 /**
@@ -129,6 +147,39 @@ export function extractComplexityFromText(text: string): string | null {
 }
 
 /**
+ * Fuzzy extract complexity from voice transcription
+ * More lenient than extractComplexityFromText - for when exact match fails
+ * Used as a fallback to catch edge cases in voice transcription
+ */
+export function fuzzyExtractComplexity(text: string): string | null {
+  // Try exact extraction first
+  const exact = extractComplexityFromText(text)
+  if (exact) return exact
+
+  const lower = text.toLowerCase()
+
+  // Fuzzy patterns for voice transcription - catches edge cases
+  const fuzzyPatterns = [
+    // Log variants - very common in voice transcription
+    { test: /log.{0,3}(n|in|en|and)/i, result: "O(log n)" },
+    { test: /logarith/i, result: "O(log n)" },
+    // Linear variants
+    { test: /\blinear\b/i, result: "O(n)" },
+    // Constant variants
+    { test: /\bconstant\b/i, result: "O(1)" },
+    // Quadratic variants
+    { test: /\bquadrat/i, result: "O(n²)" },
+    { test: /\bn\s*square/i, result: "O(n²)" },
+  ]
+
+  for (const { test, result } of fuzzyPatterns) {
+    if (test.test(lower)) return result
+  }
+
+  return null
+}
+
+/**
  * Complexity ranking for dominance calculation
  * Higher rank = worse complexity = dominates
  */
@@ -170,7 +221,11 @@ export function getComplexityRank(complexity: string): number {
   if (normalized.includes("NLOGN") || normalized.includes("N LOG N")) {
     return 60
   }
-  if (normalized.includes("LOGN") || normalized.includes("LOG N") || normalized.includes("LOGARITHMIC")) {
+  if (
+    normalized.includes("LOGN") ||
+    normalized.includes("LOG N") ||
+    normalized.includes("LOGARITHMIC")
+  ) {
     return 20
   }
   if (normalized.includes("N)") && !normalized.includes("LOG") && !normalized.includes("^")) {
@@ -306,22 +361,58 @@ export const CODING_TRANSITION_PATTERNS = [
   /you can (?:start|begin) (?:coding|implementing)/i,
   /start implementing/i,
   /go ahead and implement/i,
+
+  // NEW: Broader patterns that catch more variations
+  // Catches "You may now proceed with coding your solution"
+  /(?:you )?(?:may|can) (?:now )?(?:proceed|go ahead|start|begin)(?:\s+(?:with|to))?\s*(?:cod|implement|writ)/i,
+  /(?:ready|feel free) to (?:start|begin) (?:coding|implementing|writing)/i,
+  /(?:let's|shall we) (?:move|proceed) (?:to|into|with) (?:the )?(?:coding|implementation)/i,
+  /(?:time|ready) to (?:code|implement|write)/i,
+  /(?:dive|jump) (?:into|in) (?:the )?(?:code|implementation|coding)/i,
 ]
 
 /**
+ * Semantic detection of coding transition intent
+ * This catches cases where regex patterns miss variations
+ * Uses keyword co-occurrence to detect intent
+ */
+export function hasCodingTransitionIntent(response: string): boolean {
+  const lower = response.toLowerCase()
+
+  // Must have action word + coding-related word
+  const actionWords = ["proceed", "go ahead", "start", "begin", "ready", "move", "dive", "time to"]
+  const codingWords = ["code", "coding", "implement", "implementation", "write", "writing"]
+
+  const hasAction = actionWords.some((w) => lower.includes(w))
+  const hasCoding = codingWords.some((w) => lower.includes(w))
+
+  // Both must be present AND no complexity question in same response
+  // If they're asking about complexity, they're NOT saying "go code"
+  const asksAboutComplexity = /what(?:'s| is).*complexity|time.*complexity|space.*complexity/i.test(
+    response
+  )
+
+  return hasAction && hasCoding && !asksAboutComplexity
+}
+
+/**
  * Check if response contains coding transition
+ * Uses regex patterns first (fast), then falls back to semantic detection
  */
 export function containsCodingTransition(response: string): boolean {
-  return CODING_TRANSITION_PATTERNS.some((p) => p.test(response))
+  // First check regex patterns (fast)
+  if (CODING_TRANSITION_PATTERNS.some((p) => p.test(response))) {
+    return true
+  }
+  // Fallback to semantic intent detection
+  return hasCodingTransitionIntent(response)
 }
 
 /**
  * Find the message index where coding phase starts
  * Returns -1 if no coding transition found
  */
-export function findCodingPhaseStart(
-  transcript: Array<{ role: string; content: string }>
-): number {
+export function findCodingPhaseStart(transcript: Array<{ role: string; content: string }>): number {
   for (let i = 0; i < transcript.length; i++) {
     const msg = transcript[i]
     // Look for interviewer telling them to code
@@ -368,25 +459,56 @@ export function isCodeExplanation(message: string): boolean {
   const lower = message.toLowerCase()
 
   // Obvious filler - definitely not code explanation
-  const fillerOnly =
-    /^(hmm|uh|um|ok|okay|let me think|one sec|hold on|wait)[.!?]*$/i.test(message.trim())
+  const fillerOnly = /^(hmm|uh|um|ok|okay|let me think|one sec|hold on|wait)[.!?]*$/i.test(
+    message.trim()
+  )
   if (fillerOnly) return false
 
   // GENEROUS signals that this might be code explanation:
   // (LLM will verify, so false positives are OK)
   const codeSignals = [
     // Narration verbs
-    "i'm ", "i am ", "let me ", "i'll ", "i will ",
-    "setting", "initializing", "creating", "starting",
-    "looping", "iterating", "checking", "comparing",
-    "returning", "calling", "passing", "adding",
+    "i'm ",
+    "i am ",
+    "let me ",
+    "i'll ",
+    "i will ",
+    "setting",
+    "initializing",
+    "creating",
+    "starting",
+    "looping",
+    "iterating",
+    "checking",
+    "comparing",
+    "returning",
+    "calling",
+    "passing",
+    "adding",
     // Code concepts
-    "variable", "pointer", "index", "array", "loop",
-    "function", "return", "if ", "else", "while",
-    "for ", "the value", "this will", "that should",
+    "variable",
+    "pointer",
+    "index",
+    "array",
+    "loop",
+    "function",
+    "return",
+    "if ",
+    "else",
+    "while",
+    "for ",
+    "the value",
+    "this will",
+    "that should",
     // Narration phrases
-    "so here", "so now", "first i", "then i", "next i",
-    "basically", "essentially", "this handles",
+    "so here",
+    "so now",
+    "first i",
+    "then i",
+    "next i",
+    "basically",
+    "essentially",
+    "this handles",
   ]
 
   return codeSignals.some((signal) => lower.includes(signal))

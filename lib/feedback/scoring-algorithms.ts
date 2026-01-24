@@ -14,6 +14,7 @@ import type {
 import type { ExtractedEvidence } from "./structured-extraction"
 import { analyzeCodeCompleteness, isBlankDesignTemplate } from "./completeness-analysis"
 import { SCORING, clampScore } from "../constants"
+import { logger } from "@/lib/logger"
 
 // ============================================================================
 // SYSTEM DESIGN SCORING
@@ -604,6 +605,28 @@ export function calculateValidatedScores(
     // (explainedWhileCoding + clarifying + feedback + complexity = max 13, capped to 10)
     evidenceBonus = Math.min(10, Math.max(-5, evidenceBonus))
     communication = Math.min(95, Math.max(25, communication + evidenceBonus))
+
+    // === EVIDENCE-BASED FLOOR (prevents silent coder misclassification) ===
+    // If evidence shows communication happened, enforce a minimum floor
+    const hasCommunicationEvidence =
+      extractedEvidence.communication.quotes.length > 0 ||
+      (extractedEvidence.approach.explained && extractedEvidence.approach.quote) ||
+      (extractedEvidence.timeComplexity.mentioned && extractedEvidence.timeComplexity.quote)
+
+    if (hasCommunicationEvidence && communication < 50) {
+      logger.info("[Scoring] Evidence shows communication - enforcing floor", {
+        currentScore: communication,
+        enforcedFloor: 50,
+        evidenceQuotes: extractedEvidence.communication.quotes.length,
+        hasApproachQuote: !!(
+          extractedEvidence.approach.explained && extractedEvidence.approach.quote
+        ),
+        hasComplexityQuote: !!(
+          extractedEvidence.timeComplexity.mentioned && extractedEvidence.timeComplexity.quote
+        ),
+      })
+      communication = 50
+    }
   }
 
   // For incomplete solutions, communication can stay higher IF they discussed well
