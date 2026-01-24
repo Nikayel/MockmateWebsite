@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { useVoiceInput } from "@/lib/voice"
 import { getDbLazy } from "@/lib/firebase-lazy"
 import { collection, getDocs, query, where } from "firebase/firestore"
@@ -4568,11 +4569,14 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                         </Badge>
                       </div>
                       <div className="max-h-[calc(60vh-60px)] overflow-y-auto p-4">
-                        <p className="text-sm leading-relaxed text-gray-200">
-                          {realInterviewMode && (selectedScenario as any).fuzzyStatement
-                            ? (selectedScenario as any).fuzzyStatement
-                            : selectedScenario.problemStatement}
-                        </p>
+                        <MarkdownRenderer
+                          content={
+                            realInterviewMode && (selectedScenario as any).fuzzyStatement
+                              ? (selectedScenario as any).fuzzyStatement
+                              : selectedScenario.problemStatement
+                          }
+                          className="text-sm leading-relaxed text-gray-200"
+                        />
                         {selectedScenario.type === "dsa" &&
                           selectedScenario.examples &&
                           selectedScenario.examples.length > 0 && (
@@ -4650,11 +4654,14 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                                 </Badge>
                               )}
                             </h3>
-                            <p className="text-[15px] leading-relaxed text-gray-200">
-                              {realInterviewMode && (selectedScenario as any).fuzzyStatement
-                                ? (selectedScenario as any).fuzzyStatement
-                                : selectedScenario.problemStatement}
-                            </p>
+                            <MarkdownRenderer
+                              content={
+                                realInterviewMode && (selectedScenario as any).fuzzyStatement
+                                  ? (selectedScenario as any).fuzzyStatement
+                                  : selectedScenario.problemStatement
+                              }
+                              className="text-[15px] leading-relaxed text-gray-200"
+                            />
                           </div>
 
                           {/* AI Insights - Shown independently, right after description */}
