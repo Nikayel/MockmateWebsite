@@ -23,6 +23,12 @@ import type { ExtractedEvidence } from "./structured-extraction"
 import { buildEvidenceSummary } from "./structured-extraction"
 import { FEEDBACK_PRINCIPLES, CORE_PRINCIPLES } from "@/lib/prompts"
 import { calculatePerformanceScore } from "@/lib/constants"
+import { persistConstitutionalAIIntervention } from "@/lib/scoring/analytics-persistence"
+import type {
+  ConstitutionalAIIntervention,
+  ScoreCategoryAdjustment,
+  CritiqueAspect,
+} from "@/lib/scoring/analytics-types"
 
 // ============================================================================
 // SCORE CRITIQUE
@@ -609,5 +615,148 @@ If no issues:
     critiques: [],
     reasoning: "Critique failed, using original feedback",
     madeChanges: false,
+  }
+}
+
+// ============================================================================
+// ANALYTICS TRACKING
+// ============================================================================
+
+/**
+ * Track Constitutional AI intervention for analytics
+ * Call this after both score and feedback critiques are complete
+ */
+export async function trackConstitutionalAIIntervention(params: {
+  sessionId: string
+  userId: string
+  scenarioType: "dsa" | "system_design" | "bug_fix"
+  scenarioId: string
+  scenarioTitle: string
+  originalScores: ScoreResult | ExtendedScoreResult
+  scoreCritique: ScoreCritiqueAdjustment
+  feedbackCritique: FeedbackCritiqueAdjustment
+  context: {
+    testPassRate: number
+    codeIncomplete: boolean
+    silentSolution: boolean
+    hasBlindCopying: boolean
+    extractedEvidence?: ExtractedEvidence
+    aiValidation?: ConversationValidation
+  }
+}): Promise<void> {
+  try {
+    const {
+      sessionId,
+      userId,
+      scenarioType,
+      scenarioId,
+      scenarioTitle,
+      originalScores,
+      scoreCritique,
+      feedbackCritique,
+      context,
+    } = params
+
+    // Build category adjustments from score critique
+    const categoryAdjustments: ScoreCategoryAdjustment[] = []
+
+    if (scoreCritique.madeChanges && scoreCritique.adjustedScores) {
+      const categories: Array<{
+        key: keyof typeof scoreCritique.adjustedScores
+        category: ScoreCategoryAdjustment["category"]
+      }> = [
+        { key: "understanding", category: "understanding" },
+        { key: "problemSolving", category: "problemSolving" },
+        { key: "codeQuality", category: "codeQuality" },
+        { key: "communication", category: "communication" },
+      ]
+
+      for (const { key, category } of categories) {
+        const original = originalScores[key] as number
+        const adjusted = scoreCritique.adjustedScores[key]
+        const delta = adjusted - original
+
+        if (delta !== 0) {
+          categoryAdjustments.push({
+            category,
+            originalScore: original,
+            adjustedScore: adjusted,
+            delta,
+            direction: delta > 0 ? "increased" : "decreased",
+            reason:
+              scoreCritique.scoreChanges?.find(
+                (c) => c.category.toLowerCase().replace("-", "") === category.toLowerCase()
+              )?.reason || scoreCritique.reasoning,
+          })
+        }
+      }
+    }
+
+    // Extract aspects violated from critiques
+    const scoreAspectsViolated: CritiqueAspect[] = scoreCritique.critiques
+      .filter((c) => !c.passed)
+      .map((c) => c.aspect as CritiqueAspect)
+
+    const feedbackAspectsViolated: CritiqueAspect[] = feedbackCritique.critiques
+      .filter((c) => !c.passed)
+      .map((c) => c.aspect as CritiqueAspect)
+
+    // Build the intervention record
+    const intervention: ConstitutionalAIIntervention = {
+      sessionId,
+      userId,
+      timestamp: new Date().toISOString(),
+      scenarioType,
+      scenarioId,
+      scenarioTitle,
+      scoreCritique: {
+        triggered: true,
+        aspectsViolated: scoreAspectsViolated,
+        madeChanges: scoreCritique.madeChanges,
+        originalOverall: originalScores.overall,
+        adjustedOverall: scoreCritique.adjustedScores?.overall ?? originalScores.overall,
+        overallDelta:
+          (scoreCritique.adjustedScores?.overall ?? originalScores.overall) -
+          originalScores.overall,
+        categoryAdjustments,
+        reasoning: scoreCritique.reasoning,
+        evidenceFloorApplied: scoreCritique.reasoning?.includes("Evidence-based floor") ?? false,
+        evidenceFloorReason: scoreCritique.reasoning?.includes("Evidence-based floor")
+          ? scoreCritique.reasoning
+          : undefined,
+      },
+      feedbackCritique: {
+        triggered: true,
+        aspectsViolated: feedbackAspectsViolated,
+        madeChanges: feedbackCritique.madeChanges,
+        reasoning: feedbackCritique.reasoning,
+      },
+      context: {
+        testPassRate: context.testPassRate,
+        codeIncomplete: context.codeIncomplete,
+        silentSolution: context.silentSolution,
+        hasBlindCopying: context.hasBlindCopying,
+        communicationQuotesFound: context.extractedEvidence?.communication.quotes.length ?? 0,
+        approachExplained:
+          context.extractedEvidence?.approach.explained ??
+          context.aiValidation?.approachExplained ??
+          false,
+        complexityDiscussed:
+          context.extractedEvidence?.timeComplexity.mentioned ??
+          context.aiValidation?.complexityDiscussed ??
+          false,
+      },
+    }
+
+    // Persist asynchronously (non-blocking)
+    persistConstitutionalAIIntervention(intervention).catch((error) => {
+      logger.error("[Constitutional AI Analytics] Failed to persist intervention", {
+        error,
+        sessionId,
+      })
+    })
+  } catch (error) {
+    // Non-blocking - don't fail the main flow if analytics fails
+    logger.error("[Constitutional AI Analytics] Failed to track intervention", { error })
   }
 }

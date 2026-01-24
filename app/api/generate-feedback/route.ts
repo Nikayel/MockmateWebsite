@@ -32,6 +32,7 @@ import {
   applyScoreFloors,
   critiqueScores,
   critiqueFeedbackText,
+  trackConstitutionalAIIntervention,
   buildRAGFeedbackContext,
   parseFeedbackSections,
   injectScoresIntoFeedback,
@@ -1116,6 +1117,43 @@ CRITICAL INSTRUCTIONS:
       revisedLength: rawFinalFeedback.length,
       lengthDiff: rawFinalFeedback.length - feedback.length,
     })
+
+    // Track Constitutional AI intervention for analytics (non-blocking)
+    if (sessionId && userId) {
+      // Determine scenario type for analytics
+      const analyticsScenarioType =
+        scenarioType === "system-design"
+          ? "system_design"
+          : scenarioType === "bugfix"
+            ? "bug_fix"
+            : "dsa"
+
+      trackConstitutionalAIIntervention({
+        sessionId,
+        userId,
+        scenarioType: analyticsScenarioType as "dsa" | "system_design" | "bug_fix",
+        scenarioId: scenarioId || sessionId,
+        scenarioTitle: scenarioTitle || "Unknown",
+        originalScores: algorithmicScores,
+        scoreCritique,
+        feedbackCritique,
+        context: {
+          testPassRate: passRate,
+          codeIncomplete: code
+            ? analyzeCodeCompleteness(code, language || "python").isIncomplete
+            : false,
+          silentSolution: algorithmicScores.silentSolution || false,
+          hasBlindCopying,
+          extractedEvidence,
+          aiValidation,
+        },
+      }).catch((error) => {
+        logger.error("[Feedback API] Failed to track Constitutional AI intervention", {
+          error,
+          sessionId,
+        })
+      })
+    }
 
     // CRITICAL: Inject authoritative scores into feedback text
     // This ensures the Score Snapshot section in the feedback text always matches

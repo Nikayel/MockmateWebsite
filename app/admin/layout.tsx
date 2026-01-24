@@ -30,6 +30,7 @@ import {
   Server,
   CreditCard,
   Loader2,
+  Scale,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { logger } from "@/lib/logger"
@@ -58,6 +59,7 @@ const navigation: NavItem[] = [
 
   // Technical
   { name: "AI Usage", href: "/admin/ai-usage", icon: Cpu, section: "Technical" },
+  { name: "Scoring", href: "/admin/scoring", icon: Scale, badge: "AI", section: "Technical" },
   { name: "Rate Limits", href: "/admin/rate-limits", icon: Activity, section: "Technical" },
   { name: "Infrastructure", href: "/admin/infrastructure", icon: Server, section: "Technical" },
   { name: "RAG", href: "/admin/rag", icon: Search, section: "Technical" },

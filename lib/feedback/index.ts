@@ -64,7 +64,11 @@ export {
 // CONSTITUTIONAL AI EXPORTS
 // ============================================================================
 
-export { critiqueScores, critiqueFeedbackText } from "./constitutional-ai"
+export {
+  critiqueScores,
+  critiqueFeedbackText,
+  trackConstitutionalAIIntervention,
+} from "./constitutional-ai"
 
 // ============================================================================
 // CONTEXT BUILDER EXPORTS
