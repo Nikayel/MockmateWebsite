@@ -19,6 +19,12 @@ import {
   MessageSquare,
   Clock,
   Zap,
+  Trophy,
+  Target,
+  Sparkles,
+  Star,
+  TrendingUp,
+  Gift,
 } from "lucide-react"
 import { FormattedText } from "@/components/ui/FormattedText"
 import nextDynamic from "next/dynamic"
@@ -367,10 +373,7 @@ export function PostInterviewView({
                   </span>
                 </div>
                 {/* Phase indicator */}
-                <Badge
-                  variant="outline"
-                  className="border-gray-600 text-xs text-gray-400"
-                >
+                <Badge variant="outline" className="border-gray-600 text-xs text-gray-400">
                   {debriefPhase === "technical" ? "Debrief" : "Wrap-up"}
                 </Badge>
               </CardTitle>
@@ -499,18 +502,112 @@ export function PostInterviewView({
         </div>
       </div>
 
-      {/* Action Button - Fixed at Bottom */}
-      <div className="mt-4 flex flex-shrink-0 flex-col items-center gap-2">
-        <Button
-          onClick={proceedToFinalFeedback}
-          className="bg-accent hover:bg-accent/80 text-accent-foreground px-8 py-2"
-        >
-          End Interview
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
-        <p className="text-xs text-gray-500">
-          You&apos;ll receive detailed feedback and performance analysis
-        </p>
+      {/* Enhanced End Interview Section */}
+      <div className="mt-6 flex-shrink-0">
+        {/* Accomplishment Summary Card */}
+        <div className="mx-auto max-w-2xl">
+          <div className="rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-800/50 to-gray-900/50 p-5 backdrop-blur-sm">
+            {/* Header */}
+            <div className="mb-4 flex items-center justify-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#00d9ff]/20 to-purple-500/20">
+                <Trophy className="h-4 w-4 text-[#00d9ff]" />
+              </div>
+              <h3 className="font-heading text-lg font-semibold text-white">
+                Ready for Your Results?
+              </h3>
+            </div>
+
+            {/* Session Stats Summary */}
+            <div className="mb-5 grid grid-cols-3 gap-3">
+              {/* Test Results */}
+              <div className="rounded-lg border border-gray-700/30 bg-gray-800/30 p-3 text-center">
+                <div className="mb-1 flex items-center justify-center">
+                  {testSummary.passRate === 100 ? (
+                    <CheckCircle className="h-5 w-5 text-green-400" />
+                  ) : testSummary.passRate >= 50 ? (
+                    <Target className="h-5 w-5 text-yellow-400" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-400" />
+                  )}
+                </div>
+                <div className="text-xl font-bold text-white">
+                  {testSummary.passed}/{testSummary.total}
+                </div>
+                <div className="text-xs text-gray-400">Tests Passed</div>
+              </div>
+
+              {/* Efficiency */}
+              {efficiencyMetrics && (
+                <div className="rounded-lg border border-gray-700/30 bg-gray-800/30 p-3 text-center">
+                  <div className="mb-1 flex items-center justify-center">
+                    <Zap className="h-5 w-5 text-amber-400" />
+                  </div>
+                  <div className="text-xl font-bold text-white">
+                    {efficiencyMetrics.efficiencyScore}%
+                  </div>
+                  <div className="text-xs text-gray-400">Efficiency</div>
+                </div>
+              )}
+
+              {/* Discussion */}
+              <div className="rounded-lg border border-gray-700/30 bg-gray-800/30 p-3 text-center">
+                <div className="mb-1 flex items-center justify-center">
+                  <MessageSquare className="h-5 w-5 text-purple-400" />
+                </div>
+                <div className="text-xl font-bold text-white">
+                  {interviewerMessages.filter((m) => m.type === "user").length}
+                </div>
+                <div className="text-xs text-gray-400">Responses</div>
+              </div>
+            </div>
+
+            {/* What You'll Receive */}
+            <div className="mb-5">
+              <div className="mb-2 flex items-center gap-2 text-xs font-medium tracking-wider text-gray-400 uppercase">
+                <Gift className="h-3 w-3" />
+                Your Personalized Feedback Includes
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center gap-2 rounded-lg bg-gray-800/40 px-3 py-2">
+                  <Star className="h-4 w-4 text-[#00d9ff]" />
+                  <span className="text-sm text-gray-300">Overall Score & Grade</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg bg-gray-800/40 px-3 py-2">
+                  <TrendingUp className="h-4 w-4 text-green-400" />
+                  <span className="text-sm text-gray-300">Skill Breakdown</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg bg-gray-800/40 px-3 py-2">
+                  <CheckCircle className="h-4 w-4 text-emerald-400" />
+                  <span className="text-sm text-gray-300">What Worked Well</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg bg-gray-800/40 px-3 py-2">
+                  <Target className="h-4 w-4 text-amber-400" />
+                  <span className="text-sm text-gray-300">Areas to Improve</span>
+                </div>
+              </div>
+            </div>
+
+            {/* CTA Button */}
+            <div className="flex flex-col items-center gap-3">
+              <Button
+                onClick={proceedToFinalFeedback}
+                size="lg"
+                className="group relative w-full overflow-hidden bg-gradient-to-r from-[#00d9ff] to-[#00d9ff]/80 px-8 py-6 text-base font-semibold text-gray-900 shadow-lg shadow-[#00d9ff]/20 transition-all hover:shadow-xl hover:shadow-[#00d9ff]/30 sm:w-auto"
+              >
+                {/* Shimmer effect */}
+                <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000 group-hover:translate-x-full" />
+                <span className="relative flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" />
+                  Get My Feedback
+                  <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                </span>
+              </Button>
+              <p className="text-center text-xs text-gray-500">
+                AI analysis typically takes 15-30 seconds
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
