@@ -20,6 +20,7 @@ import { useInterviewStore, type WorkspaceFile } from "@/lib/stores"
 import type { Scenario, DSAScenario } from "@/lib/scenarios"
 import { PATTERN_METADATA, type DSAPattern } from "@/lib/types/dsa-patterns"
 import { toast } from "sonner"
+import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 
 interface ProblemPanelProps {
   scenario: Scenario
@@ -234,11 +235,14 @@ export function ProblemPanel({ scenario, onFileSelect }: ProblemPanelProps) {
               </Badge>
             )}
           </h3>
-          <p className="text-[15px] leading-relaxed text-gray-200">
-            {realInterviewMode && (scenario as any).fuzzyStatement
-              ? (scenario as any).fuzzyStatement
-              : scenario.problemStatement}
-          </p>
+          <MarkdownRenderer
+            content={
+              realInterviewMode && (scenario as any).fuzzyStatement
+                ? (scenario as any).fuzzyStatement
+                : scenario.problemStatement
+            }
+            className="text-[15px] leading-relaxed text-gray-200"
+          />
         </div>
 
         {/* Examples (DSA only) - IMPROVED: Better visual hierarchy */}
