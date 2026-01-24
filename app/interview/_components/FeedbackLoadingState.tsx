@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { CheckCircle, ArrowRight } from "lucide-react"
+import { CheckCircle2 } from "lucide-react"
 
 export interface FeedbackLoadingStateProps {
   onGoToDashboard: () => void
@@ -23,7 +22,6 @@ const ANALYSIS_STEPS = [
 ]
 
 export function FeedbackLoadingState({
-  onGoToDashboard,
   interviewStats,
 }: FeedbackLoadingStateProps) {
   const [currentStep, setCurrentStep] = useState(0)
@@ -53,20 +51,22 @@ export function FeedbackLoadingState({
   }, [])
 
   return (
-    <div className="flex min-h-[500px] flex-col items-center justify-center px-6 py-12">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="mb-10 text-center">
-          <h2 className="mb-2 text-xl font-semibold text-white">Generating Feedback</h2>
-          <p className="text-sm text-gray-500">
+    <div className="flex min-h-[500px] flex-col items-center justify-center px-6 py-16">
+      <div className="w-full max-w-sm">
+        {/* Header - Apple-style clean typography */}
+        <div className="mb-12 text-center">
+          <h2 className="mb-3 text-2xl font-semibold tracking-tight text-white">
+            Generating Feedback
+          </h2>
+          <p className="text-sm font-medium text-zinc-500">
             {elapsedTime < 60
-              ? `${elapsedTime}s elapsed`
-              : `${Math.floor(elapsedTime / 60)}m ${elapsedTime % 60}s elapsed`}
+              ? `${elapsedTime}s`
+              : `${Math.floor(elapsedTime / 60)}m ${elapsedTime % 60}s`}
           </p>
         </div>
 
-        {/* Progress Steps - Terminal Style */}
-        <div className="mb-10 rounded-lg border border-gray-800 bg-gray-900 p-4 font-mono text-sm">
+        {/* Progress Steps - Apple-style minimal */}
+        <div className="mb-12 space-y-4">
           {ANALYSIS_STEPS.map((step, index) => {
             const isComplete = index < currentStep
             const isCurrent = index === currentStep
@@ -74,68 +74,73 @@ export function FeedbackLoadingState({
             return (
               <div
                 key={step}
-                className={`flex items-center gap-3 py-1.5 transition-opacity duration-300 ${
-                  index > currentStep ? "opacity-30" : "opacity-100"
+                className={`flex items-center gap-4 transition-all duration-500 ${
+                  index > currentStep ? "opacity-40" : "opacity-100"
                 }`}
               >
-                <span className="w-4 text-gray-600">
+                <div className="flex h-6 w-6 items-center justify-center">
                   {isComplete ? (
-                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                   ) : isCurrent ? (
-                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-white" />
+                    <div className="relative flex h-5 w-5 items-center justify-center">
+                      <div className="absolute h-5 w-5 animate-ping rounded-full bg-white/20" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-white" />
+                    </div>
                   ) : (
-                    <span className="inline-block h-2 w-2 rounded-full bg-gray-700" />
+                    <div className="h-2 w-2 rounded-full bg-zinc-700" />
                   )}
-                </span>
-                <span className={isComplete ? "text-gray-500 line-through" : "text-gray-300"}>
+                </div>
+                <span
+                  className={`text-sm font-medium transition-colors duration-300 ${
+                    isComplete
+                      ? "text-zinc-500"
+                      : isCurrent
+                        ? "text-white"
+                        : "text-zinc-600"
+                  }`}
+                >
                   {step}
                 </span>
-                {isCurrent && <span className="animate-pulse text-gray-500">...</span>}
               </div>
             )
           })}
         </div>
 
-        {/* Session Summary - Compact */}
+        {/* Session Summary - Apple-style cards */}
         {interviewStats && (
-          <div className="mb-8 flex justify-center gap-6 text-center text-sm">
+          <div className="flex justify-center gap-4">
             {interviewStats.testsPassed !== undefined &&
               interviewStats.totalTests !== undefined && (
-                <div>
-                  <div className="font-medium text-white">
+                <div className="flex flex-col items-center rounded-2xl bg-zinc-800/50 px-5 py-3">
+                  <span className="text-lg font-semibold text-white">
                     {interviewStats.testsPassed}/{interviewStats.totalTests}
-                  </div>
-                  <div className="text-xs text-gray-500">tests passed</div>
+                  </span>
+                  <span className="text-xs font-medium text-zinc-500">tests</span>
                 </div>
               )}
             {interviewStats.timeSpentMinutes !== undefined && (
-              <div>
-                <div className="font-medium text-white">{interviewStats.timeSpentMinutes}m</div>
-                <div className="text-xs text-gray-500">duration</div>
+              <div className="flex flex-col items-center rounded-2xl bg-zinc-800/50 px-5 py-3">
+                <span className="text-lg font-semibold text-white">
+                  {interviewStats.timeSpentMinutes}m
+                </span>
+                <span className="text-xs font-medium text-zinc-500">duration</span>
               </div>
             )}
             {interviewStats.codeLines !== undefined && (
-              <div>
-                <div className="font-medium text-white">{interviewStats.codeLines}</div>
-                <div className="text-xs text-gray-500">lines</div>
+              <div className="flex flex-col items-center rounded-2xl bg-zinc-800/50 px-5 py-3">
+                <span className="text-lg font-semibold text-white">
+                  {interviewStats.codeLines}
+                </span>
+                <span className="text-xs font-medium text-zinc-500">lines</span>
               </div>
             )}
           </div>
         )}
 
-        {/* Dashboard Option */}
-        <div className="text-center">
-          <p className="mb-3 text-xs text-gray-600">Results will be saved to your dashboard</p>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onGoToDashboard}
-            className="text-gray-400 hover:bg-gray-800 hover:text-white"
-          >
-            Go to Dashboard
-            <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-          </Button>
-        </div>
+        {/* Subtle footer - Apple style */}
+        <p className="mt-10 text-center text-xs font-medium text-zinc-600">
+          Your results will be saved automatically
+        </p>
       </div>
     </div>
   )

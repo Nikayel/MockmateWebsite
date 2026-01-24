@@ -3381,11 +3381,11 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         if (data.conversationEnded) {
           // Show end session prompt instead of continuing conversation
           toast.info(
-            data.endMessage || "Session complete! Click 'End Interview' to see your results.",
+            data.endMessage || "Session complete! Click 'See Full Interview Score' to see your results.",
             {
               duration: 5000,
               action: {
-                label: "End Interview",
+                label: "See Full Interview Score",
                 onClick: proceedToFinalFeedback,
               },
             }
@@ -3430,10 +3430,10 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           if (data.conversationEnded === true) {
             // Show prompt to end session after the final message
             setTimeout(() => {
-              toast.info("Click 'End Interview' to see your score breakdown and analysis.", {
+              toast.info("Click 'See Full Interview Score' to see your score breakdown and analysis.", {
                 duration: 8000,
                 action: {
-                  label: "End Interview",
+                  label: "See Full Interview Score",
                   onClick: proceedToFinalFeedback,
                 },
               })
@@ -5524,6 +5524,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                       code={code}
                       language={selectedLanguage}
                       onNewProblem={resetInterview}
+                      onClose={() => router.push("/dashboard")}
                       clarifyingQuestionsAssessment={clarifyingQuestionsAssessment}
                     />
                   </ErrorBoundary>

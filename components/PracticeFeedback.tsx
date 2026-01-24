@@ -48,6 +48,7 @@ interface PracticeFeedbackProps {
   interviewerMessages?: ChatMessage[]
   onExport?: () => void
   onNewProblem?: () => void
+  onClose?: () => void
   // Complexity analysis
   complexityAnalysis?: SessionComplexityAnalysis | null
   alternativeApproaches?: AlternativeApproach[]
@@ -90,6 +91,7 @@ export default function PracticeFeedback({
   interviewerMessages,
   onExport,
   onNewProblem,
+  onClose,
   complexityAnalysis,
   alternativeApproaches,
   clarifyingQuestionsAssessment,
@@ -228,6 +230,7 @@ export default function PracticeFeedback({
         spaceComplexity={spaceComplexity}
         efficiencyScore={efficiencyScore}
         onExport={onExport}
+        onClose={onClose}
         problemTitle={problemTitle}
         grade={grade}
         scores={scores}

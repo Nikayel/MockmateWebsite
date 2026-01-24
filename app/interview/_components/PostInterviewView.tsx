@@ -199,56 +199,58 @@ export function PostInterviewView({
   const debriefPhase = interviewerMessages.length <= 2 ? "technical" : "wrapup"
 
   return (
-    <div className="mx-auto flex h-full max-w-7xl flex-col px-4 py-4">
-      {/* Compact Header */}
-      <div className="mb-3 flex-shrink-0">
+    <div className="mx-auto flex h-full max-w-7xl flex-col px-4 py-6">
+      {/* Header - Apple-style clean design */}
+      <div className="mb-6 flex-shrink-0">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-white">
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-semibold tracking-tight text-white">
               {debriefPhase === "technical" ? "Technical Debrief" : "Wrap Up"}
             </h2>
-            <span className="flex items-center gap-1.5 text-sm text-gray-400">
+            <div className="flex items-center gap-1.5 rounded-full bg-zinc-800/60 px-3 py-1.5">
               {testSummary.passRate === 100 ? (
-                <CheckCircle className="h-4 w-4 text-green-500" />
+                <CheckCircle className="h-4 w-4 text-emerald-500" />
               ) : (
-                <XCircle className="h-4 w-4 text-yellow-500" />
+                <XCircle className="h-4 w-4 text-amber-500" />
               )}
-              {testSummary.passed}/{testSummary.total} tests
-            </span>
+              <span className="text-sm font-medium text-zinc-300">
+                {testSummary.passed}/{testSummary.total} tests
+              </span>
+            </div>
             {testSummary.passRate < 100 && (
               <Button
                 onClick={() => setShowPostInterviewDiscussion(false)}
                 variant="ghost"
                 size="sm"
-                className="h-7 text-xs text-yellow-500 hover:bg-yellow-600/10 hover:text-yellow-400"
+                className="h-8 rounded-full px-3 text-xs font-medium text-amber-500 transition-colors hover:bg-amber-500/10 hover:text-amber-400"
               >
-                <Code className="mr-1 h-3 w-3" />
+                <Code className="mr-1.5 h-3 w-3" />
                 Continue Editing
               </Button>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Button
               onClick={proceedToFinalFeedback}
               size="sm"
-              className="bg-white text-gray-900 hover:bg-gray-100"
+              className="h-11 rounded-full bg-white px-6 text-sm font-semibold text-zinc-900 shadow-sm transition-all duration-200 hover:bg-zinc-50 hover:shadow-md active:scale-[0.98]"
             >
-              View Feedback
-              <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+              See Full Interview Score
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
             {onClose && (
               <Button
                 onClick={onClose}
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0 text-gray-400 hover:bg-gray-800 hover:text-white"
+                className="h-10 w-10 rounded-full p-0 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </Button>
             )}
           </div>
         </div>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-2 text-sm font-medium text-zinc-500">
           {debriefPhase === "technical"
             ? "Discuss your solution, complexity trade-offs, and alternatives."
             : "Any final questions before viewing your feedback?"}
