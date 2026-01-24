@@ -271,16 +271,20 @@ export function PostInterviewView({
                   <Badge variant="outline" className="border-gray-700 text-xs text-gray-500">
                     {selectedLanguage}
                   </Badge>
-                  {efficiencyMetrics && (
+                  {efficiencyMetrics && efficiencyMetrics.estimatedTimeComplexity !== "Unknown" && (
                     <>
                       <span className="text-gray-600">·</span>
                       <span className="text-xs text-gray-500">
                         {efficiencyMetrics.estimatedTimeComplexity} time
                       </span>
-                      <span className="text-gray-600">·</span>
-                      <span className="text-xs text-gray-500">
-                        {efficiencyMetrics.estimatedSpaceComplexity} space
-                      </span>
+                      {efficiencyMetrics.estimatedSpaceComplexity !== "Unknown" && (
+                        <>
+                          <span className="text-gray-600">·</span>
+                          <span className="text-xs text-gray-500">
+                            {efficiencyMetrics.estimatedSpaceComplexity} space
+                          </span>
+                        </>
+                      )}
                     </>
                   )}
                 </div>

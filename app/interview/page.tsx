@@ -89,6 +89,8 @@ import {
   extractTopicsFromMessage,
   extractUserAnsweredTopics,
   analyzeCodeEfficiency,
+  analyzeComplexityWithLLM,
+  type LLMComplexityResult,
 } from "@/lib/interview"
 // Local page components
 import { PostInterviewView, FeedbackLoadingState } from "./_components"
@@ -329,29 +331,16 @@ function InterviewPageContent() {
   })
 
   // Voice recording - using Deepgram with Web Speech API fallback
+  // Auto-send on utterance end is DISABLED - user must click Send button
   const interviewerVoice = useVoiceInput({
     fallbackToWebSpeech: true,
     onTranscript: (transcript, _isFinal) => {
       setInterviewerInput(transcript)
     },
     onUtteranceEnd: (transcript) => {
-      // Auto-send when user stops speaking in live mode
-      // Use ref to get current value (avoids stale closure issue)
-      if (
-        voiceModeLiveRef.current &&
-        transcript.trim() &&
-        !pendingAutoSendRef.current.interviewer
-      ) {
-        // Live Mode: auto-send on utterance end
-        pendingAutoSendRef.current.interviewer = true
+      // Auto-send DISABLED - just update the input, user clicks Send
+      if (transcript.trim()) {
         setInterviewerInput(transcript)
-        // Small delay to ensure state is updated
-        setTimeout(() => {
-          handleSendMessage(true)
-          pendingAutoSendRef.current.interviewer = false
-          // Clear the sent tracker so next utterance is detected as new
-          interviewerVoice.clearSentTracker()
-        }, 100)
       }
     },
   })
@@ -362,17 +351,9 @@ function InterviewPageContent() {
       setChatInput(transcript)
     },
     onUtteranceEnd: (transcript) => {
-      // Auto-send when user stops speaking in live mode
-      // Use ref to get current value (avoids stale closure issue)
-      if (voiceModeLiveRef.current && transcript.trim() && !pendingAutoSendRef.current.partner) {
-        // Live Mode: auto-send on utterance end for partner
-        pendingAutoSendRef.current.partner = true
+      // Auto-send DISABLED - just update the input, user clicks Send
+      if (transcript.trim()) {
         setChatInput(transcript)
-        setTimeout(() => {
-          handleSendMessage(false)
-          pendingAutoSendRef.current.partner = false
-          partnerVoice.clearSentTracker()
-        }, 100)
       }
     },
   })
@@ -2063,8 +2044,48 @@ Ask ONE focused question based on these observations.`)
         return
       }
 
-      // Calculate efficiency metrics for the discussion prompt
-      const metrics = analyzeCodeEfficiency(code, (selectedScenario as any)?.optimalComplexity)
+      const optimalComplexity = (selectedScenario as any)?.optimalComplexity
+
+      // Use LLM-based complexity analysis for accurate semantic understanding
+      // Falls back to regex-based analysis if LLM fails
+      let llmComplexity: LLMComplexityResult | null = null
+      try {
+        llmComplexity = await analyzeComplexityWithLLM({
+          code,
+          language: selectedLanguage,
+          problemTitle: selectedScenario.title,
+          problemDescription: selectedScenario.description,
+          optimalTimeComplexity: optimalComplexity?.time,
+          optimalSpaceComplexity: optimalComplexity?.space,
+        })
+      } catch (llmError) {
+        console.warn("LLM complexity analysis failed, using regex fallback:", llmError)
+      }
+
+      // Build metrics: prefer LLM results, fall back to regex for missing values
+      const regexMetrics = analyzeCodeEfficiency(code, optimalComplexity)
+
+      // Use LLM complexity if available and confident, otherwise use regex
+      let finalTimeComplexity = regexMetrics.estimatedTimeComplexity
+      let finalSpaceComplexity = regexMetrics.estimatedSpaceComplexity
+
+      if (llmComplexity && llmComplexity.confidence !== "low") {
+        if (llmComplexity.timeComplexity !== "Unknown") {
+          finalTimeComplexity = llmComplexity.timeComplexity
+        }
+        if (llmComplexity.spaceComplexity !== "Unknown") {
+          finalSpaceComplexity = llmComplexity.spaceComplexity
+        }
+      }
+
+      const metrics = {
+        ...regexMetrics,
+        estimatedTimeComplexity: finalTimeComplexity,
+        estimatedSpaceComplexity: finalSpaceComplexity,
+      }
+
+      // Update state so PostInterviewView shows accurate complexity
+      setEfficiencyMetrics(metrics)
 
       // Trigger interviewer to discuss the solution
       // NOTE: Feedback generation is now DEFERRED until user clicks "View Detailed Feedback"
@@ -2125,15 +2146,12 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           interviewPhase: "post_interview" as const,
           conversationTracker,
           hasSubmitted: true, // Explicit - don't rely on state timing
-          solutionComplexity: efficiencyMetrics
-            ? {
-                estimated: efficiencyMetrics.estimatedTimeComplexity,
-                optimal: efficiencyMetrics.optimalTimeComplexity,
-                isOptimal:
-                  efficiencyMetrics.estimatedTimeComplexity ===
-                  efficiencyMetrics.optimalTimeComplexity,
-              }
-            : null,
+          // Use freshly computed metrics (not stale state)
+          solutionComplexity: {
+            estimated: metrics.estimatedTimeComplexity,
+            optimal: metrics.optimalTimeComplexity,
+            isOptimal: metrics.estimatedTimeComplexity === metrics.optimalTimeComplexity,
+          },
         }),
       })
 
@@ -3195,43 +3213,18 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
     try {
       if (voice.isRecording) {
-        // Stop recording
-        const finalTranscript = voice.stopRecording()
-        if (finalTranscript) {
-          // In Live mode, messages are auto-sent on utterance end (when user pauses)
-          // So when manually stopping, we just capture what's left
-          if (voiceAutoSend) {
-            // Auto-send is always on now - if there's unsent content, send it
-            if (finalTranscript.trim()) {
-              setInput(finalTranscript)
-              setTimeout(() => {
-                handleSendMessage(isInterviewer)
-              }, 100)
-            }
-            toast.success("Recording stopped", { duration: 1500 })
-          } else {
-            // Manual mode: just capture the transcript, user will click send
-            toast.success("Voice captured - click send when ready", { duration: 2000 })
-          }
-        }
+        // Stop recording - DON'T auto-send, let user click send button
+        stopVoiceRecording(isInterviewer)
       } else {
         // Start recording
         // Reset the transcript before starting
         voice.resetTranscript()
         setInput("")
         await voice.startRecording()
-        // Always show simplified voice feedback
-        toast.success("Speak now - sends automatically when you pause", {
+        toast.success("Recording... click Send when ready", {
           duration: 2000,
           icon: "🎙️",
         })
-        // Removed manual mode branch - always auto-send now
-        if (false) {
-          toast.success("Recording... Click mic again to stop", {
-            duration: 2000,
-            icon: "🎤",
-          })
-        }
       }
     } catch (err: any) {
       console.error("Voice recording error:", err)
@@ -3241,6 +3234,22 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         toast.error("No microphone found. Please connect a microphone and try again.")
       } else {
         toast.error("Voice input error. Please try again.")
+      }
+    }
+  }
+
+  // Stop recording without auto-sending - user will click send button
+  const stopVoiceRecording = (isInterviewer: boolean) => {
+    const voice = isInterviewer ? interviewerVoice : partnerVoice
+    const setInput = isInterviewer ? setInterviewerInput : setChatInput
+
+    if (voice.isRecording) {
+      const finalTranscript = voice.stopRecording()
+      if (finalTranscript?.trim()) {
+        setInput(finalTranscript)
+        toast.success("Recording stopped - click Send to submit", { duration: 2000 })
+      } else {
+        toast.success("Recording stopped", { duration: 1500 })
       }
     }
   }
@@ -3257,6 +3266,14 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       setMessages((prev) => [...prev, newUserMessage])
       setInput("")
       setLoading(true)
+
+      // Stop recording and reset voice transcript after sending
+      const voice = isInterviewer ? interviewerVoice : partnerVoice
+      if (voice.isRecording) {
+        voice.stopRecording()
+      }
+      voice.resetTranscript()
+      voice.clearSentTracker()
 
       // Track user message for conversation context (phase tracking)
       if (isInterviewer) {
@@ -5263,9 +5280,10 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                                       <div
                                         className={`max-w-[85%] rounded px-2 py-1 text-[10px] ${msg.type === "user" ? "bg-blue-600/80 text-white" : "bg-gray-700 text-gray-200"}`}
                                       >
-                                        <p className="break-words whitespace-pre-wrap">
-                                          {msg.message}
-                                        </p>
+                                        <MarkdownRenderer
+                                          content={msg.message}
+                                          className="text-[10px] break-words"
+                                        />
                                       </div>
                                     </div>
                                   ))
@@ -5359,9 +5377,10 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                                       {msg.type === "user" ? "You" : "CodeSparring AI"}
                                     </span>
                                   </div>
-                                  <p className="text-xs leading-relaxed whitespace-pre-wrap">
-                                    {msg.message}
-                                  </p>
+                                  <MarkdownRenderer
+                                    content={msg.message}
+                                    className="text-xs leading-relaxed"
+                                  />
                                 </div>
                               </div>
                             ))}
@@ -5396,15 +5415,22 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                       </div>
                       {(isInterviewStarted || showPostInterviewDiscussion) && (
                         <div className="flex flex-shrink-0 flex-col gap-2 border-t border-gray-700 pt-3">
-                          {/* Enhanced Voice Mode Toggle */}
+                          {/* Voice Mode Toggle with Send button */}
                           <VoiceModeToggle
                             isRecording={isRecordingInterviewer}
                             onToggleRecording={() => toggleVoiceRecording(true)}
+                            onCancel={() => {
+                              interviewerVoice.stopRecording()
+                              interviewerVoice.resetTranscript()
+                              setInterviewerInput("")
+                            }}
+                            onSend={() => handleSendMessage(true)}
+                            isLoading={isLoadingInterviewer || isGeneratingDiscussion}
                             transcript={interviewerInput}
                             disabled={isLoadingInterviewer || isGeneratingDiscussion}
                             compact={true}
                           />
-                          {/* Text input for typing */}
+                          {/* Text input - only shown when NOT recording */}
                           {!isRecordingInterviewer && (
                             <div className="flex space-x-1">
                               <Input
@@ -5412,7 +5438,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                                 onChange={(e) => setInterviewerInput(e.target.value)}
                                 placeholder={
                                   showPostInterviewDiscussion
-                                    ? "Type or use voice..."
+                                    ? "Type or use mic above..."
                                     : "Type a question..."
                                 }
                                 className="bg-secondary border-border text-foreground placeholder-muted-foreground h-7 flex-1 text-xs"

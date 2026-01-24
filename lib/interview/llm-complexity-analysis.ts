@@ -86,18 +86,29 @@ Return ONLY valid JSON, no markdown code blocks.`
 
     const result = await response.json()
 
-    // Validate the response structure
-    if (!result.timeComplexity || !result.spaceComplexity) {
-      throw new Error("Invalid response structure")
+    // Validate the response structure - handle various edge cases
+    const timeComplexity = normalizeComplexity(result?.timeComplexity)
+    const spaceComplexity = normalizeComplexity(result?.spaceComplexity)
+
+    // If both are unknown, treat as a failure
+    if (timeComplexity === "Unknown" && spaceComplexity === "Unknown") {
+      throw new Error("LLM returned no usable complexity values")
     }
 
+    // Validate confidence is a valid value
+    const validConfidences = ["high", "medium", "low"] as const
+    const confidence = validConfidences.includes(result?.confidence)
+      ? (result.confidence as "high" | "medium" | "low")
+      : "medium"
+
     return {
-      timeComplexity: normalizeComplexity(result.timeComplexity),
-      spaceComplexity: normalizeComplexity(result.spaceComplexity),
-      confidence: result.confidence || "medium",
-      reasoning: result.reasoning || "",
-      algorithmPattern: result.algorithmPattern,
-      suggestions: result.suggestions,
+      timeComplexity,
+      spaceComplexity,
+      confidence,
+      reasoning: typeof result?.reasoning === "string" ? result.reasoning : "",
+      algorithmPattern:
+        typeof result?.algorithmPattern === "string" ? result.algorithmPattern : undefined,
+      suggestions: Array.isArray(result?.suggestions) ? result.suggestions : undefined,
     }
   } catch (error) {
     console.error("LLM complexity analysis failed, using fallback:", error)
@@ -106,7 +117,8 @@ Return ONLY valid JSON, no markdown code blocks.`
       timeComplexity: "Unknown",
       spaceComplexity: "Unknown",
       confidence: "low",
-      reasoning: "LLM analysis unavailable, complexity will be evaluated during feedback generation",
+      reasoning:
+        "LLM analysis unavailable, complexity will be evaluated during feedback generation",
     }
   }
 }
@@ -114,8 +126,15 @@ Return ONLY valid JSON, no markdown code blocks.`
 /**
  * Normalize complexity notation to standard format
  */
-function normalizeComplexity(complexity: string): string {
+function normalizeComplexity(complexity: string | null | undefined): string {
+  if (!complexity) return "Unknown"
+
   const normalized = complexity.trim().toUpperCase()
+
+  // Handle edge cases
+  if (!normalized || normalized === "UNKNOWN" || normalized === "N/A") {
+    return "Unknown"
+  }
 
   // Handle common variations
   const mappings: Record<string, string> = {
@@ -123,18 +142,34 @@ function normalizeComplexity(complexity: string): string {
     "O(N)": "O(n)",
     "O(LOGN)": "O(log n)",
     "O(LOG N)": "O(log n)",
+    "O(LOG(N))": "O(log n)",
     "O(N LOG N)": "O(n log n)",
     "O(NLOGN)": "O(n log n)",
     "O(N*LOGN)": "O(n log n)",
+    "O(N*LOG N)": "O(n log n)",
+    "O(N * LOG N)": "O(n log n)",
     "O(N^2)": "O(n²)",
     "O(N*N)": "O(n²)",
     "O(N²)": "O(n²)",
+    "O(N**2)": "O(n²)",
     "O(N^3)": "O(n³)",
     "O(N³)": "O(n³)",
+    "O(N**3)": "O(n³)",
     "O(2^N)": "O(2^n)",
+    "O(2**N)": "O(2^n)",
     "O(M*N)": "O(m×n)",
+    "O(M * N)": "O(m×n)",
+    "O(MN)": "O(m×n)",
     "O(M+N)": "O(m+n)",
+    "O(M + N)": "O(m+n)",
     "O(K)": "O(k)",
+    CONSTANT: "O(1)",
+    LINEAR: "O(n)",
+    LOGARITHMIC: "O(log n)",
+    LINEARITHMIC: "O(n log n)",
+    QUADRATIC: "O(n²)",
+    CUBIC: "O(n³)",
+    EXPONENTIAL: "O(2^n)",
   }
 
   return mappings[normalized] || complexity
