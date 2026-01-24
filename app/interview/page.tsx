@@ -3357,8 +3357,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         if (data.conversationEnded) {
           // Show end session prompt instead of continuing conversation
           toast.info(
-            data.endMessage ||
-              "Session complete! Click 'End Interview' to see your results.",
+            data.endMessage || "Session complete! Click 'End Interview' to see your results.",
             {
               duration: 5000,
               action: {
@@ -3407,16 +3406,13 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           if (data.conversationEnded === true) {
             // Show prompt to end session after the final message
             setTimeout(() => {
-              toast.info(
-                "Click 'End Interview' to see your score breakdown and analysis.",
-                {
-                  duration: 8000,
-                  action: {
-                    label: "End Interview",
-                    onClick: proceedToFinalFeedback,
-                  },
-                }
-              )
+              toast.info("Click 'End Interview' to see your score breakdown and analysis.", {
+                duration: 8000,
+                action: {
+                  label: "End Interview",
+                  onClick: proceedToFinalFeedback,
+                },
+              })
             }, 1500) // Wait for message to appear first
           }
 
@@ -5452,7 +5448,16 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                   onClose={() => router.push("/dashboard")}
                 />
               ) : isGeneratingFeedback ? (
-                <FeedbackLoadingState onGoToDashboard={() => router.push("/dashboard")} />
+                <FeedbackLoadingState
+                  onGoToDashboard={() => router.push("/dashboard")}
+                  interviewStats={{
+                    testsPassed: testSummary.passed,
+                    totalTests: testSummary.total,
+                    timeSpentMinutes: Math.round(elapsedTime / 60),
+                    messagesExchanged: interviewerMessages.length,
+                    codeLines: code.split("\n").filter((line) => line.trim()).length,
+                  }}
+                />
               ) : (
                 <>
                   <ErrorBoundary>
