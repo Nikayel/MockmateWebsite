@@ -2535,6 +2535,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           spaceComplexity: efficiencyMetrics?.estimatedSpaceComplexity,
           efficiencyScore: efficiencyMetrics?.efficiencyScore,
           feedbackStatus: "complete", // Feedback generation is done
+          // Pass pre-calculated technical score from API for consistency
+          technicalScore: technicalScore ?? undefined,
           // CRITICAL: Include scoreBreakdown to prevent overwriting scores
           scoreBreakdown: scoreBreakdown
             ? {
@@ -2715,6 +2717,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
       let feedbackText = `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
       let calculatedPerformanceScore = testSummary.passRate
+      let localTechnicalScore: number | undefined = undefined
       let scoreBreakdownData: {
         understanding?: number
         problemSolving?: number
@@ -2806,6 +2809,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             feedbackText = feedbackData.feedback || feedbackText
             calculatedPerformanceScore = feedbackData.performanceScore || calculatedPerformanceScore
             if (feedbackData.technicalScore !== undefined) {
+              localTechnicalScore = feedbackData.technicalScore
               setTechnicalScore(feedbackData.technicalScore)
             }
             if (feedbackData.scores) {
@@ -2958,6 +2962,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
             efficiencyScore: efficiencyData?.efficiencyScore,
             feedbackStatus: aiFeedbackSucceeded ? "complete" : "complete",
+            // Pass pre-calculated technical score from API for consistency
+            technicalScore: localTechnicalScore,
             scoreBreakdown: cleanScoreBreakdown,
             constitutionalAICritique: localConstitutionalAICritique || undefined,
             clarifyingQuestionsAssessment: localClarifyingQuestionsAssessment || undefined,
@@ -3634,12 +3640,14 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         codeQuality?: number
         communication?: number
       } | null = null
+      let systemDesignTechnicalScore: number | undefined = undefined
       if (feedbackResponse.ok) {
         const feedbackData = await feedbackResponse.json()
         comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
         calculatedPerformanceScore = feedbackData.scores?.overall || 0
         // Store technical score (mastery-based) for Overall/Technical toggle
         if (feedbackData.technicalScore !== undefined) {
+          systemDesignTechnicalScore = feedbackData.technicalScore
           setTechnicalScore(feedbackData.technicalScore)
         }
         // Store score breakdown for technical score calculations and display
@@ -3686,6 +3694,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
               language: "notes",
               testResults: [],
               feedbackStatus: "complete", // Feedback generation is done
+              // Pass pre-calculated technical score from API for consistency
+              technicalScore: systemDesignTechnicalScore,
               scoreBreakdown: systemDesignScoreBreakdown || undefined,
             }
           )

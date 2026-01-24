@@ -515,6 +515,7 @@ export async function updateInterviewSession(
     spaceComplexity?: string
     efficiencyScore?: number
     feedbackStatus?: FeedbackStatus // Track feedback generation state
+    technicalScore?: number // Pre-calculated mastery/technical score from API (use this instead of recalculating)
     scoreBreakdown?: {
       understanding?: number
       understandingScore?: number
@@ -598,6 +599,14 @@ export async function updateInterviewSession(
     if (additionalData.timeComplexity) updateData.time_complexity = additionalData.timeComplexity
     if (additionalData.spaceComplexity) updateData.space_complexity = additionalData.spaceComplexity
     if (additionalData.efficiencyScore) updateData.efficiency_score = additionalData.efficiencyScore
+    // Save technical_score (mastery score) - prefer pre-calculated value from API
+    // This ensures consistency between post-session display and sessions list
+    if (additionalData.technicalScore !== undefined) {
+      // Use the pre-calculated mastery score from the API (most accurate)
+      updateData.technical_score = additionalData.technicalScore
+      updateData.mastery_score = additionalData.technicalScore
+    }
+
     // Save score breakdown for technical score calculations (required for pattern ranking)
     if (additionalData.scoreBreakdown) {
       // Extract scores, handling both naming conventions (understanding/understandingScore, etc.)
@@ -641,23 +650,21 @@ export async function updateInterviewSession(
       // Only save score_breakdown if we have at least one defined score
       if (Object.keys(scoreBreakdownObj).length > 0) {
         updateData.score_breakdown = scoreBreakdownObj
+      }
 
-        // Calculate and save technical_score (excludes communication, focuses on code mastery)
-        // Uses centralized calculateTechnicalScoreFromBreakdown from lib/constants.ts
-        // Only calculate if we have the required scores
-        if (
-          codeQualityScore !== undefined &&
-          problemSolvingScore !== undefined &&
-          understandingScore !== undefined
-        ) {
-          updateData.technical_score = calculateTechnicalScoreFromBreakdown({
-            codeQualityScore,
-            problemSolvingScore,
-            understandingScore,
-          })
-          // Also save as mastery_score for backwards compatibility
-          updateData.mastery_score = updateData.technical_score
-        }
+      // Fallback: calculate technical_score from breakdown if no pre-calculated value provided
+      if (
+        additionalData.technicalScore === undefined &&
+        codeQualityScore !== undefined &&
+        problemSolvingScore !== undefined &&
+        understandingScore !== undefined
+      ) {
+        updateData.technical_score = calculateTechnicalScoreFromBreakdown({
+          codeQualityScore,
+          problemSolvingScore,
+          understandingScore,
+        })
+        updateData.mastery_score = updateData.technical_score
       }
     }
     // Save complexity analysis (user-stated vs code-analyzed)
