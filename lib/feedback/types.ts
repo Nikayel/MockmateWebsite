@@ -97,11 +97,22 @@ export interface CritiqueResult {
 }
 
 /**
+ * User-friendly score adjustment explanation
+ * Shows which score changed, by how much, and why (in plain language)
+ */
+export interface ScoreAdjustmentSummary {
+  category: "Understanding" | "Problem-Solving" | "Code Quality" | "Communication"
+  original: number
+  adjusted: number
+  reason: string // User-friendly explanation, e.g., "Your solution was optimal but this wasn't initially credited"
+}
+
+/**
  * Constitutional AI Score Critique
  * Reviews calculated scores to ensure fairness and accuracy
  */
 export interface ScoreCritiqueAdjustment {
-  critiques: CritiqueResult[]
+  critiques: CritiqueResult[] // Internal - for logging/debugging
   adjustedScores?: {
     understanding: number
     problemSolving: number
@@ -109,8 +120,11 @@ export interface ScoreCritiqueAdjustment {
     communication: number
     overall: number
   }
-  reasoning: string
+  reasoning: string // Internal technical reasoning
   madeChanges: boolean
+  // NEW: User-friendly output
+  userSummary?: string // e.g., "We corrected some scoring inaccuracies in your favor."
+  scoreChanges?: ScoreAdjustmentSummary[] // Per-category changes with plain explanations
 }
 
 /**
@@ -118,10 +132,12 @@ export interface ScoreCritiqueAdjustment {
  * Reviews generated feedback text for constructive tone and accuracy
  */
 export interface FeedbackCritiqueAdjustment {
-  critiques: CritiqueResult[]
+  critiques: CritiqueResult[] // Internal - for logging/debugging
   revisedFeedback?: string
-  reasoning: string
+  reasoning: string // Internal technical reasoning
   madeChanges: boolean
+  // NEW: User-friendly output
+  userSummary?: string // e.g., "We refined some feedback for accuracy."
 }
 
 /**

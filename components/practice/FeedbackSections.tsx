@@ -724,89 +724,224 @@ export const FeedbackSections = memo(function FeedbackSections({
           </>
         )}
 
-        {/* Constitutional AI Quality Check - Only shown if adjustments were made */}
+        {/* Grading Verification - Shows AI self-review results */}
         {constitutionalAICritique && (
-          <>
+          <div className="overflow-hidden rounded-xl border border-indigo-500/20 bg-gradient-to-b from-indigo-500/5 to-transparent">
             <button
               onClick={() => setShowQualityCheck(!showQualityCheck)}
-              className="flex w-full items-center justify-between rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-3 transition-colors hover:bg-yellow-500/20"
+              className="flex w-full items-center justify-between p-4 transition-colors hover:bg-indigo-500/5"
             >
-              <div className="flex items-center gap-2">
-                <Shield className="h-3.5 w-3.5 text-yellow-400" />
-                <span className="text-xs font-medium text-yellow-400">
-                  Quality Check (Constitutional AI)
-                </span>
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10">
+                  <Shield className="h-4 w-4 text-indigo-400" />
+                </div>
+                <div className="text-left">
+                  <h3 className="text-sm font-medium text-white">Grading Verified</h3>
+                  <p className="text-[10px] text-zinc-500">
+                    Our AI double-checked this feedback for fairness
+                  </p>
+                </div>
               </div>
-              {showQualityCheck ? (
-                <ChevronUp className="h-3.5 w-3.5 text-yellow-500" />
-              ) : (
-                <ChevronDown className="h-3.5 w-3.5 text-yellow-500" />
-              )}
-            </button>
-            {showQualityCheck && (
-              <div className="space-y-3 rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-4">
-                <p className="text-xs font-semibold text-yellow-400">
-                  Our AI reviewed its own work for fairness and accuracy.
-                </p>
-
+              <div className="flex items-center gap-2">
                 {constitutionalAICritique.scoreCritique && (
-                  <div className="rounded-lg border border-yellow-500/20 bg-zinc-900/50 p-3">
-                    <p className="mb-2 text-xs font-semibold text-yellow-300">Score Adjustments:</p>
-                    <p className="mb-3 text-[10px] text-zinc-300">
-                      {constitutionalAICritique.scoreCritique.reasoning}
-                    </p>
-                    <div className="mb-3 grid grid-cols-2 gap-2 rounded bg-zinc-800/50 p-2 text-[10px]">
-                      <div className="text-zinc-400">
-                        Original Overall:{" "}
-                        <span className="text-zinc-200">
+                  <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-medium text-emerald-400">
+                    {constitutionalAICritique.scoreCritique.adjustedScores.overall -
+                      constitutionalAICritique.scoreCritique.originalScores.overall >
+                    0
+                      ? "+"
+                      : ""}
+                    {constitutionalAICritique.scoreCritique.adjustedScores.overall -
+                      constitutionalAICritique.scoreCritique.originalScores.overall}{" "}
+                    points
+                  </span>
+                )}
+                {showQualityCheck ? (
+                  <ChevronUp className="h-4 w-4 text-zinc-500" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-zinc-500" />
+                )}
+              </div>
+            </button>
+
+            {showQualityCheck && (
+              <div className="border-t border-indigo-500/10 p-4">
+                {/* User-friendly Summary - with fallback for old sessions */}
+                {(() => {
+                  const scoreCritique = constitutionalAICritique.scoreCritique
+                  const feedbackCritique = constitutionalAICritique.feedbackCritique
+                  const summary = scoreCritique?.userSummary || feedbackCritique?.userSummary
+                  if (summary) {
+                    return (
+                      <p className="mb-4 text-[11px] leading-relaxed text-zinc-300">{summary}</p>
+                    )
+                  }
+                  // Fallback for old sessions without userSummary
+                  if (scoreCritique?.adjustedScores && scoreCritique?.originalScores) {
+                    const delta =
+                      scoreCritique.adjustedScores.overall - scoreCritique.originalScores.overall
+                    if (delta !== 0) {
+                      return (
+                        <p className="mb-4 text-[11px] leading-relaxed text-zinc-300">
+                          {delta > 0
+                            ? `We reviewed your grading and adjusted your score by +${delta} points to better reflect your performance.`
+                            : `We reviewed your grading and made adjustments for accuracy.`}
+                        </p>
+                      )
+                    }
+                  }
+                  return null
+                })()}
+
+                {/* Score Change Summary */}
+                {constitutionalAICritique.scoreCritique && (
+                  <div className="mb-4">
+                    <div className="mb-3 flex items-center justify-between rounded-lg bg-zinc-800/50 p-3">
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-zinc-500 line-through">
                           {constitutionalAICritique.scoreCritique.originalScores.overall}
-                        </span>
+                        </div>
+                        <div className="text-[10px] text-zinc-600">Original</div>
                       </div>
-                      <div className="text-yellow-400">
-                        Adjusted:{" "}
-                        <span className="font-semibold">
+                      <div className="text-zinc-600">→</div>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-emerald-400">
                           {constitutionalAICritique.scoreCritique.adjustedScores.overall}
-                        </span>
+                        </div>
+                        <div className="text-[10px] text-zinc-500">Verified</div>
                       </div>
                     </div>
-                    <ul className="space-y-2">
-                      {constitutionalAICritique.scoreCritique.critiques.map((c: any, i: number) => (
-                        <li key={i} className="flex items-start gap-2 text-[10px] text-zinc-300">
-                          <span className="shrink-0 rounded bg-yellow-500/20 px-2 py-0.5 text-[9px] font-medium text-yellow-400 capitalize">
-                            {c.aspect}
-                          </span>
-                          <span>{c.issue}</span>
-                        </li>
-                      ))}
-                    </ul>
+
+                    {/* Per-category score changes (user-friendly) - with fallback for old sessions */}
+                    {(() => {
+                      const scoreCritique = constitutionalAICritique.scoreCritique
+                      let changes = scoreCritique?.scoreChanges
+
+                      // Fallback: compute changes from original/adjusted scores for old sessions
+                      if (
+                        (!changes || changes.length === 0) &&
+                        scoreCritique?.originalScores &&
+                        scoreCritique?.adjustedScores
+                      ) {
+                        const orig = scoreCritique.originalScores
+                        const adj = scoreCritique.adjustedScores
+                        const computed: Array<{
+                          category: string
+                          original: number
+                          adjusted: number
+                          reason: string
+                        }> = []
+
+                        const categories = [
+                          {
+                            key: "understanding" as const,
+                            label: "Understanding",
+                            upReason: "Your grasp of the problem deserved more credit",
+                            downReason: "Adjusted for accuracy",
+                          },
+                          {
+                            key: "problemSolving" as const,
+                            label: "Problem-Solving",
+                            upReason: "Your approach was stronger than initially scored",
+                            downReason: "Adjusted for accuracy",
+                          },
+                          {
+                            key: "codeQuality" as const,
+                            label: "Code Quality",
+                            upReason: "Your code quality deserved a higher score",
+                            downReason: "Adjusted for accuracy",
+                          },
+                          {
+                            key: "communication" as const,
+                            label: "Communication",
+                            upReason: "Your explanations were better than initially credited",
+                            downReason: "Adjusted for accuracy",
+                          },
+                        ]
+
+                        for (const cat of categories) {
+                          if (orig[cat.key] !== adj[cat.key]) {
+                            computed.push({
+                              category: cat.label,
+                              original: orig[cat.key],
+                              adjusted: adj[cat.key],
+                              reason: adj[cat.key] > orig[cat.key] ? cat.upReason : cat.downReason,
+                            })
+                          }
+                        }
+                        changes = computed
+                      }
+
+                      if (!changes || changes.length === 0) return null
+
+                      return (
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-medium tracking-wider text-zinc-500 uppercase">
+                            Score Adjustments
+                          </p>
+                          {changes.map((change: any, i: number) => (
+                            <div
+                              key={i}
+                              className="rounded-lg border border-zinc-700/50 bg-zinc-800/30 p-3"
+                            >
+                              <div className="mb-1.5 flex items-center justify-between">
+                                <span className="text-xs font-medium text-zinc-200">
+                                  {change.category}
+                                </span>
+                                <div className="flex items-center gap-2 text-[11px]">
+                                  <span className="text-zinc-500 line-through">
+                                    {change.original}
+                                  </span>
+                                  <span className="text-zinc-600">→</span>
+                                  <span
+                                    className={
+                                      change.adjusted > change.original
+                                        ? "font-medium text-emerald-400"
+                                        : "text-zinc-400"
+                                    }
+                                  >
+                                    {change.adjusted}
+                                  </span>
+                                  {change.adjusted > change.original && (
+                                    <span className="text-[10px] text-emerald-500">
+                                      +{change.adjusted - change.original}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-[11px] leading-relaxed text-zinc-400">
+                                {change.reason}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })()}
                   </div>
                 )}
 
-                {constitutionalAICritique.feedbackCritique && (
-                  <div className="rounded-lg border border-yellow-500/20 bg-zinc-900/50 p-3">
-                    <p className="mb-2 text-xs font-semibold text-yellow-300">
-                      Feedback Improvements:
-                    </p>
-                    <p className="mb-3 text-[10px] text-zinc-300">
-                      {constitutionalAICritique.feedbackCritique.reasoning}
-                    </p>
-                    <ul className="space-y-2">
-                      {constitutionalAICritique.feedbackCritique.critiques.map(
-                        (c: any, i: number) => (
-                          <li key={i} className="flex items-start gap-2 text-[10px] text-zinc-300">
-                            <span className="shrink-0 rounded bg-yellow-500/20 px-2 py-0.5 text-[9px] font-medium text-yellow-400 capitalize">
-                              {c.aspect}
-                            </span>
-                            <span>{c.issue}</span>
-                          </li>
-                        )
-                      )}
-                    </ul>
-                  </div>
-                )}
+                {/* Feedback refinement summary */}
+                {constitutionalAICritique.feedbackCritique?.userSummary &&
+                  !constitutionalAICritique.scoreCritique?.userSummary && (
+                    <div
+                      className={
+                        constitutionalAICritique.scoreCritique
+                          ? "border-t border-zinc-800 pt-4"
+                          : ""
+                      }
+                    >
+                      <p className="text-[11px] leading-relaxed text-zinc-400">
+                        {constitutionalAICritique.feedbackCritique.userSummary}
+                      </p>
+                    </div>
+                  )}
+
+                <p className="mt-4 text-[10px] text-zinc-600">
+                  This verification helps ensure fair and accurate feedback for your interview
+                  practice.
+                </p>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
 

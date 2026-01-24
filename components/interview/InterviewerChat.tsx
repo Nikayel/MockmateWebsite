@@ -1,12 +1,18 @@
 "use client"
 
 import { useRef, useEffect, useState, useCallback } from "react"
-import { Brain, User, MessageSquare, Send, Mic, MicOff, ChevronDown } from "lucide-react"
+import { Brain, User, MessageSquare, Send, Mic, Square, ChevronDown, ChevronUp } from "lucide-react"
 import { FormattedText } from "@/components/ui/FormattedText"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useInterviewStore, type ChatMessage } from "@/lib/stores"
+import { cn } from "@/lib/utils"
+
+// Max height for message before showing "Show more" (in pixels, roughly 6 lines)
+const MAX_MESSAGE_HEIGHT = 150
+// Character threshold for potentially long messages
+const LONG_MESSAGE_THRESHOLD = 400
 
 /**
  * Smart Auto-Scroll Hook
@@ -87,6 +93,67 @@ function useSmartScroll(dependencies: any[]) {
   }
 }
 
+/**
+ * Collapsible Message Component
+ * For long messages, shows truncated view with "Show more" button
+ * Research: Users prefer collapsed long messages to reduce scrolling
+ * Sources: Slack, Mattermost, Rich Web Chat patterns
+ */
+function CollapsibleMessage({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [needsCollapse, setNeedsCollapse] = useState(false)
+
+  useEffect(() => {
+    if (contentRef.current) {
+      // Check if content exceeds max height
+      setNeedsCollapse(contentRef.current.scrollHeight > MAX_MESSAGE_HEIGHT)
+    }
+  }, [children])
+
+  return (
+    <div className="relative">
+      <div
+        ref={contentRef}
+        className={cn(
+          "overflow-hidden transition-all duration-200",
+          !isExpanded && needsCollapse && "max-h-[150px]",
+          className
+        )}
+      >
+        {children}
+      </div>
+      {needsCollapse && !isExpanded && (
+        <div className="pointer-events-none absolute right-0 bottom-0 left-0 h-8 bg-gradient-to-t from-gray-800 to-transparent" />
+      )}
+      {needsCollapse && (
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="mt-1 flex items-center gap-1 text-[10px] text-blue-400 transition-colors hover:text-blue-300"
+        >
+          {isExpanded ? (
+            <>
+              <ChevronUp className="h-3 w-3" />
+              Show less
+            </>
+          ) : (
+            <>
+              <ChevronDown className="h-3 w-3" />
+              Show more
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  )
+}
+
 // Sable thinking messages - creative status indicators like Claude Code
 const SABLE_THINKING_MESSAGES = [
   "Sable is thinking",
@@ -105,6 +172,7 @@ interface InterviewerChatProps {
   onSendMessage: (message: string) => Promise<void>
   isRecording: boolean
   onToggleRecording: () => void
+  onStopRecording?: () => void // Separate stop that doesn't send
   inputValue: string
   onInputChange: (value: string) => void
 }
@@ -113,6 +181,7 @@ export function InterviewerChat({
   onSendMessage,
   isRecording,
   onToggleRecording,
+  onStopRecording,
   inputValue,
   onInputChange,
 }: InterviewerChatProps) {
@@ -230,9 +299,18 @@ export function InterviewerChat({
                           {msg.type === "user" ? "You" : "CodeSparring AI"}
                         </span>
                       </div>
-                      <FormattedText className="text-xs leading-relaxed">
-                        {msg.message}
-                      </FormattedText>
+                      {/* Use CollapsibleMessage for long messages */}
+                      {msg.message.length > LONG_MESSAGE_THRESHOLD ? (
+                        <CollapsibleMessage>
+                          <FormattedText className="text-xs leading-relaxed">
+                            {msg.message}
+                          </FormattedText>
+                        </CollapsibleMessage>
+                      ) : (
+                        <FormattedText className="text-xs leading-relaxed">
+                          {msg.message}
+                        </FormattedText>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -286,36 +364,42 @@ export function InterviewerChat({
               onChange={(e) => onInputChange(e.target.value)}
               placeholder={
                 isRecording
-                  ? "Listening..."
+                  ? "Listening... click Send when ready"
                   : showPostInterviewDiscussion
                     ? "Ask about optimization or improvements..."
                     : "Ask a question..."
               }
               className="h-7 flex-1 border-gray-600 bg-gray-800 text-xs text-white placeholder-gray-400"
               onKeyPress={handleKeyPress}
-              disabled={isLoadingInterviewer || isGeneratingDiscussion || isRecording}
+              disabled={isLoadingInterviewer || isGeneratingDiscussion}
               aria-label="Chat with interviewer"
             />
+            {/* Mic button - shows Stop icon when recording */}
             <Button
-              onClick={onToggleRecording}
-              className={`h-7 px-2 ${
-                isRecording
-                  ? "animate-pulse bg-red-500 hover:bg-red-600"
-                  : "bg-gray-700 hover:bg-gray-600"
-              } text-white`}
+              onClick={isRecording ? onStopRecording || onToggleRecording : onToggleRecording}
+              className={cn(
+                "h-7 px-2 text-white",
+                isRecording ? "bg-red-500 hover:bg-red-600" : "bg-gray-700 hover:bg-gray-600"
+              )}
               aria-label={isRecording ? "Stop recording" : "Start voice input"}
               disabled={isLoadingInterviewer || isGeneratingDiscussion}
             >
               {isRecording ? (
-                <MicOff className="h-3 w-3" aria-hidden="true" />
+                <Square className="h-3 w-3" aria-hidden="true" />
               ) : (
                 <Mic className="h-3 w-3" aria-hidden="true" />
               )}
             </Button>
+            {/* Send button - always visible, highlighted when recording with content */}
             <Button
               onClick={handleSubmit}
-              className="h-7 bg-[#00d9ff] px-2 text-white hover:bg-[#00d9ff]/80"
-              disabled={isLoadingInterviewer || isGeneratingDiscussion}
+              className={cn(
+                "h-7 px-2 text-white",
+                isRecording && inputValue.trim()
+                  ? "animate-pulse bg-green-500 hover:bg-green-600"
+                  : "bg-[#00d9ff] hover:bg-[#00d9ff]/80"
+              )}
+              disabled={isLoadingInterviewer || isGeneratingDiscussion || !inputValue.trim()}
               aria-label={
                 isLoadingInterviewer || isGeneratingDiscussion ? "Sending message" : "Send message"
               }
@@ -339,6 +423,7 @@ interface AIChatPartnerProps {
   onSendMessage: (message: string) => Promise<void>
   isRecording: boolean
   onToggleRecording: () => void
+  onStopRecording?: () => void // Separate stop that doesn't send
   inputValue: string
   onInputChange: (value: string) => void
 }
@@ -347,6 +432,7 @@ export function AIChatPartner({
   onSendMessage,
   isRecording,
   onToggleRecording,
+  onStopRecording,
   inputValue,
   onInputChange,
 }: AIChatPartnerProps) {
@@ -432,7 +518,14 @@ export function AIChatPartner({
                     {msg.type === "user" ? "You" : "AI Partner"}
                   </span>
                 </div>
-                <FormattedText className="text-xs leading-tight">{msg.message}</FormattedText>
+                {/* Use CollapsibleMessage for long messages */}
+                {msg.message.length > LONG_MESSAGE_THRESHOLD ? (
+                  <CollapsibleMessage>
+                    <FormattedText className="text-xs leading-tight">{msg.message}</FormattedText>
+                  </CollapsibleMessage>
+                ) : (
+                  <FormattedText className="text-xs leading-tight">{msg.message}</FormattedText>
+                )}
               </div>
             </div>
           ))}
@@ -479,32 +572,38 @@ export function AIChatPartner({
         <Input
           value={inputValue}
           onChange={(e) => onInputChange(e.target.value)}
-          placeholder={isRecording ? "Listening..." : "Ask for help..."}
+          placeholder={isRecording ? "Listening... click Send when ready" : "Ask for help..."}
           className="h-7 flex-1 border-gray-600 bg-gray-800 text-xs text-white placeholder-gray-400"
           onKeyPress={handleKeyPress}
-          disabled={isLoadingChat || isRecording}
+          disabled={isLoadingChat}
           aria-label="Chat with AI partner"
         />
+        {/* Mic button - shows Stop icon when recording */}
         <Button
-          onClick={onToggleRecording}
-          className={`h-7 px-2 ${
-            isRecording
-              ? "animate-pulse bg-red-500 hover:bg-red-600"
-              : "bg-gray-700 hover:bg-gray-600"
-          } text-white`}
+          onClick={isRecording ? onStopRecording || onToggleRecording : onToggleRecording}
+          className={cn(
+            "h-7 px-2 text-white",
+            isRecording ? "bg-red-500 hover:bg-red-600" : "bg-gray-700 hover:bg-gray-600"
+          )}
           aria-label={isRecording ? "Stop recording" : "Start voice input"}
           disabled={isLoadingChat}
         >
           {isRecording ? (
-            <MicOff className="h-3 w-3" aria-hidden="true" />
+            <Square className="h-3 w-3" aria-hidden="true" />
           ) : (
             <Mic className="h-3 w-3" aria-hidden="true" />
           )}
         </Button>
+        {/* Send button - highlighted when recording with content */}
         <Button
           onClick={handleSubmit}
-          className="h-7 bg-[#00d9ff] px-2 text-white hover:bg-[#00d9ff]/80"
-          disabled={isLoadingChat}
+          className={cn(
+            "h-7 px-2 text-white",
+            isRecording && inputValue.trim()
+              ? "animate-pulse bg-green-500 hover:bg-green-600"
+              : "bg-[#00d9ff] hover:bg-[#00d9ff]/80"
+          )}
+          disabled={isLoadingChat || !inputValue.trim()}
           aria-label={isLoadingChat ? "Sending message" : "Send message"}
         >
           {!isLoadingChat && <Send className="h-3 w-3" aria-hidden="true" />}

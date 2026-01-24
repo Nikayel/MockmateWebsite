@@ -15,6 +15,7 @@ import type {
   ConversationValidation,
   ScoreResult,
   ExtendedScoreResult,
+  ScoreAdjustmentSummary,
 } from "./types"
 import { generateAIResponse } from "@/lib/ai-providers"
 import { logger } from "@/lib/logger"
@@ -26,6 +27,70 @@ import { calculatePerformanceScore } from "@/lib/constants"
 // ============================================================================
 // SCORE CRITIQUE
 // ============================================================================
+
+/**
+ * Generate user-friendly score change explanations
+ * Called when AI doesn't provide scoreChanges (backwards compatibility)
+ */
+function generateScoreChanges(
+  original: ScoreResult | ExtendedScoreResult,
+  adjusted: {
+    understanding: number
+    problemSolving: number
+    codeQuality: number
+    communication: number
+    overall: number
+  }
+): ScoreAdjustmentSummary[] {
+  const changes: ScoreAdjustmentSummary[] = []
+
+  const categories: Array<{
+    key: keyof typeof adjusted
+    label: ScoreAdjustmentSummary["category"]
+    increaseReason: string
+    decreaseReason: string
+  }> = [
+    {
+      key: "understanding",
+      label: "Understanding",
+      increaseReason: "Your grasp of the problem deserved more credit",
+      decreaseReason: "Adjusted to reflect understanding demonstrated",
+    },
+    {
+      key: "problemSolving",
+      label: "Problem-Solving",
+      increaseReason: "Your problem-solving approach was stronger than initially scored",
+      decreaseReason: "Adjusted for accuracy in problem-solving assessment",
+    },
+    {
+      key: "codeQuality",
+      label: "Code Quality",
+      increaseReason: "Your code quality deserved a higher score",
+      decreaseReason: "Adjusted to reflect code quality more accurately",
+    },
+    {
+      key: "communication",
+      label: "Communication",
+      increaseReason: "Your explanation and communication were better than initially credited",
+      decreaseReason: "Adjusted for more accurate communication assessment",
+    },
+  ]
+
+  for (const cat of categories) {
+    const origScore = original[cat.key] as number
+    const adjScore = adjusted[cat.key]
+    if (origScore !== adjScore) {
+      changes.push({
+        category: cat.label,
+        original: origScore,
+        adjusted: adjScore,
+        reason: adjScore > origScore ? cat.increaseReason : cat.decreaseReason,
+      })
+    }
+  }
+
+  return changes
+}
 
 /**
  * Constitutional AI: Critique calculated scores for fairness
@@ -227,8 +292,8 @@ Return JSON:
     {
       "aspect": "fairness|tone|accuracy|actionability",
       "passed": false,
-      "issue": "Brief description of the problem",
-      "suggestion": "Specific fix"
+      "issue": "Brief description of the problem (internal)",
+      "suggestion": "Specific fix (internal)"
     }
   ],
   "adjustedScores": {
@@ -238,9 +303,27 @@ Return JSON:
     "communication": number,
     "overall": number
   },
-  "reasoning": "Why adjustments were made (1 sentence)",
-  "madeChanges": true/false
+  "reasoning": "Technical reasoning (internal, 1 sentence)",
+  "madeChanges": true/false,
+  "userSummary": "A friendly 1-sentence summary for the user explaining what was corrected, e.g., 'We noticed your optimal solution wasn't fully credited and adjusted your score.'",
+  "scoreChanges": [
+    {
+      "category": "Understanding|Problem-Solving|Code Quality|Communication",
+      "original": number,
+      "adjusted": number,
+      "reason": "Plain English explanation for the user, e.g., 'Your clear explanation of the approach deserved more credit'"
+    }
+  ]
 }
+
+IMPORTANT FOR USER-FACING FIELDS (userSummary and scoreChanges):
+- Write like you're explaining to a friend, not a QA report
+- Focus on the BENEFIT to the user ("we gave you more credit for X")
+- Never mention internal terms like "extracted evidence", "transcript", "validation"
+- Never expose our grading internals or data structures
+- Keep explanations positive and encouraging
+- Example GOOD: "Your working solution deserved a higher score"
+- Example BAD: "The extracted evidence contradicted the performance context flags"
 
 If no issues found, return:
 {
@@ -294,11 +377,27 @@ If no issues found, return:
           result.adjustedScores.overall = recalculatedOverall
         }
 
+        // Generate scoreChanges if AI didn't provide them (backwards compatibility)
+        if (!result.scoreChanges && result.adjustedScores) {
+          result.scoreChanges = generateScoreChanges(scores, result.adjustedScores)
+        }
+
+        // Generate userSummary if AI didn't provide it
+        if (!result.userSummary && result.madeChanges) {
+          const delta = result.adjustedScores.overall - scores.overall
+          if (delta > 0) {
+            result.userSummary = `We reviewed your grading and adjusted your score by +${delta} points to better reflect your performance.`
+          } else if (delta < 0) {
+            result.userSummary = `We reviewed your grading and made minor adjustments for accuracy.`
+          }
+        }
+
         logger.info("[Constitutional AI] Score adjustment made", {
           original: scores,
           adjusted: result.adjustedScores,
           critiques: result.critiques,
           reasoning: result.reasoning,
+          userSummary: result.userSummary,
         })
       }
 
@@ -453,14 +552,21 @@ Return JSON:
     {
       "aspect": "fairness|tone|accuracy|actionability",
       "passed": false,
-      "issue": "What's wrong",
-      "suggestion": "How to fix it"
+      "issue": "What's wrong (internal)",
+      "suggestion": "How to fix it (internal)"
     }
   ],
   "revisedFeedback": "Full rewritten feedback (only if absolutely necessary)",
-  "reasoning": "Why revision was needed (1 sentence)",
-  "madeChanges": true/false
+  "reasoning": "Technical reasoning (internal, 1 sentence)",
+  "madeChanges": true/false,
+  "userSummary": "A friendly 1-sentence summary for the user, e.g., 'We refined the feedback to better reflect your actual performance.'"
 }
+
+IMPORTANT FOR userSummary:
+- Write conversationally, like explaining to a friend
+- Focus on the benefit ("refined for accuracy", "corrected to give you proper credit")
+- Never mention internal terms like "extracted evidence", "transcript analysis", "validation"
+- Keep it positive and brief
 
 If no issues:
 {

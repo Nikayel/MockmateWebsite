@@ -1,20 +1,20 @@
-'use client'
+"use client"
 
-import { useState, useEffect } from 'react'
-import { Mic, MicOff, Volume2, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { useState, useEffect } from "react"
+import { Mic, Square, Volume2, X, Send } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 interface VoiceModeToggleProps {
-  // Simplified props - removed mode toggle complexity
   isRecording: boolean
   onToggleRecording: () => void
   transcript?: string
   disabled?: boolean
   compact?: boolean
   className?: string
-  // Optional: allow canceling current recording
   onCancel?: () => void
+  onSend?: () => void // Send the current transcript
+  isLoading?: boolean // Show loading state on send button
 }
 
 /**
@@ -36,17 +36,17 @@ function AudioWaveform({ isActive }: { isActive: boolean }) {
   const bars = 5
 
   return (
-    <div className="flex items-center gap-0.5 h-4">
+    <div className="flex h-4 items-center gap-0.5">
       {Array.from({ length: bars }).map((_, i) => (
         <div
           key={i}
           className={cn(
-            "w-0.5 rounded-full transition-all duration-150 bg-accent",
+            "bg-accent w-0.5 rounded-full transition-all duration-150",
             isActive ? "animate-waveform" : "h-1 opacity-40"
           )}
           style={{
-            animationDelay: isActive ? `${i * 100}ms` : '0ms',
-            height: isActive ? undefined : '4px',
+            animationDelay: isActive ? `${i * 100}ms` : "0ms",
+            height: isActive ? undefined : "4px",
           }}
         />
       ))}
@@ -57,44 +57,21 @@ function AudioWaveform({ isActive }: { isActive: boolean }) {
 export function VoiceModeToggle({
   isRecording,
   onToggleRecording,
-  transcript = '',
+  transcript = "",
   disabled = false,
   compact = false,
   className,
   onCancel,
+  onSend,
+  isLoading = false,
 }: VoiceModeToggleProps) {
-  const [showTranscriptPreview, setShowTranscriptPreview] = useState(false)
-
-  // Show transcript preview when recording and there's content
-  useEffect(() => {
-    if (isRecording && transcript) {
-      setShowTranscriptPreview(true)
-    } else if (!isRecording) {
-      // Hide after a delay when stopped
-      const timer = setTimeout(() => setShowTranscriptPreview(false), 300)
-      return () => clearTimeout(timer)
-    }
-  }, [isRecording, transcript])
+  const hasTranscript = transcript.trim().length > 0
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      {/* Simple instruction - always the same */}
-      <p className={cn(
-        "text-muted-foreground leading-relaxed",
-        compact ? "text-[9px]" : "text-[10px]"
-      )}>
-        {isRecording ? (
-          <span className="text-accent">
-            Listening... message sends when you pause speaking
-          </span>
-        ) : (
-          "Click mic to speak – sends automatically when you pause"
-        )}
-      </p>
-
-      {/* Recording Controls - Simplified */}
+      {/* Recording Controls Row */}
       <div className="flex items-center gap-2">
-        {/* Single Microphone Button */}
+        {/* Microphone Button - Start/Stop */}
         <Button
           onClick={onToggleRecording}
           disabled={disabled}
@@ -102,29 +79,46 @@ export function VoiceModeToggle({
             "relative transition-all duration-200",
             compact ? "h-8 w-8" : "h-10 w-10",
             isRecording
-              ? "bg-destructive hover:bg-destructive/80 shadow-lg animate-pulse"
+              ? "bg-destructive hover:bg-destructive/80 shadow-lg"
               : "bg-accent hover:bg-accent/80 text-accent-foreground shadow-md hover:shadow-lg"
           )}
         >
           {isRecording ? (
-            <>
-              <MicOff className={compact ? "h-4 w-4" : "h-5 w-5"} />
-              {/* Recording ring animation */}
-              <span
-                className="absolute inset-0 rounded-md animate-ping opacity-20 bg-destructive"
-              />
-            </>
+            <Square className={compact ? "h-4 w-4" : "h-5 w-5"} />
           ) : (
             <Mic className={compact ? "h-4 w-4" : "h-5 w-5"} />
           )}
         </Button>
 
-        {/* Waveform indicator when recording */}
+        {/* Waveform + Status when recording */}
         {isRecording && (
           <div className="flex items-center gap-2">
             <AudioWaveform isActive={true} />
-            <span className="text-[10px] text-accent font-medium">Recording</span>
+            <span className="text-accent text-[10px] font-medium">Recording</span>
           </div>
+        )}
+
+        {/* Send button - visible when there's transcript content */}
+        {hasTranscript && onSend && (
+          <Button
+            onClick={onSend}
+            disabled={isLoading}
+            className={cn(
+              "h-8 px-3 transition-all",
+              isRecording
+                ? "animate-pulse bg-green-500 hover:bg-green-600"
+                : "bg-accent hover:bg-accent/80"
+            )}
+          >
+            {isLoading ? (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            ) : (
+              <>
+                <Send className="mr-1 h-4 w-4" />
+                <span className="text-xs font-medium">Send</span>
+              </>
+            )}
+          </Button>
         )}
 
         {/* Cancel button when recording */}
@@ -133,29 +127,53 @@ export function VoiceModeToggle({
             onClick={onCancel}
             variant="ghost"
             size="sm"
-            className="h-6 px-2 text-muted-foreground hover:text-destructive text-[10px]"
+            className="text-muted-foreground hover:text-destructive h-6 px-2 text-[10px]"
           >
-            <X className="h-3 w-3 mr-1" />
+            <X className="mr-1 h-3 w-3" />
             Cancel
           </Button>
         )}
       </div>
 
-      {/* Transcript Preview (when recording) */}
-      {isRecording && transcript && (
-        <div className={cn(
-          "px-3 py-2 rounded-lg bg-card border border-accent/20"
-        )}>
-          <div className="flex items-center gap-2 mb-1">
-            <Volume2 className="h-3 w-3 text-muted-foreground" />
-            <span className="text-[10px] text-muted-foreground">Live transcription</span>
+      {/* Status text */}
+      <p
+        className={cn(
+          "text-muted-foreground leading-relaxed",
+          compact ? "text-[9px]" : "text-[10px]"
+        )}
+      >
+        {isRecording ? (
+          hasTranscript ? (
+            <span className="text-green-400">Click Send when ready</span>
+          ) : (
+            <span className="text-accent">Listening...</span>
+          )
+        ) : hasTranscript ? (
+          <span className="text-green-400">Ready to send</span>
+        ) : (
+          "Click mic to speak"
+        )}
+      </p>
+
+      {/* Transcript Preview */}
+      {hasTranscript && (
+        <div
+          className={cn(
+            "rounded-lg border px-3 py-2",
+            isRecording ? "bg-card border-accent/20" : "bg-card/50 border-border"
+          )}
+        >
+          <div className="mb-1 flex items-center gap-2">
+            <Volume2 className="text-muted-foreground h-3 w-3" />
+            <span className="text-muted-foreground text-[10px]">
+              {isRecording ? "Live transcription" : "Transcribed"}
+            </span>
           </div>
-          <p className={cn(
-            "text-sm text-foreground leading-relaxed",
-            compact && "text-xs"
-          )}>
+          <p className={cn("text-foreground text-sm leading-relaxed", compact && "text-xs")}>
             {transcript}
-            <span className="inline-block w-0.5 h-4 bg-accent/70 animate-pulse ml-0.5" />
+            {isRecording && (
+              <span className="bg-accent/70 ml-0.5 inline-block h-4 w-0.5 animate-pulse" />
+            )}
           </p>
         </div>
       )}
@@ -181,7 +199,7 @@ export interface LegacyVoiceModeToggleProps {
 export function LegacyVoiceModeToggle({
   isRecording,
   onToggleRecording,
-  transcript = '',
+  transcript = "",
   disabled = false,
   compact = false,
   className,

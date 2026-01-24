@@ -163,13 +163,21 @@ export function fuzzyExtractComplexity(text: string): string | null {
     // Log variants - very common in voice transcription
     { test: /log.{0,3}(n|in|en|and)/i, result: "O(log n)" },
     { test: /logarith/i, result: "O(log n)" },
-    // Linear variants
+    // Linear variants - very generous to catch voice transcription
     { test: /\blinear\b/i, result: "O(n)" },
+    { test: /\bo\s+n\b/i, result: "O(n)" }, // "o n" with space
+    { test: /\boh?\s*en\b/i, result: "O(n)" }, // "oh en" or "o en"
+    { test: /\bo\s+of\s+n\b/i, result: "O(n)" }, // "o of n"
     // Constant variants
     { test: /\bconstant\b/i, result: "O(1)" },
+    { test: /\bo\s+one\b/i, result: "O(1)" }, // "o one"
+    { test: /\bo\s+of\s+one\b/i, result: "O(1)" }, // "o of one"
+    { test: /\boh?\s*one\b/i, result: "O(1)" }, // "oh one"
     // Quadratic variants
     { test: /\bquadrat/i, result: "O(n²)" },
     { test: /\bn\s*square/i, result: "O(n²)" },
+    { test: /\bo\s+n\s*2\b/i, result: "O(n²)" }, // "o n 2"
+    { test: /\bo\s+n\s*squared?\b/i, result: "O(n²)" }, // "o n squared"
   ]
 
   for (const { test, result } of fuzzyPatterns) {

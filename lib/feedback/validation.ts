@@ -188,17 +188,33 @@ function detectApproachHeuristically(candidateMessages: Array<{ content: string 
     /\b(as (i|we) (loop|iterate|go|move)|while (we|i) (have|loop))/i,
   ]
 
-  // Complexity patterns
+  // Complexity patterns - including voice transcription variants
+  // Voice input may produce: "o n" instead of "O(n)", "oh one" instead of "O(1)"
   const complexityPatterns = [
+    // Standard notation with parentheses
     /\bo\s*\(\s*n\s*\)/i,
     /\bo\s*\(\s*1\s*\)/i,
     /\bo\s*\(\s*n\s*log\s*n\s*\)/i,
     /\bo\s*\(\s*n\s*(squared|²|\^2|square)\s*\)/i,
+    // Voice transcription variants (without parentheses)
+    /\bo\s+of?\s*n\b/i, // "o of n", "o n"
+    /\bo\s+n\b/i, // "o n" (common voice transcription)
+    /\boh\s*n\b/i, // "oh n" (misheard O(n))
+    /\bo\s+of?\s*one\b/i, // "o of one", "o one"
+    /\bo\s+one\b/i, // "o one" (voice for O(1))
+    /\boh\s*one\b/i, // "oh one"
+    /\bo\s+of?\s*1\b/i, // "o of 1", "o 1"
+    /\bo\s+1\b/i, // "o 1"
+    /\bo\s+n\s*log\s*n\b/i, // "o n log n"
+    /\bo\s+of\s*n\s*log\s*n\b/i, // "o of n log n"
+    /\bo\s+n\s*(squared?|square)\b/i, // "o n squared"
+    // Standard terms
     /\btime complexity/i,
     /\bspace complexity/i,
     /\blinear( time)?/i,
-    /\bconstant( space)?/i,
+    /\bconstant( space| time)?/i,
     /\bquadratic/i,
+    /\blogarithmic/i,
   ]
 
   // Edge case patterns
