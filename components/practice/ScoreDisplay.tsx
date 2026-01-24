@@ -17,6 +17,8 @@ import {
   AlertTriangle,
   Download,
   Info,
+  X,
+  ArrowLeft,
 } from "lucide-react"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
@@ -42,6 +44,7 @@ interface ScoreDisplayProps {
   spaceComplexity?: string
   efficiencyScore?: number
   onExport?: () => void
+  onClose?: () => void
   problemTitle?: string
   grade?: string
   scores?: {
@@ -86,6 +89,7 @@ export function ScoreDisplay({
   spaceComplexity,
   efficiencyScore,
   onExport,
+  onClose,
   problemTitle,
   grade: gradeProp,
   scores: scoresProp,
@@ -360,6 +364,18 @@ export function ScoreDisplay({
 
       {/* Compact Header with Grade */}
       <div className="overflow-hidden rounded-2xl border border-zinc-800/50 bg-zinc-900/50">
+        {/* Close Button - Apple-style prominent placement */}
+        {onClose && (
+          <div className="flex items-center justify-end border-b border-zinc-800/50 px-5 py-3">
+            <button
+              onClick={onClose}
+              className="flex h-10 items-center gap-2 rounded-full bg-zinc-800 px-4 text-sm font-medium text-zinc-300 shadow-sm transition-all duration-200 hover:bg-zinc-700 hover:text-white active:scale-[0.98]"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Close
+            </button>
+          </div>
+        )}
         <div className="p-5">
           <div className="flex items-start gap-4">
             {/* Grade Circle - Compact with score toggle */}

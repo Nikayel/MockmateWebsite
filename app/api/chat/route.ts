@@ -1373,7 +1373,7 @@ Keep it conversational and real - like you're actually debriefing someone after 
           reply: null,
           conversationEnded: true,
           endMessage:
-            "The interview session has ended. Click 'End Interview' to see your score breakdown and detailed analysis.",
+            "The interview session has ended. Click 'See Full Interview Score' to see your score breakdown and detailed analysis.",
         })
       }
 
