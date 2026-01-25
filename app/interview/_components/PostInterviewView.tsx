@@ -199,21 +199,23 @@ export function PostInterviewView({
   const debriefPhase = interviewerMessages.length <= 2 ? "technical" : "wrapup"
 
   return (
-    <div className="mx-auto flex h-full max-w-7xl flex-col px-4 py-6">
-      {/* Header - Apple-style clean design */}
-      <div className="mb-6 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-semibold tracking-tight text-white">
+    <div className="mx-auto flex h-full max-w-7xl flex-col px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6">
+      {/* Header - Apple-style clean design with responsive layout */}
+      <div className="mb-4 flex-shrink-0 sm:mb-5 lg:mb-6">
+        {/* Mobile: Stack vertically, Tablet+: Horizontal layout */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          {/* Left side: Title and status */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 lg:gap-4">
+            <h2 className="text-lg font-semibold tracking-tight text-white sm:text-xl">
               {debriefPhase === "technical" ? "Technical Debrief" : "Wrap Up"}
             </h2>
-            <div className="flex items-center gap-1.5 rounded-full bg-zinc-800/60 px-3 py-1.5">
+            <div className="flex items-center gap-1.5 rounded-full bg-zinc-800/60 px-2.5 py-1 sm:px-3 sm:py-1.5">
               {testSummary.passRate === 100 ? (
-                <CheckCircle className="h-4 w-4 text-emerald-500" />
+                <CheckCircle className="h-3.5 w-3.5 text-emerald-500 sm:h-4 sm:w-4" />
               ) : (
-                <XCircle className="h-4 w-4 text-amber-500" />
+                <XCircle className="h-3.5 w-3.5 text-amber-500 sm:h-4 sm:w-4" />
               )}
-              <span className="text-sm font-medium text-zinc-300">
+              <span className="text-xs font-medium text-zinc-300 sm:text-sm">
                 {testSummary.passed}/{testSummary.total} tests
               </span>
             </div>
@@ -222,59 +224,71 @@ export function PostInterviewView({
                 onClick={() => setShowPostInterviewDiscussion(false)}
                 variant="ghost"
                 size="sm"
-                className="h-8 rounded-full px-3 text-xs font-medium text-amber-500 transition-colors hover:bg-amber-500/10 hover:text-amber-400"
+                className="h-8 min-h-[44px] min-w-[44px] rounded-full px-3 text-xs font-medium text-amber-500 transition-colors hover:bg-amber-500/10 hover:text-amber-400 sm:min-h-0 sm:min-w-0"
               >
                 <Code className="mr-1.5 h-3 w-3" />
-                Continue Editing
+                <span className="xs:inline hidden">Continue Editing</span>
+                <span className="xs:hidden">Edit</span>
               </Button>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          {/* Right side: Actions */}
+          <div className="flex items-center gap-2 sm:gap-3">
             <Button
               onClick={proceedToFinalFeedback}
               size="sm"
-              className="h-11 rounded-full bg-white px-6 text-sm font-semibold text-zinc-900 shadow-sm transition-all duration-200 hover:bg-zinc-50 hover:shadow-md active:scale-[0.98]"
+              className="h-10 min-h-[44px] flex-1 rounded-full bg-white px-4 text-xs font-semibold text-zinc-900 shadow-sm transition-all duration-200 hover:bg-zinc-50 hover:shadow-md active:scale-[0.98] sm:h-11 sm:flex-none sm:px-5 sm:text-sm lg:px-6"
             >
-              See Full Interview Score
-              <ArrowRight className="ml-2 h-4 w-4" />
+              <span className="hidden sm:inline">See Full Interview Score</span>
+              <span className="sm:hidden">View Score</span>
+              <ArrowRight className="ml-1.5 h-3.5 w-3.5 sm:ml-2 sm:h-4 sm:w-4" />
             </Button>
             {onClose && (
               <Button
                 onClick={onClose}
                 variant="ghost"
                 size="sm"
-                className="h-10 w-10 rounded-full p-0 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+                className="h-10 min-h-[44px] w-10 min-w-[44px] rounded-full p-0 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white sm:h-10 sm:w-10"
               >
                 <X className="h-5 w-5" />
               </Button>
             )}
           </div>
         </div>
-        <p className="mt-2 text-sm font-medium text-zinc-500">
+        <p className="mt-2 text-xs font-medium text-zinc-500 sm:text-sm">
           {debriefPhase === "technical"
             ? "Discuss your solution, complexity trade-offs, and alternatives."
             : "Any final questions before viewing your feedback?"}
         </p>
       </div>
 
-      {/* Main Content - Two Column Layout */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
+      {/* Main Content - Two Column Layout
+          Research-backed breakpoints:
+          - Mobile (<768px): Single column, stacked
+          - Tablet/Laptop (768px+): Two columns side by side
+          - Desktop (1024px+): Two columns with more spacing
+      */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 lg:gap-5">
         {/* Left Column: Code & Test Results */}
         <div className="flex min-h-0 flex-col">
           <Card className="flex min-h-0 flex-1 flex-col border-gray-800 bg-gray-900/80">
             <CardHeader
-              className="flex-shrink-0 cursor-pointer border-b border-gray-800 py-2.5 transition-colors hover:bg-gray-800/50"
+              className="min-h-[44px] flex-shrink-0 cursor-pointer border-b border-gray-800 px-3 py-2 transition-colors hover:bg-gray-800/50 sm:px-4 sm:py-2.5 lg:px-6"
               onClick={() => setShowCodeInDiscussion(!showCodeInDiscussion)}
             >
-              <CardTitle className="flex items-center justify-between text-sm text-white">
-                <div className="flex items-center gap-2">
-                  <Code className="h-4 w-4 text-gray-400" />
+              <CardTitle className="flex items-center justify-between text-xs text-white sm:text-sm">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <Code className="h-3.5 w-3.5 text-gray-400 sm:h-4 sm:w-4" />
                   <span>Your Solution</span>
-                  <Badge variant="outline" className="border-gray-700 text-xs text-gray-500">
+                  <Badge
+                    variant="outline"
+                    className="border-gray-700 text-[10px] text-gray-500 sm:text-xs"
+                  >
                     {selectedLanguage}
                   </Badge>
+                  {/* Complexity metrics - hidden on mobile, shown on tablet+ */}
                   {efficiencyMetrics && efficiencyMetrics.estimatedTimeComplexity !== "Unknown" && (
-                    <>
+                    <span className="hidden items-center gap-1.5 sm:flex">
                       <span className="text-gray-600">·</span>
                       <span className="text-xs text-gray-500">
                         {efficiencyMetrics.estimatedTimeComplexity} time
@@ -287,13 +301,13 @@ export function PostInterviewView({
                           </span>
                         </>
                       )}
-                    </>
+                    </span>
                   )}
                 </div>
                 {showCodeInDiscussion ? (
-                  <ChevronUp className="h-4 w-4 text-gray-500" />
+                  <ChevronUp className="h-4 w-4 flex-shrink-0 text-gray-500" />
                 ) : (
-                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                  <ChevronDown className="h-4 w-4 flex-shrink-0 text-gray-500" />
                 )}
               </CardTitle>
             </CardHeader>
@@ -303,14 +317,14 @@ export function PostInterviewView({
                 <div className="min-h-0 flex-1 overflow-auto">
                   <CodeEditor height="100%" language={selectedLanguage} value={code} readOnly />
                 </div>
-                {/* Test Results - Compact */}
+                {/* Test Results - Responsive height based on screen size */}
                 {testResults.length > 0 && (
-                  <div className="max-h-28 flex-shrink-0 overflow-y-auto border-t border-gray-800 p-3">
+                  <div className="max-h-24 flex-shrink-0 overflow-y-auto border-t border-gray-800 p-2 sm:max-h-28 sm:p-3 lg:max-h-32">
                     <div className="space-y-1">
                       {testResults.map((result, index) => (
                         <div
                           key={index}
-                          className={`flex items-center gap-2 rounded px-2 py-1 text-xs ${
+                          className={`flex items-center gap-2 rounded px-2 py-1.5 text-xs ${
                             result.passed
                               ? "bg-green-900/20 text-green-400"
                               : "bg-red-900/20 text-red-400"
@@ -335,24 +349,33 @@ export function PostInterviewView({
         {/* Right Column: Discussion Panel */}
         <div className="flex min-h-0 flex-col">
           <Card className="flex min-h-0 flex-1 flex-col overflow-hidden border-gray-800 bg-gray-900/80">
-            <CardHeader className="flex-shrink-0 border-b border-gray-800 py-2.5">
-              <CardTitle className="flex items-center justify-between text-sm text-white">
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4 text-gray-400" />
+            <CardHeader className="min-h-[44px] flex-shrink-0 border-b border-gray-800 px-3 py-2 sm:px-4 sm:py-2.5 lg:px-6">
+              <CardTitle className="flex items-center justify-between text-xs text-white sm:text-sm">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <MessageSquare className="h-3.5 w-3.5 text-gray-400 sm:h-4 sm:w-4" />
                   <span>Discussion</span>
                 </div>
-                <Badge variant="outline" className="border-gray-700 text-xs text-gray-500">
+                <Badge
+                  variant="outline"
+                  className="border-gray-700 text-[10px] text-gray-500 sm:text-xs"
+                >
                   {interviewerMessages.filter((m) => m.type === "user").length} messages
                 </Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
-              {/* Chat Messages */}
+              {/* Chat Messages
+                  UX Research (Baymard Institute, NN/g):
+                  - Optimal line length: 50-75 characters for readability
+                  - Mobile: 30-50 characters per line
+                  - Max-width capped at 32rem (~512px) for readable line lengths
+                  - Spacing scales with screen size for visual hierarchy
+              */}
               <div className="relative min-h-0 flex-1">
                 <div
                   ref={chatContainerRef}
                   onScroll={handleScroll}
-                  className="absolute inset-0 space-y-3 overflow-y-auto p-3"
+                  className="absolute inset-0 space-y-2 overflow-y-auto p-2 sm:space-y-3 sm:p-3 lg:space-y-4 lg:p-4"
                   role="log"
                   aria-label="Post-interview discussion messages"
                   aria-live="polite"
@@ -363,8 +386,10 @@ export function PostInterviewView({
                       key={`msg-${msg.type}-${index}`}
                       className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
                     >
+                      {/* Message bubble: max-w-[85%] on mobile for space efficiency,
+                          capped at 32rem (512px) on larger screens for optimal ~60-70 char line length */}
                       <div
-                        className={`max-w-[85%] rounded-lg px-3 py-2 ${
+                        className={`max-w-[85%] rounded-lg px-3 py-2 sm:max-w-[75%] sm:px-3.5 sm:py-2.5 md:max-w-[32rem] ${
                           msg.type === "user"
                             ? "bg-white text-gray-900"
                             : "bg-gray-800 text-gray-100"
@@ -372,11 +397,11 @@ export function PostInterviewView({
                       >
                         <div className="mb-1 flex items-center gap-1.5">
                           <User className="h-3 w-3 opacity-50" />
-                          <span className="text-xs font-medium opacity-60">
+                          <span className="text-[11px] font-medium opacity-60 sm:text-xs">
                             {msg.type === "user" ? "You" : "Interviewer"}
                           </span>
                         </div>
-                        <FormattedText className="text-sm leading-relaxed">
+                        <FormattedText className="text-[13px] leading-relaxed sm:text-sm">
                           {msg.message}
                         </FormattedText>
                       </div>
@@ -421,8 +446,8 @@ export function PostInterviewView({
                 )}
               </div>
 
-              {/* Chat Input */}
-              <div className="flex-shrink-0 border-t border-gray-800 p-3">
+              {/* Chat Input - Touch targets meet Apple HIG 44x44 minimum */}
+              <div className="flex-shrink-0 border-t border-gray-800 p-2 sm:p-3">
                 <VoiceModeToggle
                   isRecording={isRecordingInterviewer}
                   onToggleRecording={() => toggleVoiceRecording(true)}
@@ -436,17 +461,18 @@ export function PostInterviewView({
                       value={interviewerInput}
                       onChange={(e) => setInterviewerInput(e.target.value)}
                       placeholder="Ask about your solution..."
-                      className="h-9 flex-1 border-gray-700 bg-gray-800 text-sm text-white placeholder-gray-500"
+                      className="h-11 flex-1 border-gray-700 bg-gray-800 text-sm text-white placeholder-gray-500"
                       onKeyDown={(e) =>
                         e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)
                       }
                       disabled={isLoadingInterviewer || isGeneratingDiscussion}
                       aria-label="Chat with interviewer"
                     />
+                    {/* Send button: 44x44 minimum touch target per Apple HIG */}
                     <Button
                       onClick={() => handleSendMessage(true)}
                       size="sm"
-                      className="h-9 bg-white px-3 text-gray-900 hover:bg-gray-100"
+                      className="h-11 min-h-[44px] min-w-[44px] bg-white px-3 text-gray-900 hover:bg-gray-100"
                       disabled={
                         !interviewerInput.trim() || isLoadingInterviewer || isGeneratingDiscussion
                       }

@@ -536,22 +536,30 @@ function InterviewPageContent() {
     // Keep warning active if:
     // 1. Interview is in progress and feedback not shown yet
     // 2. OR we're generating discussion (feedback is being evaluated)
-    const shouldWarn = (isInterviewStarted && !showFeedback) || isGeneratingDiscussion
+    // 3. OR we're in post-interview discussion (wrap-up phase)
+    const shouldWarn =
+      (isInterviewStarted && !showFeedback) || isGeneratingDiscussion || showPostInterviewDiscussion
 
     if (!shouldWarn) return
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault()
-      const message = isGeneratingDiscussion
-        ? "Your solution is being evaluated. Are you sure you want to leave?"
-        : "You have an active interview session. Are you sure you want to leave?"
+      let message: string
+      if (isGeneratingDiscussion) {
+        message = "Your solution is being evaluated. Are you sure you want to leave?"
+      } else if (showPostInterviewDiscussion) {
+        message =
+          "You are in the wrap-up discussion. Your session will be saved, but you may lose unsaved chat messages."
+      } else {
+        message = "You have an active interview session. Are you sure you want to leave?"
+      }
       e.returnValue = message
       return message
     }
 
     window.addEventListener("beforeunload", handleBeforeUnload)
     return () => window.removeEventListener("beforeunload", handleBeforeUnload)
-  }, [isInterviewStarted, showFeedback, isGeneratingDiscussion])
+  }, [isInterviewStarted, showFeedback, isGeneratingDiscussion, showPostInterviewDiscussion])
 
   // Separate effect to handle auth check with delay to prevent race condition on refresh
   useEffect(() => {
@@ -3381,7 +3389,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         if (data.conversationEnded) {
           // Show end session prompt instead of continuing conversation
           toast.info(
-            data.endMessage || "Session complete! Click 'See Full Interview Score' to see your results.",
+            data.endMessage ||
+              "Session complete! Click 'See Full Interview Score' to see your results.",
             {
               duration: 5000,
               action: {
@@ -3430,13 +3439,16 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           if (data.conversationEnded === true) {
             // Show prompt to end session after the final message
             setTimeout(() => {
-              toast.info("Click 'See Full Interview Score' to see your score breakdown and analysis.", {
-                duration: 8000,
-                action: {
-                  label: "See Full Interview Score",
-                  onClick: proceedToFinalFeedback,
-                },
-              })
+              toast.info(
+                "Click 'See Full Interview Score' to see your score breakdown and analysis.",
+                {
+                  duration: 8000,
+                  action: {
+                    label: "See Full Interview Score",
+                    onClick: proceedToFinalFeedback,
+                  },
+                }
+              )
             }, 1500) // Wait for message to appear first
           }
 
@@ -4202,23 +4214,6 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           playSound("fail")
         }
 
-        // Clear auto-save data immediately on submission to prevent session restoration
-        if (firebaseUser && selectedScenario) {
-          const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
-          try {
-            localStorage.removeItem(storageKey)
-          } catch (e) {
-            // Silent failure - localStorage might be unavailable
-          }
-        } else if (isGuestMode && selectedScenario) {
-          const storageKey = `interview_autosave_guest_${selectedScenario.id}`
-          try {
-            localStorage.removeItem(storageKey)
-          } catch (e) {
-            // Silent failure
-          }
-        }
-
         // Mark question as evaluating in roadmap (if from roadmap)
         if (isFromRoadmap && selectedScenario && activeRoadmap) {
           markQuestionEvaluating(selectedScenario.id)
@@ -4226,6 +4221,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
         // Save session state for post-interview discussion (but don't mark as evaluating yet)
         // User will click "View Detailed Feedback" to start evaluation after wrap-up conversation
+        // IMPORTANT: Save to Firestore BEFORE clearing localStorage to prevent data loss on refresh
         if (currentSessionId && user) {
           try {
             await saveSessionState(currentSessionId, {
@@ -4249,9 +4245,29 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
               realInterviewMode,
               strictTimeLimit,
             })
+
+            // Only clear localStorage AFTER Firestore save succeeds
+            // This ensures we always have a backup until the cloud save is confirmed
+            if (firebaseUser && selectedScenario) {
+              const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
+              try {
+                localStorage.removeItem(storageKey)
+              } catch (e) {
+                // Silent failure - localStorage might be unavailable
+              }
+            }
           } catch (saveError) {
             console.error("Failed to save session state:", saveError)
-            // Continue anyway - non-critical
+            // Don't clear localStorage if Firestore save failed - keep the backup
+          }
+        } else if (isGuestMode && selectedScenario) {
+          // For guests, clear localStorage only after we know we're transitioning to wrap-up
+          // The guest session state will be saved via API during auto-save
+          const storageKey = `interview_autosave_guest_${selectedScenario.id}`
+          try {
+            localStorage.removeItem(storageKey)
+          } catch (e) {
+            // Silent failure
           }
         }
 
