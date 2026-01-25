@@ -15,7 +15,6 @@ import {
   SoftwareApplicationJsonLd,
   WebSiteJsonLd,
   FounderPersonJsonLd,
-  HomepagePositioningFAQJsonLd,
 } from "@/components/seo/JsonLd"
 import "./globals.css"
 
@@ -173,7 +172,6 @@ export default function RootLayout({
         <OrganizationJsonLd />
         <SoftwareApplicationJsonLd />
         <FounderPersonJsonLd />
-        <HomepagePositioningFAQJsonLd />
         <style>{`
 html {
   font-family: ${openSans.style.fontFamily};

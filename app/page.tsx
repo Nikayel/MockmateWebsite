@@ -7,6 +7,7 @@ import { ComparisonSection } from "@/components/comparison-section"
 import { MetricsMarketingSection } from "@/components/metrics-marketing-section"
 import { Footer } from "@/components/footer"
 import { HomePageClient } from "@/components/home/HomePageClient"
+import { HomepagePositioningFAQJsonLd } from "@/components/seo/JsonLd"
 
 /**
  * Homepage - Server Component
@@ -39,5 +40,10 @@ export default function HomePage() {
     </main>
   )
 
-  return <HomePageClient header={header} footer={footer} marketingContent={marketingContent} />
+  return (
+    <>
+      <HomepagePositioningFAQJsonLd />
+      <HomePageClient header={header} footer={footer} marketingContent={marketingContent} />
+    </>
+  )
 }
