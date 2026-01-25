@@ -273,17 +273,30 @@ If tests passed < 50%:
 - "What Worked" should be minimal - don't fabricate positives
 - Focus feedback on fixing the failing cases
 
-## HANDLING POOR COMMUNICATION (CRITICAL)
-If "Approach explained: NO" in the analysis (NOT based on score alone):
-- This is a MAJOR issue even if the solution is correct
-- In real FAANG interviews, you MUST explain your approach before coding
-- TL;DR must mention: "...but needs to explain approach before coding"
-- "Fix Next" MUST include: "EXPLAIN YOUR APPROACH before writing code - interviewers need to understand your thought process"
-- Communication score justification should state: "Did not explain approach before coding"
-- Even with a correct solution, call this out: "You got the right answer, but in a real interview, coding silently is a red flag"
+## HANDLING COMMUNICATION - USE EXTRACTED EVIDENCE AS GROUND TRUTH
 
-IMPORTANT: If "Approach explained: YES" in the analysis, do NOT tell them to explain their approach - they already did!
-Check the EXTRACTED EVIDENCE section for the actual quotes showing what they said.
+⚠️ CRITICAL: The EXTRACTED EVIDENCE section contains ACTUAL QUOTES from the transcript.
+This is the SOURCE OF TRUTH - it overrides everything else.
+
+BEFORE writing any criticism about communication, CHECK THE EVIDENCE:
+1. Look at "## APPROACH" in EXTRACTED EVIDENCE
+   - If it says "Candidate explained approach: YES" with a quote → DO NOT say "didn't explain approach"
+2. Look at "## COMPLEXITY DISCUSSION" in EXTRACTED EVIDENCE
+   - If it says "Time complexity discussed: YES" with a quote → DO NOT say "didn't discuss complexity"
+3. Look at "## EDGE CASES" in EXTRACTED EVIDENCE
+   - If it shows edge cases mentioned → DO NOT say "didn't consider edge cases"
+
+ONLY criticize communication if EXTRACTED EVIDENCE explicitly shows it was missing.
+
+If "Approach explained: NO" in EXTRACTED EVIDENCE (not just communication analysis):
+- This is a MAJOR issue even if the solution is correct
+- TL;DR must mention: "...but needs to explain approach before coding"
+- "Fix Next" MUST include: "EXPLAIN YOUR APPROACH before writing code"
+
+If "Approach explained: YES" in EXTRACTED EVIDENCE with quotes:
+- DO NOT tell them to explain their approach - they already did!
+- DO NOT say their explanation was "unclear" unless evidence shows confusion
+- Give credit for the communication they demonstrated
 
 ## OUTPUT FORMAT
 
@@ -823,13 +836,20 @@ ${phaseAnalysis.skippedPhases.includes("complexity_discussion") ? '- "DISCUSS CO
 ${
   extractedEvidence
     ? `
-EXTRACTED EVIDENCE (ground your feedback in these facts):
+═══════════════════════════════════════════════════════════════════════════════
+EXTRACTED EVIDENCE - THIS IS THE SOURCE OF TRUTH (contains actual transcript quotes)
+═══════════════════════════════════════════════════════════════════════════════
 ${buildEvidenceSummary(extractedEvidence)}
 
-CRITICAL: Your feedback must be consistent with the extracted evidence above.
-- If evidence shows they mentioned edge cases, DO NOT say "didn't mention edge cases"
-- If evidence shows they discussed complexity, DO NOT say "didn't discuss complexity"
-- Quote specific examples from the evidence when giving feedback
+⚠️ MANDATORY: Your feedback MUST be consistent with the evidence above. ⚠️
+
+BEFORE writing "Fix Next" or any criticism, verify against evidence:
+✓ If APPROACH shows "explained: YES" with quote → DO NOT say "unclear" or "didn't explain"
+✓ If COMPLEXITY shows "discussed: YES" with quote → DO NOT say "didn't discuss complexity"
+✓ If EDGE CASES shows items mentioned → DO NOT say "didn't mention edge cases"
+
+VIOLATION = writing criticism that contradicts the evidence above.
+If evidence shows they did something, give them credit - don't criticize them for not doing it.
 `
     : ""
 }${buildSilentNotesContext(analyzedSilentNotes)}

@@ -474,11 +474,20 @@ export function sanitizeFeedbackForScoreConsistency(
 
   if (shouldRemoveExplainCriticism) {
     // Remove various forms of the "explain approach" criticism
+    // These patterns cover both bullet-point and prose formats
     const explainApproachPatterns = [
+      // Bullet point formats
       /[-•*]\s*EXPLAIN YOUR APPROACH[^.]*\.[^\n]*/gi,
       /[-•*]\s*coding in silence[^.]*\.[^\n]*/gi,
       /[-•*]\s*did not explain approach[^.]*\.[^\n]*/gi,
       /[-•*]\s*needs to explain approach[^.]*\.[^\n]*/gi,
+      // Prose formats (in CRITICAL/Fix Next sections)
+      /your explanation of the approach was unclear[^.]*\./gi,
+      /explanation was unclear[^.]*\./gi,
+      /didn't explain your approach[^.]*\./gi,
+      /did not clearly explain[^.]*approach[^.]*\./gi,
+      // "unclear" in quotes pattern (AI citing evidence)
+      /\("unclear" in evidence\)/gi,
     ]
 
     for (const pattern of explainApproachPatterns) {
@@ -492,8 +501,14 @@ export function sanitizeFeedbackForScoreConsistency(
   // If evidence shows complexity was discussed, remove complexity criticism
   if (options?.complexityDiscussed === true) {
     const complexityPatterns = [
+      // Bullet point formats
       /[-•*]\s*Explicitly state Time and Space complexity[^.]*\.[^\n]*/gi,
       /[-•*]\s*did not discuss complexity[^.]*\.[^\n]*/gi,
+      // Prose formats (in CRITICAL/Fix Next sections)
+      /you did not discuss the time or space complexity[^.]*\./gi,
+      /did not discuss.*complexity[^.]*\./gi,
+      /didn't discuss.*complexity[^.]*\./gi,
+      /failed to mention.*complexity[^.]*\./gi,
     ]
 
     for (const pattern of complexityPatterns) {
