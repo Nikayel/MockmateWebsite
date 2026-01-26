@@ -288,12 +288,20 @@ export async function initializeUserQuota(
   const quotaSnap = await getDocs(quotaQuery)
 
   // Filter by date range in memory to avoid composite index requirement
+  // Find quota where current date falls within the stored period OR period_start is in current month
   if (!quotaSnap.empty) {
     const currentPeriodQuota = quotaSnap.docs
       .map((doc) => doc.data() as ProfileQuota)
       .find((quota) => {
         const quotaStart = new Date(quota.period_start)
-        return quotaStart >= periodStart && quotaStart <= periodEnd
+        const quotaEnd = new Date(quota.period_end)
+        // Check if now falls within the stored period (handles existing quotas)
+        // OR if the quota's start month matches the calculated period's month (handles mismatched dates)
+        const nowInStoredPeriod = now >= quotaStart && now <= quotaEnd
+        const sameMonth =
+          quotaStart.getFullYear() === periodStart.getFullYear() &&
+          quotaStart.getMonth() === periodStart.getMonth()
+        return nowInStoredPeriod || sameMonth
       })
 
     if (currentPeriodQuota) {
@@ -337,7 +345,12 @@ export async function initializeUserQuota(
         const quotaRef = quotaSnap.docs.find((doc) => {
           const quota = doc.data() as ProfileQuota
           const quotaStart = new Date(quota.period_start)
-          return quotaStart >= periodStart && quotaStart <= periodEnd
+          const quotaEnd = new Date(quota.period_end)
+          const nowInStoredPeriod = now >= quotaStart && now <= quotaEnd
+          const sameMonth =
+            quotaStart.getFullYear() === periodStart.getFullYear() &&
+            quotaStart.getMonth() === periodStart.getMonth()
+          return nowInStoredPeriod || sameMonth
         })?.ref
 
         if (quotaRef) {
