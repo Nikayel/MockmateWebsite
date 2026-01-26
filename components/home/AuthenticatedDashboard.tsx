@@ -13,13 +13,19 @@ import { Terminal, ArrowRight, Crown, BarChart3 } from "lucide-react"
 import Link from "next/link"
 import type { Profile } from "@/lib/types"
 
-const OnboardingModal = dynamic(() => import("@/components/OnboardingModal").then(mod => mod.OnboardingModal), {
-  ssr: false
-})
+const OnboardingModal = dynamic(
+  () => import("@/components/OnboardingModal").then((mod) => mod.OnboardingModal),
+  {
+    ssr: false,
+  }
+)
 
-const ProductTour = dynamic(() => import("@/components/ProductTour").then(mod => mod.ProductTour), {
-  ssr: false
-})
+const ProductTour = dynamic(
+  () => import("@/components/ProductTour").then((mod) => mod.ProductTour),
+  {
+    ssr: false,
+  }
+)
 
 interface AuthenticatedDashboardProps {
   header: React.ReactNode
@@ -30,7 +36,13 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
   const router = useRouter()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
-  const [usage, setUsage] = useState<{ used: number; limit: number; allowed: boolean; freeOpensRemaining: number } | null>(null)
+  const [usage, setUsage] = useState<{
+    used: number
+    limit: number
+    allowed: boolean
+    freeOpensRemaining: number
+    periodEnd: string
+  } | null>(null)
   const [isPro, setIsPro] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showTour, setShowTour] = useState(false)
@@ -47,7 +59,7 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
       try {
         const [userProfile, usageData] = await Promise.all([
           getUserProfile(firebaseUser.uid),
-          checkUsageLimit(firebaseUser.uid)
+          checkUsageLimit(firebaseUser.uid),
         ])
 
         setProfile(userProfile)
@@ -89,16 +101,17 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
   // Signed in but still loading user data
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00d9ff]"></div>
+      <main className="bg-background flex min-h-screen items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#00d9ff]"></div>
       </main>
     )
   }
 
-  const userName = user.user_metadata?.full_name?.split(' ')[0] || firebaseUser.displayName?.split(' ')[0]
+  const userName =
+    user.user_metadata?.full_name?.split(" ")[0] || firebaseUser.displayName?.split(" ")[0]
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="bg-background min-h-screen">
       <OnboardingModal
         isOpen={showOnboarding}
         userId={firebaseUser.uid}
@@ -125,7 +138,7 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
         userName={userName}
         onComplete={() => {
           setShowTour(false)
-          router.push('/interview')
+          router.push("/interview")
         }}
         onSkip={() => {
           setShowTour(false)
@@ -134,28 +147,31 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
 
       {header}
       <div className="pt-24 pb-16">
-        <div className="container mx-auto px-4 max-w-7xl">
+        <div className="container mx-auto max-w-7xl px-4">
           <div className="mb-8">
-            <h1 className="text-4xl font-heading font-bold text-white mb-2">
+            <h1 className="font-heading mb-2 text-4xl font-bold text-white">
               Welcome back, {user.user_metadata?.full_name || "Developer"}!
             </h1>
             <p className="text-gray-400">Ready to practice? Start a new interview session</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <Card className="bg-gray-900/50 border-gray-700">
+          <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+            <Card className="border-gray-700 bg-gray-900/50">
               <CardHeader className="pb-3">
-                <CardTitle className="text-white text-sm font-medium flex items-center">
-                  <BarChart3 className="h-4 w-4 mr-2" />
+                <CardTitle className="flex items-center text-sm font-medium text-white">
+                  <BarChart3 className="mr-2 h-4 w-4" />
                   Practice Sessions
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-white mb-2">
+                <div className="mb-2 text-3xl font-bold text-white">
                   {usage?.used || 0} / {usage?.limit || 2}
-                  <span className="text-sm font-normal text-gray-400 ml-2">used</span>
+                  <span className="ml-2 text-sm font-normal text-gray-400">used</span>
                 </div>
-                <Progress value={usage ? (usage.used / usage.limit) * 100 : 0} className="h-2 mb-2" />
+                <Progress
+                  value={usage ? (usage.used / usage.limit) * 100 : 0}
+                  className="mb-2 h-2"
+                />
                 {(usage?.freeOpensRemaining || 0) > 0 ? (
                   <p className="text-xs text-[#00ff88]">
                     {usage?.freeOpensRemaining} free opens remaining
@@ -167,26 +183,41 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
                       : "Limit reached - upgrade for more"}
                   </p>
                 )}
-                <p className="text-xs text-gray-500 mt-1">
-                  Resets {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                <p className="mt-1 text-xs text-gray-500">
+                  Resets{" "}
+                  {usage?.periodEnd
+                    ? new Date(usage.periodEnd).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })
+                    : ""}
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-gray-900/50 border-gray-700">
+            <Card className="border-gray-700 bg-gray-900/50">
               <CardHeader className="pb-3">
-                <CardTitle className="text-white text-sm font-medium flex items-center">
-                  <Crown className="h-4 w-4 mr-2" />
+                <CardTitle className="flex items-center text-sm font-medium text-white">
+                  <Crown className="mr-2 h-4 w-4" />
                   Subscription
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <Badge className={isPro ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" : "bg-gray-500/20 text-gray-400 border-gray-500/30"}>
+                <Badge
+                  className={
+                    isPro
+                      ? "border-yellow-500/30 bg-yellow-500/20 text-yellow-400"
+                      : "border-gray-500/30 bg-gray-500/20 text-gray-400"
+                  }
+                >
                   {isPro ? "Pro Plan" : "Free Plan"}
                 </Badge>
                 {!isPro && (
-                  <Link href="/upgrade" className="block mt-3">
-                    <Button size="sm" className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
+                  <Link href="/upgrade" className="mt-3 block">
+                    <Button
+                      size="sm"
+                      className="w-full bg-[#00d9ff] text-white hover:bg-[#00d9ff]/80"
+                    >
                       Upgrade
                     </Button>
                   </Link>
@@ -194,16 +225,16 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
               </CardContent>
             </Card>
 
-            <Card className="bg-gray-900/50 border-gray-700">
+            <Card className="border-gray-700 bg-gray-900/50">
               <CardHeader className="pb-3">
-                <CardTitle className="text-white text-sm font-medium flex items-center">
-                  <Terminal className="h-4 w-4 mr-2" />
+                <CardTitle className="flex items-center text-sm font-medium text-white">
+                  <Terminal className="mr-2 h-4 w-4" />
                   Quick Start
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <Link href="/interview">
-                  <Button className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white">
+                  <Button className="w-full bg-[#00d9ff] text-white hover:bg-[#00d9ff]/80">
                     Start Practice
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
@@ -212,15 +243,15 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
             </Card>
           </div>
 
-          <Card className="bg-gray-900/50 border-gray-700">
+          <Card className="border-gray-700 bg-gray-900/50">
             <CardHeader>
-              <CardTitle className="text-white flex items-center justify-between">
+              <CardTitle className="flex items-center justify-between text-white">
                 <span className="flex items-center">
-                  <Terminal className="h-5 w-5 mr-2 text-[#00d9ff]" />
+                  <Terminal className="mr-2 h-5 w-5 text-[#00d9ff]" />
                   Coding Practice
                 </span>
                 {!usage?.allowed && (
-                  <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
+                  <Badge className="border-red-500/30 bg-red-500/20 text-red-400">
                     Limit Reached
                   </Badge>
                 )}
@@ -230,10 +261,11 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
               {usage?.allowed ? (
                 <div className="space-y-4">
                   <p className="text-gray-300">
-                    Ready to practice? Start a new interview session and work on real coding problems with AI guidance.
+                    Ready to practice? Start a new interview session and work on real coding
+                    problems with AI guidance.
                   </p>
                   <Link href="/interview">
-                    <Button className="w-full bg-[#00d9ff] hover:bg-[#00d9ff]/80 text-white py-6 text-lg">
+                    <Button className="w-full bg-[#00d9ff] py-6 text-lg text-white hover:bg-[#00d9ff]/80">
                       <Terminal className="mr-2 h-5 w-5" />
                       Start New Practice Session
                       <ArrowRight className="ml-2 h-5 w-5" />
@@ -242,13 +274,14 @@ export function AuthenticatedDashboard({ header, footer }: AuthenticatedDashboar
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
-                    <p className="text-yellow-400 font-medium mb-2">Monthly Limit Reached</p>
-                    <p className="text-gray-300 text-sm mb-4">
-                      You've used all {usage?.limit || 2} free sessions this month. Upgrade to Pro for unlimited practice!
+                  <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-4">
+                    <p className="mb-2 font-medium text-yellow-400">Monthly Limit Reached</p>
+                    <p className="mb-4 text-sm text-gray-300">
+                      You've used all {usage?.limit || 2} free sessions this month. Upgrade to Pro
+                      for unlimited practice!
                     </p>
                     <Link href="/upgrade">
-                      <Button className="bg-yellow-500 hover:bg-yellow-600 text-black">
+                      <Button className="bg-yellow-500 text-black hover:bg-yellow-600">
                         <Crown className="mr-2 h-4 w-4" />
                         Upgrade to Pro
                       </Button>
