@@ -323,6 +323,16 @@ export async function initializeUserQuota(
         needsUpdate = true
       }
 
+      // Update period_end if it differs (e.g., Stripe billing period changed)
+      const storedPeriodEnd = new Date(currentPeriodQuota.period_end).getTime()
+      const calculatedPeriodEnd = periodEnd.getTime()
+      if (Math.abs(storedPeriodEnd - calculatedPeriodEnd) > 60000) {
+        // More than 1 minute difference
+        updateData.period_end = periodEnd.toISOString()
+        currentPeriodQuota.period_end = periodEnd.toISOString()
+        needsUpdate = true
+      }
+
       if (needsUpdate) {
         const quotaRef = quotaSnap.docs.find((doc) => {
           const quota = doc.data() as ProfileQuota
