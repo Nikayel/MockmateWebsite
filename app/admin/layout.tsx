@@ -31,6 +31,7 @@ import {
   CreditCard,
   Loader2,
   Scale,
+  Lightbulb,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { logger } from "@/lib/logger"
@@ -77,6 +78,13 @@ const navigation: NavItem[] = [
   { name: "Announcements", href: "/admin/announcements", icon: Megaphone, section: "Operations" },
   { name: "Feature Flags", href: "/admin/feature-flags", icon: Flag, section: "Operations" },
   { name: "Feedback", href: "/admin/feedback", icon: MessageSquare, section: "Operations" },
+  {
+    name: "Insights",
+    href: "/admin/insights",
+    icon: Lightbulb,
+    badge: "AI",
+    section: "Operations",
+  },
   { name: "Audit Log", href: "/admin/audit", icon: ClipboardList, section: "Operations" },
   { name: "Settings", href: "/admin/settings", icon: Settings, section: "Operations" },
 ]
@@ -243,7 +251,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         )}
 
         {/* Navigation */}
-        <nav className="scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent flex-1 overflow-y-auto px-2 py-4">
+        <nav
+          className="scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent flex-1 overflow-y-auto px-2 py-4"
+          style={{ maxHeight: "calc(100vh - 14rem)" }}
+        >
           {sections.map((section, sectionIndex) => {
             const sectionItems = navigation.filter((item) => item.section === section)
             return (
