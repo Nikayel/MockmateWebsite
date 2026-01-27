@@ -591,11 +591,13 @@ export async function getServiceBreakdown(): Promise<{
 
   try {
     // Query usage_events for current month with limit to prevent unbounded reads
+    // Reduced from 50K to 10K to save on Firestore costs (80% reduction in reads)
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const eventsSnapshot = await adminDb
       .collection("usage_events")
       .where("createdAt", ">=", startOfMonth)
-      .limit(50000)
+      .orderBy("createdAt", "desc")
+      .limit(10000)
       .get()
 
     for (const doc of eventsSnapshot.docs) {
@@ -999,11 +1001,12 @@ export async function getDailyUsageTrends(days: number = 30): Promise<{
 
   try {
     // Limit to prevent cost explosion on large date ranges
+    // 10K events is sufficient for trend analysis - saves ~90% on Firestore reads
     const eventsSnapshot = await adminDb
       .collection("usage_events")
       .where("createdAt", ">=", startDate)
-      .orderBy("createdAt", "asc")
-      .limit(100000)
+      .orderBy("createdAt", "desc")
+      .limit(10000)
       .get()
 
     const dailyMap = new Map<

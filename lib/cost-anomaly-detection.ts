@@ -17,6 +17,17 @@ import { adminDb } from './firebase-admin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { logger } from './logger'
 
+// Query limits to prevent Firestore cost explosion
+const QUERY_LIMITS = {
+  hourlyEvents: 5000,      // Max events to read for hourly check
+  userHourlyEvents: 1000,  // Max events per user per hour
+  weeklyEvents: 10000,     // Max events for 7-day average calculation
+} as const
+
+// In-memory cache for average hourly cost (expensive to calculate)
+let cachedAverageHourlyCost: { value: number; expiresAt: number } | null = null
+const AVERAGE_COST_CACHE_TTL_MS = 15 * 60 * 1000 // 15 minutes
+
 export interface CostAnomaly {
   id?: string
   type: 'high_single_request' | 'hourly_spike' | 'daily_budget_exceeded' | 'user_cost_spike' | 'unusual_pattern'
@@ -99,10 +110,12 @@ export async function checkHourlyCostAnomaly(): Promise<CostAnomaly | null> {
     const now = new Date()
     const hourAgo = new Date(now.getTime() - 60 * 60 * 1000)
 
-    // Get costs from last hour
+    // Get costs from last hour (with limit to prevent cost explosion)
     const eventsSnapshot = await adminDb
       .collection('usage_events')
       .where('createdAt', '>=', hourAgo)
+      .orderBy('createdAt', 'desc')
+      .limit(QUERY_LIMITS.hourlyEvents)
       .get()
 
     let hourlyCost = 0
@@ -158,10 +171,13 @@ export async function checkUserCostAnomaly(userId: string): Promise<CostAnomaly 
     const now = new Date()
     const hourAgo = new Date(now.getTime() - 60 * 60 * 1000)
 
+    // Limit per-user query to prevent abuse or runaway reads
     const eventsSnapshot = await adminDb
       .collection('usage_events')
       .where('userId', '==', userId)
       .where('createdAt', '>=', hourAgo)
+      .orderBy('createdAt', 'desc')
+      .limit(QUERY_LIMITS.userHourlyEvents)
       .get()
 
     let userHourlyCost = 0
@@ -244,15 +260,25 @@ async function recordAnomaly(anomaly: Omit<CostAnomaly, 'id' | 'timestamp'>): Pr
 
 /**
  * Get average hourly cost (last 7 days)
+ * Uses in-memory caching to avoid expensive repeated queries
  */
 async function getAverageHourlyCost(): Promise<number> {
+  // Check cache first
+  if (cachedAverageHourlyCost && Date.now() < cachedAverageHourlyCost.expiresAt) {
+    return cachedAverageHourlyCost.value
+  }
+
   try {
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
+    // Limit query to prevent cost explosion on large datasets
+    // Sample recent events and extrapolate if needed
     const eventsSnapshot = await adminDb
       .collection('usage_events')
       .where('createdAt', '>=', sevenDaysAgo)
+      .orderBy('createdAt', 'desc')
+      .limit(QUERY_LIMITS.weeklyEvents)
       .get()
 
     let totalCost = 0
@@ -260,8 +286,34 @@ async function getAverageHourlyCost(): Promise<number> {
       totalCost += doc.data().cost || 0
     }
 
-    // 7 days * 24 hours = 168 hours
-    return totalCost / 168
+    // If we hit the limit, we have more events - extrapolate based on time coverage
+    let avgHourlyCost: number
+    if (eventsSnapshot.size >= QUERY_LIMITS.weeklyEvents && eventsSnapshot.size > 0) {
+      // Estimate: we only sampled recent events, extrapolate for full period
+      const oldestSampled = eventsSnapshot.docs[eventsSnapshot.size - 1].data().createdAt?.toDate()
+      const newestSampled = eventsSnapshot.docs[0].data().createdAt?.toDate()
+      if (oldestSampled && newestSampled) {
+        const sampledHours = (newestSampled.getTime() - oldestSampled.getTime()) / (1000 * 60 * 60)
+        avgHourlyCost = sampledHours > 0 ? totalCost / sampledHours : 0
+      } else {
+        avgHourlyCost = totalCost / 168 // Fallback to 7 days
+      }
+      logger.debug('Average hourly cost calculated from sample', {
+        sampledEvents: eventsSnapshot.size,
+        avgHourlyCost
+      })
+    } else {
+      // 7 days * 24 hours = 168 hours
+      avgHourlyCost = totalCost / 168
+    }
+
+    // Cache the result
+    cachedAverageHourlyCost = {
+      value: avgHourlyCost,
+      expiresAt: Date.now() + AVERAGE_COST_CACHE_TTL_MS,
+    }
+
+    return avgHourlyCost
   } catch (error) {
     logger.error('Failed to get average hourly cost', { error })
     return 0

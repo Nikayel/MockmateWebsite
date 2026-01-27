@@ -84,6 +84,45 @@ const MAX_MESSAGE_LENGTH = 4000 // Truncate individual messages
 const MAX_WORKSPACE_FILES = 5 // Limit workspace files
 const MAX_FILE_SIZE = 10000 // 10KB per file max
 
+// Session-level cache for static RAG context (pattern knowledge, company knowledge)
+// This saves rebuilding the same context on every message in a session
+interface SessionRAGCache {
+  staticContext: string
+  sessionId: string
+  scenarioId: string
+  createdAt: number
+}
+
+const sessionRAGCache = new Map<string, SessionRAGCache>()
+const SESSION_RAG_CACHE_TTL_MS = 30 * 60 * 1000 // 30 minutes (typical session duration)
+const MAX_SESSION_CACHE_SIZE = 500 // Limit memory usage
+
+/**
+ * Prune old session cache entries
+ */
+function pruneSessionRAGCache(): void {
+  if (sessionRAGCache.size <= MAX_SESSION_CACHE_SIZE) return
+
+  const now = Date.now()
+  // Remove expired entries first
+  for (const [key, entry] of sessionRAGCache.entries()) {
+    if (now - entry.createdAt > SESSION_RAG_CACHE_TTL_MS) {
+      sessionRAGCache.delete(key)
+    }
+  }
+
+  // If still over limit, remove oldest entries
+  if (sessionRAGCache.size > MAX_SESSION_CACHE_SIZE) {
+    const entries = Array.from(sessionRAGCache.entries())
+      .sort((a, b) => a[1].createdAt - b[1].createdAt)
+
+    const toRemove = sessionRAGCache.size - MAX_SESSION_CACHE_SIZE + 50
+    for (let i = 0; i < toRemove && i < entries.length; i++) {
+      sessionRAGCache.delete(entries[i][0])
+    }
+  }
+}
+
 /**
  * Sliding window for conversation history
  * Keeps most recent messages, summarizes old ones if needed
@@ -147,48 +186,21 @@ function manageWorkspaceContext(
 }
 
 /**
- * Build RAG-enhanced context for the AI partner role
- * Retrieves relevant patterns, hints, and knowledge from the RAG system
- * Now includes DYNAMIC context based on what the user is currently discussing
+ * Build the STATIC parts of RAG context (pattern knowledge, company knowledge, complexity)
+ * These don't change during a session, so we cache them
  */
-async function buildRAGContext(options: {
-  scenarioTitle?: string
+function buildStaticRAGContext(options: {
   scenarioPattern?: string
   scenarioCompany?: string
-  scenarioType?: string
   scenarioId?: string
-  problemText?: string
-  userCode?: string
-  userId?: string
-  userMessage?: string // NEW: Current user message for dynamic context
-  testResults?: { passed: number; total: number; failingTests?: string[] } // NEW: Test results for debugging context
-}): Promise<string> {
-  const ragContextParts: string[] = []
+}): string {
+  const staticParts: string[] = []
 
-  try {
-    // NEW: Dynamic context based on user's current message
-    if (options.userMessage && shouldRetrieveDynamicContext(options.userMessage)) {
-      const dynamicContext = await getDynamicChatContext({
-        userMessage: options.userMessage,
-        currentCode: options.userCode,
-        pattern: options.scenarioPattern as DSAPattern,
-        problemTitle: options.scenarioTitle,
-        testResults: options.testResults,
-      })
-
-      // Only add if we got meaningful context
-      if (dynamicContext.retrievedContext || dynamicContext.debuggingHints) {
-        ragContextParts.push(`
-## Dynamic Context (based on user's current question)
-${formatDynamicContextForPrompt(dynamicContext)}
-`)
-      }
-    }
-    // 1. Get pattern-specific knowledge if pattern is known
-    if (options.scenarioPattern) {
-      const patternKnowledge = getPatternKnowledge(options.scenarioPattern as DSAPattern)
-      if (patternKnowledge) {
-        ragContextParts.push(`
+  // 1. Get pattern-specific knowledge if pattern is known
+  if (options.scenarioPattern) {
+    const patternKnowledge = getPatternKnowledge(options.scenarioPattern as DSAPattern)
+    if (patternKnowledge) {
+      staticParts.push(`
 ## Pattern Knowledge: ${patternKnowledge.displayName}
 
 ### When to Use
@@ -213,23 +225,23 @@ ${patternKnowledge.commonMistakes
 - Time: ${patternKnowledge.timeComplexity.typical}
 - Space: ${patternKnowledge.spaceComplexity.typical}
 `)
-      }
     }
+  }
 
-    // 2. Get company-specific interview knowledge
-    if (options.scenarioCompany && options.scenarioCompany !== "Generic") {
-      const companyKnowledge = getCompanyInterviewKnowledge(options.scenarioCompany as CompanyId)
-      if (companyKnowledge) {
-        ragContextParts.push(`
+  // 2. Get company-specific interview knowledge
+  if (options.scenarioCompany && options.scenarioCompany !== "Generic") {
+    const companyKnowledge = getCompanyInterviewKnowledge(options.scenarioCompany as CompanyId)
+    if (companyKnowledge) {
+      staticParts.push(`
 ## ${companyKnowledge.companyName} Interview Tips
 
 ### Interview Style
 ${companyKnowledge.interviewStyle.description}
 Pace: ${companyKnowledge.interviewStyle.pace}
 Expectations: ${companyKnowledge.interviewStyle.expectations
-          .slice(0, 3)
-          .map((e) => `- ${e}`)
-          .join("\n")}
+        .slice(0, 3)
+        .map((e) => `- ${e}`)
+        .join("\n")}
 
 ### Focus Areas
 ${companyKnowledge.topPatterns
@@ -243,19 +255,98 @@ ${companyKnowledge.cultureTips
   .map((t) => `- ${t}`)
   .join("\n")}
 `)
+    }
+  }
+
+  // 3. Build complexity knowledge context for interviewer
+  if (options.scenarioId || options.scenarioPattern) {
+    const complexityContext = buildComplexityContext(
+      options.scenarioId || "",
+      options.scenarioPattern as DSAPattern
+    )
+    if (complexityContext) {
+      staticParts.push(complexityContext)
+    }
+  }
+
+  return staticParts.join("\n")
+}
+
+/**
+ * Build RAG-enhanced context for the AI partner role
+ * Retrieves relevant patterns, hints, and knowledge from the RAG system
+ * Now includes DYNAMIC context based on what the user is currently discussing
+ *
+ * OPTIMIZATION: Static parts (pattern, company, complexity) are cached per-session
+ * to avoid rebuilding on every message. Only dynamic context is fetched per-message.
+ */
+async function buildRAGContext(options: {
+  scenarioTitle?: string
+  scenarioPattern?: string
+  scenarioCompany?: string
+  scenarioType?: string
+  scenarioId?: string
+  problemText?: string
+  userCode?: string
+  userId?: string
+  sessionId?: string // NEW: For session-level caching
+  userMessage?: string // Current user message for dynamic context
+  testResults?: { passed: number; total: number; failingTests?: string[] } // Test results for debugging context
+}): Promise<string> {
+  const ragContextParts: string[] = []
+
+  try {
+    // NEW: Dynamic context based on user's current message (changes per message)
+    if (options.userMessage && shouldRetrieveDynamicContext(options.userMessage)) {
+      const dynamicContext = await getDynamicChatContext({
+        userMessage: options.userMessage,
+        currentCode: options.userCode,
+        pattern: options.scenarioPattern as DSAPattern,
+        problemTitle: options.scenarioTitle,
+        testResults: options.testResults,
+      })
+
+      // Only add if we got meaningful context
+      if (dynamicContext.retrievedContext || dynamicContext.debuggingHints) {
+        ragContextParts.push(`
+## Dynamic Context (based on user's current question)
+${formatDynamicContextForPrompt(dynamicContext)}
+`)
       }
     }
 
-    // 3. Build complexity knowledge context for interviewer
-    // This gives the interviewer knowledge of multiple approaches, trade-offs, and how to question about complexity
-    if (options.scenarioId || options.scenarioPattern) {
-      const complexityContext = buildComplexityContext(
-        options.scenarioId || "",
-        options.scenarioPattern as DSAPattern
-      )
-      if (complexityContext) {
-        ragContextParts.push(complexityContext)
-      }
+    // STATIC CONTEXT: Check session cache first (saves ~50ms per message)
+    const sessionCacheKey = options.sessionId || `${options.userId}-${options.scenarioId}`
+    let staticContext: string
+
+    const cachedSession = sessionRAGCache.get(sessionCacheKey)
+    if (
+      cachedSession &&
+      cachedSession.scenarioId === (options.scenarioId || "") &&
+      Date.now() - cachedSession.createdAt < SESSION_RAG_CACHE_TTL_MS
+    ) {
+      // Use cached static context
+      staticContext = cachedSession.staticContext
+    } else {
+      // Build and cache static context
+      staticContext = buildStaticRAGContext({
+        scenarioPattern: options.scenarioPattern,
+        scenarioCompany: options.scenarioCompany,
+        scenarioId: options.scenarioId,
+      })
+
+      // Cache it for the session
+      sessionRAGCache.set(sessionCacheKey, {
+        staticContext,
+        sessionId: sessionCacheKey,
+        scenarioId: options.scenarioId || "",
+        createdAt: Date.now(),
+      })
+      pruneSessionRAGCache()
+    }
+
+    if (staticContext) {
+      ragContextParts.push(staticContext)
     }
 
     // 4. Build hint context from RAG if we have problem text
@@ -1120,6 +1211,7 @@ Keep responses brief, actionable, and helpful. You're a tool they can use, but t
 
     // Enhance both interviewer and partner roles with RAG context
     // Now includes DYNAMIC context based on the user's current message
+    // OPTIMIZATION: Static parts are cached per-session for cost savings
     const ragContext = await buildRAGContext({
       scenarioTitle,
       scenarioPattern,
@@ -1129,8 +1221,9 @@ Keep responses brief, actionable, and helpful. You're a tool they can use, but t
       problemText: scenarioTitle, // Use title as problem text
       userCode: currentCode,
       userId,
-      userMessage: message, // NEW: Pass user message for dynamic context
-      testResults, // NEW: Pass test results for debugging context
+      sessionId, // For session-level caching of static context
+      userMessage: message, // Pass user message for dynamic context
+      testResults, // Pass test results for debugging context
     })
 
     if (ragContext) {
