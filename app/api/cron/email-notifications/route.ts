@@ -274,15 +274,24 @@ async function processInactivityReminders(now: Date, results: any): Promise<void
 
   // DUPLICATE PREVENTION: Pre-fetch all inactivity emails sent in last 24 hours
   // This prevents sending multiple inactivity reminders within a 24-hour window
-  const recentInactivityEmailsSnap = await db
-    .collection("email_notifications")
-    .where("email_type", "in", ["inactivity_24h", "inactivity_48h"])
-    .where("created_at", ">=", twentyFourHoursAgo.toISOString())
-    .get()
+  let usersWithRecentInactivityEmail = new Set<string>()
+  try {
+    const recentInactivityEmailsSnap = await db
+      .collection("email_notifications")
+      .where("email_type", "in", ["inactivity_24h", "inactivity_48h"])
+      .where("created_at", ">=", twentyFourHoursAgo.toISOString())
+      .get()
 
-  const usersWithRecentInactivityEmail = new Set(
-    recentInactivityEmailsSnap.docs.map((doc) => doc.data().user_id)
-  )
+    usersWithRecentInactivityEmail = new Set(
+      recentInactivityEmailsSnap.docs.map((doc) => doc.data().user_id)
+    )
+  } catch (indexError: any) {
+    // Index may not exist yet - continue without deduplication
+    console.warn(
+      "[Cron Email] Inactivity dedup query failed (index may be building):",
+      indexError.message
+    )
+  }
 
   // Get learning states where last_session_at is before 24h ago
   // Filter for 72h in memory to avoid composite index requirement
@@ -419,13 +428,19 @@ async function processInactivityReminders(now: Date, results: any): Promise<void
 async function processSpacedRepetitionReminders(now: Date, results: any): Promise<void> {
   // DUPLICATE PREVENTION: Pre-fetch all spaced repetition emails sent in last 24 hours
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-  const recentSREmailsSnap = await db
-    .collection("email_notifications")
-    .where("email_type", "==", "spaced_repetition")
-    .where("created_at", ">=", twentyFourHoursAgo.toISOString())
-    .get()
+  let usersWithRecentSREmail = new Set<string>()
+  try {
+    const recentSREmailsSnap = await db
+      .collection("email_notifications")
+      .where("email_type", "==", "spaced_repetition")
+      .where("created_at", ">=", twentyFourHoursAgo.toISOString())
+      .get()
 
-  const usersWithRecentSREmail = new Set(recentSREmailsSnap.docs.map((doc) => doc.data().user_id))
+    usersWithRecentSREmail = new Set(recentSREmailsSnap.docs.map((doc) => doc.data().user_id))
+  } catch (indexError: any) {
+    // Index may not exist yet - continue without deduplication
+    console.warn("[Cron Email] SR dedup query failed (index may be building):", indexError.message)
+  }
 
   // Find users with problem mastery data (new system)
   const problemMasteryUsersSnap = await db.collection("problem_mastery").limit(100).get()
@@ -692,15 +707,24 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
 async function processRoadmapReminders(now: Date, results: any): Promise<void> {
   // DUPLICATE PREVENTION: Pre-fetch all roadmap emails sent in last 24 hours
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-  const recentRoadmapEmailsSnap = await db
-    .collection("email_notifications")
-    .where("email_type", "in", ["daily_roadmap", "interview_countdown", "behind_schedule"])
-    .where("created_at", ">=", twentyFourHoursAgo.toISOString())
-    .get()
+  let usersWithRecentRoadmapEmail = new Set<string>()
+  try {
+    const recentRoadmapEmailsSnap = await db
+      .collection("email_notifications")
+      .where("email_type", "in", ["daily_roadmap", "interview_countdown", "behind_schedule"])
+      .where("created_at", ">=", twentyFourHoursAgo.toISOString())
+      .get()
 
-  const usersWithRecentRoadmapEmail = new Set(
-    recentRoadmapEmailsSnap.docs.map((doc) => doc.data().user_id)
-  )
+    usersWithRecentRoadmapEmail = new Set(
+      recentRoadmapEmailsSnap.docs.map((doc) => doc.data().user_id)
+    )
+  } catch (indexError: any) {
+    // Index may not exist yet - continue without deduplication
+    console.warn(
+      "[Cron Email] Roadmap dedup query failed (index may be building):",
+      indexError.message
+    )
+  }
 
   // Get all active roadmaps
   const roadmapsSnap = await db
