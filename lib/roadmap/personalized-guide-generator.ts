@@ -913,17 +913,17 @@ function generateAdaptiveRecommendations(
     )
     const focusHours = criticalAndHighPatterns.reduce((sum, p) => sum + p.estimatedHoursToLearn, 0)
 
+    const topPatterns = criticalAndHighPatterns.slice(0, 3)
+    const patternNames = topPatterns.map((p) => p.pattern).join(", ")
+
     recommendations.push({
       type: "speed-up",
       message:
         focusHours <= availableHours
           ? `Focus on ${criticalAndHighPatterns.length} high-priority patterns to make the most of your ${Math.round(availableHours)} hours.`
-          : `Limited time available. Prioritize the ${Math.min(3, criticalGaps.length)} most critical patterns.`,
+          : `Limited time available. Focus on ${topPatterns.length} key patterns: ${patternNames}.`,
       actionItems: [
-        `Focus on: ${criticalAndHighPatterns
-          .slice(0, 3)
-          .map((p) => p.pattern)
-          .join(", ")}`,
+        `Prioritize: ${patternNames}`,
         "Skip low-priority patterns for now",
         "Use video tutorials for faster pattern recognition",
       ],
