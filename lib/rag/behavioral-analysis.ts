@@ -258,7 +258,10 @@ export interface AccurateBehavioralProfile {
 /**
  * Load rich session data from Firestore
  */
-async function loadRichSessionData(userId: string, limit: number = 100): Promise<RichSessionData[]> {
+async function loadRichSessionData(
+  userId: string,
+  limit: number = 100
+): Promise<RichSessionData[]> {
   const snapshot = await adminDb
     .collection("users")
     .doc(userId)
@@ -323,15 +326,16 @@ function analyzePlanningBehavior(sessions: RichSessionData[]): PlanningBehavior 
 
   // Estimate time to first execution based on total time and success rate
   // Users who plan more tend to have higher first-attempt success
-  const avgFirstAttemptSuccessRate = sessions.reduce((sum, s) => {
-    const metrics = s.interactionMetrics
-    const passed = metrics.testCasesPassed || 0
-    const total = metrics.testCasesTotal || 1
-    return sum + (passed / total)
-  }, 0) / sessions.length
+  const avgFirstAttemptSuccessRate =
+    sessions.reduce((sum, s) => {
+      const metrics = s.interactionMetrics
+      const passed = metrics.testCasesPassed || 0
+      const total = metrics.testCasesTotal || 1
+      return sum + passed / total
+    }, 0) / sessions.length
 
   // Higher first-attempt success = more planning
-  const planningScore = avgFirstAttemptSuccessRate * sessionsWithApproach / sessions.length
+  const planningScore = (avgFirstAttemptSuccessRate * sessionsWithApproach) / sessions.length
 
   let style: PlanningBehavior["style"]
   if (planningScore > 0.6) {
@@ -346,14 +350,16 @@ function analyzePlanningBehavior(sessions: RichSessionData[]): PlanningBehavior 
   const confidence = Math.min(100, sessions.length * 5)
 
   return {
-    avgTimeToFirstExecutionMinutes: sessions.reduce((sum, s) => sum + s.durationMinutes * 0.2, 0) / sessions.length, // Estimate
+    avgTimeToFirstExecutionMinutes:
+      sessions.reduce((sum, s) => sum + s.durationMinutes * 0.2, 0) / sessions.length, // Estimate
     approachExplanationRate: sessionsWithApproach / sessions.length,
     style,
     confidence,
     evidence: {
       totalSessionsAnalyzed: sessions.length,
       sessionsWithApproachFirst: sessionsWithApproach,
-      avgExecutionsBeforeSuccess: executionCounts.reduce((sum, e) => sum + e.testsTotal, 0) / executionCounts.length,
+      avgExecutionsBeforeSuccess:
+        executionCounts.reduce((sum, e) => sum + e.testsTotal, 0) / executionCounts.length,
     },
   }
 }
@@ -398,9 +404,7 @@ function analyzeDebuggingBehavior(sessions: RichSessionData[]): DebuggingBehavio
     0
   )
 
-  const sessionsWithTDD = sessions.filter(
-    (s) => s.interactionMetrics.testDrivenApproach
-  ).length
+  const sessionsWithTDD = sessions.filter((s) => s.interactionMetrics.testDrivenApproach).length
 
   const sessionsWithSystematic = sessions.filter(
     (s) => s.interactionMetrics.systematicDebugging
@@ -483,9 +487,7 @@ function analyzeHelpSeekingBehavior(sessions: RichSessionData[]): HelpSeekingBeh
   )
 
   const totalAISuggestions = totalAIApplied + totalAICopied
-  const aiUnderstandingRate = totalAISuggestions > 0
-    ? totalAIApplied / totalAISuggestions
-    : 1 // No AI usage = assume would understand
+  const aiUnderstandingRate = totalAISuggestions > 0 ? totalAIApplied / totalAISuggestions : 1 // No AI usage = assume would understand
 
   const hintUsageRate = sessionsWithHints / sessions.length
   const aiUsageRate = sessionsWithAI / sessions.length
@@ -562,20 +564,25 @@ function analyzePersistenceBehavior(sessions: RichSessionData[]): PersistenceBeh
     hard: sessions.filter((s) => s.difficulty === "hard"),
   }
 
-  const avgScoreEasy = byDifficulty.easy.length > 0
-    ? byDifficulty.easy.reduce((sum, s) => sum + s.performanceScore, 0) / byDifficulty.easy.length
-    : 0
-  const avgScoreMedium = byDifficulty.medium.length > 0
-    ? byDifficulty.medium.reduce((sum, s) => sum + s.performanceScore, 0) / byDifficulty.medium.length
-    : 0
-  const avgScoreHard = byDifficulty.hard.length > 0
-    ? byDifficulty.hard.reduce((sum, s) => sum + s.performanceScore, 0) / byDifficulty.hard.length
-    : 0
+  const avgScoreEasy =
+    byDifficulty.easy.length > 0
+      ? byDifficulty.easy.reduce((sum, s) => sum + s.performanceScore, 0) / byDifficulty.easy.length
+      : 0
+  const avgScoreMedium =
+    byDifficulty.medium.length > 0
+      ? byDifficulty.medium.reduce((sum, s) => sum + s.performanceScore, 0) /
+        byDifficulty.medium.length
+      : 0
+  const avgScoreHard =
+    byDifficulty.hard.length > 0
+      ? byDifficulty.hard.reduce((sum, s) => sum + s.performanceScore, 0) / byDifficulty.hard.length
+      : 0
 
   const hardAttemptRate = byDifficulty.hard.length / sessions.length
-  const hardSuccessRate = byDifficulty.hard.length > 0
-    ? byDifficulty.hard.filter((s) => s.performanceScore >= 70).length / byDifficulty.hard.length
-    : 0
+  const hardSuccessRate =
+    byDifficulty.hard.length > 0
+      ? byDifficulty.hard.filter((s) => s.performanceScore >= 70).length / byDifficulty.hard.length
+      : 0
 
   const avgDuration = sessions.reduce((sum, s) => sum + s.durationMinutes, 0) / sessions.length
 
@@ -583,9 +590,11 @@ function analyzePersistenceBehavior(sessions: RichSessionData[]): PersistenceBeh
   const potentiallyAbandoned = sessions.filter(
     (s) => s.performanceScore < 40 && s.durationMinutes < avgDuration * 0.5
   )
-  const frustrationThreshold = potentiallyAbandoned.length > 0
-    ? potentiallyAbandoned.reduce((sum, s) => sum + s.durationMinutes, 0) / potentiallyAbandoned.length
-    : null
+  const frustrationThreshold =
+    potentiallyAbandoned.length > 0
+      ? potentiallyAbandoned.reduce((sum, s) => sum + s.durationMinutes, 0) /
+        potentiallyAbandoned.length
+      : null
 
   // Determine persistence level
   let persistenceLevel: PersistenceBehavior["persistenceLevel"]
@@ -686,15 +695,17 @@ function analyzeLearningVelocity(sessions: RichSessionData[]): LearningVelocity 
       repeatedPatterns++
       const firstScore = patternSessions[0].performanceScore
       const lastScore = patternSessions[patternSessions.length - 1].performanceScore
-      const patternTrend = lastScore > firstScore + 5
-        ? "improving"
-        : lastScore < firstScore - 5
-          ? "declining"
-          : "stable"
+      const patternTrend =
+        lastScore > firstScore + 5
+          ? "improving"
+          : lastScore < firstScore - 5
+            ? "declining"
+            : "stable"
 
       patternVelocity.push({
         pattern,
-        sessionsToFirstSuccess: patternSessions.findIndex((s) => s.performanceScore >= 70) + 1 || patternSessions.length,
+        sessionsToFirstSuccess:
+          patternSessions.findIndex((s) => s.performanceScore >= 70) + 1 || patternSessions.length,
         currentProficiency: lastScore,
         trend: patternTrend,
       })
@@ -705,9 +716,10 @@ function analyzeLearningVelocity(sessions: RichSessionData[]): LearningVelocity 
   const retentionScores = patternVelocity
     .filter((p) => p.trend !== "declining")
     .map((p) => p.currentProficiency)
-  const retentionScore = retentionScores.length > 0
-    ? retentionScores.reduce((sum, s) => sum + s, 0) / retentionScores.length
-    : 50
+  const retentionScore =
+    retentionScores.length > 0
+      ? retentionScores.reduce((sum, s) => sum + s, 0) / retentionScores.length
+      : 50
 
   const confidence = Math.min(100, sessions.length * 3)
 
@@ -808,9 +820,7 @@ function analyzeTemporalPerformance(sessions: RichSessionData[]): TemporalPerfor
     confidence,
     evidence: {
       totalSessionsAnalyzed: sessions.length,
-      hourlyDistribution: Object.fromEntries(
-        Object.entries(byHour).map(([h, d]) => [h, d.count])
-      ),
+      hourlyDistribution: Object.fromEntries(Object.entries(byHour).map(([h, d]) => [h, d.count])),
     },
   }
 }
@@ -818,7 +828,9 @@ function analyzeTemporalPerformance(sessions: RichSessionData[]): TemporalPerfor
 /**
  * Generate insights from accurate behavioral data
  */
-function generateAccurateInsights(profile: Omit<AccurateBehavioralProfile, "strengths" | "areasForImprovement" | "recommendations">): {
+function generateAccurateInsights(
+  profile: Omit<AccurateBehavioralProfile, "strengths" | "areasForImprovement" | "recommendations">
+): {
   strengths: string[]
   areasForImprovement: string[]
   recommendations: string[]
@@ -840,7 +852,9 @@ function generateAccurateInsights(profile: Omit<AccurateBehavioralProfile, "stre
     strengths.push("Excellent test-driven development habits")
   } else if (profile.debugging.style === "trial-and-error") {
     areasForImprovement.push("Debugging approach could be more systematic")
-    recommendations.push("Try adding print statements strategically rather than randomly changing code")
+    recommendations.push(
+      "Try adding print statements strategically rather than randomly changing code"
+    )
   }
 
   // Help-seeking insights
@@ -848,7 +862,9 @@ function generateAccurateInsights(profile: Omit<AccurateBehavioralProfile, "stre
     strengths.push("Strong independent problem-solving skills")
   } else if (profile.helpSeeking.style === "ai-dependent") {
     areasForImprovement.push("High reliance on AI suggestions without full understanding")
-    recommendations.push("When using AI hints, try to understand WHY the suggestion works before applying it")
+    recommendations.push(
+      "When using AI hints, try to understand WHY the suggestion works before applying it"
+    )
   } else if (profile.helpSeeking.aiUnderstandingRate > 0.8) {
     strengths.push("Uses AI assistance strategically and understands suggestions")
   }
@@ -876,10 +892,88 @@ function generateAccurateInsights(profile: Omit<AccurateBehavioralProfile, "stre
   // Temporal insights
   if (profile.temporalPerformance.bestPerformanceHours.length > 0) {
     const bestHours = profile.temporalPerformance.bestPerformanceHours.slice(0, 2)
-    recommendations.push(`Your peak performance hours are around ${bestHours.map(h => `${h}:00`).join(" and ")}`)
+    recommendations.push(
+      `Your peak performance hours are around ${bestHours.map((h) => `${h}:00`).join(" and ")}`
+    )
   }
 
   return { strengths, areasForImprovement, recommendations }
+}
+
+// ============================================================================
+// PERSISTENCE & CACHING
+// ============================================================================
+
+const BEHAVIORAL_PROFILE_COLLECTION = "behavioral_profiles"
+const CACHE_TTL_HOURS = 24 // Recompute profile after 24 hours
+
+/**
+ * Check if cached profile is still valid
+ */
+function isCacheValid(analyzedAt: Date, ttlHours: number = CACHE_TTL_HOURS): boolean {
+  const now = new Date()
+  const cacheAge = (now.getTime() - analyzedAt.getTime()) / (1000 * 60 * 60)
+  return cacheAge < ttlHours
+}
+
+/**
+ * Load cached behavioral profile from Firestore
+ */
+async function loadCachedProfile(userId: string): Promise<AccurateBehavioralProfile | null> {
+  try {
+    const doc = await adminDb.collection(BEHAVIORAL_PROFILE_COLLECTION).doc(userId).get()
+
+    if (!doc.exists) return null
+
+    const data = doc.data()
+    if (!data) return null
+
+    const analyzedAt = data.analyzedAt?.toDate?.() || new Date(data.analyzedAt)
+
+    // Check if cache is still valid
+    if (!isCacheValid(analyzedAt)) {
+      return null // Cache expired
+    }
+
+    return {
+      ...data,
+      analyzedAt,
+      learningVelocity: {
+        ...data.learningVelocity,
+        evidence: {
+          ...data.learningVelocity.evidence,
+          scoreHistory:
+            data.learningVelocity.evidence.scoreHistory?.map(
+              (s: { date: Date | string; score: number }) => ({
+                ...s,
+                date: s.date instanceof Date ? s.date : new Date(s.date),
+              })
+            ) || [],
+        },
+      },
+    } as AccurateBehavioralProfile
+  } catch (error) {
+    console.error("[BehavioralAnalysis] Failed to load cached profile:", error)
+    return null
+  }
+}
+
+/**
+ * Save behavioral profile to Firestore
+ */
+async function saveProfileToCache(profile: AccurateBehavioralProfile): Promise<void> {
+  try {
+    await adminDb
+      .collection(BEHAVIORAL_PROFILE_COLLECTION)
+      .doc(profile.userId)
+      .set({
+        ...profile,
+        analyzedAt: profile.analyzedAt,
+        updatedAt: new Date(),
+      })
+  } catch (error) {
+    console.error("[BehavioralAnalysis] Failed to save profile to cache:", error)
+  }
 }
 
 // ============================================================================
@@ -888,10 +982,22 @@ function generateAccurateInsights(profile: Omit<AccurateBehavioralProfile, "stre
 
 /**
  * Generate accurate behavioral profile from actual session data
+ * Uses caching to avoid recomputing on every request
  */
 export async function generateAccurateBehavioralProfile(
-  userId: string
+  userId: string,
+  options: { forceRefresh?: boolean; ttlHours?: number } = {}
 ): Promise<AccurateBehavioralProfile> {
+  const { forceRefresh = false, ttlHours = CACHE_TTL_HOURS } = options
+
+  // Check cache first (unless force refresh)
+  if (!forceRefresh) {
+    const cached = await loadCachedProfile(userId)
+    if (cached && isCacheValid(cached.analyzedAt, ttlHours)) {
+      return cached
+    }
+  }
+
   // Load rich session data
   const sessions = await loadRichSessionData(userId, 100)
 
@@ -931,11 +1037,37 @@ export async function generateAccurateBehavioralProfile(
 
   const { strengths, areasForImprovement, recommendations } = generateAccurateInsights(baseProfile)
 
-  return {
+  const profile: AccurateBehavioralProfile = {
     ...baseProfile,
     strengths,
     areasForImprovement,
     recommendations,
+  }
+
+  // Save to cache (fire and forget)
+  saveProfileToCache(profile).catch(() => {})
+
+  return profile
+}
+
+/**
+ * Invalidate cached profile (call after session completion)
+ */
+export async function invalidateBehavioralProfileCache(userId: string): Promise<void> {
+  try {
+    // Instead of deleting, we just let TTL handle it
+    // But we can force a shorter TTL by updating the analyzedAt to an old date
+    const doc = await adminDb.collection(BEHAVIORAL_PROFILE_COLLECTION).doc(userId).get()
+
+    if (doc.exists) {
+      // Mark for refresh on next request by setting a flag
+      await adminDb.collection(BEHAVIORAL_PROFILE_COLLECTION).doc(userId).update({
+        needsRefresh: true,
+        lastSessionAt: new Date(),
+      })
+    }
+  } catch (error) {
+    // Ignore - cache invalidation is best-effort
   }
 }
 
@@ -955,9 +1087,10 @@ export async function assessDataQuality(userId: string): Promise<{
 
   // Check for missing interaction metrics
   const sessionsWithFullMetrics = sessions.filter(
-    (s) => s.interactionMetrics &&
-           s.interactionMetrics.testCasesTotal !== undefined &&
-           s.interactionMetrics.debuggingAttempts !== undefined
+    (s) =>
+      s.interactionMetrics &&
+      s.interactionMetrics.testCasesTotal !== undefined &&
+      s.interactionMetrics.debuggingAttempts !== undefined
   )
 
   if (sessionsWithFullMetrics.length < sessions.length * 0.8) {

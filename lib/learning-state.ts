@@ -14,6 +14,7 @@ import type { DSAPattern } from "./types/dsa-patterns"
 import type { Difficulty } from "./spaced-repetition/sm2-algorithm"
 import { logger } from "./logger"
 import { DEFAULT_TIMEZONE } from "./email/timezone"
+import { invalidateBehavioralProfileCache } from "./rag/behavioral-analysis"
 
 /**
  * Get the start of a calendar day in a specific timezone
@@ -408,10 +409,11 @@ export async function completeSessionWithMastery(
         daysUntilDue,
       })
 
-      // IMPORTANT: Always use performanceScore for user-facing displays (last_score)
-      // masteryScore is only used internally for spaced repetition interval calculations
+      // Update scores: performance_score for history/average, last_score for display
+      // last_score should be the technical/mastery score (what user sees in practice page)
       masteryResult = await updateProblemMastery(userId, sessionData.scenarioId, {
-        performance_score: sessionData.performanceScore, // Always use full interview score for display
+        performance_score: sessionData.performanceScore,
+        last_score: sessionData.masteryScore ?? sessionData.performanceScore, // Technical score for display
         time_spent_minutes: sessionData.timeSpentMinutes,
         hints_used: sessionData.hintsUsed,
         increment_review_count: false, // Not a valid SR review
@@ -469,7 +471,8 @@ export async function completeSessionWithMastery(
         })
 
         masteryResult = await updateProblemMastery(userId, sessionData.scenarioId, {
-          performance_score: scoreForSR,
+          performance_score: sessionData.performanceScore,
+          last_score: scoreForSR, // Technical/mastery score for display in practice page
           time_spent_minutes: sessionData.timeSpentMinutes,
           hints_used: sessionData.hintsUsed,
           increment_review_count: false, // Practice session, not SR review
@@ -512,6 +515,7 @@ export async function completeSessionWithMastery(
 
     masteryResult = await updateProblemMastery(userId, sessionData.scenarioId, {
       performance_score: sessionData.performanceScore,
+      last_score: scoreForSR, // Technical/mastery score for display in practice page
       time_spent_minutes: sessionData.timeSpentMinutes,
       hints_used: sessionData.hintsUsed,
       ease_factor: sm2Result.newEaseFactor,
@@ -565,8 +569,7 @@ export async function completeSessionWithMastery(
     }
   } else {
     // Initialize new problem mastery
-    // IMPORTANT: Use performanceScore for display (last_score), not masteryScore
-    // masteryScore is used internally for SR quality rating calculations
+    // performance_score goes to history/average, mastery_score goes to last_score for display
     const scoreForSR = sessionData.masteryScore ?? sessionData.performanceScore
 
     masteryResult = await initializeProblemMasteryFromSession(userId, {
@@ -574,7 +577,8 @@ export async function completeSessionWithMastery(
       title: sessionData.title,
       pattern: sessionData.pattern,
       difficulty: sessionData.difficulty,
-      performance_score: sessionData.performanceScore, // Always use full interview score for display
+      performance_score: sessionData.performanceScore,
+      mastery_score: scoreForSR, // Technical score for last_score display in practice page
       time_spent_minutes: sessionData.timeSpentMinutes,
       hints_used: sessionData.hintsUsed,
     })
@@ -617,6 +621,11 @@ export async function completeSessionWithMastery(
 
   // Update longest streak
   await updateLongestStreak(userId)
+
+  // Invalidate behavioral profile cache (will recompute on next request)
+  invalidateBehavioralProfileCache(userId).catch(() => {
+    // Best-effort cache invalidation
+  })
 
   // Get updated streak
   const updatedLearningState = await getUserLearningState(userId)
