@@ -143,18 +143,22 @@ function TimeStrategyBanner({
   strategy: PersonalizedGuideData["timeStrategy"]
   companyName: string
 }) {
+  // UX-optimized urgency colors:
+  // - Critical/High use warm amber/orange (urgency without error connotation)
+  // - Moderate uses calm blue (steady progress)
+  // - Relaxed uses green (on track/positive)
   const urgencyColors = {
-    critical: "from-red-500/20 to-orange-500/20 border-red-500/30",
-    high: "from-orange-500/20 to-yellow-500/20 border-orange-500/30",
-    moderate: "from-blue-500/20 to-cyan-500/20 border-blue-500/30",
-    relaxed: "from-green-500/20 to-emerald-500/20 border-green-500/30",
+    critical: "from-amber-500/20 to-orange-500/20 border-amber-500/40",
+    high: "from-orange-400/20 to-amber-400/20 border-orange-400/40",
+    moderate: "from-sky-500/20 to-blue-500/20 border-sky-500/30",
+    relaxed: "from-emerald-500/20 to-teal-500/20 border-emerald-500/30",
   }
 
   const urgencyIcons = {
-    critical: <Flame className="h-5 w-5 text-red-500" />,
-    high: <AlertTriangle className="h-5 w-5 text-orange-500" />,
-    moderate: <Clock className="h-5 w-5 text-blue-500" />,
-    relaxed: <CheckCircle className="h-5 w-5 text-green-500" />,
+    critical: <Flame className="h-5 w-5 text-amber-600 dark:text-amber-400" />,
+    high: <AlertTriangle className="h-5 w-5 text-orange-500 dark:text-orange-400" />,
+    moderate: <Clock className="h-5 w-5 text-sky-600 dark:text-sky-400" />,
+    relaxed: <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />,
   }
 
   const phaseDescriptions = {
@@ -185,13 +189,13 @@ function TimeStrategyBanner({
             className={cn(
               "rounded-full px-2 py-1 text-xs font-medium",
               strategy.urgencyLevel === "critical" &&
-                "bg-red-500/20 text-red-700 dark:text-red-400",
+                "bg-amber-500/20 text-amber-700 dark:text-amber-300",
               strategy.urgencyLevel === "high" &&
-                "bg-orange-500/20 text-orange-700 dark:text-orange-400",
+                "bg-orange-400/20 text-orange-700 dark:text-orange-300",
               strategy.urgencyLevel === "moderate" &&
-                "bg-blue-500/20 text-blue-700 dark:text-blue-400",
+                "bg-sky-500/20 text-sky-700 dark:text-sky-300",
               strategy.urgencyLevel === "relaxed" &&
-                "bg-green-500/20 text-green-700 dark:text-green-400"
+                "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
             )}
           >
             {strategy.urgencyLevel.toUpperCase()}
@@ -233,12 +237,25 @@ function AdaptiveRecommendationsCard({
   expanded: boolean
   onToggle: () => void
 }) {
+  // Action-based colors with better contrast and distinct hues
   const typeConfig = {
-    "speed-up": { icon: Zap, color: "text-orange-500", bg: "bg-orange-500/10" },
-    "slow-down": { icon: Clock, color: "text-blue-500", bg: "bg-blue-500/10" },
-    pivot: { icon: TrendingUp, color: "text-purple-500", bg: "bg-purple-500/10" },
-    maintain: { icon: CheckCircle, color: "text-green-500", bg: "bg-green-500/10" },
-    review: { icon: BookOpen, color: "text-amber-500", bg: "bg-amber-500/10" },
+    "speed-up": { icon: Zap, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10" },
+    "slow-down": { icon: Clock, color: "text-sky-600 dark:text-sky-400", bg: "bg-sky-500/10" },
+    pivot: {
+      icon: TrendingUp,
+      color: "text-violet-600 dark:text-violet-400",
+      bg: "bg-violet-500/10",
+    },
+    maintain: {
+      icon: CheckCircle,
+      color: "text-emerald-600 dark:text-emerald-400",
+      bg: "bg-emerald-500/10",
+    },
+    review: {
+      icon: BookOpen,
+      color: "text-orange-600 dark:text-orange-400",
+      bg: "bg-orange-500/10",
+    },
   }
 
   const criticalRecommendations = recommendations.filter(
@@ -329,25 +346,25 @@ function WhyTheseQuestionsCard({
               label="Critical"
               count={rationale.byPriority.critical}
               total={rationale.totalQuestions}
-              color="bg-red-500"
+              color="bg-purple-500"
             />
             <PriorityBar
               label="High"
               count={rationale.byPriority.high}
               total={rationale.totalQuestions}
-              color="bg-orange-500"
+              color="bg-indigo-500"
             />
             <PriorityBar
               label="Medium"
               count={rationale.byPriority.medium}
               total={rationale.totalQuestions}
-              color="bg-blue-500"
+              color="bg-sky-500"
             />
             <PriorityBar
               label="Low"
               count={rationale.byPriority.low}
               total={rationale.totalQuestions}
-              color="bg-gray-400"
+              color="bg-slate-400"
             />
           </div>
         </div>
@@ -433,26 +450,33 @@ function PatternRow({
 }) {
   const [showTips, setShowTips] = useState(false)
 
+  // Priority uses purple/indigo spectrum to distinguish from difficulty colors
+  // Critical = deep purple, High = indigo, Medium = blue, Low = slate
   const priorityColors = {
-    critical: "border-l-red-500 bg-red-500/5",
-    high: "border-l-orange-500 bg-orange-500/5",
-    medium: "border-l-blue-500 bg-blue-500/5",
-    low: "border-l-gray-400 bg-gray-500/5",
+    critical: "border-l-purple-500 bg-purple-500/5",
+    high: "border-l-indigo-500 bg-indigo-500/5",
+    medium: "border-l-sky-500 bg-sky-500/5",
+    low: "border-l-slate-400 bg-slate-500/5",
   }
 
+  // Level badges use a distinct pink/rose/violet/teal spectrum
+  // to avoid confusion with difficulty colors (green/yellow/red)
   const levelBadges = {
-    unknown: { text: "New", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
+    unknown: {
+      text: "New",
+      color: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
+    },
     seen: {
       text: "Seen",
-      color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+      color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
     },
     practiced: {
       text: "Practiced",
-      color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+      color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
     },
     confident: {
       text: "Strong",
-      color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+      color: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
     },
   }
 
@@ -547,12 +571,13 @@ function PersonalizedTipsCard({
     mindset: Lightbulb,
   }
 
+  // Category colors use distinct semantic hues with good dark mode contrast
   const categoryColors = {
-    preparation: "bg-blue-500/10 text-blue-500",
-    "during-interview": "bg-green-500/10 text-green-500",
-    technical: "bg-purple-500/10 text-purple-500",
-    behavioral: "bg-amber-500/10 text-amber-500",
-    mindset: "bg-cyan-500/10 text-cyan-500",
+    preparation: "bg-sky-500/15 text-sky-600 dark:text-sky-400",
+    "during-interview": "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+    technical: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
+    behavioral: "bg-orange-500/15 text-orange-600 dark:text-orange-400",
+    mindset: "bg-teal-500/15 text-teal-600 dark:text-teal-400",
   }
 
   return (

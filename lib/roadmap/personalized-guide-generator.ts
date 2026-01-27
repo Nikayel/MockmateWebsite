@@ -122,6 +122,61 @@ const TIME_PHASES = {
 }
 
 /**
+ * Pattern complexity tiers - different patterns require different learning time
+ * Based on conceptual difficulty and typical problem variations
+ */
+const PATTERN_COMPLEXITY: Record<string, "simple" | "moderate" | "complex"> = {
+  // Simple patterns - foundational, quick to grasp
+  "arrays-hashing": "simple",
+  "two-pointers": "simple",
+  stack: "simple",
+  "linked-list": "simple",
+  string: "simple",
+  sorting: "simple",
+
+  // Moderate patterns - require understanding but manageable
+  "sliding-window": "moderate",
+  "binary-search": "moderate",
+  trees: "moderate",
+  bfs: "moderate",
+  dfs: "moderate",
+  heap: "moderate",
+  intervals: "moderate",
+  greedy: "moderate",
+
+  // Complex patterns - significant learning curve
+  graphs: "complex",
+  "dp-1d": "complex",
+  "dp-2d": "complex",
+  backtracking: "complex",
+  trie: "complex",
+  "union-find": "complex",
+}
+
+/**
+ * Base hours by complexity and user level
+ * These are realistic for interview prep (not deep mastery)
+ */
+const BASE_HOURS_BY_COMPLEXITY: Record<
+  "simple" | "moderate" | "complex",
+  Record<"unknown" | "seen" | "practiced" | "confident", number>
+> = {
+  simple: { unknown: 3, seen: 2, practiced: 1, confident: 0.5 },
+  moderate: { unknown: 5, seen: 3, practiced: 1.5, confident: 0.5 },
+  complex: { unknown: 8, seen: 5, practiced: 2, confident: 1 },
+}
+
+/**
+ * Pattern groups for knowledge transfer - learning one helps with others
+ */
+const PATTERN_GROUPS: Record<string, string[]> = {
+  traversal: ["bfs", "dfs", "trees", "graphs"],
+  dp: ["dp-1d", "dp-2d", "greedy"],
+  pointers: ["two-pointers", "sliding-window", "linked-list"],
+  search: ["binary-search", "arrays-hashing"],
+}
+
+/**
  * Experience level configurations
  */
 const EXPERIENCE_CONFIG: Record<
@@ -146,7 +201,7 @@ const EXPERIENCE_CONFIG: Record<
       "string",
     ],
     avoidPatterns: ["dp-2d", "dp-tree", "advanced-graphs", "segment-tree"],
-    timeMultiplier: 1.5,
+    timeMultiplier: 1.3,
     tipFocus: "fundamentals",
   },
   beginner: {
@@ -161,21 +216,21 @@ const EXPERIENCE_CONFIG: Record<
       "dp-1d",
     ],
     avoidPatterns: ["dp-tree", "segment-tree"],
-    timeMultiplier: 1.3,
+    timeMultiplier: 1.15,
     tipFocus: "pattern-recognition",
   },
   intermediate: {
     difficultyFocus: { easy: 20, medium: 55, hard: 25 },
-    priorityPatterns: [], // All patterns fair game
+    priorityPatterns: [],
     avoidPatterns: [],
     timeMultiplier: 1.0,
     tipFocus: "optimization",
   },
   advanced: {
     difficultyFocus: { easy: 10, medium: 50, hard: 40 },
-    priorityPatterns: [], // Focus on hard patterns
+    priorityPatterns: [],
     avoidPatterns: [],
-    timeMultiplier: 0.8,
+    timeMultiplier: 0.85,
     tipFocus: "edge-cases",
   },
 }
@@ -432,10 +487,10 @@ function generatePrioritizedPatterns(
     // Generate reasoning
     const reasoning = generatePatternReasoning(pattern, data.frequency, userLevel, company.name)
 
-    // Estimate hours to learn
-    const baseHours =
-      userLevel === "unknown" ? 10 : userLevel === "seen" ? 6 : userLevel === "practiced" ? 3 : 1
-    const estimatedHours = Math.round(baseHours * expConfig.timeMultiplier)
+    // Estimate hours to learn based on pattern complexity
+    const complexity = PATTERN_COMPLEXITY[pattern] || "moderate"
+    const baseHours = BASE_HOURS_BY_COMPLEXITY[complexity][userLevel]
+    const estimatedHours = Math.round(baseHours * expConfig.timeMultiplier * 10) / 10
 
     // Get tips from pattern knowledge base
     const patternKnowledge = getPatternKnowledge(pattern)
@@ -821,21 +876,56 @@ function generateAdaptiveRecommendations(
   const criticalGaps = prioritizedPatterns.filter(
     (p) => p.priority === "critical" && p.userLevel === "unknown"
   )
-  const totalEstimatedHours = prioritizedPatterns.reduce(
-    (sum, p) => sum + p.estimatedHoursToLearn,
-    0
-  )
+
+  // Calculate effective hours with knowledge transfer discount
+  // Related patterns share knowledge, so we don't double-count
+  const seenGroups = new Set<string>()
+  let totalEstimatedHours = 0
+
+  for (const p of prioritizedPatterns) {
+    let hours = p.estimatedHoursToLearn
+
+    // Apply knowledge transfer discount if we've already counted a related pattern
+    for (const [group, patterns] of Object.entries(PATTERN_GROUPS)) {
+      if (patterns.includes(p.pattern) && seenGroups.has(group)) {
+        hours *= 0.6 // 40% discount for related patterns
+        break
+      }
+    }
+
+    // Mark this pattern's groups as seen
+    for (const [group, patterns] of Object.entries(PATTERN_GROUPS)) {
+      if (patterns.includes(p.pattern)) {
+        seenGroups.add(group)
+      }
+    }
+
+    totalEstimatedHours += hours
+  }
+
+  totalEstimatedHours = Math.round(totalEstimatedHours)
   const availableHours = assessment.daysRemaining * assessment.hoursPerDay
 
-  // Time crunch detection
-  if (totalEstimatedHours > availableHours * 1.5) {
+  // Time crunch detection - but with better messaging
+  if (totalEstimatedHours > availableHours * 1.3) {
+    const criticalAndHighPatterns = prioritizedPatterns.filter(
+      (p) => p.priority === "critical" || p.priority === "high"
+    )
+    const focusHours = criticalAndHighPatterns.reduce((sum, p) => sum + p.estimatedHoursToLearn, 0)
+
     recommendations.push({
       type: "speed-up",
-      message: `You have ${Math.round(availableHours)} hours but need ~${Math.round(totalEstimatedHours)} hours for full coverage.`,
+      message:
+        focusHours <= availableHours
+          ? `Focus on ${criticalAndHighPatterns.length} high-priority patterns to make the most of your ${Math.round(availableHours)} hours.`
+          : `Limited time available. Prioritize the ${Math.min(3, criticalGaps.length)} most critical patterns.`,
       actionItems: [
-        "Focus only on critical and high priority patterns",
-        "Skip low-priority patterns entirely",
-        "Use pattern videos instead of reading for faster learning",
+        `Focus on: ${criticalAndHighPatterns
+          .slice(0, 3)
+          .map((p) => p.pattern)
+          .join(", ")}`,
+        "Skip low-priority patterns for now",
+        "Use video tutorials for faster pattern recognition",
       ],
     })
   }
