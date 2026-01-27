@@ -331,29 +331,33 @@ function InterviewPageContent() {
   })
 
   // Voice recording - using Deepgram with Web Speech API fallback
-  // Auto-send on utterance end is DISABLED - user must click Send button
+  // Auto-send enabled: sends automatically after 500ms pause
   const interviewerVoice = useVoiceInput({
     fallbackToWebSpeech: true,
+    autoSendEnabled: true,
+    autoSendDelayMs: 500,
     onTranscript: (transcript, _isFinal) => {
       setInterviewerInput(transcript)
     },
     onUtteranceEnd: (transcript) => {
-      // Auto-send DISABLED - just update the input, user clicks Send
+      // Auto-send on utterance end
       if (transcript.trim()) {
-        setInterviewerInput(transcript)
+        handleAutoSend(true, transcript)
       }
     },
   })
 
   const partnerVoice = useVoiceInput({
     fallbackToWebSpeech: true,
+    autoSendEnabled: true,
+    autoSendDelayMs: 500,
     onTranscript: (transcript, _isFinal) => {
       setChatInput(transcript)
     },
     onUtteranceEnd: (transcript) => {
-      // Auto-send DISABLED - just update the input, user clicks Send
+      // Auto-send on utterance end
       if (transcript.trim()) {
-        setChatInput(transcript)
+        handleAutoSend(false, transcript)
       }
     },
   })
@@ -2622,7 +2626,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       }
     }
 
-    // Stop any active voice recordings to prevent Deepgram billing
+    // Stop any active voice recordings and countdowns to prevent Deepgram billing
+    interviewerVoice.cancelCountdown()
+    partnerVoice.cancelCountdown()
     if (interviewerVoice.isRecording) {
       interviewerVoice.stopRecording()
     }
@@ -3498,6 +3504,26 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       }
     }
   }
+
+  // Auto-send handler for voice input - called when user pauses speaking
+  const handleAutoSend = useCallback(
+    async (isInterviewer: boolean, transcript: string) => {
+      const setInput = isInterviewer ? setInterviewerInput : setChatInput
+      const voice = isInterviewer ? interviewerVoice : partnerVoice
+
+      // Update input with final transcript
+      setInput(transcript)
+
+      // Stop recording
+      if (voice.isRecording) {
+        voice.stopRecording()
+      }
+
+      // Send the message
+      await handleSendMessage(isInterviewer)
+    },
+    [interviewerVoice, partnerVoice, handleSendMessage]
+  )
 
   // Note: analyzeCodeEfficiency is now imported from @/lib/interview
   // Usage: analyzeCodeEfficiency(code, (selectedScenario as any)?.optimalComplexity)
@@ -5436,11 +5462,15 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
                             isRecording={isRecordingInterviewer}
                             onToggleRecording={() => toggleVoiceRecording(true)}
                             onCancel={() => {
+                              interviewerVoice.cancelCountdown()
                               interviewerVoice.stopRecording()
                               interviewerVoice.resetTranscript()
                               setInterviewerInput("")
                             }}
                             onSend={() => handleSendMessage(true)}
+                            onCancelCountdown={() => interviewerVoice.cancelCountdown()}
+                            countdownActive={interviewerVoice.countdownActive}
+                            autoSendDelayMs={500}
                             isLoading={isLoadingInterviewer || isGeneratingDiscussion}
                             transcript={interviewerInput}
                             disabled={isLoadingInterviewer || isGeneratingDiscussion}

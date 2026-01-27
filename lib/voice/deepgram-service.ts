@@ -190,6 +190,10 @@ export class DeepgramVoiceService {
       })
 
       // Create WebSocket connection to Deepgram
+      console.log(
+        "[Deepgram] Connecting with API key:",
+        this.config.apiKey?.substring(0, 8) + "..."
+      )
       const ws = new WebSocket(this.buildWebSocketUrl(), ["token", this.config.apiKey!])
 
       ws.onopen = () => {
@@ -486,6 +490,9 @@ export class DeepgramVoiceService {
 
     this.connection.isConnected = false
     this.connection.isRecording = false
+
+    // Notify listeners that recording has stopped
+    this.onStatus?.("disconnected")
   }
 }
 
