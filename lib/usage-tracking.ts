@@ -509,8 +509,8 @@ export async function getAdminUsageStats(options?: {
   const now = new Date()
   const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
 
-  // Get all users with their usage summaries
-  const usersSnapshot = await adminDb.collection("users").get()
+  // Get users with their usage summaries (limit to prevent unbounded reads)
+  const usersSnapshot = await adminDb.collection("users").limit(10000).get()
 
   const userStats: Array<{
     userId: string
@@ -590,11 +590,12 @@ export async function getServiceBreakdown(): Promise<{
   }
 
   try {
-    // Query usage_events for current month
+    // Query usage_events for current month with limit to prevent unbounded reads
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const eventsSnapshot = await adminDb
       .collection("usage_events")
       .where("createdAt", ">=", startOfMonth)
+      .limit(50000)
       .get()
 
     for (const doc of eventsSnapshot.docs) {
@@ -664,10 +665,12 @@ export async function getUserServiceBreakdown(userId: string): Promise<{
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
+    // Limit per-user query to prevent abuse or runaway reads
     const eventsSnapshot = await adminDb
       .collection("usage_events")
       .where("userId", "==", userId)
       .where("createdAt", ">=", startOfMonth)
+      .limit(5000)
       .get()
 
     for (const doc of eventsSnapshot.docs) {
@@ -936,10 +939,12 @@ export async function getSessionUsageBreakdown(sessionId: string): Promise<{
   }
 
   try {
+    // Session events are bounded by session duration, but add limit as safety net
     const eventsSnapshot = await adminDb
       .collection("usage_events")
       .where("sessionId", "==", sessionId)
       .orderBy("createdAt", "asc")
+      .limit(1000)
       .get()
 
     for (const doc of eventsSnapshot.docs) {
@@ -993,10 +998,12 @@ export async function getDailyUsageTrends(days: number = 30): Promise<{
   }
 
   try {
+    // Limit to prevent cost explosion on large date ranges
     const eventsSnapshot = await adminDb
       .collection("usage_events")
       .where("createdAt", ">=", startDate)
       .orderBy("createdAt", "asc")
+      .limit(100000)
       .get()
 
     const dailyMap = new Map<

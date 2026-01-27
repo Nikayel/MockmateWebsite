@@ -180,6 +180,69 @@ export interface ErrorState {
 }
 
 /**
+ * Profile Audit Log
+ * Tracks changes to important profile fields for research and analytics
+ * Answers: "When did user change their goal from startup to FAANG?"
+ */
+export interface ProfileAuditLog {
+  id: string
+  user_id: string
+  field_name:
+    | "role"
+    | "goal"
+    | "target_company"
+    | "daily_goal"
+    | "onboarding_completed"
+    | "subscription_tier"
+  old_value: string | number | boolean | null
+  new_value: string | number | boolean | null
+  changed_at: string // ISO date
+  change_source?: "user" | "system" | "admin" | "stripe_webhook"
+  metadata?: {
+    session_id?: string
+    trigger?: string // What triggered the change
+  }
+  created_at: string
+}
+
+/**
+ * Subscription History Record
+ * Tracks all subscription tier changes AND status changes for churn research
+ * Allows answering: "What tier was the user in when they did X?"
+ * Also tracks: active -> past_due -> canceled transitions
+ */
+export interface SubscriptionHistory {
+  id: string
+  user_id: string
+  tier: "free" | "pro" | "enterprise"
+  status: "active" | "canceled" | "expired" | "past_due" | "trialing"
+  subscription_type?: "monthly" | "yearly"
+  platform?: "website" | "vscode"
+  stripe_subscription_id?: string
+  started_at: string // ISO date - when this tier/status period began
+  ended_at?: string // ISO date - when this period ended (null if current)
+  reason?:
+    | "upgrade"
+    | "downgrade"
+    | "cancellation"
+    | "expiration"
+    | "payment_failed"
+    | "payment_recovered"
+    | "trial_started"
+    | "trial_ended"
+    | "initial"
+  previous_tier?: "free" | "pro" | "enterprise"
+  previous_status?: "active" | "canceled" | "expired" | "past_due" | "trialing"
+  // Payment failure tracking
+  failure_count?: number // Number of consecutive payment failures
+  last_payment_error?: string // Stripe error code/message
+  // Cancellation tracking
+  cancellation_reason?: string // User-provided reason
+  cancellation_feedback?: string // Optional feedback
+  created_at: string
+}
+
+/**
  * Payment history record for subscription and one-time payments
  */
 export interface PaymentHistory {
@@ -226,6 +289,42 @@ export interface TopicLearningState {
   next_review_at: string
   interval_days: number
   ease_factor: number // SM-2 algorithm ease factor (default 2.5)
+}
+
+/**
+ * Email Log Record (Audit Trail)
+ * Persistent record of all email send attempts for compliance, debugging, and analytics
+ * Recommended TTL: 90 days
+ */
+export interface EmailLog {
+  id: string
+  user_id: string
+  email_type:
+    | "welcome"
+    | "inactivity_reminder"
+    | "spaced_repetition_reminder"
+    | "milestone"
+    | "subscription_expiry"
+    | "payment_failed"
+    | "subscription_canceled"
+    | "marketing"
+  recipient_email: string
+  subject: string
+  status: "pending" | "sent" | "failed" | "bounced" | "complained"
+  provider: "resend" | "sendgrid" | "ses" // Email service provider used
+  provider_message_id?: string // ID from email provider for tracking
+  error_message?: string // If failed, why
+  metadata?: {
+    template_id?: string
+    template_variables?: Record<string, unknown>
+    session_id?: string // Related interview session if applicable
+    trigger_reason?: string // What triggered this email
+  }
+  scheduled_at?: string // If scheduled for later
+  sent_at?: string // When actually sent
+  opened_at?: string // If tracking pixels used
+  clicked_at?: string // If link tracking used
+  created_at: string
 }
 
 /**

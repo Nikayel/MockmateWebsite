@@ -9,18 +9,18 @@
  * NPS = % Promoters - % Detractors (ranges from -100 to +100)
  */
 
-import { adminDb } from './firebase-admin'
-import { FieldValue, Timestamp } from 'firebase-admin/firestore'
-import { logger } from './logger'
+import { adminDb } from "./firebase-admin"
+import { FieldValue, Timestamp } from "firebase-admin/firestore"
+import { logger } from "./logger"
 
 export interface NPSResponse {
   id?: string
   userId: string
   score: number // 0-10
   feedback?: string // Optional text feedback
-  triggerContext: 'session_complete' | 'manual' | 'milestone'
+  triggerContext: "session_complete" | "manual" | "milestone"
   sessionCount: number // How many sessions user had when surveyed
-  subscriptionTier: 'free' | 'pro' | 'enterprise'
+  subscriptionTier: "free" | "pro" | "enterprise"
   createdAt: Date | Timestamp
 }
 
@@ -45,22 +45,24 @@ export interface NPSStats {
 /**
  * Record an NPS response
  */
-export async function recordNPSResponse(response: Omit<NPSResponse, 'id' | 'createdAt'>): Promise<string> {
+export async function recordNPSResponse(
+  response: Omit<NPSResponse, "id" | "createdAt">
+): Promise<string> {
   try {
-    const docRef = await adminDb.collection('nps_responses').add({
+    const docRef = await adminDb.collection("nps_responses").add({
       ...response,
       createdAt: FieldValue.serverTimestamp(),
     })
 
-    logger.info('NPS response recorded', {
+    logger.info("NPS response recorded", {
       userId: response.userId,
       score: response.score,
-      npsCategory: getNPSCategory(response.score)
+      npsCategory: getNPSCategory(response.score),
     })
 
     return docRef.id
   } catch (error) {
-    logger.error('Failed to record NPS response', { error, userId: response.userId })
+    logger.error("Failed to record NPS response", { error, userId: response.userId })
     throw error
   }
 }
@@ -69,10 +71,14 @@ export async function recordNPSResponse(response: Omit<NPSResponse, 'id' | 'crea
  * Check if user should see NPS survey
  * Shows survey after 3rd, 10th, and every 20th completed session
  */
-export async function shouldShowNPSSurvey(userId: string, completedSessions: number): Promise<boolean> {
+export async function shouldShowNPSSurvey(
+  userId: string,
+  completedSessions: number
+): Promise<boolean> {
   // Trigger points: 3rd session, 10th session, then every 20 sessions
   const triggerPoints = [3, 10]
-  const isTriggerPoint = triggerPoints.includes(completedSessions) ||
+  const isTriggerPoint =
+    triggerPoints.includes(completedSessions) ||
     (completedSessions > 10 && (completedSessions - 10) % 20 === 0)
 
   if (!isTriggerPoint) return false
@@ -83,15 +89,15 @@ export async function shouldShowNPSSurvey(userId: string, completedSessions: num
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
     const recentResponse = await adminDb
-      .collection('nps_responses')
-      .where('userId', '==', userId)
-      .where('createdAt', '>=', thirtyDaysAgo)
+      .collection("nps_responses")
+      .where("userId", "==", userId)
+      .where("createdAt", ">=", thirtyDaysAgo)
       .limit(1)
       .get()
 
     return recentResponse.empty
   } catch (error) {
-    logger.error('Failed to check NPS eligibility', { error, userId })
+    logger.error("Failed to check NPS eligibility", { error, userId })
     return false
   }
 }
@@ -102,9 +108,9 @@ export async function shouldShowNPSSurvey(userId: string, completedSessions: num
 export async function getUserLastNPSResponse(userId: string): Promise<NPSResponse | null> {
   try {
     const snapshot = await adminDb
-      .collection('nps_responses')
-      .where('userId', '==', userId)
-      .orderBy('createdAt', 'desc')
+      .collection("nps_responses")
+      .where("userId", "==", userId)
+      .orderBy("createdAt", "desc")
       .limit(1)
       .get()
 
@@ -117,7 +123,7 @@ export async function getUserLastNPSResponse(userId: string): Promise<NPSRespons
       createdAt: doc.data().createdAt?.toDate() || new Date(),
     } as NPSResponse
   } catch (error) {
-    logger.error('Failed to get user NPS response', { error, userId })
+    logger.error("Failed to get user NPS response", { error, userId })
     return null
   }
 }
@@ -125,16 +131,21 @@ export async function getUserLastNPSResponse(userId: string): Promise<NPSRespons
 /**
  * Calculate NPS category from score
  */
-export function getNPSCategory(score: number): 'promoter' | 'passive' | 'detractor' {
-  if (score >= 9) return 'promoter'
-  if (score >= 7) return 'passive'
-  return 'detractor'
+export function getNPSCategory(score: number): "promoter" | "passive" | "detractor" {
+  if (score >= 9) return "promoter"
+  if (score >= 7) return "passive"
+  return "detractor"
 }
 
 /**
  * Calculate NPS score from responses
  */
-function calculateNPS(responses: Array<{ score: number }>): { nps: number; promoters: number; passives: number; detractors: number } {
+function calculateNPS(responses: Array<{ score: number }>): {
+  nps: number
+  promoters: number
+  passives: number
+  detractors: number
+} {
   if (responses.length === 0) {
     return { nps: 0, promoters: 0, passives: 0, detractors: 0 }
   }
@@ -145,13 +156,13 @@ function calculateNPS(responses: Array<{ score: number }>): { nps: number; promo
 
   for (const r of responses) {
     const category = getNPSCategory(r.score)
-    if (category === 'promoter') promoters++
-    else if (category === 'passive') passives++
+    if (category === "promoter") promoters++
+    else if (category === "passive") passives++
     else detractors++
   }
 
   const total = responses.length
-  const nps = Math.round(((promoters / total) - (detractors / total)) * 100)
+  const nps = Math.round((promoters / total - detractors / total) * 100)
 
   return { nps, promoters, passives, detractors }
 }
@@ -179,10 +190,12 @@ export async function getNPSStats(): Promise<NPSStats> {
   }
 
   try {
-    // Get all responses
+    // Get responses with limit to prevent unbounded reads
+    // 10,000 is sufficient for NPS analysis while preventing cost explosion
     const allResponsesSnapshot = await adminDb
-      .collection('nps_responses')
-      .orderBy('createdAt', 'desc')
+      .collection("nps_responses")
+      .orderBy("createdAt", "desc")
+      .limit(10000)
       .get()
 
     if (allResponsesSnapshot.empty) return stats
@@ -204,7 +217,7 @@ export async function getNPSStats(): Promise<NPSStats> {
     for (const doc of allResponsesSnapshot.docs) {
       const data = doc.data()
       const score = data.score as number
-      const tier = (data.subscriptionTier || 'free') as string
+      const tier = (data.subscriptionTier || "free") as string
       const createdAt = data.createdAt?.toDate() || new Date()
 
       allResponses.push({ score, subscriptionTier: tier, createdAt })
@@ -232,7 +245,7 @@ export async function getNPSStats(): Promise<NPSStats> {
     stats.detractors = overall.detractors
 
     // Calculate by tier
-    for (const tier of ['free', 'pro', 'enterprise'] as const) {
+    for (const tier of ["free", "pro", "enterprise"] as const) {
       const tierData = tierResponses[tier]
       if (tierData.length > 0) {
         const tierNPS = calculateNPS(tierData)
@@ -257,9 +270,8 @@ export async function getNPSStats(): Promise<NPSStats> {
         nps: calculateNPS(last30Days).nps,
       }
     }
-
   } catch (error) {
-    logger.error('Failed to get NPS stats', { error })
+    logger.error("Failed to get NPS stats", { error })
   }
 
   return stats

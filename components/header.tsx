@@ -146,6 +146,12 @@ export function Header() {
                 >
                   Pricing
                 </Link>
+                <Link
+                  href="/careers"
+                  className="hover:text-accent cursor-pointer text-sm text-white/60 transition-colors duration-300"
+                >
+                  Join us
+                </Link>
                 <Link href="/login">
                   <Button
                     size="sm"
@@ -278,6 +284,13 @@ export function Header() {
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Pricing
+                  </Link>
+                  <Link
+                    href="/careers"
+                    className="hover:text-accent cursor-pointer text-sm text-white/60 transition-colors duration-300"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Join us
                   </Link>
                   <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
                     <Button

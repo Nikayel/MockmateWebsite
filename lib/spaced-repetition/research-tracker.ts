@@ -477,7 +477,8 @@ async function getDistributionFromProfiles(): Promise<{
   sm2: { total: number; active_7d: number }
   fsrs: { total: number; active_7d: number }
 }> {
-  const profiles = await adminDb.collection("profiles").get()
+  // Limit to prevent unbounded reads at scale
+  const profiles = await adminDb.collection("profiles").limit(50000).get()
   const stats = {
     sm2: { total: 0, active_7d: 0 },
     fsrs: { total: 0, active_7d: 0 },
@@ -521,11 +522,12 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
   const fsrsUsers: AlgorithmResearchSummary[] = []
 
   try {
-    // Query SM-2 users with review data
+    // Query SM-2 users with review data (limit for research sample)
     const sm2Snap = await adminDb
       .collectionGroup("summary")
       .where("algorithm", "==", "sm2")
       .where("total_reviews", ">", 0)
+      .limit(10000)
       .get()
 
     sm2Snap.docs.forEach((doc) => {
@@ -539,11 +541,12 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
   }
 
   try {
-    // Query FSRS users with review data
+    // Query FSRS users with review data (limit for research sample)
     const fsrsSnap = await adminDb
       .collectionGroup("summary")
       .where("algorithm", "==", "fsrs")
       .where("total_reviews", ">", 0)
+      .limit(10000)
       .get()
 
     fsrsSnap.docs.forEach((doc) => {
