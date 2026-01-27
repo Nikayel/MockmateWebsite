@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Mic, X, Check, Volume2, Send } from "lucide-react"
+import { Mic, X, Volume2, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
@@ -102,20 +102,6 @@ function AudioWaveform({ isActive }: { isActive: boolean }) {
   )
 }
 
-// Success checkmark animation
-function SuccessIndicator() {
-  return (
-    <motion.div
-      initial={{ scale: 0, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ scale: 0, opacity: 0 }}
-      className="text-green-500"
-    >
-      <Check className="h-5 w-5" />
-    </motion.div>
-  )
-}
-
 export function VoiceModeToggle({
   isRecording,
   onToggleRecording,
@@ -132,20 +118,6 @@ export function VoiceModeToggle({
 }: VoiceModeToggleProps) {
   const hasTranscript = transcript.trim().length > 0
   const [dragOffset, setDragOffset] = useState(0)
-  const [showSuccess, setShowSuccess] = useState(false)
-  const [wasSending, setWasSending] = useState(false)
-
-  // Track when loading finishes to show success
-  useEffect(() => {
-    if (isLoading) {
-      setWasSending(true)
-    } else if (wasSending && !isLoading) {
-      setShowSuccess(true)
-      setWasSending(false)
-      const timer = setTimeout(() => setShowSuccess(false), 1000)
-      return () => clearTimeout(timer)
-    }
-  }, [isLoading, wasSending])
 
   const handleCancel = useCallback(() => {
     onCancelCountdown?.()
@@ -234,8 +206,6 @@ export function VoiceModeToggle({
                   exit={{ opacity: 0, scale: 0.8 }}
                   className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
                 />
-              ) : showSuccess ? (
-                <SuccessIndicator key="success" />
               ) : (
                 <motion.div
                   key="mic"
@@ -280,7 +250,7 @@ export function VoiceModeToggle({
                 </motion.div>
               )}
 
-              {!isRecording && !countdownActive && !isLoading && !showSuccess && (
+              {!isRecording && !countdownActive && !isLoading && (
                 <motion.span
                   key="idle"
                   initial={{ opacity: 0 }}
@@ -301,18 +271,6 @@ export function VoiceModeToggle({
                   className="text-accent text-xs font-medium"
                 >
                   Sending...
-                </motion.span>
-              )}
-
-              {showSuccess && (
-                <motion.span
-                  key="sent"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="text-xs font-medium text-green-400"
-                >
-                  Sent!
                 </motion.span>
               )}
             </AnimatePresence>

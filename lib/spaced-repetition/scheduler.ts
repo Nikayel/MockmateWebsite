@@ -402,6 +402,7 @@ export async function updateProblemMastery(
   problemId: string,
   update: Partial<ProblemMastery> & {
     performance_score: number
+    last_score?: number // Technical/mastery score for display (defaults to performance_score)
     time_spent_minutes?: number
     hints_used?: number
     increment_review_count?: boolean // Whether to atomically increment review_count
@@ -446,10 +447,11 @@ export async function updateProblemMastery(
     const correctScenarioId = getScenarioIdByTitle(current.title) || current.scenario_id
 
     // Prepare update data - separate atomic operations from regular updates
-    const { increment_review_count, time_spent_minutes, hints_used, ...restUpdate } = update
+    const { increment_review_count, time_spent_minutes, hints_used, last_score, ...restUpdate } =
+      update
 
-    // Use last_score from update if provided (for mastery_score), otherwise use performance_score
-    const scoreForLastScore = (restUpdate as any).last_score ?? update.performance_score
+    // Use last_score if provided (technical/mastery score), otherwise use performance_score
+    const scoreForLastScore = last_score ?? update.performance_score
 
     // Build the Firestore update object with atomic increments
     const firestoreUpdate: Record<string, any> = {

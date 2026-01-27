@@ -256,17 +256,20 @@ export async function getAnalyticsTimeSeries(
  * Get conflict summaries
  */
 export async function getConflicts(limit: number = 50): Promise<ConflictSummary[]> {
+  // Query without composite index requirement - filter in memory instead
   const snapshot = await adminDb
     .collection(COLLECTION_NAME)
-    .where("scoreCritique.madeChanges", "==", true)
     .orderBy("timestamp", "desc")
-    .limit(limit)
+    .limit(limit * 3) // Fetch more to account for filtering
     .get()
 
   const conflicts: ConflictSummary[] = []
 
   snapshot.docs.forEach((doc) => {
     const data = doc.data() as ConstitutionalAIIntervention
+
+    // Filter in memory to avoid composite index requirement
+    if (!data.scoreCritique?.madeChanges) return
 
     // Create a conflict entry for each aspect violated
     data.scoreCritique.aspectsViolated.forEach((aspect) => {

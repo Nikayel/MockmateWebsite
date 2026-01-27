@@ -68,7 +68,6 @@ export class DeepgramVoiceService {
   private onUtteranceEnd: UtteranceEndCallback | null = null
   private accumulatedTranscript: string = ""
   private keepAliveInterval: ReturnType<typeof setInterval> | null = null
-  private utteranceBuffer: string = ""
   private lastSentTranscript: string = ""
 
   constructor(config: DeepgramConfig = {}) {
@@ -224,10 +223,6 @@ export class DeepgramVoiceService {
             if (transcript) {
               if (isFinal) {
                 this.accumulatedTranscript += (this.accumulatedTranscript ? " " : "") + transcript
-                // Track what's new since last utterance end
-                this.utteranceBuffer = this.accumulatedTranscript
-                  .substring(this.lastSentTranscript.length)
-                  .trim()
                 this.onTranscript?.(this.accumulatedTranscript, true)
               } else {
                 // Show interim result with accumulated + current
@@ -247,8 +242,8 @@ export class DeepgramVoiceService {
                 .substring(this.lastSentTranscript.length)
                 .trim()
               if (newContent) {
-                // Call utterance end callback with the full accumulated transcript
-                this.onUtteranceEnd?.(this.accumulatedTranscript)
+                // Call utterance end callback with only the NEW content since last send
+                this.onUtteranceEnd?.(newContent)
                 // Track what we've sent to avoid duplicates
                 this.lastSentTranscript = this.accumulatedTranscript
               }
@@ -412,7 +407,6 @@ export class DeepgramVoiceService {
 
     const finalTranscript = this.accumulatedTranscript
     this.accumulatedTranscript = ""
-    this.utteranceBuffer = ""
     this.lastSentTranscript = ""
 
     return finalTranscript
@@ -424,7 +418,6 @@ export class DeepgramVoiceService {
    */
   clearSentTracker(): void {
     this.lastSentTranscript = this.accumulatedTranscript
-    this.utteranceBuffer = ""
   }
 
   /**
@@ -432,7 +425,6 @@ export class DeepgramVoiceService {
    */
   resetTranscript(): void {
     this.accumulatedTranscript = ""
-    this.utteranceBuffer = ""
     this.lastSentTranscript = ""
   }
 

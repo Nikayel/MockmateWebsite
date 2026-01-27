@@ -318,6 +318,20 @@ export function useVoiceInput(
   const [webSpeechTranscript, setWebSpeechTranscript] = useState("")
   const recognitionRef = useRef<SpeechRecognition | null>(null)
 
+  // Cleanup Web Speech recognition on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop()
+          recognitionRef.current = null
+        } catch {
+          // Ignore errors during cleanup
+        }
+      }
+    }
+  }, [])
+
   const startWebSpeechRecording = useCallback(async () => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition

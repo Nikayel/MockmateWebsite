@@ -96,7 +96,10 @@
       "Skill(remotion)",
       "Skill(remotion:*)",
       "Bash(npm uninstall:*)",
-      "Bash(pnpm run typecheck:*)"
+      "Bash(pnpm run typecheck:*)",
+      "Skill(build)",
+      "Skill(build:*)",
+      "Bash(firebase deploy:*)"
     ]
   }
 }
