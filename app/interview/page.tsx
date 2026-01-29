@@ -3242,10 +3242,23 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       }
     } catch (err: any) {
       console.error("Voice recording error:", err)
-      if (err.message?.includes("denied") || err.message?.includes("NotAllowed")) {
+      const errorName = err.name || ""
+      const errorMessage = err.message || ""
+
+      // Check both err.name (DOMException) and err.message for error types
+      if (
+        errorName === "NotAllowedError" ||
+        errorMessage.includes("denied") ||
+        errorMessage.includes("NotAllowed") ||
+        errorName === "SecurityError"
+      ) {
         toast.error("Microphone access denied. Please allow microphone access in your browser.")
-      } else if (err.message?.includes("NotFound")) {
+      } else if (errorName === "NotFoundError" || errorMessage.includes("NotFound")) {
         toast.error("No microphone found. Please connect a microphone and try again.")
+      } else if (errorName === "NotReadableError" || errorMessage.includes("NotReadable")) {
+        toast.error("Microphone is in use by another app. Please close other apps using the mic.")
+      } else if (errorMessage.includes("not supported")) {
+        toast.error("Voice input is not supported in this browser. Try Chrome or Edge.")
       } else {
         toast.error("Voice input error. Please try again.")
       }
