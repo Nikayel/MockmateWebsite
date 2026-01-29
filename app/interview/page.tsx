@@ -3242,12 +3242,55 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       }
     } catch (err: any) {
       console.error("Voice recording error:", err)
-      if (err.message?.includes("denied") || err.message?.includes("NotAllowed")) {
-        toast.error("Microphone access denied. Please allow microphone access in your browser.")
-      } else if (err.message?.includes("NotFound")) {
+      const errorMessage = err.message || String(err)
+
+      // Permission errors
+      if (
+        errorMessage.includes("denied") ||
+        errorMessage.includes("NotAllowed") ||
+        errorMessage.includes("Permission")
+      ) {
+        toast.error(
+          "Microphone access denied. Please allow microphone access in your browser settings."
+        )
+      }
+      // Device not found
+      else if (
+        errorMessage.includes("NotFound") ||
+        errorMessage.includes("No microphone detected")
+      ) {
         toast.error("No microphone found. Please connect a microphone and try again.")
-      } else {
-        toast.error("Voice input error. Please try again.")
+      }
+      // Deepgram configuration
+      else if (errorMessage.includes("API key not configured")) {
+        toast.error("Voice service not configured. Please contact support.")
+      }
+      // WebSocket/connection errors
+      else if (errorMessage.includes("WebSocket") || errorMessage.includes("connection error")) {
+        toast.error("Connection error. Please check your internet and try again.")
+      }
+      // Microphone disconnected mid-recording
+      else if (errorMessage.includes("disconnected") || errorMessage.includes("inactive")) {
+        toast.error("Microphone disconnected. Please reconnect and try again.")
+      }
+      // Browser compatibility
+      else if (errorMessage.includes("MediaRecorder") || errorMessage.includes("not supported")) {
+        toast.error("Voice recording not supported in this browser. Try Chrome or Edge.")
+      }
+      // Audio format issues
+      else if (errorMessage.includes("mime type")) {
+        toast.error("Audio format not supported. Try a different browser.")
+      }
+      // Web Speech API fallback error
+      else if (errorMessage.includes("Speech recognition")) {
+        toast.error("Speech recognition not available. Try Chrome or Edge browser.")
+      }
+      // Generic fallback with actual error for debugging
+      else {
+        console.error("Unhandled voice error type:", errorMessage)
+        toast.error(
+          `Voice input error: ${errorMessage.substring(0, 50)}${errorMessage.length > 50 ? "..." : ""}`
+        )
       }
     }
   }
