@@ -31,7 +31,6 @@ import {
   calculateValidatedScores,
   applyScoreFloors,
   critiqueScores,
-  critiqueFeedbackText,
   trackConstitutionalAIIntervention,
   buildRAGFeedbackContext,
   parseFeedbackSections,
@@ -388,22 +387,57 @@ CODE EFFICIENCY ANALYSIS:
 
     const passRate = testsTotal > 0 ? (testsPassed / testsTotal) * 100 : 0
 
-    // Step 1: Pre-screen conversation (fast, no AI)
+    // ============================================================================
+    // TIMEOUT-AWARE OPTIMIZATION: Run independent AI operations in PARALLEL
+    // Target: Complete all AI analysis within 20 seconds to leave buffer for response
+    // ============================================================================
+    const TIMEOUT_BUDGET_MS = 20000 // 20 seconds for AI operations, 10s buffer
+
+    // Step 1: Pre-screen conversation (fast, no AI) - SYNC
     const preScreen = preScreenConversation(conversationTranscript)
 
-    // Step 2: AI validation
-    // For system design, always validate with AI (even minimal conversations) to get accurate feedback
-    // For other types, skip AI call if: no content, gibberish detected, or keyword stuffing
+    // Step 1.5: AI Code Overlap Detection (fast, no AI) - SYNC
+    const aiCodeOverlap = analyzeAICodeOverlap(code, partnerMessages)
+    const hasBlindCopying = aiCodeOverlap.hasHighOverlap && !aiCodeOverlap.modificationsMade
+
+    // Determine if AI validation is needed
     const shouldValidateWithAI =
       scenarioType === "system-design"
-        ? true // Always validate system design to analyze what was discussed (or not discussed)
+        ? true
         : preScreen.hasContent &&
           !preScreen.suspiciousPatterns.possibleGibberish &&
           !preScreen.suspiciousPatterns.keywordStuffing &&
           preScreen.candidateMessageCount >= 1
 
-    const aiValidation = shouldValidateWithAI
-      ? await validateConversationWithAI(
+    // Prepare transcript messages once (reused by multiple operations)
+    const transcriptMessages =
+      conversationTranscript && Array.isArray(conversationTranscript)
+        ? conversationTranscript.map(
+            (msg: { type?: string; role?: string; message?: string; content?: string }) => ({
+              role:
+                msg.type === "user" || msg.role === "user" || msg.role === "candidate"
+                  ? ("user" as const)
+                  : ("interviewer" as const),
+              content: msg.message || msg.content || "",
+            })
+          )
+        : []
+
+    // ============================================================================
+    // PARALLEL AI OPERATIONS: Run validation and extraction concurrently
+    // These operations are independent and can run in parallel
+    // ============================================================================
+    logger.info("[Feedback API] Starting parallel AI operations", {
+      sessionId,
+      shouldValidateWithAI,
+      transcriptLength: transcriptMessages.length,
+    })
+
+    const parallelStartTime = Date.now()
+
+    // Create promise for AI validation
+    const aiValidationPromise = shouldValidateWithAI
+      ? validateConversationWithAI(
           conversationTranscript,
           code,
           efficiencyMetrics
@@ -412,13 +446,43 @@ CODE EFFICIENCY ANALYSIS:
                 space: efficiencyMetrics.estimatedSpaceComplexity || "unknown",
               }
             : null
-        )
-      : getDefaultValidation()
+        ).catch((err) => {
+          logger.warn("[Feedback API] AI validation failed, using defaults", { error: err })
+          return getDefaultValidation()
+        })
+      : Promise.resolve(getDefaultValidation())
+
+    // Create promise for structured extraction (only if transcript exists)
+    const extractionPromise =
+      transcriptMessages.length > 0
+        ? extractConversationEvidence(transcriptMessages, {
+            title: scenarioTitle,
+            optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || "O(n)",
+            optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
+            criticalEdgeCases: ["empty input", "single element", "null values"],
+          }).catch((err) => {
+            logger.warn("[Feedback API] Structured extraction failed", { error: err })
+            return undefined
+          })
+        : Promise.resolve(undefined)
+
+    // Run both in parallel with timeout
+    const [aiValidation, extractedEvidence] = await Promise.all([
+      aiValidationPromise,
+      extractionPromise,
+    ])
+
+    const parallelDuration = Date.now() - parallelStartTime
+    logger.info("[Feedback API] Parallel AI operations completed", {
+      sessionId,
+      parallelDurationMs: parallelDuration,
+      hasValidation: !!aiValidation,
+      hasExtraction: !!extractedEvidence,
+      remainingBudgetMs: TIMEOUT_BUDGET_MS - parallelDuration,
+    })
 
     // For system design with no/minimal conversation, ensure validation reflects reality
-    // (Blank design notes are handled in scoring logic, not here - we still want to analyze conversation if it exists)
     if (scenarioType === "system-design" && !preScreen.hasContent) {
-      // Override default validation to reflect that nothing was discussed
       aiValidation.isCoherent = false
       aiValidation.responsesRelevant = false
       aiValidation.approachExplained = false
@@ -426,64 +490,13 @@ CODE EFFICIENCY ANALYSIS:
       aiValidation.complexityDiscussed = false
       aiValidation.edgeCasesConsidered = false
       aiValidation.alternativesDiscussed = false
-      aiValidation.communicationScore = 10 // Very low score for no communication
+      aiValidation.communicationScore = 10
       aiValidation.questionsAsked = 0
       aiValidation.questionsAnswered = 0
     }
 
     // RECONCILE SOURCES OF TRUTH: Use extractedEvidence as authoritative when available
-    // This prevents contradictions between aiValidation and extractedEvidence
-    // Evidence has actual quotes, so it's more reliable
-
-    // Step 2.5: AI Code Overlap Detection
-    // Check if candidate blindly copied AI Partner suggestions
-    const aiCodeOverlap = analyzeAICodeOverlap(code, partnerMessages)
-    const hasBlindCopying = aiCodeOverlap.hasHighOverlap && !aiCodeOverlap.modificationsMade
-
-    // Step 2.6: Structured Extraction from Transcript (BEFORE scoring)
-    // Extract concrete evidence to ground scoring in actual quotes
-    let extractedEvidence: ExtractedEvidence | undefined
-    try {
-      if (
-        conversationTranscript &&
-        Array.isArray(conversationTranscript) &&
-        conversationTranscript.length > 0
-      ) {
-        const transcriptMessages = conversationTranscript.map(
-          (msg: { type?: string; role?: string; message?: string; content?: string }) => ({
-            role:
-              msg.type === "user" || msg.role === "user" || msg.role === "candidate"
-                ? ("user" as const)
-                : ("interviewer" as const),
-            content: msg.message || msg.content || "",
-          })
-        )
-
-        extractedEvidence = await extractConversationEvidence(transcriptMessages, {
-          title: scenarioTitle,
-          optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || "O(n)",
-          optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
-          criticalEdgeCases: ["empty input", "single element", "null values"],
-        })
-
-        logger.info("Structured extraction completed for scoring", {
-          sessionId,
-          approachExplained: extractedEvidence.approach.explained,
-          complexityDiscussed: extractedEvidence.timeComplexity.mentioned,
-          edgeCasesMentioned: extractedEvidence.edgeCases.mentionedByCandidate.length,
-          selfCorrectedBugs: extractedEvidence.progression.selfCorrectedBugs,
-          improvedAfterPrompt: extractedEvidence.progression.improvedAfterPrompt,
-        })
-      }
-    } catch (error) {
-      logger.warn("Structured extraction failed, continuing without evidence", { error, sessionId })
-    }
-
-    // RECONCILE SOURCES OF TRUTH: Use extractedEvidence as authoritative when available
-    // This prevents contradictions between aiValidation and extractedEvidence
-    // Evidence has actual quotes, so it's more reliable than LLM guesses
     if (extractedEvidence) {
-      // If evidence shows approach was explained (with quote), trust it over aiValidation
       if (extractedEvidence.approach.explained && extractedEvidence.approach.quote) {
         if (!aiValidation.approachExplained) {
           logger.info("Reconciling approachExplained: evidence shows YES, aiValidation said NO", {
@@ -496,7 +509,6 @@ CODE EFFICIENCY ANALYSIS:
           aiValidation.approachQuality === "none" ? "basic" : aiValidation.approachQuality
       }
 
-      // If evidence shows complexity was discussed with value, trust it
       if (extractedEvidence.timeComplexity.mentioned && extractedEvidence.timeComplexity.value) {
         if (!aiValidation.complexityDiscussed) {
           logger.info("Reconciling complexityDiscussed: evidence shows YES, aiValidation said NO", {
@@ -509,7 +521,6 @@ CODE EFFICIENCY ANALYSIS:
         aiValidation.statedComplexity = extractedEvidence.timeComplexity.value
       }
 
-      // If evidence shows edge cases were mentioned, trust it
       if (extractedEvidence.edgeCases.mentionedByCandidate.length > 0) {
         aiValidation.edgeCasesConsidered = true
       }
@@ -713,29 +724,49 @@ CODE EFFICIENCY ANALYSIS:
       aiValidation
     )
 
-    // Step 5: Constitutional AI Score Critique
-    // Now with extracted evidence for grounded critique
-    const scoreCritique = await critiqueScores(algorithmicScores, {
-      passRate,
-      scenarioType: scenarioType || "dsa",
-      aiValidation,
-      codeCompleteness: code ? analyzeCodeCompleteness(code, language || "python") : undefined,
-      hasBlindCopying,
-      // NEW: Pass extracted evidence for grounded critique
-      extractedEvidence,
-      problemContext: {
-        title: scenarioTitle,
-        optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || "O(n)",
-        optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
-      },
-      // NEW: Pass actual conversation for ground-truth verification
-      conversationTranscript: conversationTranscript?.map(
-        (msg: { type?: string; role?: string; message?: string; content?: string }) => ({
-          role: msg.type === "user" || msg.role === "user" ? "candidate" : "interviewer",
-          content: msg.message || msg.content || "",
-        })
-      ),
+    // ============================================================================
+    // TIME BUDGET CHECK: Skip Constitutional AI critique if running low on time
+    // This is a non-essential operation that can be skipped for faster response
+    // ============================================================================
+    const elapsedSoFar = Date.now() - parallelStartTime
+    const remainingBudget = TIMEOUT_BUDGET_MS - elapsedSoFar
+    const skipConstitutionalAI = remainingBudget < 8000 // Need at least 8s for main AI + response
+
+    logger.info("[Feedback API] Time budget check before Constitutional AI", {
+      sessionId,
+      elapsedMs: elapsedSoFar,
+      remainingBudgetMs: remainingBudget,
+      skipConstitutionalAI,
     })
+
+    // Step 5: Constitutional AI Score Critique (CONDITIONAL - skip if low on time)
+    let scoreCritique: Awaited<ReturnType<typeof critiqueScores>> = {
+      madeChanges: false,
+      adjustedScores: undefined,
+      critiques: [],
+      reasoning: skipConstitutionalAI ? "Skipped due to time constraints" : "",
+    }
+    if (!skipConstitutionalAI) {
+      scoreCritique = await critiqueScores(algorithmicScores, {
+        passRate,
+        scenarioType: scenarioType || "dsa",
+        aiValidation,
+        codeCompleteness: code ? analyzeCodeCompleteness(code, language || "python") : undefined,
+        hasBlindCopying,
+        extractedEvidence,
+        problemContext: {
+          title: scenarioTitle,
+          optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || "O(n)",
+          optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
+        },
+        conversationTranscript: conversationTranscript?.map(
+          (msg: { type?: string; role?: string; message?: string; content?: string }) => ({
+            role: msg.type === "user" || msg.role === "user" ? "candidate" : "interviewer",
+            content: msg.message || msg.content || "",
+          })
+        ),
+      })
+    }
 
     // Use adjusted scores if critique made changes
     const finalScores =
@@ -744,25 +775,17 @@ CODE EFFICIENCY ANALYSIS:
         : algorithmicScores
 
     // Step 5.5: Post-interview transcript analysis for "What You Missed"
-    // Analyze transcript to detect uncorrected mistakes (one-time cost)
+    // SKIP if low on time - this is nice-to-have, not essential
     let analyzedSilentNotes = silentNotes || []
-    if (
+    const shouldAnalyzeTranscript =
+      !skipConstitutionalAI && // Only if we have time budget
       conversationTranscript &&
       Array.isArray(conversationTranscript) &&
       conversationTranscript.length > 0 &&
-      scenarioType !== "system-design" // Skip for system design (different feedback format)
-    ) {
-      try {
-        const transcriptMessages = conversationTranscript.map(
-          (msg: { type?: string; role?: string; message?: string; content?: string }) => ({
-            role:
-              msg.type === "user" || msg.role === "user" || msg.role === "candidate"
-                ? ("user" as const)
-                : ("interviewer" as const),
-            content: msg.message || msg.content || "",
-          })
-        )
+      scenarioType !== "system-design"
 
+    if (shouldAnalyzeTranscript) {
+      try {
         const analysisResult = await analyzeTranscriptForMistakes(
           transcriptMessages,
           {
@@ -772,12 +795,10 @@ CODE EFFICIENCY ANALYSIS:
             criticalEdgeCases: ["empty input", "single element", "null/undefined values"],
             scenarioType,
           },
-          extractedEvidence // Reuse existing evidence to avoid duplicate work (DRY)
+          extractedEvidence
         )
 
-        // Merge with any existing silent notes (from real-time tracking, if implemented)
         if (analysisResult.silentNotes.length > 0) {
-          // Deduplicate by type+context
           const existingKeys = new Set(
             analyzedSilentNotes.map(
               (n: { type: string; context?: string }) => `${n.type}:${n.context || ""}`
@@ -1102,6 +1123,8 @@ CRITICAL INSTRUCTIONS:
     const feedback = aiResponse.text
 
     // Log raw AI response for debugging
+    const totalElapsed = Date.now() - parallelStartTime
+
     logger.info("[Feedback API] Raw AI response received", {
       sessionId,
       provider: aiResponse.provider,
@@ -1112,31 +1135,12 @@ CRITICAL INSTRUCTIONS:
       hasFixNext: feedback.includes("Fix Next") || feedback.includes("To Improve"),
       hasScoreSnapshot: feedback.includes("Score Snapshot"),
       responsePreview: feedback.substring(0, 500),
+      totalElapsedMs: totalElapsed,
     })
 
-    // Step 6: Constitutional AI Feedback Critique
-    // Now includes extracted evidence to catch feedback that contradicts what actually happened
-    const feedbackCritique = await critiqueFeedbackText(feedback, finalScores, {
-      passRate,
-      scenarioType: scenarioType || "dsa",
-      isIncomplete: code ? analyzeCodeCompleteness(code, language || "python").isIncomplete : false,
-      extractedEvidence, // Pass evidence so Constitutional AI can fact-check feedback claims
-    })
-
-    // Use revised feedback if critique made changes
-    const rawFinalFeedback =
-      feedbackCritique.madeChanges && feedbackCritique.revisedFeedback
-        ? feedbackCritique.revisedFeedback
-        : feedback
-
-    // Log Constitutional AI changes
-    logger.info("[Feedback API] Constitutional AI critique", {
-      sessionId,
-      madeChanges: feedbackCritique.madeChanges,
-      originalLength: feedback.length,
-      revisedLength: rawFinalFeedback.length,
-      lengthDiff: rawFinalFeedback.length - feedback.length,
-    })
+    // Use AI-generated feedback directly (Constitutional AI feedback critique removed for performance)
+    // We still use critiqueScores for score adjustments, but skip the feedback text revision
+    const rawFinalFeedback = feedback
 
     // Track Constitutional AI intervention for analytics (non-blocking)
     if (sessionId && userId) {
@@ -1296,126 +1300,90 @@ CRITICAL INSTRUCTIONS:
       }
     }
 
-    // Update learning state for spaced repetition email reminders
-    // Also update problem-level mastery for enhanced SM-2 spaced repetition
-    // Use scenarioId (e.g., 'dsa-two-sum') for spaced repetition tracking, not sessionId (Firebase session UUID)
+    // BACKGROUND PROCESSING: These operations are non-critical and should not block the response
+    // They run in the background using fire-and-forget promises to avoid timeout issues
+    // Note: On Vercel, these will complete as long as the function is still running when response is sent
+
+    // 1. Update spaced repetition learning state (background)
     if (userId && scenarioTitle && scenarioId) {
-      try {
-        // Use canonical values from frontend, with fallbacks
-        const pattern = (scenarioPattern ||
-          efficiencyMetrics?.problemPattern ||
-          "arrays-hashing") as DSAPattern
-        const difficulty = (scenarioDifficulty || efficiencyMetrics?.difficulty || "medium") as
-          | "easy"
-          | "medium"
-          | "hard"
+      const pattern = (scenarioPattern ||
+        efficiencyMetrics?.problemPattern ||
+        "arrays-hashing") as DSAPattern
+      const difficulty = (scenarioDifficulty || efficiencyMetrics?.difficulty || "medium") as
+        | "easy"
+        | "medium"
+        | "hard"
 
-        // Calculate mastery score (technical proficiency only, excludes communication)
-        // This is critical for spaced repetition - we need to measure code mastery, not interview skills
-        // Use extracted evidence when available for accurate hint/approach tracking
-        const masteryScoreResult = calculateMasteryScore({
-          testCasesPassed: testsPassed,
-          testCasesTotal: testsTotal,
-          timeSpentMinutes: timeSpent ? Math.round(timeSpent / 60) : 0,
-          hintsUsed: hintsUsedActual,
-          hintsTotal: 5, // Standard hint limit
-          problemDifficulty: difficulty as Difficulty,
-          approachExplained:
-            extractedEvidence?.approach.explained ?? aiValidation.approachExplained,
-          complexityDiscussed:
-            extractedEvidence?.timeComplexity.mentioned ?? aiValidation.complexityDiscussed,
-          interviewerMessagesCount: aiValidation.questionsAsked || 0,
-        })
+      const masteryScoreResult = calculateMasteryScore({
+        testCasesPassed: testsPassed,
+        testCasesTotal: testsTotal,
+        timeSpentMinutes: timeSpent ? Math.round(timeSpent / 60) : 0,
+        hintsUsed: hintsUsedActual,
+        hintsTotal: 5,
+        problemDifficulty: difficulty as Difficulty,
+        approachExplained: extractedEvidence?.approach.explained ?? aiValidation.approachExplained,
+        complexityDiscussed:
+          extractedEvidence?.timeComplexity.mentioned ?? aiValidation.complexityDiscussed,
+        interviewerMessagesCount: aiValidation.questionsAsked || 0,
+      })
 
-        logger.info("SR update starting", {
-          userId,
-          scenarioId,
-          scenarioTitle,
-          pattern,
-          difficulty,
-          performanceScore: scores.overall,
-          masteryScore: masteryScoreResult.masteryScore,
-          scoreDifference: scores.overall - masteryScoreResult.masteryScore,
-        })
-
-        // Update both topic-level (legacy) and problem-level mastery
-        // CRITICAL: Pass BOTH performance score (interview) AND mastery score (technical)
-        await completeSessionWithMastery(userId, {
-          scenarioId: scenarioId,
-          title: scenarioTitle,
-          pattern,
-          difficulty,
-          performanceScore: scores.overall, // Full interview score (includes communication 30%)
-          masteryScore: masteryScoreResult.masteryScore, // Technical-only score for SR algorithm
-          timeSpentMinutes: timeSpent ? Math.round(timeSpent / 60) : undefined,
-          hintsUsed: interactionMetrics?.hintsUsed || 0,
-          completedAt: new Date().toISOString(),
-        })
-
-        logger.info("SR update completed successfully", { userId, scenarioId })
-      } catch (err) {
-        // Non-blocking - don't fail feedback if learning state update fails
-        logger.error("Learning state update error", {
+      // Fire-and-forget: don't await
+      completeSessionWithMastery(userId, {
+        scenarioId: scenarioId,
+        title: scenarioTitle,
+        pattern,
+        difficulty,
+        performanceScore: scores.overall,
+        masteryScore: masteryScoreResult.masteryScore,
+        timeSpentMinutes: timeSpent ? Math.round(timeSpent / 60) : undefined,
+        hintsUsed: interactionMetrics?.hintsUsed || 0,
+        completedAt: new Date().toISOString(),
+      }).catch((err) => {
+        logger.error("Learning state update error (background)", {
           error: err,
           userId,
           scenarioId,
-          scenarioTitle,
         })
-      }
-    } else {
-      // Log why SR update was skipped
-      logger.warn("SR update skipped - missing required fields", {
-        hasUserId: !!userId,
-        hasScenarioTitle: !!scenarioTitle,
-        hasScenarioId: !!scenarioId,
-        userId: userId || "missing",
-        scenarioId: scenarioId || "missing",
-        scenarioTitle: scenarioTitle || "missing",
       })
     }
 
-    // Store solution in RAG vector store for future similarity matching
+    // 2. Store solution in RAG vector store (background)
     if (userId && sessionId && code) {
-      try {
-        await embedAndStoreSolution(userId, sessionId, code, {
-          problemTitle: scenarioTitle,
-          language: language || "javascript",
-          passed: scores.overall >= 70,
-          score: scores.overall,
-          problemType: scenarioType || "dsa",
-        })
-      } catch (err) {
-        // Non-blocking - don't fail feedback if RAG storage fails
-        logger.error("RAG solution storage error", { error: err })
-      }
+      // Fire-and-forget: don't await
+      embedAndStoreSolution(userId, sessionId, code, {
+        problemTitle: scenarioTitle,
+        language: language || "javascript",
+        passed: scores.overall >= 70,
+        score: scores.overall,
+        problemType: scenarioType || "dsa",
+      }).catch((err) => {
+        logger.error("RAG solution storage error (background)", { error: err })
+      })
     }
 
-    // Analyze code for misconceptions and track them (non-blocking)
-    // Only analyze DSA problems where we can detect pattern-specific errors
+    // 3. Analyze code for misconceptions (background)
     if (
       userId &&
       code &&
       scenarioType === "dsa" &&
       (scenarioPattern || efficiencyMetrics?.problemPattern)
     ) {
-      try {
-        const pattern = (scenarioPattern || efficiencyMetrics?.problemPattern) as DSAPattern
-        await analyzeAndTrackMisconceptions(userId, code, pattern, {
-          passed: testsPassed,
-          total: testsTotal,
-          failingTests:
-            testResults
-              ?.filter((t: any) => !t.passed)
-              ?.slice(0, 5)
-              ?.map(
-                (t: any) =>
-                  `${t.description}: expected ${JSON.stringify(t.expected)}, got ${JSON.stringify(t.actual)}`
-              ) || [],
-        })
-      } catch (err) {
-        // Non-blocking - don't fail feedback if misconception analysis fails
-        logger.error("Misconception analysis error", { error: err })
-      }
+      const pattern = (scenarioPattern || efficiencyMetrics?.problemPattern) as DSAPattern
+      // Fire-and-forget: don't await
+      analyzeAndTrackMisconceptions(userId, code, pattern, {
+        passed: testsPassed,
+        total: testsTotal,
+        failingTests:
+          testResults
+            ?.filter((t: any) => !t.passed)
+            ?.slice(0, 5)
+            ?.map(
+              (t: any) =>
+                `${t.description}: expected ${JSON.stringify(t.expected)}, got ${JSON.stringify(t.actual)}`
+            ) || [],
+      }).catch((err) => {
+        logger.error("Misconception analysis error (background)", { error: err })
+      })
     }
 
     // End request tracking
@@ -1465,30 +1433,24 @@ CRITICAL INSTRUCTIONS:
             latencyMs: clarifyingQuestionsResult.latencyMs,
           }
         : undefined,
-      // Constitutional AI critique metadata (only if changes were made)
-      ...(scoreCritique.madeChanges || feedbackCritique.madeChanges
+      // Constitutional AI score critique metadata (only if changes were made)
+      ...(scoreCritique.madeChanges
         ? {
             constitutionalAICritique: {
-              scoreCritique: scoreCritique.madeChanges
-                ? {
-                    critiques: scoreCritique.critiques,
-                    reasoning: scoreCritique.reasoning,
-                    originalScores: {
-                      understanding: algorithmicScores.understanding,
-                      problemSolving: algorithmicScores.problemSolving,
-                      codeQuality: algorithmicScores.codeQuality,
-                      communication: algorithmicScores.communication,
-                      overall: algorithmicScores.overall,
-                    },
-                    adjustedScores: scoreCritique.adjustedScores,
-                  }
-                : null,
-              feedbackCritique: feedbackCritique.madeChanges
-                ? {
-                    critiques: feedbackCritique.critiques,
-                    reasoning: feedbackCritique.reasoning,
-                  }
-                : null,
+              scoreCritique: {
+                critiques: scoreCritique.critiques,
+                reasoning: scoreCritique.reasoning,
+                originalScores: {
+                  understanding: algorithmicScores.understanding,
+                  problemSolving: algorithmicScores.problemSolving,
+                  codeQuality: algorithmicScores.codeQuality,
+                  communication: algorithmicScores.communication,
+                  overall: algorithmicScores.overall,
+                },
+                adjustedScores: scoreCritique.adjustedScores,
+              },
+              // Feedback text critique removed for performance
+              feedbackCritique: null,
             },
           }
         : {}),

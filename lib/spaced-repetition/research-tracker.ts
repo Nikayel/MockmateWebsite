@@ -89,6 +89,33 @@ export async function recordReviewEvent(params: {
   const actualRetention = params.masteryScore >= 56
   const retentionAsPredicted = params.preReviewState.predictedRetention >= 50 === actualRetention
 
+  // Build pre_review object, filtering out undefined values to prevent Firestore errors
+  const preReview: Record<string, any> = {
+    interval_days: params.preReviewState.intervalDays,
+    days_since_last_review: params.preReviewState.daysSinceLastReview,
+    days_overdue: params.preReviewState.daysOverdue,
+    predicted_retention: params.preReviewState.predictedRetention,
+  }
+  if (params.preReviewState.easeFactor !== undefined) {
+    preReview.ease_factor = params.preReviewState.easeFactor
+  }
+  if (params.preReviewState.stability !== undefined) {
+    preReview.stability = params.preReviewState.stability
+  }
+
+  // Build post_review object, filtering out undefined values to prevent Firestore errors
+  const postReview: Record<string, any> = {
+    new_interval_days: params.postReviewState.newIntervalDays,
+    mastery_level: params.postReviewState.masteryLevel,
+    mastery_level_changed: masteryChanged,
+  }
+  if (params.postReviewState.newEaseFactor !== undefined) {
+    postReview.new_ease_factor = params.postReviewState.newEaseFactor
+  }
+  if (params.postReviewState.newStability !== undefined) {
+    postReview.new_stability = params.postReviewState.newStability
+  }
+
   const event: AlgorithmResearchEvent = {
     id: eventId,
     user_id: params.userId,
@@ -103,21 +130,8 @@ export async function recordReviewEvent(params: {
     quality_rating: params.qualityRating,
     time_spent_minutes: params.timeSpentMinutes,
     hints_used: params.hintsUsed,
-    pre_review: {
-      interval_days: params.preReviewState.intervalDays,
-      days_since_last_review: params.preReviewState.daysSinceLastReview,
-      days_overdue: params.preReviewState.daysOverdue,
-      ease_factor: params.preReviewState.easeFactor,
-      stability: params.preReviewState.stability,
-      predicted_retention: params.preReviewState.predictedRetention,
-    },
-    post_review: {
-      new_interval_days: params.postReviewState.newIntervalDays,
-      new_ease_factor: params.postReviewState.newEaseFactor,
-      new_stability: params.postReviewState.newStability,
-      mastery_level: params.postReviewState.masteryLevel,
-      mastery_level_changed: masteryChanged,
-    },
+    pre_review: preReview as any,
+    post_review: postReview as any,
     actual_retention: actualRetention,
     retention_as_predicted: retentionAsPredicted,
     session_number: params.sessionNumber,

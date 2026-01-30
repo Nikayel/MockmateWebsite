@@ -13,6 +13,7 @@ import { User as FirebaseUser } from "firebase/auth"
 import { Scenario } from "@/lib/scenarios"
 import { getUserProfile, updateInterviewSession } from "@/lib/firestore-helpers"
 import { toast } from "sonner"
+import { logger } from "@/lib/logger"
 
 export interface ChatMessage {
   type: "user" | "ai"
@@ -168,6 +169,18 @@ export async function generateFeedback({
 
   if (sessionId && userId && code.trim()) {
     try {
+      logger.info("[FeedbackGenerator] Starting feedback generation", {
+        sessionId,
+        userId,
+        scenarioId: scenario.id,
+        scenarioTitle: scenario.title,
+        testsPassed: testSummary.passed,
+        testsTotal: testSummary.total,
+        codeLength: code.length,
+        interviewerMessagesCount: interviewerMessages.length,
+        chatMessagesCount: chatMessages.length,
+      })
+
       // Prepare conversation transcript for content-based evaluation
       const conversationTranscript = prepareConversationTranscript(
         chatMessages,
@@ -200,16 +213,60 @@ export async function generateFeedback({
 
       if (feedbackResponse.ok) {
         const feedbackData = await feedbackResponse.json()
+
+        logger.info("[FeedbackGenerator] API response received", {
+          sessionId,
+          hasRawFeedback: !!feedbackData.feedback,
+          feedbackLength: feedbackData.feedback?.length || 0,
+          performanceScore: feedbackData.performanceScore,
+          technicalScore: feedbackData.technicalScore,
+          hasStructured: !!feedbackData.structured,
+          hasTldr: !!feedbackData.structured?.tldr,
+          whatWorkedCount: feedbackData.structured?.whatWorked?.length || 0,
+          fixNextCount: feedbackData.structured?.fixNext?.length || 0,
+          provider: feedbackData.provider,
+          latencyMs: feedbackData.latencyMs,
+        })
+
+        // Check if feedback is missing or suspiciously short
+        if (!feedbackData.feedback || feedbackData.feedback.length < 100) {
+          logger.warn("[FeedbackGenerator] Feedback missing or too short", {
+            sessionId,
+            feedbackLength: feedbackData.feedback?.length || 0,
+            feedbackPreview: feedbackData.feedback?.substring(0, 200) || "EMPTY",
+            usingFallback: true,
+          })
+        }
+
         comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
         calculatedPerformanceScore = feedbackData.performanceScore || calculatedPerformanceScore
         constitutionalAICritique = feedbackData.constitutionalAICritique || null
+      } else {
+        const errorText = await feedbackResponse.text()
+        logger.error("[FeedbackGenerator] API returned error status", {
+          sessionId,
+          status: feedbackResponse.status,
+          statusText: feedbackResponse.statusText,
+          errorBody: errorText.substring(0, 500),
+        })
       }
     } catch (feedbackError) {
-      console.error("Error generating feedback:", feedbackError)
+      logger.error("[FeedbackGenerator] Exception during feedback generation", {
+        sessionId,
+        error: feedbackError instanceof Error ? feedbackError.message : String(feedbackError),
+        stack: feedbackError instanceof Error ? feedbackError.stack : undefined,
+      })
       toast.warning("Feedback generation delayed", {
         description: "Using basic feedback. Full analysis may be available shortly.",
       })
     }
+  } else {
+    logger.warn("[FeedbackGenerator] Skipping API call - missing required fields", {
+      hasSessionId: !!sessionId,
+      hasUserId: !!userId,
+      hasCode: !!code.trim(),
+      codeLength: code.length,
+    })
   }
 
   return {
@@ -246,6 +303,16 @@ export async function generateSystemDesignFeedback({
 
   if (sessionId && userId) {
     try {
+      logger.info("[FeedbackGenerator] Starting system design feedback generation", {
+        sessionId,
+        userId,
+        scenarioId: scenario.id,
+        scenarioTitle: scenario.title,
+        codeLength: code?.length || 0,
+        interviewerMessagesCount: interviewerMessages.length,
+        chatMessagesCount: chatMessages.length,
+      })
+
       // Prepare conversation transcript for content-based evaluation
       const conversationTranscript = prepareConversationTranscript(
         chatMessages,
@@ -276,15 +343,43 @@ export async function generateSystemDesignFeedback({
 
       if (feedbackResponse.ok) {
         const feedbackData = await feedbackResponse.json()
+
+        logger.info("[FeedbackGenerator] System design API response received", {
+          sessionId,
+          hasRawFeedback: !!feedbackData.feedback,
+          feedbackLength: feedbackData.feedback?.length || 0,
+          overallScore: feedbackData.scores?.overall,
+          hasStructured: !!feedbackData.structured,
+          provider: feedbackData.provider,
+          latencyMs: feedbackData.latencyMs,
+        })
+
         comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
         calculatedPerformanceScore = feedbackData.scores?.overall || 0
+      } else {
+        const errorText = await feedbackResponse.text()
+        logger.error("[FeedbackGenerator] System design API returned error", {
+          sessionId,
+          status: feedbackResponse.status,
+          statusText: feedbackResponse.statusText,
+          errorBody: errorText.substring(0, 500),
+        })
       }
     } catch (error) {
-      console.error("Error generating system design feedback:", error)
+      logger.error("[FeedbackGenerator] Exception during system design feedback", {
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      })
       toast.error("Failed to generate feedback", {
         description: "There was a problem generating your feedback. Please try again.",
       })
     }
+  } else {
+    logger.warn("[FeedbackGenerator] Skipping system design API call - missing required fields", {
+      hasSessionId: !!sessionId,
+      hasUserId: !!userId,
+    })
   }
 
   return {

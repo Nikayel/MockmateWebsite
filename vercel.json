@@ -7,13 +7,16 @@
       "maxDuration": 30
     },
     "app/api/execute/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 30
     },
     "app/api/chat/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 30
+    },
+    "app/api/generate-feedback/route.ts": {
+      "maxDuration": 30
     },
     "app/api/cron/email-notifications/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 30
     }
   }
 }

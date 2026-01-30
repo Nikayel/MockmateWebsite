@@ -121,8 +121,14 @@ export async function trackUsageEvent(event: Omit<UsageEvent, "id" | "createdAt"
   try {
     const usageRef = adminDb.collection("usage_events")
 
+    // Filter out undefined values to prevent Firestore errors
+    // "Cannot use 'undefined' as a Firestore value"
+    const cleanEvent = Object.fromEntries(
+      Object.entries(event).filter(([, value]) => value !== undefined)
+    )
+
     await usageRef.add({
-      ...event,
+      ...cleanEvent,
       createdAt: FieldValue.serverTimestamp(),
     })
 
