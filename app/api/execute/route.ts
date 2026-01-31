@@ -300,7 +300,15 @@ export async function POST(request: NextRequest) {
     let allConsoleLogs: any[] = []
 
     // Execute each test case using Piston (secure sandbox)
-    for (const testCase of testCases) {
+    // Add small delay between test cases to avoid rate limit bursts on Piston API
+    for (let i = 0; i < testCases.length; i++) {
+      const testCase = testCases[i]
+
+      // Add 100ms delay between test cases (not before first one)
+      if (i > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+
       try {
         const executionResult = await executeWithPiston(fullCode, language, testCase.input)
 

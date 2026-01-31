@@ -145,9 +145,42 @@ export async function POST(request: NextRequest) {
       (aiCollaborationMetrics?.partnerMessagesSent || 0) +
       (interactionMetrics?.interviewerQuestionsAnswered || 0)
 
-    // Calculate test metrics
-    const testsPassed = testResults?.filter((t: any) => t.passed).length || 0
-    const testsTotal = testResults?.length || 0
+    // Calculate test metrics - EXCLUDE service errors from both passed and total counts
+    // Service errors (e.g., "Code execution service is busy") should not count as failed tests
+    // because they represent infrastructure issues, not code problems
+    const validTests =
+      testResults?.filter(
+        (t: any) =>
+          !t.error?.includes("service is busy") &&
+          !t.error?.includes("timed out") &&
+          !t.error?.includes("Service unavailable") &&
+          t.actual !== "null" // null actual value with error indicates service failure
+      ) || []
+    const serviceErrorTests =
+      testResults?.filter(
+        (t: any) =>
+          t.error?.includes("service is busy") ||
+          t.error?.includes("timed out") ||
+          t.error?.includes("Service unavailable") ||
+          (t.error && t.actual === "null")
+      ) || []
+    const testsPassed = validTests.filter((t: any) => t.passed).length
+    const testsTotal = validTests.length
+    const serviceErrorCount = serviceErrorTests.length
+
+    // Log if we filtered out service errors
+    if (serviceErrorCount > 0) {
+      logger.info("[Feedback API] Filtered out service error tests", {
+        sessionId,
+        originalTotal: testResults?.length || 0,
+        validTotal: testsTotal,
+        serviceErrors: serviceErrorCount,
+        serviceErrorDetails: serviceErrorTests.map((t: any) => ({
+          description: t.description,
+          error: t.error?.substring(0, 100),
+        })),
+      })
+    }
 
     // Scenario-specific system instruction - AI generates narrative only, scores are algorithmic
     const getSystemInstruction = () => {
@@ -353,7 +386,7 @@ DSA FOCUS:
 
     const testResultsSummary =
       testResults && Array.isArray(testResults)
-        ? `\n\nTEST RESULTS:\n- Total tests: ${testsTotal}\n- Passed: ${testsPassed}\n- Failed: ${testsTotal - testsPassed}\n`
+        ? `\n\nTEST RESULTS:\n- Total tests: ${testsTotal}\n- Passed: ${testsPassed}\n- Failed: ${testsTotal - testsPassed}${serviceErrorCount > 0 ? `\n- Note: ${serviceErrorCount} test(s) excluded due to service errors (not code issues)` : ""}\n`
         : ""
 
     const timeInfo = timeSpent

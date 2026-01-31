@@ -107,8 +107,13 @@ export interface PistonResponse {
   }
 }
 
+// Retry configuration for handling Piston rate limits
+const MAX_RETRIES = 3
+const BASE_DELAY_MS = 500 // 500ms, 1s, 2s exponential backoff
+
 /**
  * Execute code securely using Piston API
+ * Includes retry logic with exponential backoff for rate limit errors (429)
  */
 export async function executeWithPiston(
   code: string,
@@ -127,118 +132,147 @@ export async function executeWithPiston(
 
   // Wrap code to handle input/output
   const wrappedCode = wrapCodeForExecution(code, language, testInput)
+  const startTime = Date.now()
 
-  try {
-    const startTime = Date.now()
+  // Retry loop for rate limit errors
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      // Create abort controller for timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second total timeout
 
-    // Create abort controller for timeout
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second total timeout
+      const response = await fetch(`${PISTON_API_URL}/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          language: langConfig.language,
+          version: langConfig.version,
+          files: [{ content: wrappedCode }],
+          stdin: "",
+          run_timeout: 5000, // 5 second timeout for code execution
+          compile_timeout: 5000,
+        }),
+        signal: controller.signal,
+      })
 
-    const response = await fetch(`${PISTON_API_URL}/execute`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        language: langConfig.language,
-        version: langConfig.version,
-        files: [{ content: wrappedCode }],
-        stdin: "",
-        run_timeout: 5000, // 5 second timeout for code execution
-        compile_timeout: 5000,
-      }),
-      signal: controller.signal,
-    })
+      clearTimeout(timeoutId)
 
-    clearTimeout(timeoutId)
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      // Provide more helpful error messages for common issues
+      // Handle rate limiting with retry
       if (response.status === 429) {
+        if (attempt < MAX_RETRIES - 1) {
+          // Exponential backoff with jitter: 500ms, 1s, 2s + random 0-200ms
+          const delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 200
+          await new Promise((resolve) => setTimeout(resolve, delay))
+          continue // Retry
+        }
+        // Final attempt failed
         return {
           success: false,
           output: null,
           error: "Code execution service is busy. Please try again in a few seconds.",
         }
       }
+
+      // Handle server errors with retry
       if (response.status >= 500) {
+        if (attempt < MAX_RETRIES - 1) {
+          const delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 200
+          await new Promise((resolve) => setTimeout(resolve, delay))
+          continue // Retry
+        }
         return {
           success: false,
           output: null,
           error: "Code execution service is temporarily unavailable. Please try again.",
         }
       }
-      return {
-        success: false,
-        output: null,
-        error: `Code execution failed (${response.status}): ${errorText}`,
-      }
-    }
 
-    const result: PistonResponse = await response.json()
-    const executionTime = Date.now() - startTime
-
-    // Check for compilation errors (TypeScript)
-    if (result.compile && result.compile.code !== 0) {
-      return {
-        success: false,
-        output: null,
-        error: `Compilation error: ${result.compile.stderr || result.compile.stdout}`,
-        executionTime,
-      }
-    }
-
-    // Check for runtime errors
-    if (result.run.code !== 0 || result.run.stderr) {
-      return {
-        success: false,
-        output: null,
-        error: result.run.stderr || `Process exited with code ${result.run.code}`,
-        executionTime,
-      }
-    }
-
-    return {
-      success: true,
-      output: result.run.stdout.trim(),
-      error: null,
-      executionTime,
-    }
-  } catch (error) {
-    // Handle specific error types
-    if (error instanceof Error) {
-      if (error.name === "AbortError") {
+      if (!response.ok) {
+        const errorText = await response.text()
         return {
           success: false,
           output: null,
-          error:
-            "Code execution timed out. Try simplifying your solution or check for infinite loops.",
+          error: `Code execution failed (${response.status}): ${errorText}`,
         }
       }
-      // Network errors
-      if (
-        error.message.includes("fetch") ||
-        error.message.includes("network") ||
-        error.message.includes("ECONNREFUSED")
-      ) {
+
+      const result: PistonResponse = await response.json()
+      const executionTime = Date.now() - startTime
+
+      // Check for compilation errors (TypeScript)
+      if (result.compile && result.compile.code !== 0) {
         return {
           success: false,
           output: null,
-          error:
-            "Unable to connect to code execution service. Please check your connection and try again.",
+          error: `Compilation error: ${result.compile.stderr || result.compile.stdout}`,
+          executionTime,
+        }
+      }
+
+      // Check for runtime errors
+      if (result.run.code !== 0 || result.run.stderr) {
+        return {
+          success: false,
+          output: null,
+          error: result.run.stderr || `Process exited with code ${result.run.code}`,
+          executionTime,
+        }
+      }
+
+      return {
+        success: true,
+        output: result.run.stdout.trim(),
+        error: null,
+        executionTime,
+      }
+    } catch (error) {
+      // Handle specific error types
+      if (error instanceof Error) {
+        if (error.name === "AbortError") {
+          return {
+            success: false,
+            output: null,
+            error:
+              "Code execution timed out. Try simplifying your solution or check for infinite loops.",
+          }
+        }
+        // Network errors - retry on transient failures
+        if (
+          error.message.includes("fetch") ||
+          error.message.includes("network") ||
+          error.message.includes("ECONNREFUSED")
+        ) {
+          if (attempt < MAX_RETRIES - 1) {
+            const delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 200
+            await new Promise((resolve) => setTimeout(resolve, delay))
+            continue // Retry
+          }
+          return {
+            success: false,
+            output: null,
+            error:
+              "Unable to connect to code execution service. Please check your connection and try again.",
+          }
+        }
+        return {
+          success: false,
+          output: null,
+          error: error.message,
         }
       }
       return {
         success: false,
         output: null,
-        error: error.message,
+        error: "An unexpected error occurred while running your code.",
       }
     }
-    return {
-      success: false,
-      output: null,
-      error: "An unexpected error occurred while running your code.",
-    }
+  }
+
+  // Should not reach here, but just in case
+  return {
+    success: false,
+    output: null,
+    error: "Code execution failed after multiple attempts.",
   }
 }
 
