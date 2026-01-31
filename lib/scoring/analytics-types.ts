@@ -57,12 +57,12 @@ export interface ConstitutionalAIIntervention {
     evidenceFloorReason?: string
   }
 
-  // Feedback Critique
+  // Feedback Critique (optional - removed in optimization)
   feedbackCritique: {
     triggered: boolean
     aspectsViolated: CritiqueAspect[]
     madeChanges: boolean
-    reasoning: string
+    reasoning?: string
   }
 
   // Context for analysis

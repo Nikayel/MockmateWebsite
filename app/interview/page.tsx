@@ -1391,9 +1391,11 @@ Let's continue!`
 
     const restoreSession = async () => {
       try {
-        // If coming from roadmap (starting fresh on a problem), check if there's already
-        // a completed session. If so, clear any old autosave data to start fresh.
-        if (isFromRoadmap && firebaseUser) {
+        const sessionIdFromUrl = searchParams?.get("session")
+
+        // Check if there's already a completed session for this scenario
+        // This prevents old chat history from bleeding into new sessions
+        if (firebaseUser && !sessionIdFromUrl) {
           const existingSession = await findLatestSubmittedSession(
             firebaseUser.uid,
             selectedScenario.id
@@ -1409,6 +1411,8 @@ Let's continue!`
               return
             }
             // Session is completed - clear old autosave and start fresh
+            // This is critical: when a user opens a problem they've already completed,
+            // we must NOT restore old chat messages from the previous session
             const storageKey = `interview_autosave_${firebaseUser.uid}_${selectedScenario.id}`
             localStorage.removeItem(storageKey)
             // Don't restore anything - let user start fresh
@@ -1438,7 +1442,6 @@ Let's continue!`
           }
 
           // Check Firestore if we have a session ID in URL
-          const sessionIdFromUrl = searchParams?.get("session")
           if (sessionIdFromUrl) {
             const firestoreState = await getSessionState(sessionIdFromUrl)
 
@@ -1484,8 +1487,7 @@ Let's continue!`
             }
           }
 
-          // Check API for saved session state
-          const sessionIdFromUrl = searchParams?.get("session")
+          // Check API for saved session state (guest sessions)
           if (sessionIdFromUrl) {
             try {
               const response = await fetch(
@@ -1608,7 +1610,6 @@ Let's continue!`
     selectedScenario,
     searchParams,
     isInterviewStarted,
-    isFromRoadmap,
     router,
   ])
 

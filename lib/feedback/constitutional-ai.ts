@@ -482,13 +482,25 @@ export async function critiqueFeedbackText(
     passRate: number
     scenarioType: string
     isIncomplete: boolean
-    // NEW: Evidence from transcript extraction for fact-checking
+    // Evidence from transcript extraction for fact-checking
     extractedEvidence?: ExtractedEvidence
+    // Raw transcript for ground-truth verification (in case extraction failed)
+    conversationTranscript?: Array<{ role: string; content: string }>
   }
 ): Promise<FeedbackCritiqueAdjustment> {
   // Build evidence summary if available
   const evidenceSummary = context.extractedEvidence
     ? buildEvidenceSummary(context.extractedEvidence)
+    : null
+
+  // Build raw transcript summary for ground-truth verification
+  // This catches cases where extraction failed but the raw transcript has the evidence
+  const transcriptSummary = context.conversationTranscript?.length
+    ? context.conversationTranscript
+        .filter((m) => m.role === "candidate")
+        .slice(0, 15) // First 15 candidate messages
+        .map((m, i) => `[${i}] ${m.content.substring(0, 200)}`)
+        .join("\n")
     : null
 
   const critiquePrompt = `You are a Constitutional AI reviewer ensuring helpful, honest, and constructive feedback.
@@ -518,7 +530,20 @@ CRITICAL: Compare feedback claims against this evidence!
 - Feedback that contradicts evidence is a SEVERE accuracy violation
 `
     : ""
-}
+}${
+    transcriptSummary
+      ? `
+RAW CANDIDATE MESSAGES (ground-truth verification):
+${transcriptSummary}
+
+IMPORTANT: If extracted evidence above seems incomplete, check these raw messages for:
+- Complexity discussion: Look for "O(n)", "time complexity", "space complexity", "o n", "linear"
+- Approach explanation: Look for "I'll use", "my approach", "I'm thinking", "hash map", "bucket"
+- Edge cases: Look for "empty", "null", "edge case", "what if"
+If candidate discussed these but feedback criticizes them for NOT discussing, that's an ACCURACY VIOLATION.
+`
+      : ""
+  }
 
 CONSTITUTIONAL PRINCIPLES - Critique against these 4 aspects:
 
@@ -634,7 +659,7 @@ export async function trackConstitutionalAIIntervention(params: {
   scenarioTitle: string
   originalScores: ScoreResult | ExtendedScoreResult
   scoreCritique: ScoreCritiqueAdjustment
-  feedbackCritique: FeedbackCritiqueAdjustment
+  feedbackCritique?: FeedbackCritiqueAdjustment | null // Made optional - feedback critique removed
   context: {
     testPassRate: number
     codeIncomplete: boolean
@@ -697,9 +722,10 @@ export async function trackConstitutionalAIIntervention(params: {
       .filter((c) => !c.passed)
       .map((c) => c.aspect as CritiqueAspect)
 
-    const feedbackAspectsViolated: CritiqueAspect[] = feedbackCritique.critiques
-      .filter((c) => !c.passed)
-      .map((c) => c.aspect as CritiqueAspect)
+    const feedbackAspectsViolated: CritiqueAspect[] =
+      feedbackCritique?.critiques
+        ?.filter((c) => !c.passed)
+        ?.map((c) => c.aspect as CritiqueAspect) ?? []
 
     // Build the intervention record
     const intervention: ConstitutionalAIIntervention = {
@@ -726,10 +752,10 @@ export async function trackConstitutionalAIIntervention(params: {
           : undefined,
       },
       feedbackCritique: {
-        triggered: true,
+        triggered: !!feedbackCritique,
         aspectsViolated: feedbackAspectsViolated,
-        madeChanges: feedbackCritique.madeChanges,
-        reasoning: feedbackCritique.reasoning,
+        madeChanges: feedbackCritique?.madeChanges ?? false,
+        reasoning: feedbackCritique?.reasoning,
       },
       context: {
         testPassRate: context.testPassRate,

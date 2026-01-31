@@ -1160,7 +1160,7 @@ CRITICAL INSTRUCTIONS:
         scenarioTitle: scenarioTitle || "Unknown",
         originalScores: algorithmicScores,
         scoreCritique,
-        feedbackCritique,
+        feedbackCritique: null, // Removed - no longer using feedback text critique
         context: {
           testPassRate: passRate,
           codeIncomplete: code
