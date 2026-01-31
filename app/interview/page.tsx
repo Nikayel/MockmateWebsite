@@ -94,6 +94,8 @@ import {
 } from "@/lib/interview"
 // Local page components
 import { PostInterviewView, FeedbackLoadingState } from "./_components"
+// Streaming feedback - Edge function with no timeout
+import { useStreamingFeedback } from "@/lib/hooks/use-streaming-feedback"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -268,6 +270,9 @@ function InterviewPageContent() {
   } | null>(null)
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false) // Track AI feedback generation
   const [isGeneratingDiscussion, setIsGeneratingDiscussion] = useState(false)
+
+  // Streaming feedback hook - Edge function with no timeout
+  const streamingFeedback = useStreamingFeedback()
   const [showCodeInDiscussion, setShowCodeInDiscussion] = useState(true) // Expanded by default for better UX
   const [code, setCode] = useState("")
   const [selectedLanguage, setSelectedLanguage] = useState<
@@ -449,6 +454,53 @@ function InterviewPageContent() {
     }
     return () => document.documentElement.classList.remove("calm")
   }, [calmMode])
+
+  // Handle two-phase feedback: update state when rich feedback arrives
+  useEffect(() => {
+    const { state: feedbackState } = streamingFeedback
+
+    // Update scores as they stream in (instant first, then refined)
+    const bestScores = streamingFeedback.getBestScores()
+    if (bestScores) {
+      setScoreBreakdown({
+        understandingScore: bestScores.understanding,
+        problemSolvingScore: bestScores.problemSolving,
+        codeQualityScore: bestScores.codeQuality,
+        communicationScore: bestScores.communication,
+      })
+      setPerformanceScore(bestScores.overall)
+      // Technical score = average of understanding, problemSolving, codeQuality
+      setTechnicalScore(
+        Math.round(
+          (bestScores.understanding + bestScores.problemSolving + bestScores.codeQuality) / 3
+        )
+      )
+    }
+
+    // When full feedback arrives, update structured sections
+    if (feedbackState.feedback) {
+      setComprehensiveFeedback(feedbackState.feedback.raw)
+      setStructuredFeedback({
+        whatWorked: feedbackState.feedback.whatWorked || [],
+        fixNext: feedbackState.feedback.fixNext || [],
+        actionPlan: feedbackState.feedback.actionPlan || [],
+        tldr: feedbackState.feedback.tldr || "",
+      })
+    }
+
+    // Handle completion
+    if (feedbackState.isComplete && !feedbackState.error) {
+      setIsGeneratingFeedback(false)
+      toast.success("Feedback ready!", {
+        description: "Your personalized analysis is complete.",
+      })
+    } else if (feedbackState.error) {
+      setIsGeneratingFeedback(false)
+      toast.error("Feedback generation failed", {
+        description: feedbackState.error,
+      })
+    }
+  }, [streamingFeedback.state, streamingFeedback])
 
   // Toggle focus mode class on document for CSS cascade
   useEffect(() => {
@@ -1970,6 +2022,9 @@ Interviews are conversations, not just coding exercises.`
             optimal: efficiencyMetrics.optimalTimeComplexity,
             isOptimal:
               efficiencyMetrics.estimatedTimeComplexity === efficiencyMetrics.optimalTimeComplexity,
+            // Include space complexity for real-time validation of user claims
+            estimatedSpace: efficiencyMetrics.estimatedSpaceComplexity,
+            optimalSpace: efficiencyMetrics.optimalSpaceComplexity,
           }
         : null,
     }),
@@ -2164,6 +2219,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             estimated: metrics.estimatedTimeComplexity,
             optimal: metrics.optimalTimeComplexity,
             isOptimal: metrics.estimatedTimeComplexity === metrics.optimalTimeComplexity,
+            // Include space complexity for real-time validation of user claims
+            estimatedSpace: metrics.estimatedSpaceComplexity,
+            optimalSpace: metrics.optimalSpaceComplexity,
           },
         }),
       })
@@ -2749,9 +2807,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         skillsDemonstrated: selectedScenario?.tags || [],
       }
 
-      let feedbackText = `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
+      const feedbackText = `Completed ${selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
       let calculatedPerformanceScore = testSummary.passRate
-      let localTechnicalScore: number | undefined = undefined
+      const localTechnicalScore: number | undefined = undefined
       let scoreBreakdownData: {
         understanding?: number
         problemSolving?: number
@@ -2759,8 +2817,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         communication?: number
       } | null = null
       let aiFeedbackSucceeded = false
-      let localConstitutionalAICritique: Record<string, unknown> | null = null
-      let localClarifyingQuestionsAssessment: {
+      const localConstitutionalAICritique: Record<string, unknown> | null = null
+      const localClarifyingQuestionsAssessment: {
         score: number
         totalExpected: number
         totalAsked: number
@@ -2811,122 +2869,48 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
             },
           }
 
-          const feedbackResponse = await fetch("/api/generate-feedback", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              code,
-              scenarioTitle: selectedScenario?.title,
-              scenarioType: selectedScenario?.type,
-              scenarioId: selectedScenario?.id,
-              scenarioDifficulty: selectedScenario?.difficulty,
-              scenarioPattern: (selectedScenario as any)?.pattern,
-              scenarioCompany: targetCompany,
-              testResults: testResults,
-              language: selectedLanguage,
-              timeSpent: elapsedTime,
-              aiCollaborationMetrics,
-              interactionMetrics,
-              efficiencyMetrics: efficiencyData,
-              conversationTranscript,
-              phaseTracking,
-              sessionId: currentSessionId,
-              userId: user.id,
-              // Real Interview Mode (clarifying questions)
-              scenarioClarifyingQuestions: (selectedScenario as any)?.clarifyingQuestions,
-              realInterviewMode,
-            }),
-          })
+          // ================================================================
+          // TWO-PHASE FEEDBACK: Get instant scores, then poll for rich feedback
+          // Phase 1: Instant algorithmic scores (< 3 seconds)
+          // Phase 2: Rich AI-generated narrative (background, polled)
+          // ================================================================
+          // ================================================================
+          // STREAMING FEEDBACK: Edge function with NO TIMEOUT
+          // Scores stream in immediately, then rich feedback follows
+          // ================================================================
+          const feedbackRequest = {
+            sessionId: currentSessionId,
+            userId: user.id,
+            code,
+            language: selectedLanguage,
+            testsPassed: testSummary.passed,
+            testsTotal: testSummary.total,
+            scenarioType: selectedScenario?.type,
+            scenarioTitle: selectedScenario?.title,
+            scenarioId: selectedScenario?.id,
+            scenarioDifficulty: selectedScenario?.difficulty,
+            scenarioPattern: (selectedScenario as any)?.pattern,
+            conversationTranscript,
+            partnerMessages: chatMessages.filter((m) => m.type === "ai").map((m) => m.message),
+            phaseTracking,
+            silentNotes: conversationTracker.silentNotes || [],
+            efficiencyMetrics: efficiencyData,
+            submittedFromPhase: getCurrentInterviewPhase(),
+            testsRanBeforeSubmit: testResults.length > 0,
+          }
 
-          if (feedbackResponse.ok) {
-            const feedbackData = await feedbackResponse.json()
-            feedbackText = feedbackData.feedback || feedbackText
-            calculatedPerformanceScore = feedbackData.performanceScore || calculatedPerformanceScore
-            if (feedbackData.technicalScore !== undefined) {
-              localTechnicalScore = feedbackData.technicalScore
-              setTechnicalScore(feedbackData.technicalScore)
-            }
-            if (feedbackData.scores) {
-              scoreBreakdownData = feedbackData.scores
-              // Ensure all scores are defined numbers before setting state
-              // This prevents undefined values from causing display issues
-              const scores = feedbackData.scores
-              setScoreBreakdown({
-                understandingScore:
-                  scores.understanding !== undefined && scores.understanding !== null
-                    ? scores.understanding
-                    : undefined,
-                problemSolvingScore:
-                  scores.problemSolving !== undefined && scores.problemSolving !== null
-                    ? scores.problemSolving
-                    : undefined,
-                codeQualityScore:
-                  scores.codeQuality !== undefined && scores.codeQuality !== null
-                    ? scores.codeQuality
-                    : undefined,
-                communicationScore:
-                  scores.communication !== undefined && scores.communication !== null
-                    ? scores.communication
-                    : undefined,
-              })
-            }
-            if (feedbackData.constitutionalAICritique) {
-              setConstitutionalAICritique(feedbackData.constitutionalAICritique)
-              // Store locally for saving to session
-              localConstitutionalAICritique = feedbackData.constitutionalAICritique
-            }
-            // Extract and store structured feedback sections (pre-parsed by API)
-            if (feedbackData.structured) {
-              setStructuredFeedback({
-                whatWorked: feedbackData.structured.whatWorked || [],
-                fixNext: feedbackData.structured.fixNext || [],
-                actionPlan: feedbackData.structured.actionPlan || [],
-                tldr: feedbackData.structured.tldr || "",
-              })
-            }
-            // Store clarifying questions assessment (Real Interview Mode)
-            if (feedbackData.clarifyingQuestionsAssessment) {
-              setClarifyingQuestionsAssessment(feedbackData.clarifyingQuestionsAssessment)
-              localClarifyingQuestionsAssessment = feedbackData.clarifyingQuestionsAssessment
-            }
-            aiFeedbackSucceeded = true
-          } else {
-            const passRate = testSummary.passRate
-            const fallbackScores = {
-              understanding: Math.min(100, Math.round(passRate * 0.9 + 10)),
-              problemSolving: Math.round(passRate),
-              codeQuality: Math.min(100, Math.round(passRate * 0.95 + 5)),
-              communication: 50,
-            }
-            scoreBreakdownData = fallbackScores
-            calculatedPerformanceScore = Math.round(
-              fallbackScores.understanding * 0.25 +
-                fallbackScores.problemSolving * 0.25 +
-                fallbackScores.codeQuality * 0.3 +
-                fallbackScores.communication * 0.2
-            )
-            // Ensure all fallback scores are valid numbers
-            setScoreBreakdown({
-              understandingScore:
-                typeof fallbackScores.understanding === "number"
-                  ? fallbackScores.understanding
-                  : undefined,
-              problemSolvingScore:
-                typeof fallbackScores.problemSolving === "number"
-                  ? fallbackScores.problemSolving
-                  : undefined,
-              codeQualityScore:
-                typeof fallbackScores.codeQuality === "number"
-                  ? fallbackScores.codeQuality
-                  : undefined,
-              communicationScore:
-                typeof fallbackScores.communication === "number"
-                  ? fallbackScores.communication
-                  : undefined,
-            })
-            toast.warning("Using estimated scores", {
-              description: "AI feedback unavailable. Scores based on test results.",
-            })
+          // Start streaming feedback - scores come first, then rich feedback
+          // The useEffect above handles updating state as events stream in
+          streamingFeedback.startStreaming(feedbackRequest)
+
+          // Set initial values while streaming
+          aiFeedbackSucceeded = true
+          calculatedPerformanceScore = testSummary.passRate // Will be updated by stream
+          scoreBreakdownData = {
+            understanding: 50,
+            problemSolving: 50,
+            codeQuality: 50,
+            communication: 50,
           }
         } catch (feedbackError) {
           console.error("Error generating feedback:", feedbackError)
@@ -3731,6 +3715,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           // Real Interview Mode (clarifying questions)
           scenarioClarifyingQuestions: (selectedScenario as any)?.clarifyingQuestions,
           realInterviewMode,
+          // Pass silent notes from real-time tracking (systemic fix)
+          silentNotes: conversationTracker.silentNotes || [],
         }),
       })
 

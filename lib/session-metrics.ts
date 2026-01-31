@@ -27,6 +27,11 @@ import {
   DEFAULT_TIMEZONE,
 } from "./email/timezone"
 import type { Profile } from "./types"
+import {
+  calculateInstantScores,
+  buildSignalsFromMetrics,
+  type AccumulatedScores,
+} from "./feedback/score-accumulator"
 
 // =============================================================================
 // TYPES
@@ -90,6 +95,13 @@ export interface SessionMetricsState {
   testsTotal?: number
   efficiencyScore?: number
   performanceScore?: number
+
+  // Pre-computed scores (updated in real-time for instant feedback)
+  accumulatedScores?: AccumulatedScores
+  testsRanBeforeSubmit?: boolean
+  submittedFromPhase?: string
+  hasActualLogic?: boolean
+  codeLength?: number
 }
 
 export interface ChatMetric {
@@ -207,6 +219,92 @@ export function getSessionMetrics(sessionId: string): SessionMetricsState | null
 }
 
 /**
+ * Recalculate accumulated scores based on current session state
+ * Called automatically after significant events (test run, message, hint)
+ */
+function recalculateAccumulatedScores(state: SessionMetricsState): void {
+  const signals = buildSignalsFromMetrics({
+    testsPassed: state.testsPassed,
+    testsTotal: state.testsTotal,
+    efficiencyScore: state.efficiencyScore ?? 50,
+    codeLength: state.codeLength ?? 0,
+    hasActualLogic: state.hasActualLogic ?? true,
+    approachExplained: state.approachExplained,
+    complexityDiscussed: state.complexityDiscussed,
+    complexityCorrect: false, // We don't know this yet without AI
+    edgeCasesIdentified: state.edgeCasesIdentified,
+    hintsViewed: state.hintsViewed,
+    totalInterviewerMessages: state.totalInterviewerMessages,
+    totalChatMessages: state.totalChatMessages,
+    aiSuggestionsCopiedBlindly: state.aiSuggestionsCopiedBlindly,
+    testsRanBeforeSubmit: state.testsRanBeforeSubmit,
+    submittedFromPhase: state.submittedFromPhase,
+    scenarioType: state.scenarioType,
+    difficulty: state.difficulty,
+  })
+
+  state.accumulatedScores = calculateInstantScores(signals)
+}
+
+/**
+ * Get instant scores for a session (for two-phase feedback)
+ * Returns pre-computed scores without any AI calls
+ */
+export function getInstantScores(sessionId: string): AccumulatedScores | null {
+  const state = activeSessions.get(sessionId)
+  if (!state) return null
+
+  // Recalculate to ensure latest state
+  recalculateAccumulatedScores(state)
+  return state.accumulatedScores || null
+}
+
+/**
+ * Update code analysis data for score calculation
+ */
+export function updateCodeAnalysis(
+  sessionId: string,
+  data: {
+    codeLength: number
+    hasActualLogic: boolean
+    efficiencyScore?: number
+  }
+): void {
+  const state = activeSessions.get(sessionId)
+  if (!state) return
+
+  state.codeLength = data.codeLength
+  state.hasActualLogic = data.hasActualLogic
+  if (data.efficiencyScore !== undefined) {
+    state.efficiencyScore = data.efficiencyScore
+  }
+
+  recalculateAccumulatedScores(state)
+}
+
+/**
+ * Mark that tests were run (for phase tracking)
+ */
+export function markTestsRan(sessionId: string): void {
+  const state = activeSessions.get(sessionId)
+  if (!state) return
+
+  state.testsRanBeforeSubmit = true
+  recalculateAccumulatedScores(state)
+}
+
+/**
+ * Set the phase from which user submitted
+ */
+export function setSubmittedFromPhase(sessionId: string, phase: string): void {
+  const state = activeSessions.get(sessionId)
+  if (!state) return
+
+  state.submittedFromPhase = phase
+  recalculateAccumulatedScores(state)
+}
+
+/**
  * Track a chat message
  */
 export async function trackChatMessage(params: {
@@ -300,6 +398,9 @@ export async function trackChatMessage(params: {
 
   state.lastActivityAt = now
 
+  // Recalculate scores after message (communication signals updated)
+  recalculateAccumulatedScores(state)
+
   // Track chat message usage (fire and forget)
   trackUsageEvent({
     userId: state.userId,
@@ -378,6 +479,11 @@ export async function trackCodeExecution(params: {
   state.codeExecutions.push(metric)
   state.totalExecutions++
 
+  // Update test results for instant scoring
+  state.testsPassed = params.passed
+  state.testsTotal = params.total
+  state.testsRanBeforeSubmit = true
+
   if (params.passed === params.total && !params.hasErrors) {
     state.successfulExecutions++
   }
@@ -388,6 +494,9 @@ export async function trackCodeExecution(params: {
   }
 
   state.lastActivityAt = now
+
+  // Recalculate scores after test execution (important signal)
+  recalculateAccumulatedScores(state)
 }
 
 /**

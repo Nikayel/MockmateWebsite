@@ -87,3 +87,15 @@ export {
   formatSilentNotesForFeedback,
   buildSilentNotesContext,
 } from "./parsers"
+
+// ============================================================================
+// SCORE ACCUMULATOR EXPORTS (Two-Phase Feedback)
+// ============================================================================
+
+export type { AccumulatedScores, ScoreSignals } from "./score-accumulator"
+
+export {
+  calculateInstantScores,
+  calculateSystemDesignScores as calculateSystemDesignInstantScores,
+  buildSignalsFromMetrics,
+} from "./score-accumulator"
